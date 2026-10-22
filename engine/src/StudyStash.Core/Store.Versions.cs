@@ -1,0 +1,244 @@
+using System.Globalization;
+
+namespace StudyStash.Core;
+
+/// <summary>What made a version of a lecture's notes (<see cref="Store.NotesVersions"/>). The words each is said in
+/// are the app's.</summary>
+public static class NotesChangeKind
+{
+    /// <summary>The library wrote them (filing a lecture, writing it again after more was recorded, another library's
+    /// lecture brought over); also the notes a lecture had before it kept versions, by whoever wrote them.</summary>
+    public const string Written = "written";
+    /// <summary>Rewritten with another AI ("Rewrite notes with", then Use new).</summary>
+    public const string Rewrite = "rewrite";
+    /// <summary>An AI app saved them through Study Stash's connection (save_notes).</summary>
+    public const string App = "app";
+    /// <summary>Pasted from a chat (Paste notes).</summary>
+    public const string Paste = "paste";
+    /// <summary>The student's edit (Edit, then Save).</summary>
+    public const string Edit = "edit";
+    /// <summary>A version chosen in History, put back.</summary>
+    public const string Restore = "restore";
+    /// <summary>Undo: the version before, put back.</summary>
+    public const string Undo = "undo";
+    /// <summary>Redo: the version an undo went back from, put back.</summary>
+    public const string Redo = "redo";
+    /// <summary>The designer added its diagrams.</summary>
+    public const string Diagrams = "diagrams";
+    /// <summary>Changed in the note file itself (in another app, or by an AI working in the folder), taken in.</summary>
+    public const string File = "file";
+}
+
+/// <summary>One version of a lecture's notes: its words, who wrote them (a model or an app's name as notes store it,
+/// "" for the student's own), what made it (<see cref="NotesChangeKind"/>), when, and for an undo, a redo or a restore,
+/// the version it put back.</summary>
+public sealed record NoteVersion(long Seq, string Markdown, string Model, string Kind, string At, long? Ref);
+
+/// <summary>Where Undo and Redo would take a lecture's notes: the version each would put back, or null.</summary>
+public sealed record NotesUndo(NoteVersion? Undo, NoteVersion? Redo);
+
+/// <summary>
+/// Version control for a lecture's notes: a version for every change to them, whatever made it (the library writing
+/// them, a rewrite, an AI app's save, a paste, an edit, a version put back, Undo and Redo, diagrams added, a change in
+/// the note file), each with who made it, when and how. Undo puts the version before back, Redo the one an undo went
+/// back from, and History any version: each as a version of its own, so nothing is ever only overwritten.
+/// <para>Bounded, and it's text, so it's small: every version for <see cref="EveryVersionFor"/>, then the day's last
+/// one a day, and never more than <see cref="MostVersions"/> a lecture; the first version is always kept. A lecture
+/// keeps its versions in the trash and loses them when it's deleted for good.</para>
+/// </summary>
+public sealed partial class Store
+{
+    /// <summary>How long every version is kept; older ones are thinned to the last of each day.</summary>
+    public static readonly TimeSpan EveryVersionFor = TimeSpan.FromDays(30);
+
+    /// <summary>The most versions a lecture keeps: its first, and the newest others.</summary>
+    public const int MostVersions = 200;
+
+    /// <summary>An AI app's save this close to its own last one, untouched since, is a draft put right ("fix the diagram
+    /// and save again"): it takes that version's place rather than making one of its own.</summary>
+    public static readonly TimeSpan RedraftWithin = TimeSpan.FromMinutes(10);
+
+    void CreateNotesVersions() => Exec("""
+        CREATE TABLE IF NOT EXISTS notes_history (
+            seq INTEGER PRIMARY KEY AUTOINCREMENT,
+            id TEXT NOT NULL,
+            summary_md TEXT,
+            summary_model TEXT,
+            kind TEXT,
+            at TEXT,
+            ref INTEGER
+        );
+        CREATE INDEX IF NOT EXISTS notes_history_id ON notes_history(id, seq);
+        """);
+
+    /// <summary>A lecture's versions, newest first (the first of them is the notes as they are now).</summary>
+    public List<NoteVersion> NotesVersions(string noteId)
+    {
+        lock (gate)
+        {
+            var list = new List<NoteVersion>();
+            using var cmd = Command("SELECT seq, summary_md, summary_model, kind, at, ref FROM notes_history WHERE id=? ORDER BY seq DESC", noteId);
+            using var r = cmd.ExecuteReader();
+            while (r.Read())
+                list.Add(new NoteVersion(r.GetInt64(0), r.IsDBNull(1) ? "" : r.GetString(1), r.IsDBNull(2) ? "" : r.GetString(2),
+                    r.IsDBNull(3) ? NotesChangeKind.Written : r.GetString(3), r.IsDBNull(4) ? "" : r.GetString(4), r.IsDBNull(5) ? null : r.GetInt64(5)));
+            return list;
+        }
+    }
+
+    /// <summary>One version, or null.</summary>
+    public NoteVersion? NotesVersion(string noteId, long seq) => NotesVersions(noteId).FirstOrDefault(v => v.Seq == seq);
+
+    /// <summary>A lecture from before versions were kept gets its notes as they are as its first version (by whoever
+    /// wrote them, when they last changed), so the first change to them has something to go back to.</summary>
+    public void EnsureFirstVersion(string noteId)
+    {
+        lock (gate)
+        {
+            if (Get(noteId) is { } row) FirstVersion(noteId, row.SummaryMd ?? "", row.SummaryModel ?? "", row.UpdatedAt ?? "");
+        }
+    }
+
+    /// <summary>The notes a lecture has before a change, as its first version, when it has none yet.</summary>
+    void FirstVersion(string noteId, string markdown, string model, string at)
+    {
+        if (Py.Strip(markdown).Length == 0) return;
+        using var cmd = Command("SELECT COUNT(*) FROM notes_history WHERE id=?", noteId);
+        if (Convert.ToInt64(cmd.ExecuteScalar(), CultureInfo.InvariantCulture) > 0) return;
+        Exec("INSERT INTO notes_history(id, summary_md, summary_model, kind, at) VALUES(?,?,?,?,?)",
+            noteId, markdown, model.Length > 0 ? model : null, NotesChangeKind.Written, at.Length > 0 ? at : Now());
+    }
+
+    /// <summary>
+    /// A change to a lecture's notes, as a version: after <paramref name="before"/> (the notes it had, kept as its first
+    /// version when it has none), <paramref name="markdown"/> by <paramref name="model"/>, made by
+    /// <paramref name="kind"/>. Notes the same as the newest version again (the lecture moved, renamed, written again
+    /// the same) are no new version, but for an undo or a redo, which say where they went. <paramref name="draftOf"/>:
+    /// the newest version is an AI app's draft it's putting right, and these take its place.
+    /// </summary>
+    void RecordVersion(string noteId, (string Markdown, string Model, string At) before, string markdown, string model, string kind,
+        long? refSeq = null, bool draftOf = false)
+    {
+        FirstVersion(noteId, before.Markdown, before.Model, before.At);
+        if (Py.Strip(markdown).Length == 0) return;
+        string now = Now();
+        long? newest = null;
+        string newestMd = "";
+        using (var cmd = Command("SELECT seq, summary_md FROM notes_history WHERE id=? ORDER BY seq DESC LIMIT 1", noteId))
+        using (var r = cmd.ExecuteReader())
+            if (r.Read())
+            {
+                newest = r.GetInt64(0);
+                newestMd = r.IsDBNull(1) ? "" : r.GetString(1);
+            }
+        if (draftOf && newest is { } draft)
+        {
+            Exec("UPDATE notes_history SET summary_md=?, summary_model=?, at=? WHERE seq=?", markdown, model.Length > 0 ? model : null, now, draft);
+            return;
+        }
+        if (newestMd == markdown && kind is not (NotesChangeKind.Undo or NotesChangeKind.Redo)) return;
+        Exec("INSERT INTO notes_history(id, summary_md, summary_model, kind, at, ref) VALUES(?,?,?,?,?,?)",
+            noteId, markdown, model.Length > 0 ? model : null, kind, now, refSeq);
+        Prune(noteId, DateTimeOffset.UtcNow);
+    }
+
+    /// <summary>The bound: every version for <see cref="EveryVersionFor"/>, the last of each day before that, never more
+    /// than <see cref="MostVersions"/>, and always the first.</summary>
+    internal void PruneVersions(string noteId, DateTimeOffset now)
+    {
+        lock (gate) Prune(noteId, now);
+    }
+
+    void Prune(string noteId, DateTimeOffset now)
+    {
+        var all = new List<(long Seq, DateTimeOffset At)>();
+        using (var cmd = Command("SELECT seq, at FROM notes_history WHERE id=? ORDER BY seq", noteId))
+        using (var r = cmd.ExecuteReader())
+            while (r.Read())
+                all.Add((r.GetInt64(0), DateTimeOffset.TryParse(r.IsDBNull(1) ? "" : r.GetString(1), CultureInfo.InvariantCulture,
+                    DateTimeStyles.AssumeUniversal, out var at) ? at : now));
+        if (all.Count <= 1) return;
+        var gone = all.Skip(1).Where(v => now - v.At > EveryVersionFor).GroupBy(v => v.At.UtcDateTime.Date)
+            .SelectMany(day => day.OrderBy(v => v.Seq).SkipLast(1)).Select(v => v.Seq).ToHashSet();
+        var left = all.Where(v => !gone.Contains(v.Seq)).ToList();
+        foreach (var v in left.Skip(1).Take(Math.Max(0, left.Count - MostVersions))) gone.Add(v.Seq);
+        foreach (long seq in gone) Exec("DELETE FROM notes_history WHERE seq=?", seq);
+    }
+
+    /// <summary>
+    /// Where Undo and Redo would take the notes, as an editor's would: the versions replayed in order, each change
+    /// putting the notes it changed on the undo stack (and ending what could be redone), each undo moving the notes it
+    /// left onto the redo stack, each redo moving them back. An undo or a redo stands for the version it put back.
+    /// </summary>
+    public NotesUndo UndoState(string noteId)
+    {
+        var versions = NotesVersions(noteId);
+        var bySeq = versions.ToDictionary(v => v.Seq);
+        var undo = new List<long>();
+        var redo = new List<long>();
+        long? current = null;
+        foreach (var v in Enumerable.Reverse(versions))
+        {
+            long state = v.Ref is { } r && v.Kind is NotesChangeKind.Undo or NotesChangeKind.Redo ? r : v.Seq;
+            switch (v.Kind)
+            {
+                case NotesChangeKind.Undo:
+                    if (current is { } left) redo.Add(left);
+                    if (undo.Count > 0) undo.RemoveAt(undo.Count - 1);
+                    break;
+                case NotesChangeKind.Redo:
+                    if (current is { } undone) undo.Add(undone);
+                    if (redo.Count > 0) redo.RemoveAt(redo.Count - 1);
+                    break;
+                default:
+                    if (current is { } before) undo.Add(before);
+                    redo.Clear();
+                    break;
+            }
+            current = state;
+        }
+        // A version thinned away can't come back: the next one down the stack does.
+        NoteVersion? Top(List<long> stack) => Enumerable.Reverse(stack).Select(s => bySeq.GetValueOrDefault(s)).FirstOrDefault(v => v is not null);
+        return new NotesUndo(Top(undo), Top(redo));
+    }
+
+    /// <summary>Undo: the version before, put back, as a version of its own. <see cref="NotesEdited.Gone"/> with
+    /// nothing to undo.</summary>
+    public NotesEdited UndoNotes(string noteId)
+    {
+        lock (gate) return UndoState(noteId).Undo is { } back ? PutBack(noteId, back, NotesChangeKind.Undo) : NotesEdited.Gone;
+    }
+
+    /// <summary>Redo: the version the last undo went back from, put back. <see cref="NotesEdited.Gone"/> with nothing to
+    /// redo.</summary>
+    public NotesEdited RedoNotes(string noteId)
+    {
+        lock (gate) return UndoState(noteId).Redo is { } forward ? PutBack(noteId, forward, NotesChangeKind.Redo) : NotesEdited.Gone;
+    }
+
+    /// <summary>A version chosen in History (<paramref name="seq"/>, or the one before the notes now), put back as a new
+    /// version: undone like any other change. <see cref="NotesEdited.Gone"/> when there's no such version.</summary>
+    public NotesEdited RestoreNotesVersion(string noteId, long? seq = null)
+    {
+        lock (gate)
+        {
+            var versions = NotesVersions(noteId);
+            var version = seq is { } wanted ? versions.FirstOrDefault(v => v.Seq == wanted) : versions.Skip(1).FirstOrDefault();
+            return version is null ? NotesEdited.Gone : PutBack(noteId, version, NotesChangeKind.Restore);
+        }
+    }
+
+    NotesEdited PutBack(string noteId, NoteVersion version, string kind) =>
+        EditNotes(noteId, version.Markdown, writer: version.Model, kind: kind, refSeq: version.Seq);
+
+    /// <summary>Who last saved a lecture's notes through an AI app, when, and what they saved: how a draft put right is
+    /// told from notes that are the lecture's own by now.</summary>
+    static string OutsideKey(string noteId) => "notes-from-outside:" + noteId;
+
+    /// <summary>A lecture deleted for good takes its versions with it.</summary>
+    void ForgetNotesVersions(string noteId)
+    {
+        Exec("DELETE FROM notes_history WHERE id=?", noteId);
+        Exec("DELETE FROM sync_state WHERE key=?", OutsideKey(noteId));
+    }
+}

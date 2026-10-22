@@ -115,7 +115,9 @@ public static class Engines
         _ => "",
     };
 
-    /// <summary>Who wrote notes the library didn't write itself, when it can't say which AI: "your AI".</summary>
+    /// <summary>Who wrote notes the library didn't write itself, when it can't say which AI: "your AI". The one place
+    /// this name is said (pasted notes, an AI app that doesn't say which it is): change it here and it changes in the
+    /// notes' byline, their file, the Undo line and History.</summary>
     public const string YourAi = "your AI";
 
     /// <summary>The writer of notes pasted from a chat ("Paste notes"), as the note's file and its byline name them.</summary>

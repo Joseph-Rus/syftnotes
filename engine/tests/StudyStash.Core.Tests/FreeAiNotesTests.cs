@@ -59,69 +59,13 @@ public class FreeAiNotesTests
         var remote = new AiRemote("http://localhost", "pw", site.Client);
         var info = (await remote.RewriteAsync("lec-1"))!;
         Assert.Equal("Claude", info.Current!.By);
-        Assert.Equal("Ollama", Assert.Single(info.Earlier).By); // the notes it replaced, ready to put back
+        Assert.Equal((NotesChangeKind.App, "Claude", true), (info.Change!.Kind, info.Change.By, info.Change.CanUndo)); // what it replaced can come back
 
-        var back = (await remote.RestoreNotesAsync("lec-1"))!;
+        var back = (await remote.UndoNotesAsync("lec-1"))!;
         Assert.Equal("## Summary\nOld notes about cells.", back.Current!.Markdown);
         Assert.Equal("Ollama", back.Current.By);
-        Assert.Equal("Claude", Assert.Single(back.Earlier).By); // and putting back is undone the same way
+        Assert.True(back.Change!.CanRedo); // and Redo takes it back again
         Assert.Equal("qwen3:8b", store.Get("lec-1")!.SummaryModel);
-    }
-
-    [Fact]
-    public async Task Saving_again_and_again_never_pushes_out_a_lectures_own_notes_and_any_version_comes_back()
-    {
-        using var dir = new TempDir();
-        var cfg = Cfg(dir);
-        using var store = new Store(cfg.DbPath, cfg.PoolDir);
-        Seed(store, notes: "## Summary\nThe library's own notes.", model: "qwen3:8b");
-        await using var site = await Site(cfg, store);
-        var app = new RemoteLibrary("http://localhost", "pw", site.Client);
-        var remote = new AiRemote("http://localhost", "pw", site.Client);
-        const string Writer = "Claude (in the Claude app)";
-
-        // The AI saves, hears a diagram is broken, and saves again: its first draft isn't a version of its own.
-        await ClaudeTools.SaveNotesAsync(app, "lec-1", "## Summary\nDraft one.", replace: true, Writer);
-        await ClaudeTools.SaveNotesAsync(app, "lec-1", "## Summary\nDraft two.", replace: true, Writer);
-        Assert.Equal("Ollama", Assert.Single((await remote.RewriteAsync("lec-1"))!.Earlier).By);
-
-        // A typo fixed by hand, and many edits after: the newest versions are kept, and the library's own notes too.
-        for (int i = 1; i <= 7; i++) await remote.EditNotesAsync("lec-1", $"## Summary\nEdit {i}.", basedOn: null);
-        var info = (await remote.RewriteAsync("lec-1"))!;
-        Assert.Equal(Store.VersionsKept, info.Earlier.Count);
-        Assert.Equal("Ollama", info.Earlier[^1].By);
-        Assert.Equal(["## Summary\nEdit 6.", "## Summary\nEdit 5.", "## Summary\nEdit 4.", "## Summary\nEdit 3.", "## Summary\nThe library's own notes."],
-            store.NotesVersions("lec-1").Select(v => v.Markdown));
-
-        // Put back the oldest, past the newer ones; then the notes it replaced come back the same way.
-        var back = (await remote.RestoreNotesAsync("lec-1", info.Earlier[^1].Id))!;
-        Assert.Equal("## Summary\nThe library's own notes.", back.Current!.Markdown);
-        Assert.Equal("qwen3:8b", store.Get("lec-1")!.SummaryModel);
-        Assert.Equal("## Summary\nEdit 7.", store.NotesVersions("lec-1")[0].Markdown);
-        Assert.Equal("## Summary\nEdit 7.", (await remote.RestoreNotesAsync("lec-1"))!.Current!.Markdown);
-    }
-
-    [Fact]
-    public void A_lectures_earlier_notes_wait_in_the_trash_with_it_and_go_with_it_for_good()
-    {
-        using var dir = new TempDir();
-        var cfg = Cfg(dir);
-        using var store = new Store(cfg.DbPath, cfg.PoolDir);
-        Seed(store, notes: "## Summary\nOld.", model: "qwen3:8b");
-        Seed(store, id: "lec-2", notes: "## Summary\nOld.", model: "qwen3:8b");
-        store.EditNotes("lec-1", "## Summary\nNew.");
-        store.EditNotes("lec-2", "## Summary\nNew.");
-
-        store.Trash("lec-1");
-        Assert.Single(store.NotesVersions("lec-1"));
-        store.Restore("lec-1");
-        Assert.Single(store.NotesVersions("lec-1"));
-        store.Trash("lec-1");
-        store.EmptyTrash();
-        Assert.Empty(store.NotesVersions("lec-1"));
-
-        store.Delete("lec-2");
-        Assert.Empty(store.NotesVersions("lec-2"));
     }
 
     [Fact]
@@ -140,15 +84,16 @@ public class FreeAiNotesTests
         // Fixed in the note file itself (another app, or an AI working in the folder), then an AI app saves over them.
         EditFile("The library's own notes.", "Fixed in Obsidian.");
         Assert.StartsWith("Saved.", await ClaudeTools.SaveNotesAsync(app, "lec-1", "## Summary\nClaude's notes.", replace: true, "Claude (in the Claude app)"));
-        Assert.Equal(["## Summary\nFixed in Obsidian.", "## Summary\nThe library's own notes."], store.NotesVersions("lec-1").Select(v => v.Markdown));
+        Assert.Equal([("## Summary\nClaude's notes.", NotesChangeKind.App), ("## Summary\nFixed in Obsidian.", NotesChangeKind.File), ("## Summary\nThe library's own notes.", NotesChangeKind.Written)],
+            store.NotesVersions("lec-1").Select(v => (v.Markdown, v.Kind)));
         Assert.Equal("## Summary\nClaude's notes.", store.Get("lec-1")!.SummaryMd);
 
-        // Fixed in the file again, then the newest version is put back: that fix is kept too.
+        // Fixed in the file again, then the version before is put back: that fix is kept too.
         EditFile("Claude's notes.", "Claude's notes, fixed in the file.");
         var back = (await remote.RestoreNotesAsync("lec-1"))!;
         Assert.Equal("## Summary\nFixed in Obsidian.", back.Current!.Markdown);
-        Assert.Equal(["## Summary\nClaude's notes, fixed in the file.", "## Summary\nClaude's notes.", "## Summary\nThe library's own notes."],
-            store.NotesVersions("lec-1").Select(v => v.Markdown));
+        Assert.Equal([NotesChangeKind.Restore, NotesChangeKind.File, NotesChangeKind.App], store.NotesVersions("lec-1").Take(3).Select(v => v.Kind));
+        Assert.Equal("## Summary\nClaude's notes, fixed in the file.", store.NotesVersions("lec-1")[1].Markdown);
         Assert.Contains("Fixed in Obsidian.", File.ReadAllText(path));
     }
 
@@ -173,7 +118,7 @@ public class FreeAiNotesTests
         Assert.Contains("$3\\,\\mathrm{Na^+}$", notes); // the chat's maths, as the library writes it
         Assert.DoesNotContain("Let me know", notes);
         Assert.Equal("your AI", info.Current.By);
-        Assert.Empty(info.Earlier); // there were no notes to replace
+        Assert.Equal((NotesChangeKind.Paste, false), (info.Change!.Kind, info.Change.CanUndo)); // there were no notes to replace
         Assert.Equal(Engines.PastedWriter, store.Get("lec-1")!.SummaryModel);
     }
 

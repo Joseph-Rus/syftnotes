@@ -330,14 +330,42 @@ public sealed partial class LibraryWeb
             if (fromApp && !Claude.Reading.SaveNotes) return Http.Detail(403, ToolAccess.Refused("save"));
             bool replace = body?["replace"] is JsonValue rv && rv.TryGetValue(out bool r) && r;
             string writer = fromApp ? WriterSaid(Str(body, "writer")) : Engines.PastedWriter;
-            return RewriteResult(() => Rewrites.Save((string)ctx.Request.RouteValues["lecture"]!, markdown, replace, writer, Str(body, "based_on")));
+            return RewriteResult(() => Rewrites.Save((string)ctx.Request.RouteValues["lecture"]!, markdown, replace, writer, Str(body, "based_on"),
+                fromApp ? NotesChangeKind.App : NotesChangeKind.Paste));
         })));
 
-        // Puts a version of the lecture's notes back: the one asked for (version, from its earlier ones), or the newest.
+        // The notes' versions (History): every change, whatever made it, newest first; one version's words; putting one
+        // back (version, or the one before the notes now) as a new version; Undo and Redo, each a version too.
         app.MapPost("/api/v2/ai/rewrite/{lecture}/restore", Http.Handle(ctx => ApiAsync(ctx, async () =>
         {
             var body = await Http.JsonBodyAsync(ctx.Request);
             return RewriteResult(() => Rewrites.Restore((string)ctx.Request.RouteValues["lecture"]!, Str(body, "version")));
+        })));
+        app.MapPost("/api/v2/ai/rewrite/{lecture}/undo", Http.Handle(ctx => ApiAsync(ctx, () =>
+            Task.FromResult(RewriteResult(() => Rewrites.Undo((string)ctx.Request.RouteValues["lecture"]!))))));
+        app.MapPost("/api/v2/ai/rewrite/{lecture}/redo", Http.Handle(ctx => ApiAsync(ctx, () =>
+            Task.FromResult(RewriteResult(() => Rewrites.Redo((string)ctx.Request.RouteValues["lecture"]!))))));
+        app.MapGet("/api/v2/ai/rewrite/{lecture}/versions", Http.Handle(ctx => ApiAsync(ctx, () =>
+        {
+            try
+            {
+                return Task.FromResult(AiJson(new { Versions = Rewrites.Versions((string)ctx.Request.RouteValues["lecture"]!) }));
+            }
+            catch (RewriteRefusedException e)
+            {
+                return Task.FromResult(Http.Detail(e.Status, e.Message));
+            }
+        })));
+        app.MapGet("/api/v2/ai/rewrite/{lecture}/versions/{version}", Http.Handle(ctx => ApiAsync(ctx, () =>
+        {
+            try
+            {
+                return Task.FromResult(AiJson(Rewrites.Version((string)ctx.Request.RouteValues["lecture"]!, (string)ctx.Request.RouteValues["version"]!)));
+            }
+            catch (RewriteRefusedException e)
+            {
+                return Task.FromResult(Http.Detail(e.Status, e.Message));
+            }
         })));
 
         // How the library writes this lecture's notes, for an AI it doesn't run: for=app (an AI app, through the

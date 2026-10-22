@@ -928,7 +928,7 @@ public static class ClaudeTools
         if (info is null) return "Nothing was saved: the student's library runs an older Study Stash, which can't take notes from here. They can update it, or copy these notes into Study Stash with Paste notes.";
         var said = new StringBuilder("Saved. The notes are on the lecture's page in Study Stash now");
         said.Append(info.Current is { By.Length: > 0 } cur ? $", written by {cur.By}." : ".");
-        if (info.Earlier.Count > 0 && replace) said.Append(" The notes it had before are kept: the student can put them back from the notes' ⋯ menu.");
+        if (info.Change is { CanUndo: true } && replace) said.Append(" The notes it had before are kept: the student can undo this, or put them back from the notes' History.");
         var broken = Rich.NoteBlocks.Find(markdown).Where(b => b.IsDiagram && b.Closed)
             .Select((b, i) => (Number: i + 1, Why: Summarize.DiagramProblem(b.Kind, b.Text))).Where(x => x.Why is not null).ToList();
         foreach (var (n, why) in broken)

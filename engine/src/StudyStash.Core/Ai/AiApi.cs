@@ -90,9 +90,22 @@ public sealed record AskReply(string Answer, List<AskSource> Sources, string Eng
 
 public sealed record NotesVersion(string Markdown, string By, string At);
 
-/// <summary>A version of a lecture's notes kept from before they were replaced: its id (to put it back), who wrote it
-/// ("Claude"; "" for the student's own), when it was written and when it was replaced.</summary>
-public sealed record NotesKept(string Id, string By, string Written, string Replaced);
+/// <summary>A version of a lecture's notes (History): its id (to look at it or put it back), what made it (written,
+/// rewrite, app, paste, edit, restore, undo, redo, diagrams, file), who wrote the notes ("Claude"; "" for the student's
+/// own), when, and whether it's the notes now. <see cref="Markdown"/> only when one version is asked for.</summary>
+public sealed record NotesKept(string Id, string Kind, string By, string At)
+{
+    public bool Current { get; init; }
+    public string Markdown { get; init; } = "";
+}
+
+/// <summary>The last change to a lecture's notes, as the notes' Undo line says it: what made it, who, when, and
+/// whether Undo (back to the notes before) and Redo (forward again, after an undo) can follow.</summary>
+public sealed record NotesChange(string Id, string Kind, string By, string At)
+{
+    public bool CanUndo { get; init; }
+    public bool CanRedo { get; init; }
+}
 
 /// <summary>state: none | working | ready | failed | cancelled</summary>
 public sealed record RewriteInfo(string Lecture, string State)
@@ -108,10 +121,9 @@ public sealed record RewriteInfo(string Lecture, string State)
     /// <summary>"adding" while the designer adds the current notes' diagrams (they follow the notes, a few minutes
     /// later); "" otherwise, and from a library older than that.</summary>
     public string Diagrams { get; init; } = "";
-    /// <summary>The versions of the lecture's notes kept from before they were replaced (by an edit, an AI app, a paste
-    /// or putting earlier ones back), newest first, each of which can be put back: who wrote them and when (their words
-    /// stay on the library). Empty when there are none, and from a library older than that.</summary>
-    public List<NotesKept> Earlier { get; init; } = [];
+    /// <summary>The last change to the lecture's notes (what made it, who, when), and whether Undo or Redo can follow
+    /// it. Null with none kept, and from a library older than notes' versions.</summary>
+    public NotesChange? Change { get; init; }
 }
 
 /// <summary>What AI apps may read while tool access is on, and <see cref="SaveNotes"/>: whether they may save the notes
@@ -198,9 +210,17 @@ public interface IAiLibrary
     /// them, the student's typed lines kept in them. A lecture with notes keeps them unless <paramref name="replace"/>
     /// (409); <paramref name="basedOn"/> as for an edit. Null from a library too old to take them.</summary>
     Task<RewriteInfo?> SaveNotesAsync(string lecture, string markdown, bool replace, string? basedOn) => Task.FromResult<RewriteInfo?>(null);
-    /// <summary>Puts a version of the lecture's notes back (<paramref name="version"/>, a <see cref="NotesKept.Id"/>, or
-    /// the newest). Null from a library too old to.</summary>
+    /// <summary>Puts a version of the lecture's notes back as a new version (<paramref name="version"/>, a
+    /// <see cref="NotesKept.Id"/>, or the one before the notes now). Null from a library too old to.</summary>
     Task<RewriteInfo?> RestoreNotesAsync(string lecture, string? version = null) => Task.FromResult<RewriteInfo?>(null);
+    /// <summary>Undo: the notes before the last change, put back. Null from a library too old to.</summary>
+    Task<RewriteInfo?> UndoNotesAsync(string lecture) => Task.FromResult<RewriteInfo?>(null);
+    /// <summary>Redo: the notes the last undo went back from, put back. Null from a library too old to.</summary>
+    Task<RewriteInfo?> RedoNotesAsync(string lecture) => Task.FromResult<RewriteInfo?>(null);
+    /// <summary>The versions of the lecture's notes, newest first (History). Null from a library too old to.</summary>
+    Task<List<NotesKept>?> NotesVersionsAsync(string lecture) => Task.FromResult<List<NotesKept>?>(null);
+    /// <summary>One version, with its words. Null when there's no such version, or the library is too old.</summary>
+    Task<NotesKept?> NotesVersionAsync(string lecture, string version) => Task.FromResult<NotesKept?>(null);
     /// <summary>What to ask a free chat for the lecture's notes, the transcript with it (<see cref="NotesBrief"/>). Null
     /// from a library too old to say.</summary>
     Task<NotesBrief?> NotesBriefAsync(string lecture) => Task.FromResult<NotesBrief?>(null);
@@ -381,6 +401,18 @@ public sealed class AiRemote(string serverUrl, Func<string> key, HttpClient? htt
 
     public async Task<RewriteInfo?> RestoreNotesAsync(string lecture, string? version = null) =>
         As<RewriteInfo>(await SendAsync(HttpMethod.Post, $"/rewrite/{Seg(lecture)}/restore", new JsonObject { ["version"] = version }));
+
+    public async Task<RewriteInfo?> UndoNotesAsync(string lecture) =>
+        As<RewriteInfo>(await SendAsync(HttpMethod.Post, $"/rewrite/{Seg(lecture)}/undo"));
+
+    public async Task<RewriteInfo?> RedoNotesAsync(string lecture) =>
+        As<RewriteInfo>(await SendAsync(HttpMethod.Post, $"/rewrite/{Seg(lecture)}/redo"));
+
+    public async Task<List<NotesKept>?> NotesVersionsAsync(string lecture) =>
+        (await SendAsync(HttpMethod.Get, $"/rewrite/{Seg(lecture)}/versions"))?["versions"]?.Deserialize<List<NotesKept>>(Options);
+
+    public async Task<NotesKept?> NotesVersionAsync(string lecture, string version) =>
+        As<NotesKept>(await SendAsync(HttpMethod.Get, $"/rewrite/{Seg(lecture)}/versions/{Seg(version)}"));
 
     public async Task<NotesBrief?> NotesBriefAsync(string lecture) =>
         As<NotesBrief>(await SendAsync(HttpMethod.Get, $"/rewrite/{Seg(lecture)}/brief?for=chat"));

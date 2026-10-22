@@ -569,8 +569,10 @@ public sealed partial class Store : IDisposable
         return path;
     }
 
-    /// <summary>Write the Markdown file and mark the note done.</summary>
-    public string Save(Meeting m, Classification c, string summaryMd = "", string summaryModel = "", string error = "")
+    /// <summary>Write the Markdown file and mark the note done. New notes are a version (<see cref="NotesVersions"/>)
+    /// made by <paramref name="versionKind"/>: the library writing them, unless said otherwise.</summary>
+    public string Save(Meeting m, Classification c, string summaryMd = "", string summaryModel = "", string error = "",
+        string versionKind = NotesChangeKind.Written)
     {
         lock (gate)
         {
@@ -578,8 +580,9 @@ public sealed partial class Store : IDisposable
             Py.WriteText(path, Notes.Render(m, c, summaryMd, summaryModel));
             string now = Now();
             string? oldPath = null, firstSeen = null;
+            (string Markdown, string Model, string At) before = ("", "", "");
             bool known = false;
-            using (var cmd = Command("SELECT md_path, first_seen FROM notes WHERE id=?", m.Id))
+            using (var cmd = Command("SELECT md_path, first_seen, summary_md, summary_model, updated_at FROM notes WHERE id=?", m.Id))
             using (var r = cmd.ExecuteReader())
             {
                 if (r.Read())
@@ -587,6 +590,7 @@ public sealed partial class Store : IDisposable
                     known = true;
                     oldPath = r.IsDBNull(0) ? null : r.GetString(0);
                     firstSeen = r.IsDBNull(1) ? null : r.GetString(1);
+                    before = (r.IsDBNull(2) ? "" : r.GetString(2), r.IsDBNull(3) ? "" : r.GetString(3), r.IsDBNull(4) ? "" : r.GetString(4));
                 }
             }
             // The Python engine compared spellings only; a class renamed "bio 110" → "Bio 110" on a Mac is the
@@ -614,6 +618,7 @@ public sealed partial class Store : IDisposable
                 error.Length > 0 ? error : null, known ? firstSeen : now, now);
             Index(m.Id, summaryMd.Length > 0 ? summaryMd : m.NotesMarkdown, m.Transcript, now);
             AttachmentsFollow(m.Id, c.ClassName);
+            RecordVersion(m.Id, before, summaryMd, summaryModel, versionKind);
             return path;
         }
     }

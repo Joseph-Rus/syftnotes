@@ -117,14 +117,12 @@ public sealed class Rewrites(Config cfg, Store store, AiJobs ai, Action<string>?
     {
         var current = new NotesVersion(row.SummaryMd ?? "", Engines.WhoWrote(row.SummaryModel ?? ""), row.UpdatedAt ?? "");
         string adding = diagrams?.Adding(id) == true ? "adding" : "";
-        // The versions kept from before each replace, to put back: who wrote them and when, not their words.
-        List<NotesKept> earlier = [.. store.NotesVersions(id).Select(v => new NotesKept(v.Seq.ToString(System.Globalization.CultureInfo.InvariantCulture),
-            v.Model.Length > 0 ? Engines.WhoWrote(v.Model) : "", v.WrittenAt, v.ReplacedAt))];
-        if (job is null) return new RewriteInfo(id, "none") { Current = current, Diagrams = adding, Earlier = earlier };
+        var change = Change(id);
+        if (job is null) return new RewriteInfo(id, "none") { Current = current, Diagrams = adding, Change = change };
         return new RewriteInfo(id, job.State)
         {
             Engine = job.Engine, EngineName = Engines.Name(job.Engine), Started = job.Started, Error = job.Error,
-            Done = job.Done, Parts = job.Parts, Current = current, Diagrams = adding, Earlier = earlier,
+            Done = job.Done, Parts = job.Parts, Current = current, Diagrams = adding, Change = change,
             Draft = job.State == "ready" && job.DraftMarkdown is { } md
                 ? new NotesVersion(md, Engines.WhoWrote(job.DraftModel), job.DraftAt) : null,
         };
@@ -269,7 +267,7 @@ public sealed class Rewrites(Config cfg, Store store, AiJobs ai, Action<string>?
             var m = store.Meeting(row);
             var c = new Classification(row.ClassName ?? "", row.Confidence ?? 1, row.ClassifiedBy ?? "human",
                 row.LectureTitle ?? "", JsonTopics(row.Topics));
-            store.Save(m, c, draft, job.DraftModel);
+            store.Save(m, c, draft, job.DraftModel, versionKind: NotesChangeKind.Rewrite);
             store.MarkAttachmentsUsed(job.AttachmentIds);
             jobs.Remove(id);
             Forget(cfg.Home, id);
@@ -324,7 +322,7 @@ public sealed class Rewrites(Config cfg, Store store, AiJobs ai, Action<string>?
     /// (409); while the pipeline is writing this lecture's notes (409); and, with <paramref name="basedOn"/>, notes
     /// that changed since (412).
     /// </summary>
-    public RewriteInfo Save(string id, string markdown, bool replace, string writer, string? basedOn = null)
+    public RewriteInfo Save(string id, string markdown, bool replace, string writer, string? basedOn = null, string kind = NotesChangeKind.App)
     {
         var row = Require(id);
         string notes = ChatNotes.Clean(markdown);
@@ -340,7 +338,8 @@ public sealed class Rewrites(Config cfg, Store store, AiJobs ai, Action<string>?
                 throw new RewriteRefusedException(409, "this lecture already has notes. Ask the student whether to replace them; "
                     + "if they say yes, save again with replace set to true (the notes it has now are kept, and the student can put them back).");
             notes = Summarize.KeepTyped(notes, Summarize.Typed(m));
-            switch (store.EditNotes(id, notes, basedOn, writer, redraft: true))
+            // An AI app putting its own draft right (a diagram fixed) keeps one version of it; a paste is always its own.
+            switch (store.EditNotes(id, notes, basedOn, writer, redraft: kind == NotesChangeKind.App, kind: kind))
             {
                 case NotesEdited.Gone:
                     throw new RewriteRefusedException(404, "there's no lecture with that id.");
@@ -356,20 +355,68 @@ public sealed class Rewrites(Config cfg, Store store, AiJobs ai, Action<string>?
         }
     }
 
-    /// <summary>Puts a version of the lecture's notes back (<paramref name="version"/>, or the newest:
-    /// <see cref="Store.RestoreNotesVersion"/>): the ones they replace are kept as a version in their place. Refuses
-    /// (409) with no such version, or while the pipeline is writing this lecture's notes.</summary>
+    static string Id(long seq) => seq.ToString(System.Globalization.CultureInfo.InvariantCulture);
+
+    static NotesKept Kept(NoteVersion v, bool current = false, bool words = false) =>
+        new(Id(v.Seq), v.Kind, v.Model.Length > 0 ? Engines.WhoWrote(v.Model) : "", v.At) { Current = current, Markdown = words ? v.Markdown : "" };
+
+    /// <summary>The last change to the lecture's notes, and whether Undo or Redo can follow it.</summary>
+    NotesChange? Change(string id)
+    {
+        var newest = store.NotesVersions(id).FirstOrDefault();
+        if (newest is null) return null;
+        var undo = store.UndoState(id);
+        return new NotesChange(Id(newest.Seq), newest.Kind, newest.Model.Length > 0 ? Engines.WhoWrote(newest.Model) : "", newest.At)
+        {
+            CanUndo = undo.Undo is not null, CanRedo = undo.Redo is not null,
+        };
+    }
+
+    /// <summary>The versions of the lecture's notes, newest first (the first is the notes now). A lecture from before
+    /// versions were kept gets its notes as they are as its first.</summary>
+    public List<NotesKept> Versions(string id)
+    {
+        Require(id);
+        store.EnsureFirstVersion(id);
+        return [.. store.NotesVersions(id).Select((v, i) => Kept(v, current: i == 0))];
+    }
+
+    /// <summary>One version, with its words; 404 when there's no such version.</summary>
+    public NotesKept Version(string id, string version)
+    {
+        Require(id);
+        var versions = store.NotesVersions(id);
+        int at = long.TryParse(version, System.Globalization.NumberStyles.None, System.Globalization.CultureInfo.InvariantCulture, out long seq)
+            ? versions.FindIndex(v => v.Seq == seq) : -1;
+        if (at < 0) throw new RewriteRefusedException(404, "there's no such version of these notes.");
+        return Kept(versions[at], current: at == 0, words: true);
+    }
+
+    /// <summary>Puts a version of the lecture's notes back as a new version (<paramref name="version"/>, or the one before
+    /// the notes now: <see cref="Store.RestoreNotesVersion"/>), undone like any change. Refuses (409) with no such
+    /// version, or while the pipeline is writing this lecture's notes.</summary>
     public RewriteInfo Restore(string id, string? version = null)
     {
-        var row = Require(id);
         long? seq = long.TryParse(version, System.Globalization.NumberStyles.None, System.Globalization.CultureInfo.InvariantCulture, out long n) ? n : null;
         if (version is { Length: > 0 } && seq is null) throw new RewriteRefusedException(409, "there are no such earlier notes to put back.");
+        return PutBack(id, () => store.RestoreNotesVersion(id, seq), "there are no earlier notes to put back.");
+    }
+
+    /// <summary>Undo: the notes before the last change, put back (409 with nothing to undo).</summary>
+    public RewriteInfo Undo(string id) => PutBack(id, () => store.UndoNotes(id), "there's nothing to undo.");
+
+    /// <summary>Redo: the notes the last undo went back from, put back (409 with nothing to redo).</summary>
+    public RewriteInfo Redo(string id) => PutBack(id, () => store.RedoNotes(id), "there's nothing to redo.");
+
+    RewriteInfo PutBack(string id, Func<NotesEdited> run, string none)
+    {
+        var row = Require(id);
         lock (gate)
         {
-            switch (store.RestoreNotesVersion(id, seq))
+            switch (run())
             {
                 case NotesEdited.Gone:
-                    throw new RewriteRefusedException(409, "there are no earlier notes to put back.");
+                    throw new RewriteRefusedException(409, none);
                 case NotesEdited.Busy:
                     throw new RewriteRefusedException(409, "the library is writing this lecture's notes right now.");
                 case NotesEdited.Changed:
