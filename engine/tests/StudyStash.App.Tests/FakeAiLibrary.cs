@@ -43,7 +43,8 @@ public sealed class FakeAiLibrary : IAiLibrary
     public List<(string Markdown, bool Replace, string? BasedOn)> Saves { get; } = [];
     /// <summary>What "Copy for your AI" gets for a lecture; null: an older library.</summary>
     public Func<string, NotesBrief?>? OnNotesBrief { get; set; }
-    public Func<string, RewriteInfo?>? OnRestoreNotes { get; set; }
+    /// <summary>(lecture, the version asked for, or null for the newest).</summary>
+    public Func<string, string?, RewriteInfo?>? OnRestoreNotes { get; set; }
     public Func<ToolAccessInfo?>? OnAccess { get; set; }
     public Func<bool?, ReadingScopes?, ToolAccessInfo?>? OnSetAccess { get; set; }
     public Func<bool, ToolAccessInfo?>? OnSetWeb { get; set; }
@@ -226,10 +227,10 @@ public sealed class FakeAiLibrary : IAiLibrary
             : new RewriteInfo(lecture, "none") { Current = new NotesVersion(ChatNotes.Clean(markdown), "your AI", DateTime.Now.ToString("o")) });
     }
 
-    public Task<RewriteInfo?> RestoreNotesAsync(string lecture)
+    public Task<RewriteInfo?> RestoreNotesAsync(string lecture, string? version = null)
     {
-        Calls.Add($"restore:{lecture}");
-        return Task.FromResult(OnRestoreNotes?.Invoke(lecture));
+        Calls.Add($"restore:{lecture}" + (version is null ? "" : $":{version}"));
+        return Task.FromResult(OnRestoreNotes?.Invoke(lecture, version));
     }
 
     public Task<NotesBrief?> NotesBriefAsync(string lecture)

@@ -371,7 +371,7 @@ public class FreeAiFilms
             var notes = AiDemo.LectureNotes("## Summary\nNotes.", "Claude");
             notes.OnCopyForAi = () => { };
             notes.OnPasteNotes = () => { };
-            notes.Earlier = new NotesVersion("", "Ollama", "2026-10-20T09:30:00");
+            notes.Earlier = [new NotesKept("2", "Claude", "2026-10-21T15:10:00", "2026-10-21T15:12:00"), new NotesKept("1", "Ollama", "2026-10-20T09:30:00", "2026-10-21T15:10:00")];
             Control Menu()
             {
                 Control menu = skin == SkinKind.Mac ? new MacAiEngineMenu { DataContext = notes.Menu } : new WinAiEngineMenu { DataContext = notes.Menu };

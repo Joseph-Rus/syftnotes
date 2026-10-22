@@ -80,15 +80,27 @@ public static partial class Notes
 
 public sealed partial class Store
 {
-    /// <summary>The notes a lecture had before the last time they were replaced (an edit, notes an AI app saved, notes
-    /// pasted from a chat), one set a lecture: <see cref="RestoreEarlierNotes"/> puts them back.</summary>
-    void CreateEarlierNotes() => Exec("""
-        CREATE TABLE IF NOT EXISTS earlier_notes (
-            id TEXT PRIMARY KEY,
+    /// <summary>How many earlier versions of its notes a lecture keeps: its first ones, and the newest others.</summary>
+    public const int VersionsKept = 5;
+
+    /// <summary>Saves of notes from outside the library (an AI app, a paste) this close to the same writer's last ones
+    /// are a draft put right ("fix the diagram and save again"), not a version of their own.</summary>
+    public static readonly TimeSpan RedraftWithin = TimeSpan.FromMinutes(10);
+
+    /// <summary>The notes a lecture had before each time they were replaced (an edit, notes an AI app saved, notes
+    /// pasted from a chat, putting earlier ones back), newest last: <see cref="RestoreNotesVersion"/> puts one back. At
+    /// most <see cref="VersionsKept"/> a lecture, and never without the oldest (the library's own notes, or the
+    /// student's first), however often an AI saves. Kept while a lecture is in the trash; gone with it for good.</summary>
+    void CreateNotesVersions() => Exec("""
+        CREATE TABLE IF NOT EXISTS notes_versions (
+            seq INTEGER PRIMARY KEY AUTOINCREMENT,
+            id TEXT NOT NULL,
             summary_md TEXT,
             summary_model TEXT,
+            written_at TEXT,
             replaced_at TEXT
         );
+        CREATE INDEX IF NOT EXISTS notes_versions_id ON notes_versions(id, seq);
         """);
 
     /// <summary>
@@ -108,9 +120,12 @@ public sealed partial class Store
     /// student pasted them from), named as their writer the way the library names its own AI ("Claude (in the Claude
     /// app)"), and the lecture's notes done, any old error about them gone. Null keeps whoever wrote the notes as their
     /// writer; "" names none (the student's own).</para>
-    /// <para>The notes replaced are kept (<see cref="EarlierNotes"/>), so whatever replaced them can be undone.</para>
+    /// <para>The notes replaced are kept as a version (<see cref="NotesVersions"/>), so whatever replaced them can be
+    /// undone. <paramref name="redraft"/>: notes from outside the library (an AI app, a paste) that replace the same
+    /// writer's own from a few minutes before keep no version of those (a draft put right); the version before them
+    /// stays.</para>
     /// </summary>
-    public NotesEdited EditNotes(string noteId, string markdown, string? basedOn = null, string? writer = null)
+    public NotesEdited EditNotes(string noteId, string markdown, string? basedOn = null, string? writer = null, bool redraft = false)
     {
         lock (gate)
         {
@@ -171,11 +186,16 @@ public sealed partial class Store
                 }
             }
             string now = Now();
-            // What they replace can be put back.
-            if (Py.Strip(current).Length > 0 && (current != markdown || model != by))
-                Exec("INSERT INTO earlier_notes(id, summary_md, summary_model, replaced_at) VALUES(?,?,?,?) "
-                    + "ON CONFLICT(id) DO UPDATE SET summary_md=excluded.summary_md, summary_model=excluded.summary_model, replaced_at=excluded.replaced_at",
-                    noteId, current, model.Length > 0 ? model : null, now);
+            // What they replace can be put back, but for a draft the same writer is putting right: notes it saved from
+            // outside a few minutes ago, untouched since (not edited, not put back, not changed in their file).
+            string outside = OutsideKey(noteId);
+            bool draft = redraft && writer is not null && GetState(outside)?.Split('\n') is [var who, var at, var print]
+                && who == writer && print == Notes.Fingerprint(current)
+                && DateTimeOffset.TryParse(at, System.Globalization.CultureInfo.InvariantCulture, System.Globalization.DateTimeStyles.AssumeUniversal, out var last)
+                && DateTimeOffset.UtcNow - last < RedraftWithin;
+            if (Py.Strip(current).Length > 0 && (current != markdown || model != by) && !draft)
+                KeepVersion(noteId, current, model, row.UpdatedAt ?? "", now);
+            if (redraft && writer is not null) SetState(outside, $"{writer}\n{now}\n{Notes.Fingerprint(markdown)}");
             if (writer is null) Exec("UPDATE notes SET summary_md=?, updated_at=? WHERE id=?", markdown, now, noteId);
             else Exec("UPDATE notes SET summary_md=?, summary_model=?, status=?, error=NULL, updated_at=? WHERE id=?",
                 markdown, by.Length > 0 ? by : null, Done, now, noteId);
@@ -184,28 +204,64 @@ public sealed partial class Store
         }
     }
 
-    /// <summary>The notes a lecture had before they were last replaced, who wrote them and when they were replaced;
-    /// null when they never were (or have been put back since and replaced by nothing).</summary>
-    public (string Markdown, string Model, string ReplacedAt)? EarlierNotes(string noteId)
+    /// <summary>One version kept, and the oldest kept with the newest others when there are more than
+    /// <see cref="VersionsKept"/>.</summary>
+    void KeepVersion(string noteId, string markdown, string model, string writtenAt, string replacedAt)
+    {
+        Exec("INSERT INTO notes_versions(id, summary_md, summary_model, written_at, replaced_at) VALUES(?,?,?,?,?)",
+            noteId, markdown, model.Length > 0 ? model : null, writtenAt, replacedAt);
+        var seqs = new List<long>();
+        using (var cmd = Command("SELECT seq FROM notes_versions WHERE id=? ORDER BY seq", noteId))
+        using (var r = cmd.ExecuteReader())
+            while (r.Read()) seqs.Add(r.GetInt64(0));
+        foreach (long seq in seqs.Skip(1).Take(Math.Max(0, seqs.Count - VersionsKept)))
+            Exec("DELETE FROM notes_versions WHERE seq=?", seq);
+    }
+
+    /// <summary>The versions of a lecture's notes kept from before they were replaced, newest first: their words, who
+    /// wrote them ("" for the student's own), when they were written and when they were replaced.</summary>
+    public List<(long Seq, string Markdown, string Model, string WrittenAt, string ReplacedAt)> NotesVersions(string noteId)
     {
         lock (gate)
         {
-            using var cmd = Command("SELECT summary_md, summary_model, replaced_at FROM earlier_notes WHERE id=?", noteId);
+            var list = new List<(long, string, string, string, string)>();
+            using var cmd = Command("SELECT seq, summary_md, summary_model, written_at, replaced_at FROM notes_versions WHERE id=? ORDER BY seq DESC", noteId);
             using var r = cmd.ExecuteReader();
-            if (!r.Read() || r.IsDBNull(0) || r.GetString(0).Trim().Length == 0) return null;
-            return (r.GetString(0), r.IsDBNull(1) ? "" : r.GetString(1), r.IsDBNull(2) ? "" : r.GetString(2));
+            while (r.Read())
+            {
+                string md = r.IsDBNull(1) ? "" : r.GetString(1);
+                if (md.Trim().Length > 0)
+                    list.Add((r.GetInt64(0), md, r.IsDBNull(2) ? "" : r.GetString(2), r.IsDBNull(3) ? "" : r.GetString(3), r.IsDBNull(4) ? "" : r.GetString(4)));
+            }
+            return list;
         }
     }
 
-    /// <summary>Puts back the notes a lecture had before they were last replaced, with their writer, the way any edit is
-    /// saved (<see cref="EditNotes"/>): the ones they replace are kept in their place, so putting back can be undone
-    /// too. <see cref="NotesEdited.Gone"/> when there's nothing to put back.</summary>
-    public NotesEdited RestoreEarlierNotes(string noteId)
+    /// <summary>Puts a version of a lecture's notes back (<paramref name="seq"/>, or the newest), with its writer, the way
+    /// any edit is saved (<see cref="EditNotes"/>): the notes it replaces become a version in its place, so putting back
+    /// can be undone, or gone back from again. <see cref="NotesEdited.Gone"/> when there's no such version.</summary>
+    public NotesEdited RestoreNotesVersion(string noteId, long? seq = null)
     {
         lock (gate)
         {
-            if (EarlierNotes(noteId) is not { } earlier) return NotesEdited.Gone;
-            return EditNotes(noteId, earlier.Markdown, writer: earlier.Model);
+            var versions = NotesVersions(noteId);
+            if ((seq is { } wanted ? versions.FirstOrDefault(v => v.Seq == wanted) : versions.FirstOrDefault()) is not { Seq: > 0 } version)
+                return NotesEdited.Gone;
+            var said = EditNotes(noteId, version.Markdown, writer: version.Model);
+            // Back as the lecture's notes, it isn't an earlier version of them any more.
+            if (said == NotesEdited.Saved) Exec("DELETE FROM notes_versions WHERE seq=?", version.Seq);
+            return said;
         }
+    }
+
+    /// <summary>Who last saved a lecture's notes from outside the library, when, and what they saved: how a draft put
+    /// right is told from notes that are the lecture's own by now.</summary>
+    static string OutsideKey(string noteId) => "notes-from-outside:" + noteId;
+
+    /// <summary>A lecture deleted for good takes its earlier versions with it.</summary>
+    void ForgetNotesVersions(string noteId)
+    {
+        Exec("DELETE FROM notes_versions WHERE id=?", noteId);
+        Exec("DELETE FROM sync_state WHERE key=?", OutsideKey(noteId));
     }
 }

@@ -297,10 +297,14 @@ public static partial class AiWords
         engineName.Length == 0 ? "" // an older lecture that doesn't say who wrote its notes
         : ParseUntil(updatedAtIso) is { } at ? $"Written by {engineName} · {at:ddd H:mm}" : $"Written by {engineName}";
 
-    /// <summary>The earlier notes the ⋯ menu puts back: "By Claude, replaced Tue 9:30" ("Your own" when nobody else
-    /// wrote them).</summary>
-    public static string EarlierLine(string by, string replacedIso) =>
-        (by.Length > 0 ? $"By {by}" : "Your own") + (ParseUntil(replacedIso) is { } at ? $", replaced {at:ddd H:mm}" : "");
+    /// <summary>A version of the notes the ⋯ menu puts back, by who wrote it: "Put back notes by Claude", "Put back your
+    /// own notes".</summary>
+    public static string EarlierName(string by) => by.Length > 0 ? $"Put back notes by {by}" : "Put back your own notes";
+
+    /// <summary>When that version was written ("Written 21 Oct 3:10 PM"), or else when it was replaced.</summary>
+    public static string EarlierWhen(string writtenIso, string replacedIso) =>
+        ParseUntil(writtenIso) is { } written ? "Written " + written.ToString("d MMM h:mm tt", CultureInfo.InvariantCulture)
+        : ParseUntil(replacedIso) is { } replaced ? "Replaced " + replaced.ToString("d MMM h:mm tt", CultureInfo.InvariantCulture) : "";
 
     /// <summary>A ready draft's byline: "Claude Code · just now" (or "· 5 min ago", "· 2 h ago", a date).</summary>
     public static string DraftByline(string engineName, string atIso, DateTime now) => $"{engineName} · {History.Ago(atIso, now)}";

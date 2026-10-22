@@ -117,8 +117,9 @@ public sealed class Rewrites(Config cfg, Store store, AiJobs ai, Action<string>?
     {
         var current = new NotesVersion(row.SummaryMd ?? "", Engines.WhoWrote(row.SummaryModel ?? ""), row.UpdatedAt ?? "");
         string adding = diagrams?.Adding(id) == true ? "adding" : "";
-        // The notes from before the last replace, to put back: who wrote them and when, not their words.
-        var earlier = store.EarlierNotes(id) is { } e ? new NotesVersion("", Engines.WhoWrote(e.Model), e.ReplacedAt) : null;
+        // The versions kept from before each replace, to put back: who wrote them and when, not their words.
+        List<NotesKept> earlier = [.. store.NotesVersions(id).Select(v => new NotesKept(v.Seq.ToString(System.Globalization.CultureInfo.InvariantCulture),
+            v.Model.Length > 0 ? Engines.WhoWrote(v.Model) : "", v.WrittenAt, v.ReplacedAt))];
         if (job is null) return new RewriteInfo(id, "none") { Current = current, Diagrams = adding, Earlier = earlier };
         return new RewriteInfo(id, job.State)
         {
@@ -339,7 +340,7 @@ public sealed class Rewrites(Config cfg, Store store, AiJobs ai, Action<string>?
                 throw new RewriteRefusedException(409, "this lecture already has notes. Ask the student whether to replace them; "
                     + "if they say yes, save again with replace set to true (the notes it has now are kept, and the student can put them back).");
             notes = Summarize.KeepTyped(notes, Summarize.Typed(m));
-            switch (store.EditNotes(id, notes, basedOn, writer))
+            switch (store.EditNotes(id, notes, basedOn, writer, redraft: true))
             {
                 case NotesEdited.Gone:
                     throw new RewriteRefusedException(404, "there's no lecture with that id.");
@@ -355,15 +356,17 @@ public sealed class Rewrites(Config cfg, Store store, AiJobs ai, Action<string>?
         }
     }
 
-    /// <summary>Puts back the notes the lecture had before they were last replaced (<see cref="Store.RestoreEarlierNotes"/>):
-    /// the ones they replace are kept in their place. Refuses (409) with nothing to put back, or while the pipeline is
-    /// writing this lecture's notes.</summary>
-    public RewriteInfo Restore(string id)
+    /// <summary>Puts a version of the lecture's notes back (<paramref name="version"/>, or the newest:
+    /// <see cref="Store.RestoreNotesVersion"/>): the ones they replace are kept as a version in their place. Refuses
+    /// (409) with no such version, or while the pipeline is writing this lecture's notes.</summary>
+    public RewriteInfo Restore(string id, string? version = null)
     {
         var row = Require(id);
+        long? seq = long.TryParse(version, System.Globalization.NumberStyles.None, System.Globalization.CultureInfo.InvariantCulture, out long n) ? n : null;
+        if (version is { Length: > 0 } && seq is null) throw new RewriteRefusedException(409, "there are no such earlier notes to put back.");
         lock (gate)
         {
-            switch (store.RestoreEarlierNotes(id))
+            switch (store.RestoreNotesVersion(id, seq))
             {
                 case NotesEdited.Gone:
                     throw new RewriteRefusedException(409, "there are no earlier notes to put back.");

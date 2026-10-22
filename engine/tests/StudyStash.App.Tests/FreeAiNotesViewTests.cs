@@ -79,28 +79,37 @@ public class FreeAiNotesViewTests
     }
 
     [AvaloniaFact]
-    public async Task The_notes_menu_copies_for_a_chat_pastes_its_notes_and_puts_earlier_notes_back()
+    public async Task The_notes_menu_copies_for_a_chat_pastes_its_notes_and_puts_any_earlier_version_back()
     {
         string now = DateTime.Now.ToString("o");
         var ai = new FakeAiLibrary
         {
             Overview = AiDemo.Overview(),
-            OnRewrite = id => new RewriteInfo(id, "none") { Current = new NotesVersion("## Summary\nNew.", "Claude", now), Earlier = new NotesVersion("", "Ollama", "2026-10-20T09:30:00") },
-            OnRestoreNotes = id => new RewriteInfo(id, "none") { Current = new NotesVersion("## Summary\nOld.", "Ollama", now), Earlier = new NotesVersion("", "Claude", now) },
+            OnRewrite = id => new RewriteInfo(id, "none")
+            {
+                Current = new NotesVersion("## Summary\nNewest.", "Claude", now),
+                Earlier = [new NotesKept("7", "Claude", "2026-10-21T15:10:00", now), new NotesKept("3", "Ollama", "2026-10-20T09:30:00", now)],
+            },
+            OnRestoreNotes = (id, version) => new RewriteInfo(id, "none")
+            {
+                Current = new NotesVersion("## Summary\nThe library's own.", "Ollama", now),
+                Earlier = [new NotesKept("8", "Claude", now, now), new NotesKept("7", "Claude", "2026-10-21T15:10:00", now)],
+            },
         };
         int copies = 0, pastes = 0;
         var notes = new AiNotesModel(ai) { OnCopyForAi = () => copies++, OnPasteNotes = () => pastes++ };
-        await notes.Load("n1", "## Summary\nNew.", "Claude", now);
+        await notes.Load("n1", "## Summary\nNewest.", "Claude", now);
 
-        Assert.Equal(["Copy for your AI", "Paste notes", "Put back earlier notes"], notes.Menu.Actions.Select(a => a.Name));
-        Assert.Equal("By Ollama, replaced Tue 9:30", notes.Menu.Actions[2].Subtitle);
+        Assert.Equal(["Copy for your AI", "Paste notes", "Put back notes by Claude", "Put back notes by Ollama"], notes.Menu.Actions.Select(a => a.Name));
+        Assert.Equal(["Written 21 Oct 3:10 PM", "Written 20 Oct 9:30 AM"], notes.Menu.Actions.Skip(2).Select(a => a.Subtitle));
         notes.Menu.Actions[0].Command.Execute(null);
         notes.Menu.Actions[1].Command.Execute(null);
         Assert.Equal((1, 1), (copies, pastes));
 
-        await ((CommunityToolkit.Mvvm.Input.IAsyncRelayCommand)notes.Menu.Actions[2].Command).ExecuteAsync(null);
-        Assert.Contains("restore:n1", ai.Calls);
-        Assert.Equal("## Summary\nOld.", notes.CurrentMarkdown);
-        Assert.Equal("Claude", notes.Earlier!.By); // putting back can be undone the same way
+        // The oldest, past a newer one: the library's own notes come back.
+        await ((CommunityToolkit.Mvvm.Input.IAsyncRelayCommand)notes.Menu.Actions[3].Command).ExecuteAsync(null);
+        Assert.Contains("restore:n1:3", ai.Calls);
+        Assert.Equal("## Summary\nThe library's own.", notes.CurrentMarkdown);
+        Assert.Equal(["Put back notes by Claude", "Put back notes by Claude"], notes.Menu.Actions.Skip(2).Select(a => a.Name)); // and both newer ones can come back
     }
 }

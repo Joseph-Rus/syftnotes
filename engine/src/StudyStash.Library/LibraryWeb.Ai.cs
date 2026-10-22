@@ -327,9 +327,12 @@ public sealed partial class LibraryWeb
             return RewriteResult(() => Rewrites.Save((string)ctx.Request.RouteValues["lecture"]!, markdown, replace, writer, Str(body, "based_on")));
         })));
 
-        // Puts back the notes the lecture had before they were last replaced.
-        app.MapPost("/api/v2/ai/rewrite/{lecture}/restore", Http.Handle(ctx => ApiAsync(ctx, () =>
-            Task.FromResult(RewriteResult(() => Rewrites.Restore((string)ctx.Request.RouteValues["lecture"]!))))));
+        // Puts a version of the lecture's notes back: the one asked for (version, from its earlier ones), or the newest.
+        app.MapPost("/api/v2/ai/rewrite/{lecture}/restore", Http.Handle(ctx => ApiAsync(ctx, async () =>
+        {
+            var body = await Http.JsonBodyAsync(ctx.Request);
+            return RewriteResult(() => Rewrites.Restore((string)ctx.Request.RouteValues["lecture"]!, Str(body, "version")));
+        })));
 
         // How the library writes this lecture's notes, for an AI it doesn't run: for=app (an AI app, through the
         // connection), or for=chat, with the whole request to copy into a free chat.

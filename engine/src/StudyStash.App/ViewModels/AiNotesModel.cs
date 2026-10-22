@@ -455,11 +455,11 @@ public sealed partial class AiNotesModel : ObservableObject, IDisposable
 
     // --- Notes from an AI Study Stash doesn't run, and putting earlier notes back ---------------------------------------
 
-    /// <summary>The notes from before they were last replaced (an edit, an AI app's, a paste), which the ⋯ menu puts
-    /// back: who wrote them and when they were replaced. Null when there are none.</summary>
-    [ObservableProperty] public partial NotesVersion? Earlier { get; set; }
-    public bool HasEarlier => Earlier is not null;
-    partial void OnEarlierChanged(NotesVersion? value)
+    /// <summary>The versions of the notes kept from before they were replaced (an edit, an AI app's, a paste, putting
+    /// back), newest first: the ⋯ menu puts any of them back. Who wrote each and when.</summary>
+    [ObservableProperty] public partial IReadOnlyList<NotesKept> Earlier { get; set; } = [];
+    public bool HasEarlier => Earlier.Count > 0;
+    partial void OnEarlierChanged(IReadOnlyList<NotesKept> value)
     {
         OnPropertyChanged(nameof(HasEarlier));
         BuildActions();
@@ -488,7 +488,7 @@ public sealed partial class AiNotesModel : ObservableObject, IDisposable
     }
 
     /// <summary>The ⋯ menu's actions under its engines: copy these notes' lecture for a free chat, paste notes a chat
-    /// wrote, and put back the notes from before, when there are some.</summary>
+    /// wrote, and put back each version kept from before ("Put back notes by Claude", when they were written).</summary>
     void BuildActions()
     {
         Menu.Actions.Clear();
@@ -504,14 +504,13 @@ public sealed partial class AiNotesModel : ObservableObject, IDisposable
                 CloseMenu?.Invoke();
                 paste();
             })));
-        if (Earlier is { } e)
-            Menu.Actions.Add(new MenuAction("undo", "Put back earlier notes", AiWords.EarlierLine(e.By, e.At), RestoreEarlierCommand));
+        foreach (var kept in Earlier)
+            Menu.Actions.Add(new MenuAction("undo", AiWords.EarlierName(kept.By), AiWords.EarlierWhen(kept.Written, kept.Replaced), new AsyncRelayCommand(() => RestoreEarlier(kept.Id))));
     }
 
-    /// <summary>Puts back the notes from before the last replace; the ones on the page now become the earlier ones, so
-    /// this can be undone the same way.</summary>
-    [RelayCommand]
-    async Task RestoreEarlier()
+    /// <summary>Puts a version kept from before back (<paramref name="version"/>, or the newest); the notes on the page
+    /// now become a version in their place, so this can be undone the same way.</summary>
+    public async Task RestoreEarlier(string? version = null)
     {
         if (Busy || Editing) return;
         CloseMenu?.Invoke();
@@ -519,7 +518,7 @@ public sealed partial class AiNotesModel : ObservableObject, IDisposable
         Say = null;
         try
         {
-            var info = await library.RestoreNotesAsync(LectureId);
+            var info = await library.RestoreNotesAsync(LectureId, version);
             if (info is null) { OlderLibrary = true; return; }
             Apply(info);
             NotesChanged?.Invoke();

@@ -213,7 +213,7 @@ public sealed partial class Store : IDisposable
         Migrate();
         HasPassages = CreatePassages();
         CreateAttachments();
-        CreateEarlierNotes();
+        CreateNotesVersions();
     }
 
     public void Dispose() => conn.Dispose();
@@ -924,7 +924,12 @@ public sealed partial class Store : IDisposable
         return at < 0 ? text : string.Concat(text.AsSpan(0, at), with, text.AsSpan(at + find.Length));
     }
 
-    public bool Delete(string noteId)
+    /// <summary>A lecture gone for good: its row, its file, its passages and the earlier versions of its notes.</summary>
+    public bool Delete(string noteId) => Remove(noteId, forGood: true);
+
+    /// <summary>A lecture's row, file and passages gone; for good, the earlier versions of its notes too (into the
+    /// trash, they wait with it).</summary>
+    bool Remove(string noteId, bool forGood)
     {
         lock (gate)
         {
@@ -934,6 +939,7 @@ public sealed partial class Store : IDisposable
             if (path is not null && File.Exists(path)) File.Delete(path);
             Exec("DELETE FROM notes WHERE id=?", noteId);
             Unindex(noteId);
+            if (forGood) ForgetNotesVersions(noteId);
             DropEmptyDir(path, null);
             return true;
         }
@@ -957,7 +963,7 @@ public sealed partial class Store : IDisposable
             Exec("INSERT INTO trash(id, row_json, md_text, deleted_at) VALUES(?,?,?,?) ON CONFLICT(id) DO UPDATE SET "
                 + "row_json=excluded.row_json, md_text=excluded.md_text, deleted_at=excluded.deleted_at",
                 noteId, row.ToJsonString(), text, Stamp(now ?? DateTimeOffset.UtcNow));
-            return Delete(noteId);
+            return Remove(noteId, forGood: false);
         }
     }
 
@@ -1012,6 +1018,7 @@ public sealed partial class Store : IDisposable
                 Exec("INSERT INTO gone(id, gone_at) VALUES(?,?) ON CONFLICT(id) DO UPDATE SET gone_at=excluded.gone_at", id, now);
                 Exec("DELETE FROM trash WHERE id=?", id);
                 DetachAttachments(id);
+                ForgetNotesVersions(id);
             }
             // A laptop that hasn't reached the library in a month has long since dropped old audio anyway.
             Exec("DELETE FROM gone WHERE gone_at < ?", Stamp(DateTimeOffset.UtcNow.AddDays(-30)));
