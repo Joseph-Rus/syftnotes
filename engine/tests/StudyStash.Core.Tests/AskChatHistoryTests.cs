@@ -122,6 +122,24 @@ public class AskChatHistoryTests
     }
 
     [Fact]
+    public async Task A_lectures_chats_are_on_the_page_of_the_folder_it_is_in_now()
+    {
+        await using var lib = await Library.StartAsync();
+        string onVessels = (await lib.AskAsync("Vessels?", "new", new AskPlace("lecture", "v1", "BIO 110"), lecture: "v1"))!.Chat!;
+        // A recording in no folder: its chat has none to start with.
+        string onRecording = (await lib.AskAsync("What has she said?", "new", new AskPlace("lecture", "rec-live"), lecture: "rec-live", live: "[00:05] Moles, today."))!.Chat!;
+
+        lib.Store.SetClass("v1", "CHEM 121"); // moved
+        lib.Store.Save(new Meeting("rec-live") { Title = "CHEM 121, Wed 21 Oct", Date = "2026-10-21", Transcript = "Moles." },
+            new Classification("CHEM 121", 1, "folder"), "## Summary\nMoles.", "Claude"); // filed when it stopped
+
+        Assert.Empty(await lib.Remote.ChatsAsync(null, "BIO 110"));
+        var chem = await lib.Remote.ChatsAsync(null, "CHEM 121");
+        Assert.Equal([onRecording, onVessels], chem.Select(c => c.Id));
+        Assert.All(chem, c => Assert.Equal("CHEM 121", c.Class));
+    }
+
+    [Fact]
     public async Task A_lecture_deleted_for_good_takes_its_chats_with_it()
     {
         await using var lib = await Library.StartAsync();

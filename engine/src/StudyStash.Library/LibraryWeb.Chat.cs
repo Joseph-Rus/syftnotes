@@ -80,12 +80,21 @@ public sealed partial class LibraryWeb
     };
 
     /// <summary>An Ask chat in a list: from the index, with its lecture's title for a folder's page or Home.</summary>
-    JsonObject EntryJson(ChatEntry e) => new()
+    static JsonObject EntryJson(ChatEntry e, IReadOnlyDictionary<string, NoteRow> lectures) => new()
     {
         ["id"] = e.Id, ["title"] = e.Title, ["class"] = e.ClassName, ["lecture"] = e.Lecture, ["updated"] = e.Updated, ["kind"] = e.Kind,
         ["scope"] = e.Scope, ["turns"] = e.Turns,
-        ["lecture_title"] = e.Lecture.Length > 0 && store.Get(e.Lecture) is { } n ? (!string.IsNullOrEmpty(n.LectureTitle) ? n.LectureTitle : n.Title) : "",
+        ["lecture_title"] = e.Lecture.Length > 0 && lectures.TryGetValue(e.Lecture, out var n) ? (!string.IsNullOrEmpty(n.LectureTitle) ? n.LectureTitle : n.Title) : "",
     };
+
+    /// <summary>The app's Ask chats on a lecture's page, a folder's or Home: each lecture's by the folder it's in now,
+    /// read once for the whole list.</summary>
+    IResult AskChatList(string? lecture, string? cls)
+    {
+        var lectures = store.ListNotes().ToDictionary(r => r.Id);
+        var chats = LibraryChats.AskChats(lecture, cls, id => lectures.TryGetValue(id, out var n) ? n.ClassName : null);
+        return Http.Json(new JsonArray([.. chats.Take(200).Select(e => (JsonNode)EntryJson(e, lectures))]));
+    }
 
     void MapChat(WebApplication app)
     {
@@ -101,7 +110,7 @@ public sealed partial class LibraryWeb
         });
         // kind=ask: the app's Ask chats, from the index: a lecture's, a class's (its own and its lectures'), or all of them.
         app.MapGet("/api/v2/chats", (HttpContext ctx, string? kind, string? lecture, string? @class) => Api(ctx, () => kind == Chats.AskKind
-            ? Http.Json(new JsonArray([.. LibraryChats.AskChats(NotEmpty(lecture), NotEmpty(@class)).Take(200).Select(e => (JsonNode)EntryJson(e))]))
+            ? AskChatList(NotEmpty(lecture), NotEmpty(@class))
             : Http.Json(new JsonArray(LibraryChats.List().Select(c => (JsonNode)ChatJson(c, false)).ToArray()))));
         app.MapGet("/api/v2/chats/{id}", (HttpContext ctx, string id) => Api(ctx, () => LibraryChats.Get(id) is { } c ? Http.Json(ChatJson(c, true)) : Http.Detail(404, "no such chat")));
         // Renamed: {"title"}.

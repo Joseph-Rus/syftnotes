@@ -120,9 +120,13 @@ public sealed class Chats(string home, string library, AiJobs ai, History histor
     }
 
     /// <summary>The Ask chats on a note's page (that lecture's), a folder's (its own and its lectures'), or Home (all
-    /// of them), newest first.</summary>
-    public List<ChatEntry> AskChats(string? lecture = null, string? className = null) =>
-        [.. Entries().Where(e => e.Kind == AskKind && (lecture is not null ? e.Lecture == lecture : className is null || e.ClassName == className))];
+    /// of them), newest first. A lecture's chats go by the folder the lecture is in now (<paramref name="classOf"/>, by
+    /// its id): it may have moved since, or been a recording in no folder when the chat began. Each comes with that
+    /// class.</summary>
+    public List<ChatEntry> AskChats(string? lecture = null, string? className = null, Func<string, string?>? classOf = null) =>
+        [.. Entries().Where(e => e.Kind == AskKind)
+            .Select(e => e.Lecture.Length > 0 && classOf?.Invoke(e.Lecture) is { } now ? e with { ClassName = now } : e)
+            .Where(e => lecture is not null ? e.Lecture == lecture : className is null || e.ClassName == className)];
 
     public Chat? Get(string id)
     {
