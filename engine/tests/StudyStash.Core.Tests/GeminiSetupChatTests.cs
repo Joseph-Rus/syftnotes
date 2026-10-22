@@ -33,6 +33,7 @@ public class GeminiSetupChatTests
     public void Gemini_is_locked_to_the_setup_tools_by_its_own_agent_home_and_settings()
     {
         using var dir = new TempDir();
+        using var agyHome = Antigravity.Use(dir["agy"]); // this test's own, whatever runs beside it
         var t = Turn(dir, "agy", session: "c-9", prompt: "[Study Stash] Setup was opened.");
         var cmd = SetupChat.Command(t);
         Assert.Equal(["agy", "--agent", "study-stash-setup", "--output-format", "stream-json", "--disable-slash-commands", "--sandbox"], cmd[..7]);
@@ -71,6 +72,7 @@ public class GeminiSetupChatTests
     public async Task A_gemini_turn_runs_in_its_own_home_and_streams_its_words_and_the_setup_tools_it_uses()
     {
         using var dir = new TempDir();
+        using var agyHome = Antigravity.Use(dir["agy"]); // this test's own, whatever runs beside it
         string exe = FakeAgents.WriteCli(dir["bin"], "gemini");
         FakeAgents.Replay(dir["bin"],
         [
@@ -117,11 +119,29 @@ public class GeminiSetupChatTests
     public async Task A_gemini_turn_that_reaches_for_anything_but_the_setup_tools_is_stopped(string what, string line)
     {
         using var dir = new TempDir();
+        using var agyHome = Antigravity.Use(dir["agy"]); // this test's own, whatever runs beside it
         string exe = FakeAgents.WriteCli(dir["bin"], "gemini");
         FakeAgents.Replay(dir["bin"], [line.Contains("\"init\"", StringComparison.Ordinal) ? line : FakeAgents.Agy.Init(), FakeAgents.Agy.Words(1, "Let me look."), line, FakeAgents.Agy.Mcp(3, "study_stash_setup", "add_class"), FakeAgents.Agy.Result("Done.")]);
         var events = await Run(Turn(dir, exe));
         Assert.True(events[^1].Problem == ChatProblem.Guard, what);
         Assert.DoesNotContain(events, e => e.Kind == "Tool" && e.Tool == "add_class");
+    }
+
+    /// <summary>A test's own agy home is its alone: the process-wide one (a library run in a test sets it) never moves
+    /// it, so no test writes into a folder another test beside it has made or deleted (CI on Linux did once).</summary>
+    [Fact]
+    public void A_tests_own_agy_home_is_its_alone()
+    {
+        using var dir = new TempDir();
+        string shared = Antigravity.Home();
+        using (Antigravity.Use(dir["mine"]))
+        {
+            Assert.Equal(dir["mine"], Antigravity.Home());
+            Assert.Equal(dir["mine"], Antigravity.HomeEnv()["HOME"]);
+            Antigravity.PrepareAnswer(); // makes its folders itself
+            Assert.True(File.Exists(Antigravity.AgentPath(dir["mine"], Antigravity.AnswerAgent)));
+        }
+        Assert.Equal(shared, Antigravity.Home());
     }
 
     /// <summary>The library's notes on Gemini run agy in Study Stash's own home for it (the library's home's gemini
@@ -130,6 +150,7 @@ public class GeminiSetupChatTests
     public async Task The_librarys_notes_on_gemini_run_in_study_stashs_own_home_for_agy()
     {
         using var dir = new TempDir();
+        using var agyHome = Antigravity.Use(dir["agy"]); // this test's own, whatever runs beside it
         Assert.Equal(Path.Combine(dir["library"], "gemini"), Antigravity.For(dir["library"]));
         string exe = FakeAgents.WriteCli(dir["bin"], "gemini");
         FakeAgents.Replay(dir["bin"], [FakeAgents.Agy.Words(1, "# Notes"), FakeAgents.Agy.Result("# Notes")]);
@@ -154,6 +175,7 @@ public class GeminiSetupChatTests
     public void The_librarys_mcp_server_is_the_library_agents_alone_never_global()
     {
         using var dir = new TempDir();
+        using var agyHome = Antigravity.Use(dir["agy"]); // this test's own, whatever runs beside it
         string global = Antigravity.McpConfigPath(Antigravity.Home());
         Directory.CreateDirectory(Path.GetDirectoryName(global)!);
         File.WriteAllText(global, """{"mcpServers": {"study-stash": {"command": "studystash", "args": ["mcp"]}, "theirs": {"url": "https://x"}}}""");
@@ -228,6 +250,7 @@ public class GeminiSetupChatTests
     public async Task Geminis_plan_check_says_how_much_is_left_without_spending_any_then_tries_a_turn_in_the_chats_own_home()
     {
         using var dir = new TempDir();
+        using var agyHome = Antigravity.Use(dir["agy"]); // this test's own, whatever runs beside it
         string bin = dir["bin"];
         string exe = FakeAgents.WriteCli(bin, "gemini");
         string work = SetupChat.Folder(dir["home"]);

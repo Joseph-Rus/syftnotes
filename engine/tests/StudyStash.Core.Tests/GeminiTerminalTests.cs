@@ -10,6 +10,7 @@ public class GeminiTerminalTests
     public void Open_in_antigravity_runs_agy_in_study_stashs_own_home()
     {
         using var dir = new TempDir();
+        using var agyHome = Antigravity.Use(dir["agy"]); // this test's own, whatever runs beside it
         var (bin, args, env) = Terminal.Command(dir["pool/BIO 110"], dir["pool"], "BIO 110", "gemini", []);
         Assert.Equal("agy", bin);
         Assert.Equal(["--agent", "study-stash-library", "--add-dir", dir["pool"]], args);

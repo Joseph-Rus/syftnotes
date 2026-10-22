@@ -45,6 +45,7 @@ public sealed class GeminiSignInTests
     public void Finding_agy_asks_its_version_in_study_stashs_own_home()
     {
         using var home = new TempHome();
+        using var agyHome = Antigravity.Use(home["agy"]);
         StudyStash.Core.Tests.FakeAgents.WriteCli(home["bin"], "gemini");
         var found = StudyStash.App.Services.AgentInstall.Find(AgentCli.Gemini, StudyStash.Core.Tests.FakeAgents.Which(home["bin"]));
         Assert.Equal(new Version(1, 4, 4), found.Version);

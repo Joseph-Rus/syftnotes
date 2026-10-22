@@ -36,8 +36,33 @@ public static class Antigravity
     public static readonly string[] ResourceTools = ["list_resources", "read_resource"];
 
     /// <summary>Study Stash's own home for agy, where its sign-in, its notes and its setup chat are: the library's home's
-    /// <c>gemini</c> folder (<see cref="For"/>). The app and the library set it from their own home; the tests give their own.</summary>
-    public static Func<string> Home { get; set; } = () => For(Configs.DefaultHome);
+    /// <c>gemini</c> folder (<see cref="For"/>). The app and the library set it from their own home; a test gives its own
+    /// with <see cref="Use"/>, which no other test running beside it sees.</summary>
+    public static Func<string> Home
+    {
+        get => () => scoped.Value ?? home();
+        set => home = value;
+    }
+
+    static Func<string> home = () => For(Configs.DefaultHome);
+    static readonly AsyncLocal<string?> scoped = new();
+
+    /// <summary>
+    /// <paramref name="agyHome"/> as the home for the calls that follow in this flow of work only (a test's own), until
+    /// disposed. <see cref="Home"/> is shared by the whole process, and a library run in a test (its command line sets
+    /// it) changed it under tests beside it: one wrote into a folder another had just deleted.
+    /// </summary>
+    public static IDisposable Use(string agyHome)
+    {
+        string? before = scoped.Value;
+        scoped.Value = agyHome;
+        return new Restore(() => scoped.Value = before);
+    }
+
+    sealed class Restore(Action undo) : IDisposable
+    {
+        public void Dispose() => undo();
+    }
 
     /// <summary>The agy home for a Study Stash home: its <c>gemini</c> folder, or STUDYSTASH_AGY_HOME when that's set
     /// (an app and its library pointed at one signed-in home, as the off-screen films are).</summary>
