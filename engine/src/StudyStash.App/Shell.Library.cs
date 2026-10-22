@@ -2,6 +2,7 @@ using System.Globalization;
 using System.Text.Json.Nodes;
 using Avalonia;
 using Avalonia.Controls;
+using Avalonia.Input.Platform;
 using Avalonia.Media;
 using StudyStash.App.Controls.Rich;
 using StudyStash.App.Services;
@@ -303,9 +304,37 @@ public static partial class Shell
         library.CanvasClass = null;
         library.Overview = null;
         library.Note = note;
+        ShowFreeAi(note, has: notes.Length > 0 && !mine, offer: !writing && notes.Length == 0 && heard && S(l["no_notes"]) != Summarize.NoNotesShort);
         // Notes to read that nothing is writing now (with none written, what the student typed) can be edited and rewritten.
         ShowLectureAi(l, note, written: !writing && (notes.Length > 0 || (mine && S(l["error"]).Length == 0)));
         ShowLectureFiles(note);
+    }
+
+    /// <summary>
+    /// Notes from an AI Study Stash doesn't run, for a lecture's page (<see cref="FreeAiModel"/>): over one with no notes
+    /// (<paramref name="offer"/>: none written, nothing writing them, a transcript to write them from), that the Claude
+    /// app or any free chat can write them; Copy for your AI and Paste notes, there and in the notes' ⋯ menu. The same
+    /// lecture read again keeps its model, so what's pasted and not saved stays.
+    /// </summary>
+    static void ShowFreeAi(NoteModel note, bool has, bool offer)
+    {
+        if (library.FreeAi is not { } free || free.LectureId != note.Id)
+        {
+            string id = note.Id;
+            free = new FreeAiModel(Ai(), id, note.Noun)
+            {
+                Copy = text => mainWindow?.Clipboard?.SetTextAsync(text) ?? Task.CompletedTask,
+                // Based on the library's own notes, as the page has them: notes that arrived meanwhile aren't replaced unseen.
+                BasedOn = () => library.Notes is { } n && n.LectureId == id ? Notes.Fingerprint(n.Written) : null,
+            };
+            free.Saved += () => Avalonia.Threading.Dispatcher.UIThread.Post(() =>
+            {
+                if (openLecture == id) _ = ShowLectureAsync(id, library.Note?.ShowTranscript == true);
+            });
+        }
+        free.HasNotes = has;
+        free.Offer = offer && !has;
+        library.FreeAi = free;
     }
 
     /// <summary>When a note was, and how long: "Monday 12 October at 9:30 AM, 52 min" (with its year once that isn't
@@ -401,6 +430,7 @@ public static partial class Shell
         ClearPane();
         library.Overview = null;
         library.Note = note;
+        library.FreeAi = null; // not in the library yet: nothing to copy, nowhere to paste
     }
 
     /// <summary>A long run of speech as paragraphs of a few sentences each (about <paramref name="size"/> characters),
@@ -443,7 +473,12 @@ public static partial class Shell
             else if (!unsavedNotes.Remove(note.Id, out notes))
             {
                 fresh = true;
-                var made = notes = new AiNotesModel(ai);
+                var made = notes = new AiNotesModel(ai)
+                {
+                    // The notes' ⋯ menu: a free chat can write them again, and what it wrote can be pasted in their place.
+                    OnCopyForAi = () => library.FreeAi?.CopyForAiCommand.Execute(null),
+                    OnPasteNotes = () => library.FreeAi?.Paste(),
+                };
                 FollowEdits(notes);
                 notes.NotesChanged += () => Avalonia.Threading.Dispatcher.UIThread.Post(() =>
                 {

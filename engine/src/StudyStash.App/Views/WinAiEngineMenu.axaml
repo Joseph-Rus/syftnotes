@@ -13,7 +13,7 @@
   <Border Classes="ai-menu" Width="{Binding Width}" CornerRadius="8" Background="{DynamicResource Acrylic}" BorderBrush="{DynamicResource FlyStroke}"
           BorderThickness="1" Padding="4">
     <StackPanel Spacing="0">
-      <TextBlock Classes="ai-menu-header" Text="{Binding Header}" />
+      <TextBlock Classes="ai-menu-header" Text="{Binding Header}" IsVisible="{Binding HasItems}" />
       <ItemsControl ItemsSource="{Binding Items}">
         <ItemsControl.ItemTemplate>
           <DataTemplate x:DataType="vm:EngineMenuItem">
@@ -34,10 +34,30 @@
           </DataTemplate>
         </ItemsControl.ItemTemplate>
       </ItemsControl>
-      <Border Height="1" Background="{DynamicResource Sep}" Margin="0,4" IsVisible="{Binding FooterText, Converter={x:Static c:Converters.NotEmpty}}" />
-      <Button Classes="ai-menu-footer" Command="{Binding FooterCommand}" IsVisible="{Binding FooterText, Converter={x:Static c:Converters.NotEmpty}}">
+      <Border Height="1" Background="{DynamicResource Sep}" Margin="0,4" IsVisible="{Binding ShowFooter}" />
+      <Button Classes="ai-menu-footer" Command="{Binding FooterCommand}" IsVisible="{Binding ShowFooter}">
         <TextBlock Text="{Binding FooterText}" />
       </Button>
+      <!-- What else it does (the notes': copy them for a free chat, paste a chat's notes, put back earlier ones) -->
+      <Border Height="1" Background="{DynamicResource Sep}" Margin="0,4" IsVisible="{Binding ShowActionsLine}" />
+      <ItemsControl Name="Actions" ItemsSource="{Binding Actions}" IsVisible="{Binding HasActions}">
+        <ItemsControl.ItemTemplate>
+          <DataTemplate x:DataType="vm:MenuAction">
+            <Button Theme="{StaticResource Surface}" CornerRadius="4" HorizontalContentAlignment="Stretch" Command="{Binding Command}"
+                    AutomationProperties.Name="{Binding Name}">
+              <Border Classes="ai-menu-item">
+                <Grid ColumnDefinitions="16,10,Auto,8,*">
+                  <c:Icon Grid.Column="2" Glyph="{Binding Glyph}" Size="16" VerticalAlignment="Center" />
+                  <StackPanel Grid.Column="4" Spacing="1">
+                    <TextBlock Classes="ai-menu-title" Text="{Binding Name}" />
+                    <TextBlock Classes="ai-menu-sub" Text="{Binding Subtitle}" IsVisible="{Binding Subtitle, Converter={x:Static c:Converters.NotEmpty}}" />
+                  </StackPanel>
+                </Grid>
+              </Border>
+            </Button>
+          </DataTemplate>
+        </ItemsControl.ItemTemplate>
+      </ItemsControl>
     </StackPanel>
   </Border>
 </UserControl>

@@ -366,7 +366,7 @@ public static partial class Summarize
     /// really wraps the whole note (counting the fences inside it, which open with a word and close bare) and what it
     /// holds isn't a diagram — so a note that merely starts with a diagram or a code block is kept as it is.
     /// </summary>
-    static string Unwrapped(string t)
+    internal static string Unwrapped(string t)
     {
         var fence = Fenced().Match(t);
         if (!fence.Success) return t;
@@ -449,8 +449,14 @@ public static partial class Summarize
     }
 
     public static string WholePrompt(Meeting m, string transcript, Drawings drawings = Drawings.Flowcharts, string attached = "") =>
+        $"{Brief(m, drawings, attached)}\n\nTranscript:\n{transcript}";
+
+    /// <summary>The notes prompt without the transcript: how Study Stash writes a lecture's notes (its sections, its
+    /// diagrams and formulas, the student's typed lines kept and marked as theirs). What an AI app is told before it
+    /// writes notes for the library, and what "Copy for your AI" puts before the transcript.</summary>
+    public static string Brief(Meeting m, Drawings drawings = Drawings.Flowcharts, string attached = "") =>
         "You are an expert note-taker for university lectures. Write study notes for this lecture "
-        + $"from its transcript.\n\n{Shape(m)}\n\n{Drawing(drawings)}\n\n{Rules}\n\n{Header(m)}{TypedPart(m)}{AttachedPart(attached)}\n\nTranscript:\n{transcript}";
+        + $"from its transcript.\n\n{Shape(m)}\n\n{Drawing(drawings)}\n\n{Rules}\n\n{Header(m)}{TypedPart(m)}{AttachedPart(attached)}";
 
     /// <summary>What the student typed during the lecture, as they typed it (never more than a few pages of it).</summary>
     public static string Typed(Meeting m) => Py.Head(Py.Strip(m.PrivateNotes), MaxTypedChars);

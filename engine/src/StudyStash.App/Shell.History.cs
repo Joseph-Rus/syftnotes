@@ -139,10 +139,25 @@ public static partial class Shell
         Bind(new KeyGesture(Key.J, mac ? KeyModifiers.Meta : KeyModifiers.Control), () => Views.AskKeys.Focus(w));
         // Record, from the window (the shortcut in Settings works from any app; this one is the window's own).
         Bind(new KeyGesture(Key.R, mac ? KeyModifiers.Meta : KeyModifiers.Control), ToggleRecording);
+        // Undo and Redo for a note's notes, when the page (not a field being typed in) has the keys.
+        var command = mac ? KeyModifiers.Meta : KeyModifiers.Control;
+        Bind(new KeyGesture(Key.Z, command), () => UndoNotes(w, redo: false));
+        Bind(new KeyGesture(Key.Z, command | KeyModifiers.Shift), () => UndoNotes(w, redo: true));
+        if (!mac) Bind(new KeyGesture(Key.Y, KeyModifiers.Control), () => UndoNotes(w, redo: true));
         w.AddHandler(Avalonia.Input.InputElement.PointerReleasedEvent, (_, e) =>
         {
             if (e.InitialPressMouseButton == MouseButton.XButton1) GoBack();
             else if (e.InitialPressMouseButton == MouseButton.XButton2) GoForward();
         }, Avalonia.Interactivity.RoutingStrategies.Tunnel);
+    }
+
+    /// <summary>⌘Z / Ctrl+Z (and Redo) on a note's page: the notes' last change undone, or redone. A field being typed in
+    /// keeps the keys for its own undo.</summary>
+    static void UndoNotes(Avalonia.Controls.Window w, bool redo)
+    {
+        if (w.FocusManager?.GetFocusedElement() is Avalonia.Controls.TextBox) return;
+        if (!library.ShowNotePage || library.Notes is not { Editing: false } notes) return;
+        var command = redo ? notes.RedoCommand : notes.UndoCommand;
+        if (command.CanExecute(null)) command.Execute(null);
     }
 }

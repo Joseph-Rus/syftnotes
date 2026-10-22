@@ -106,12 +106,22 @@ public static class Engines
     /// (<see cref="AiJobs.Describe"/>: an Ollama model like "qwen3:30b", or "Claude sonnet", "ChatGPT", "Gemini …").</summary>
     public static string WhoWrote(string notesModel) => notesModel switch
     {
+        // Notes the student brought back from a chat, or that an AI app saved without saying which it is.
+        _ when notesModel.StartsWith(YourAi, StringComparison.Ordinal) => YourAi,
         _ when notesModel.StartsWith("Claude", StringComparison.Ordinal) => "Claude",
         _ when notesModel.StartsWith("ChatGPT", StringComparison.Ordinal) || notesModel.StartsWith("Codex", StringComparison.Ordinal) => "ChatGPT",
         _ when notesModel.StartsWith("Gemini", StringComparison.Ordinal) => "Gemini",
         { Length: > 0 } => "Ollama",
         _ => "",
     };
+
+    /// <summary>Who wrote notes the library didn't write itself, when it can't say which AI: "your AI". The one place
+    /// this name is said (pasted notes, an AI app that doesn't say which it is): change it here and it changes in the
+    /// notes' byline, their file, the Undo line and History.</summary>
+    public const string YourAi = "your AI";
+
+    /// <summary>The writer of notes pasted from a chat ("Paste notes"), as the note's file and its byline name them.</summary>
+    public const string PastedWriter = YourAi + " (pasted from a chat)";
 
     /// <summary>What a lecture's notes' byline names: the AI (<see cref="WhoWrote"/>), or, when another model than the
     /// one asked wrote them ("Gemini · Gemini 3.5 Flash-Lite (Flash's free daily limit is used up)"), that model and
