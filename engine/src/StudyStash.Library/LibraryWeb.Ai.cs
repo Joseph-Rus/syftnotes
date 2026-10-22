@@ -216,7 +216,7 @@ public sealed partial class LibraryWeb
             if (!Engines.Order.Contains(id)) return Http.Detail(400, $"there's no AI called {id}");
             string? model = Str(await Http.JsonBodyAsync(ctx.Request), "model");
             var (ok, why) = await Jobs.TestAsync(id, model ?? "");
-            return AiJson(new AiSaid(ok ? $"{Engines.Name(id)} is ready." : why, await AiOverviewAsync()));
+            return AiJson(new AiSaid(ok ? $"{Engines.Name(id)} is ready." + Answered(why) : why, await AiOverviewAsync()));
         })));
 
         app.MapPost("/api/v2/ai/engines/{id}/key", Http.Handle(ctx => ApiAsync(ctx, async () =>
@@ -232,9 +232,12 @@ public sealed partial class LibraryWeb
             settings.Save(cfg.Home);
             if (key.Trim().Length == 0) return AiJson(new AiSaid($"{Engines.Name(id)}'s API key is gone.", await AiOverviewAsync()));
             var (ok, why) = await Jobs.TestAsync(id);
-            return AiJson(new AiSaid(ok ? $"{Engines.Name(id)} works with your API key." : $"The key was saved, but {Engines.Name(id)} said: {why}",
+            return AiJson(new AiSaid(ok ? $"{Engines.Name(id)} works with your API key." + Answered(why) : $"The key was saved, but {Engines.Name(id)} said: {why}",
                 await AiOverviewAsync()));
         })));
+
+        // A check that worked with another model than the one asked: which answered, and why.
+        static string Answered(string note) => note.Length > 0 ? $" It answered with {note}." : "";
 
         app.MapPost("/api/v2/ai/engines/{id}/model", Http.Handle(ctx => ApiAsync(ctx, async () =>
         {

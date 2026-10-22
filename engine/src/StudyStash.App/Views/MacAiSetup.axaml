@@ -132,6 +132,8 @@
             </Border>
             <Button Grid.Column="2" Classes="btn sm ink" VerticalAlignment="Center" Command="{Binding SaveKeyCommand}" IsEnabled="{Binding !Busy}" Content="Save" />
           </Grid>
+          <!-- Gemini: what Google's free tier does with what's sent, and who can have a free key -->
+          <TextBlock Classes="hint" Text="{Binding KeyPrivacy}" IsVisible="{Binding HasKeyPrivacy}" TextWrapping="Wrap" FontSize="12.5" LineHeight="18" />
           <Grid ColumnDefinitions="*,12,Auto" IsVisible="{Binding HasKeyAlternative}">
             <TextBlock Classes="hint" Text="{Binding KeyAlternative}" TextWrapping="Wrap" VerticalAlignment="Center" />
             <Button AutomationProperties.Name="Check again" Grid.Column="2" Classes="btn sm" VerticalAlignment="Center" Command="{Binding CheckKeyAlternativeCommand}">
