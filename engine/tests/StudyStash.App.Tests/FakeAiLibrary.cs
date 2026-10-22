@@ -239,13 +239,13 @@ public sealed class FakeAiLibrary : IAiLibrary
         return Task.FromResult(OnRestoreNotes?.Invoke(lecture, version));
     }
 
-    public Task<RewriteInfo?> UndoNotesAsync(string lecture)
+    public Task<RewriteInfo?> UndoNotesAsync(string lecture, string? expect = null)
     {
         Calls.Add($"undo:{lecture}");
         return Task.FromResult(OnUndoNotes?.Invoke(lecture));
     }
 
-    public Task<RewriteInfo?> RedoNotesAsync(string lecture)
+    public Task<RewriteInfo?> RedoNotesAsync(string lecture, string? expect = null)
     {
         Calls.Add($"redo:{lecture}");
         return Task.FromResult(OnRedoNotes?.Invoke(lecture));

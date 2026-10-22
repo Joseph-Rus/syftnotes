@@ -54,7 +54,10 @@ public class NotesVersionTests
         store.EditNotes("lec-1", "C");
         string Notes() => store.Get("lec-1")!.SummaryMd!;
 
-        Assert.Equal(NotesEdited.Saved, store.UndoNotes("lec-1"));
+        long seen = store.NewestVersion("lec-1")!.Seq;
+        Assert.Equal(NotesEdited.Changed, store.UndoNotes("lec-1", expect: seen - 1)); // asked from notes changed since: nothing undone
+        Assert.Equal("C", Notes());
+        Assert.Equal(NotesEdited.Saved, store.UndoNotes("lec-1", expect: seen));
         Assert.Equal("B", Notes());
         store.UndoNotes("lec-1");
         Assert.Equal("A", Notes());

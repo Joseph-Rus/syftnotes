@@ -313,6 +313,9 @@ public static partial class AiWords
         _ => $"New notes from {Who(by)}",
     };
 
+    /// <summary>Undo or Redo pressed after the notes changed on another device or in another app.</summary>
+    public const string ChangedElsewhere = "These notes changed on another device since this page showed them, so nothing was undone. Here they are now.";
+
     /// <summary>A version in History, by what made it: "Written by Claude", "Your edit", "Pasted from a chat", "Put
     /// back".</summary>
     public static string VersionWords(string kind, string by) => kind switch

@@ -341,10 +341,17 @@ public sealed partial class LibraryWeb
             var body = await Http.JsonBodyAsync(ctx.Request);
             return RewriteResult(() => Rewrites.Restore((string)ctx.Request.RouteValues["lecture"]!, Str(body, "version")));
         })));
-        app.MapPost("/api/v2/ai/rewrite/{lecture}/undo", Http.Handle(ctx => ApiAsync(ctx, () =>
-            Task.FromResult(RewriteResult(() => Rewrites.Undo((string)ctx.Request.RouteValues["lecture"]!))))));
-        app.MapPost("/api/v2/ai/rewrite/{lecture}/redo", Http.Handle(ctx => ApiAsync(ctx, () =>
-            Task.FromResult(RewriteResult(() => Rewrites.Redo((string)ctx.Request.RouteValues["lecture"]!))))));
+        // expect: the version the app shows (none from an older app): changed elsewhere since, 412 and nothing undone.
+        app.MapPost("/api/v2/ai/rewrite/{lecture}/undo", Http.Handle(ctx => ApiAsync(ctx, async () =>
+        {
+            var body = await Http.JsonBodyAsync(ctx.Request);
+            return RewriteResult(() => Rewrites.Undo((string)ctx.Request.RouteValues["lecture"]!, Str(body, "expect")));
+        })));
+        app.MapPost("/api/v2/ai/rewrite/{lecture}/redo", Http.Handle(ctx => ApiAsync(ctx, async () =>
+        {
+            var body = await Http.JsonBodyAsync(ctx.Request);
+            return RewriteResult(() => Rewrites.Redo((string)ctx.Request.RouteValues["lecture"]!, Str(body, "expect")));
+        })));
         app.MapGet("/api/v2/ai/rewrite/{lecture}/versions", Http.Handle(ctx => ApiAsync(ctx, () =>
         {
             try

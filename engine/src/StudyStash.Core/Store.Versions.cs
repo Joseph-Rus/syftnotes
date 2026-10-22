@@ -268,17 +268,27 @@ public sealed partial class Store
     }
 
     /// <summary>Undo: the version before, put back, as a version of its own. <see cref="NotesEdited.Gone"/> with
-    /// nothing to undo.</summary>
-    public NotesEdited UndoNotes(string noteId)
+    /// nothing to undo. <paramref name="expect"/>: the version the undo was asked from (the newest, as the asker last
+    /// saw it); when another device or app has changed the notes since, nothing is undone (<see cref="NotesEdited.Changed"/>),
+    /// so two at once never go back two steps.</summary>
+    public NotesEdited UndoNotes(string noteId, long? expect = null)
     {
-        lock (gate) return UndoState(noteId).Undo is { } back ? PutBack(noteId, back, NotesChangeKind.Undo) : NotesEdited.Gone;
+        lock (gate)
+        {
+            if (expect is { } seen && NewestVersion(noteId)?.Seq != seen) return NotesEdited.Changed;
+            return UndoState(noteId).Undo is { } back ? PutBack(noteId, back, NotesChangeKind.Undo) : NotesEdited.Gone;
+        }
     }
 
     /// <summary>Redo: the version the last undo went back from, put back. <see cref="NotesEdited.Gone"/> with nothing to
-    /// redo.</summary>
-    public NotesEdited RedoNotes(string noteId)
+    /// redo; <see cref="NotesEdited.Changed"/> as for <see cref="UndoNotes"/>.</summary>
+    public NotesEdited RedoNotes(string noteId, long? expect = null)
     {
-        lock (gate) return UndoState(noteId).Redo is { } forward ? PutBack(noteId, forward, NotesChangeKind.Redo) : NotesEdited.Gone;
+        lock (gate)
+        {
+            if (expect is { } seen && NewestVersion(noteId)?.Seq != seen) return NotesEdited.Changed;
+            return UndoState(noteId).Redo is { } forward ? PutBack(noteId, forward, NotesChangeKind.Redo) : NotesEdited.Gone;
+        }
     }
 
     /// <summary>A version chosen in History (<paramref name="seq"/>, or the one before the notes now), put back as a new

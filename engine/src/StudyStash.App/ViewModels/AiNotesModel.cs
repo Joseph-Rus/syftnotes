@@ -488,10 +488,10 @@ public sealed partial class AiNotesModel : ObservableObject, IDisposable
     /// <summary>Undo: the notes before the last change, put back (a change of its own, so Redo, or Undo again, takes it
     /// back).</summary>
     [RelayCommand(CanExecute = nameof(CanUndo))]
-    Task Undo() => PutBack(() => library.UndoNotesAsync(LectureId));
+    Task Undo() => PutBack(() => library.UndoNotesAsync(LectureId, Change?.Id));
 
     [RelayCommand(CanExecute = nameof(CanRedo))]
-    Task Redo() => PutBack(() => library.RedoNotesAsync(LectureId));
+    Task Redo() => PutBack(() => library.RedoNotesAsync(LectureId, Change?.Id));
 
     async Task PutBack(Func<Task<RewriteInfo?>> ask)
     {
@@ -504,6 +504,13 @@ public sealed partial class AiNotesModel : ObservableObject, IDisposable
             var info = await ask();
             if (info is null) { OlderLibrary = true; return; }
             Apply(info);
+            NotesChanged?.Invoke();
+        }
+        catch (LibraryRefusedException ex) when (ex.Status == 412)
+        {
+            // Changed on another device or in another app since this page last looked: nothing was undone, and the
+            // page shows the notes as they are now, with their own Undo.
+            Say = AiWords.ChangedElsewhere;
             NotesChanged?.Invoke();
         }
         catch (LibraryRefusedException ex)

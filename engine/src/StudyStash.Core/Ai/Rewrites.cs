@@ -400,11 +400,16 @@ public sealed class Rewrites(Config cfg, Store store, AiJobs ai, Action<string>?
         return PutBack(id, () => store.RestoreNotesVersion(id, seq), "there are no earlier notes to put back.");
     }
 
-    /// <summary>Undo: the notes before the last change, put back (409 with nothing to undo).</summary>
-    public RewriteInfo Undo(string id) => PutBack(id, () => store.UndoNotes(id), "there's nothing to undo.");
+    /// <summary>Undo: the notes before the last change, put back (409 with nothing to undo). <paramref name="expect"/>:
+    /// the version the student's app shows; when the notes changed elsewhere since, 412, and nothing is undone.</summary>
+    public RewriteInfo Undo(string id, string? expect = null) => PutBack(id, () => store.UndoNotes(id, Seq(expect)), "there's nothing to undo.");
 
-    /// <summary>Redo: the notes the last undo went back from, put back (409 with nothing to redo).</summary>
-    public RewriteInfo Redo(string id) => PutBack(id, () => store.RedoNotes(id), "there's nothing to redo.");
+    /// <summary>Redo: the notes the last undo went back from, put back (409 with nothing to redo; 412 as for Undo).</summary>
+    public RewriteInfo Redo(string id, string? expect = null) => PutBack(id, () => store.RedoNotes(id, Seq(expect)), "there's nothing to redo.");
+
+    /// <summary>A version's id as the library numbers them; null for none (or one that isn't a number, which no version has).</summary>
+    static long? Seq(string? version) =>
+        long.TryParse(version, System.Globalization.NumberStyles.None, System.Globalization.CultureInfo.InvariantCulture, out long n) ? n : version is { Length: > 0 } ? -1 : null;
 
     RewriteInfo PutBack(string id, Func<NotesEdited> run, string none)
     {

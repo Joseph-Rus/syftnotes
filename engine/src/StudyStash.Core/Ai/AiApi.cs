@@ -213,10 +213,12 @@ public interface IAiLibrary
     /// <summary>Puts a version of the lecture's notes back as a new version (<paramref name="version"/>, a
     /// <see cref="NotesKept.Id"/>, or the one before the notes now). Null from a library too old to.</summary>
     Task<RewriteInfo?> RestoreNotesAsync(string lecture, string? version = null) => Task.FromResult<RewriteInfo?>(null);
-    /// <summary>Undo: the notes before the last change, put back. Null from a library too old to.</summary>
-    Task<RewriteInfo?> UndoNotesAsync(string lecture) => Task.FromResult<RewriteInfo?>(null);
-    /// <summary>Redo: the notes the last undo went back from, put back. Null from a library too old to.</summary>
-    Task<RewriteInfo?> RedoNotesAsync(string lecture) => Task.FromResult<RewriteInfo?>(null);
+    /// <summary>Undo: the notes before the last change, put back. <paramref name="expect"/>: the version the app shows
+    /// (<see cref="NotesChange.Id"/>); changed elsewhere since, the library refuses (412) and nothing is undone. Null from
+    /// a library too old to.</summary>
+    Task<RewriteInfo?> UndoNotesAsync(string lecture, string? expect = null) => Task.FromResult<RewriteInfo?>(null);
+    /// <summary>Redo: the notes the last undo went back from, put back (412 as for Undo). Null from a library too old to.</summary>
+    Task<RewriteInfo?> RedoNotesAsync(string lecture, string? expect = null) => Task.FromResult<RewriteInfo?>(null);
     /// <summary>The versions of the lecture's notes, newest first (History). Null from a library too old to.</summary>
     Task<List<NotesKept>?> NotesVersionsAsync(string lecture) => Task.FromResult<List<NotesKept>?>(null);
     /// <summary>One version, with its words. Null when there's no such version, or the library is too old.</summary>
@@ -402,11 +404,11 @@ public sealed class AiRemote(string serverUrl, Func<string> key, HttpClient? htt
     public async Task<RewriteInfo?> RestoreNotesAsync(string lecture, string? version = null) =>
         As<RewriteInfo>(await SendAsync(HttpMethod.Post, $"/rewrite/{Seg(lecture)}/restore", new JsonObject { ["version"] = version }));
 
-    public async Task<RewriteInfo?> UndoNotesAsync(string lecture) =>
-        As<RewriteInfo>(await SendAsync(HttpMethod.Post, $"/rewrite/{Seg(lecture)}/undo"));
+    public async Task<RewriteInfo?> UndoNotesAsync(string lecture, string? expect = null) =>
+        As<RewriteInfo>(await SendAsync(HttpMethod.Post, $"/rewrite/{Seg(lecture)}/undo", new JsonObject { ["expect"] = expect }));
 
-    public async Task<RewriteInfo?> RedoNotesAsync(string lecture) =>
-        As<RewriteInfo>(await SendAsync(HttpMethod.Post, $"/rewrite/{Seg(lecture)}/redo"));
+    public async Task<RewriteInfo?> RedoNotesAsync(string lecture, string? expect = null) =>
+        As<RewriteInfo>(await SendAsync(HttpMethod.Post, $"/rewrite/{Seg(lecture)}/redo", new JsonObject { ["expect"] = expect }));
 
     public async Task<List<NotesKept>?> NotesVersionsAsync(string lecture) =>
         (await SendAsync(HttpMethod.Get, $"/rewrite/{Seg(lecture)}/versions"))?["versions"]?.Deserialize<List<NotesKept>>(Options);
