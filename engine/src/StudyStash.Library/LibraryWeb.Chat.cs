@@ -190,7 +190,8 @@ public sealed partial class LibraryWeb
         if (!ready) sb.Append($"<div class=\"notice\"><div>{Ui.Esc(why)} Pick another AI in <a href=\"/settings\">Settings</a>.</div></div>");
         if (chat is null)
         {
-            var recent = LibraryChats.List(60).Where(r => r.Kind != Chats.AskKind).Take(20).ToList(); // the app's Ask chats are the app's
+            // Its own chats only (the app's Ask chats are the app's), the 20 newest, from the index: only those are read.
+            var recent = LibraryChats.Entries().Where(e => e.Kind != Chats.AskKind).Take(20).Select(e => LibraryChats.Get(e.Id)).OfType<Chat>().ToList();
             if (recent.Count > 0)
                 sb.Append("<h2>Recent chats</h2><div class=\"group\">" + string.Concat(recent.Select(r =>
                     $"<a class=\"row\" href=\"/chat/{r.Id}\"><div class=\"grow\"><div class=\"title\">{Ui.Esc(r.Title)}</div>"
