@@ -124,6 +124,30 @@ public class GeminiSetupChatTests
         Assert.DoesNotContain(events, e => e.Kind == "Tool" && e.Tool == "add_class");
     }
 
+    /// <summary>The library's notes on Gemini run agy in Study Stash's own home for it (the library's home's gemini
+    /// folder), never the student's own ~/.gemini: what main did, and how a test run made the owner's ~/.gemini once.</summary>
+    [Fact]
+    public async Task The_librarys_notes_on_gemini_run_in_study_stashs_own_home_for_agy()
+    {
+        using var dir = new TempDir();
+        Assert.Equal(Path.Combine(dir["library"], "gemini"), Antigravity.For(dir["library"]));
+        string exe = FakeAgents.WriteCli(dir["bin"], "gemini");
+        FakeAgents.Replay(dir["bin"], [FakeAgents.Agy.Words(1, "# Notes"), FakeAgents.Agy.Result("# Notes")]);
+        var gemini = new GeminiProvider { At = exe };
+        var done = await gemini.CompleteAsync(new AiRequest("Write notes", dir.Path) { ReadDirs = [dir["lectures"]] });
+        Assert.True(done.Ok, done.Text);
+        Assert.Equal(Antigravity.Home(), File.ReadAllText(Path.Combine(dir["bin"], "home-1.txt")).Trim());
+        Assert.NotEqual(Py.UserHome(), Antigravity.Home());
+        // Reading the turn's folders is allowed in that home's settings, not the student's own.
+        Assert.Contains("read_file(", File.ReadAllText(Antigravity.SettingsPath(Antigravity.Home())));
+
+        // A plain answer (notes, the Check) runs as the answer agent, which that home has: no tools to reach for.
+        var check = await gemini.CompleteAsync(new AiRequest("Reply with the single word: ready", dir.Path));
+        Assert.True(check.Ok, check.Text);
+        Assert.Equal("study-stash-answer", FakeAgents.Argv(dir["bin"], 2)[FakeAgents.Argv(dir["bin"], 2).ToList().IndexOf("--agent") + 1]);
+        Assert.Contains("excludeDefaultComponents: true", File.ReadAllText(Antigravity.AgentPath(Antigravity.Home(), Antigravity.AnswerAgent)));
+    }
+
     /// <summary>Lines the real agy 1.4.4 printed for a setup turn (its paths and the tools' long output shortened): read
     /// as the parser expects, and agy's own agent (no "agent" in its init) or a refusal of agy's own stops the turn.</summary>
     [Fact]

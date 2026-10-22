@@ -111,6 +111,42 @@ public static class Antigravity
             """.Replace("\r\n", "\n");
     }
 
+    /// <summary>The agent the library's plain answers (notes, sorting, its Check) run as: <see cref="AnswerAgentFile"/>.</summary>
+    public const string AnswerAgent = "study-stash-answer";
+
+    /// <summary>
+    /// The library's plain answers as an agy agent: everything it needs is in the message (the transcript, the brief),
+    /// so it has no tools at all, like the setup agent with no MCP server. agy's own agent sometimes reaches for a tool
+    /// even for "Reply with the single word: ready", and a print run refuses it and ends with no answer (seen with the
+    /// real agy: the library's Check of Gemini came back empty).
+    /// </summary>
+    public static string AnswerAgentFile() => """
+        ---
+        name: study-stash-answer
+        description: Study Stash's notes and answers, from what the message gives it. It has no tools.
+        mainAgent: true
+        subagent: false
+        hidden: true
+        excludeDefaultComponents: true
+        inheritCustomizations: false
+        inheritMcp: false
+        commandExecutionPolicy: "off"
+        tools: []
+        mcpServers: []
+        ---
+        # Study Stash
+
+        Answer from what the message gives you. You have no tools: don't try to use any.
+
+        """.Replace("\r\n", "\n");
+
+    /// <summary>The answer agent's file in Study Stash's home for agy, written when it isn't there as it should be.</summary>
+    public static void PrepareAnswer()
+    {
+        string path = AgentPath(Home(), AnswerAgent);
+        if (!File.Exists(path) || File.ReadAllText(path) != AnswerAgentFile()) Private(path, AnswerAgentFile());
+    }
+
     /// <summary>
     /// Writes the setup agent afresh for a turn, in Study Stash's home for agy, with <paramref name="brief"/> and the
     /// setup tools' address and token (none: no tools at all); the folder the run works in is made empty. agy keeps the

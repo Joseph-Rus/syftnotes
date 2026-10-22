@@ -19,8 +19,9 @@ static class TestSafety
         Core.Ai.SetupChat.CodexConfig = () => System.IO.Path.Combine(System.IO.Path.GetTempPath(), "studystash-app-tests-no-codex", "config.toml");
         // Claude Code's version, as a current one says it: no test asks the real one.
         Core.Ai.ClaudeProvider.VersionOf = _ => new Version(2, 1, 260);
-        // Antigravity's home of Study Stash's own: a folder of the tests' own, never ~/.study-stash/gemini.
-        Core.Ai.Antigravity.Home = () => System.IO.Path.Combine(System.IO.Path.GetTempPath(), "studystash-app-tests", "agy-home");
+        // Antigravity's home of Study Stash's own: a folder of the tests' own, never ~/.study-stash/gemini (an off-screen
+        // film points it at a signed-in one with STUDYSTASH_AGY_HOME).
+        Core.Ai.Antigravity.Home = () => Core.Ai.Antigravity.For(System.IO.Path.Combine(System.IO.Path.GetTempPath(), "studystash-app-tests"));
     }
 #pragma warning restore CA2255
 }

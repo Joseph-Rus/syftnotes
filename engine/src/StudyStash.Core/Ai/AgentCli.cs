@@ -101,7 +101,8 @@ public static partial class AgentCli
     /// <summary>
     /// Gemini, through Google's Antigravity CLI: a personal Google account signs in (free, with a small weekly allowance,
     /// or Google AI Pro and Ultra with more). Its own installer, per-user, no Node.js: one program in ~/.local/bin, or
-    /// %LOCALAPPDATA%\agy\bin on Windows. Every command it runs for Study Stash has Study Stash's own home for agy.
+    /// %LOCALAPPDATA%\agy\bin on Windows. Every command it runs for Study Stash has Study Stash's own home for agy,
+    /// where its sign-in is kept too (so a student who already uses agy signs in once more, for Study Stash).
     /// </summary>
     public static readonly AgentCliInfo Gemini = new()
     {

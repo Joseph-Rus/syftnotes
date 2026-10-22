@@ -137,6 +137,9 @@ public sealed partial class GuidedSetupModel : ObservableObject, IDisposable
     [ObservableProperty] public partial bool OfferTerminal { get; set; }
     [ObservableProperty] public partial bool SignedIn { get; set; }
     [ObservableProperty] public partial bool CheckingPlan { get; set; }
+    /// <summary>Asking the CLI whether it's signed in (Gemini's agy takes a second or two): no sign-in button meanwhile,
+    /// for a student who turns out to be signed in already.</summary>
+    [ObservableProperty] public partial bool CheckingSignIn { get; set; }
     /// <summary>Signed in, and the plan check passed: the AI is ready.</summary>
     [ObservableProperty] public partial bool AiReady { get; set; }
     [ObservableProperty] public partial string? SignInProblem { get; set; }
@@ -277,7 +280,7 @@ public sealed partial class GuidedSetupModel : ObservableObject, IDisposable
         "gemini" => "A personal Google account works; school and work accounts often don't. Without one, Study Stash still records and transcribes your lectures. Have an API key? Carry on, and add it on the notes step.",
         _ => "Study Stash needs Claude Pro or Max. Without one, it still records and transcribes your lectures. Have an API key? Carry on, and add it on the notes step.",
     };
-    public bool ShowOpenSignIn => !WaitingSignIn && !SignedIn && PlanProblem == ChatProblem.None;
+    public bool ShowOpenSignIn => !WaitingSignIn && !SignedIn && !CheckingSignIn && PlanProblem == ChatProblem.None;
     public bool HasSignInProblem => !string.IsNullOrEmpty(SignInProblem);
     public bool HasPlanProblem => PlanProblem != ChatProblem.None;
     public bool PlanIsPlan => PlanProblem == ChatProblem.Plan;
@@ -371,6 +374,7 @@ public sealed partial class GuidedSetupModel : ObservableObject, IDisposable
     partial void OnWaitingSignInChanged(bool value) => Notify(nameof(ShowOpenSignIn));
     partial void OnSignedInChanged(bool value) => Notify(nameof(ShowOpenSignIn), nameof(SignInTitle), nameof(SignInLede));
     partial void OnCheckingPlanChanged(bool value) => Notify(nameof(ShowCheckingPlan));
+    partial void OnCheckingSignInChanged(bool value) => Notify(nameof(ShowOpenSignIn));
 
     partial void OnAiReadyChanged(bool value)
     {
@@ -715,8 +719,18 @@ public sealed partial class GuidedSetupModel : ObservableObject, IDisposable
     async Task ToSignInAsync()
     {
         ResetSignIn();
+        CheckingSignIn = true;
         Screen = GuidedScreen.SignIn;
-        if ((await CheckSignedInAsync()).SignedIn)
+        AgentSignedIn now;
+        try
+        {
+            now = await CheckSignedInAsync();
+        }
+        finally
+        {
+            CheckingSignIn = false;
+        }
+        if (now.SignedIn)
         {
             SignedIn = true;
             await CheckPlanAsync();

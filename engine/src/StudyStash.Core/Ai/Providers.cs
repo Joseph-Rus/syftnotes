@@ -627,7 +627,7 @@ public class CodexProvider : AiProvider
 /// <summary>Gemini, through Google's Antigravity CLI (<c>agy -p</c>), which took over from Gemini CLI for
 /// personal Google accounts, in a home of Study Stash's own (<see cref="Antigravity.Home"/>): the student's own agy
 /// settings, MCP servers, plugins and skills don't run in the library's work, and Study Stash never changes theirs. The
-/// sign-in is the computer's (agy keeps it in the Keychain or Credential Manager), so it's the same one.</summary>
+/// sign-in is kept in that home too: the one setup's "Sign in to Gemini" made.</summary>
 public sealed class GeminiProvider : AiProvider
 {
     public override string Id => "gemini";
@@ -675,8 +675,19 @@ public sealed class GeminiProvider : AiProvider
         return Antigravity.Allow(settingsPath, rules);
     }
 
+    /// <summary>A plain answer (notes, sorting, the Check: no tools, no files to change, no folders to look at): it runs
+    /// as Study Stash's answer agent, which has no tools to reach for (<see cref="Antigravity.AnswerAgentFile"/>).</summary>
+    static bool PlainAnswer(AiRequest req) => !req.Tools && !req.Write && req.ReadDirs.Count == 0;
+
     public override List<string> Command(AiRequest req, bool stream)
     {
+        if (PlainAnswer(req))
+        {
+            var plain = new List<string> { Exe() ?? "agy", "-p", WithSystem(req), "--output-format", "stream-json", "--agent", Antigravity.AnswerAgent, "--disable-slash-commands" };
+            if (req.Model.Length > 0) plain.AddRange(["--model", req.Model]);
+            if (req.Session.Length > 0) plain.AddRange(["--conversation", req.Session]);
+            return plain;
+        }
         var cmd = new List<string> { Exe() ?? "agy", "-p", WithSystem(req), "--output-format", "stream-json",
             "--mode", req.Write ? "accept-edits" : "plan" };
         if (!req.Write) // read-only turns may look around the other folders; editing turns stay in the library
@@ -688,7 +699,11 @@ public sealed class GeminiProvider : AiProvider
 
     public override IAsyncEnumerable<AiEvent> RunAsync(AiRequest req, bool stream = true, CancellationToken ct = default)
     {
-        if (Available()) Prepare(req.Tools ? req.McpCommand : [], [req.Cwd, .. req.ReadDirs]);
+        if (Available())
+        {
+            if (PlainAnswer(req)) Antigravity.PrepareAnswer();
+            else Prepare(req.Tools ? req.McpCommand : [], [req.Cwd, .. req.ReadDirs]);
+        }
         return base.RunAsync(req, stream, ct);
     }
 
