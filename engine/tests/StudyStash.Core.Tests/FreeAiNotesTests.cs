@@ -85,15 +85,15 @@ public class FreeAiNotesTests
         EditFile("The library's own notes.", "Fixed in Obsidian.");
         Assert.StartsWith("Saved.", await ClaudeTools.SaveNotesAsync(app, "lec-1", "## Summary\nClaude's notes.", replace: true, "Claude (in the Claude app)"));
         Assert.Equal([("## Summary\nClaude's notes.", NotesChangeKind.App), ("## Summary\nFixed in Obsidian.", NotesChangeKind.File), ("## Summary\nThe library's own notes.", NotesChangeKind.Written)],
-            store.NotesVersions("lec-1").Select(v => (v.Markdown, v.Kind)));
+            store.NotesVersionsWithText("lec-1").Select(v => (v.Markdown, v.Kind)));
         Assert.Equal("## Summary\nClaude's notes.", store.Get("lec-1")!.SummaryMd);
 
         // Fixed in the file again, then the version before is put back: that fix is kept too.
         EditFile("Claude's notes.", "Claude's notes, fixed in the file.");
         var back = (await remote.RestoreNotesAsync("lec-1"))!;
         Assert.Equal("## Summary\nFixed in Obsidian.", back.Current!.Markdown);
-        Assert.Equal([NotesChangeKind.Restore, NotesChangeKind.File, NotesChangeKind.App], store.NotesVersions("lec-1").Take(3).Select(v => v.Kind));
-        Assert.Equal("## Summary\nClaude's notes, fixed in the file.", store.NotesVersions("lec-1")[1].Markdown);
+        Assert.Equal([NotesChangeKind.Restore, NotesChangeKind.File, NotesChangeKind.App], store.NotesVersionsWithText("lec-1").Take(3).Select(v => v.Kind));
+        Assert.Equal("## Summary\nClaude's notes, fixed in the file.", store.NotesVersionsWithText("lec-1")[1].Markdown);
         Assert.Contains("Fixed in Obsidian.", File.ReadAllText(path));
     }
 

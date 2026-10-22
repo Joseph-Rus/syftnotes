@@ -363,12 +363,11 @@ public sealed class Rewrites(Config cfg, Store store, AiJobs ai, Action<string>?
     /// <summary>The last change to the lecture's notes, and whether Undo or Redo can follow it.</summary>
     NotesChange? Change(string id)
     {
-        var newest = store.NotesVersions(id).FirstOrDefault();
-        if (newest is null) return null;
-        var undo = store.UndoState(id);
+        // One row, without its words: asked on every page open and every poll.
+        if (store.NewestVersion(id) is not { } newest) return null;
         return new NotesChange(Id(newest.Seq), newest.Kind, newest.Model.Length > 0 ? Engines.WhoWrote(newest.Model) : "", newest.At)
         {
-            CanUndo = undo.Undo is not null, CanRedo = undo.Redo is not null,
+            CanUndo = newest.UndoTo is not null, CanRedo = newest.RedoTo is not null,
         };
     }
 
@@ -385,11 +384,10 @@ public sealed class Rewrites(Config cfg, Store store, AiJobs ai, Action<string>?
     public NotesKept Version(string id, string version)
     {
         Require(id);
-        var versions = store.NotesVersions(id);
-        int at = long.TryParse(version, System.Globalization.NumberStyles.None, System.Globalization.CultureInfo.InvariantCulture, out long seq)
-            ? versions.FindIndex(v => v.Seq == seq) : -1;
-        if (at < 0) throw new RewriteRefusedException(404, "there's no such version of these notes.");
-        return Kept(versions[at], current: at == 0, words: true);
+        var kept = long.TryParse(version, System.Globalization.NumberStyles.None, System.Globalization.CultureInfo.InvariantCulture, out long seq)
+            ? store.NotesVersion(id, seq) : null;
+        if (kept is null) throw new RewriteRefusedException(404, "there's no such version of these notes.");
+        return Kept(kept, current: store.NewestVersion(id)?.Seq == kept.Seq, words: true);
     }
 
     /// <summary>Puts a version of the lecture's notes back as a new version (<paramref name="version"/>, or the one before

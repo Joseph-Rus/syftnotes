@@ -13,7 +13,7 @@ public class NotesVersionTests
         store.Save(new Meeting(id) { Title = "Cells", Date = "2026-10-01T09:00:00", Transcript = "Today: cells." },
             new Classification("Bio 110", 0.9, "ollama", "Cells", []), notes, model, versionKind: kind);
 
-    static string[] Kinds(Store store, string id = "lec-1") => [.. store.NotesVersions(id).Select(v => v.Kind).Reverse()];
+    static string[] Kinds(Store store, string id = "lec-1") => [.. store.NotesVersionsWithText(id).Select(v => v.Kind).Reverse()];
 
     [Fact]
     public void Every_kind_of_change_to_the_notes_is_a_version()
@@ -26,7 +26,7 @@ public class NotesVersionTests
         store.EditNotes("lec-1", "## Summary\nFrom the Claude app.", writer: "Claude (in the Claude app)", redraft: true, kind: NotesChangeKind.App);
         store.EditNotes("lec-1", "## Summary\nPasted.", writer: Engines.PastedWriter, kind: NotesChangeKind.Paste);
         store.EditNotes("lec-1", "## Summary\nPasted, typo fixed.");                      // an edit by hand
-        store.RestoreNotesVersion("lec-1", store.NotesVersions("lec-1")[^1].Seq);          // History: the first, put back
+        store.RestoreNotesVersion("lec-1", store.NotesVersionsWithText("lec-1")[^1].Seq);          // History: the first, put back
         store.UndoNotes("lec-1");
         store.RedoNotes("lec-1");
         string path = store.Get("lec-1")!.MdPath!;
@@ -37,10 +37,11 @@ public class NotesVersionTests
 
         Assert.Equal([NotesChangeKind.Written, NotesChangeKind.Rewrite, NotesChangeKind.App, NotesChangeKind.Paste, NotesChangeKind.Edit,
             NotesChangeKind.Restore, NotesChangeKind.Undo, NotesChangeKind.Redo, NotesChangeKind.File, NotesChangeKind.Edit, NotesChangeKind.Diagrams], Kinds(store));
-        var versions = store.NotesVersions("lec-1");
+        var versions = store.NotesVersionsWithText("lec-1");
         Assert.Equal("Claude sonnet", versions.Single(v => v.Kind == NotesChangeKind.Rewrite).Model); // who made each
         Assert.Equal(store.Get("lec-1")!.SummaryMd, versions[0].Markdown);                    // the newest is the notes now
         Assert.All(versions, v => Assert.True(DateTimeOffset.TryParse(v.At, out _)));          // and when
+        Assert.All(store.NotesVersions("lec-1"), v => Assert.True(v.Markdown == "" && v.Length > 0)); // listed without their words
     }
 
     [Fact]
@@ -69,7 +70,7 @@ public class NotesVersionTests
         Assert.Null(store.UndoState("lec-1").Redo);                   // C can't be redone over it
         store.UndoNotes("lec-1");
         Assert.Equal("B", Notes());                                   // Undo goes back to what D changed
-        Assert.Equal("C", store.NotesVersions("lec-1").Single(v => v.Kind == NotesChangeKind.Edit && v.Markdown == "C").Markdown); // still in History
+        Assert.Equal("C", store.NotesVersionsWithText("lec-1").Single(v => v.Kind == NotesChangeKind.Edit && v.Markdown == "C").Markdown); // still in History
     }
 
     [Fact]
@@ -81,11 +82,11 @@ public class NotesVersionTests
         const string Claude = "Claude (in the Claude app)";
         store.EditNotes("lec-1", "Draft one", writer: Claude, redraft: true, kind: NotesChangeKind.App);
         store.EditNotes("lec-1", "Draft two", writer: Claude, redraft: true, kind: NotesChangeKind.App); // a diagram put right
-        Assert.Equal(["Draft two", "Own"], store.NotesVersions("lec-1").Select(v => v.Markdown));
+        Assert.Equal(["Draft two", "Own"], store.NotesVersionsWithText("lec-1").Select(v => v.Markdown));
 
-        long own = store.NotesVersions("lec-1")[^1].Seq;
+        long own = store.NotesVersionsWithText("lec-1")[^1].Seq;
         store.RestoreNotesVersion("lec-1", own);
-        var versions = store.NotesVersions("lec-1");
+        var versions = store.NotesVersionsWithText("lec-1");
         Assert.Equal(3, versions.Count);                               // nothing was removed: a new version on top
         Assert.Equal(("Own", NotesChangeKind.Restore, own), (versions[0].Markdown, versions[0].Kind, versions[0].Ref));
         Assert.Equal("qwen3:8b", store.Get("lec-1")!.SummaryModel);   // and its writer with it
@@ -99,19 +100,19 @@ public class NotesVersionTests
         store.RedoNotes("lec-1");
         store.EditNotes("lec-1", "Claude B", writer: Claude, redraft: true, kind: NotesChangeKind.App);
         Assert.Equal([("Claude B", NotesChangeKind.App), ("Claude A", NotesChangeKind.Redo), ("Draft two", NotesChangeKind.Undo), ("Claude A", NotesChangeKind.App)],
-            store.NotesVersions("lec-1").Take(4).Select(v => (v.Markdown, v.Kind)));
+            store.NotesVersionsWithText("lec-1").Take(4).Select(v => (v.Markdown, v.Kind)));
         store.UndoNotes("lec-1");
         Assert.Equal("Claude A", store.Get("lec-1")!.SummaryMd);
         store.EditNotes("lec-1", "My edit");
         store.UndoNotes("lec-1");
         store.EditNotes("lec-1", "Claude C", writer: Claude, redraft: true, kind: NotesChangeKind.App);
         Assert.Equal([("Claude C", NotesChangeKind.App), ("Claude A", NotesChangeKind.Undo), ("My edit", NotesChangeKind.Edit)],
-            store.NotesVersions("lec-1").Take(3).Select(v => (v.Markdown, v.Kind)));
+            store.NotesVersionsWithText("lec-1").Take(3).Select(v => (v.Markdown, v.Kind)));
 
         // A paste isn't a draft: each is its own version.
         store.EditNotes("lec-1", "Pasted one", writer: Engines.PastedWriter, kind: NotesChangeKind.Paste);
         store.EditNotes("lec-1", "Pasted two", writer: Engines.PastedWriter, kind: NotesChangeKind.Paste);
-        Assert.Equal(["Pasted two", "Pasted one"], store.NotesVersions("lec-1").Take(2).Select(v => v.Markdown));
+        Assert.Equal(["Pasted two", "Pasted one"], store.NotesVersionsWithText("lec-1").Take(2).Select(v => v.Markdown));
     }
 
     [Fact]
@@ -121,14 +122,14 @@ public class NotesVersionTests
         using var store = Open(dir);
         File(store, notes: "First");
         for (int i = 1; i <= Store.MostVersions + 5; i++) store.EditNotes("lec-1", $"Edit {i}");
-        var versions = store.NotesVersions("lec-1");
+        var versions = store.NotesVersionsWithText("lec-1");
         Assert.Equal(Store.MostVersions, versions.Count);
         Assert.Equal("First", versions[^1].Markdown);
         Assert.Equal($"Edit {Store.MostVersions + 5}", versions[0].Markdown);
 
         // Looked at two months on: one a day before the last 30 days (all of these are one day's), and the first.
         store.PruneVersions("lec-1", DateTimeOffset.UtcNow.AddDays(60));
-        Assert.Equal(["Edit 205", "First"], store.NotesVersions("lec-1").Select(v => v.Markdown));
+        Assert.Equal(["Edit 205", "First"], store.NotesVersionsWithText("lec-1").Select(v => v.Markdown));
     }
 
     [Fact]
@@ -150,7 +151,7 @@ public class NotesVersionTests
         var state = store.UndoState("lec-1");
         Assert.Null(state.Redo);                                       // Claude's notes are gone: nothing to redo, not the first notes
         Assert.Equal("## Summary\nOwn.\n\n## Key points\n- One.", state.Undo!.Markdown); // and Undo still goes back past the diagrams
-        Assert.All(store.NotesVersions("lec-1"), v => Assert.True(v.Ref is null || store.NotesVersions("lec-1").Any(o => o.Seq == v.Ref)));
+        Assert.All(store.NotesVersionsWithText("lec-1"), v => Assert.True(v.Ref is null || store.NotesVersionsWithText("lec-1").Any(o => o.Seq == v.Ref)));
 
         // The next change has its Undo: back to the notes with diagrams.
         store.EditNotes("lec-1", withDiagrams + "\n- Two.");
@@ -170,14 +171,14 @@ public class NotesVersionTests
         store.EditNotes("lec-2", "## Summary\nNew.");
 
         store.Trash("lec-1");
-        Assert.Equal(2, store.NotesVersions("lec-1").Count);
+        Assert.Equal(2, store.NotesVersionsWithText("lec-1").Count);
         store.Restore("lec-1");
-        Assert.Equal(2, store.NotesVersions("lec-1").Count);
+        Assert.Equal(2, store.NotesVersionsWithText("lec-1").Count);
         store.Trash("lec-1");
         store.EmptyTrash();
-        Assert.Empty(store.NotesVersions("lec-1"));
+        Assert.Empty(store.NotesVersionsWithText("lec-1"));
 
         store.Delete("lec-2");
-        Assert.Empty(store.NotesVersions("lec-2"));
+        Assert.Empty(store.NotesVersionsWithText("lec-2"));
     }
 }

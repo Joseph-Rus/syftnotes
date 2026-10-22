@@ -33,7 +33,11 @@ public static class NotesChangeKind
 /// "" for the student's own), what made it (<see cref="NotesChangeKind"/>), when, and for an undo, a redo or a restore,
 /// the version it put back. <see cref="UndoTo"/> and <see cref="RedoTo"/>: the versions Undo and Redo put back from
 /// this one, worked out when it was made (so thinning old versions away never changes where they go).</summary>
-public sealed record NoteVersion(long Seq, string Markdown, string Model, string Kind, string At, long? Ref, long? UndoTo = null, long? RedoTo = null);
+public sealed record NoteVersion(long Seq, string Markdown, string Model, string Kind, string At, long? Ref, long? UndoTo = null, long? RedoTo = null)
+{
+    /// <summary>How long its words are, in characters (a listing leaves the words themselves out).</summary>
+    public int Length { get; init; }
+}
 
 /// <summary>Where Undo and Redo would take a lecture's notes: the version each would put back, or null.</summary>
 public sealed record NotesUndo(NoteVersion? Undo, NoteVersion? Redo);
@@ -85,24 +89,54 @@ public sealed partial class Store
             if (!cols.Contains(col)) Exec($"ALTER TABLE notes_history ADD COLUMN {col} INTEGER");
     }
 
-    /// <summary>A lecture's versions, newest first (the first of them is the notes as they are now).</summary>
+    const string VersionColumns = "seq, summary_model, kind, at, ref, undo_to, redo_to, length(summary_md)";
+
+    static NoteVersion ReadVersion(Microsoft.Data.Sqlite.SqliteDataReader r, string markdown = "") =>
+        new(r.GetInt64(0), markdown, r.IsDBNull(1) ? "" : r.GetString(1), r.IsDBNull(2) ? NotesChangeKind.Written : r.GetString(2),
+            r.IsDBNull(3) ? "" : r.GetString(3), r.IsDBNull(4) ? null : r.GetInt64(4), r.IsDBNull(5) ? null : r.GetInt64(5), r.IsDBNull(6) ? null : r.GetInt64(6))
+        {
+            Length = r.IsDBNull(7) ? 0 : r.GetInt32(7),
+        };
+
+    /// <summary>A lecture's versions, newest first (the first of them is the notes as they are now): who, what kind,
+    /// when, where Undo and Redo go, and how long, without their words (<see cref="NotesVersion"/> has one's).</summary>
     public List<NoteVersion> NotesVersions(string noteId)
     {
         lock (gate)
         {
             var list = new List<NoteVersion>();
-            using var cmd = Command("SELECT seq, summary_md, summary_model, kind, at, ref, undo_to, redo_to FROM notes_history WHERE id=? ORDER BY seq DESC", noteId);
+            using var cmd = Command($"SELECT {VersionColumns} FROM notes_history WHERE id=? ORDER BY seq DESC", noteId);
             using var r = cmd.ExecuteReader();
-            while (r.Read())
-                list.Add(new NoteVersion(r.GetInt64(0), r.IsDBNull(1) ? "" : r.GetString(1), r.IsDBNull(2) ? "" : r.GetString(2),
-                    r.IsDBNull(3) ? NotesChangeKind.Written : r.GetString(3), r.IsDBNull(4) ? "" : r.GetString(4), r.IsDBNull(5) ? null : r.GetInt64(5),
-                    r.IsDBNull(6) ? null : r.GetInt64(6), r.IsDBNull(7) ? null : r.GetInt64(7)));
+            while (r.Read()) list.Add(ReadVersion(r));
             return list;
         }
     }
 
-    /// <summary>One version, or null.</summary>
-    public NoteVersion? NotesVersion(string noteId, long seq) => NotesVersions(noteId).FirstOrDefault(v => v.Seq == seq);
+    /// <summary>The newest version, without its words; null with none.</summary>
+    public NoteVersion? NewestVersion(string noteId)
+    {
+        lock (gate)
+        {
+            using var cmd = Command($"SELECT {VersionColumns} FROM notes_history WHERE id=? ORDER BY seq DESC LIMIT 1", noteId);
+            using var r = cmd.ExecuteReader();
+            return r.Read() ? ReadVersion(r) : null;
+        }
+    }
+
+    /// <summary>One version, with its words; null when the lecture has no such version.</summary>
+    public NoteVersion? NotesVersion(string noteId, long seq)
+    {
+        lock (gate)
+        {
+            using var cmd = Command($"SELECT {VersionColumns}, summary_md FROM notes_history WHERE id=? AND seq=?", noteId, seq);
+            using var r = cmd.ExecuteReader();
+            return r.Read() ? ReadVersion(r, r.IsDBNull(8) ? "" : r.GetString(8)) : null;
+        }
+    }
+
+    /// <summary>Every version with its words, newest first: for tests (listings leave the words out).</summary>
+    internal List<NoteVersion> NotesVersionsWithText(string noteId) =>
+        [.. NotesVersions(noteId).Select(v => NotesVersion(noteId, v.Seq)!)];
 
     /// <summary>A lecture from before versions were kept gets its notes as they are as its first version (by whoever
     /// wrote them, when they last changed), so the first change to them has something to go back to.</summary>
@@ -226,11 +260,11 @@ public sealed partial class Store
     /// </summary>
     public NotesUndo UndoState(string noteId)
     {
-        var versions = NotesVersions(noteId);
-        if (versions.Count == 0) return new NotesUndo(null, null);
-        var bySeq = versions.ToDictionary(v => v.Seq);
-        var newest = versions[0];
-        return new NotesUndo(newest.UndoTo is { } u ? bySeq.GetValueOrDefault(u) : null, newest.RedoTo is { } r ? bySeq.GetValueOrDefault(r) : null);
+        lock (gate)
+        {
+            var newest = NewestVersion(noteId);
+            return new NotesUndo(newest?.UndoTo is { } u ? NotesVersion(noteId, u) : null, newest?.RedoTo is { } r ? NotesVersion(noteId, r) : null);
+        }
     }
 
     /// <summary>Undo: the version before, put back, as a version of its own. <see cref="NotesEdited.Gone"/> with
@@ -253,9 +287,8 @@ public sealed partial class Store
     {
         lock (gate)
         {
-            var versions = NotesVersions(noteId);
-            var version = seq is { } wanted ? versions.FirstOrDefault(v => v.Seq == wanted) : versions.Skip(1).FirstOrDefault();
-            return version is null ? NotesEdited.Gone : PutBack(noteId, version, NotesChangeKind.Restore);
+            long? wanted = seq ?? NotesVersions(noteId).Skip(1).FirstOrDefault()?.Seq;
+            return wanted is { } at && NotesVersion(noteId, at) is { } version ? PutBack(noteId, version, NotesChangeKind.Restore) : NotesEdited.Gone;
         }
     }
 
