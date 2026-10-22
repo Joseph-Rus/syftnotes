@@ -30,12 +30,12 @@ public static class EngineSetupWords
         _ => "",
     };
 
-    /// <summary>What to run to sign in.</summary>
+    /// <summary>What to run to sign in. Not Gemini: typed by hand, <c>agy</c> signs in to the student's own home, not
+    /// Study Stash's own one for it that its notes use, so its row has a Sign in button instead.</summary>
     public static string SignInCommand(string id) => id switch
     {
         "claude" => "claude",
         "codex" => "codex login",
-        "gemini" => "agy",
         _ => "",
     };
 
@@ -55,7 +55,6 @@ public static class EngineSetupWords
         HowToStep SignIn() => id switch
         {
             "claude" => new HowToStep("Sign in: run this, then sign in with your Claude account in the browser", SignInCommand(id), Plan(id)),
-            "gemini" => new HowToStep("Sign in: run this, then sign in with your Google account", SignInCommand(id), "Or use an API key instead: there's no app to install for that."),
             _ => new HowToStep("Sign in: run this and choose Sign in with ChatGPT", SignInCommand(id), Plan(id)),
         };
         return (id, state) switch
@@ -66,9 +65,9 @@ public static class EngineSetupWords
                 new HowToStep($"Install it: paste this into {where}", InstallCommand(id, windows), $"Or with npm: {NpmCommand(id)}"),
                 SignIn(),
             ],
-            // Gemini's Antigravity is installed from Google's own site (its row's one button is an API key instead):
-            // once it's here, it only needs signing in.
-            ("claude" or "codex" or "gemini", "not_signed_in") => [SignIn()],
+            // Gemini signed out has no command to paste: its row's Sign in button signs in to Study Stash's own home for
+            // agy (setup's sign-in screen, or a terminal the library opens with that home).
+            ("claude" or "codex", "not_signed_in") => [SignIn()],
             _ => [],
         };
     }

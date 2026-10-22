@@ -71,6 +71,22 @@ public static class Antigravity
             $"$env:USERPROFILE = {Quoted(home)}; $env:HOME = {Quoted(home)}; & {Quoted(agy)} '-p=/usage'"]);
     }
 
+    /// <summary>
+    /// The sign-in as a line to type, for where only words can be given (the library's own computer, reached from
+    /// another): <c>HOME="…/gemini" agy -p=/usage</c> in a Mac's Terminal, PowerShell setting the home first on Windows.
+    /// Never bare <c>agy</c>, which signs in to the student's own home, not the one the library's notes use.
+    /// </summary>
+    public static string SignInLine(bool windows)
+    {
+        string home = Home();
+        if (windows)
+        {
+            string q = "'" + home.Replace("'", "''", StringComparison.Ordinal) + "'";
+            return $"$env:USERPROFILE = {q}; $env:HOME = {q}; agy '-p=/usage'";
+        }
+        return $"HOME=\"{home.Replace("\"", "\\\"", StringComparison.Ordinal)}\" agy -p=/usage";
+    }
+
     // --- the setup agent -----------------------------------------------------------------------------------------------
 
     /// <summary>

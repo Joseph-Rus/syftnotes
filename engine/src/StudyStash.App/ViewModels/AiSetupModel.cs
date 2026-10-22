@@ -336,8 +336,10 @@ public sealed partial class AiSetupModel : ObservableObject
         var working = overview.Pulling is { Why.Length: 0 } at ? at : null;
         var failed = overview.Pulling is { Why.Length: > 0 } stopped ? stopped : null;
         bool freeNeedsWork = overview.Engines.FirstOrDefault(e => e.Id == "ollama") is { State: "not_installed" or "not_running" or "model_missing" };
-        // Claude or ChatGPT, not on this computer or not signed in, where the host gets them ready with buttons.
-        bool Buttons(EngineInfo e) => SetUpPaid is not null && e is { Id: "claude" or "codex", State: "not_installed" or "not_signed_in" };
+        // Claude or ChatGPT, not on this computer or not signed in, or Gemini signed out, where the host gets them ready
+        // with buttons (guided setup's screens: Gemini's sign-in is in Study Stash's own home for agy).
+        bool Buttons(EngineInfo e) => SetUpPaid is not null
+            && (e is { Id: "claude" or "codex", State: "not_installed" or "not_signed_in" } || e is { Id: "gemini", State: "not_signed_in" });
         // Gemini, not here at all: its one button is its API key (Google's own app is installed by the student).
         bool GeminiKey(EngineInfo e) => TakesKeys && e is { Id: "gemini", State: "not_installed" };
         // Not a working pick: not here, signed out, or its last try failed (a plan other apps can't use, say).
@@ -525,7 +527,7 @@ public sealed partial class AiSetupModel : ObservableObject
             await SetUpFreeAsync();
             return;
         }
-        if (row.Id == "gemini" && row.OneButton)
+        if (row is { Id: "gemini", OneButton: true, State: "not_installed" })
         {
             OpenKey("gemini");
             return;
