@@ -320,6 +320,9 @@ public sealed partial class LibraryWeb
             string? markdown = body?["markdown"] is JsonValue mv && mv.TryGetValue(out string? text) ? text : null;
             if (markdown is null) return Http.Detail(400, "what are the notes?");
             bool fromApp = Str(body, "from") == "app";
+            // Not a barrier: "from" is the caller's own word, and the library's password (which Study Stash's own MCP
+            // server holds) already lets anyone change notes through /edit. This only makes the switch in Settings → AI
+            // apps hold at once for the connection that says it's an AI app, whatever its server last heard.
             if (fromApp && !Claude.ToolsOn) return Http.Detail(403, ToolAccess.Off);
             if (fromApp && !Claude.Reading.SaveNotes) return Http.Detail(403, ToolAccess.Refused("save"));
             bool replace = body?["replace"] is JsonValue rv && rv.TryGetValue(out bool r) && r;
