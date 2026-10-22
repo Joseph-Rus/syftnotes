@@ -33,6 +33,9 @@ public sealed partial class AiNotesModel : ObservableObject, IDisposable
     public AiNotesModel(IAiLibrary library) => this.library = library;
 
     public string LectureId { get; private set; } = "";
+    /// <summary>The lecture's notes as the library keeps them ("" while it has written none): what's pasted in their
+    /// place is based on them.</summary>
+    public string Written => written;
     /// <summary>The engine id that wrote the notes on screen right now (<see cref="CurrentByline"/>'s engine): the
     /// "Rewrite notes with" menu shows it last, marked "Wrote the current notes".</summary>
     public string WriterId { get; private set; } = "ollama";
@@ -273,6 +276,7 @@ public sealed partial class AiNotesModel : ObservableObject, IDisposable
             "failed" => RewriteState.Failed,
             _ => State == RewriteState.Comparing ? RewriteState.Comparing : RewriteState.Idle,
         };
+        Earlier = info.Earlier;
         bool was = AddingDiagrams;
         AddingDiagrams = info.Diagrams == "adding";
         if (AddingDiagrams != was) OnPropertyChanged(nameof(ShowEditButton));
@@ -448,6 +452,91 @@ public sealed partial class AiNotesModel : ObservableObject, IDisposable
 
     [RelayCommand]
     Task TryAgain() => Rewrite(lastEngine.Length > 0 ? lastEngine : WriterId);
+
+    // --- Notes from an AI Study Stash doesn't run, and putting earlier notes back ---------------------------------------
+
+    /// <summary>The notes from before they were last replaced (an edit, an AI app's, a paste), which the ⋯ menu puts
+    /// back: who wrote them and when they were replaced. Null when there are none.</summary>
+    [ObservableProperty] public partial NotesVersion? Earlier { get; set; }
+    public bool HasEarlier => Earlier is not null;
+    partial void OnEarlierChanged(NotesVersion? value)
+    {
+        OnPropertyChanged(nameof(HasEarlier));
+        BuildActions();
+    }
+
+    /// <summary>"Copy for your AI", from the ⋯ menu (the page's <see cref="FreeAiModel"/> does it); null leaves it out.</summary>
+    public Action? OnCopyForAi
+    {
+        get;
+        set
+        {
+            field = value;
+            BuildActions();
+        }
+    }
+
+    /// <summary>"Paste notes", from the ⋯ menu: the page's paste box opens; null leaves it out.</summary>
+    public Action? OnPasteNotes
+    {
+        get;
+        set
+        {
+            field = value;
+            BuildActions();
+        }
+    }
+
+    /// <summary>The ⋯ menu's actions under its engines: copy these notes' lecture for a free chat, paste notes a chat
+    /// wrote, and put back the notes from before, when there are some.</summary>
+    void BuildActions()
+    {
+        Menu.Actions.Clear();
+        if (OnCopyForAi is { } copy)
+            Menu.Actions.Add(new MenuAction("content_copy", "Copy for your AI", "For ChatGPT, Claude or Gemini", new RelayCommand(() =>
+            {
+                CloseMenu?.Invoke();
+                copy();
+            })));
+        if (OnPasteNotes is { } paste)
+            Menu.Actions.Add(new MenuAction("content_paste", "Paste notes", "Notes a chat wrote, in place of these", new RelayCommand(() =>
+            {
+                CloseMenu?.Invoke();
+                paste();
+            })));
+        if (Earlier is { } e)
+            Menu.Actions.Add(new MenuAction("undo", "Put back earlier notes", AiWords.EarlierLine(e.By, e.At), RestoreEarlierCommand));
+    }
+
+    /// <summary>Puts back the notes from before the last replace; the ones on the page now become the earlier ones, so
+    /// this can be undone the same way.</summary>
+    [RelayCommand]
+    async Task RestoreEarlier()
+    {
+        if (Busy || Editing) return;
+        CloseMenu?.Invoke();
+        Busy = true;
+        Say = null;
+        try
+        {
+            var info = await library.RestoreNotesAsync(LectureId);
+            if (info is null) { OlderLibrary = true; return; }
+            Apply(info);
+            NotesChanged?.Invoke();
+        }
+        catch (LibraryRefusedException ex)
+        {
+            Say = ex.Message;
+        }
+        catch
+        {
+            Offline = true;
+        }
+        finally
+        {
+            Busy = false;
+        }
+    }
 
     // --- Editing the notes by hand --------------------------------------------------------------------------------
 

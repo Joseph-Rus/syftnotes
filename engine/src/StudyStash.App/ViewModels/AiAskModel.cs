@@ -23,14 +23,48 @@ public sealed partial class EngineMenuItem(string id, string name, string subtit
     public IRelayCommand Command { get; internal set; } = null!;
 }
 
-/// <summary>A menu of engines, shared by the Ask bar's "Answer with" and the notes' "Rewrite notes with": a header,
-/// the rows, and an optional footer link. The view is one control (<c>{Mac,Win}AiEngineMenu</c>) over this.</summary>
-public sealed class EngineMenuModel
+/// <summary>One thing a menu does besides picking an engine ("Copy for your AI", "Paste notes", "Put back earlier
+/// notes"): its icon, its words, a quieter line under them, and what it does.</summary>
+public sealed class MenuAction(string glyph, string name, string subtitle, IRelayCommand command)
 {
+    public string Glyph { get; } = glyph;
+    public string Name { get; } = name;
+    public string Subtitle { get; } = subtitle;
+    public IRelayCommand Command { get; } = command;
+}
+
+/// <summary>A menu of engines, shared by the Ask bar's "Answer with" and the notes' "Rewrite notes with": a header,
+/// the rows, then anything else it does (<see cref="Actions"/>), and an optional footer link. The view is one control
+/// (<c>{Mac,Win}AiEngineMenu</c>) over this.</summary>
+public sealed partial class EngineMenuModel : ObservableObject
+{
+    public EngineMenuModel()
+    {
+        Items.CollectionChanged += (_, _) => Changed();
+        Actions.CollectionChanged += (_, _) => Changed();
+    }
+
+    void Changed()
+    {
+        OnPropertyChanged(nameof(HasItems));
+        OnPropertyChanged(nameof(HasActions));
+        OnPropertyChanged(nameof(ShowActionsLine));
+        OnPropertyChanged(nameof(ShowFooter));
+    }
+
     public string Header { get; init; } = "";
     public ObservableCollection<EngineMenuItem> Items { get; } = [];
+    /// <summary>The header and the engines show only when there are engines to pick (a student with no AI on the
+    /// library's computer has only the actions).</summary>
+    public bool HasItems => Items.Count > 0;
+    public ObservableCollection<MenuAction> Actions { get; } = [];
+    public bool HasActions => Actions.Count > 0;
+    /// <summary>A line between the engines and the actions, when there are both.</summary>
+    public bool ShowActionsLine => HasItems && HasActions;
     public string FooterText { get; init; } = "";
     public IRelayCommand? FooterCommand { get; init; }
+    /// <summary>The footer is about the engines: it goes with them.</summary>
+    public bool ShowFooter => HasItems && FooterText.Length > 0;
     /// <summary>260 for "Answer with", 280 for "Rewrite notes with" (the design's Mac widths).</summary>
     public double Width { get; init; } = 260;
 }

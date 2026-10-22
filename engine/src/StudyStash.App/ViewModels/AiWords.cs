@@ -297,6 +297,11 @@ public static partial class AiWords
         engineName.Length == 0 ? "" // an older lecture that doesn't say who wrote its notes
         : ParseUntil(updatedAtIso) is { } at ? $"Written by {engineName} · {at:ddd H:mm}" : $"Written by {engineName}";
 
+    /// <summary>The earlier notes the ⋯ menu puts back: "By Claude, replaced Tue 9:30" ("Your own" when nobody else
+    /// wrote them).</summary>
+    public static string EarlierLine(string by, string replacedIso) =>
+        (by.Length > 0 ? $"By {by}" : "Your own") + (ParseUntil(replacedIso) is { } at ? $", replaced {at:ddd H:mm}" : "");
+
     /// <summary>A ready draft's byline: "Claude Code · just now" (or "· 5 min ago", "· 2 h ago", a date).</summary>
     public static string DraftByline(string engineName, string atIso, DateTime now) => $"{engineName} · {History.Ago(atIso, now)}";
 

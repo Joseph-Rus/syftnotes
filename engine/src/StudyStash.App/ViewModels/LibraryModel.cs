@@ -376,6 +376,10 @@ public sealed partial class LibraryModel : ObservableObject
         OnPropertyChanged(nameof(HasLectureFiles));
     }
 
+    /// <summary>Notes from an AI Study Stash doesn't run, for the open note: the offer over a lecture with none, Copy for
+    /// your AI and Paste notes. Null with no note open, or one being recorded.</summary>
+    [ObservableProperty] public partial FreeAiModel? FreeAi { get; set; }
+
     /// <summary>The window is narrow (below <see cref="NarrowBelow"/>).</summary>
     [ObservableProperty] public partial bool Narrow { get; set; }
     /// <summary>Narrow, on a class's Canvas lists, and showing what was opened in the list's place.</summary>
@@ -523,6 +527,7 @@ public sealed partial class LibraryModel : ObservableObject
     partial void OnNoteChanged(NoteModel? value)
     {
         if (LectureFiles is { } files && files.LectureId != value?.Id) LectureFiles = null; // another note's files don't stay
+        if (FreeAi is { } free && (free.LectureId != value?.Id || value is { Live: true })) FreeAi = null;
         OnPropertyChanged(nameof(HasNote));
         OnPropertyChanged(nameof(NoNote));
         PageChanged();

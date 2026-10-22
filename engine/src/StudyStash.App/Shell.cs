@@ -1073,6 +1073,12 @@ public static partial class Shell
         }
         // The small recorder floats only while this window isn't the one in front.
         w.Activated += (_, _) => ShowRecorderIfAway();
+        // Back from another app (the Claude app, a chat in the browser): the note on the page is read again, so notes
+        // written for it meanwhile show. (Read the same, the page stays as it is.)
+        w.Activated += (_, _) =>
+        {
+            if (library.ShowNotePage && library.Note is { Live: false, Local: false, Planned: false } && library.Notes is not { Editing: true }) RequestLibraryReload();
+        };
         w.Deactivated += (_, _) => ShowRecorderIfAway();
         w.Closing += (_, e) =>
         {

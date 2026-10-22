@@ -36,6 +36,14 @@ public sealed class FakeAiLibrary : IAiLibrary
     public Func<string, string, string?, RewriteInfo?>? OnEditNotes { get; set; }
     /// <summary>Each edit sent: the notes, and the fingerprint of the notes they were based on.</summary>
     public List<(string Markdown, string? BasedOn)> Edits { get; } = [];
+    /// <summary>(lecture, the notes pasted, replace, based on): what the library says to pasted notes. Without it,
+    /// they're tidied and saved as the library would (<see cref="ChatNotes.Clean"/>), written by "your AI".</summary>
+    public Func<string, string, bool, string?, RewriteInfo?>? OnSaveNotes { get; set; }
+    /// <summary>Each paste sent: the notes as pasted, whether they replace the lecture's, and what they were based on.</summary>
+    public List<(string Markdown, bool Replace, string? BasedOn)> Saves { get; } = [];
+    /// <summary>What "Copy for your AI" gets for a lecture; null: an older library.</summary>
+    public Func<string, NotesBrief?>? OnNotesBrief { get; set; }
+    public Func<string, RewriteInfo?>? OnRestoreNotes { get; set; }
     public Func<ToolAccessInfo?>? OnAccess { get; set; }
     public Func<bool?, ReadingScopes?, ToolAccessInfo?>? OnSetAccess { get; set; }
     public Func<bool, ToolAccessInfo?>? OnSetWeb { get; set; }
@@ -208,6 +216,26 @@ public sealed class FakeAiLibrary : IAiLibrary
         Edits.Add((markdown, basedOn));
         return Task.FromResult(OnEditNotes is not null ? OnEditNotes(lecture, markdown, basedOn)
             : new RewriteInfo(lecture, "none") { Current = new NotesVersion(markdown, "Ollama", DateTime.Now.ToString("o")) });
+    }
+
+    public Task<RewriteInfo?> SaveNotesAsync(string lecture, string markdown, bool replace, string? basedOn)
+    {
+        Calls.Add($"save:{lecture}");
+        Saves.Add((markdown, replace, basedOn));
+        return Task.FromResult(OnSaveNotes is not null ? OnSaveNotes(lecture, markdown, replace, basedOn)
+            : new RewriteInfo(lecture, "none") { Current = new NotesVersion(ChatNotes.Clean(markdown), "your AI", DateTime.Now.ToString("o")) });
+    }
+
+    public Task<RewriteInfo?> RestoreNotesAsync(string lecture)
+    {
+        Calls.Add($"restore:{lecture}");
+        return Task.FromResult(OnRestoreNotes?.Invoke(lecture));
+    }
+
+    public Task<NotesBrief?> NotesBriefAsync(string lecture)
+    {
+        Calls.Add($"brief:{lecture}");
+        return Task.FromResult(OnNotesBrief?.Invoke(lecture));
     }
 
     public Task<ToolAccessInfo?> AccessAsync()

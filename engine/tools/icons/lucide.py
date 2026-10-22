@@ -12,7 +12,7 @@ NAMES = {
     "auto_awesome": "bot", "battery_5_bar": "battery-medium", "bluetooth": "bluetooth", "book_2": "book", "bookmark": "bookmark",
     "campaign": "megaphone", "chat": "message-circle", "check": "check", "check_circle": "circle-check",
     "chevron_left": "chevron-left", "chevron_right": "chevron-right", "circle": "circle", "close": "x",
-    "close_fullscreen": "minimize-2", "cloud": "cloud", "cloud_off": "cloud-off", "code": "code", "content_copy": "copy",
+    "close_fullscreen": "minimize-2", "cloud": "cloud", "cloud_off": "cloud-off", "code": "code", "content_copy": "copy", "content_paste": "clipboard",
     "crop_square": "square", "delete": "trash-2", "description": "file-text", "desktop_windows": "monitor", "dns": "server",
     "dock_to_right": "panel-right", "download": "download", "draft": "file", "drive_file_move": "folder-input", "edit": "pencil",
     "edit_note": "notebook-pen", "error": "circle-alert", "event": "calendar", "event_upcoming": "calendar-clock",
@@ -29,7 +29,7 @@ NAMES = {
     "remove": "minus", "save_alt": "download", "schedule": "clock", "school": "graduation-cap", "search": "search",
     "send": "send", "settings": "settings", "sidebar": "panel-left", "slideshow": "presentation", "smartphone": "smartphone",
     "stop": "square", "subject": "text", "swap_horiz": "arrow-left-right", "sync": "refresh-cw", "table_chart": "table",
-    "travel_explore": "compass", "terminal": "terminal", "tune": "sliders-horizontal", "unfold_less": "chevrons-down-up",
+    "travel_explore": "compass", "terminal": "terminal", "tune": "sliders-horizontal", "undo": "undo-2", "unfold_less": "chevrons-down-up",
     "unfold_more": "chevrons-up-down", "upload": "upload", "volume_up": "volume-2", "warning": "triangle-alert", "wifi": "wifi",
     "wifi_off": "wifi-off",
 }

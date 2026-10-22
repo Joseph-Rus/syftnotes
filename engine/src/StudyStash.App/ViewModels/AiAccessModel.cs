@@ -147,6 +147,16 @@ public sealed partial class AiAccessModel : ObservableObject
     [ObservableProperty] public partial bool ReadNotes { get; set; } = true;
     [ObservableProperty] public partial bool ReadCanvas { get; set; } = true;
     [ObservableProperty] public partial bool ReadAudio { get; set; }
+    /// <summary>AI apps may save the notes a student asks them to write for a lecture (save_notes). On by default: it
+    /// only ever happens when the student asks, and the notes it replaces are kept.</summary>
+    [ObservableProperty] public partial bool SaveNotes { get; set; } = true;
+
+    /// <summary>The switch's words, as a tool that's refused names it (<see cref="ToolAccess.SaveToggle"/>).</summary>
+    public const string SaveToggle = ToolAccess.SaveToggle;
+    public const string SaveToggleSub = "When you ask an AI app to write a lecture's notes, they're saved on its page. Notes they replace are kept, so you can put them back.";
+
+    /// <summary>The one line a student with no paid AI is told here: the Claude app can write their notes.</summary>
+    public const string NoPlanLine = "No paid AI? Connect the free Claude app above and ask it to “write notes for my last lecture”: they appear on the lecture's page.";
     [ObservableProperty] public partial bool Busy { get; set; }
     [ObservableProperty] public partial string? Say { get; set; }
     [ObservableProperty] public partial bool OlderLibrary { get; set; }
@@ -318,16 +328,18 @@ public sealed partial class AiAccessModel : ObservableObject
     partial void OnReadNotesChanged(bool value) => PostReading();
     partial void OnReadCanvasChanged(bool value) => PostReading();
     partial void OnReadAudioChanged(bool value) => PostReading();
+    partial void OnSaveNotesChanged(bool value) => PostReading();
 
     void PostReading()
     {
-        if (!loading) _ = PostAsync(reading: new ReadingScopes(ReadLectures, ReadNotes, ReadCanvas, ReadAudio));
+        if (!loading) _ = PostAsync(reading: new ReadingScopes(ReadLectures, ReadNotes, ReadCanvas, ReadAudio, SaveNotes));
     }
 
     [RelayCommand] public void ToggleLectures() => ReadLectures = !ReadLectures;
     [RelayCommand] public void ToggleNotes() => ReadNotes = !ReadNotes;
     [RelayCommand] public void ToggleCanvas() => ReadCanvas = !ReadCanvas;
     [RelayCommand] public void ToggleAudio() => ReadAudio = !ReadAudio;
+    [RelayCommand] public void ToggleSaveNotes() => SaveNotes = !SaveNotes;
 
     [RelayCommand]
     public Task Refresh() => Load();
@@ -368,6 +380,7 @@ public sealed partial class AiAccessModel : ObservableObject
             ReadNotes = info.Reading.Notes;
             ReadCanvas = info.Reading.Canvas;
             ReadAudio = info.Reading.Audio;
+            SaveNotes = info.Reading.SaveNotes;
             PublicUrl = info.PublicUrl;
             HasPassword = info.HasPassword;
             ApplyWeb(info.Web);
