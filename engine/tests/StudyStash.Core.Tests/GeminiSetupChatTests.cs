@@ -148,7 +148,7 @@ public class GeminiSetupChatTests
         Assert.Contains("excludeDefaultComponents: true", File.ReadAllText(Antigravity.AgentPath(Antigravity.Home(), Antigravity.AnswerAgent)));
     }
 
-    /// <summary>Lines the real agy 1.4.4 printed for a setup turn (its paths and the tools' long output shortened): read
+    /// <summary>Lines the real agy 1.4.5 printed for a setup turn (its paths and the tools' long output shortened): read
     /// as the parser expects, and agy's own agent (no "agent" in its init) or a refusal of agy's own stops the turn.</summary>
     [Fact]
     public void Real_agy_lines_read_as_expected_and_agys_own_agent_or_a_refusal_stops_the_turn()

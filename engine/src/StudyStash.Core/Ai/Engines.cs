@@ -214,7 +214,7 @@ public static class Engines
     static bool? Hinted(string id, EngineChecks checks) => id switch
     {
         "codex" => checks.FileExists(CodexAuthPath(checks)) || checks.Env("OPENAI_API_KEY") is { Length: > 0 },
-        // Gemini runs through Google's Antigravity (agy), in Study Stash's own home for it, where agy 1.4.4 keeps its
+        // Gemini runs through Google's Antigravity (agy), in Study Stash's own home for it, where agy 1.4.5 keeps its
         // sign-in in a file of its own (only whether it's there is looked at). Its absence proves nothing (another
         // version may keep it elsewhere): without it or a key in the environment, it's unchecked until tried.
         "gemini" => checks.Env("GEMINI_API_KEY") is { Length: > 0 } || checks.FileExists(GeminiCredsPath)

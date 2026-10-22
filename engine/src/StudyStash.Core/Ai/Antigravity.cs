@@ -12,12 +12,12 @@ namespace StudyStash.Core.Ai;
 /// Study Stash runs it with a home of its own (<see cref="Home"/>: agy keeps everything under <c>~/.gemini</c>, and reads
 /// its home from HOME, or USERPROFILE on Windows), so nothing of the student's own agy (their MCP servers, plugins,
 /// skills, hooks, rules, settings) ever runs inside Study Stash's work, and Study Stash never writes theirs. The sign-in
-/// is kept in that home too (agy 1.4.4 keeps it there, <c>antigravity-cli/antigravity-oauth-token</c>, which Study Stash
+/// is kept in that home too (agy 1.4.5 keeps it there, <c>antigravity-cli/antigravity-oauth-token</c>, which Study Stash
 /// never reads): a student signs in to Gemini for Study Stash once, in setup, and its notes and its setup chat use that.
 /// </para>
 /// <para>
 /// The setup chat runs in that home as an agent of its own (<see cref="SetupAgent"/>): Antigravity's default prompt and
-/// built-in tools left out (tried with the real agy 1.4.4: what's left is only <c>call_mcp_tool</c>, <c>list_resources</c>,
+/// built-in tools left out (tried with the real agy 1.4.5: what's left is only <c>call_mcp_tool</c>, <c>list_resources</c>,
 /// <c>read_resource</c> and <c>manage_task</c>, so no command, file, web page or browser), none of the home's skills,
 /// rules, plugins, subagents or MCP servers taken in, commands off, and the setup tools as its only MCP server, declared
 /// in the agent itself. The turn's guard holds it to that as it runs (<see cref="SetupChatParser"/>).
