@@ -8,9 +8,13 @@ public partial class WinAiAskChat : UserControl
     public WinAiAskChat()
     {
         InitializeComponent();
+        AskThread.Follow(this, Thread);
         DataContextChanged += (_, _) =>
         {
-            if (DataContext is AiAskModel m) m.CloseMenu = () => EngineChip.Flyout?.Hide();
+            if (DataContext is not AiAskModel m) return;
+            m.CloseMenu = () => EngineChip.Flyout?.Hide();
+            // A new chat's first question goes straight in.
+            m.Started = () => ChatInput.Focus();
         };
     }
 

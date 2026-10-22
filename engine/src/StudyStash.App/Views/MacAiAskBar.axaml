@@ -15,7 +15,7 @@
   </UserControl.Styles>
 
   <Border Classes="ask" ClipToBounds="False">
-    <Grid ColumnDefinitions="*,12,Auto,2,Auto,8,Auto" VerticalAlignment="Center">
+    <Grid ColumnDefinitions="*,12,Auto,2,Auto,2,Auto,8,Auto" VerticalAlignment="Center">
       <TextBox Name="AskInput" c:OneLinePaste.IsOn="True" Classes="bare" Text="{Binding Question}" PlaceholderText="{Binding Placeholder}" PlaceholderForeground="{DynamicResource InkSubtle}"
                FontSize="15.5" VerticalAlignment="Center" AutomationProperties.Name="Ask about your lectures">
         <TextBox.KeyBindings>
@@ -33,7 +33,16 @@
         </Button.Flyout>
       </Button>
       <!-- Which AI answers: its own mark, no sparkle and no pill -->
-      <Button Name="EngineChip" Grid.Column="4" Classes="icon-btn" VerticalAlignment="Center" ToolTip.Tip="{Binding EngineTip}" AutomationProperties.Name="{Binding EngineTip}">
+      <!-- This place's kept conversations, when it has any: one picked opens in the card above, to carry on -->
+      <Button Name="ChatsButton" Grid.Column="4" Classes="icon-btn" VerticalAlignment="Center" IsVisible="{Binding HasChats}" AutomationProperties.Name="Chats">
+        <c:Icon Glyph="forum" Size="18" />
+        <Button.Flyout>
+          <Flyout Placement="Top" VerticalOffset="-12" ShowMode="Standard" FlyoutPresenterClasses="bare">
+            <v:AiChatsMenu />
+          </Flyout>
+        </Button.Flyout>
+      </Button>
+      <Button Name="EngineChip" Grid.Column="6" Classes="icon-btn" VerticalAlignment="Center" ToolTip.Tip="{Binding EngineTip}" AutomationProperties.Name="{Binding EngineTip}">
         <c:Icon Glyph="{Binding EngineIcon}" Size="18" />
         <Button.Flyout>
           <Flyout Placement="Top" VerticalOffset="-12" ShowMode="Standard" FlyoutPresenterClasses="bare">
@@ -48,14 +57,14 @@
         </Button.Flyout>
       </Button>
       <!-- Nothing typed: the keys that bring the caret here. A question: Send takes their place. -->
-      <Border Grid.Column="6" Classes="kbd" IsVisible="{Binding ShowKeys}">
+      <Border Grid.Column="8" Classes="kbd" IsVisible="{Binding ShowKeys}">
         <TextBlock Text="{x:Static v:AskKeys.Shown}" />
       </Border>
-      <Button AutomationProperties.Name="Send question" Grid.Column="6" Classes="ask-send" Command="{Binding AskCommand}" IsVisible="{Binding CanSend}" ToolTip.Tip="Send">
+      <Button AutomationProperties.Name="Send question" Grid.Column="8" Classes="ask-send" Command="{Binding AskCommand}" IsVisible="{Binding CanSend}" ToolTip.Tip="Send">
         <c:Icon Glyph="arrow_upward" Size="18" />
       </Button>
       <!-- While an answer is being written, the same place stops it -->
-      <Button Grid.Column="6" Classes="ask-send" Command="{Binding StopCommand}" IsVisible="{Binding Busy}" ToolTip.Tip="Stop" AutomationProperties.Name="Stop the answer">
+      <Button Grid.Column="8" Classes="ask-send" Command="{Binding StopCommand}" IsVisible="{Binding Busy}" ToolTip.Tip="Stop" AutomationProperties.Name="Stop the answer">
         <c:Icon Glyph="stop" Filled="True" Size="12" />
       </Button>
     </Grid>

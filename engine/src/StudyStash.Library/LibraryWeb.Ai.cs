@@ -44,9 +44,11 @@ public sealed partial class LibraryWeb
     /// An answer as it's written, as newline-delimited JSON, each line sent the moment it's ready: <c>{"kind":
     /// "text", "text"}</c> for more of the answer, <c>{"kind": "answer", "text"}</c> for all of it so far (when what
     /// came before changed rather than grew), then <c>{"kind": "done", "reply"}</c> with the whole reply, or
-    /// <c>{"kind": "error", "status", "detail"}</c> saying why it stopped. Leaving stops the engine too.
+    /// <c>{"kind": "error", "status", "detail"}</c> saying why it stopped. Leaving stops the engine too. A question in a
+    /// kept chat says which first, <c>{"kind": "chat", "id"}</c> (a new one's id too), so the app knows it whatever
+    /// comes of the answer: one stopped or cut off is kept there as well.
     /// </summary>
-    async Task StreamAnswerAsync(HttpContext ctx, AskRequest request)
+    async Task StreamAnswerAsync(HttpContext ctx, AskRequest request, Chat? chat, object? turn)
     {
         ctx.Response.ContentType = "application/x-ndjson; charset=utf-8";
         ctx.Response.Headers.CacheControl = "no-store";
@@ -54,7 +56,27 @@ public sealed partial class LibraryWeb
         ctx.Features.Get<IHttpResponseBodyFeature>()?.DisableBuffering();
         await ctx.Response.StartAsync(ctx.RequestAborted);
         var lines = Channel.CreateUnbounded<JsonObject>(new UnboundedChannelOptions { SingleReader = true });
+        if (chat is not null) lines.Writer.TryWrite(new JsonObject { ["kind"] = "chat", ["id"] = chat.Id });
         string sent = "";
+        // The turn ends once: answered, cut off, or stopped. Stopped, what was written is kept and the chat is free
+        // at once (the AI can take a moment longer to stop), so asking again straight away isn't told it's busy.
+        var ending = new Lock();
+        bool over = false;
+        bool EndsNow()
+        {
+            lock (ending)
+            {
+                if (over) return false;
+                over = true;
+                return true;
+            }
+        }
+        void KeepStopped()
+        {
+            if (chat is null || !EndsNow()) return;
+            if (sent.Length > 0) LibraryChats.AddAskTurn(chat, request.Question, sent, stopped: true);
+            if (turn is not null) LibraryChats.End(chat.Id, turn);
+        }
         void SoFar(string answer)
         {
             lines.Writer.TryWrite(answer.StartsWith(sent, StringComparison.Ordinal)
@@ -67,15 +89,18 @@ public sealed partial class LibraryWeb
             try
             {
                 var reply = await Jobs.AskAsync(request, Reader, cfg, ctx.RequestAborted, SoFar);
+                if (EndsNow()) reply = Kept(chat, request.Question, reply);
                 lines.Writer.TryWrite(new JsonObject { ["kind"] = "done", ["reply"] = JsonSerializer.SerializeToNode(reply, AiRemote.Options) });
             }
             catch (Exception e) when (e is HttpRequestException or TimeoutException or InvalidOperationException or InvalidDataException)
             {
+                // What came before it stopped is kept, as the app shows it.
+                if (chat is not null && sent.Length > 0 && EndsNow()) LibraryChats.AddAskTurn(chat, request.Question, sent, stopped: true);
                 lines.Writer.TryWrite(new JsonObject { ["kind"] = "error", ["status"] = 503, ["detail"] = e.Message });
             }
             catch (OperationCanceledException) when (ctx.RequestAborted.IsCancellationRequested)
             {
-                // they stopped it, or went away
+                KeepStopped(); // they stopped it, or went away: what was written by then is kept
             }
             finally
             {
@@ -96,9 +121,44 @@ public sealed partial class LibraryWeb
         }
         catch (Exception e) when (e is OperationCanceledException or IOException)
         {
-            // they went away: the answer stops with them
+            // they went away: the answer stops with them, and the chat is theirs again at once
+            KeepStopped();
         }
         await asking;
+    }
+
+    /// <summary>A turn answered, kept in its chat (when it's in one), and the reply saying which.</summary>
+    AskReply Kept(Chat? chat, string question, AskReply reply)
+    {
+        if (chat is null) return reply;
+        LibraryChats.AddAskTurn(chat, question, reply.Answer, reply);
+        return reply with { Chat = chat.Id };
+    }
+
+    /// <summary>The kept chat a question goes on ("new": a new one where it says it's asked), or null when it isn't
+    /// kept. A chat deleted meanwhile starts again as a new one there.</summary>
+    Chat? AskChatFor(JsonObject? body)
+    {
+        if (Str(body, "chat") is not { } id) return null;
+        AskPlace? place = body?["place"] is JsonObject p
+            ? new AskPlace(Str(p, "scope") ?? "home", Str(p, "lecture"), Str(p, "class"))
+            : null;
+        return id != "new" && LibraryChats.Get(id) is { Kind: Chats.AskKind } kept ? kept : LibraryChats.NewAsk(place);
+    }
+
+    /// <summary>A follow-up's conversation so far, as the app sends it; null when there's none, or none that can be
+    /// read (the question is then asked on its own, as a library before this did).</summary>
+    static List<AskTurn>? AskHistory(JsonNode? history)
+    {
+        if (history is not JsonArray) return null;
+        try
+        {
+            return history.Deserialize<List<AskTurn?>>(AiRemote.Options) is { } turns ? AskMemory.Last(turns, int.MaxValue, int.MaxValue) : null;
+        }
+        catch (Exception e) when (e is JsonException or NotSupportedException or InvalidOperationException)
+        {
+            return null;
+        }
     }
 
     void MapAi(WebApplication app)
@@ -264,20 +324,34 @@ public sealed partial class LibraryWeb
             var request = new AskRequest(question)
             {
                 Lecture = Str(body, "lecture"), Class = Str(body, "class"), Engine = Str(body, "engine"),
-                Live = Str(body, "live"), LiveTitle = Str(body, "live_title"),
+                Live = Str(body, "live"), LiveTitle = Str(body, "live_title"), History = AskHistory(body?["history"]),
             };
-            if (body?["stream"] is JsonValue sv && sv.TryGetValue(out bool stream) && stream)
-            {
-                await StreamAnswerAsync(ctx, request);
-                return Results.Empty;
-            }
+            // A kept chat: the turns before this one come from it, and this one is kept in it. One turn at a time: a
+            // question in a chat that's still answering one (asked on another device) waits its turn.
+            var chat = AskChatFor(body);
+            var turn = chat is null ? null : LibraryChats.TryBegin(chat.Id);
+            if (chat is not null && turn is null)
+                return Http.Detail(409, "This chat is still answering a question asked on another device. Ask again once that answer is done.");
             try
             {
-                return AiJson(await Jobs.AskAsync(request, Reader, cfg, ctx.RequestAborted));
+                if (chat is not null) request = request with { History = Chats.AskTurns(chat) };
+                if (body?["stream"] is JsonValue sv && sv.TryGetValue(out bool stream) && stream)
+                {
+                    await StreamAnswerAsync(ctx, request, chat, turn);
+                    return Results.Empty;
+                }
+                try
+                {
+                    return AiJson(Kept(chat, question, await Jobs.AskAsync(request, Reader, cfg, ctx.RequestAborted)));
+                }
+                catch (Exception e) when (e is HttpRequestException or TimeoutException or InvalidOperationException or InvalidDataException)
+                {
+                    return Http.Detail(503, e.Message);
+                }
             }
-            catch (Exception e) when (e is HttpRequestException or TimeoutException or InvalidOperationException or InvalidDataException)
+            finally
             {
-                return Http.Detail(503, e.Message);
+                if (chat is not null && turn is not null) LibraryChats.End(chat.Id, turn);
             }
         })));
 

@@ -705,9 +705,13 @@ public sealed class AiJobs(string home, Func<string>? ollamaHost = null)
             throw new InvalidOperationException("Asking needs an AI: choose one in Settings → Your AI.");
 
         string shown = "", note = "";
+        int remembered = 0;
         async Task<JsonObject> RunAsync(string who, CancellationTokenSource timer)
         {
             string model = AskModel(who, settings, cfg);
+            // The conversation so far, as much of it as this AI is given (the free AI less: its model reads less at once).
+            var earlier = AskMemory.For(who, model, request.History);
+            remembered = earlier.Count;
             Action<string>? written = answerSoFar is null ? null : raw =>
             {
                 timer.CancelAfter(Timeout.InfiniteTimeSpan); // it's answering: from here it has as long as it needs
@@ -718,8 +722,9 @@ public sealed class AiJobs(string home, Func<string>? ollamaHost = null)
                 }
             };
             var answer = await reader.AskAsync(request.Question, request.Lecture, request.Class, request.Live,
-                request.LiveTitle is { Length: > 0 } t ? t : "This lecture", AskWith(who, model, timer.Token, written, n => note = n));
+                request.LiveTitle is { Length: > 0 } t ? t : "This lecture", AskWith(who, model, timer.Token, written, said => note = said), earlier);
             Record(who, true, "");
+            if (answer["remembered"] is JsonValue rv && rv.TryGetValue(out int n)) remembered = n;
             return answer;
         }
 
@@ -761,7 +766,7 @@ public sealed class AiJobs(string home, Func<string>? ollamaHost = null)
         // Answered by another model than the one asked (Gemini's free daily limit): its byline says which, and why.
         return new AskReply(Py.AsString(result["answer"]) ?? "", sources, engine, note.Length > 0 ? note : Engines.Name(engine))
         {
-            Asked = asked, AskedName = Engines.Name(asked), FellBack = fellBack, Why = why,
+            Asked = asked, AskedName = Engines.Name(asked), FellBack = fellBack, Why = why, Remembered = remembered,
         };
     }
 }

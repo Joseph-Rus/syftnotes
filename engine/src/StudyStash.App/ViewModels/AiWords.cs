@@ -251,26 +251,37 @@ public static partial class AiWords
 
     /// <summary>An answer's byline: the engine, then the moments in the lecture it drew on, earliest first ("Ollama ·
     /// from 18:05 and 18:40"), or just the engine when nothing carries a moment.</summary>
-    public static string AskByline(string engineName, IEnumerable<AskSource> sources) =>
-        string.Concat(AskBylineParts(engineName, [.. sources], null).Select(p => p.Text));
+    public static string AskByline(string engineName, IEnumerable<AskSource> sources, bool readChat = false) =>
+        string.Concat(AskBylineParts(engineName, [.. sources], null, readChat).Select(p => p.Text));
 
     /// <summary>The byline in the pieces it's shown in. With <paramref name="open"/> (the page can show a source),
     /// each moment is a link of its own that opens its source, so every one the answer drew on can be gone to; a
-    /// byline that names no moment opens the answer's first source, as one press.</summary>
-    public static List<BylinePart> AskBylineParts(string engineName, IReadOnlyList<AskSource> sources, Action<AskSource>? open)
+    /// byline that names no moment opens the answer's first source, as one press. <paramref name="readChat"/>: the
+    /// conversation above went to this AI with the question, where another AI (the free one, on the student's own
+    /// computer) answered it, and the byline says so (<see cref="ReadChat"/>).</summary>
+    public static List<BylinePart> AskBylineParts(string engineName, IReadOnlyList<AskSource> sources, Action<AskSource>? open, bool readChat = false)
     {
         // The moments the answer drew on, in the order they were said (an engine lists them by relevance), each once.
         var moments = sources.Where(s => s.At is not null).OrderBy(s => s.At!.Value).DistinctBy(s => TimedText.Clock(s.At!.Value)).ToList();
-        if (moments.Count == 0) return [new BylinePart(engineName, open is not null && sources.Count > 0 ? () => open(sources[0]) : null)];
-        var parts = new List<BylinePart> { new($"{engineName} · from ") };
+        var parts = new List<BylinePart>();
+        if (moments.Count == 0) parts.Add(new BylinePart(engineName, open is not null && sources.Count > 0 ? () => open(sources[0]) : null));
+        else parts.Add(new BylinePart($"{engineName} · from "));
         for (int i = 0; i < moments.Count; i++)
         {
             if (i > 0) parts.Add(new BylinePart(i == moments.Count - 1 ? " and " : ", "));
             var source = moments[i];
             parts.Add(new BylinePart(TimedText.Clock(source.At!.Value), open is null ? null : () => open(source), moment: true));
         }
+        if (readChat) parts.Add(new BylinePart(ReadChat));
         return parts;
     }
+
+    /// <summary>After an answer's byline, when the chat above went to an AI that hadn't had it (Claude asked after the
+    /// free AI answered, which kept it on the computer): " · also read the chat above".</summary>
+    public const string ReadChat = " · also read the chat above";
+
+    /// <summary>Under the first answer from a library too old to keep chats.</summary>
+    public const string NoHistoryOnOlderLibrary = "Your library runs an older Study Stash, so this chat isn't kept and follow-ups start fresh. Update it to keep your chats.";
 
     /// <summary>What a moment in a byline does: "Read the transcript at 01:52".</summary>
     public static string MomentTip(string time) => $"Read the transcript at {time}";

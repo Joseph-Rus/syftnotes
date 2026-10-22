@@ -65,8 +65,13 @@ public sealed partial class AiTurn : ObservableObject
     /// it names a link of its own (<see cref="AiWords.AskBylineParts"/>).</summary>
     [ObservableProperty] public partial IReadOnlyList<BylinePart> BylineParts { get; set; } = [];
     [ObservableProperty] public partial string? FellBackNote { get; set; }
+    /// <summary>Under the first answer from a library too old to keep chats: this conversation isn't kept.</summary>
+    [ObservableProperty] public partial string? OlderLibraryNote { get; set; }
     [ObservableProperty] public partial string? Failed { get; set; }
     public List<AskSource> Sources { get; set; } = [];
+    /// <summary>The engine that answered (the one asked, until the answer says otherwise): whether the chat above has
+    /// been to an AI before goes by it.</summary>
+    public string Engine { get; set; } = "";
     public bool IsThinking => Answer is null && Failed is null;
     public string ThinkingWords => AiWords.Thinking(AskedName);
 
@@ -179,13 +184,43 @@ public sealed partial class AiAskModel : ObservableObject
 
     partial void OnAnswerClosedChanged(bool value) => ThreadShown();
 
-    /// <summary>The answer card's close button: the notes get their room back, and an answer still being written stops.</summary>
+    /// <summary>The answer card's close button: the notes get their room back, and an answer still being written stops.
+    /// The conversation is kept: the next question carries it on, and it's in the Chats list.</summary>
     [RelayCommand]
     void CloseAnswer()
     {
         Stop();
         AnswerClosed = true;
     }
+
+    /// <summary>New chat: the next question starts a conversation of its own, the AI remembering nothing before it. The
+    /// one before stays in the Chats list. An answer still being written stops. The card closes until then.</summary>
+    [RelayCommand(CanExecute = nameof(CanStartOver))]
+    void NewChat() => StartOver(show: true);
+
+    void StartOver(bool show)
+    {
+        Stop();
+        Turns.Clear();
+        ChatId = null;
+        foreach (var row in Chats) row.Current = false;
+        AnswerClosed = false;
+        OnPropertyChanged(nameof(Latest));
+        ThreadShown();
+        if (show) Started?.Invoke();
+    }
+
+    /// <summary>The student asked: a turn was added at the end of the thread. The views bring the thread back to its end,
+    /// even where the student had scrolled up to read something earlier, so the question and its answer show.</summary>
+    public event Action? Asked;
+
+    public bool CanStartOver => Turns.Count > 0;
+
+    /// <summary>A new chat was started: the view puts the caret in the field for its first question.</summary>
+    public Action? Started { get; set; }
+
+    /// <summary>Whether this bar has said its library is too old to keep chats (it says so once).</summary>
+    bool toldOlder;
 
     /// <summary>The recorder's chat was closed with a conversation in it: "Show the chat" brings it back as it was.</summary>
     public bool CanShowChat => Turns.Count > 0 && AnswerClosed;
@@ -194,7 +229,11 @@ public sealed partial class AiAskModel : ObservableObject
     /// being written stops. The conversation is kept for this lecture: the next question, or "Show the chat", shows it
     /// again (a new recording starts a new one).</summary>
     [RelayCommand(CanExecute = nameof(HasLatest))]
-    void CloseChat() => CloseAnswer();
+    void CloseChat()
+    {
+        Stop();
+        AnswerClosed = true;
+    }
 
     /// <summary>"Show the chat": the conversation closed a moment ago, back as it was.</summary>
     [RelayCommand]
@@ -205,7 +244,9 @@ public sealed partial class AiAskModel : ObservableObject
     {
         OnPropertyChanged(nameof(HasLatest));
         OnPropertyChanged(nameof(CanShowChat));
+        OnPropertyChanged(nameof(CanStartOver));
         CloseChatCommand.NotifyCanExecuteChanged();
+        NewChatCommand.NotifyCanExecuteChanged();
     }
 
     /// <summary>Opens Settings → AI engines (the "Change defaults" footer link).</summary>
@@ -271,6 +312,8 @@ public sealed partial class AiAskModel : ObservableObject
             return;
         }
         Apply(overview);
+        // A lecture's page opens on its latest conversation (in the card, closed until it's asked in or opened).
+        await LoadChatsAsync(openLatest: Place?.Scope == "lecture");
     }
 
     void Apply(AiOverview? overview)
@@ -317,14 +360,21 @@ public sealed partial class AiAskModel : ObservableObject
         string q = Question.Trim();
         if (q.Length == 0 || Busy) return;
         Question = "";
-        var turn = new AiTurn(q, EngineName);
+        // The conversation so far goes with the question: the library reads it from the kept chat; where nothing is
+        // kept, the turns that were answered go with it (the last few, each cut short).
+        var answered = Turns.Where(t => !string.IsNullOrWhiteSpace(t.Answer)).TakeLast(AskMemory.Turns).ToList();
+        var earlier = Place is null ? AskMemory.Last(answered.Select(t => new AskTurn(t.Question, t.Answer!) { Sources = t.Sources })) : [];
+        string first = Turns.Count > 0 ? Turns[0].Question : q;
+        var turn = new AiTurn(q, EngineName) { Engine = Engine };
         Turns.Add(turn);
         AnswerClosed = false;
         OnPropertyChanged(nameof(Latest));
         ThreadShown();
+        Asked?.Invoke();
         Busy = true;
         using var stop = asking = new CancellationTokenSource();
         var paced = new Paced(text => turn.Answer = PartialText.Showable(text));
+        string? inChat = null;
         string? Partial() => paced.End() is { } text ? PartialText.Ended(text) : null;
         try
         {
@@ -337,8 +387,11 @@ public sealed partial class AiAskModel : ObservableObject
                 // While it records the scope still says how far to look: this recording alone, its folder, everything.
                 Lecture = Scope == "lecture" ? LectureId : null,
                 Class = Scope == "class" ? ClassName : null,
+                History = earlier.Count > 0 ? earlier : null,
+                Chat = Place is null ? null : ChatId ?? "new",
+                Place = Place,
             };
-            AskReply? reply = await library.AskAsync(request, paced.Show, stop.Token);
+            AskReply? reply = await library.AskAsync(request, paced.Show, id => inChat = id, stop.Token);
             paced.End();
             if (reply is null)
             {
@@ -348,9 +401,23 @@ public sealed partial class AiAskModel : ObservableObject
             }
             turn.Answer = reply.Answer;
             turn.Sources = reply.Sources;
-            turn.Byline = AiWords.AskByline(reply.EngineName, reply.Sources);
-            turn.BylineParts = AiWords.AskBylineParts(reply.EngineName, reply.Sources, OnSource);
+            turn.Engine = reply.Engine;
+            // The chat above went to an AI that hadn't had it: Claude or ChatGPT, after the free AI kept it on the computer.
+            bool readChat = reply.Remembered is int n && n > 0 && SentElsewhere(reply.Engine, answered.TakeLast(n));
+            turn.Byline = AiWords.AskByline(reply.EngineName, reply.Sources, readChat);
+            turn.BylineParts = AiWords.AskBylineParts(reply.EngineName, reply.Sources, OnSource, readChat);
             if (reply.FellBack) turn.FellBackNote = AiWords.FellBackNote(reply.EngineName, reply.Why);
+            if (reply.Chat is { } kept)
+            {
+                Kept(kept, first);
+                inChat = null;
+            }
+            else if (Place is not null && !toldOlder)
+            {
+                // A library too old to keep chats: said once, so a chat that isn't there later isn't a mystery.
+                toldOlder = true;
+                turn.OlderLibraryNote = AiWords.NoHistoryOnOlderLibrary;
+            }
         }
         catch (OperationCanceledException) when (stop.IsCancellationRequested)
         {
@@ -371,6 +438,9 @@ public sealed partial class AiAskModel : ObservableObject
         }
         finally
         {
+            // Stopped or cut off with some of an answer: the library kept it in the chat it said it's in, and the next
+            // question carries that chat on (a new one's first turn too, so it isn't split in two).
+            if (inChat is { } said && !string.IsNullOrWhiteSpace(turn.Answer)) Kept(said, first);
             asking = null;
             Busy = false;
             OnPropertyChanged(nameof(Latest));

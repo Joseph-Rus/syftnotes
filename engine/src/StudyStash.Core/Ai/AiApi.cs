@@ -76,9 +76,55 @@ public sealed record AskRequest(string Question)
     public string? Engine { get; init; }
     public string? Live { get; init; }
     public string? LiveTitle { get; init; }
+    /// <summary>The conversation so far, oldest first, when this is a follow-up and the library doesn't keep it
+    /// (<see cref="Chat"/> unset): the last few turns, each cut short (<see cref="AskMemory"/>). A library too old to
+    /// know it ignores it.</summary>
+    public List<AskTurn>? History { get; init; }
+    /// <summary>The kept conversation this question goes on: its id, or "new" to start one where <see cref="Place"/>
+    /// says. The library reads the turns before it from the chat itself and keeps this one in it. Null: nothing kept
+    /// (the phone, the quick panel). A library too old to keep chats ignores it, and its reply has no
+    /// <see cref="AskReply.Chat"/>.</summary>
+    public string? Chat { get; init; }
+    public AskPlace? Place { get; init; }
+}
+
+/// <summary>Where an Ask chat lives: a lecture's page ("lecture", with its folder), a folder's page ("class") or Home
+/// ("home"). The questions in it may still look further (the scope chip): this is where it's listed.</summary>
+public sealed record AskPlace(string Scope, string? Lecture = null, string? Class = null);
+
+/// <summary>A kept Ask conversation, as a list shows it (<see cref="Messages"/> null) or whole.</summary>
+public sealed record AskChat(string Id, string Title, string Updated)
+{
+    public string Kind { get; init; } = "";
+    public string Scope { get; init; } = "";
+    public string Class { get; init; } = "";
+    public string Lecture { get; init; } = "";
+    /// <summary>Its lecture's title, for a list on a folder's page or Home ("" when it has none, or it's gone).</summary>
+    public string LectureTitle { get; init; } = "";
+    public int Turns { get; init; }
+    public List<AskChatMessage>? Messages { get; init; }
+}
+
+/// <summary>One message in a kept Ask conversation: a question ("user") or its answer ("assistant"), with what the
+/// answer drew on and the AI that wrote it.</summary>
+public sealed record AskChatMessage(string Role, string Text)
+{
+    public List<AskSource> Sources { get; init; } = [];
+    public string Engine { get; init; } = "";
+    public string EngineName { get; init; } = "";
+    public bool Failed { get; init; }
+    public bool Stopped { get; init; }
 }
 
 public sealed record AskSource(string? Id, string Title, string? Class, string? Date, double? At, string Section);
+
+/// <summary>An earlier question in the same conversation and the answer it got, sent along with a follow-up so the AI
+/// knows what "that" or "the second one" means. Its sources are what the answer drew on: the follow-up reads them
+/// again.</summary>
+public sealed record AskTurn(string Question, string Answer)
+{
+    public List<AskSource> Sources { get; init; } = [];
+}
 
 public sealed record AskReply(string Answer, List<AskSource> Sources, string Engine, string EngineName)
 {
@@ -86,6 +132,12 @@ public sealed record AskReply(string Answer, List<AskSource> Sources, string Eng
     public string AskedName { get; init; } = "";
     public bool FellBack { get; init; }
     public string Why { get; init; } = "";
+    /// <summary>How many of the conversation's earlier turns went to the AI with this question (the most recent ones;
+    /// 0 for none). Null from a library too old to remember a conversation: it answered the question on its own.</summary>
+    public int? Remembered { get; init; }
+    /// <summary>The kept conversation this turn is in now (a new one's id when it started one). Null from a library too
+    /// old to keep chats.</summary>
+    public string? Chat { get; init; }
 }
 
 public sealed record NotesVersion(string Markdown, string By, string At);
@@ -166,6 +218,11 @@ public interface IAiLibrary
     /// each time more arrives. <paramref name="stop"/> ends it where it is. A library too old to stream (or a
     /// stand-in that doesn't) answers once, at the end.</summary>
     Task<AskReply?> AskAsync(AskRequest request, Action<string> answerSoFar, CancellationToken stop) => AskAsync(request);
+    /// <summary>Asks in a kept chat: <paramref name="inChat"/> hears first which one (a new one's id too), whatever
+    /// comes of the answer after, so a turn stopped or cut off is carried on in the same chat. A library too old to
+    /// keep chats never says.</summary>
+    Task<AskReply?> AskAsync(AskRequest request, Action<string> answerSoFar, Action<string> inChat, CancellationToken stop) =>
+        AskAsync(request, answerSoFar, stop);
     /// <summary>A student has started typing a question for <paramref name="engine"/> (null: the library's pick):
     /// the library gets that engine ready, so the answer starts sooner. Never fails: it's only a head start.</summary>
     Task WarmAsync(string? engine) => Task.CompletedTask;
@@ -185,6 +242,15 @@ public interface IAiLibrary
     Task<ToolAccessInfo?> SetWebAsync(bool on);
     /// <summary>Checks again whether the library answers from the internet.</summary>
     Task<ToolAccessInfo?> CheckWebAsync();
+    /// <summary>The kept Ask chats on a lecture's page, a folder's (its own and its lectures') or, with neither, Home's
+    /// (all of them), newest first. Empty from a library too old to keep them.</summary>
+    Task<List<AskChat>> ChatsAsync(string? lecture, string? className) => Task.FromResult(new List<AskChat>());
+    /// <summary>One kept chat, whole; null when it's gone.</summary>
+    Task<AskChat?> ChatAsync(string id) => Task.FromResult<AskChat?>(null);
+    Task<AskChat?> RenameChatAsync(string id, string title) => Task.FromResult<AskChat?>(null);
+    /// <summary>Deletes a chat, kept a while for <see cref="RestoreChatAsync"/>; false when it was gone already.</summary>
+    Task<bool> DeleteChatAsync(string id) => Task.FromResult(false);
+    Task<bool> RestoreChatAsync(string id) => Task.FromResult(false);
 }
 
 /// <summary>The library's AI over its API (/api/v2/ai), the way the Study Stash app reads it. Like
@@ -209,11 +275,13 @@ public sealed class AiRemote(string serverUrl, Func<string> key, HttpClient? htt
 
     static readonly HttpClient Shared = new() { Timeout = Waits };
     readonly HttpClient client = http ?? Shared;
-    readonly string root = serverUrl.TrimEnd('/') + "/api/v2/ai";
+    readonly string server = serverUrl.TrimEnd('/');
+    string Root => server + "/api/v2/ai";
 
+    /// <summary>A path under /api/v2/ai, or, starting with "~", one of the library's own (~/api/v2/chats).</summary>
     HttpRequestMessage Request(HttpMethod method, string path, JsonNode? body)
     {
-        var request = new HttpRequestMessage(method, root + path);
+        var request = new HttpRequestMessage(method, path.StartsWith('~') ? server + path[1..] : Root + path);
         if (key() is { Length: > 0 } now) request.Headers.TryAddWithoutValidation("Authorization", "Bearer " + now);
         if (body is not null) request.Content = new StringContent(body.ToJsonString(), Encoding.UTF8, "application/json");
         return request;
@@ -289,7 +357,9 @@ public sealed class AiRemote(string serverUrl, Func<string> key, HttpClient? htt
 
     /// <summary>The answer as the library streams it (see the library's <c>/api/v2/ai/ask</c> with <c>stream</c>),
     /// read a line at a time as each arrives. Stopping closes the connection, which stops the engine too.</summary>
-    public async Task<AskReply?> AskAsync(AskRequest request, Action<string> answerSoFar, CancellationToken stop)
+    public Task<AskReply?> AskAsync(AskRequest request, Action<string> answerSoFar, CancellationToken stop) => AskAsync(request, answerSoFar, _ => { }, stop);
+
+    public async Task<AskReply?> AskAsync(AskRequest request, Action<string> answerSoFar, Action<string> inChat, CancellationToken stop)
     {
         var body = JsonSerializer.SerializeToNode(request, Options)!.AsObject();
         body["stream"] = true;
@@ -310,6 +380,9 @@ public sealed class AiRemote(string serverUrl, Func<string> key, HttpClient? htt
                     break;
                 case "answer":
                     answerSoFar(answer.Clear().Append(text).ToString());
+                    break;
+                case "chat" when Py.AsString(said["id"]) is { Length: > 0 } id:
+                    inChat(id);
                     break;
                 case "done":
                     return As<AskReply>(said["reply"]);
@@ -365,4 +438,51 @@ public sealed class AiRemote(string serverUrl, Func<string> key, HttpClient? htt
         As<ToolAccessInfo>(await SendAsync(HttpMethod.Post, "/access/web", new JsonObject { ["on"] = on }));
 
     public async Task<ToolAccessInfo?> CheckWebAsync() => As<ToolAccessInfo>(await SendAsync(HttpMethod.Post, "/access/web/check"));
+
+    /// <summary>A library too old to keep Ask chats lists only the ones it has (none with kind "ask"): an empty list.</summary>
+    public async Task<List<AskChat>> ChatsAsync(string? lecture, string? className)
+    {
+        string query = "?kind=ask" + (lecture is not null ? "&lecture=" + Seg(lecture) : className is not null ? "&class=" + Seg(className) : "");
+        var list = As<List<AskChat>>(await SendAsync(HttpMethod.Get, "~/api/v2/chats" + query)) ?? [];
+        return [.. list.Where(c => c.Kind == "ask")];
+    }
+
+    public async Task<AskChat?> ChatAsync(string id)
+    {
+        try
+        {
+            return As<AskChat>(await SendAsync(HttpMethod.Get, $"~/api/v2/chats/{Seg(id)}"));
+        }
+        catch (LibraryRefusedException e) when (e.Status == 404)
+        {
+            return null; // deleted meanwhile
+        }
+    }
+
+    public async Task<AskChat?> RenameChatAsync(string id, string title) =>
+        As<AskChat>(await SendAsync(HttpMethod.Post, $"~/api/v2/chats/{Seg(id)}", new JsonObject { ["title"] = title }));
+
+    public async Task<bool> DeleteChatAsync(string id)
+    {
+        try
+        {
+            return await SendAsync(HttpMethod.Delete, $"~/api/v2/chats/{Seg(id)}") is not null;
+        }
+        catch (LibraryRefusedException e) when (e.Status == 404)
+        {
+            return false;
+        }
+    }
+
+    public async Task<bool> RestoreChatAsync(string id)
+    {
+        try
+        {
+            return await SendAsync(HttpMethod.Post, $"~/api/v2/chats/{Seg(id)}/restore") is not null;
+        }
+        catch (LibraryRefusedException e) when (e.Status == 404)
+        {
+            return false;
+        }
+    }
 }

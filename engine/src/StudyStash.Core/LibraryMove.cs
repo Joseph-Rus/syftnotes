@@ -551,6 +551,7 @@ public static class LibraryMove
             File.WriteAllText(path, copy.ToJsonString(new JsonSerializerOptions { WriteIndented = true }));
             filed++;
         }
+        if (filed > 0) Chats.IndexChanged(home); // listed from now on
         return new MoveResult(0, skipped, 0, Chats: filed);
     }
 
