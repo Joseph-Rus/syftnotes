@@ -236,6 +236,12 @@ public interface IAiLibrary
     /// refuses (412) rather than save over them; null saves over whatever is there. Null from a library too old to
     /// take edits.</summary>
     Task<RewriteInfo?> EditNotesAsync(string lecture, string markdown, string? basedOn) => Task.FromResult<RewriteInfo?>(null);
+    Task<ToolAccessInfo?> AccessAsync();
+    Task<ToolAccessInfo?> SetAccessAsync(bool? on = null, ReadingScopes? reading = null);
+    /// <summary>Turns Funnel on or off on the library's computer, then checks it from the internet.</summary>
+    Task<ToolAccessInfo?> SetWebAsync(bool on);
+    /// <summary>Checks again whether the library answers from the internet.</summary>
+    Task<ToolAccessInfo?> CheckWebAsync();
     /// <summary>The kept Ask chats on a lecture's page, a folder's (its own and its lectures') or, with neither, Home's
     /// (all of them), newest first. Empty from a library too old to keep them.</summary>
     Task<List<AskChat>> ChatsAsync(string? lecture, string? className) => Task.FromResult(new List<AskChat>());
@@ -245,12 +251,6 @@ public interface IAiLibrary
     /// <summary>Deletes a chat, kept a while for <see cref="RestoreChatAsync"/>; false when it was gone already.</summary>
     Task<bool> DeleteChatAsync(string id) => Task.FromResult(false);
     Task<bool> RestoreChatAsync(string id) => Task.FromResult(false);
-    Task<ToolAccessInfo?> AccessAsync();
-    Task<ToolAccessInfo?> SetAccessAsync(bool? on = null, ReadingScopes? reading = null);
-    /// <summary>Turns Funnel on or off on the library's computer, then checks it from the internet.</summary>
-    Task<ToolAccessInfo?> SetWebAsync(bool on);
-    /// <summary>Checks again whether the library answers from the internet.</summary>
-    Task<ToolAccessInfo?> CheckWebAsync();
 }
 
 /// <summary>The library's AI over its API (/api/v2/ai), the way the Study Stash app reads it. Like
@@ -424,6 +424,21 @@ public sealed class AiRemote(string serverUrl, Func<string> key, HttpClient? htt
     public async Task<RewriteInfo?> EditNotesAsync(string lecture, string markdown, string? basedOn) => As<RewriteInfo>(await SendAsync(
         HttpMethod.Post, $"/rewrite/{Seg(lecture)}/edit", new JsonObject { ["markdown"] = markdown, ["based_on"] = basedOn }));
 
+    public async Task<ToolAccessInfo?> AccessAsync() => As<ToolAccessInfo>(await SendAsync(HttpMethod.Get, "/access"));
+
+    public async Task<ToolAccessInfo?> SetAccessAsync(bool? on = null, ReadingScopes? reading = null)
+    {
+        var body = new JsonObject();
+        if (on is not null) body["on"] = on.Value;
+        if (reading is not null) body["reading"] = JsonSerializer.SerializeToNode(reading, Options);
+        return As<ToolAccessInfo>(await SendAsync(HttpMethod.Post, "/access", body));
+    }
+
+    public async Task<ToolAccessInfo?> SetWebAsync(bool on) =>
+        As<ToolAccessInfo>(await SendAsync(HttpMethod.Post, "/access/web", new JsonObject { ["on"] = on }));
+
+    public async Task<ToolAccessInfo?> CheckWebAsync() => As<ToolAccessInfo>(await SendAsync(HttpMethod.Post, "/access/web/check"));
+
     /// <summary>A library too old to keep Ask chats lists only the ones it has (none with kind "ask"): an empty list.</summary>
     public async Task<List<AskChat>> ChatsAsync(string? lecture, string? className)
     {
@@ -470,19 +485,4 @@ public sealed class AiRemote(string serverUrl, Func<string> key, HttpClient? htt
             return false;
         }
     }
-
-    public async Task<ToolAccessInfo?> AccessAsync() => As<ToolAccessInfo>(await SendAsync(HttpMethod.Get, "/access"));
-
-    public async Task<ToolAccessInfo?> SetAccessAsync(bool? on = null, ReadingScopes? reading = null)
-    {
-        var body = new JsonObject();
-        if (on is not null) body["on"] = on.Value;
-        if (reading is not null) body["reading"] = JsonSerializer.SerializeToNode(reading, Options);
-        return As<ToolAccessInfo>(await SendAsync(HttpMethod.Post, "/access", body));
-    }
-
-    public async Task<ToolAccessInfo?> SetWebAsync(bool on) =>
-        As<ToolAccessInfo>(await SendAsync(HttpMethod.Post, "/access/web", new JsonObject { ["on"] = on }));
-
-    public async Task<ToolAccessInfo?> CheckWebAsync() => As<ToolAccessInfo>(await SendAsync(HttpMethod.Post, "/access/web/check"));
 }
