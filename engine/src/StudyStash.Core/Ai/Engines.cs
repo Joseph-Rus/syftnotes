@@ -52,8 +52,11 @@ public sealed record EngineChecks
         DiskFreeGb = () => StudyStash.Core.Machine.DiskFreeGb(),
         OpenSignIn = (home, terminal, id) =>
         {
-            var (exe, args) = Engines.SignInCommand(id);
-            return $"Opened {Terminal.RunCommand(home, terminal, exe, args)} to sign in to {Engines.Name(id)}.";
+            // Gemini signs in to Study Stash's own home for agy, the one its notes run in.
+            var (exe, args) = id == "gemini" && AiProvider.Which(Antigravity.Binary) is { } agy
+                ? Antigravity.InTerminal(agy, OperatingSystem.IsWindows())
+                : Engines.SignInCommand(id);
+            return $"Opened {Terminal.RunCommand(home, terminal, exe, [.. args])} to sign in to {Engines.Name(id)}.";
         },
         Now = () => DateTime.Now,
     };
@@ -98,7 +101,7 @@ public static class Engines
     {
         "claude" => "Claude Code",
         "codex" => "Codex",
-        "gemini" => "Gemini CLI",
+        "gemini" => "Antigravity CLI",
         _ => Name(id),
     };
 
@@ -221,9 +224,11 @@ public static class Engines
     static bool? Hinted(string id, EngineChecks checks) => id switch
     {
         "codex" => checks.FileExists(CodexAuthPath(checks)) || checks.Env("OPENAI_API_KEY") is { Length: > 0 },
-        // Gemini runs through Google's Antigravity (agy), whose sign-in isn't the Gemini CLI's oauth_creds.json: a
-        // missing file proves nothing, so without a key in the environment it's unchecked until tried.
-        "gemini" => checks.Env("GEMINI_API_KEY") is { Length: > 0 } || checks.FileExists(GeminiCredsPath) ? true : null,
+        // Gemini runs through Google's Antigravity (agy), in Study Stash's own home for it, where agy 1.4.5 keeps its
+        // sign-in in a file of its own (only whether it's there is looked at). Its absence proves nothing (another
+        // version may keep it elsewhere): without it or a key in the environment, it's unchecked until tried.
+        "gemini" => checks.Env("GEMINI_API_KEY") is { Length: > 0 } || checks.FileExists(GeminiCredsPath)
+            || checks.FileExists(Path.Combine(Antigravity.Home(), ".gemini", "antigravity-cli", "antigravity-oauth-token")) ? true : null,
         _ => null, // claude
     };
 

@@ -16,7 +16,7 @@ public class AiEnginesTests
         Assert.Equal(["ollama", "claude", "codex", "gemini"], Engines.Order);
         // Each AI by the name the person using Study Stash knows; the tool it's reached through is a separate thing.
         Assert.Equal(["Ollama", "Claude", "ChatGPT", "Gemini"], Engines.Order.Select(Engines.Name));
-        Assert.Equal(["Ollama", "Claude Code", "Codex", "Gemini CLI"], Engines.Order.Select(Engines.Tool));
+        Assert.Equal(["Ollama", "Claude Code", "Codex", "Antigravity CLI"], Engines.Order.Select(Engines.Tool));
     }
 
     [Theory]

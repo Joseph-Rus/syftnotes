@@ -152,7 +152,8 @@ public abstract class AiProvider
     /// <summary>Where these commands usually live: a background service starts with a short PATH. On Windows also
     /// the PATH as Windows has it now: an engine (or Node.js, which npm's claude.cmd and codex.cmd run on) installed
     /// while Study Stash was running isn't on the PATH it started with, and "Check again" in setup should find it.
-    /// Codex's own Windows installer puts it in %LOCALAPPDATA%\Programs\OpenAI\Codex\bin. Last of all, the copies the
+    /// Codex's own Windows installer puts it in %LOCALAPPDATA%\Programs\OpenAI\Codex\bin, Antigravity's in
+    /// %LOCALAPPDATA%\agy\bin. Last of all, the copies the
     /// ChatGPT and Claude desktop apps carry (<see cref="DesktopAppDirs"/>): one installed on its own comes first.</summary>
     public static string SearchPath()
     {
@@ -160,6 +161,7 @@ public abstract class AiProvider
         string[] extra = OperatingSystem.IsWindows()
             ? [.. WindowsPathNow(), Path.Combine(home, "AppData", "Roaming", "npm"), Path.Combine(home, ".local", "bin"),
                Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Programs", "OpenAI", "Codex", "bin"),
+               Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "agy", "bin"),
                Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles), "nodejs")]
             : ["/opt/homebrew/bin", "/usr/local/bin", "/usr/bin", "/bin", Path.Combine(home, ".local", "bin"),
                Path.Combine(home, ".npm-global", "bin"), Path.Combine(home, ".bun", "bin"), Path.Combine(home, ".claude", "local"),
@@ -623,7 +625,9 @@ public class CodexProvider : AiProvider
 }
 
 /// <summary>Gemini, through Google's Antigravity CLI (<c>agy -p</c>), which took over from Gemini CLI for
-/// personal Google accounts.</summary>
+/// personal Google accounts, in a home of Study Stash's own (<see cref="Antigravity.Home"/>): the student's own agy
+/// settings, MCP servers, plugins and skills don't run in the library's work, and Study Stash never changes theirs. The
+/// sign-in is kept in that home too: the one setup's "Sign in to Gemini" made.</summary>
 public sealed class GeminiProvider : AiProvider
 {
     public override string Id => "gemini";
@@ -634,22 +638,26 @@ public sealed class GeminiProvider : AiProvider
         [("", "Antigravity's default model"), ("gemini-3.8-flash-medium", "Gemini 3.8 Flash: fast"), ("gemini-3.1-pro-high", "Gemini 3.1 Pro: strongest")];
 
     /// <summary>
-    /// Antigravity keeps its MCP servers in its own settings: add Study Stash's once. In print mode it can't ask
-    /// before running a command or opening a file, so it refuses them and ends with an empty answer; allow the
-    /// commands that only read (ls, cat, grep…) and reading the turn's own folders (<paramref name="folders"/>), or a
-    /// turn that wants a look around comes back empty.
+    /// Antigravity keeps its MCP servers in its own settings (Study Stash's home for it): add Study Stash's once. In
+    /// print mode it can't ask before running a command or opening a file, so it refuses them and ends with an empty
+    /// answer; allow the commands that only read (ls, cat, grep…) and reading the turn's own folders
+    /// (<paramref name="folders"/>), or a turn that wants a look around comes back empty.
     /// </summary>
     public void Prepare(IReadOnlyList<string> mcp, IEnumerable<string>? folders = null)
     {
         string exe = Exe() ?? "agy";
+        var env = Antigravity.HomeEnv();
         // Once seen there, it stays: later turns don't wait for `agy mcp list` again before they start.
-        if (mcp.Count > 0 && !mcpAdded && Machine.Run(exe, ["mcp", "list"], TimeSpan.FromSeconds(20)) is { } listed)
+        if (mcp.Count > 0 && !mcpAdded && Machine.Run(exe, ["mcp", "list"], TimeSpan.FromSeconds(20), env) is { } listed)
         {
             mcpAdded = listed.Stdout.Contains(ClaudeTools.ServerName, StringComparison.Ordinal)
-                || Machine.Run(exe, ["mcp", "add", ClaudeTools.ServerName, .. mcp], TimeSpan.FromSeconds(20)) is { ExitCode: 0 };
+                || Machine.Run(exe, ["mcp", "add", ClaudeTools.ServerName, .. mcp], TimeSpan.FromSeconds(20), env) is { ExitCode: 0 };
         }
-        AllowReading(Path.Combine(Py.UserHome(), ".gemini", "antigravity-cli", "settings.json"), folders);
+        AllowReading(Antigravity.SettingsPath(Antigravity.Home()), folders, create: true);
     }
+
+    /// <summary>agy's home of Study Stash's own.</summary>
+    protected override IReadOnlyDictionary<string, string> Env(AiRequest req) => Antigravity.HomeEnv();
 
     /// <summary>Study Stash's MCP server is in Antigravity's settings (seen by this process, or added by it).</summary>
     static bool mcpAdded;
@@ -657,36 +665,29 @@ public sealed class GeminiProvider : AiProvider
     public static readonly string[] ReadOnlyCommands = ["ls", "cat", "head", "tail", "grep", "rg", "find", "wc", "pdftotext", "file", "stat"];
 
     /// <summary>Add read-only command rules, and reading each of <paramref name="folders"/> (Antigravity's
-    /// <c>read_file(/a/folder)</c>), to Antigravity's settings, keeping everything else in them. True when it changed them.</summary>
-    public static bool AllowReading(string settingsPath, IEnumerable<string>? folders = null)
+    /// <c>read_file(/a/folder)</c>), to Antigravity's settings, keeping everything else in them (made, with
+    /// <paramref name="create"/>, when there are none yet: Study Stash's own home). True when it changed them.</summary>
+    public static bool AllowReading(string settingsPath, IEnumerable<string>? folders = null, bool create = false)
     {
-        if (!File.Exists(settingsPath)) return false;
-        JsonObject root;
-        try
-        {
-            root = JsonNode.Parse(File.ReadAllText(settingsPath)) as JsonObject ?? [];
-        }
-        catch (JsonException)
-        {
-            return false; // not ours to repair
-        }
-        var perms = root["permissions"] as JsonObject ?? [];
-        var allow = perms["allow"] as JsonArray ?? [];
-        var have = allow.Select(S).ToHashSet();
-        bool changed = false;
+        if (!File.Exists(settingsPath) && !create) return false;
         var rules = ReadOnlyCommands.Select(c => $"command({c})")
             .Concat((folders ?? []).Where(f => f.Length > 0).Select(f => $"read_file({Path.TrimEndingDirectorySeparator(Path.GetFullPath(f))})"));
-        foreach (string rule in rules)
-            if (have.Add(rule)) { allow.Add(rule); changed = true; }
-        if (!changed) return false;
-        perms["allow"] = allow;
-        root["permissions"] = perms;
-        File.WriteAllText(settingsPath, root.ToJsonString(new JsonSerializerOptions { WriteIndented = true }));
-        return true;
+        return Antigravity.Allow(settingsPath, rules);
     }
+
+    /// <summary>A plain answer (notes, sorting, the Check: no tools, no files to change, no folders to look at): it runs
+    /// as Study Stash's answer agent, which has no tools to reach for (<see cref="Antigravity.AnswerAgentFile"/>).</summary>
+    static bool PlainAnswer(AiRequest req) => !req.Tools && !req.Write && req.ReadDirs.Count == 0;
 
     public override List<string> Command(AiRequest req, bool stream)
     {
+        if (PlainAnswer(req))
+        {
+            var plain = new List<string> { Exe() ?? "agy", "-p", WithSystem(req), "--output-format", "stream-json", "--agent", Antigravity.AnswerAgent, "--disable-slash-commands" };
+            if (req.Model.Length > 0) plain.AddRange(["--model", req.Model]);
+            if (req.Session.Length > 0) plain.AddRange(["--conversation", req.Session]);
+            return plain;
+        }
         var cmd = new List<string> { Exe() ?? "agy", "-p", WithSystem(req), "--output-format", "stream-json",
             "--mode", req.Write ? "accept-edits" : "plan" };
         if (!req.Write) // read-only turns may look around the other folders; editing turns stay in the library
@@ -698,7 +699,11 @@ public sealed class GeminiProvider : AiProvider
 
     public override IAsyncEnumerable<AiEvent> RunAsync(AiRequest req, bool stream = true, CancellationToken ct = default)
     {
-        if (Available()) Prepare(req.Tools ? req.McpCommand : [], [req.Cwd, .. req.ReadDirs]);
+        if (Available())
+        {
+            if (PlainAnswer(req)) Antigravity.PrepareAnswer();
+            else Prepare(req.Tools ? req.McpCommand : [], [req.Cwd, .. req.ReadDirs]);
+        }
         return base.RunAsync(req, stream, ct);
     }
 

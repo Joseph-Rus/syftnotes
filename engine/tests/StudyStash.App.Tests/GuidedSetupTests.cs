@@ -16,7 +16,7 @@ using StudyStash.Library;
 namespace StudyStash.App.Tests;
 
 /// <summary>
-/// Guided setup from start to finish with fakes only: a fake installer that drops a fake Claude Code or Codex into a
+/// Guided setup from start to finish with fakes only: a fake installer that drops a fake Claude Code, Codex or agy into a
 /// test's own folder, fake sign-in, fake chat turns replayed by the fake CLI, and the real setup tools behind their real
 /// door, called by the test the way the CLI would call them. Never a real installer, account, microphone or download.
 /// </summary>
@@ -93,7 +93,9 @@ public sealed class GuidedSetupTests
             if (signedIn) File.WriteAllText(Path.Combine(Bin, "signed-in"), "");
             // Every turn says a word and ends, unless a test scripts its own.
             Directory.CreateDirectory(Bin);
-            FakeAgents.Replay(Bin, [Init(), Says("OK."), Done("OK.")]);
+            FakeAgents.Replay(Bin, cli == "gemini"
+                ? [FakeAgents.Agy.Init(), FakeAgents.Agy.Words(1, "OK."), FakeAgents.Agy.Result("OK.")]
+                : [Init(), Says("OK."), Done("OK.")]);
             File.WriteAllText(Path.Combine(Bin, "login-delay"), "1");
             foreach (var m in WhisperModels.All) Models.Hold.Add(m.File);
             Host = new AppHost(Home.Path, mic ?? (() => throw new InvalidOperationException("no microphone in this test")), log: _ => { }, loginItems: Login,
@@ -265,7 +267,7 @@ public sealed class GuidedSetupTests
     }
 
     [AvaloniaFact]
-    public async Task No_paid_plan_and_gemini_are_answers_like_claude_and_chatgpt_and_open_setup_by_hand()
+    public async Task No_paid_plan_opens_setup_by_hand_and_gemini_goes_the_way_claude_and_chatgpt_do()
     {
         await using var rig = await new Rig().OpenAsync();
         var g = rig.Guided;
@@ -282,16 +284,18 @@ public sealed class GuidedSetupTests
         Assert.Equal(["Pick your AI", "Get your AI ready", "Sign in", "Set up Study Stash"], g.Steps.Select(s => s.Title));
         g.PickCommand.Execute("claude");
         Assert.Equal(["Pick your AI", "Get Claude ready", "Sign in to Claude", "Set up Study Stash"], g.Steps.Select(s => s.Title));
+        // Gemini gets ready and signs in the same way, its own mark beside it.
+        g.PickCommand.Execute("gemini");
+        Assert.False(g.PickedByHand);
+        Assert.Equal(["Pick your AI", "Get Gemini ready", "Sign in to Gemini", "Set up Study Stash"], g.Steps.Select(s => s.Title));
+        Assert.Equal("brand:gemini", g.BrandGlyph);
 
-        // Gemini and "I don't have a paid plan" are answers like the other two: nothing to install or sign in to here,
-        // and Continue goes on, to setup by hand.
-        foreach (string answer in new[] { "gemini", "free" })
-        {
-            g.PickCommand.Execute(answer);
-            Assert.True(g.PickedByHand);
-            Assert.True(g.CanContinue);
-            Assert.Equal(["Pick your AI", "Set up Study Stash"], g.Steps.Select(s => s.Title));
-        }
+        // "I don't have a paid plan" is an answer like the others: nothing to install or sign in to here, and Continue
+        // goes on, to setup by hand.
+        g.PickCommand.Execute("free");
+        Assert.True(g.PickedByHand);
+        Assert.True(g.CanContinue);
+        Assert.Equal(["Pick your AI", "Set up Study Stash"], g.Steps.Select(s => s.Title));
         await g.ContinueCommand.ExecuteAsync(null);
         Assert.Equal(GuidedScreen.Manual, g.Screen);
         Assert.True(g.PreferOllama);
@@ -303,10 +307,10 @@ public sealed class GuidedSetupTests
     }
 
     /// <summary>
-    /// Each AI the first screen offers, picked and carried on with, ends with that AI writing the notes. Claude and
-    /// ChatGPT through the chat (here a fake CLI): once the library's made, the AI picked writes the notes. Gemini and the
-    /// free AI through setup by hand: its notes step opens on that AI (Gemini's key box showing, since it isn't on this
-    /// computer yet), and Continue saves it.
+    /// Each AI the first screen offers, picked and carried on with, ends with that AI writing the notes. Claude, ChatGPT
+    /// and Gemini through the chat (here a fake CLI): once the library's made, the AI picked writes the notes. The free
+    /// AI through setup by hand: its notes step opens on it, and Continue saves it. Setup by hand's notes step still
+    /// opens Gemini's key box when Gemini was the answer last time and isn't on this computer.
     /// </summary>
     [AvaloniaTheory]
     [InlineData("claude")]
@@ -315,7 +319,7 @@ public sealed class GuidedSetupTests
     [InlineData("free")]
     public async Task Each_ai_picked_on_the_first_screen_ends_up_writing_the_notes(string answer)
     {
-        bool chat = answer is "claude" or "codex";
+        bool chat = answer is "claude" or "codex" or "gemini";
         await using var rig = await new Rig(cli: chat ? answer : "claude", installed: chat, signedIn: chat, role: AppRole.Both).OpenAsync();
         var g = rig.Guided;
         g.PickCommand.Execute(answer);
@@ -337,13 +341,30 @@ public sealed class GuidedSetupTests
         }
 
         Assert.Equal(GuidedScreen.Manual, g.Screen);
-        string engine = answer == "free" ? "ollama" : "gemini";
-        Assert.Equal(engine, g.NotesPick);
-        // The notes step, as setup's window makes it (Shell.EnterSetupStep), over a library where the free AI is
-        // ready and Gemini isn't on this computer.
+        Assert.Equal("ollama", g.NotesPick);
+        await NotesStepOpensOn("ollama");
+    }
+
+    /// <summary>Gemini as the answer last time, and not on this computer now (setup run again, gone to setup by hand):
+    /// setup by hand's notes step opens with its key box, and a key saved there makes Gemini the notes' writer.</summary>
+    [AvaloniaFact]
+    public async Task Setup_by_hand_opened_on_gemini_still_takes_its_api_key()
+    {
+        await using var rig = await new Rig(saved: s => s.SetupAi = "gemini").OpenAsync();
+        var g = rig.Guided;
+        Assert.Equal("gemini", g.Picked); // that answer again
+        g.ByHandCommand.Execute(null);
+        Assert.Equal("gemini", g.NotesPick);
+        await NotesStepOpensOn("gemini");
+    }
+
+    /// <summary>The notes step, as setup's window makes it (Shell.EnterSetupStep), opened on <paramref name="engine"/>,
+    /// over a library where the free AI is ready and Gemini isn't on this computer.</summary>
+    static async Task NotesStepOpensOn(string engine)
+    {
         var lib = new FakeAiLibrary { Overview = AiTestData.MixedOverview() with { Notes = "ollama" } };
         var opened = new List<string>();
-        var notes = new AiSetupModel(lib) { Windows = false, Prefer = g.NotesPick, TakesKeys = true, WriteNotes = _ => Task.FromResult(true), OpenUrl = opened.Add };
+        var notes = new AiSetupModel(lib) { Windows = false, Prefer = engine, TakesKeys = true, WriteNotes = _ => Task.FromResult(true), OpenUrl = opened.Add };
         await notes.Load();
         if (engine == "gemini")
         {
@@ -361,6 +382,43 @@ public sealed class GuidedSetupTests
         Assert.Equal(engine, notes.SelectedNotes);
         Assert.True(await notes.SaveAsync());
         Assert.Equal(engine, lib.DefaultsCalls[^1].Notes);
+    }
+
+    /// <summary>
+    /// Gemini the guided way: "Get Gemini ready" installs Google's Antigravity CLI with one button, "Sign in to Gemini"
+    /// runs its own sign-in in Study Stash's own home for it (the browser opens on Google's page), and the check after
+    /// says in plain words how much of the account's allowance is left; then the chat, on Gemini.
+    /// </summary>
+    [AvaloniaFact]
+    public async Task Gemini_installs_with_one_button_signs_in_with_google_and_says_how_much_is_left()
+    {
+        await using var rig = await new Rig(cli: "gemini").OpenAsync();
+        var g = rig.Guided;
+        g.PickCommand.Execute("gemini");
+        await g.ContinueCommand.ExecuteAsync(null);
+        Assert.Equal(GuidedScreen.Install, g.Screen);
+        Assert.Equal(("Get Gemini ready", "brand:gemini", "Step 1 of 3 · Gemini"), (g.InstallTitle, g.BrandGlyph, g.StepLabel));
+        Assert.Contains("through Antigravity CLI, Google's own helper for apps", g.InstallLede);
+        Assert.Equal("Installs with Google's own installer from antigravity.google", g.InstallSource);
+
+        await g.InstallCommand.ExecuteAsync(null);
+        Assert.True(g.Installed, g.InstallProblem);
+        Assert.Equal("Antigravity CLI 1.4.4 is installed.", g.InstalledWords);
+        await g.ContinueCommand.ExecuteAsync(null);
+        Assert.Equal((GuidedScreen.SignIn, "Sign in to Gemini"), (g.Screen, g.SignInTitle));
+        Assert.Contains("Google's sign-in page", g.SignInLede);
+
+        await g.OpenSignInCommand.ExecuteAsync(null);
+        await Until(() => g.AiReady, "Gemini signed in and its allowance checked");
+        Assert.Equal("About 80% of this week's Gemini allowance is left.", g.AllowanceWords);
+        Assert.True(g.HasAllowance);
+        // The sign-in ran in Study Stash's own home for agy, never the student's own.
+        Assert.Equal(Antigravity.Home(), File.ReadAllText(Path.Combine(rig.Bin, "usage-home.txt")).Trim());
+
+        await g.ContinueCommand.ExecuteAsync(null);
+        await Until(() => g.Screen == GuidedScreen.Chat && !g.Busy, "the chat on Gemini");
+        Assert.Equal(("Setup with Gemini", "Reply to Gemini…"), (g.SidebarTitle, g.FieldHint));
+        Assert.Contains(g.Thread.OfType<AiEntry>(), a => a.Text == "OK.");
     }
 
     [AvaloniaFact]

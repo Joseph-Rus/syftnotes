@@ -20,7 +20,10 @@ public delegate ProcResult? Runner(string exe, IReadOnlyList<string> args, TimeS
 /// <summary>Facts about this computer, each asked safely: null means it couldn't tell.</summary>
 public static partial class Machine
 {
-    public static ProcResult? Run(string exe, IReadOnlyList<string> args, TimeSpan timeout)
+    public static ProcResult? Run(string exe, IReadOnlyList<string> args, TimeSpan timeout) => Run(exe, args, timeout, null);
+
+    /// <summary>The same, with <paramref name="env"/> added to its environment (agy's home of Study Stash's own).</summary>
+    public static ProcResult? Run(string exe, IReadOnlyList<string> args, TimeSpan timeout, IReadOnlyDictionary<string, string>? env)
     {
         try
         {
@@ -29,6 +32,7 @@ public static partial class Machine
                 RedirectStandardOutput = true, RedirectStandardError = true, UseShellExecute = false, CreateNoWindow = true,
             };
             foreach (string a in args) psi.ArgumentList.Add(a);
+            foreach (var (k, v) in env ?? new Dictionary<string, string>()) psi.Environment[k] = v;
             using var p = Process.Start(psi);
             if (p is null) return null;
             var stdout = p.StandardOutput.ReadToEndAsync();

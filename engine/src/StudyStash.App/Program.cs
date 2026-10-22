@@ -33,6 +33,8 @@ static class Program
         }
         int at = Array.IndexOf(args, "--home");
         if (at >= 0 && at + 1 < args.Length) Home = Path.GetFullPath(Py.ExpandUser(args[at + 1]));
+        // Gemini's agy (setup's sign-in, its check) runs in the same home of Study Stash's own as the library's notes.
+        StudyStash.Core.Ai.Antigravity.Home = () => StudyStash.Core.Ai.Antigravity.For(Home);
         Background = args.Contains("--background");
         // STUDYSTASH_SELFTEST: before anything touches --home (even making its logs folder, which would fail the
         // "new, empty folder" check), refuse a bad setup or start the self-test's own library and AI engine, so the

@@ -358,7 +358,12 @@ public class AiTests
         Assert.Empty(g.Parse("""{"event":"step_update","step_update":{"state":"DONE","step_type":"tool"}}"""));
         Assert.Equal("Done", g.Parse("""{"event":"result","result":{"status":"SUCCESS","response":"Done","conversation_id":"c1"}}""").Last().Text);
         Assert.Equal("error", g.Parse("""{"event":"result","result":{"status":"FAILED","error":"quota"}}""").Single().Kind);
-        Assert.Equal("plan", g.Command(new AiRequest("q", "/lib"), false)[g.Command(new AiRequest("q", "/lib"), false).IndexOf("--mode") + 1]);
+        // A plain answer runs as Study Stash's answer agent, with no tools to reach for; agent work in plan mode.
+        var plain = g.Command(new AiRequest("q", "/lib"), false);
+        Assert.Equal("study-stash-answer", plain[plain.IndexOf("--agent") + 1]);
+        Assert.DoesNotContain("--mode", plain);
+        var agent = g.Command(new AiRequest("q", "/lib") { Tools = true }, false);
+        Assert.Equal("plan", agent[agent.IndexOf("--mode") + 1]);
     }
 
     [Fact]

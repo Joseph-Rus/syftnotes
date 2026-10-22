@@ -19,17 +19,18 @@ public sealed record AgentInstaller(string Program, IReadOnlyList<string> Args, 
 public sealed record AgentSignedIn(bool SignedIn, string AuthMethod = "", string Plan = "");
 
 /// <summary>
-/// One AI a student can set Study Stash up with: Claude (through Claude Code) or ChatGPT (through Codex). Everything
+/// One AI a student can set Study Stash up with: Claude (through Claude Code), ChatGPT (through Codex) or Gemini
+/// (through Google's Antigravity CLI). Everything
 /// guided setup needs to know about it, in one place: what it's called, which plan it needs, its maker's documented
 /// installer for each computer, and the commands that sign in and say whether it's signed in.
 /// </summary>
 public sealed record AgentCliInfo
 {
-    /// <summary>"claude" or "codex": the same id the library's AI settings use.</summary>
+    /// <summary>"claude", "codex" or "gemini": the same id the library's AI settings use.</summary>
     public required string Id { get; init; }
-    /// <summary>The command-line tool: "Claude Code", "Codex".</summary>
+    /// <summary>The command-line tool: "Claude Code", "Codex", "Antigravity CLI".</summary>
     public required string Name { get; init; }
-    /// <summary>The AI as students know it: "Claude", "ChatGPT".</summary>
+    /// <summary>The AI as students know it: "Claude", "ChatGPT", "Gemini".</summary>
     public required string Brand { get; init; }
     public required string Maker { get; init; }
     public required string Binary { get; init; }
@@ -42,17 +43,25 @@ public sealed record AgentCliInfo
     public required string PlansUrl { get; init; }
     public required AgentInstaller MacInstaller { get; init; }
     public required AgentInstaller WindowsInstaller { get; init; }
-    /// <summary>Signs in (it opens the browser itself): `claude auth login`, `codex login`.</summary>
+    /// <summary>Signs in (it opens the browser itself): `claude auth login`, `codex login`; `agy -p=/usage`, which signs
+    /// in first when it isn't, then says how much is left (no turn, nothing spent).</summary>
     public required IReadOnlyList<string> SignInArgs { get; init; }
-    /// <summary>Says whether it's signed in, by its exit code: `claude auth status`, `codex login status`.</summary>
+    /// <summary>Says whether it's signed in, by its exit code: `claude auth status`, `codex login status`, `agy models`
+    /// (which says "Please sign in" and stops when it isn't, never opening the browser).</summary>
     public required IReadOnlyList<string> StatusArgs { get; init; }
+    /// <summary>The sign-in waits for the browser this long and then gives up by itself (agy's print mode: a minute);
+    /// null when it waits as long as it's left running.</summary>
+    public TimeSpan? SignInGivesUp { get; init; }
+    /// <summary>What its commands' environment needs besides the app's own: agy's home of Study Stash's own
+    /// (<see cref="Antigravity.Home"/>). Asked each time (the tests move that home).</summary>
+    public Func<IReadOnlyDictionary<string, string>> Env { get; init; } = () => new Dictionary<string, string>();
 
     public AgentInstaller Installer(bool windows) => windows ? WindowsInstaller : MacInstaller;
     public string SignInLine => string.Join(' ', [Binary, .. SignInArgs]);
 }
 
 /// <summary>
-/// The two AIs guided setup offers, and how to read what their commands print. The installers are the providers'
+/// The three AIs guided setup offers, and how to read what their commands print. The installers are the providers'
 /// own one-liners, exactly as their docs write them (per-user, no administrator): <c>set -o pipefail</c> in front on
 /// a Mac only makes a download that failed fail the whole line, instead of piping nothing into the shell.
 /// </summary>
@@ -66,6 +75,7 @@ public static partial class AgentCli
 
     const string ClaudeDocs = "https://code.claude.com/docs/en/setup";
     const string CodexDocs = "https://learn.chatgpt.com/docs/codex/cli";
+    const string GeminiDocs = "https://antigravity.google/docs/getting-started?tab=cli";
     static readonly Dictionary<string, string> CodexQuiet = new() { ["CODEX_NON_INTERACTIVE"] = "1" };
 
     public static readonly AgentCliInfo Claude = new()
@@ -88,13 +98,31 @@ public static partial class AgentCli
         StatusArgs = ["login", "status"],
     };
 
-    public static readonly IReadOnlyList<AgentCliInfo> All = [Claude, Codex];
+    /// <summary>
+    /// Gemini, through Google's Antigravity CLI: a personal Google account signs in (free, with a small weekly allowance,
+    /// or Google AI Pro and Ultra with more). Its own installer, per-user, no Node.js: one program in ~/.local/bin, or
+    /// %LOCALAPPDATA%\agy\bin on Windows. Every command it runs for Study Stash has Study Stash's own home for agy,
+    /// where its sign-in is kept too (so a student who already uses agy signs in once more, for Study Stash).
+    /// </summary>
+    public static readonly AgentCliInfo Gemini = new()
+    {
+        Id = "gemini", Name = "Antigravity CLI", Brand = "Gemini", Maker = "Google", Binary = Antigravity.Binary, Site = "antigravity.google",
+        Plans = "a Google account", PlanName = "Google AI Pro", PlansUrl = "https://antigravity.google/pricing",
+        MacInstaller = Mac("curl -fsSL https://antigravity.google/cli/install.sh | bash", GeminiDocs),
+        WindowsInstaller = Windows("irm https://antigravity.google/cli/install.ps1 | iex", GeminiDocs),
+        SignInArgs = ["-p=/usage", "--output-format", "json"],
+        StatusArgs = ["models"],
+        SignInGivesUp = TimeSpan.FromSeconds(60),
+        Env = () => Antigravity.HomeEnv(),
+    };
 
-    public static AgentCliInfo Get(string id) => id == "codex" ? Codex : Claude;
+    public static readonly IReadOnlyList<AgentCliInfo> All = [Claude, Codex, Gemini];
+
+    public static AgentCliInfo Get(string id) => id switch { "codex" => Codex, "gemini" => Gemini, _ => Claude };
 
     /// <summary>The only pages a guided-setup card may open, besides the school's own Canvas address and the
-    /// computer's settings: the two plan pages and the two install docs.</summary>
-    public static readonly IReadOnlyList<string> Pages = [Claude.PlansUrl, Codex.PlansUrl, ClaudeDocs, CodexDocs];
+    /// computer's settings: the plan pages and the install docs.</summary>
+    public static readonly IReadOnlyList<string> Pages = [Claude.PlansUrl, Codex.PlansUrl, Gemini.PlansUrl, ClaudeDocs, CodexDocs, GeminiDocs];
 
     // --- versions and the flags each one has -------------------------------------------------------------------
 
@@ -152,6 +180,12 @@ public static partial class AgentCli
         string l = Plain(line);
         if (cli.Id == "claude")
             return l.StartsWith("Setting up Claude Code", StringComparison.Ordinal) ? "Setting it up…" : null;
+        // Antigravity's installer on a Mac: "⠋ Downloading release package...", "✓ Download complete and checksum
+        // verified.", "⠋ Configuring shell environment..." (on Windows it prints nothing until it's done).
+        if (cli.Id == "gemini")
+            return l.Contains("Downloading release package", StringComparison.Ordinal) ? $"Downloading {cli.Name}…"
+                : l.Contains("checksum verified", StringComparison.OrdinalIgnoreCase) || l.Contains("Configuring", StringComparison.Ordinal) ? "Setting it up…"
+                : null;
         if (l.StartsWith("==> Downloading Codex", StringComparison.Ordinal)) return "Downloading Codex…";
         if (l.StartsWith("==> Installing standalone package", StringComparison.Ordinal) || l.StartsWith("==> PATH", StringComparison.Ordinal)
             || l.Contains("installed successfully", StringComparison.Ordinal))
