@@ -57,7 +57,7 @@
                                IsVisible="{Binding Failed, Converter={x:Static c:Converters.NotEmpty}}" />
                     <v:AiByline HorizontalAlignment="Left" IsVisible="{Binding Byline, Converter={x:Static c:Converters.NotEmpty}}" />
                     <TextBlock Classes="ai-byline" Text="{Binding FellBackNote}" IsVisible="{Binding FellBackNote, Converter={x:Static c:Converters.NotEmpty}}" />
-                    <TextBlock Classes="ai-byline" Text="{Binding MemoryNote}" TextWrapping="Wrap" IsVisible="{Binding MemoryNote, Converter={x:Static c:Converters.NotEmpty}}" />
+                    <TextBlock Classes="ai-byline" Text="{Binding OlderLibraryNote}" TextWrapping="Wrap" IsVisible="{Binding OlderLibraryNote, Converter={x:Static c:Converters.NotEmpty}}" />
                   </StackPanel>
                 </Border>
                 <StackPanel Orientation="Horizontal" Spacing="8" IsVisible="{Binding IsThinking}">

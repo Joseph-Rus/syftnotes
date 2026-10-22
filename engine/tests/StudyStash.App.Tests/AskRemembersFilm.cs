@@ -17,6 +17,7 @@ using StudyStash.App.ViewModels;
 using StudyStash.App.Views;
 using StudyStash.Core;
 using StudyStash.Core.Ai;
+using StudyStash.Core.Tests;
 using StudyStash.Library;
 using Path = Avalonia.Controls.Shapes.Path;
 
@@ -47,6 +48,8 @@ public class AskRemembersFilm
     {
         public readonly Window Window;
         readonly Canvas over = new() { IsHitTestVisible = false };
+        /// <summary>What a flyout shows, drawn in place: a popup isn't part of the window's own picture.</summary>
+        readonly Canvas popups = new();
         readonly Path arrow = new()
         {
             Data = Geometry.Parse("M0,0 L0,17 L4.6,13 L7.6,20 L10.4,18.8 L7.4,12 L13,12 Z"), Fill = Brushes.Black, Stroke = Brushes.White, StrokeThickness = 1.2,
@@ -76,7 +79,7 @@ public class AskRemembersFilm
             Window = new Window
             {
                 Width = width, Height = height, RequestedThemeVariant = ThemeVariant.Light,
-                Content = new Panel { Children = { view, over } },
+                Content = new Panel { Children = { view, popups, over } },
             };
             Look.Apply(Window);
             index = new StreamWriter(System.IO.Path.Combine(Shot.Dir, "frames.tsv"), append: false) { AutoFlush = true };
@@ -117,6 +120,19 @@ public class AskRemembersFilm
                 frame.Save(stream, Avalonia.Media.Imaging.PngBitmapEncoderOptions.Default);
             index.WriteLine($"{file}\t{kind}");
         }
+
+        /// <summary>A flyout's content drawn above <paramref name="anchor"/>, centred on it, as its Placement="Top" puts it.</summary>
+        public void Popup(Control content, Control anchor)
+        {
+            popups.Children.Add(content);
+            Settle();
+            var at = anchor.TranslatePoint(new Point(anchor.Bounds.Width / 2, 0), Window)!.Value;
+            Canvas.SetLeft(content, at.X - content.Bounds.Width / 2);
+            Canvas.SetTop(content, at.Y - 12 - content.Bounds.Height);
+            Settle();
+        }
+
+        public void ClosePopups() => popups.Children.Clear();
 
         public void Hold(double seconds)
         {
@@ -208,8 +224,9 @@ public class AskRemembersFilm
         public required Store Store { get; init; }
         public required LibraryReader Reader { get; init; }
         public required string Url { get; init; }
+        public string Folder { get; init; } = "";
 
-        public static async Task<RealLibrary> StartAsync(string folder, int port)
+        public static async Task<RealLibrary> StartAsync(string folder, int port, Func<string, AiProvider>? standIn = null)
         {
             if (port is 8787 or 8788) throw new InvalidOperationException("never 8787: that's the owner's real library");
             var cfg = new Config(System.IO.Path.Combine(folder, "home"), System.IO.Path.Combine(folder, "notes"))
@@ -224,39 +241,46 @@ public class AskRemembersFilm
             var app = LibraryWeb.Build(builder, cfg, store, new Pipeline(cfg, store, log: _ => { }), new LibraryWebOptions
             {
                 ListModels = _ => Task.FromResult<List<(string, double)>?>(null), Tailscale = () => new TailscaleInfo(),
-                Latest = _ => Task.FromResult<Release?>(null), Ai = new AiJobs(cfg.Home),
+                Latest = _ => Task.FromResult<Release?>(null),
+                Ai = standIn is null ? new AiJobs(cfg.Home) : new AiJobs(cfg.Home) { Providers = standIn, Checks = new FakeChecks().Installed("claude").Build() },
             });
             await app.StartAsync();
-            return new RealLibrary { App = app, Store = store, Reader = new LibraryReader(cfg, store), Url = $"http://127.0.0.1:{port}" };
+            return new RealLibrary { App = app, Store = store, Reader = new LibraryReader(cfg, store), Url = $"http://127.0.0.1:{port}", Folder = standIn is null ? "" : folder };
         }
+
+        bool disposed;
 
         public async ValueTask DisposeAsync()
         {
+            if (disposed) return;
+            disposed = true;
             await App.StopAsync();
             await App.DisposeAsync();
             Store.Dispose();
         }
     }
 
-    /// <summary>A stand-in for the library's AI: it answers the film's questions the way a library that remembers does,
-    /// a few words at a time.</summary>
-    static FakeAiLibrary StandIn()
+    const string Lecture = "rec-20261008-093000-c00000";
+
+    /// <summary>A stand-in library for checking the film for free: the demo lecture alone, in a folder of its own.</summary>
+    static string StandInFolder()
     {
-        var lib = new FakeAiLibrary { Overview = AiTestData.MixedOverview() };
-        lib.OnAskStream = async (r, soFar, stop) =>
-        {
-            string answer = r.History is { Count: > 0 }
-                ? "The second one is **capillaries**: tiny vessels with walls just one cell thick, so oxygen, carbon dioxide and nutrients pass straight through to the tissues."
-                : "There are three: **arteries** carry blood away from the heart under high pressure, **capillaries** are one cell thick where gases and nutrients are exchanged, and **veins** carry blood back at low pressure, with valves to stop backflow.";
-            await Task.Delay(900, stop);
-            for (int i = 12; i < answer.Length; i += 12)
-            {
-                soFar(answer[..i]);
-                await Task.Delay(70, stop);
-            }
-            return new AskReply(answer, [new AskSource("v1", "Blood vessels", "BIO 110", null, 4, "")], "claude", "Claude") { Remembered = r.History?.Count ?? 0 };
-        };
-        return lib;
+        string folder = System.IO.Path.Combine(System.IO.Path.GetTempPath(), "ask-film-" + Guid.NewGuid().ToString("N")[..8]);
+        var cfg = new Config(System.IO.Path.Combine(folder, "home"), System.IO.Path.Combine(folder, "notes")) { Classes = [new ClassDef("BIO 110")] };
+        using var store = new Store(cfg.DbPath, cfg.PoolDir);
+        store.Save(new Meeting(Lecture) { Title = "Blood vessels and blood pressure", Date = "2026-10-08", Transcript = "Arteries, capillaries and veins." },
+            new Classification("BIO 110", 1, "folder"),
+            "## Summary\nHow arteries, capillaries and veins differ, and how blood pressure is measured and worked out.\n\n### Three kinds of vessel\n- **Arteries** carry blood away from the heart under high pressure; thick, elastic walls.\n- **Capillaries** are one cell thick: this is where gases and nutrients are exchanged.\n- **Veins** carry blood back at low pressure and have valves to stop backflow.",
+            "Claude");
+        return folder;
+    }
+
+    /// <summary>A stand-in Claude that writes <paramref name="answer"/> a few words at a time, as JSON.</summary>
+    static void Says(ScriptedAi ai, string answer)
+    {
+        string json = System.Text.Json.JsonSerializer.Serialize(new { answer, sources = new[] { 1 } });
+        ai.Pause = TimeSpan.FromMilliseconds(60);
+        ai.Script = [.. Enumerable.Range(0, (json.Length + 11) / 12).Select(i => new AiEvent("text", json.Substring(i * 12, Math.Min(12, json.Length - i * 12)))), new AiEvent("final", json)];
     }
 
     static LibraryModel Page(string id, string title, string when, string markdown, AiAskModel ask)
@@ -276,30 +300,33 @@ public class AskRemembersFilm
     }
 
     [AvaloniaFact]
-    public async Task A_follow_up_that_needs_the_question_before_it_then_New_chat()
+    public async Task Ask_close_the_card_open_the_chat_again_from_Chats_and_carry_it_on()
     {
         if (!On) return;
         string home = Env("STUDYSTASH_FILM_HOME");
         int port = int.Parse(Env("STUDYSTASH_FILM_PORT", "9471"), System.Globalization.CultureInfo.InvariantCulture);
-        await using var library = home.Length > 0 ? await RealLibrary.StartAsync(home, port) : null;
-        const string lecture = "rec-20261008-093000-c00000";
-        string markdown = library?.Reader.Lecture(lecture)?["notes"]?.GetValue<string>()
-            ?? "## Summary\nHow arteries, capillaries and veins differ, and how blood pressure is measured and worked out.\n\n### Three kinds of vessel\n- **Arteries** carry blood away from the heart under high pressure; thick, elastic walls.\n- **Capillaries** are one cell thick: this is where gases and nutrients are exchanged.\n- **Veins** carry blood back at low pressure and have valves to stop backflow.";
-        IAiLibrary ai = library is null ? StandIn() : new AiRemote(library.Url, "film");
-        var ask = new AiAskModel(ai) { LectureId = lecture, ClassName = "BIO 110", OpenSettings = () => { } };
+        var standIn = home.Length > 0 ? null : new ScriptedAi("claude", "Claude");
+        await using var library = await RealLibrary.StartAsync(home.Length > 0 ? home : StandInFolder(), port, standIn is null ? null : id => id == "claude" ? standIn : new ScriptedAi(id));
+        string markdown = library.Reader.Lecture(Lecture)!["notes"]!.GetValue<string>();
+        var ask = new AiAskModel(new AiRemote(library.Url, "film"))
+        {
+            LectureId = Lecture, ClassName = "BIO 110", OpenSettings = () => { }, Place = new AskPlace("lecture", Lecture, "BIO 110"),
+        };
         ask.NameScopes(Nouns.Lecture, "BIO 110");
         await ask.Load();
         ask.Engine = Env("STUDYSTASH_FILM_ENGINE", "claude");
-        Log($"library {(library is null ? "stand-in" : library.Url)}, engine {ask.Engine} ({ask.EngineName})");
+        Log($"library {library.Url}{(standIn is null ? "" : " (stand-in AI)")}, engine {ask.Engine} ({ask.EngineName}), {ask.Chats.Count} chats before");
 
-        var model = Page(lecture, "Blood vessels and blood pressure", "Thursday 8 October at 9:30 AM, 50 min", markdown, ask);
+        var model = Page(Lecture, "Blood vessels and blood pressure", "Thursday 8 October at 9:30 AM, 50 min", markdown, ask);
         var view = new MacLibrary { DataContext = model };
-        using var f = new Film("ask-remembers", view, Env("STUDYSTASH_FILM_CLI", "STAND-IN: not a real AI"), 1180, 820);
+        using var f = new Film("ask-history", view, Env("STUDYSTASH_FILM_CLI", "STAND-IN: not a real AI"), 1180, 820);
         var field = view.GetVisualDescendants().OfType<TextBox>().First(t => t.Name == "AskInput" && t.IsEffectivelyVisible);
+        ask.ChatsDone += f.ClosePopups;
         f.Hold(0.8);
 
-        async Task AskAsync(string question)
+        async Task AskAsync(string question, string standInAnswer)
         {
+            if (standIn is not null) Says(standIn, standInAnswer);
             f.Glide(field, 0.3, 0.5);
             f.Click();
             f.Type(question);
@@ -307,19 +334,39 @@ public class AskRemembersFilm
             f.Return();
             var turn = ask.Turns[^1];
             await f.WhileAsync(() => !ask.Busy, () => turn.Answer, TimeSpan.FromMinutes(3));
-            Log($"Q: {question}\nA ({turn.Engine}): {turn.Answer}\n   byline: {turn.Byline}{(turn.Failed is { } why ? "\n   failed: " + why : "")}{(turn.FellBackNote is { } fb ? "\n   " + fb : "")}");
-            f.Hold(2.4);
+            Log($"Q: {question}\nA ({turn.Engine}): {turn.Answer}\n   byline: {turn.Byline}{(turn.Failed is { } why ? "\n   failed: " + why : "")}{(turn.FellBackNote is { } fb ? "\n   " + fb : "")}\n   chat {ask.ChatId}");
+            f.Hold(2.2);
         }
 
-        await AskAsync("What are the three kinds of blood vessel?");
-        await AskAsync("And the second one?");
+        await AskAsync("What are the three kinds of blood vessel?",
+            "There are three: **arteries** carry blood away from the heart under high pressure, **capillaries** are one cell thick where gases and nutrients are exchanged, and **veins** carry blood back at low pressure, with valves.");
 
-        // New chat: the conversation is put away, and the field is ready for a question that starts afresh.
-        var newChat = view.GetVisualDescendants().OfType<Button>().First(b => b.Name == "NewChat" && b.IsEffectivelyVisible);
-        f.Glide(newChat);
+        // Closed: the notes get their room back, and the conversation is kept.
+        var close = view.GetVisualDescendants().OfType<Button>().First(b => b.Classes.Contains("ai-close") && b.IsEffectivelyVisible);
+        f.Glide(close);
         f.Click();
-        f.Hold(1.6);
-        Log($"after New chat: {ask.Turns.Count} turns, the card {(ask.HasLatest ? "shows" : "is gone")}");
+        f.Hold(1.0);
+
+        // Chats, in the ask bar: this lecture's conversations; the one from before opens again.
+        var chats = view.GetVisualDescendants().OfType<Button>().First(b => b.Name == "ChatsButton" && b.IsEffectivelyVisible);
+        f.Glide(chats);
+        f.Click();
+        chats.Flyout?.Hide(); // the real flyout opened off the picture: it's drawn in place instead
+        f.Popup(new AiChatsMenu { DataContext = ask }, chats);
+        f.Hold(1.0);
+        var row = f.Window.GetVisualDescendants().OfType<AiChatsMenu>().Single().GetVisualDescendants().OfType<Button>()
+            .First(b => b.DataContext is ChatRow r && b.Command == r.Open);
+        f.Glide(row, 0.3, 0.5);
+        f.Click();
+        await Task.Delay(300);
+        f.Hold(1.4);
+        Log($"opened again from Chats: {ask.Turns.Count} turn(s), chat {ask.ChatId}, {ask.Chats.Count} in the list");
+
+        await AskAsync("And the second one?",
+            "The second one is **capillaries**: their walls are just one cell thick, so oxygen and nutrients pass straight through to the tissues.");
+        Log($"after: {ask.Turns.Count} turns in chat {ask.ChatId}, {ask.Chats.Count} in the list");
+        if (home.Length == 0) await library.DisposeAsync(); // the stand-in's folder goes too
+        if (home.Length == 0 && library.Folder.Length > 0) Directory.Delete(library.Folder, recursive: true);
     }
 
     /// <summary>A still of the conversation card in the Windows look, light and dark, its words a stand-in's

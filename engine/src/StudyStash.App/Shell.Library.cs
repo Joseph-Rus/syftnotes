@@ -467,8 +467,11 @@ public static partial class Shell
         var ask = new AiAskModel(ai)
         {
             LectureId = note.Id, ClassName = note.HasClass ? note.ClassName : null,
+            // Its conversations are kept with the lecture: the page opens on the latest, and Chats lists them all.
+            Place = new Core.Ai.AskPlace("lecture", note.Id, note.HasClass ? note.ClassName : null),
             OpenSettings = () => ShowSettings("AI"),
             OnSource = s => PlaySource(s.Id ?? note.Id, s.At),
+            ToldDeleted = ChatDeleted,
         };
         // A note in no folder has no folder to ask about.
         if (!note.HasClass) ask.OnlyScopes("lecture", "all");
@@ -477,6 +480,9 @@ public static partial class Shell
         library.Ask = ask;
         _ = ask.Load();
     }
+
+    /// <summary>A kept Ask conversation deleted from a Chats list: the toast says which, with Undo.</summary>
+    static void ChatDeleted(string title, Func<Task> undo) => Toast("Chat deleted", title, "Undo", () => _ = undo());
 
     /// <summary>Notes saved by hand that are all the student's own (what they typed while it recorded, changed or added
     /// to since): the recording on this computer keeps them as what the student typed, so Keep recording starts from

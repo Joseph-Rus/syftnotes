@@ -280,8 +280,8 @@ public static partial class AiWords
     /// free AI answered, which kept it on the computer): " · also read the chat above".</summary>
     public const string ReadChat = " · also read the chat above";
 
-    /// <summary>Under a follow-up a library too old to remember the conversation answered on its own, once per chat.</summary>
-    public const string ForgetsOnOlderLibrary = "Your library runs an older Study Stash, so each question starts fresh, without the ones before it. Update it to ask follow-ups.";
+    /// <summary>Under the first answer from a library too old to keep chats.</summary>
+    public const string NoHistoryOnOlderLibrary = "Your library runs an older Study Stash, so this chat isn't kept and follow-ups start fresh. Update it to keep your chats.";
 
     /// <summary>What a moment in a byline does: "Read the transcript at 01:52".</summary>
     public static string MomentTip(string time) => $"Read the transcript at {time}";

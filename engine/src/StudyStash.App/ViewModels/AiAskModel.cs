@@ -65,8 +65,8 @@ public sealed partial class AiTurn : ObservableObject
     /// it names a link of its own (<see cref="AiWords.AskBylineParts"/>).</summary>
     [ObservableProperty] public partial IReadOnlyList<BylinePart> BylineParts { get; set; } = [];
     [ObservableProperty] public partial string? FellBackNote { get; set; }
-    /// <summary>A follow-up that an older library answered without the conversation before it says so, once a chat.</summary>
-    [ObservableProperty] public partial string? MemoryNote { get; set; }
+    /// <summary>Under the first answer from a library too old to keep chats: this conversation isn't kept.</summary>
+    [ObservableProperty] public partial string? OlderLibraryNote { get; set; }
     [ObservableProperty] public partial string? Failed { get; set; }
     public List<AskSource> Sources { get; set; } = [];
     /// <summary>The engine that answered (the one asked, until the answer says otherwise): whether the chat above has
@@ -184,33 +184,30 @@ public sealed partial class AiAskModel : ObservableObject
 
     partial void OnAnswerClosedChanged(bool value) => ThreadShown();
 
-    /// <summary>The answer card's close button: the notes get their room back, and the conversation ends there, as New
-    /// chat ends it: the next question starts afresh, nothing before it carried in. An answer still being written stops
-    /// and goes with it.</summary>
+    /// <summary>The answer card's close button: the notes get their room back, and an answer still being written stops.
+    /// The conversation is kept: the next question carries it on, and it's in the Chats list.</summary>
     [RelayCommand]
     void CloseAnswer()
     {
-        EndChat();
+        Stop();
         AnswerClosed = true;
     }
 
-    /// <summary>New chat: the conversation so far is put away, and the next question starts afresh, the AI remembering
-    /// nothing before it. An answer still being written stops. The card closes until then.</summary>
+    /// <summary>New chat: the next question starts a conversation of its own, the AI remembering nothing before it. The
+    /// one before stays in the Chats list. An answer still being written stops. The card closes until then.</summary>
     [RelayCommand(CanExecute = nameof(CanStartOver))]
-    void NewChat()
-    {
-        EndChat();
-        AnswerClosed = false;
-        Started?.Invoke();
-    }
+    void NewChat() => StartOver(show: true);
 
-    /// <summary>The conversation is over: its turns go (one still being answered stops, and its answer lands nowhere).</summary>
-    void EndChat()
+    void StartOver(bool show)
     {
         Stop();
         Turns.Clear();
+        ChatId = null;
+        foreach (var row in Chats) row.Current = false;
+        AnswerClosed = false;
         OnPropertyChanged(nameof(Latest));
         ThreadShown();
+        if (show) Started?.Invoke();
     }
 
     /// <summary>The student asked: a turn was added at the end of the thread. The views bring the thread back to its end,
@@ -222,8 +219,8 @@ public sealed partial class AiAskModel : ObservableObject
     /// <summary>A new chat was started: the view puts the caret in the field for its first question.</summary>
     public Action? Started { get; set; }
 
-    /// <summary>Whether this chat has said its library answers each question on its own (it says so once).</summary>
-    bool toldForgets;
+    /// <summary>Whether this bar has said its library is too old to keep chats (it says so once).</summary>
+    bool toldOlder;
 
     /// <summary>The recorder's chat was closed with a conversation in it: "Show the chat" brings it back as it was.</summary>
     public bool CanShowChat => Turns.Count > 0 && AnswerClosed;
@@ -315,6 +312,8 @@ public sealed partial class AiAskModel : ObservableObject
             return;
         }
         Apply(overview);
+        // A lecture's page opens on its latest conversation (in the card, closed until it's asked in or opened).
+        await LoadChatsAsync(openLatest: Place?.Scope == "lecture");
     }
 
     void Apply(AiOverview? overview)
@@ -361,10 +360,11 @@ public sealed partial class AiAskModel : ObservableObject
         string q = Question.Trim();
         if (q.Length == 0 || Busy) return;
         Question = "";
-        // The conversation so far goes with the question: the turns that were answered (what came of one cut off, as it
-        // shows), the last few, each cut short.
+        // The conversation so far goes with the question: the library reads it from the kept chat; where nothing is
+        // kept, the turns that were answered go with it (the last few, each cut short).
         var answered = Turns.Where(t => !string.IsNullOrWhiteSpace(t.Answer)).TakeLast(AskMemory.Turns).ToList();
-        var earlier = AskMemory.Last(answered.Select(t => new AskTurn(t.Question, t.Answer!) { Sources = t.Sources }));
+        var earlier = Place is null ? AskMemory.Last(answered.Select(t => new AskTurn(t.Question, t.Answer!) { Sources = t.Sources })) : [];
+        string first = Turns.Count > 0 ? Turns[0].Question : q;
         var turn = new AiTurn(q, EngineName) { Engine = Engine };
         Turns.Add(turn);
         AnswerClosed = false;
@@ -387,6 +387,8 @@ public sealed partial class AiAskModel : ObservableObject
                 Lecture = Scope == "lecture" ? LectureId : null,
                 Class = Scope == "class" ? ClassName : null,
                 History = earlier.Count > 0 ? earlier : null,
+                Chat = Place is null ? null : ChatId ?? "new",
+                Place = Place,
             };
             AskReply? reply = await library.AskAsync(request, paced.Show, stop.Token);
             paced.End();
@@ -400,16 +402,16 @@ public sealed partial class AiAskModel : ObservableObject
             turn.Sources = reply.Sources;
             turn.Engine = reply.Engine;
             // The chat above went to an AI that hadn't had it: Claude or ChatGPT, after the free AI kept it on the computer.
-            bool readChat = reply.Engine != "ollama" && reply.Remembered is int n && n > 0
-                && answered.TakeLast(n).Any(t => t.Engine != reply.Engine);
+            bool readChat = reply.Remembered is int n && n > 0 && SentElsewhere(reply.Engine, answered.TakeLast(n));
             turn.Byline = AiWords.AskByline(reply.EngineName, reply.Sources, readChat);
             turn.BylineParts = AiWords.AskBylineParts(reply.EngineName, reply.Sources, OnSource, readChat);
             if (reply.FellBack) turn.FellBackNote = AiWords.FellBackNote(reply.EngineName, reply.Why);
-            // A library too old to remember answered the follow-up on its own: said once, so a worse answer isn't a mystery.
-            if (earlier.Count > 0 && reply.Remembered is null && !toldForgets)
+            if (reply.Chat is { } kept) Kept(kept, first);
+            else if (Place is not null && !toldOlder)
             {
-                toldForgets = true;
-                turn.MemoryNote = AiWords.ForgetsOnOlderLibrary;
+                // A library too old to keep chats: said once, so a chat that isn't there later isn't a mystery.
+                toldOlder = true;
+                turn.OlderLibraryNote = AiWords.NoHistoryOnOlderLibrary;
             }
         }
         catch (OperationCanceledException) when (stop.IsCancellationRequested)

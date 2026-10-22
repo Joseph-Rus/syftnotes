@@ -64,29 +64,16 @@ public class AskRemembersTests
     }
 
     [AvaloniaFact]
-    public async Task Closing_the_card_ends_the_conversation_and_an_answer_on_its_way_lands_nowhere()
+    public async Task Closing_the_card_keeps_the_conversation_and_the_next_question_carries_it_on()
     {
         var (model, lib) = await Loaded();
         await Ask(model, "What are the three kinds of blood vessel?");
         model.CloseAnswerCommand.Execute(null);
-        Assert.Empty(model.Turns);
-        await Ask(model, "And the second one?");
-        Assert.Null(lib.AskRequests[^1].History); // nothing before it carried in
-
-        // Closed while an answer is still being written: it stops, and no stray turn is left.
-        lib.OnAskStream = async (r, soFar, stop) =>
-        {
-            soFar("Capillaries");
-            await Task.Delay(Timeout.InfiniteTimeSpan, stop);
-            return null;
-        };
-        model.Question = "Explain that more simply";
-        var asking = model.AskCommand.ExecuteAsync(null);
-        model.CloseAnswerCommand.Execute(null);
-        await asking;
-        Assert.Empty(model.Turns);
-        Assert.False(model.Busy);
         Assert.False(model.HasLatest);
+        Assert.Single(model.Turns);
+        await Ask(model, "And the second one?");
+        Assert.Equal("What are the three kinds of blood vessel?", Assert.Single(lib.AskRequests[^1].History!).Question);
+        Assert.True(model.HasLatest);
     }
 
     [AvaloniaFact]
@@ -111,20 +98,20 @@ public class AskRemembersTests
     }
 
     [AvaloniaFact]
-    public async Task An_older_library_still_answers_and_says_once_that_follow_ups_start_fresh()
+    public async Task An_older_library_still_answers_and_says_once_that_chats_arent_kept()
     {
         var (model, lib) = await Loaded();
-        // A library from before: it reads the question, never the turns, and its reply doesn't say what it remembered.
+        model.Place = new AskPlace("lecture", "lec-vessels");
+        // A library from before: its reply doesn't say which chat it's in.
         lib.OnAsk = r => new AskReply($"Answer to {r.Question}", [], "claude", "Claude");
 
         await Ask(model, "What are the three kinds of blood vessel?");
         await Ask(model, "And the second one?");
-        await Ask(model, "Explain that more simply");
 
-        Assert.Equal(["Answer to What are the three kinds of blood vessel?", "Answer to And the second one?", "Answer to Explain that more simply"],
-            model.Turns.Select(t => t.Answer));
-        Assert.Equal([null, AiWords.ForgetsOnOlderLibrary, null], model.Turns.Select(t => t.MemoryNote));
-        Assert.Equal("Claude", model.Turns[1].Byline);
+        Assert.Equal(["Answer to What are the three kinds of blood vessel?", "Answer to And the second one?"], model.Turns.Select(t => t.Answer));
+        Assert.Equal([AiWords.NoHistoryOnOlderLibrary, null], model.Turns.Select(t => t.OlderLibraryNote));
+        Assert.Equal("new", lib.AskRequests[1].Chat); // nothing kept to carry on
+        Assert.Empty(model.Chats);
     }
 
     static Window Show(Control content, SkinKind skin, double height)

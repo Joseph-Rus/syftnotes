@@ -785,6 +785,9 @@ public static partial class Shell
             // The scope's "This lecture" is this recording and nothing else in the library; its folder and All notes
             // look further, as they do under a note.
             LectureId = liveId, ClassName = cls.Length > 0 ? cls : null,
+            // Kept under the recording's own id, the lecture's once it's filed: after Stop it's on the lecture's page.
+            Place = new Core.Ai.AskPlace("lecture", liveId, cls.Length > 0 ? cls : null),
+            ToldDeleted = ChatDeleted,
             OpenSettings = () => ShowSettings("AI"),
             OnSource = s =>
             {

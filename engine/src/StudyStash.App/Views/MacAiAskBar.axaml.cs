@@ -8,6 +8,7 @@ public partial class MacAiAskBar : UserControl
     public MacAiAskBar()
     {
         InitializeComponent();
+        AskThread.ClosesChats(this, ChatsButton);
         DataContextChanged += (_, _) =>
         {
             if (DataContext is not AiAskModel m) return;
