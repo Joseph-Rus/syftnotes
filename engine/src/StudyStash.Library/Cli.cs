@@ -83,6 +83,8 @@ public static class Cli
         // The command and its words, wherever the options are: a service runs `studystash --home DIR run`.
         var words = args.Where((a, i) => !a.StartsWith("--", StringComparison.Ordinal) && (i == 0 || !valued.Contains(args[i - 1]))).ToList();
         string home = Path.GetFullPath(Option("--home") is string h ? Py.ExpandUser(h) : Configs.DefaultHome);
+        // Gemini's agy runs in a home of this library's own, inside its own home (--home included).
+        StudyStash.Core.Ai.Antigravity.Home = () => Path.Combine(home, "gemini");
         static string? Env(string name) => Environment.GetEnvironmentVariable(name) is { Length: > 0 } v ? v : null;
 
         // Ctrl+C, or the service manager's SIGTERM: stop cleanly, as the Python engine's web server does, so a setup page
