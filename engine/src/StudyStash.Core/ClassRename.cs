@@ -147,6 +147,7 @@ public static class ClassRename
                 // A chat file that can't be read is left as it is.
             }
         }
+        Ai.Chats.IndexChanged(home); // their list is made again with the new name
     }
 
     /// <summary>This computer's own copies of a renamed class's name: the recorded lectures still waiting here. The app calls this for its home after the library renames; the library for its own.</summary>

@@ -13,6 +13,12 @@ public sealed record ChatMessage(string Role, string Text, string When)
     public List<string> Changed { get; init; } = [];
     public string Change { get; init; } = "";
     public bool Failed { get; init; }
+    /// <summary>An Ask answer's: what it drew on (each moment a link in the app), the AI that wrote it, and whether
+    /// the student stopped it partway.</summary>
+    public List<AskSource> Sources { get; init; } = [];
+    public string Engine { get; init; } = "";
+    public string EngineName { get; init; } = "";
+    public bool Stopped { get; init; }
 }
 
 /// <summary>A conversation with the library's AI: about everything, one class, or one lecture.</summary>
@@ -20,6 +26,12 @@ public sealed class Chat
 {
     public string Id { get; set; } = "";
     public string Title { get; set; } = "";
+    /// <summary>"ask": a conversation in the app's Ask bar (answers from passages, kept as history); "" one with the
+    /// AI that reads the whole library (the browser's chat page).</summary>
+    public string Kind { get; set; } = "";
+    /// <summary>An Ask chat's place: "lecture" (a note's page, or the recording's chat), "class" (a folder's page) or
+    /// "home".</summary>
+    public string Scope { get; set; } = "";
     public string ClassName { get; set; } = "";
     public string Lecture { get; set; } = "";
     /// <summary>The AI that holds the conversation, and its own id for it (a follow-up continues it).</summary>
@@ -28,6 +40,9 @@ public sealed class Chat
     public string Updated { get; set; } = "";
     public List<ChatMessage> Messages { get; set; } = [];
 }
+
+/// <summary>A chat in a line, as lists show it: kept in chats/.index.json so a list never reads every chat.</summary>
+public sealed record ChatEntry(string Id, string Title, string Kind, string Scope, string ClassName, string Lecture, string Updated, int Turns);
 
 /// <summary>
 /// Chatting with the library: the AI picked for agent work reads the whole library (lectures, Canvas, the files you
@@ -42,8 +57,72 @@ public sealed class Chats(string home, string library, AiJobs ai, History histor
 
     string Dir => Path.Combine(home, "chats");
     string PathOf(string id) => Path.Combine(Dir, id + ".json");
+    /// <summary>Deleted chats, kept a while so Undo can bring one back.</summary>
+    string TrashDir => Path.Combine(Dir, ".trash");
+
+    public const string AskKind = "ask";
 
     public static bool GoodId(string id) => id.Length is > 0 and <= 40 && id.All(c => char.IsAsciiLetterOrDigit(c) || c == '-');
+
+    /// <summary>The list of chats in a line each (<see cref="ChatEntry"/>), so listing them never reads every chat:
+    /// chats/.index.json, made again from the chats themselves whenever it's missing.</summary>
+    static string IndexIn(string home) => Path.Combine(home, "chats", ".index.json");
+
+    /// <summary>Something changed chat files without this class (a class renamed, chats brought from another library):
+    /// the index is made again the next time chats are listed.</summary>
+    public static void IndexChanged(string home)
+    {
+        try
+        {
+            File.Delete(IndexIn(home));
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException)
+        {
+        }
+    }
+
+    static ChatEntry EntryOf(Chat c) => new(c.Id, c.Title, c.Kind, c.Scope, c.ClassName, c.Lecture, c.Updated, c.Messages.Count(m => m.Role == "user"));
+
+    /// <summary>Every chat in a line, newest first.</summary>
+    public List<ChatEntry> Entries()
+    {
+        lock (gate)
+        {
+            if (File.Exists(IndexIn(home)))
+                try
+                {
+                    if (JsonSerializer.Deserialize<List<ChatEntry>>(File.ReadAllText(IndexIn(home)), Options) is { } kept) return Newest(kept);
+                }
+                catch (JsonException)
+                {
+                    // made again below
+                }
+            var all = Directory.Exists(Dir)
+                ? Directory.EnumerateFiles(Dir, "*.json").Select(f => Get(Path.GetFileNameWithoutExtension(f))).OfType<Chat>().Select(EntryOf).ToList()
+                : [];
+            WriteIndex(all);
+            return Newest(all);
+        }
+    }
+
+    static List<ChatEntry> Newest(IEnumerable<ChatEntry> entries) => [.. entries.OrderByDescending(e => e.Updated, StringComparer.Ordinal)];
+
+    void WriteIndex(List<ChatEntry> entries)
+    {
+        if (!Directory.Exists(Dir)) return;
+        File.WriteAllText(IndexIn(home), JsonSerializer.Serialize(entries, Options));
+    }
+
+    void Indexed(Func<List<ChatEntry>, List<ChatEntry>> change)
+    {
+        var now = change([.. Entries()]);
+        WriteIndex(now);
+    }
+
+    /// <summary>The Ask chats on a note's page (that lecture's), a folder's (its own and its lectures'), or Home (all
+    /// of them), newest first.</summary>
+    public List<ChatEntry> AskChats(string? lecture = null, string? className = null) =>
+        [.. Entries().Where(e => e.Kind == AskKind && (lecture is not null ? e.Lecture == lecture : className is null || e.ClassName == className))];
 
     public Chat? Get(string id)
     {
@@ -64,14 +143,134 @@ public sealed class Chats(string home, string library, AiJobs ai, History histor
         {
             Directory.CreateDirectory(Dir);
             File.WriteAllText(PathOf(c.Id), JsonSerializer.Serialize(c, Options));
+            Indexed(all => [.. all.Where(e => e.Id != c.Id), EntryOf(c)]);
         }
     }
 
+    /// <summary>How long a deleted chat waits, so the app's Undo can bring it back.</summary>
+    public static readonly TimeSpan TrashKeeps = TimeSpan.FromDays(1);
+
+    /// <summary>A chat deleted: out of every list at once, and kept a while (<see cref="TrashKeeps"/>) for
+    /// <see cref="Restore"/>.</summary>
     public bool Delete(string id)
     {
-        if (!GoodId(id) || !File.Exists(PathOf(id))) return false;
-        File.Delete(PathOf(id));
-        return true;
+        lock (gate)
+        {
+            if (!GoodId(id) || !File.Exists(PathOf(id))) return false;
+            Directory.CreateDirectory(TrashDir);
+            string to = Path.Combine(TrashDir, id + ".json");
+            File.Move(PathOf(id), to, overwrite: true);
+            File.SetLastWriteTimeUtc(to, DateTime.UtcNow);
+            Indexed(all => [.. all.Where(e => e.Id != id)]);
+            EmptyTrash(DateTime.UtcNow - TrashKeeps);
+            return true;
+        }
+    }
+
+    /// <summary>A deleted chat back, as it was; false once it's gone for good.</summary>
+    public bool Restore(string id)
+    {
+        lock (gate)
+        {
+            string from = Path.Combine(TrashDir, id + ".json");
+            if (!GoodId(id) || !File.Exists(from) || File.Exists(PathOf(id))) return false;
+            File.Move(from, PathOf(id));
+            if (Get(id) is { } back) Indexed(all => [.. all.Where(e => e.Id != id), EntryOf(back)]);
+            return true;
+        }
+    }
+
+    void EmptyTrash(DateTime before)
+    {
+        if (!Directory.Exists(TrashDir)) return;
+        foreach (string f in Directory.EnumerateFiles(TrashDir, "*.json"))
+            if (File.GetLastWriteTimeUtc(f) < before) File.Delete(f);
+    }
+
+    /// <summary>A chat called something else (its title starts as its first question).</summary>
+    public Chat? Rename(string id, string title)
+    {
+        lock (gate)
+        {
+            if (Get(id) is not { } c) return null;
+            c.Title = title;
+            Save(c);
+            return c;
+        }
+    }
+
+    /// <summary>A lecture deleted for good takes its chats with it (deleted ones waiting for Undo too).</summary>
+    public int ForgetLecture(string lecture)
+    {
+        lock (gate)
+        {
+            var ids = Entries().Where(e => e.Lecture == lecture).Select(e => e.Id).ToList();
+            foreach (string id in ids) File.Delete(PathOf(id));
+            if (ids.Count > 0) Indexed(all => [.. all.Where(e => e.Lecture != lecture)]);
+            if (Directory.Exists(TrashDir))
+                foreach (string f in Directory.EnumerateFiles(TrashDir, "*.json"))
+                    try
+                    {
+                        if (JsonSerializer.Deserialize<Chat>(File.ReadAllText(f), Options)?.Lecture == lecture) File.Delete(f);
+                    }
+                    catch (JsonException)
+                    {
+                    }
+            return ids.Count;
+        }
+    }
+
+    // --- Ask chats ---------------------------------------------------------------------------------------------------
+
+    /// <summary>A new Ask chat where it was started: a lecture (with its folder), a folder, or Home.</summary>
+    public Chat NewAsk(AskPlace? place)
+    {
+        var c = New(place?.Class ?? "", place?.Lecture ?? "");
+        c.Kind = AskKind;
+        c.Scope = place?.Scope is "lecture" or "class" ? place.Scope : "home";
+        return c;
+    }
+
+    /// <summary>Chats answering a question right now: one turn at a time each.</summary>
+    readonly HashSet<string> answering = [];
+
+    /// <summary>Takes a chat's turn: false while it's still answering a question (asked on another device, say).</summary>
+    public bool TryBegin(string id)
+    {
+        lock (answering) return answering.Add(id);
+    }
+
+    public void End(string id)
+    {
+        lock (answering) answering.Remove(id);
+    }
+
+    /// <summary>The conversation so far, as Ask's memory takes it (<see cref="AskMemory"/>): each question with the answer
+    /// it got and what that drew on.</summary>
+    public static List<AskTurn> AskTurns(Chat c)
+    {
+        var turns = new List<AskTurn>();
+        for (int i = 0; i + 1 < c.Messages.Count; i++)
+            if (c.Messages[i].Role == "user" && c.Messages[i + 1].Role == "assistant" && !c.Messages[i + 1].Failed)
+                turns.Add(new AskTurn(c.Messages[i].Text, c.Messages[i + 1].Text) { Sources = c.Messages[i + 1].Sources });
+        return turns;
+    }
+
+    /// <summary>One Ask turn kept: the question, and its answer (or what came of it before it stopped, or why it
+    /// failed). The chat is named for its first question.</summary>
+    public void AddAskTurn(Chat c, string question, string answer, AskReply? reply = null, bool stopped = false, bool failed = false)
+    {
+        lock (gate)
+        {
+            if (c.Title.Length == 0) c.Title = Py.Head(question.ReplaceLineEndings(" "), 80);
+            c.Messages.Add(new ChatMessage("user", question, Now()));
+            c.Messages.Add(new ChatMessage("assistant", answer, Now())
+            {
+                Sources = reply?.Sources ?? [], Engine = reply?.Engine ?? "", EngineName = reply?.EngineName ?? "", Stopped = stopped, Failed = failed,
+            });
+            c.Updated = Now();
+            Save(c);
+        }
     }
 
     /// <summary>The chats, most recent first.</summary>

@@ -32,13 +32,27 @@ public sealed partial class LibraryWeb
     public static readonly TimeSpan TrashKeeps = TimeSpan.FromMinutes(10);
 
     /// <summary>Lectures deleted longer ago than <see cref="TrashKeeps"/> are gone for good.</summary>
-    void EmptyOldTrash() => store.EmptyTrash(DateTimeOffset.UtcNow - TrashKeeps);
+    void EmptyOldTrash() => EmptyTrash(DateTimeOffset.UtcNow - TrashKeeps);
+
+    /// <summary>The trash emptied (what was deleted before <paramref name="before"/>; everything with none): a lecture
+    /// gone for good takes its chats with it.</summary>
+    int EmptyTrash(DateTimeOffset? before = null)
+    {
+        var trashed = store.Trashed();
+        int n = store.EmptyTrash(before);
+        if (n > 0)
+        {
+            var gone = store.Gone().ToHashSet();
+            foreach (string id in trashed.Where(gone.Contains)) LibraryChats.ForgetLecture(id);
+        }
+        return n;
+    }
 
     void MapApp(WebApplication app)
     {
         if (store.IndexMissing() is int n and > 0) Console.WriteLine($"[library] indexed {n} lecture(s) for search");
         // The trash lasts while the library runs: what was deleted before it started again is gone.
-        if (store.EmptyTrash() is int t and > 0) Console.WriteLine($"[library] emptied the trash ({t} lecture(s))");
+        if (EmptyTrash() is int t and > 0) Console.WriteLine($"[library] emptied the trash ({t} lecture(s))");
 
         app.MapGet("/api/v2/library", (HttpContext ctx) => Api(ctx, () =>
         {
