@@ -173,12 +173,14 @@ public sealed partial class Store
             }
             string now = Now();
             // A draft the same AI app is putting right: notes it saved a few minutes ago, untouched since (not edited,
-            // not put back, not changed in their file). Its version takes these instead of keeping both.
+            // put back, undone, redone or changed in their file). Its version takes these instead of keeping both. Only
+            // when the newest version is that very save: the app's, by the same writer, with the words it saved.
             string outside = OutsideKey(noteId);
             bool draft = redraft && writer is not null && GetState(outside)?.Split('\n') is [var who, var at, var print]
                 && who == writer && print == Notes.Fingerprint(current)
                 && DateTimeOffset.TryParse(at, System.Globalization.CultureInfo.InvariantCulture, System.Globalization.DateTimeStyles.AssumeUniversal, out var last)
-                && DateTimeOffset.UtcNow - last < RedraftWithin;
+                && DateTimeOffset.UtcNow - last < RedraftWithin
+                && NewestIsOwnSave(noteId, writer, print);
             if (redraft && writer is not null) SetState(outside, $"{writer}\n{now}\n{Notes.Fingerprint(markdown)}");
             if (writer is null) Exec("UPDATE notes SET summary_md=?, updated_at=? WHERE id=?", markdown, now, noteId);
             else Exec("UPDATE notes SET summary_md=?, summary_model=?, status=?, error=NULL, updated_at=? WHERE id=?",

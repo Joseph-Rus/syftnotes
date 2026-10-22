@@ -134,6 +134,8 @@ public sealed partial class Store
     void RecordVersion(string noteId, (string Markdown, string Model, string At) before, string markdown, string model, string kind,
         long? refSeq = null, bool draftOf = false)
     {
+        // Any change but an AI app's save ends what that app could put right as a draft.
+        if (kind != NotesChangeKind.App) Exec("DELETE FROM sync_state WHERE key=?", OutsideKey(noteId));
         FirstVersion(noteId, before.Markdown, before.Model, before.At);
         if (Py.Strip(markdown).Length == 0) return;
         string now = Now();
@@ -259,6 +261,16 @@ public sealed partial class Store
 
     NotesEdited PutBack(string noteId, NoteVersion version, string kind) =>
         EditNotes(noteId, version.Markdown, writer: version.Model, kind: kind, refSeq: version.Seq);
+
+    /// <summary>The newest version is an AI app's save by <paramref name="writer"/>, with the words it saved (their
+    /// <see cref="Notes.Fingerprint"/>, <paramref name="print"/>): nothing has been made on top of it.</summary>
+    bool NewestIsOwnSave(string noteId, string writer, string print)
+    {
+        using var cmd = Command("SELECT kind, summary_model, summary_md FROM notes_history WHERE id=? ORDER BY seq DESC LIMIT 1", noteId);
+        using var r = cmd.ExecuteReader();
+        return r.Read() && !r.IsDBNull(0) && r.GetString(0) == NotesChangeKind.App && !r.IsDBNull(1) && r.GetString(1) == writer
+            && Notes.Fingerprint(r.IsDBNull(2) ? "" : r.GetString(2)) == print;
+    }
 
     /// <summary>Who last saved a lecture's notes through an AI app, when, and what they saved: how a draft put right is
     /// told from notes that are the lecture's own by now.</summary>

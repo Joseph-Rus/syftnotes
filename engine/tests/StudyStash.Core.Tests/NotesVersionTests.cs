@@ -92,6 +92,22 @@ public class NotesVersionTests
         store.UndoNotes("lec-1");
         Assert.Equal("Draft two", store.Get("lec-1")!.SummaryMd);      // undone like any change
 
+        // Undone and redone, or edited and undone, its save isn't a draft any more: the next is a version of its own,
+        // and the undo and the redo stay what they were.
+        store.EditNotes("lec-1", "Claude A", writer: Claude, redraft: true, kind: NotesChangeKind.App);
+        store.UndoNotes("lec-1");
+        store.RedoNotes("lec-1");
+        store.EditNotes("lec-1", "Claude B", writer: Claude, redraft: true, kind: NotesChangeKind.App);
+        Assert.Equal([("Claude B", NotesChangeKind.App), ("Claude A", NotesChangeKind.Redo), ("Draft two", NotesChangeKind.Undo), ("Claude A", NotesChangeKind.App)],
+            store.NotesVersions("lec-1").Take(4).Select(v => (v.Markdown, v.Kind)));
+        store.UndoNotes("lec-1");
+        Assert.Equal("Claude A", store.Get("lec-1")!.SummaryMd);
+        store.EditNotes("lec-1", "My edit");
+        store.UndoNotes("lec-1");
+        store.EditNotes("lec-1", "Claude C", writer: Claude, redraft: true, kind: NotesChangeKind.App);
+        Assert.Equal([("Claude C", NotesChangeKind.App), ("Claude A", NotesChangeKind.Undo), ("My edit", NotesChangeKind.Edit)],
+            store.NotesVersions("lec-1").Take(3).Select(v => (v.Markdown, v.Kind)));
+
         // A paste isn't a draft: each is its own version.
         store.EditNotes("lec-1", "Pasted one", writer: Engines.PastedWriter, kind: NotesChangeKind.Paste);
         store.EditNotes("lec-1", "Pasted two", writer: Engines.PastedWriter, kind: NotesChangeKind.Paste);
