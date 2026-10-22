@@ -214,6 +214,7 @@ public sealed partial class Store : IDisposable
         HasPassages = CreatePassages();
         CreateAttachments();
         CreateNotesVersions();
+        MigrateNotesVersions();
     }
 
     public void Dispose() => conn.Dispose();

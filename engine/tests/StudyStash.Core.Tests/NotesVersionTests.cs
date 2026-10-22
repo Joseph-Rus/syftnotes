@@ -116,6 +116,34 @@ public class NotesVersionTests
     }
 
     [Fact]
+    public void Thinning_away_the_versions_an_undo_pointed_at_never_sends_Undo_or_Redo_somewhere_else()
+    {
+        using var dir = new TempDir();
+        using var store = Open(dir);
+        File(store, notes: "## Summary\nOwn.\n\n## Key points\n- One.");                                   // 1
+        store.AddDiagrams("lec-1", Notes.Fingerprint(store.Get("lec-1")!.SummaryMd!),
+            [new DesignedDiagram("Chain", "Key points", 25, NoteBlockKind.Mermaid, "flowchart LR\n  A --> B", "A leads to B.")]); // 2
+        string withDiagrams = store.Get("lec-1")!.SummaryMd!;
+        store.EditNotes("lec-1", "## Summary\nClaude's.", writer: "Claude (in the Claude app)", redraft: true, kind: NotesChangeKind.App); // 3
+        store.UndoNotes("lec-1");                                                                                // 4: back to 2
+        Assert.Equal(withDiagrams, store.Get("lec-1")!.SummaryMd);
+
+        // A month on, only the day's last version and the first are kept: 2 and 3 go.
+        store.PruneVersions("lec-1", DateTimeOffset.UtcNow.AddDays(60));
+        Assert.Equal([NotesChangeKind.Written, NotesChangeKind.Undo], Kinds(store));
+        var state = store.UndoState("lec-1");
+        Assert.Null(state.Redo);                                       // Claude's notes are gone: nothing to redo, not the first notes
+        Assert.Equal("## Summary\nOwn.\n\n## Key points\n- One.", state.Undo!.Markdown); // and Undo still goes back past the diagrams
+        Assert.All(store.NotesVersions("lec-1"), v => Assert.True(v.Ref is null || store.NotesVersions("lec-1").Any(o => o.Seq == v.Ref)));
+
+        // The next change has its Undo: back to the notes with diagrams.
+        store.EditNotes("lec-1", withDiagrams + "\n- Two.");
+        Assert.Equal(withDiagrams, store.UndoState("lec-1").Undo!.Markdown);
+        Assert.Equal(NotesEdited.Saved, store.UndoNotes("lec-1"));
+        Assert.Equal(withDiagrams, store.Get("lec-1")!.SummaryMd);
+    }
+
+    [Fact]
     public void A_lectures_versions_wait_in_the_trash_with_it_and_go_when_its_deleted_for_good()
     {
         using var dir = new TempDir();

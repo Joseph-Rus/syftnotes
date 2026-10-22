@@ -31,8 +31,9 @@ public static class NotesChangeKind
 
 /// <summary>One version of a lecture's notes: its words, who wrote them (a model or an app's name as notes store it,
 /// "" for the student's own), what made it (<see cref="NotesChangeKind"/>), when, and for an undo, a redo or a restore,
-/// the version it put back.</summary>
-public sealed record NoteVersion(long Seq, string Markdown, string Model, string Kind, string At, long? Ref);
+/// the version it put back. <see cref="UndoTo"/> and <see cref="RedoTo"/>: the versions Undo and Redo put back from
+/// this one, worked out when it was made (so thinning old versions away never changes where they go).</summary>
+public sealed record NoteVersion(long Seq, string Markdown, string Model, string Kind, string At, long? Ref, long? UndoTo = null, long? RedoTo = null);
 
 /// <summary>Where Undo and Redo would take a lecture's notes: the version each would put back, or null.</summary>
 public sealed record NotesUndo(NoteVersion? Undo, NoteVersion? Redo);
@@ -66,10 +67,23 @@ public sealed partial class Store
             summary_model TEXT,
             kind TEXT,
             at TEXT,
-            ref INTEGER
+            ref INTEGER,
+            undo_to INTEGER,
+            redo_to INTEGER
         );
         CREATE INDEX IF NOT EXISTS notes_history_id ON notes_history(id, seq);
         """);
+
+    /// <summary>A history table from before Undo and Redo were written down with each version gets their columns.</summary>
+    void MigrateNotesVersions()
+    {
+        var cols = new HashSet<string>();
+        using (var cmd = Command("PRAGMA table_info(notes_history)"))
+        using (var r = cmd.ExecuteReader())
+            while (r.Read()) cols.Add(r.GetString(r.GetOrdinal("name")));
+        foreach (string col in new[] { "undo_to", "redo_to" })
+            if (!cols.Contains(col)) Exec($"ALTER TABLE notes_history ADD COLUMN {col} INTEGER");
+    }
 
     /// <summary>A lecture's versions, newest first (the first of them is the notes as they are now).</summary>
     public List<NoteVersion> NotesVersions(string noteId)
@@ -77,11 +91,12 @@ public sealed partial class Store
         lock (gate)
         {
             var list = new List<NoteVersion>();
-            using var cmd = Command("SELECT seq, summary_md, summary_model, kind, at, ref FROM notes_history WHERE id=? ORDER BY seq DESC", noteId);
+            using var cmd = Command("SELECT seq, summary_md, summary_model, kind, at, ref, undo_to, redo_to FROM notes_history WHERE id=? ORDER BY seq DESC", noteId);
             using var r = cmd.ExecuteReader();
             while (r.Read())
                 list.Add(new NoteVersion(r.GetInt64(0), r.IsDBNull(1) ? "" : r.GetString(1), r.IsDBNull(2) ? "" : r.GetString(2),
-                    r.IsDBNull(3) ? NotesChangeKind.Written : r.GetString(3), r.IsDBNull(4) ? "" : r.GetString(4), r.IsDBNull(5) ? null : r.GetInt64(5)));
+                    r.IsDBNull(3) ? NotesChangeKind.Written : r.GetString(3), r.IsDBNull(4) ? "" : r.GetString(4), r.IsDBNull(5) ? null : r.GetInt64(5),
+                    r.IsDBNull(6) ? null : r.GetInt64(6), r.IsDBNull(7) ? null : r.GetInt64(7)));
             return list;
         }
     }
@@ -122,14 +137,16 @@ public sealed partial class Store
         FirstVersion(noteId, before.Markdown, before.Model, before.At);
         if (Py.Strip(markdown).Length == 0) return;
         string now = Now();
-        long? newest = null;
+        long? newest = null, newestUndo = null, newestRedo = null;
         string newestMd = "";
-        using (var cmd = Command("SELECT seq, summary_md FROM notes_history WHERE id=? ORDER BY seq DESC LIMIT 1", noteId))
+        using (var cmd = Command("SELECT seq, summary_md, undo_to, redo_to FROM notes_history WHERE id=? ORDER BY seq DESC LIMIT 1", noteId))
         using (var r = cmd.ExecuteReader())
             if (r.Read())
             {
                 newest = r.GetInt64(0);
                 newestMd = r.IsDBNull(1) ? "" : r.GetString(1);
+                newestUndo = r.IsDBNull(2) ? null : r.GetInt64(2);
+                newestRedo = r.IsDBNull(3) ? null : r.GetInt64(3);
             }
         if (draftOf && newest is { } draft)
         {
@@ -137,8 +154,17 @@ public sealed partial class Store
             return;
         }
         if (newestMd == markdown && kind is not (NotesChangeKind.Undo or NotesChangeKind.Redo)) return;
-        Exec("INSERT INTO notes_history(id, summary_md, summary_model, kind, at, ref) VALUES(?,?,?,?,?,?)",
-            noteId, markdown, model.Length > 0 ? model : null, kind, now, refSeq);
+        // Where Undo and Redo go from these notes, written down with them. A change: Undo goes back to the notes it
+        // changed, and nothing can be redone over it. An undo: Undo goes on back from the version it put back, and Redo
+        // returns to the notes it left. A redo: Undo returns to the notes it left, Redo goes on from the version it put back.
+        (long? undoTo, long? redoTo) = kind switch
+        {
+            NotesChangeKind.Undo => (Pointer(refSeq, "undo_to"), newest),
+            NotesChangeKind.Redo => (newest, Pointer(refSeq, "redo_to")),
+            _ => (newest, (long?)null),
+        };
+        Exec("INSERT INTO notes_history(id, summary_md, summary_model, kind, at, ref, undo_to, redo_to) VALUES(?,?,?,?,?,?,?,?)",
+            noteId, markdown, model.Length > 0 ? model : null, kind, now, refSeq, undoTo, redoTo);
         Prune(noteId, DateTimeOffset.UtcNow);
     }
 
@@ -149,57 +175,60 @@ public sealed partial class Store
         lock (gate) Prune(noteId, now);
     }
 
+    /// <summary>A version's Undo or Redo pointer (<paramref name="column"/>), or null.</summary>
+    long? Pointer(long? seq, string column)
+    {
+        if (seq is null) return null;
+        using var cmd = Command($"SELECT {column} FROM notes_history WHERE seq=?", seq);
+        return cmd.ExecuteScalar() is long v ? v : null;
+    }
+
     void Prune(string noteId, DateTimeOffset now)
     {
-        var all = new List<(long Seq, DateTimeOffset At)>();
-        using (var cmd = Command("SELECT seq, at FROM notes_history WHERE id=? ORDER BY seq", noteId))
+        var all = new List<(long Seq, DateTimeOffset At, long? Ref, long? UndoTo, long? RedoTo)>();
+        using (var cmd = Command("SELECT seq, at, ref, undo_to, redo_to FROM notes_history WHERE id=? ORDER BY seq", noteId))
         using (var r = cmd.ExecuteReader())
             while (r.Read())
                 all.Add((r.GetInt64(0), DateTimeOffset.TryParse(r.IsDBNull(1) ? "" : r.GetString(1), CultureInfo.InvariantCulture,
-                    DateTimeStyles.AssumeUniversal, out var at) ? at : now));
+                    DateTimeStyles.AssumeUniversal, out var at) ? at : now, r.IsDBNull(2) ? null : r.GetInt64(2),
+                    r.IsDBNull(3) ? null : r.GetInt64(3), r.IsDBNull(4) ? null : r.GetInt64(4)));
         if (all.Count <= 1) return;
         var gone = all.Skip(1).Where(v => now - v.At > EveryVersionFor).GroupBy(v => v.At.UtcDateTime.Date)
             .SelectMany(day => day.OrderBy(v => v.Seq).SkipLast(1)).Select(v => v.Seq).ToHashSet();
         var left = all.Where(v => !gone.Contains(v.Seq)).ToList();
         foreach (var v in left.Skip(1).Take(Math.Max(0, left.Count - MostVersions))) gone.Add(v.Seq);
+        if (gone.Count == 0) return;
+        // Nothing left pointing at a version thinned away: Undo goes on back past it to the nearest one kept (the first is
+        // always kept); Redo to it, or "put back" naming it, has nowhere to go and is dropped.
+        var bySeq = all.ToDictionary(v => v.Seq);
+        long? Back(long? seq)
+        {
+            while (seq is { } s && gone.Contains(s)) seq = bySeq.TryGetValue(s, out var v) ? v.UndoTo : null;
+            return seq;
+        }
+        foreach (var v in all.Where(v => !gone.Contains(v.Seq)))
+        {
+            long? undoTo = Back(v.UndoTo);
+            long? redoTo = v.RedoTo is { } rt && gone.Contains(rt) ? null : v.RedoTo;
+            long? refSeq = v.Ref is { } rf && gone.Contains(rf) ? null : v.Ref;
+            if (undoTo != v.UndoTo || redoTo != v.RedoTo || refSeq != v.Ref)
+                Exec("UPDATE notes_history SET undo_to=?, redo_to=?, ref=? WHERE seq=?", undoTo, redoTo, refSeq, v.Seq);
+        }
         foreach (long seq in gone) Exec("DELETE FROM notes_history WHERE seq=?", seq);
     }
 
     /// <summary>
-    /// Where Undo and Redo would take the notes, as an editor's would: the versions replayed in order, each change
-    /// putting the notes it changed on the undo stack (and ending what could be redone), each undo moving the notes it
-    /// left onto the redo stack, each redo moving them back. An undo or a redo stands for the version it put back.
+    /// Where Undo and Redo would take the notes, as an editor's would: written down with the newest version when it was
+    /// made (a change: back to the notes it changed; an undo: further back, or forward to the notes it left; a redo: the
+    /// other way), so it never depends on versions that have been thinned away since.
     /// </summary>
     public NotesUndo UndoState(string noteId)
     {
         var versions = NotesVersions(noteId);
+        if (versions.Count == 0) return new NotesUndo(null, null);
         var bySeq = versions.ToDictionary(v => v.Seq);
-        var undo = new List<long>();
-        var redo = new List<long>();
-        long? current = null;
-        foreach (var v in Enumerable.Reverse(versions))
-        {
-            long state = v.Ref is { } r && v.Kind is NotesChangeKind.Undo or NotesChangeKind.Redo ? r : v.Seq;
-            switch (v.Kind)
-            {
-                case NotesChangeKind.Undo:
-                    if (current is { } left) redo.Add(left);
-                    if (undo.Count > 0) undo.RemoveAt(undo.Count - 1);
-                    break;
-                case NotesChangeKind.Redo:
-                    if (current is { } undone) undo.Add(undone);
-                    if (redo.Count > 0) redo.RemoveAt(redo.Count - 1);
-                    break;
-                default:
-                    if (current is { } before) undo.Add(before);
-                    redo.Clear();
-                    break;
-            }
-            current = state;
-        }
-        // A version thinned away can't come back: the next one down the stack does.
-        NoteVersion? Top(List<long> stack) => Enumerable.Reverse(stack).Select(s => bySeq.GetValueOrDefault(s)).FirstOrDefault(v => v is not null);
-        return new NotesUndo(Top(undo), Top(redo));
+        var newest = versions[0];
+        return new NotesUndo(newest.UndoTo is { } u ? bySeq.GetValueOrDefault(u) : null, newest.RedoTo is { } r ? bySeq.GetValueOrDefault(r) : null);
     }
 
     /// <summary>Undo: the version before, put back, as a version of its own. <see cref="NotesEdited.Gone"/> with
