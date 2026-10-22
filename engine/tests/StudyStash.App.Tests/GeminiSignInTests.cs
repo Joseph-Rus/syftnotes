@@ -1,3 +1,4 @@
+using Avalonia.Headless.XUnit;
 using StudyStash.App.ViewModels;
 using StudyStash.Core.Ai;
 
@@ -50,6 +51,40 @@ public sealed class GeminiSignInTests
         var found = StudyStash.App.Services.AgentInstall.Find(AgentCli.Gemini, StudyStash.Core.Tests.FakeAgents.Which(home["bin"]));
         Assert.Equal(new Version(1, 4, 4), found.Version);
         Assert.Equal(Antigravity.Home(), File.ReadAllText(Path.Combine(home["bin"], "version-home.txt")).Trim());
+    }
+
+    /// <summary>Google turning the country away, at the sign-in or the check after it, says so in plain words, with
+    /// the way on (another AI, or by hand), instead of "Gemini didn't answer the check".</summary>
+    [AvaloniaFact]
+    public async Task A_country_google_doesnt_serve_says_so_at_sign_in_and_at_the_check()
+    {
+        const string words = "Gemini isn't available in your country yet: pick another AI or set up by hand.";
+        // At the check (signed in already).
+        await using (var rig = new GuidedSetupTests.Rig(cli: "gemini", installed: true, signedIn: true))
+        {
+            using var agyHome = Antigravity.Use(rig.Home["agy"]);
+            File.WriteAllText(Path.Combine(rig.Bin, "region"), "");
+            await rig.OpenAsync();
+            var g = rig.Guided;
+            g.PickCommand.Execute("gemini");
+            await g.ContinueCommand.ExecuteAsync(null);
+            await GuidedSetupTests.Until(() => g.HasPlanProblem, "the check's answer");
+            Assert.Equal((ChatProblem.Region, words), (g.PlanProblem, g.PlanProblemTitle));
+            Assert.Equal("Use ChatGPT instead", g.UseOtherLabel);
+        }
+        // At the sign-in.
+        await using (var rig = new GuidedSetupTests.Rig(cli: "gemini", installed: true))
+        {
+            using var agyHome = Antigravity.Use(rig.Home["agy"]);
+            File.WriteAllText(Path.Combine(rig.Bin, "region"), "");
+            await rig.OpenAsync();
+            var g = rig.Guided;
+            g.PickCommand.Execute("gemini");
+            await g.ContinueCommand.ExecuteAsync(null);
+            await g.OpenSignInCommand.ExecuteAsync(null);
+            Assert.Equal(words, g.SignInProblem);
+            Assert.False(g.SignedIn);
+        }
     }
 
     [Fact]

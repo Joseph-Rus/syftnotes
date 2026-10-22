@@ -249,6 +249,17 @@ public class GeminiSetupChatTests
         Assert.Equal(ChatProblem.Auth, signedOut.Single().Problem);
     }
 
+    /// <summary>A country Google doesn't serve, in the words its services use, is said as that (not "didn't answer the
+    /// check"); a used-up quota is still the limit.</summary>
+    [Theory]
+    [InlineData("User location is not supported for the API use.", ChatProblem.Region)]
+    [InlineData("FAILED_PRECONDITION: User location is not supported for the API use.", ChatProblem.Region)]
+    [InlineData("Antigravity is not available in your country yet.", ChatProblem.Region)]
+    [InlineData("This service isn't available in your region", ChatProblem.Region)]
+    [InlineData("RESOURCE_EXHAUSTED: Quota exceeded for this week's Gemini limit. Resets at 10:47 PM", ChatProblem.Limit)]
+    [InlineData("authentication failed or timed out", ChatProblem.Auth)]
+    public void A_country_google_doesnt_serve_is_said_as_that(string said, ChatProblem kind) => Assert.Equal(kind, SetupChat.Classify(said));
+
     [Fact]
     public async Task Geminis_plan_check_says_how_much_is_left_without_spending_any_then_tries_a_turn_in_the_chats_own_home()
     {

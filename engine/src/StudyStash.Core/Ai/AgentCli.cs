@@ -200,10 +200,15 @@ public static partial class AgentCli
         RegexOptions.IgnoreCase)]
     private static partial Regex OfflineWords();
 
-    [GeneratedRegex(@"not available in your (region|country)|supported-countries|unsupported (country|region)|isn't available in your (country|region)|"
-        + @"not supported in your (country|region)|unsupported_country",
+    // Google's own: "User location is not supported for the API use.", "… is not available in your country".
+    [GeneratedRegex(@"not available in your (region|country|location)|supported-countries|unsupported (country|region|location)|"
+        + @"(isn't|is not) available in your (country|region|location)|not supported in your (country|region|location)|unsupported_country|"
+        + @"(user )?location is not supported|not available in (this|the user's) (country|region|location)|available-regions",
         RegexOptions.IgnoreCase)]
     private static partial Regex RegionWords();
+
+    /// <summary>Whether what a CLI said means its maker doesn't offer it in this country.</summary>
+    public static bool LooksLikeRegion(string said) => RegionWords().IsMatch(said);
 
     [GeneratedRegex(@"exit code 137|ran out of memory|out of memory|cannot allocate memory|OutOfMemory", RegexOptions.IgnoreCase)]
     private static partial Regex MemoryWords();

@@ -25,6 +25,8 @@ public enum ChatProblem
     Guard,
     /// <summary>It couldn't reach Study Stash's setup tools.</summary>
     Tools,
+    /// <summary>Its maker doesn't offer it in this country.</summary>
+    Region,
     Other,
 }
 
@@ -598,10 +600,12 @@ public static partial class SetupChat
         RegexOptions.IgnoreCase)]
     private static partial Regex PlanWords();
 
-    /// <summary>What an error from a turn means for the student: the network first, then a usage limit (whose words
+    /// <summary>What an error from a turn means for the student: the network first, then a country the maker doesn't
+    /// serve, then a usage limit (whose words
     /// often mention the plan too), then a plan without the CLI, then signing in, else something else.</summary>
     public static ChatProblem Classify(string error) =>
         OfflineWords().IsMatch(error) ? ChatProblem.Offline
+        : AgentCli.LooksLikeRegion(error) ? ChatProblem.Region
         : Engines.LooksLikeLimit(error) ? ChatProblem.Limit
         : PlanWords().IsMatch(error) ? ChatProblem.Plan
         : Engines.LooksLikeAuth(error) ? ChatProblem.Auth

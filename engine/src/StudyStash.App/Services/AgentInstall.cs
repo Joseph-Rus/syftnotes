@@ -257,6 +257,9 @@ public sealed class AgentSignIn : IDisposable
     public bool NeedsTerminal { get; private set; }
     /// <summary>The sign-in waited for the browser as long as it does and stopped without being signed in.</summary>
     public bool GaveUp { get; private set; }
+    /// <summary>The sign-in stopped because its maker doesn't offer it in this country (what it printed said so; the
+    /// words themselves are never kept or logged).</summary>
+    public bool Region { get; private set; }
     public bool Running => child is { HasExited: false };
 
     /// <summary>Asks the CLI whether it's signed in (its status command's exit code). Codex's words are never read
@@ -270,6 +273,8 @@ public sealed class AgentSignIn : IDisposable
         if (Running) return true;
         NeedsTerminal = false;
         GaveUp = false;
+        Region = false;
+        regionSaid = false;
         exited = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         List<string> cmd = [exe, .. cli.SignInArgs];
         var launch = OperatingSystem.IsWindows() ? WindowsCommand.For(cmd) : new Launch(exe, [.. cli.SignInArgs]);
@@ -302,15 +307,23 @@ public sealed class AgentSignIn : IDisposable
         var p = child;
         var at = started;
         var done = exited;
-        _ = Task.Run(() => Watch(p.StandardOutput));
-        _ = Task.Run(() => Watch(p.StandardError));
+        var reading = Task.WhenAll(Task.Run(() => Watch(p.StandardOutput)), Task.Run(() => Watch(p.StandardError)));
         _ = Task.Run(async () =>
         {
             try
             {
                 await p.WaitForExitAsync();
+                // What it printed last, read before it's judged (a refusal for the country comes just before it stops).
+                try
+                {
+                    await reading.WaitAsync(TimeSpan.FromSeconds(2));
+                }
+                catch (TimeoutException)
+                {
+                }
                 // Only the sign-in still current: one stopped to be run again isn't one that couldn't open the browser.
-                if (p.ExitCode != 0 && DateTime.UtcNow - at < QuickFail && ReferenceEquals(child, p)) NeedsTerminal = true;
+                if (p.ExitCode != 0 && regionSaid && ReferenceEquals(child, p)) Region = true;
+                else if (p.ExitCode != 0 && DateTime.UtcNow - at < QuickFail && ReferenceEquals(child, p)) NeedsTerminal = true;
                 else if (p.ExitCode != 0 && cli.SignInGivesUp is not null && ReferenceEquals(child, p)) GaveUp = true;
             }
             catch (InvalidOperationException)
@@ -363,20 +376,25 @@ public sealed class AgentSignIn : IDisposable
             {
                 return false;
             }
-            // It gave up waiting for the browser: one last look, and the wait ends with it.
-            if (GaveUp) return await Task.Run(Check, CancellationToken.None) is { SignedIn: true } last && Report(last);
+            // It gave up waiting for the browser, or its maker turned the country away: one last look, and the wait ends.
+            if (GaveUp || Region) return await Task.Run(Check, CancellationToken.None) is { SignedIn: true } last && Report(last);
             if (exited.Task.IsCompleted) exited = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         }
         return false;
     }
 
-    /// <summary>Reads what the sign-in prints, only to keep the first https address in it: nothing is logged.</summary>
+    /// <summary>What the sign-in printed said its maker doesn't offer it in this country.</summary>
+    volatile bool regionSaid;
+
+    /// <summary>Reads what the sign-in prints, only to keep the first https address in it and to see whether it says
+    /// the country isn't served: nothing is logged.</summary>
     async Task Watch(StreamReader from)
     {
         try
         {
             while (await from.ReadLineAsync() is { } line)
             {
+                if (AgentCli.LooksLikeRegion(line)) regionSaid = true;
                 if (Url is not null) continue;
                 int at = line.IndexOf("https://", StringComparison.Ordinal);
                 if (at < 0) continue;
