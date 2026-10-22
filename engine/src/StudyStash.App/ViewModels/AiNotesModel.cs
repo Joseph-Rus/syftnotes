@@ -177,7 +177,7 @@ public sealed partial class AiNotesModel : ObservableObject, IDisposable
     {
         LectureId = lectureId;
         written = typed ? "" : markdown;
-        SetCurrent(markdown, Engines.WhoWrote(notesModel), updatedAt);
+        SetCurrent(markdown, Engines.WrittenBy(notesModel), updatedAt);
         Engine = WriterId;
         await Refresh();
     }

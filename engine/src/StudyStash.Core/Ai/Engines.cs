@@ -121,6 +121,13 @@ public static class Engines
     /// <summary>The writer of notes pasted from a chat ("Paste notes"), as the note's file and its byline name them.</summary>
     public const string PastedWriter = YourAi + " (pasted from a chat)";
 
+    /// <summary>What a lecture's notes' byline names: the AI (<see cref="WhoWrote"/>), or, when another model than the
+    /// one asked wrote them ("Gemini · Gemini 3.5 Flash-Lite (Flash's free daily limit is used up)"), that model and
+    /// why.</summary>
+    public static string WrittenBy(string notesModel) =>
+        notesModel.IndexOf(" · ", StringComparison.Ordinal) is var at and > 0 && WhoWrote(notesModel) is { Length: > 0 } who && who != "Ollama"
+            ? notesModel[(at + 3)..] : WhoWrote(notesModel);
+
     /// <summary>The command a terminal runs to sign in ("claude", "codex login", "agy").</summary>
     public static (string Exe, string[] Args) SignInCommand(string id) => id switch
     {
