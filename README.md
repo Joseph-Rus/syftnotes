@@ -32,6 +32,10 @@ Press Record when the lecture starts. It's written down as it goes, on your comp
 stop, the notes are written, filed under the right class next to your Canvas assignments, and ready
 to ask about. Two students build it, with Claude.
 
+Study Stash is an open-source alternative to Otter.ai, Granola and Notability for recording
+lectures: it's free, transcribes on your own computer, and writes notes with whichever AI you
+choose, including a free one that runs on your machine.
+
 ## What it does
 
 - **Records lectures** from the menu bar (Mac) or the tray (Windows), with one click or one shortcut.
