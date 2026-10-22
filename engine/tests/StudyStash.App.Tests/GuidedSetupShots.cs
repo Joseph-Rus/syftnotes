@@ -25,6 +25,7 @@ public sealed class GuidedSetupShots
     }
 
     static readonly AgentFound ClaudeHere = new("/Users/student/.local/bin/claude", new Version(2, 1, 260), "2.1.260 (Claude Code)");
+    static readonly AgentFound GeminiHere = new("/Users/student/.local/bin/agy", new Version(1, 4, 4), "1.4.4");
 
     /// <summary>Each state of the first three screens.</summary>
     internal static IEnumerable<(string Name, Func<SkinKind, GuidedSetupModel> Make)> States()
@@ -37,7 +38,7 @@ public sealed class GuidedSetupShots
             g.PickCommand.Execute("free");
             return g;
         });
-        // Gemini: no chat with it, so Continue goes to setup by hand too.
+        // Gemini: the same way as the other two, through Google's Antigravity CLI.
         yield return ("pick-gemini", skin =>
         {
             var g = Guided(skin);
@@ -121,6 +122,33 @@ public sealed class GuidedSetupShots
             g.Screen = GuidedScreen.SignIn;
             g.SignedIn = true;
             g.AiReady = true;
+            return g;
+        });
+        yield return ("install-gemini", skin =>
+        {
+            var g = Guided(skin);
+            g.Picked = "gemini";
+            g.Screen = GuidedScreen.Install;
+            return g;
+        });
+        yield return ("sign-in-gemini-waiting", skin =>
+        {
+            var g = Guided(skin);
+            g.GeminiFound = GeminiHere;
+            g.Picked = "gemini";
+            g.Screen = GuidedScreen.SignIn;
+            g.WaitingSignIn = true;
+            return g;
+        });
+        yield return ("sign-in-gemini-ready", skin =>
+        {
+            var g = Guided(skin);
+            g.GeminiFound = GeminiHere;
+            g.Picked = "gemini";
+            g.Screen = GuidedScreen.SignIn;
+            g.SignedIn = true;
+            g.AiReady = true;
+            g.AllowanceWords = "About 80% of your Gemini allowance is left.";
             return g;
         });
         yield return ("sign-in-plan", skin =>

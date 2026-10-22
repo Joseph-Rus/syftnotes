@@ -31,6 +31,8 @@ static class NoInternetFetch
         StudyStash.Core.Ai.SetupChat.CodexConfig = () => Path.Combine(Path.GetTempPath(), "studystash-core-tests-no-codex", "config.toml");
         // Claude Code's version, as a current one says it: no test asks the real one.
         StudyStash.Core.Ai.ClaudeProvider.VersionOf = _ => new Version(2, 1, 260);
+        // Antigravity's home of Study Stash's own: a folder of the tests' own, never ~/.study-stash/gemini.
+        StudyStash.Core.Ai.Antigravity.Home = () => Path.Combine(Path.GetTempPath(), "studystash-core-tests-agy-home");
     }
 #pragma warning restore CA2255
 }

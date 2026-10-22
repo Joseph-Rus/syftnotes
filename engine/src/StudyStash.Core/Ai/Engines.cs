@@ -52,8 +52,11 @@ public sealed record EngineChecks
         DiskFreeGb = () => StudyStash.Core.Machine.DiskFreeGb(),
         OpenSignIn = (home, terminal, id) =>
         {
-            var (exe, args) = Engines.SignInCommand(id);
-            return $"Opened {Terminal.RunCommand(home, terminal, exe, args)} to sign in to {Engines.Name(id)}.";
+            // Gemini signs in to Study Stash's own home for agy, the one its notes run in.
+            var (exe, args) = id == "gemini" && AiProvider.Which(Antigravity.Binary) is { } agy
+                ? Antigravity.InTerminal(agy, OperatingSystem.IsWindows())
+                : Engines.SignInCommand(id);
+            return $"Opened {Terminal.RunCommand(home, terminal, exe, [.. args])} to sign in to {Engines.Name(id)}.";
         },
         Now = () => DateTime.Now,
     };
@@ -98,7 +101,7 @@ public static class Engines
     {
         "claude" => "Claude Code",
         "codex" => "Codex",
-        "gemini" => "Gemini CLI",
+        "gemini" => "Antigravity CLI",
         _ => Name(id),
     };
 

@@ -64,13 +64,13 @@ public interface IGuidedActions
 }
 
 /// <summary>
-/// Guided setup (the design's Pick your AI → Install → Sign in → chat): the student picks Claude or ChatGPT, Study
-/// Stash installs its CLI with its maker's installer only when they press Install, they sign in on the provider's own
-/// page, and then their own AI, run headless and locked to Study Stash's setup tools, walks them through the rest in a
-/// chat, with a checklist beside it that only Study Stash ticks. Gemini and "I don't have a paid plan" are answers
-/// too, with no chat (Gemini's command-line tool can't be locked to the setup tools; a small free model can't follow
-/// the brief): they go to setup by hand, whose notes step opens on that AI (<see cref="NotesPick"/>). "Set up by hand"
-/// (today's setup, over the same <see cref="SetupModel"/>, so nothing done is lost) is one click away throughout.
+/// Guided setup (the design's Pick your AI → Install → Sign in → chat): the student picks Claude, ChatGPT or Gemini,
+/// Study Stash installs its CLI with its maker's installer only when they press Install, they sign in on the
+/// provider's own page, and then their own AI, run headless and locked to Study Stash's setup tools, walks them through
+/// the rest in a chat, with a checklist beside it that only Study Stash ticks. "I don't have a paid plan" is an answer
+/// too, with no chat (a small free model can't follow the brief): it goes to setup by hand, whose notes step opens on
+/// the free AI (<see cref="NotesPick"/>). "Set up by hand" (today's setup, over the same <see cref="SetupModel"/>, so
+/// nothing done is lost) is one click away throughout.
 /// </summary>
 public sealed partial class GuidedSetupModel : ObservableObject, IDisposable
 {
@@ -115,11 +115,12 @@ public sealed partial class GuidedSetupModel : ObservableObject, IDisposable
     public Action? OnFinish { get; set; }
 
     [ObservableProperty] public partial GuidedScreen Screen { get; set; } = GuidedScreen.PickAi;
-    /// <summary>"claude", "codex", "gemini", "free", or "" (nothing picked yet: nothing is, on a first run). Gemini and
-    /// "free" have no chat: Continue goes to setup by hand, with that AI picked for the notes when it's ready.</summary>
+    /// <summary>"claude", "codex", "gemini", "free", or "" (nothing picked yet: nothing is, on a first run). "free" has
+    /// no chat: Continue goes to setup by hand, with the free AI picked for the notes when it's ready.</summary>
     [ObservableProperty] public partial string Picked { get; set; } = "";
     [ObservableProperty] public partial AgentFound ClaudeFound { get; set; } = AgentFound.None;
     [ObservableProperty] public partial AgentFound CodexFound { get; set; } = AgentFound.None;
+    [ObservableProperty] public partial AgentFound GeminiFound { get; set; } = AgentFound.None;
 
     // Install
     [ObservableProperty] public partial bool Installing { get; set; }
@@ -142,6 +143,8 @@ public sealed partial class GuidedSetupModel : ObservableObject, IDisposable
     [ObservableProperty] public partial ChatProblem PlanProblem { get; set; }
     [ObservableProperty] public partial string PlanProblemTitle { get; set; } = "";
     [ObservableProperty] public partial string PlanProblemText { get; set; } = "";
+    /// <summary>How much of the account's allowance is left, as the plan check found it (Gemini's), in plain words.</summary>
+    [ObservableProperty] public partial string AllowanceWords { get; set; } = "";
 
     // Chat
     [ObservableProperty] public partial string Draft { get; set; } = "";
@@ -166,17 +169,30 @@ public sealed partial class GuidedSetupModel : ObservableObject, IDisposable
     /// <summary>The AI setup by hand's notes step opens on (<see cref="AiSetupModel.Prefer"/>): Claude or ChatGPT once
     /// it's ready here, Gemini or the free AI when that was the answer on the first screen (now, or the last time setup
     /// ran), else "" (the step goes by what the library does).</summary>
-    public string NotesPick => AiReady && Picked is ("claude" or "codex") ? Picked
+    public string NotesPick => AiReady && Picked is ("claude" or "codex" or "gemini") ? Picked
         : PickedGemini ? "gemini"
         : PickedFree ? "ollama"
         : settings().SetupAi is "ollama" or "gemini" ? settings().SetupAi : "";
 
     public bool Again => Setup.Again;
     public string Device => Setup.DeviceWord;
-    public AgentCliInfo Cli => AgentCli.Get(Picked == "codex" ? "codex" : "claude");
+    public AgentCliInfo Cli => AgentCli.Get(Picked is "codex" or "gemini" ? Picked : "claude");
+    /// <summary>The AI offered instead when this one can't be used (its country, its plan): Claude for ChatGPT,
+    /// ChatGPT for the others.</summary>
     public AgentCliInfo Other => Cli.Id == "codex" ? AgentCli.Claude : AgentCli.Codex;
     public string Brand => Cli.Brand;
-    public AgentFound Found => Cli.Id == "codex" ? CodexFound : ClaudeFound;
+    /// <summary>The picked AI's own mark, beside its name on the screens that get it ready and on the chat.</summary>
+    public string BrandGlyph => AiWords.EngineIcon(Cli.Id);
+    public AgentFound Found => FoundFor(Cli.Id);
+
+    AgentFound FoundFor(string id) => id switch { "codex" => CodexFound, "gemini" => GeminiFound, _ => ClaudeFound };
+
+    void SetFound(string id, AgentFound found)
+    {
+        if (id == "codex") CodexFound = found;
+        else if (id == "gemini") GeminiFound = found;
+        else ClaudeFound = found;
+    }
     public IReadOnlySet<string> Skipped => skipped;
 
     // --- the words each screen shows (the design's) ------------------------------------------------------------------
@@ -187,22 +203,22 @@ public sealed partial class GuidedSetupModel : ObservableObject, IDisposable
     // Antigravity, Ollama), which the next screens name once, where they're installed.
     public static string ClaudeLine => "I have a paid Claude plan (Pro or Max).";
     public static string CodexLine => "I have a paid ChatGPT plan (Plus or higher).";
-    /// <summary>Gemini has no setup chat (its command-line tool can't be held to setup's own tools), so it's set up by
-    /// hand: the line says where it's connected.</summary>
-    public static string GeminiLine => "I use Gemini. You'll connect it on the notes step.";
+    /// <summary>Gemini works with a personal Google account, free or paid (a free one has a small weekly allowance).</summary>
+    public static string GeminiLine => "I use Gemini with my Google account (free or Google AI Pro).";
     public static string FreeTitle => "I don't have a paid plan";
     public string FreeLine => $"That's fine: Study Stash still records and transcribes. Advanced: a free AI on this {Device} (Ollama), or an API key.";
     public string AlreadyHere => $"Already on this {Device}";
     public bool ClaudeHere => ClaudeFound.Works;
     public bool CodexHere => CodexFound.Works;
+    public bool GeminiHere => GeminiFound.Works;
     public bool PickedClaude => Picked == "claude";
     public bool PickedCodex => Picked == "codex";
     public bool PickedGemini => Picked == "gemini";
     /// <summary>No paid plan: Continue goes to setup by hand, with the free AI on this computer picked for the notes.</summary>
     public bool PickedFree => Picked == "free";
-    /// <summary>An answer with no chat (Gemini, no paid plan): nothing to install or sign in to here, and Continue goes
-    /// to setup by hand.</summary>
-    public bool PickedByHand => PickedFree || PickedGemini;
+    /// <summary>The answer with no chat (no paid plan): nothing to install or sign in to here, and Continue goes to
+    /// setup by hand.</summary>
+    public bool PickedByHand => PickedFree;
 
     /// <summary>Setup by hand's notes step asked for Claude or ChatGPT to be got ready on this computer: the two
     /// screens guided setup has for that (download and set up, sign in) show, and then it's back to that step with the
@@ -241,17 +257,26 @@ public sealed partial class GuidedSetupModel : ObservableObject, IDisposable
 
     public string SignInTitle => SignedIn ? $"You're signed in to {Brand}" : $"Sign in to {Brand}";
     public string SignInLede => SignedIn ? $"{Brand} is signed in on this {Device}. There's nothing more to do here."
-        : Cli.Id == "codex"
-        ? "Your browser will open ChatGPT's sign-in page. Sign in with the account that has your Plus plan (or higher), then come back here."
-        : "Your browser will open Claude's sign-in page. Sign in with the account that has your Pro or Max plan, then come back here.";
-    public string Privacy => $"Study Stash never sees your password. The sign-in is {Brand}'s own, and stays on this {Device}.";
-    public string PlanNote => $"Your chat with {Brand} uses your {Brand} plan.";
+        : Cli.Id switch
+        {
+            "codex" => "Your browser will open ChatGPT's sign-in page. Sign in with the account that has your Plus plan (or higher), then come back here.",
+            "gemini" => "Your browser will open Google's sign-in page. Sign in with your personal Google account, then come back here.",
+            _ => "Your browser will open Claude's sign-in page. Sign in with the account that has your Pro or Max plan, then come back here.",
+        };
+    public string Privacy => Cli.Id == "gemini"
+        ? $"Study Stash never sees your password. The sign-in is Google's own, and stays on this {Device}."
+        : $"Study Stash never sees your password. The sign-in is {Brand}'s own, and stays on this {Device}.";
+    public string PlanNote => Cli.Id == "gemini" ? "Your chat with Gemini uses a little of your Google account's Gemini allowance." : $"Your chat with {Brand} uses your {Brand} plan.";
     public string ReadyWords => $"{Brand} is ready.";
+    public bool HasAllowance => AllowanceWords.Length > 0 && ShowReady;
     /// <summary>Signed in, but on a plan other apps can't use (the free one): said as that, with what would work.</summary>
-    public string PlanTooSmallTitle => $"This {Brand} account is on a plan that other apps can't use";
-    public string PlanTooSmallText => Cli.Id == "codex"
-        ? "Study Stash needs ChatGPT Plus or higher. Without one, it still records and transcribes your lectures. Have an API key? Carry on, and add it on the notes step."
-        : "Study Stash needs Claude Pro or Max. Without one, it still records and transcribes your lectures. Have an API key? Carry on, and add it on the notes step.";
+    public string PlanTooSmallTitle => Cli.Id == "gemini" ? "This Google account can't use Gemini from other apps" : $"This {Brand} account is on a plan that other apps can't use";
+    public string PlanTooSmallText => Cli.Id switch
+    {
+        "codex" => "Study Stash needs ChatGPT Plus or higher. Without one, it still records and transcribes your lectures. Have an API key? Carry on, and add it on the notes step.",
+        "gemini" => "A personal Google account works; school and work accounts often don't. Without one, Study Stash still records and transcribes your lectures. Have an API key? Carry on, and add it on the notes step.",
+        _ => "Study Stash needs Claude Pro or Max. Without one, it still records and transcribes your lectures. Have an API key? Carry on, and add it on the notes step.",
+    };
     public bool ShowOpenSignIn => !WaitingSignIn && !SignedIn && PlanProblem == ChatProblem.None;
     public bool HasSignInProblem => !string.IsNullOrEmpty(SignInProblem);
     public bool HasPlanProblem => PlanProblem != ChatProblem.None;
@@ -286,9 +311,9 @@ public sealed partial class GuidedSetupModel : ObservableObject, IDisposable
     void BuildSteps()
     {
         int at = Screen switch { GuidedScreen.PickAi => 0, GuidedScreen.Install => 1, GuidedScreen.SignIn => 2, _ => 3 };
-        // Without a paid plan, or with Gemini, there's nothing to install or sign in to here: setup by hand comes next.
-        // Nothing picked yet, the steps don't name an AI the student hasn't chosen.
-        string ai = PickedClaude || PickedCodex ? Brand : "";
+        // Without a paid plan there's nothing to install or sign in to here: setup by hand comes next. Nothing picked
+        // yet, the steps don't name an AI the student hasn't chosen.
+        string ai = PickedClaude || PickedCodex || PickedGemini ? Brand : "";
         string[] titles = PickedByHand ? ["Pick your AI", "Set up Study Stash"]
             : ["Pick your AI", ai.Length > 0 ? $"Get {ai} ready" : "Get your AI ready", ai.Length > 0 ? $"Sign in to {ai}" : "Sign in", "Set up Study Stash"];
         if (PickedByHand) at = Math.Min(at, 1);
@@ -308,17 +333,18 @@ public sealed partial class GuidedSetupModel : ObservableObject, IDisposable
     partial void OnScreenChanged(GuidedScreen value)
     {
         Notify(nameof(CanContinue), nameof(StepLabel), nameof(OnPick), nameof(OnInstall), nameof(OnSignIn), nameof(OnChat), nameof(HasStepLabel),
-            nameof(ViewWidth), nameof(ViewHeight), nameof(ShowReady));
+            nameof(ViewWidth), nameof(ViewHeight), nameof(ShowReady), nameof(HasAllowance));
         BuildSteps();
     }
 
     partial void OnPickedChanged(string value)
     {
         BuildSteps();
-        Notify(nameof(Cli), nameof(Other), nameof(Brand), nameof(Found), nameof(PickedClaude), nameof(PickedCodex), nameof(PickedGemini), nameof(PickedFree),
+        Notify(nameof(Cli), nameof(Other), nameof(Brand), nameof(BrandGlyph), nameof(Found), nameof(PickedClaude), nameof(PickedCodex), nameof(PickedGemini), nameof(PickedFree),
             nameof(PickedByHand), nameof(CanContinue), nameof(StepLabel),
             nameof(InstallTitle), nameof(InstallLede), nameof(InstallButton), nameof(InstallSource), nameof(InstallLine), nameof(UseOtherLabel), nameof(SignInTitle),
-            nameof(SignInLede), nameof(Privacy), nameof(PlanNote), nameof(ReadyWords), nameof(SidebarTitle), nameof(FieldHint), nameof(Thinking));
+            nameof(SignInLede), nameof(Privacy), nameof(PlanNote), nameof(ReadyWords), nameof(PlanTooSmallTitle), nameof(PlanTooSmallText), nameof(SidebarTitle),
+            nameof(FieldHint), nameof(Thinking));
     }
 
     partial void OnClaudeFoundChanged(AgentFound value)
@@ -332,6 +358,12 @@ public sealed partial class GuidedSetupModel : ObservableObject, IDisposable
         Notify(nameof(CodexHere), nameof(Found));
         BuildSteps();
     }
+
+    partial void OnGeminiFoundChanged(AgentFound value)
+    {
+        Notify(nameof(GeminiHere), nameof(Found));
+        BuildSteps();
+    }
     partial void OnInstallingChanged(bool value) => Notify(nameof(ShowInstallButton));
     partial void OnInstalledChanged(bool value) => Notify(nameof(ShowInstallButton), nameof(CanContinue), nameof(ShowInstalled));
     partial void OnInstallProblemChanged(string? value) => Notify(nameof(ShowInstallButton), nameof(HasInstallProblem));
@@ -342,9 +374,10 @@ public sealed partial class GuidedSetupModel : ObservableObject, IDisposable
 
     partial void OnAiReadyChanged(bool value)
     {
-        Notify(nameof(CanContinue), nameof(ShowReady));
+        Notify(nameof(CanContinue), nameof(ShowReady), nameof(HasAllowance));
         Refresh();
     }
+    partial void OnAllowanceWordsChanged(string value) => Notify(nameof(HasAllowance));
     partial void OnSignInProblemChanged(string? value) => Notify(nameof(HasSignInProblem));
     partial void OnPlanProblemChanged(ChatProblem value) => Notify(nameof(HasPlanProblem), nameof(PlanIsPlan), nameof(ShowOpenSignIn));
     partial void OnBusyChanged(bool value) => Notify(nameof(CanType));
@@ -370,13 +403,14 @@ public sealed partial class GuidedSetupModel : ObservableObject, IDisposable
     public async Task OpenAsync()
     {
         opened = true;
-        var (claude, codex, apps) = await Task.Run(() => (services.Find(AgentCli.Claude), services.Find(AgentCli.Codex), ReadAiApps()));
+        var (claude, codex, gemini, apps) = await Task.Run(() => (services.Find(AgentCli.Claude), services.Find(AgentCli.Codex), services.Find(AgentCli.Gemini), ReadAiApps()));
         ClaudeFound = claude;
         CodexFound = codex;
+        GeminiFound = gemini;
         aiApps = apps;
         Refresh();
         var s = settings();
-        if (s.SetupAi is "claude" or "codex" && (s.SetupAi == "codex" ? codex : claude).Works)
+        if (s.SetupAi is "claude" or "codex" or "gemini" && FoundFor(s.SetupAi).Works)
         {
             Picked = s.SetupAi;
             if (s.SetupChat is { } saved && saved.Provider == Picked) session = saved.Session;
@@ -393,11 +427,12 @@ public sealed partial class GuidedSetupModel : ObservableObject, IDisposable
             return;
         }
         RoleChosen = Again;
-        // Setup run again after Gemini or no paid plan was the answer: that answer again.
+        // Setup run again after Gemini (not on this computer now) or no paid plan was the answer: that answer again.
         if (Picked.Length == 0 && s.SetupAi is "gemini") Picked = "gemini";
         else if (Picked.Length == 0 && s.SetupAi is "ollama") Picked = "free";
-        // One of them is on this computer already and the other isn't: it starts picked, so it's just Continue.
-        if (Picked.Length == 0 && claude.Works != codex.Works) Picked = claude.Works ? "claude" : "codex";
+        // Just one of them is on this computer already: it starts picked, so it's just Continue.
+        var here = new[] { ("claude", claude), ("codex", codex), ("gemini", gemini) }.Where(f => f.Item2.Works).ToList();
+        if (Picked.Length == 0 && here.Count == 1) Picked = here[0].Item1;
         Screen = GuidedScreen.PickAi;
         Refresh();
     }
@@ -454,8 +489,8 @@ public sealed partial class GuidedSetupModel : ObservableObject, IDisposable
     void UseOllama() => ByHandWith("ollama");
 
     /// <summary>
-    /// An answer with no chat (Gemini, or no paid plan): setup by hand from its first page, the answer kept so its notes
-    /// step opens on that AI (<see cref="AiSetupModel.Prefer"/>): picked when it's ready, else showing what it needs.
+    /// The answer with no chat (no paid plan): setup by hand from its first page, the answer kept so its notes step
+    /// opens on that AI (<see cref="AiSetupModel.Prefer"/>): picked when it's ready, else showing what it needs.
     /// </summary>
     void ByHandWith(string engine)
     {
@@ -484,14 +519,13 @@ public sealed partial class GuidedSetupModel : ObservableObject, IDisposable
     /// into Terminal. Already here and signed in, it's straight back with it picked.</summary>
     public async Task GetReadyForNotesAsync(string id)
     {
-        if (id is not ("claude" or "codex")) return;
+        if (id is not ("claude" or "codex" or "gemini")) return;
         StopWork();
         forNotes = id;
         Picked = id;
         Notify(nameof(ForNotes), nameof(ByHandLabel));
         var found = await Task.Run(() => services.Find(AgentCli.Get(id)));
-        if (id == "codex") CodexFound = found;
-        else ClaudeFound = found;
+        SetFound(id, found);
         if (!found.Works)
         {
             ToInstall();
@@ -559,9 +593,6 @@ public sealed partial class GuidedSetupModel : ObservableObject, IDisposable
             case GuidedScreen.PickAi when PickedFree:
                 UseOllama();
                 break;
-            case GuidedScreen.PickAi when PickedGemini:
-                ByHandWith("gemini");
-                break;
             case GuidedScreen.PickAi when Picked.Length > 0:
                 save(s => s.SetupAi = Picked);
                 if (Found.Works) await ToSignInOrChatAsync();
@@ -625,8 +656,7 @@ public sealed partial class GuidedSetupModel : ObservableObject, IDisposable
         {
             Installed = true;
             InstalledWords = outcome.Words;
-            if (Cli.Id == "codex") CodexFound = outcome.Found;
-            else ClaudeFound = outcome.Found;
+            SetFound(Cli.Id, outcome.Found);
             return;
         }
         if (outcome.Failure == InstallFailure.Cancelled) return;
@@ -659,6 +689,7 @@ public sealed partial class GuidedSetupModel : ObservableObject, IDisposable
         CheckingPlan = false;
         SignInProblem = null;
         PlanProblem = ChatProblem.None;
+        AllowanceWords = "";
     }
 
     async Task<AgentSignedIn> CheckSignedInAsync()
@@ -709,6 +740,8 @@ public sealed partial class GuidedSetupModel : ObservableObject, IDisposable
         var cts = Fresh();
         bool done = await s.WaitAsync(cts.Token, _ => services.Post(() => OfferTerminal |= s.NeedsTerminal));
         WaitingSignIn = false;
+        // Its sign-in waits a while for the browser, then stops by itself (Gemini's, after a minute).
+        if (!done && s.GaveUp && !cts.IsCancellationRequested) SignInProblem = "The sign-in stopped waiting before you'd finished. Try again.";
         if (!done) return;
         SignedIn = true;
         await CheckPlanAsync();
@@ -729,7 +762,14 @@ public sealed partial class GuidedSetupModel : ObservableObject, IDisposable
     void SignInInTerminal()
     {
         signIn?.Stop();
-        if (Found.Exe is { } exe) services.OpenTerminal?.Invoke(exe, Cli.SignInArgs);
+        if (Found.Exe is not { } exe) return;
+        // Gemini's sign-in runs in Study Stash's own home for agy, in the terminal as well.
+        if (Cli.Id == "gemini")
+        {
+            var (program, args) = Antigravity.InTerminal(exe, Windows);
+            services.OpenTerminal?.Invoke(program, args);
+        }
+        else services.OpenTerminal?.Invoke(exe, Cli.SignInArgs);
     }
 
     [RelayCommand]
@@ -746,6 +786,7 @@ public sealed partial class GuidedSetupModel : ObservableObject, IDisposable
         var check = await services.CheckPlanAsync(Cli.Id, exe, Found.Version, cts.Token);
         CheckingPlan = false;
         if (cts.IsCancellationRequested) return;
+        AllowanceWords = check.Words;
         if (check.Ok)
         {
             keepUserConfig = check.KeptConfig;
@@ -762,6 +803,12 @@ public sealed partial class GuidedSetupModel : ObservableObject, IDisposable
                 PlanProblemTitle = PlanTooSmallTitle;
                 PlanProblemText = PlanTooSmallText;
                 PlanProblem = ChatProblem.Plan;
+                break;
+            case ChatProblem.Limit when Cli.Id == "gemini":
+                // Gemini says how much is left, not when it comes back.
+                PlanProblemTitle = "This Google account has used up its Gemini allowance for now.";
+                PlanProblemText = "Set up by hand now, or come back once it's back. A free Google account gets a small allowance each week.";
+                PlanProblem = ChatProblem.Limit;
                 break;
             case ChatProblem.Limit:
                 PlanProblemTitle = $"{Brand} is at its usage limit until {UntilWords(Engines.UntilFrom(check.Said, services.Now()))}.";

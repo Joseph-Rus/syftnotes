@@ -46,20 +46,23 @@ public sealed record PlanCheck(ChatProblem Problem, string Said)
 {
     public bool Ok => Problem == ChatProblem.None;
     public bool KeptConfig { get; init; }
+    /// <summary>How much of the account's allowance is left, in the student's words (Gemini's); "" when it doesn't say.</summary>
+    public string Words { get; init; } = "";
 }
 
 /// <summary>One turn of the setup chat: which CLI, where it runs, its setup tools' address and token (none for the
 /// plan check), the conversation to carry on, and what to say.</summary>
 public sealed record SetupTurn
 {
-    /// <summary>"claude" or "codex".</summary>
+    /// <summary>"claude", "codex" or "gemini".</summary>
     public required string Provider { get; init; }
     public required string Exe { get; init; }
     /// <summary>What its <c>--version</c> said: newer lockdown flags are added only when it has them.</summary>
     public Version? Version { get; init; }
     /// <summary>The setup chat's own folder (<c>&lt;home&gt;/setup-chat</c>), where brief.md and mcp.json are.</summary>
     public required string WorkDir { get; init; }
-    /// <summary>The system prompt: a file for Claude Code (<c>--system-prompt-file</c>), the text for Codex.</summary>
+    /// <summary>The system prompt: a file for Claude Code (<c>--system-prompt-file</c>), the text for Codex, the body of
+    /// the setup agent for Antigravity (<see cref="Antigravity.SetupAgentFile"/>).</summary>
     public required string BriefFile { get; init; }
     /// <summary>The setup tools' address (http://127.0.0.1:PORT/setup-mcp); empty for a turn with no tools at all.</summary>
     public string McpUrl { get; init; } = "";
@@ -77,10 +80,11 @@ public sealed record SetupTurn
 }
 
 /// <summary>
-/// Guided setup's chat, run headless through the student's own Claude Code or Codex, locked to Study Stash's setup
-/// tools (MCP server <see cref="Server"/>) and nothing else: no shell, no files, no web, no connectors, no
-/// sub-agents, by the CLI's own flags; and checked again as it runs, so a turn that tries anything else is stopped
-/// at once (<see cref="SetupChatParser"/>). One turn is one process, carrying the conversation on by its id.
+/// Guided setup's chat, run headless through the student's own Claude Code, Codex or Antigravity CLI (Gemini), locked
+/// to Study Stash's setup tools (MCP server <see cref="Server"/>) and nothing else: no shell, no files, no web, no
+/// connectors, no sub-agents, by the CLI's own flags and settings; and checked again as it runs, so a turn that tries
+/// anything else is stopped at once (<see cref="SetupChatParser"/>). One turn is one process, carrying the
+/// conversation on by its id.
 /// </summary>
 public static partial class SetupChat
 {
@@ -105,13 +109,13 @@ public static partial class SetupChat
     // --- the brief --------------------------------------------------------------------------------------------------
 
     /// <summary>The setup guide's system prompt, filled in for this computer. <paramref name="library"/>: the
-    /// installer was the library download. <paramref name="ai"/>: the AI running the chat ("claude" or "codex"),
-    /// which is the one the student picked, so it's the one that writes their notes.</summary>
+    /// installer was the library download. <paramref name="ai"/>: the AI running the chat ("claude", "codex" or
+    /// "gemini"), which is the one the student picked, so it's the one that writes their notes.</summary>
     public static string Brief(bool windows, bool again = false, bool library = false, string ai = "")
     {
         string device = windows ? "PC" : "Mac";
         string hint = library ? " The installer they used was the library download, so this computer is probably their library: suggest that." : "";
-        string you = ai is "claude" or "codex"
+        string you = ai is "claude" or "codex" or "gemini"
             ? $"\n- You are {Engines.Name(ai)}, the AI the student picked, so you write their notes. Once step 1 is done, if get_setup_status\n  still says notes are to do, call set_notes_writer with \"{ai}\" (unless they ask for another; on setup run again, ask first)."
             : "";
         string text = $"""
@@ -172,15 +176,16 @@ public static partial class SetupChat
     /// <summary>
     /// Writes the chat's folder: brief.md (the system prompt) and mcp.json (Claude Code's entry for the setup tools,
     /// which names the token's environment variable, never the token), both readable by this account alone. Anything
-    /// that would add instructions of its own (CLAUDE.md, AGENTS.md, a project's .mcp.json or .claude folder) is
-    /// cleared out. The brief's path.
+    /// that would add instructions of its own (CLAUDE.md, AGENTS.md, GEMINI.md, a project's .mcp.json, .claude,
+    /// .agents or .gemini folder) is cleared out. The brief's path.
     /// </summary>
     public static string Prepare(string workDir, string brief, string mcpUrl, string briefName = "brief.md")
     {
         Directory.CreateDirectory(workDir);
-        foreach (string stray in new[] { "CLAUDE.md", "AGENTS.md", ".mcp.json" })
+        foreach (string stray in new[] { "CLAUDE.md", "AGENTS.md", "GEMINI.md", ".mcp.json" })
             if (File.Exists(Path.Combine(workDir, stray))) File.Delete(Path.Combine(workDir, stray));
-        if (Directory.Exists(Path.Combine(workDir, ".claude"))) Directory.Delete(Path.Combine(workDir, ".claude"), recursive: true);
+        foreach (string stray in new[] { ".claude", ".agents", ".gemini" })
+            if (Directory.Exists(Path.Combine(workDir, stray))) Directory.Delete(Path.Combine(workDir, stray), recursive: true);
         string briefPath = Path.Combine(workDir, briefName);
         Private(briefPath, brief);
         if (mcpUrl.Length > 0) Private(McpConfigPath(workDir), McpConfig(mcpUrl));
@@ -211,7 +216,12 @@ public static partial class SetupChat
 
     // --- the command lines ------------------------------------------------------------------------------------------
 
-    public static List<string> Command(SetupTurn t) => t.Provider == "codex" ? CodexCommand(t) : ClaudeCommand(t);
+    public static List<string> Command(SetupTurn t) => t.Provider switch
+    {
+        "codex" => CodexCommand(t),
+        "gemini" => GeminiCommand(t),
+        _ => ClaudeCommand(t),
+    };
 
     /// <summary>Claude Code, locked down: no built-in tools at all, only the setup server's tools and those
     /// pre-approved, everything else denied without asking, and its coding prompt replaced by the setup brief. The
@@ -281,6 +291,27 @@ public static partial class SetupChat
         }
         if (t.Session.Length > 0) cmd.AddRange(["resume", t.Session]);
         cmd.Add("-");
+        return cmd;
+    }
+
+    /// <summary>
+    /// Antigravity (Gemini), locked down: the setup guide's own agent (<see cref="Antigravity.SetupAgent"/>: no default
+    /// tools or prompt, nothing of the home's taken in, the setup tools its only MCP server, commands off), in the setup
+    /// chat's own home (<see cref="Antigravity.PrepareSetup"/>: settings that refuse every command, file, web page and
+    /// browser action), slash commands and skills not expanded, the terminal sandbox on, thinking kept short. The
+    /// prompt goes on the command line, joined to -p (agy's -p takes the prompt itself); its input is left empty, and
+    /// a run whose input is piped stops at once when it isn't signed in, instead of opening a browser. The next turn
+    /// of a conversation adds <c>--conversation ID</c>.
+    /// </summary>
+    public static List<string> GeminiCommand(SetupTurn t)
+    {
+        var cmd = new List<string>
+        {
+            t.Exe, "--agent", Antigravity.SetupAgent, "--output-format", "stream-json", "--disable-slash-commands", "--sandbox",
+            "--effort", "low",
+        };
+        if (t.Session.Length > 0) cmd.AddRange(["--conversation", t.Session]);
+        cmd.Add("-p=" + t.Prompt);
         return cmd;
     }
 
@@ -368,11 +399,15 @@ public static partial class SetupChat
     /// </summary>
     public static async IAsyncEnumerable<SetupChatEvent> RunAsync(SetupTurn t, [EnumeratorCancellation] CancellationToken ct = default)
     {
+        bool gemini = t.Provider == "gemini";
+        // Antigravity's home of the chat's own, written for this turn, and an empty folder to work in.
+        string? agyHome = gemini ? Antigravity.PrepareSetup(t.WorkDir, File.Exists(t.BriefFile) ? File.ReadAllText(t.BriefFile) : "", t.McpUrl, t.Token) : null;
         var cmd = Command(t);
         var launch = OperatingSystem.IsWindows() ? WindowsCommand.For(cmd) : new Launch(cmd[0], cmd[1..]);
         var psi = new ProcessStartInfo(launch.FileName)
         {
-            WorkingDirectory = t.WorkDir, RedirectStandardOutput = true, RedirectStandardError = true, RedirectStandardInput = true,
+            WorkingDirectory = gemini ? Antigravity.SetupWorkspace(t.WorkDir) : t.WorkDir,
+            RedirectStandardOutput = true, RedirectStandardError = true, RedirectStandardInput = true,
             UseShellExecute = false, CreateNoWindow = true, StandardOutputEncoding = Encoding.UTF8, StandardInputEncoding = new UTF8Encoding(false),
         };
         if (launch.CommandLine is { } whole) psi.Arguments = whole;
@@ -382,7 +417,9 @@ public static partial class SetupChat
         psi.Environment.Remove(TokenVar);
         // Claude's own connectors (claude.ai's Gmail, Drive…) stay out of it; its flags remove their tools too.
         psi.Environment["ENABLE_CLAUDEAI_MCP_SERVERS"] = "false";
-        if (t.McpUrl.Length > 0) psi.Environment[TokenVar] = t.Token;
+        if (t.McpUrl.Length > 0 && !gemini) psi.Environment[TokenVar] = t.Token;
+        if (agyHome is not null)
+            foreach (var (k, v) in Antigravity.HomeEnv(agyHome, t.Windows)) psi.Environment[k] = v;
 
         Process? p;
         string? startError = null;
@@ -405,7 +442,7 @@ public static partial class SetupChat
         {
             try
             {
-                await proc.StandardInput.WriteAsync(t.Prompt);
+                if (!gemini) await proc.StandardInput.WriteAsync(t.Prompt);
                 proc.StandardInput.Close();
             }
             catch (Exception e) when (e is IOException or ObjectDisposedException)
@@ -475,6 +512,7 @@ public static partial class SetupChat
     public static async Task<PlanCheck> CheckPlanAsync(string provider, string exe, Version? version, string workDir,
         TimeSpan? timeout = null, CancellationToken ct = default, IReadOnlyList<string>? ownMcpServers = null)
     {
+        if (provider == "gemini") return await GeminiPlanAsync(exe, version, workDir, timeout, ct);
         string brief = Prepare(workDir, PlanCheckBrief, "", "plan-check.md");
         var turn = new SetupTurn
         {
@@ -486,6 +524,33 @@ public static partial class SetupChat
         if (provider == "codex" && (check.Problem == ChatProblem.Auth || check.Said.Contains("--ignore-user-config", StringComparison.Ordinal)) && !ct.IsCancellationRequested)
             check = await OnceAsync(turn with { IgnoreUserConfig = false, OwnMcpServers = ownMcpServers }, ct) is { Problem: not ChatProblem.Auth } again ? again with { KeptConfig = true } : check;
         return check;
+    }
+
+    /// <summary>
+    /// Gemini's check: first how much of the account's allowance is left (<c>agy -p=/usage</c>, in Study Stash's own
+    /// home for agy, where it signed in: a slash command print mode answers itself, so nothing is spent), said in the
+    /// student's words; used up is the limit at once. Then the same tiny turn as the others, in the setup chat's own
+    /// home, which also shows the chat can use the sign-in there. Its input is piped and empty: signed out, agy says so
+    /// and stops, and never opens a browser from here.
+    /// </summary>
+    static async Task<PlanCheck> GeminiPlanAsync(string exe, Version? version, string workDir, TimeSpan? timeout, CancellationToken ct)
+    {
+        var usage = await Antigravity.RunPipedAsync(exe, ["-p=/usage", "--output-format", "json"], Antigravity.HomeEnv(), timeout ?? TimeSpan.FromSeconds(60), ct);
+        if (ct.IsCancellationRequested) return new PlanCheck(ChatProblem.Other, "Stopped.");
+        if (usage is not { ExitCode: 0 })
+        {
+            string said = usage is null ? "Gemini didn't answer." : Antigravity.ErrorOf(usage.Stdout, usage.Stderr);
+            return new PlanCheck(usage is null ? ChatProblem.NoAnswer : Classify(said), said);
+        }
+        string words = Antigravity.UsageWords(usage.Stdout) ?? "";
+        if (Antigravity.UsedUp(usage.Stdout)) return new PlanCheck(ChatProblem.Limit, words) { Words = words };
+        string brief = Prepare(workDir, PlanCheckBrief, "", "plan-check.md");
+        var turn = new SetupTurn
+        {
+            Provider = "gemini", Exe = exe, Version = version, WorkDir = workDir, BriefFile = brief,
+            Prompt = "Reply with the single word: ready", Timeout = timeout ?? TimeSpan.FromSeconds(90),
+        };
+        return await OnceAsync(turn, ct) with { Words = words };
     }
 
     static async Task<PlanCheck> OnceAsync(SetupTurn turn, CancellationToken ct)
@@ -519,7 +584,7 @@ public static partial class SetupChat
 
     [GeneratedRegex(@"subscription|upgrade|(isn't|is not|not) (available|included) (on|in|with|for) your (plan|account)|"
         + @"(doesn't|does not) (include|have access)|no access to (claude code|codex)|pro or max|plus or (higher|pro)|"
-        + @"requires a (paid|pro|plus|max)|free plan|your plan",
+        + @"requires a (paid|pro|plus|max)|free plan|your plan|not eligible|ineligible",
         RegexOptions.IgnoreCase)]
     private static partial Regex PlanWords();
 
@@ -573,7 +638,8 @@ public static partial class SetupChat
 }
 
 /// <summary>
-/// Reads a setup-chat turn's output line by line (Claude Code's stream-json, Codex's exec JSONL) into
+/// Reads a setup-chat turn's output line by line (Claude Code's stream-json, Codex's exec JSONL, Antigravity's
+/// stream-json) into
 /// <see cref="SetupChatEvent"/>s: the AI's words, its conversation id, the setup tools it used (as chips), how it
 /// ended, and the guards. A turn whose tool list has anything but the setup tools, or that connects another MCP server,
 /// or that uses (or starts) any other tool, a command, a file change or a web search, becomes a <c>Guard</c> problem:
@@ -591,7 +657,12 @@ public sealed class SetupChatParser(string provider)
     /// <summary>It said something or finished: a stray line on its error output doesn't make that a failure.</summary>
     public bool Answered { get; private set; }
 
-    public IEnumerable<SetupChatEvent> Parse(string line) => provider == "codex" ? Codex(line) : Claude(line);
+    public IEnumerable<SetupChatEvent> Parse(string line) => provider switch
+    {
+        "codex" => Codex(line),
+        "gemini" => Gemini(line),
+        _ => Claude(line),
+    };
 
     static JsonObject? Json(string line)
     {
@@ -755,6 +826,138 @@ public sealed class SetupChatParser(string provider)
         {
             Answered = true;
             yield return new SetupChatEvent("Final", Last);
+        }
+    }
+
+    // --- Antigravity (Gemini) --------------------------------------------------------------------------------------------
+
+    string session = "";
+    int wordsStep = -1;
+    readonly HashSet<int> toolSteps = [];
+
+    /// <summary>A tool a Gemini turn may have: the one agy reaches MCP servers through, which the turn's guard then holds
+    /// to the setup tools' server, call by call.</summary>
+    static bool GeminiOurs(string tool) => tool == Antigravity.McpTool;
+
+    static string Field(JsonNode? o, params string[] names)
+    {
+        if (o is not JsonObject obj) return "";
+        foreach (var (k, v) in obj)
+            if (names.Any(n => string.Equals(n, k, StringComparison.OrdinalIgnoreCase)) && S(v) is { Length: > 0 } found) return found;
+        return "";
+    }
+
+    static JsonNode? Node(JsonNode? o, params string[] names)
+    {
+        if (o is not JsonObject obj) return null;
+        foreach (var (k, v) in obj)
+            if (names.Any(n => string.Equals(n, k, StringComparison.OrdinalIgnoreCase))) return v;
+        return null;
+    }
+
+    IEnumerable<SetupChatEvent> Gemini(string line)
+    {
+        if (Json(line) is not { } e) yield break;
+        switch (S(e["event"]))
+        {
+            case "init":
+                // The tools the turn was given: the setup agent has none of agy's own, only its way to the setup tools.
+                foreach (var t in (e["init"]?["tools"] ?? e["tools"]) as JsonArray ?? [])
+                {
+                    string name = t is JsonObject o ? S(o["name"]) : S(t);
+                    if (!GeminiOurs(name))
+                    {
+                        yield return Guard(name);
+                        yield break;
+                    }
+                }
+                break;
+            case "step_update":
+                var st = e["step_update"];
+                if (S(st?["conversation_id"]) is { Length: > 0 } sid && sid != session)
+                {
+                    session = sid;
+                    yield return new SetupChatEvent("Session", sid);
+                }
+                int step = st?["step_index"] is JsonValue iv && iv.TryGetValue(out int i) ? i : -1;
+                if (st?["subagent_info"] is JsonObject)
+                {
+                    yield return Guard("a subagent");
+                    yield break;
+                }
+                string type = S(st?["step_type"]);
+                string tool = S(st?["tool_name"]) is { Length: > 0 } tn ? tn : S(st?["tool_info"]?["name"]);
+                if (type == "agent_response")
+                {
+                    if (S(st?["text_delta"]) is not { Length: > 0 } piece) break;
+                    if (sawText && step != wordsStep)
+                    {
+                        lastMessage.Clear();
+                        yield return new SetupChatEvent("Text", "\n\n");
+                    }
+                    wordsStep = step;
+                    sawText = true;
+                    Answered = true;
+                    lastMessage.Append(piece);
+                    yield return new SetupChatEvent("Text", piece);
+                }
+                else if (tool.Length > 0 || type == "tool")
+                {
+                    if (tool != Antigravity.McpTool)
+                    {
+                        yield return Guard(tool.Length > 0 ? tool : type);
+                        yield break;
+                    }
+                    var p = st?["tool_info"]?["parameters"];
+                    string server = Field(p, "ServerName", "server_name", "server");
+                    string name = Field(p, "ToolName", "tool_name", "tool", "name");
+                    if (server != SetupChat.Server)
+                    {
+                        yield return Guard($"{(server.Length > 0 ? server : "an MCP server")}.{name}");
+                        yield break;
+                    }
+                    if (!toolSteps.Add(step)) break;
+                    var args = Node(p, "Arguments", "arguments", "args", "input");
+                    if (args is JsonValue text && text.GetValueKind() == JsonValueKind.String) args = ParseJson(text.GetValue<string>());
+                    yield return new SetupChatEvent("Tool") { Tool = name, Chip = SetupChat.Chip(name, args) };
+                }
+                break;
+            case "result":
+                var r = e["result"];
+                Answered = true;
+                if (S(r?["conversation_id"]) is { Length: > 0 } rid && rid != session)
+                {
+                    session = rid;
+                    yield return new SetupChatEvent("Session", rid);
+                }
+                // Anything agy refused on its own (a command, a file, a page): the turn tried more than the setup tools.
+                if (r?["denied_actions"] is JsonArray { Count: > 0 } denied)
+                {
+                    yield return Guard(denied[0] is JsonObject d ? Field(d, "tool", "name", "action") : S(denied[0]));
+                    yield break;
+                }
+                string said = S(r?["response"]);
+                if (S(r?["status"]).Equals("SUCCESS", StringComparison.OrdinalIgnoreCase))
+                {
+                    // Words that came whole, at the end, with nothing streamed before them.
+                    if (!sawText && said.Length > 0)
+                    {
+                        sawText = true;
+                        lastMessage.Clear().Append(said);
+                        yield return new SetupChatEvent("Text", said);
+                    }
+                    yield return new SetupChatEvent("Final", said.Length > 0 ? said : Last);
+                }
+                else
+                {
+                    string why = S(r?["error"]) is { Length: > 0 } err ? err : S(r?["status"]) is { Length: > 0 } status ? $"Gemini stopped ({status})." : "Gemini stopped with an error.";
+                    yield return SetupChatEvent.Trouble(SetupChat.Classify(why), why);
+                }
+                break;
+            case "error":
+                string msg = S(e["message"]) is { Length: > 0 } m ? m : "Gemini stopped with an error.";
+                yield return SetupChatEvent.Trouble(SetupChat.Classify(msg), msg);
+                break;
         }
     }
 

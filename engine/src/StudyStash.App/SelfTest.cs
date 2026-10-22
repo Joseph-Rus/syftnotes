@@ -331,24 +331,30 @@ public static partial class SelfTest
 
     /// <summary>A first run opens guided setup on Pick your AI. The self-test finds no AI's CLI (it never installs one
     /// or reaches an account), so it takes the first screen's picture and goes on by hand, as a student can: by the
-    /// "Set up by hand" link, or with <paramref name="answer"/> (Gemini) picked and Continue, which has no chat either
-    /// and goes by hand too, its notes step opening on that AI.</summary>
+    /// "Set up by hand" link, or with <paramref name="answer"/> (Gemini) picked and Continue, which opens "Get Gemini
+    /// ready" (Google's Antigravity CLI isn't here), whose picture it takes before that link; the notes step then
+    /// opens on that AI.</summary>
     static async Task ByHandAsync(string answer = "")
     {
         if (Shell.Windows.Guided is not { } g) return;
         await Until(() => g.Screen == ViewModels.GuidedScreen.PickAi && g.Steps.Count > 0, 10);
-        Say($"guided setup: {g.Screen}, Claude here: {g.ClaudeHere}, ChatGPT here: {g.CodexHere}");
+        Say($"guided setup: {g.Screen}, Claude here: {g.ClaudeHere}, ChatGPT here: {g.CodexHere}, Gemini here: {g.GeminiHere}");
         await Wait(1);
         Shot(Shell.Windows.Setup, "setup-guided-pick");
         if (answer.Length > 0)
         {
             g.PickCommand.Execute(answer);
-            if (!g.PickedByHand || g.Steps.Count != 2) throw new InvalidOperationException($"{answer} on the first screen should go by hand, in two steps");
+            if (g.PickedByHand || g.Steps.Count != 4) throw new InvalidOperationException($"{answer} on the first screen should go the guided way, in four steps");
             await Wait(1);
             Shot(Shell.Windows.Setup, $"setup-guided-pick-{answer}");
             await g.ContinueCommand.ExecuteAsync(null);
+            bool install = await Until(() => g.Screen == ViewModels.GuidedScreen.Install, 5);
+            Say(install ? $"guided setup: {g.InstallTitle} ({g.Cli.Name}, {g.BrandGlyph})" : $"guided setup: expected Install, got {g.Screen}");
+            if (!install || g.Cli.Id != answer) throw new InvalidOperationException($"{answer} on the first screen should open its own install page");
+            await Wait(1);
+            Shot(Shell.Windows.Setup, $"setup-guided-install-{answer}");
         }
-        else g.ByHandCommand.Execute(null);
+        g.ByHandCommand.Execute(null);
         bool swapped = await Until(() => g.Screen == ViewModels.GuidedScreen.Manual, 5);
         Say(swapped ? $"set up by hand{(answer.Length > 0 ? $", with {answer}" : "")}" : "setup by hand didn't open");
     }
@@ -361,7 +367,7 @@ public static partial class SelfTest
         bool opened = await Until(() => Shell.Windows.Setup is not null, 10);
         Say(opened ? "setup opened" : "setup didn't open");
         var m = Shell.Windows.SetupModel ?? throw new InvalidOperationException("no setup window");
-        // Gemini, answered on the first screen: there's no chat with it, so it's setup by hand from there.
+        // Gemini, answered on the first screen: its install page (no Antigravity CLI here), then setup by hand from there.
         await ByHandAsync("gemini");
         await PastIntroAsync(m);
 

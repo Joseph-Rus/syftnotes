@@ -156,8 +156,9 @@ public sealed class GuidedSetup : ISetupDriver, IGuidedActions
         if (!m.LibraryOk) return "Set up the library first (offer_computer_setup).";
         if (engine is "claude" or "codex" && engine != g.Picked)
             return $"Only {g.Brand} is set up on this {Device}. The student can add {AgentCli.Get(engine).Brand} later in Settings → Your AI.";
-        if (engine is "claude" or "codex" && !g.AiReady) return $"{g.Brand} isn't ready yet.";
-        if (engine == "gemini" && await (NotReady ?? NotReadyOnLibraryAsync)(engine) is { } notYet) return notYet;
+        if (engine == g.Picked && !g.AiReady) return $"{g.Brand} isn't ready yet.";
+        // Gemini running the chat is ready here; asked for while another AI runs it, the library says whether it is.
+        if (engine == "gemini" && g.Picked != "gemini" && await (NotReady ?? NotReadyOnLibraryAsync)(engine) is { } notYet) return notYet;
         string? refused = await (WriteNotes ?? WriteOnLibraryAsync)(engine);
         if (refused is not null) return refused;
         g.NotesWriter = engine;

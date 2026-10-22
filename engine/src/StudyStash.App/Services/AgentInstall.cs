@@ -22,7 +22,7 @@ public sealed record InstallOutcome(bool Ok, InstallFailure Failure, string Word
 }
 
 /// <summary>
-/// Installs Claude Code or Codex for guided setup: only when the student presses Install, with the maker's own
+/// Installs Claude Code, Codex or Antigravity CLI for guided setup: only when the student presses Install, with the maker's own
 /// installer (<see cref="AgentCli"/>), for this account alone (never as an administrator). It says where it's got to
 /// as it goes, keeps everything the installer printed for Details and <c>logs/setup-install.log</c>, gives up after
 /// ten minutes, and on cancel stops the installer and everything it started. A failure is sorted into the few kinds
@@ -221,11 +221,13 @@ public sealed class AgentInstall
 }
 
 /// <summary>
-/// Signing in to Claude Code or Codex for guided setup, with the provider's own sign-in: <c>claude auth login</c> or
-/// <c>codex login</c> runs hidden and opens the browser itself; Study Stash never sees the password or the tokens.
-/// Whether it's worked is read from the status command's exit code (<see cref="AgentCli.ReadStatus"/>), every three
-/// seconds while setup waits and whenever the sign-in exits. A sign-in that stops at once without working (it wants a
-/// real terminal) sets <see cref="NeedsTerminal"/>, and setup offers the Terminal instead.
+/// Signing in to Claude Code, Codex or Antigravity CLI for guided setup, with the provider's own sign-in:
+/// <c>claude auth login</c>, <c>codex login</c> or <c>agy -p=/usage</c> runs hidden and opens the browser itself; Study
+/// Stash never sees the password or the tokens. Whether it's worked is read from the status command's exit code
+/// (<see cref="AgentCli.ReadStatus"/>), every three seconds while setup waits and whenever the sign-in exits. A sign-in
+/// that stops at once without working (it wants a real terminal) sets <see cref="NeedsTerminal"/>, and setup offers the
+/// Terminal instead; one that waited for the browser and gave up by itself (agy's, after a minute) sets
+/// <see cref="GaveUp"/>, and the wait ends.
 /// </summary>
 public sealed class AgentSignIn : IDisposable
 {
@@ -249,11 +251,13 @@ public sealed class AgentSignIn : IDisposable
     /// <summary>The sign-in page the CLI printed, for "Open it again": kept in memory only, never logged.</summary>
     public string? Url { get; private set; }
     public bool NeedsTerminal { get; private set; }
+    /// <summary>The sign-in waited for the browser as long as it does and stopped without being signed in.</summary>
+    public bool GaveUp { get; private set; }
     public bool Running => child is { HasExited: false };
 
     /// <summary>Asks the CLI whether it's signed in (its status command's exit code). Codex's words are never read
     /// (they can show part of a key); Claude Code's are only for how and on which plan.</summary>
-    public AgentSignedIn Check() => AgentCli.ReadStatus(cli.Id, Machine.Run(exe, cli.StatusArgs, TimeSpan.FromSeconds(20)));
+    public AgentSignedIn Check() => AgentCli.ReadStatus(cli.Id, Machine.Run(exe, cli.StatusArgs, TimeSpan.FromSeconds(20), cli.Env()));
 
     /// <summary>Starts the sign-in, hidden (it opens the browser itself). Once at a time: again while it runs does
     /// nothing. False when it didn't start.</summary>
@@ -261,17 +265,22 @@ public sealed class AgentSignIn : IDisposable
     {
         if (Running) return true;
         NeedsTerminal = false;
+        GaveUp = false;
         exited = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         List<string> cmd = [exe, .. cli.SignInArgs];
         var launch = OperatingSystem.IsWindows() ? WindowsCommand.For(cmd) : new Launch(exe, [.. cli.SignInArgs]);
         var psi = new ProcessStartInfo(launch.FileName)
         {
-            RedirectStandardOutput = true, RedirectStandardError = true, RedirectStandardInput = true, UseShellExecute = false, CreateNoWindow = true,
+            RedirectStandardOutput = true, RedirectStandardError = true, UseShellExecute = false, CreateNoWindow = true,
+            // agy signs in with the browser only when its input isn't a pipe (piped, it stops at once, saying it isn't
+            // signed in): it gets the app's own, which is nothing.
+            RedirectStandardInput = cli.SignInGivesUp is null,
         };
         if (launch.CommandLine is { } whole) psi.Arguments = whole;
         else foreach (string a in launch.Arguments) psi.ArgumentList.Add(a);
         psi.Environment["PATH"] = AiProvider.SearchPath();
         psi.Environment.Remove("CLAUDECODE");
+        foreach (var (k, v) in cli.Env()) psi.Environment[k] = v;
         try
         {
             child = Process.Start(psi);
@@ -298,6 +307,7 @@ public sealed class AgentSignIn : IDisposable
                 await p.WaitForExitAsync();
                 // Only the sign-in still current: one stopped to be run again isn't one that couldn't open the browser.
                 if (p.ExitCode != 0 && DateTime.UtcNow - at < QuickFail && ReferenceEquals(child, p)) NeedsTerminal = true;
+                else if (p.ExitCode != 0 && cli.SignInGivesUp is not null && ReferenceEquals(child, p)) GaveUp = true;
             }
             catch (InvalidOperationException)
             {
@@ -327,9 +337,15 @@ public sealed class AgentSignIn : IDisposable
     }
 
     /// <summary>Waits until it's signed in (true), checking every <see cref="Every"/> and when the sign-in exits, or
-    /// until <paramref name="ct"/> ends the wait (false). <paramref name="changed"/> hears each check's answer.</summary>
+    /// until <paramref name="ct"/> ends the wait, or the sign-in gave up (false). <paramref name="changed"/> hears each
+    /// check's answer.</summary>
     public async Task<bool> WaitAsync(CancellationToken ct, Action<AgentSignedIn>? changed = null)
     {
+        bool Report(AgentSignedIn now)
+        {
+            changed?.Invoke(now);
+            return true;
+        }
         while (!ct.IsCancellationRequested)
         {
             var now = await Task.Run(Check, CancellationToken.None);
@@ -343,6 +359,8 @@ public sealed class AgentSignIn : IDisposable
             {
                 return false;
             }
+            // It gave up waiting for the browser: one last look, and the wait ends with it.
+            if (GaveUp) return await Task.Run(Check, CancellationToken.None) is { SignedIn: true } last && Report(last);
             if (exited.Task.IsCompleted) exited = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         }
         return false;
