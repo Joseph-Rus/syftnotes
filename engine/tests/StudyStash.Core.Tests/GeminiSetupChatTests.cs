@@ -102,6 +102,9 @@ public class GeminiSetupChatTests
         Assert.Equal("", FakeAgents.Input(bin, 1).Trim());
         Assert.DoesNotContain(FakeAgents.Argv(bin, 1), a => a.Contains(Token, StringComparison.Ordinal));
         Assert.DoesNotContain(SetupChat.TokenVar, FakeAgents.EnvNames(bin, 1));
+        // The setup agent's file (with the token) was there for the turn, and is gone once it ended.
+        Assert.Equal("yes", File.ReadAllText(Path.Combine(bin, "setup-agent-1.txt")).Trim());
+        Assert.False(File.Exists(Antigravity.AgentPath(Antigravity.Home(), Antigravity.SetupAgent)));
     }
 
     public static TheoryData<string, string> Reaches => new()

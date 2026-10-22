@@ -66,7 +66,10 @@ public sealed record SetupTurn
     public required string BriefFile { get; init; }
     /// <summary>The setup tools' address (http://127.0.0.1:PORT/setup-mcp); empty for a turn with no tools at all.</summary>
     public string McpUrl { get; init; } = "";
-    /// <summary>The setup tools' token: put in the CLI's environment only, never on its command line or in a file.</summary>
+    /// <summary>The setup tools' token: never on the CLI's command line. Claude Code and Codex get it in their environment
+    /// only. agy can't read it from there (it sends a header's <c>${VAR}</c> as it is), so it's in the setup agent's file,
+    /// readable by this account alone, for the turn only: the file is removed when the turn ends, and when setup
+    /// closes (<see cref="Antigravity.ForgetSetup"/>).</summary>
     public string Token { get; init; } = "";
     public string Session { get; init; } = "";
     public required string Prompt { get; init; }
@@ -439,6 +442,7 @@ public static partial class SetupChat
         }
         if (p is null)
         {
+            if (gemini) Antigravity.ForgetSetup();
             yield return SetupChatEvent.Trouble(ChatProblem.Other, $"{Path.GetFileName(t.Exe)} didn't start: {startError}");
             yield break;
         }
@@ -503,6 +507,8 @@ public static partial class SetupChat
         finally
         {
             Stop(proc);
+            // The setup agent's file, with the setup tools' token, lasts only as long as the turn.
+            if (gemini) Antigravity.ForgetSetup();
             await feeding;
         }
     }

@@ -124,6 +124,7 @@ public static class FakeAgents
         for a in "$@"; do printf '%s\n' "$a"; done > "$D/argv-$n.txt"
         env | cut -d= -f1 | sort > "$D/env-$n.txt"
         echo "$HOME" > "$D/home-$n.txt"; pwd > "$D/cwd-$n.txt"
+        [ -f "$HOME/.gemini/config/agents/study-stash-setup/agent.md" ] && echo yes > "$D/setup-agent-$n.txt"
         if [ -f "$D/refuse" ]; then
           r="$(cat "$D/refuse")"
           for a in "$@"; do [ "$a" = "$r" ] && { echo "error: unexpected argument '$r' found" >&2; exit 2; }; done
@@ -216,6 +217,7 @@ public static class FakeAgents
         Get-ChildItem env: | ForEach-Object { $_.Name } | Sort-Object | Set-Content "$D\env-$n.txt"
         Set-Content "$D\home-$n.txt" $env:USERPROFILE
         Set-Content "$D\cwd-$n.txt" (Get-Location).Path
+        if (Test-Path "$env:USERPROFILE\.gemini\config\agents\study-stash-setup\agent.md") { Set-Content "$D\setup-agent-$n.txt" 'yes' }
         if (Test-Path "$D\refuse") {
           $r = (Get-Content "$D\refuse" -Raw).Trim()
           if ($argv -contains $r) { [Console]::Error.WriteLine("error: unexpected argument '$r' found"); exit 2 }

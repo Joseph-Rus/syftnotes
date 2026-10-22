@@ -1188,5 +1188,7 @@ public sealed partial class GuidedSetupModel : ObservableObject, IDisposable
         closing.Cancel();
         signIn?.Dispose();
         signIn = null;
+        // Gemini's setup agent holds the setup tools' token while a turn runs: never left behind once setup closes.
+        if (Picked == "gemini") Antigravity.ForgetSetup();
     }
 }

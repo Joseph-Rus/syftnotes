@@ -120,7 +120,7 @@ public static class Antigravity
     /// listed), none of the home's skills, rules, plugins, subagents or MCP servers taken in, commands off, and the setup
     /// tools as its one MCP server (none for a turn with no tools). agy doesn't fill in <c>${VAR}</c> in a header
     /// (tried: it sends the words as they are), so the token is written in: in a file only this account can read, in
-    /// Study Stash's own folder, good only while setup's window is open. Its body (after the H1) is the brief.
+    /// Study Stash's own folder, for the turn alone (<see cref="ForgetSetup"/>). Its body (after the H1) is the brief.
     /// </summary>
     public static string SetupAgentFile(string brief, string mcpUrl = "", string token = "")
     {
@@ -249,6 +249,20 @@ public static class Antigravity
     {
         string path = AgentPath(Home(), AnswerAgent);
         if (!File.Exists(path) || File.ReadAllText(path) != AnswerAgentFile()) Private(path, AnswerAgentFile());
+    }
+
+    /// <summary>Removes the setup agent's file (it holds the setup tools' token): when a turn ends, and when setup
+    /// closes. A turn writes it again before it starts.</summary>
+    public static void ForgetSetup()
+    {
+        try
+        {
+            string path = AgentPath(Home(), SetupAgent);
+            if (File.Exists(path)) File.Delete(path);
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException)
+        {
+        }
     }
 
     /// <summary>
