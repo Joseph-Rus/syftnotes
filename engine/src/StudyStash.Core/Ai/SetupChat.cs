@@ -838,6 +838,11 @@ public sealed class SetupChatParser(string provider)
     string session = "";
     int wordsStep = -1;
     readonly HashSet<int> toolSteps = [];
+    /// <summary>agy's init named the setup agent: until then nothing it does is trusted.</summary>
+    bool started;
+
+    /// <summary>The steps agy 1.4.5 makes in a setup turn (seen), and its docs' checkpoint: any other stops the turn.</summary>
+    static readonly string[] KnownSteps = ["user_input", "system_message", "agent_response", "tool", "checkpoint"];
 
 
     static string Field(JsonNode? o, params string[] names)
@@ -874,7 +879,12 @@ public sealed class SetupChatParser(string provider)
                     yield return Guard("agy's own agent, not the setup guide's");
                     yield break;
                 }
+                started = true;
                 break;
+            case "step_update" when !started:
+                // Fail closed: a step before agy said the setup agent runs.
+                yield return Guard("a step before the setup guide started");
+                yield break;
             case "step_update":
                 var st = e["step_update"];
                 if (S(st?["conversation_id"]) is { Length: > 0 } sid && sid != session)
@@ -889,6 +899,11 @@ public sealed class SetupChatParser(string provider)
                     yield break;
                 }
                 string type = S(st?["step_type"]);
+                if (!KnownSteps.Contains(type))
+                {
+                    yield return Guard($"a step agy calls \"{type}\"");
+                    yield break;
+                }
                 string tool = S(st?["tool_name"]) is { Length: > 0 } tn ? tn : S(st?["tool_info"]?["name"]);
                 if (type == "agent_response")
                 {
@@ -963,6 +978,11 @@ public sealed class SetupChatParser(string provider)
             case "error":
                 string msg = S(e["message"]) is { Length: > 0 } m ? m : "Gemini stopped with an error.";
                 yield return SetupChatEvent.Trouble(SetupChat.Classify(msg), msg);
+                break;
+            default:
+                // Fail closed: anything agy says that the parser doesn't know. (A result or an error can come with no
+                // init: a run that stopped before it began, signed out, say.)
+                yield return Guard($"something agy calls \"{S(e["event"])}\"");
                 break;
         }
     }

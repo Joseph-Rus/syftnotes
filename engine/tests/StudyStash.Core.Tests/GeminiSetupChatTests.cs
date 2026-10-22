@@ -175,6 +175,29 @@ public class GeminiSetupChatTests
         Assert.Equal(ChatProblem.Guard, new SetupChatParser("gemini").Parse(refused).Last().Problem); // (after its conversation id)
     }
 
+    /// <summary>Fail closed: a step before agy's init has named the setup agent, a step or an event the parser doesn't
+    /// know, each stops the turn; a run that stopped before it began (signed out) is that, not a guard.</summary>
+    [Fact]
+    public void Anything_before_the_setup_agent_starts_or_unknown_stops_the_turn()
+    {
+        static List<SetupChatEvent> Read(params string[] lines)
+        {
+            var parser = new SetupChatParser("gemini");
+            return [.. lines.SelectMany(parser.Parse)];
+        }
+        Assert.Equal(ChatProblem.Guard, Read(FakeAgents.Agy.Words(1, "Hi"), FakeAgents.Agy.Init()).First(e => e.Kind == "Problem").Problem);
+        Assert.Equal(ChatProblem.Guard, Read(FakeAgents.Agy.Mcp(1, "study_stash_setup", "get_setup_status")).First(e => e.Kind == "Problem").Problem);
+        string oddStep = FakeAgents.Agy.Words(2, "x").Replace("\"agent_response\"", "\"browser_action\"", StringComparison.Ordinal);
+        Assert.Equal(ChatProblem.Guard, Read(FakeAgents.Agy.Init(), oddStep)[^1].Problem);
+        Assert.Equal(ChatProblem.Guard, Read(FakeAgents.Agy.Init(), """{"event":"control_request","request":{"subtype":"can_use_tool"}}""")[^1].Problem);
+        // agy's own known steps go through.
+        string system = FakeAgents.Agy.Words(1, "").Replace("\"agent_response\"", "\"system_message\"", StringComparison.Ordinal);
+        Assert.DoesNotContain(Read(FakeAgents.Agy.Init(), system, FakeAgents.Agy.Words(2, "Hi"), FakeAgents.Agy.Result("Hi")), e => e.Kind == "Problem");
+        // Signed out: agy's only line is its result.
+        var signedOut = Read("""{"event":"result","result":{"conversation_id":"","status":"ERROR","response":"","error":"authentication failed or timed out"}}""");
+        Assert.Equal(ChatProblem.Auth, signedOut.Single().Problem);
+    }
+
     [Fact]
     public async Task Geminis_plan_check_says_how_much_is_left_without_spending_any_then_tries_a_turn_in_the_chats_own_home()
     {
