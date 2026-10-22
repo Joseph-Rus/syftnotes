@@ -335,6 +335,71 @@ public class FreeAiFilms
         f.Window.Close();
     }
 
+    /// <summary>Version control on a real library (a throwaway one on this computer): the Claude app's notes (what real
+    /// Claude Code saved in run 1) replace the student's, through the connection's own save; Undo puts theirs back;
+    /// History lists every version; and an older one is restored, as a new version.</summary>
+    [AvaloniaFact]
+    public async Task Undo_and_history_after_an_AI_app_replaces_notes()
+    {
+        if (!On) return;
+        string claudes = File.ReadAllText(Run("run1/notes.md")).TrimEnd();
+        await using var rig = await LibraryRig.StartAsync();
+        const string Id = "rec-20261012-093012-a41c07";
+        const string Own = "## Summary\nThe cardiac cycle: five phases, always in the same order.\n\n## Key points\n- Atrial systole, then isovolumetric contraction.\n- Ejection, relaxation, filling.\n- S1 is the AV valves closing, S2 the semilunar valves.";
+        rig.AddLecture(new Meeting(Id) { Title = "The Cardiac Cycle: Phases, Valves, and Cardiac Output", Date = "2026-10-12T09:30:12-07:00", Transcript = "[00:04] Today: the cardiac cycle." },
+            "BIO 110", Own, summaryModel: "qwen3:8b");
+        var ai = new AiRemote(rig.Url, LibraryRig.Password);
+        await ai.EditNotesAsync(Id, Own + "\n- **CO = HR × SV**, about 5 L/min at rest.", basedOn: null);
+        string said = await ClaudeTools.SaveNotesAsync(new RemoteLibrary(rig.Url, LibraryRig.Password), Id, claudes, replace: true, "Claude (in the Claude app)");
+        if (!said.StartsWith("Saved.", StringComparison.Ordinal)) throw new InvalidOperationException(said);
+
+        var (page, _, _) = Library("BIO 110", Id, "The Cardiac Cycle: Phases, Valves, and Cardiac Output", "Monday 12 October at 9:30 AM, 50 min", "");
+        page.FreeAi = null;
+        page.Note = new NoteModel
+        {
+            Id = Id, ClassName = "BIO 110", Dot = page.Note!.Dot, Noun = Nouns.Lecture, When = page.Note.When, Title = page.Note.Title, Markdown = claudes,
+        }.Titled();
+        var notes = new AiNotesModel(ai);
+        await notes.Load(Id, claudes, "Claude (in the Claude app)", DateTime.Now.ToString("o"));
+        page.Notes = notes;
+        Control view = null!;
+        var f = new Film("free-version-history", () => view = View(page, SkinKind.Mac), SkinKind.Mac, ThemeVariant.Light, 1280, 820);
+        f.Caption("The Claude app replaced Sam's notes", "real Claude Code's notes from run 1, saved through the connection");
+        f.Hold(2.4);
+        f.Caption();
+        f.Glide(view.Part<Button>("UndoButton"), steps: 12);
+        f.Click();
+        await Settled(f, () => notes.Change?.Kind == NotesChangeKind.Undo);
+        f.Hold(1.8);
+        f.Glide(view.Part<Button>("HistoryButton"), steps: 12);
+        f.Click();
+        await Settled(f, () => notes.HistoryOpen && notes.PickedChanges.Count > 0);
+        f.Hold(1.6);
+        var oldest = view.GetVisualDescendants().OfType<Button>().Where(b => b.Classes.Contains("version-row") && b.IsEffectivelyVisible).Last();
+        f.Glide(oldest, 0.3, 0.5, steps: 12);
+        f.Click();
+        await Settled(f, () => notes.Picked is { Words: "Written by Ollama" } && notes.PickedChanges.Count > 0);
+        f.Hold(2.2);
+        f.Glide(view.Part<Button>("RestoreVersion"), steps: 12);
+        f.Click();
+        await Settled(f, () => !notes.HistoryOpen && notes.Change?.Kind == NotesChangeKind.Restore);
+        f.NoPointer();
+        f.Hold(2.4);
+        f.Window.Close();
+    }
+
+    /// <summary>Lets the library answer (a real one, over HTTP) until <paramref name="done"/>, a frame at a time.</summary>
+    static async Task Settled(Film f, Func<bool> done)
+    {
+        for (int i = 0; i < 100 && !done(); i++)
+        {
+            await Task.Delay(30);
+            f.Settle();
+        }
+        if (!done()) throw new InvalidOperationException("the library didn't answer as expected");
+        DiagramsReady.Wait(f.Window);
+    }
+
     /// <summary>Stills of each piece in both looks, light and dark, and in colour themes with a pale accent and a dark
     /// one: the offer over a lecture with no notes, a long lecture's parts, the paste box over notes it would replace,
     /// the notes' ⋯ menu, and Settings → AI apps' switch.</summary>
@@ -367,11 +432,43 @@ public class FreeAiFilms
             f.Frame();
             f.Window.Close();
 
+            // Right after an AI app replaced the notes: the Undo line; then History, an older version picked.
+            string now = DateTime.Now.ToString("o");
+            const string Claudes = "## Summary\nThe cardiac cycle has five phases.\n\n## Key points\n- Atrial systole pushes the last blood in.\n- S1 is the AV valves closing.";
+            var versioned = new FakeAiLibrary
+            {
+                Overview = new AiOverview([], Notes: "ollama", Ask: "ollama", Fallback: false, Problems: []),
+                OnRewrite = id => new RewriteInfo(id, "none")
+                {
+                    Current = new NotesVersion(Claudes, "Claude", now), Change = new NotesChange("4", NotesChangeKind.App, "Claude", now) { CanUndo = true },
+                },
+                OnNotesVersions = _ =>
+                [
+                    new NotesKept("4", NotesChangeKind.App, "Claude", now) { Current = true }, new NotesKept("3", NotesChangeKind.Edit, "", now),
+                    new NotesKept("2", NotesChangeKind.Paste, "your AI", "2026-10-20T19:05:00"), new NotesKept("1", NotesChangeKind.Written, "Ollama", "2026-10-20T09:30:00"),
+                ],
+                OnNotesVersion = (_, v) => new NotesKept(v, NotesChangeKind.Written, "Ollama", now)
+                {
+                    Markdown = "## Summary\nThe cardiac cycle: five phases.\n\n## Key points\n- Atrial systole pushes the last blood in.\n- S1 = lub, S2 = dub.",
+                },
+            };
+            var (vpage, _, _) = Library("BIO 110", "n1", "The Cardiac Cycle: Phases, Valves, and Cardiac Output", "Monday 12 October at 9:30 AM, 50 min", "");
+            vpage.FreeAi = null;
+            var vnotes = new AiNotesModel(versioned);
+            vnotes.Load("n1", Claudes, "Claude (in the Claude app)", now).GetAwaiter().GetResult();
+            vpage.Notes = vnotes;
+            var h = new Film($"still-history-{tag}", () => View(vpage, skin), skin, variant, 1280, 820, named[theme]);
+            h.NoPointer();
+            h.Frame();
+            vnotes.OpenHistory().GetAwaiter().GetResult();
+            vnotes.Pick(vnotes.Versions[^1]).GetAwaiter().GetResult();
+            h.Frame();
+            h.Window.Close();
+
             // The notes' ⋯ menu, drawn where it opens (a real one is a window of its own).
             var notes = AiDemo.LectureNotes("## Summary\nNotes.", "Claude");
             notes.OnCopyForAi = () => { };
             notes.OnPasteNotes = () => { };
-            notes.Earlier = [new NotesKept("2", "Claude", "2026-10-21T15:10:00", "2026-10-21T15:12:00"), new NotesKept("1", "Ollama", "2026-10-20T09:30:00", "2026-10-21T15:10:00")];
             Control Menu()
             {
                 Control menu = skin == SkinKind.Mac ? new MacAiEngineMenu { DataContext = notes.Menu } : new WinAiEngineMenu { DataContext = notes.Menu };

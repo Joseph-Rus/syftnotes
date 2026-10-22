@@ -55,8 +55,8 @@ public sealed class LibraryRig : IAsyncDisposable
 
     /// <summary>Puts a lecture straight into the store with its notes already written, the way the pipeline leaves
     /// one once it's summarized — for tests that need lectures already there, not sent in through ingest.</summary>
-    public string AddLecture(Meeting m, string className, string summaryMd = "", List<string>? topics = null) =>
-        store!.Save(m, new Classification(className, 0.95, "folder", topics: topics), summaryMd: summaryMd);
+    public string AddLecture(Meeting m, string className, string summaryMd = "", List<string>? topics = null, string summaryModel = "") =>
+        store!.Save(m, new Classification(className, 0.95, "folder", topics: topics), summaryMd: summaryMd, summaryModel: summaryModel);
 
     /// <summary>A place for a test's own files, removed with the rest.</summary>
     public string Scratch(string name) => dir[name];

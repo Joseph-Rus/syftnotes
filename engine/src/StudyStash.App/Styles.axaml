@@ -1235,4 +1235,71 @@
     <Setter Property="MaxHeight" Value="360" />
     <Setter Property="VerticalContentAlignment" Value="Top" />
   </Style>
+  <!-- A lecture's notes' versions: the line over them right after a change ("Notes replaced by Claude · Undo"), and
+       History (the versions, newest first, and one against the notes now: lines it brings back marked green, lines it
+       takes away pink and struck through). -->
+  <Style Selector="Border.change-bar">
+    <Setter Property="Background" Value="{DynamicResource SurfaceSunken}" />
+    <Setter Property="CornerRadius" Value="{DynamicResource RadiusPanel}" />
+    <Setter Property="BoxShadow" Value="{DynamicResource LineRing}" />
+    <Setter Property="Padding" Value="14,6,6,6" />
+  </Style>
+  <Style Selector="TextBlock.change-line">
+    <Setter Property="FontSize" Value="13.5" />
+    <Setter Property="FontWeight" Value="SemiBold" />
+    <Setter Property="Foreground" Value="{DynamicResource Ink}" />
+    <Setter Property="VerticalAlignment" Value="Center" />
+    <Setter Property="TextTrimming" Value="CharacterEllipsis" />
+  </Style>
+  <Style Selector="Button.version-row">
+    <Setter Property="Theme" Value="{StaticResource Surface}" />
+    <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+    <Setter Property="Padding" Value="0" />
+  </Style>
+  <Style Selector="Button.version-row /template/ Border#PART_Wash">
+    <Setter Property="IsVisible" Value="False" />
+  </Style>
+  <Style Selector="Border.version-row">
+    <Setter Property="CornerRadius" Value="8" />
+    <Setter Property="Padding" Value="12,8" />
+    <Setter Property="Background" Value="Transparent" />
+  </Style>
+  <Style Selector="Button.version-row:pointerover Border.version-row">
+    <Setter Property="Background" Value="{DynamicResource Hover}" />
+  </Style>
+  <Style Selector="Border.version-row.selected">
+    <Setter Property="Background" Value="{DynamicResource SurfaceSunken}" />
+    <Setter Property="BoxShadow" Value="{DynamicResource LineRing}" />
+  </Style>
+  <Style Selector="TextBlock.version-words">
+    <Setter Property="FontSize" Value="14" />
+    <Setter Property="FontWeight" Value="SemiBold" />
+    <Setter Property="Foreground" Value="{DynamicResource Ink}" />
+  </Style>
+  <Style Selector="TextBlock.version-when">
+    <Setter Property="FontSize" Value="12.5" />
+    <Setter Property="Foreground" Value="{DynamicResource InkMuted}" />
+  </Style>
+  <Style Selector="Border.diff-line">
+    <Setter Property="Padding" Value="8,2" />
+    <Setter Property="CornerRadius" Value="4" />
+  </Style>
+  <Style Selector="Border.diff-line.added">
+    <Setter Property="Background" Value="{DynamicResource HlGreen}" />
+  </Style>
+  <Style Selector="Border.diff-line.removed">
+    <Setter Property="Background" Value="{DynamicResource HlPink}" />
+  </Style>
+  <Style Selector="TextBlock.diff-text">
+    <Setter Property="FontSize" Value="13.5" />
+    <Setter Property="LineHeight" Value="20" />
+    <Setter Property="TextWrapping" Value="Wrap" />
+    <Setter Property="Foreground" Value="{DynamicResource InkMuted}" />
+  </Style>
+  <Style Selector="Border.diff-line.added TextBlock.diff-text, Border.diff-line.removed TextBlock.diff-text">
+    <Setter Property="Foreground" Value="{DynamicResource Ink}" />
+  </Style>
+  <Style Selector="Border.diff-line.removed TextBlock.diff-text">
+    <Setter Property="TextDecorations" Value="Strikethrough" />
+  </Style>
 </Styles>

@@ -18,7 +18,7 @@ NAMES = {
     "edit_note": "notebook-pen", "error": "circle-alert", "event": "calendar", "event_upcoming": "calendar-clock",
     "expand_less": "chevron-up", "expand_more": "chevron-down", "extension": "puzzle", "fiber_manual_record": "circle",
     "filter_list": "list-filter", "folder": "folder", "folder_open": "folder-open", "forum": "messages-square", "grade": "star",
-    "graphic_eq": "audio-lines", "headphones": "headphones", "home": "house", "hourglass_top": "hourglass", "hub": "waypoints",
+    "graphic_eq": "audio-lines", "headphones": "headphones", "history": "history", "home": "house", "hourglass_top": "hourglass", "hub": "waypoints",
     "image": "image", "inbox": "inbox", "info": "info", "ios_share": "share", "key": "key-round", "keyboard": "keyboard",
     "keyboard_arrow_up": "chevron-up", "language": "globe", "laptop_mac": "laptop", "link": "link", "link_off": "unlink",
     "local_cafe": "coffee", "lock": "lock", "logout": "log-out", "memory": "cpu", "mic": "mic", "more_horiz": "ellipsis",

@@ -5,6 +5,7 @@ using Avalonia.Threading;
 using StudyStash.App.Controls;
 using StudyStash.App.ViewModels;
 using StudyStash.App.Views;
+using StudyStash.Core;
 using StudyStash.Core.Ai;
 
 namespace StudyStash.App.Tests;
@@ -79,37 +80,47 @@ public class FreeAiNotesViewTests
     }
 
     [AvaloniaFact]
-    public async Task The_notes_menu_copies_for_a_chat_pastes_its_notes_and_puts_any_earlier_version_back()
+    public async Task Right_after_a_change_Undo_shows_and_History_puts_any_version_back()
     {
         string now = DateTime.Now.ToString("o");
+        RewriteInfo Info(string id, string notes, string by, string kind, bool undo, bool redo) => new(id, "none")
+        {
+            Current = new NotesVersion(notes, by, now), Change = new NotesChange("1", kind, by, now) { CanUndo = undo, CanRedo = redo },
+        };
         var ai = new FakeAiLibrary
         {
             Overview = AiDemo.Overview(),
-            OnRewrite = id => new RewriteInfo(id, "none")
-            {
-                Current = new NotesVersion("## Summary\nNewest.", "Claude", now),
-                Earlier = [new NotesKept("7", "Claude", "2026-10-21T15:10:00", now), new NotesKept("3", "Ollama", "2026-10-20T09:30:00", now)],
-            },
-            OnRestoreNotes = (id, version) => new RewriteInfo(id, "none")
-            {
-                Current = new NotesVersion("## Summary\nThe library's own.", "Ollama", now),
-                Earlier = [new NotesKept("8", "Claude", now, now), new NotesKept("7", "Claude", "2026-10-21T15:10:00", now)],
-            },
+            OnRewrite = id => Info(id, "## Summary\nClaude's notes.", "Claude", NotesChangeKind.App, undo: true, redo: false),
+            OnUndoNotes = id => Info(id, "## Summary\nThe library's own.", "Ollama", NotesChangeKind.Undo, undo: false, redo: true),
+            OnNotesVersions = _ =>
+            [
+                new NotesKept("9", NotesChangeKind.App, "Claude", now) { Current = true },
+                new NotesKept("8", NotesChangeKind.Edit, "", now),
+                new NotesKept("3", NotesChangeKind.Written, "Ollama", "2026-10-20T09:30:00"),
+            ],
+            OnNotesVersion = (_, v) => new NotesKept(v, NotesChangeKind.Written, "Ollama", now) { Markdown = "## Summary\nThe library's own.\n- A line it had." },
+            OnRestoreNotes = (id, _) => Info(id, "## Summary\nThe library's own.\n- A line it had.", "Ollama", NotesChangeKind.Restore, undo: true, redo: false),
         };
-        int copies = 0, pastes = 0;
-        var notes = new AiNotesModel(ai) { OnCopyForAi = () => copies++, OnPasteNotes = () => pastes++ };
-        await notes.Load("n1", "## Summary\nNewest.", "Claude", now);
+        int copies = 0;
+        var notes = new AiNotesModel(ai) { OnCopyForAi = () => copies++, OnPasteNotes = () => { } };
+        await notes.Load("n1", "## Summary\nClaude's notes.", "Claude", now);
 
-        Assert.Equal(["Copy for your AI", "Paste notes", "Put back notes by Claude", "Put back notes by Ollama"], notes.Menu.Actions.Select(a => a.Name));
-        Assert.Equal(["Written 21 Oct 3:10 PM", "Written 20 Oct 9:30 AM"], notes.Menu.Actions.Skip(2).Select(a => a.Subtitle));
-        notes.Menu.Actions[0].Command.Execute(null);
-        notes.Menu.Actions[1].Command.Execute(null);
-        Assert.Equal((1, 1), (copies, pastes));
+        Assert.True(notes.ShowChange);
+        Assert.Equal("Notes replaced by Claude", notes.ChangeLine);
+        await notes.UndoCommand.ExecuteAsync(null);
+        Assert.Contains("undo:n1", ai.Calls);
+        Assert.Equal(("## Summary\nThe library's own.", "Undone", true), (notes.CurrentMarkdown, notes.ChangeLine, notes.CanRedo));
 
-        // The oldest, past a newer one: the library's own notes come back.
-        await ((CommunityToolkit.Mvvm.Input.IAsyncRelayCommand)notes.Menu.Actions[3].Command).ExecuteAsync(null);
+        Assert.Equal(["Copy for your AI", "Paste notes", "History"], notes.Menu.Actions.Select(a => a.Name));
+        await notes.OpenHistory();
+        Assert.True(notes.HistoryOpen);
+        Assert.False(notes.ShowNotes);
+        Assert.Equal(["Written by Claude", "Your edit", "Written by Ollama"], notes.Versions.Select(v => v.Words));
+        await notes.Pick(notes.Versions[2]);
+        Assert.Contains(notes.PickedChanges, l => l.Added && l.Text == "- A line it had.");
+        await notes.RestorePickedCommand.ExecuteAsync(null);
         Assert.Contains("restore:n1:3", ai.Calls);
-        Assert.Equal("## Summary\nThe library's own.", notes.CurrentMarkdown);
-        Assert.Equal(["Put back notes by Claude", "Put back notes by Claude"], notes.Menu.Actions.Skip(2).Select(a => a.Name)); // and both newer ones can come back
+        Assert.False(notes.HistoryOpen);
+        Assert.Equal("Earlier notes put back", notes.ChangeLine);
     }
 }

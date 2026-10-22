@@ -297,14 +297,55 @@ public static partial class AiWords
         engineName.Length == 0 ? "" // an older lecture that doesn't say who wrote its notes
         : ParseUntil(updatedAtIso) is { } at ? $"Written by {engineName} · {at:ddd H:mm}" : $"Written by {engineName}";
 
-    /// <summary>A version of the notes the ⋯ menu puts back, by who wrote it: "Put back notes by Claude", "Put back your
-    /// own notes".</summary>
-    public static string EarlierName(string by) => by.Length > 0 ? $"Put back notes by {by}" : "Put back your own notes";
+    /// <summary>The line over the notes right after a change to them, by what made it: "Notes replaced by Claude",
+    /// "Notes pasted from a chat", "Your edit saved", "Earlier notes put back", "Undone".</summary>
+    public static string ChangeWords(string kind, string by) => kind switch
+    {
+        NotesChangeKind.App => $"Notes replaced by {Who(by)}",
+        NotesChangeKind.Paste => "Notes pasted from a chat",
+        NotesChangeKind.Edit => "Your edit saved",
+        NotesChangeKind.Restore => "Earlier notes put back",
+        NotesChangeKind.Undo => "Undone",
+        NotesChangeKind.Redo => "Redone",
+        NotesChangeKind.Rewrite => $"Notes rewritten by {Who(by)}",
+        NotesChangeKind.Diagrams => "Diagrams added",
+        NotesChangeKind.File => "Changed in the note's file",
+        _ => $"New notes from {Who(by)}",
+    };
 
-    /// <summary>When that version was written ("Written 21 Oct 3:10 PM"), or else when it was replaced.</summary>
-    public static string EarlierWhen(string writtenIso, string replacedIso) =>
-        ParseUntil(writtenIso) is { } written ? "Written " + written.ToString("d MMM h:mm tt", CultureInfo.InvariantCulture)
-        : ParseUntil(replacedIso) is { } replaced ? "Replaced " + replaced.ToString("d MMM h:mm tt", CultureInfo.InvariantCulture) : "";
+    /// <summary>A version in History, by what made it: "Written by Claude", "Your edit", "Pasted from a chat", "Put
+    /// back".</summary>
+    public static string VersionWords(string kind, string by) => kind switch
+    {
+        NotesChangeKind.Paste => "Pasted from a chat",
+        NotesChangeKind.Edit => "Your edit",
+        NotesChangeKind.Restore => "Put back",
+        NotesChangeKind.Undo => "Undo",
+        NotesChangeKind.Redo => "Redo",
+        NotesChangeKind.Rewrite => $"Rewritten by {Who(by)}",
+        NotesChangeKind.Diagrams => "Diagrams added",
+        NotesChangeKind.File => "Changed in the note's file",
+        _ => by.Length > 0 ? $"Written by {by}" : "Your notes",
+    };
+
+    static string Who(string by) => by.Length > 0 ? by : Engines.YourAi;
+
+    /// <summary>When a version was made: "Today 3:10 PM", "Yesterday 9:30 AM", "21 Oct 3:10 PM".</summary>
+    public static string VersionWhen(string atIso, DateTime now) => ParseUntil(atIso) is { } at
+        ? (at.Date == now.Date ? "Today " : at.Date == now.Date.AddDays(-1) ? "Yesterday " : at.ToString(at.Year == now.Year ? "d MMM " : "d MMM yyyy ", CultureInfo.InvariantCulture))
+          + at.ToString("h:mm tt", CultureInfo.InvariantCulture)
+        : "";
+
+    /// <summary>What putting a version back would change, in a line.</summary>
+    public static string DiffSummary(int added, int removed) => (added, removed) switch
+    {
+        (0, 0) => "The same words as the notes now.",
+        _ => "Against the notes now: " + string.Join(", ", new[]
+            {
+                added > 0 ? $"{added} line{(added == 1 ? "" : "s")} it brings back" : "",
+                removed > 0 ? $"{removed} line{(removed == 1 ? "" : "s")} it takes away" : "",
+            }.Where(x => x.Length > 0)) + ".",
+    };
 
     /// <summary>A ready draft's byline: "Claude Code · just now" (or "· 5 min ago", "· 2 h ago", a date).</summary>
     public static string DraftByline(string engineName, string atIso, DateTime now) => $"{engineName} · {History.Ago(atIso, now)}";

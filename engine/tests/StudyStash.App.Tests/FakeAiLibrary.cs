@@ -45,6 +45,12 @@ public sealed class FakeAiLibrary : IAiLibrary
     public Func<string, NotesBrief?>? OnNotesBrief { get; set; }
     /// <summary>(lecture, the version asked for, or null for the newest).</summary>
     public Func<string, string?, RewriteInfo?>? OnRestoreNotes { get; set; }
+    public Func<string, RewriteInfo?>? OnUndoNotes { get; set; }
+    public Func<string, RewriteInfo?>? OnRedoNotes { get; set; }
+    /// <summary>A lecture's versions, newest first (History); null: an older library.</summary>
+    public Func<string, List<NotesKept>?>? OnNotesVersions { get; set; }
+    /// <summary>(lecture, version id): one version with its words.</summary>
+    public Func<string, string, NotesKept?>? OnNotesVersion { get; set; }
     public Func<ToolAccessInfo?>? OnAccess { get; set; }
     public Func<bool?, ReadingScopes?, ToolAccessInfo?>? OnSetAccess { get; set; }
     public Func<bool, ToolAccessInfo?>? OnSetWeb { get; set; }
@@ -231,6 +237,30 @@ public sealed class FakeAiLibrary : IAiLibrary
     {
         Calls.Add($"restore:{lecture}" + (version is null ? "" : $":{version}"));
         return Task.FromResult(OnRestoreNotes?.Invoke(lecture, version));
+    }
+
+    public Task<RewriteInfo?> UndoNotesAsync(string lecture)
+    {
+        Calls.Add($"undo:{lecture}");
+        return Task.FromResult(OnUndoNotes?.Invoke(lecture));
+    }
+
+    public Task<RewriteInfo?> RedoNotesAsync(string lecture)
+    {
+        Calls.Add($"redo:{lecture}");
+        return Task.FromResult(OnRedoNotes?.Invoke(lecture));
+    }
+
+    public Task<List<NotesKept>?> NotesVersionsAsync(string lecture)
+    {
+        Calls.Add($"versions:{lecture}");
+        return Task.FromResult(OnNotesVersions?.Invoke(lecture));
+    }
+
+    public Task<NotesKept?> NotesVersionAsync(string lecture, string version)
+    {
+        Calls.Add($"version:{lecture}:{version}");
+        return Task.FromResult(OnNotesVersion?.Invoke(lecture, version));
     }
 
     public Task<NotesBrief?> NotesBriefAsync(string lecture)
