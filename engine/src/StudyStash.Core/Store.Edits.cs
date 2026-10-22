@@ -114,8 +114,10 @@ public sealed partial class Store
     /// keeps every line of its own: only its summary is replaced, and with no summary in it, it's left exactly as it
     /// is (the app, the phone and Ask still get the edit).</para>
     /// <para>A summary edited in the file itself is notes the app never showed: it shows the library's. Those become
-    /// the library's notes here (where the app, search and Ask read them), and an edit that says what it started
-    /// from isn't saved over them unseen (<see cref="NotesEdited.Changed"/>): the student sees them and chooses.</para>
+    /// the library's notes here first (where the app, search and Ask read them; the older copy kept as a version). An
+    /// edit that says what it started from isn't saved over them unseen (<see cref="NotesEdited.Changed"/>): the
+    /// student sees them and chooses. Without (an AI app's save, a paste, a version put back), they're kept as the
+    /// version the new notes replace.</para>
     /// <para><paramref name="writer"/>: notes someone else wrote (an AI app through Study Stash's connection, a chat the
     /// student pasted them from), named as their writer the way the library names its own AI ("Claude (in the Claude
     /// app)"), and the lecture's notes done, any old error about them gone. Null keeps whoever wrote the notes as their
@@ -160,12 +162,20 @@ public sealed partial class Store
                 return NotesEdited.Unwritten;
             }
 
-            if (basedOn is not null && edited is not null && Notes.SummaryInFile(edited) is { Length: > 0 } theirs && !Notes.SameWords(theirs, current))
+            // A summary edited in the note file itself (in another app, or by an AI working in the folder) is taken in
+            // first, the library's older copy kept as a version. An edit that says what it started from then stops, so
+            // the student sees them and chooses; anything else (an AI app's save, a paste, a version put back) goes on,
+            // and they're the notes it replaces: kept as a version, never saved over unseen.
+            string writtenAt = row.UpdatedAt ?? "";
+            if (edited is not null && Notes.SummaryInFile(edited) is { Length: > 0 } theirs && !Notes.SameWords(theirs, current))
             {
                 string seen = Now();
+                if (Py.Strip(current).Length > 0) KeepVersion(noteId, current, model, writtenAt, seen);
                 Exec("UPDATE notes SET summary_md=?, updated_at=? WHERE id=?", theirs, seen, noteId);
                 Index(noteId, theirs, m.Transcript, seen);
-                return NotesEdited.Changed;
+                if (basedOn is not null) return NotesEdited.Changed;
+                current = theirs;
+                writtenAt = File.GetLastWriteTimeUtc(path).ToString("yyyy-MM-dd'T'HH:mm:ss'+00:00'", System.Globalization.CultureInfo.InvariantCulture);
             }
             if (basedOn is not null && Notes.Fingerprint(current) != basedOn) return NotesEdited.Changed;
 
@@ -194,7 +204,7 @@ public sealed partial class Store
                 && DateTimeOffset.TryParse(at, System.Globalization.CultureInfo.InvariantCulture, System.Globalization.DateTimeStyles.AssumeUniversal, out var last)
                 && DateTimeOffset.UtcNow - last < RedraftWithin;
             if (Py.Strip(current).Length > 0 && (current != markdown || model != by) && !draft)
-                KeepVersion(noteId, current, model, row.UpdatedAt ?? "", now);
+                KeepVersion(noteId, current, model, writtenAt, now);
             if (redraft && writer is not null) SetState(outside, $"{writer}\n{now}\n{Notes.Fingerprint(markdown)}");
             if (writer is null) Exec("UPDATE notes SET summary_md=?, updated_at=? WHERE id=?", markdown, now, noteId);
             else Exec("UPDATE notes SET summary_md=?, summary_model=?, status=?, error=NULL, updated_at=? WHERE id=?",

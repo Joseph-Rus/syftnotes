@@ -125,6 +125,34 @@ public class FreeAiNotesTests
     }
 
     [Fact]
+    public async Task Notes_edited_in_their_own_file_are_kept_when_an_AI_app_saves_over_them_or_a_version_is_put_back()
+    {
+        using var dir = new TempDir();
+        var cfg = Cfg(dir);
+        using var store = new Store(cfg.DbPath, cfg.PoolDir);
+        Seed(store, notes: "## Summary\nThe library's own notes.", model: "qwen3:8b");
+        await using var site = await Site(cfg, store);
+        var app = new RemoteLibrary("http://localhost", "pw", site.Client);
+        var remote = new AiRemote("http://localhost", "pw", site.Client);
+        string path = store.Get("lec-1")!.MdPath!;
+        void EditFile(string from, string to) => File.WriteAllText(path, File.ReadAllText(path).Replace(from, to));
+
+        // Fixed in the note file itself (another app, or an AI working in the folder), then an AI app saves over them.
+        EditFile("The library's own notes.", "Fixed in Obsidian.");
+        Assert.StartsWith("Saved.", await ClaudeTools.SaveNotesAsync(app, "lec-1", "## Summary\nClaude's notes.", replace: true, "Claude (in the Claude app)"));
+        Assert.Equal(["## Summary\nFixed in Obsidian.", "## Summary\nThe library's own notes."], store.NotesVersions("lec-1").Select(v => v.Markdown));
+        Assert.Equal("## Summary\nClaude's notes.", store.Get("lec-1")!.SummaryMd);
+
+        // Fixed in the file again, then the newest version is put back: that fix is kept too.
+        EditFile("Claude's notes.", "Claude's notes, fixed in the file.");
+        var back = (await remote.RestoreNotesAsync("lec-1"))!;
+        Assert.Equal("## Summary\nFixed in Obsidian.", back.Current!.Markdown);
+        Assert.Equal(["## Summary\nClaude's notes, fixed in the file.", "## Summary\nClaude's notes.", "## Summary\nThe library's own notes."],
+            store.NotesVersions("lec-1").Select(v => v.Markdown));
+        Assert.Contains("Fixed in Obsidian.", File.ReadAllText(path));
+    }
+
+    [Fact]
     public async Task What_the_student_typed_is_in_notes_pasted_from_a_chat_and_the_chats_words_are_not()
     {
         using var dir = new TempDir();
