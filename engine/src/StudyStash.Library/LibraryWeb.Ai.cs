@@ -48,7 +48,7 @@ public sealed partial class LibraryWeb
     /// kept chat says which first, <c>{"kind": "chat", "id"}</c> (a new one's id too), so the app knows it whatever
     /// comes of the answer: one stopped or cut off is kept there as well.
     /// </summary>
-    async Task StreamAnswerAsync(HttpContext ctx, AskRequest request, Chat? chat)
+    async Task StreamAnswerAsync(HttpContext ctx, AskRequest request, Chat? chat, object? turn)
     {
         ctx.Response.ContentType = "application/x-ndjson; charset=utf-8";
         ctx.Response.Headers.CacheControl = "no-store";
@@ -58,6 +58,25 @@ public sealed partial class LibraryWeb
         var lines = Channel.CreateUnbounded<JsonObject>(new UnboundedChannelOptions { SingleReader = true });
         if (chat is not null) lines.Writer.TryWrite(new JsonObject { ["kind"] = "chat", ["id"] = chat.Id });
         string sent = "";
+        // The turn ends once: answered, cut off, or stopped. Stopped, what was written is kept and the chat is free
+        // at once (the AI can take a moment longer to stop), so asking again straight away isn't told it's busy.
+        var ending = new Lock();
+        bool over = false;
+        bool EndsNow()
+        {
+            lock (ending)
+            {
+                if (over) return false;
+                over = true;
+                return true;
+            }
+        }
+        void KeepStopped()
+        {
+            if (chat is null || !EndsNow()) return;
+            if (sent.Length > 0) LibraryChats.AddAskTurn(chat, request.Question, sent, stopped: true);
+            if (turn is not null) LibraryChats.End(chat.Id, turn);
+        }
         void SoFar(string answer)
         {
             lines.Writer.TryWrite(answer.StartsWith(sent, StringComparison.Ordinal)
@@ -69,19 +88,19 @@ public sealed partial class LibraryWeb
         {
             try
             {
-                var reply = Kept(chat, request.Question, await Jobs.AskAsync(request, Reader, cfg, ctx.RequestAborted, SoFar));
+                var reply = await Jobs.AskAsync(request, Reader, cfg, ctx.RequestAborted, SoFar);
+                if (EndsNow()) reply = Kept(chat, request.Question, reply);
                 lines.Writer.TryWrite(new JsonObject { ["kind"] = "done", ["reply"] = JsonSerializer.SerializeToNode(reply, AiRemote.Options) });
             }
             catch (Exception e) when (e is HttpRequestException or TimeoutException or InvalidOperationException or InvalidDataException)
             {
                 // What came before it stopped is kept, as the app shows it.
-                if (chat is not null && sent.Length > 0) LibraryChats.AddAskTurn(chat, request.Question, sent, stopped: true);
+                if (chat is not null && sent.Length > 0 && EndsNow()) LibraryChats.AddAskTurn(chat, request.Question, sent, stopped: true);
                 lines.Writer.TryWrite(new JsonObject { ["kind"] = "error", ["status"] = 503, ["detail"] = e.Message });
             }
             catch (OperationCanceledException) when (ctx.RequestAborted.IsCancellationRequested)
             {
-                // they stopped it, or went away: what was written by then is kept
-                if (chat is not null && sent.Length > 0) LibraryChats.AddAskTurn(chat, request.Question, sent, stopped: true);
+                KeepStopped(); // they stopped it, or went away: what was written by then is kept
             }
             finally
             {
@@ -102,7 +121,8 @@ public sealed partial class LibraryWeb
         }
         catch (Exception e) when (e is OperationCanceledException or IOException)
         {
-            // they went away: the answer stops with them
+            // they went away: the answer stops with them, and the chat is theirs again at once
+            KeepStopped();
         }
         await asking;
     }
@@ -309,14 +329,15 @@ public sealed partial class LibraryWeb
             // A kept chat: the turns before this one come from it, and this one is kept in it. One turn at a time: a
             // question in a chat that's still answering one (asked on another device) waits its turn.
             var chat = AskChatFor(body);
-            if (chat is not null && !LibraryChats.TryBegin(chat.Id))
+            var turn = chat is null ? null : LibraryChats.TryBegin(chat.Id);
+            if (chat is not null && turn is null)
                 return Http.Detail(409, "This chat is still answering a question asked on another device. Ask again once that answer is done.");
             try
             {
                 if (chat is not null) request = request with { History = Chats.AskTurns(chat) };
                 if (body?["stream"] is JsonValue sv && sv.TryGetValue(out bool stream) && stream)
                 {
-                    await StreamAnswerAsync(ctx, request, chat);
+                    await StreamAnswerAsync(ctx, request, chat, turn);
                     return Results.Empty;
                 }
                 try
@@ -330,7 +351,7 @@ public sealed partial class LibraryWeb
             }
             finally
             {
-                if (chat is not null) LibraryChats.End(chat.Id);
+                if (chat is not null && turn is not null) LibraryChats.End(chat.Id, turn);
             }
         })));
 

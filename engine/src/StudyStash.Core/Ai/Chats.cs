@@ -123,10 +123,13 @@ public sealed class Chats(string home, string library, AiJobs ai, History histor
     /// of them), newest first. A lecture's chats go by the folder the lecture is in now (<paramref name="classOf"/>, by
     /// its id): it may have moved since, or been a recording in no folder when the chat began. Each comes with that
     /// class.</summary>
-    public List<ChatEntry> AskChats(string? lecture = null, string? className = null, Func<string, string?>? classOf = null) =>
-        [.. Entries().Where(e => e.Kind == AskKind)
+    public List<ChatEntry> AskChats(string? lecture = null, string? className = null, Func<string, string?>? classOf = null)
+    {
+        lock (gate) EmptyTrash(DateTime.UtcNow - TrashKeeps); // what's waited long enough for Undo goes
+        return [.. Entries().Where(e => e.Kind == AskKind)
             .Select(e => e.Lecture.Length > 0 && classOf?.Invoke(e.Lecture) is { } now ? e with { ClassName = now } : e)
             .Where(e => lecture is not null ? e.Lecture == lecture : className is null || e.ClassName == className)];
+    }
 
     public Chat? Get(string id)
     {
@@ -235,18 +238,28 @@ public sealed class Chats(string home, string library, AiJobs ai, History histor
         return c;
     }
 
-    /// <summary>Chats answering a question right now: one turn at a time each.</summary>
-    readonly HashSet<string> answering = [];
+    /// <summary>Chats answering a question right now, each with the turn that holds it: one turn at a time each.</summary>
+    readonly Dictionary<string, object> answering = [];
 
-    /// <summary>Takes a chat's turn: false while it's still answering a question (asked on another device, say).</summary>
-    public bool TryBegin(string id)
+    /// <summary>Takes a chat's turn, for <see cref="End"/> to give back; null while it's still answering a question
+    /// (asked on another device, say).</summary>
+    public object? TryBegin(string id)
     {
-        lock (answering) return answering.Add(id);
+        lock (answering)
+        {
+            if (answering.ContainsKey(id)) return null;
+            var turn = new object();
+            answering[id] = turn;
+            return turn;
+        }
     }
 
-    public void End(string id)
+    /// <summary>A turn over: the chat is free for the next question. Only the turn that holds it gives it back (one
+    /// stopped and freed early doesn't free the next one's later).</summary>
+    public void End(string id, object turn)
     {
-        lock (answering) answering.Remove(id);
+        lock (answering)
+            if (answering.TryGetValue(id, out var holding) && ReferenceEquals(holding, turn)) answering.Remove(id);
     }
 
     /// <summary>The conversation so far, as Ask's memory takes it (<see cref="AskMemory"/>): each question with the answer

@@ -132,7 +132,10 @@ public static class ClassRename
     {
         string dir = Path.Combine(home, "chats");
         if (!Directory.Exists(dir)) return;
-        foreach (string file in Directory.EnumerateFiles(dir, "*.json"))
+        // Deleted ones waiting for Undo too: one brought back afterwards is under the new name.
+        string trash = Path.Combine(dir, ".trash");
+        var files = Directory.EnumerateFiles(dir, "*.json").Concat(Directory.Exists(trash) ? Directory.EnumerateFiles(trash, "*.json") : []);
+        foreach (string file in files)
         {
             try
             {
