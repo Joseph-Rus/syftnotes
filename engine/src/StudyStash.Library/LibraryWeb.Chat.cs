@@ -22,7 +22,9 @@ public sealed partial class LibraryWeb
     /// <summary>The folders (outside the library) the AI may read, from folders.json beside config.toml.</summary>
     public Func<IReadOnlyList<string>> ReadDirs => () => Folders.Load(cfg.Home).Where(f => f.Ai && !f.Private).Select(f => f.Path).Where(Directory.Exists).ToList();
 
-    Chats LibraryChats => chats ??= new Chats(cfg.Home, cfg.PoolDir, options.Ai ?? new AiJobs(cfg.Home, () => cfg.OllamaHost), LibraryHistory, ReadDirs);
+    /// <summary>One for the library, even when two questions arrive at once: it's what keeps a chat to one turn at a time.</summary>
+    Chats LibraryChats => LazyInitializer.EnsureInitialized(ref chats,
+        () => new Chats(cfg.Home, cfg.PoolDir, options.Ai ?? new AiJobs(cfg.Home, () => cfg.OllamaHost), LibraryHistory, ReadDirs));
 
     /// <summary>Chat is in the sidebar once an AI is picked in Settings (or a chat exists).</summary>
     bool ChatOn => File.Exists(AiSettings.PathIn(cfg.Home)) || Directory.Exists(Path.Combine(cfg.Home, "chats"));
