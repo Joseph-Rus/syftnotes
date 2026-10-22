@@ -54,6 +54,21 @@ public static partial class Notes
         return string.Join("\n", lines);
     }
 
+    /// <summary>A note file whose summary says who wrote it as <paramref name="writer"/> ("_Written by … from the
+    /// transcript._" under it, as <see cref="Render"/> writes it; with no writer, no such line), every other line as it
+    /// is. As it is, for a file with no summary.</summary>
+    public static string WithWriter(string text, string writer, bool fromNotes)
+    {
+        var lines = text.Split('\n').ToList();
+        if (SummaryLines(lines) is not { } at) return text;
+        string said = $"_Written by {writer} from {(fromNotes ? "the notes it came with" : "the transcript")}._";
+        bool has = at.End < lines.Count && lines[at.End].StartsWith("_Written by ", StringComparison.Ordinal);
+        if (has && writer.Length > 0) lines[at.End] = said;
+        else if (has) lines.RemoveRange(at.End, at.End + 1 < lines.Count && lines[at.End + 1].Length == 0 ? 2 : 1);
+        else if (writer.Length > 0) lines.InsertRange(at.End, [said, ""]);
+        return string.Join("\n", lines);
+    }
+
     /// <summary>Whether two versions of some notes say the same thing, whatever level their headings are at and
     /// whatever follows the end of a line: what tells an edit from a note file written by an older Study Stash.</summary>
     public static bool SameWords(string a, string b)
@@ -76,10 +91,21 @@ public sealed partial class Store
     /// keeps every line of its own: only its summary is replaced, and with no summary in it, it's left exactly as it
     /// is (the app, the phone and Ask still get the edit).</para>
     /// <para>A summary edited in the file itself is notes the app never showed: it shows the library's. Those become
-    /// the library's notes here (where the app, search and Ask read them), and an edit that says what it started
-    /// from isn't saved over them unseen (<see cref="NotesEdited.Changed"/>): the student sees them and chooses.</para>
+    /// the library's notes here first (where the app, search and Ask read them; the older copy kept as a version). An
+    /// edit that says what it started from isn't saved over them unseen (<see cref="NotesEdited.Changed"/>): the
+    /// student sees them and chooses. Without (an AI app's save, a paste, a version put back), they're kept as the
+    /// version the new notes replace.</para>
+    /// <para><paramref name="writer"/>: notes someone else wrote (an AI app through Study Stash's connection, a chat the
+    /// student pasted them from), named as their writer the way the library names its own AI ("Claude (in the Claude
+    /// app)"), and the lecture's notes done, any old error about them gone. Null keeps whoever wrote the notes as their
+    /// writer; "" names none (the student's own).</para>
+    /// <para>Every change is a version (<see cref="NotesVersions"/>), made by <paramref name="kind"/> (an edit, unless
+    /// it's an AI app's save, a paste, a version put back, an undo or a redo; <paramref name="refSeq"/>: the version
+    /// put back), so it can be undone. <paramref name="redraft"/>: an AI app's save that replaces its own from a few
+    /// minutes before, untouched since, takes that version's place (a draft put right).</para>
     /// </summary>
-    public NotesEdited EditNotes(string noteId, string markdown, string? basedOn = null)
+    public NotesEdited EditNotes(string noteId, string markdown, string? basedOn = null, string? writer = null, bool redraft = false,
+        string kind = NotesChangeKind.Edit, long? refSeq = null)
     {
         lock (gate)
         {
@@ -114,16 +140,25 @@ public sealed partial class Store
                 return NotesEdited.Unwritten;
             }
 
-            if (basedOn is not null && edited is not null && Notes.SummaryInFile(edited) is { Length: > 0 } theirs && !Notes.SameWords(theirs, current))
+            // A summary edited in the note file itself (in another app, or by an AI working in the folder) is taken in
+            // first, the library's older copy kept as a version. An edit that says what it started from then stops, so
+            // the student sees them and chooses; anything else (an AI app's save, a paste, a version put back) goes on,
+            // and they're the notes it replaces: kept as a version, never saved over unseen.
+            if (edited is not null && Notes.SummaryInFile(edited) is { Length: > 0 } theirs && !Notes.SameWords(theirs, current))
             {
                 string seen = Now();
                 Exec("UPDATE notes SET summary_md=?, updated_at=? WHERE id=?", theirs, seen, noteId);
                 Index(noteId, theirs, m.Transcript, seen);
-                return NotesEdited.Changed;
+                RecordVersion(noteId, (current, model, row.UpdatedAt ?? ""), theirs, model, NotesChangeKind.File);
+                if (basedOn is not null) return NotesEdited.Changed;
+                current = theirs;
             }
             if (basedOn is not null && Notes.Fingerprint(current) != basedOn) return NotesEdited.Changed;
 
-            string? file = edited is null ? Notes.Render(m, c, markdown, model) : Notes.WithSummary(edited, markdown);
+            string by = writer ?? model;
+            string? file = edited is null ? Notes.Render(m, c, markdown, by) : Notes.WithSummary(edited, markdown);
+            // A file with edits of its own says who wrote the notes now, under them, as the library's own file would.
+            if (edited is not null && file is not null && writer is not null) file = Notes.WithWriter(file, by, Summarize.FromNotes(m));
             if (file is not null)
             {
                 try
@@ -137,8 +172,21 @@ public sealed partial class Store
                 }
             }
             string now = Now();
-            Exec("UPDATE notes SET summary_md=?, updated_at=? WHERE id=?", markdown, now, noteId);
+            // A draft the same AI app is putting right: notes it saved a few minutes ago, untouched since (not edited,
+            // put back, undone, redone or changed in their file). Its version takes these instead of keeping both. Only
+            // when the newest version is that very save: the app's, by the same writer, with the words it saved.
+            string outside = OutsideKey(noteId);
+            bool draft = redraft && writer is not null && GetState(outside)?.Split('\n') is [var who, var at, var print]
+                && who == writer && print == Notes.Fingerprint(current)
+                && DateTimeOffset.TryParse(at, System.Globalization.CultureInfo.InvariantCulture, System.Globalization.DateTimeStyles.AssumeUniversal, out var last)
+                && DateTimeOffset.UtcNow - last < RedraftWithin
+                && NewestIsOwnSave(noteId, writer, print);
+            if (redraft && writer is not null) SetState(outside, $"{writer}\n{now}\n{Notes.Fingerprint(markdown)}");
+            if (writer is null) Exec("UPDATE notes SET summary_md=?, updated_at=? WHERE id=?", markdown, now, noteId);
+            else Exec("UPDATE notes SET summary_md=?, summary_model=?, status=?, error=NULL, updated_at=? WHERE id=?",
+                markdown, by.Length > 0 ? by : null, Done, now, noteId);
             Index(noteId, markdown, m.Transcript, now);
+            RecordVersion(noteId, (current, model, row.UpdatedAt ?? ""), markdown, by, kind, refSeq, draftOf: draft);
             return NotesEdited.Saved;
         }
     }

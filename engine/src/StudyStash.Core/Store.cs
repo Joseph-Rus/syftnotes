@@ -213,6 +213,8 @@ public sealed partial class Store : IDisposable
         Migrate();
         HasPassages = CreatePassages();
         CreateAttachments();
+        CreateNotesVersions();
+        MigrateNotesVersions();
     }
 
     public void Dispose() => conn.Dispose();
@@ -568,8 +570,10 @@ public sealed partial class Store : IDisposable
         return path;
     }
 
-    /// <summary>Write the Markdown file and mark the note done.</summary>
-    public string Save(Meeting m, Classification c, string summaryMd = "", string summaryModel = "", string error = "")
+    /// <summary>Write the Markdown file and mark the note done. New notes are a version (<see cref="NotesVersions"/>)
+    /// made by <paramref name="versionKind"/>: the library writing them, unless said otherwise.</summary>
+    public string Save(Meeting m, Classification c, string summaryMd = "", string summaryModel = "", string error = "",
+        string versionKind = NotesChangeKind.Written)
     {
         lock (gate)
         {
@@ -577,8 +581,9 @@ public sealed partial class Store : IDisposable
             Py.WriteText(path, Notes.Render(m, c, summaryMd, summaryModel));
             string now = Now();
             string? oldPath = null, firstSeen = null;
+            (string Markdown, string Model, string At) before = ("", "", "");
             bool known = false;
-            using (var cmd = Command("SELECT md_path, first_seen FROM notes WHERE id=?", m.Id))
+            using (var cmd = Command("SELECT md_path, first_seen, summary_md, summary_model, updated_at FROM notes WHERE id=?", m.Id))
             using (var r = cmd.ExecuteReader())
             {
                 if (r.Read())
@@ -586,6 +591,7 @@ public sealed partial class Store : IDisposable
                     known = true;
                     oldPath = r.IsDBNull(0) ? null : r.GetString(0);
                     firstSeen = r.IsDBNull(1) ? null : r.GetString(1);
+                    before = (r.IsDBNull(2) ? "" : r.GetString(2), r.IsDBNull(3) ? "" : r.GetString(3), r.IsDBNull(4) ? "" : r.GetString(4));
                 }
             }
             // The Python engine compared spellings only; a class renamed "bio 110" → "Bio 110" on a Mac is the
@@ -613,6 +619,7 @@ public sealed partial class Store : IDisposable
                 error.Length > 0 ? error : null, known ? firstSeen : now, now);
             Index(m.Id, summaryMd.Length > 0 ? summaryMd : m.NotesMarkdown, m.Transcript, now);
             AttachmentsFollow(m.Id, c.ClassName);
+            RecordVersion(m.Id, before, summaryMd, summaryModel, versionKind);
             return path;
         }
     }
@@ -923,7 +930,12 @@ public sealed partial class Store : IDisposable
         return at < 0 ? text : string.Concat(text.AsSpan(0, at), with, text.AsSpan(at + find.Length));
     }
 
-    public bool Delete(string noteId)
+    /// <summary>A lecture gone for good: its row, its file, its passages and the earlier versions of its notes.</summary>
+    public bool Delete(string noteId) => Remove(noteId, forGood: true);
+
+    /// <summary>A lecture's row, file and passages gone; for good, the earlier versions of its notes too (into the
+    /// trash, they wait with it).</summary>
+    bool Remove(string noteId, bool forGood)
     {
         lock (gate)
         {
@@ -933,6 +945,7 @@ public sealed partial class Store : IDisposable
             if (path is not null && File.Exists(path)) File.Delete(path);
             Exec("DELETE FROM notes WHERE id=?", noteId);
             Unindex(noteId);
+            if (forGood) ForgetNotesVersions(noteId);
             DropEmptyDir(path, null);
             return true;
         }
@@ -956,7 +969,7 @@ public sealed partial class Store : IDisposable
             Exec("INSERT INTO trash(id, row_json, md_text, deleted_at) VALUES(?,?,?,?) ON CONFLICT(id) DO UPDATE SET "
                 + "row_json=excluded.row_json, md_text=excluded.md_text, deleted_at=excluded.deleted_at",
                 noteId, row.ToJsonString(), text, Stamp(now ?? DateTimeOffset.UtcNow));
-            return Delete(noteId);
+            return Remove(noteId, forGood: false);
         }
     }
 
@@ -1011,6 +1024,7 @@ public sealed partial class Store : IDisposable
                 Exec("INSERT INTO gone(id, gone_at) VALUES(?,?) ON CONFLICT(id) DO UPDATE SET gone_at=excluded.gone_at", id, now);
                 Exec("DELETE FROM trash WHERE id=?", id);
                 DetachAttachments(id);
+                ForgetNotesVersions(id);
             }
             // A laptop that hasn't reached the library in a month has long since dropped old audio anyway.
             Exec("DELETE FROM gone WHERE gone_at < ?", Stamp(DateTimeOffset.UtcNow.AddDays(-30)));

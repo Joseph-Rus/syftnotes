@@ -35,6 +35,8 @@ public class AiToolAccessTests
     [InlineData("list_lectures", "lectures")]
     [InlineData("search_notes", "lectures")]
     [InlineData("get_transcript", "lectures")]
+    [InlineData("notes_brief", "lectures")]
+    [InlineData("save_notes", "save")]
     [InlineData("get_lecture", "notes")]
     [InlineData("search_files", "canvas")]
     [InlineData("read_file", "canvas")]

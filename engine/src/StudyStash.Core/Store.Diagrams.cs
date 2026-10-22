@@ -126,6 +126,7 @@ public sealed partial class Store
             string now = Now();
             Exec("UPDATE notes SET summary_md=?, updated_at=? WHERE id=?", updated, now, noteId);
             Index(noteId, updated, m.Transcript, now);
+            RecordVersion(noteId, (current, model, row.UpdatedAt ?? ""), updated, model, NotesChangeKind.Diagrams);
             return new DiagramsOutcome(same ? DiagramsLanded.Added : DiagramsLanded.Reanchored, placed, skipped) { FileEdited = edited, FileLeft = file is null };
         }
     }

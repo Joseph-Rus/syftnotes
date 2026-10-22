@@ -33,6 +33,9 @@ public sealed partial class AiNotesModel : ObservableObject, IDisposable
     public AiNotesModel(IAiLibrary library) => this.library = library;
 
     public string LectureId { get; private set; } = "";
+    /// <summary>The lecture's notes as the library keeps them ("" while it has written none): what's pasted in their
+    /// place is based on them.</summary>
+    public string Written => written;
     /// <summary>The engine id that wrote the notes on screen right now (<see cref="CurrentByline"/>'s engine): the
     /// "Rewrite notes with" menu shows it last, marked "Wrote the current notes".</summary>
     public string WriterId { get; private set; } = "ollama";
@@ -100,13 +103,13 @@ public sealed partial class AiNotesModel : ObservableObject, IDisposable
     /// view's two columns show side by side.</summary>
     public string CurrentBody => AiWords.DropLeadingSummary(CurrentMarkdown);
     public string DraftBody => AiWords.DropLeadingSummary(DraftMarkdown);
-    public bool ShowRewriteButton => State == RewriteState.Idle && !Editing;
+    public bool ShowRewriteButton => State == RewriteState.Idle && !Editing && !HistoryOpen;
     /// <summary>"Edit" sits beside "Rewrite notes", and goes when it does: the notes are edited while nothing else is
     /// changing them. That includes their diagrams, which follow the notes by a few minutes: an edit begun before they
     /// arrive has no line for them, so saving it would put notes without them over the ones that have them.</summary>
-    public bool ShowEditButton => State == RewriteState.Idle && !Editing && !AddingDiagrams;
+    public bool ShowEditButton => State == RewriteState.Idle && !Editing && !AddingDiagrams && !HistoryOpen;
     /// <summary>The notes as they read: not while the two are compared side by side, or the editor has their place.</summary>
-    public bool ShowNotes => !IsComparing && !Editing;
+    public bool ShowNotes => !IsComparing && !Editing && !HistoryOpen;
     public bool ShowBar => State is RewriteState.Rewriting or RewriteState.Ready or RewriteState.Failed;
     public bool Dimmed => MenuOpen;
     public bool IsRewriting => State == RewriteState.Rewriting;
@@ -273,6 +276,7 @@ public sealed partial class AiNotesModel : ObservableObject, IDisposable
             "failed" => RewriteState.Failed,
             _ => State == RewriteState.Comparing ? RewriteState.Comparing : RewriteState.Idle,
         };
+        Change = info.Change;
         bool was = AddingDiagrams;
         AddingDiagrams = info.Diagrams == "adding";
         if (AddingDiagrams != was) OnPropertyChanged(nameof(ShowEditButton));
@@ -449,6 +453,225 @@ public sealed partial class AiNotesModel : ObservableObject, IDisposable
     [RelayCommand]
     Task TryAgain() => Rewrite(lastEngine.Length > 0 ? lastEngine : WriterId);
 
+    // --- Notes from an AI Study Stash doesn't run, and putting earlier notes back ---------------------------------------
+
+    /// <summary>The last change to the notes (what made it, who, when) and whether Undo or Redo can follow: the line
+    /// over the notes ("Notes replaced by Claude · Undo") while it's recent.</summary>
+    [ObservableProperty] public partial NotesChange? Change { get; set; }
+    partial void OnChangeChanged(NotesChange? value)
+    {
+        OnPropertyChanged(nameof(ChangeLine));
+        UndoChanged();
+    }
+
+    /// <summary>How long after a change its Undo line stays over the notes (⌘Z and History do any time).</summary>
+    public static readonly TimeSpan UndoLineFor = TimeSpan.FromMinutes(30);
+
+    /// <summary>The change whose line the student put away (×).</summary>
+    string dismissedChange = "";
+
+    public bool CanUndo => Change is { CanUndo: true } && !Busy && !Editing;
+    public bool CanRedo => Change is { CanRedo: true } && !Busy && !Editing;
+    public string ChangeLine => Change is { } c ? AiWords.ChangeWords(c.Kind, c.By) : "";
+    /// <summary>The Undo line shows right after a change (one made in the last <see cref="UndoLineFor"/>, here or by an
+    /// AI app while the student was away) that can be undone or redone, until it's put away.</summary>
+    public bool ShowChange => Change is { } c && (c.CanUndo || c.CanRedo) && c.Id != dismissedChange && !Editing && !HistoryOpen
+        && AiWords.ParseUntil(c.At) is { } at && Now() - at < UndoLineFor;
+
+    [RelayCommand]
+    void DismissChange()
+    {
+        dismissedChange = Change?.Id ?? "";
+        OnPropertyChanged(nameof(ShowChange));
+    }
+
+    /// <summary>Undo: the notes before the last change, put back (a change of its own, so Redo, or Undo again, takes it
+    /// back).</summary>
+    [RelayCommand(CanExecute = nameof(CanUndo))]
+    Task Undo() => PutBack(() => library.UndoNotesAsync(LectureId, Change?.Id));
+
+    [RelayCommand(CanExecute = nameof(CanRedo))]
+    Task Redo() => PutBack(() => library.RedoNotesAsync(LectureId, Change?.Id));
+
+    async Task PutBack(Func<Task<RewriteInfo?>> ask)
+    {
+        if (Busy || Editing) return;
+        CloseMenu?.Invoke();
+        Busy = true;
+        Say = null;
+        try
+        {
+            var info = await ask();
+            if (info is null) { OlderLibrary = true; return; }
+            Apply(info);
+            NotesChanged?.Invoke();
+        }
+        catch (LibraryRefusedException ex) when (ex.Status == 412)
+        {
+            // Changed on another device or in another app since this page last looked: nothing was undone, and the
+            // page shows the notes as they are now, with their own Undo.
+            Say = AiWords.ChangedElsewhere;
+            NotesChanged?.Invoke();
+        }
+        catch (LibraryRefusedException ex)
+        {
+            Say = ex.Message;
+        }
+        catch
+        {
+            Offline = true;
+        }
+        finally
+        {
+            Busy = false;
+        }
+    }
+
+    // --- History: every version of the notes, any of them put back ----------------------------------------------------
+
+    /// <summary>What History is, under its title.</summary>
+    public const string HistoryLine = "Every change to these notes is kept: the library writing them, your edits, AI apps, pastes and undos. Pick one to see what it would change, then restore it.";
+
+    /// <summary>History is open in the notes' place: the versions, newest first, and the one picked against the notes now.</summary>
+    [ObservableProperty] public partial bool HistoryOpen { get; set; }
+    partial void OnHistoryOpenChanged(bool value)
+    {
+        OnPropertyChanged(nameof(ShowNotes));
+        OnPropertyChanged(nameof(ShowEditButton));
+        OnPropertyChanged(nameof(ShowRewriteButton));
+        OnPropertyChanged(nameof(ShowChange));
+    }
+
+    public ObservableCollection<VersionRow> Versions { get; } = [];
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HasPicked), nameof(PickedIsNow))]
+    public partial VersionRow? Picked { get; set; }
+    public bool HasPicked => Picked is not null;
+    public bool PickedIsNow => Picked is { Current: true };
+    /// <summary>What putting the picked version back would change: lines it brings back, lines it takes away.</summary>
+    public ObservableCollection<DiffRow> PickedChanges { get; } = [];
+    [ObservableProperty] public partial string PickedSummary { get; set; } = "";
+    /// <summary>The picked version's words, when it's the notes now (nothing to compare).</summary>
+    [ObservableProperty] public partial string PickedMarkdown { get; set; } = "";
+
+    [RelayCommand]
+    public async Task OpenHistory()
+    {
+        if (Editing || Busy) return;
+        CloseMenu?.Invoke();
+        Say = null;
+        try
+        {
+            var versions = await library.NotesVersionsAsync(LectureId);
+            if (versions is null) { OlderLibrary = true; Say = "Your library runs an older Study Stash. Update it to see these notes' history."; return; }
+            Versions.Clear();
+            foreach (var v in versions) Versions.Add(new VersionRow(v, Now()));
+            HistoryOpen = true;
+            await Pick(Versions.Skip(1).FirstOrDefault() ?? Versions.FirstOrDefault());
+        }
+        catch (LibraryRefusedException ex)
+        {
+            Say = ex.Message;
+        }
+        catch
+        {
+            Offline = true;
+        }
+    }
+
+    [RelayCommand]
+    void CloseHistory()
+    {
+        HistoryOpen = false;
+        Picked = null;
+        PickedChanges.Clear();
+    }
+
+    /// <summary>Shows one version against the notes now.</summary>
+    [RelayCommand]
+    public async Task Pick(VersionRow? row)
+    {
+        foreach (var r in Versions) r.Selected = ReferenceEquals(r, row);
+        Picked = row;
+        PickedChanges.Clear();
+        PickedSummary = "";
+        PickedMarkdown = "";
+        if (row is null) return;
+        try
+        {
+            if (await library.NotesVersionAsync(LectureId, row.Id) is not { } version || !ReferenceEquals(Picked, row)) return;
+            if (row.Current)
+            {
+                PickedMarkdown = AiWords.DropLeadingSummary(version.Markdown);
+                PickedSummary = "These are the notes now.";
+                return;
+            }
+            var changes = NoteDiff.Lines(written, version.Markdown);
+            foreach (var line in changes) PickedChanges.Add(new DiffRow(line));
+            int added = changes.Count(l => l.Kind == DiffKind.Added), removed = changes.Count(l => l.Kind == DiffKind.Removed);
+            PickedSummary = AiWords.DiffSummary(added, removed);
+        }
+        catch (LibraryRefusedException ex)
+        {
+            PickedSummary = ex.Message;
+        }
+        catch
+        {
+            Offline = true;
+        }
+    }
+
+    /// <summary>Puts the picked version back as the notes, a new version of its own (undone like any change).</summary>
+    [RelayCommand]
+    async Task RestorePicked()
+    {
+        if (Picked is not { Current: false } row) return;
+        await PutBack(() => library.RestoreNotesAsync(LectureId, row.Id));
+        if (!Offline && Say is null) CloseHistory();
+    }
+
+    /// <summary>"Copy for your AI", from the ⋯ menu (the page's <see cref="FreeAiModel"/> does it); null leaves it out.</summary>
+    public Action? OnCopyForAi
+    {
+        get;
+        set
+        {
+            field = value;
+            BuildActions();
+        }
+    }
+
+    /// <summary>"Paste notes", from the ⋯ menu: the page's paste box opens; null leaves it out.</summary>
+    public Action? OnPasteNotes
+    {
+        get;
+        set
+        {
+            field = value;
+            BuildActions();
+        }
+    }
+
+    /// <summary>The ⋯ menu's actions under its engines: copy these notes' lecture for a free chat, paste notes a chat
+    /// wrote, and the notes' History.</summary>
+    void BuildActions()
+    {
+        Menu.Actions.Clear();
+        if (OnCopyForAi is { } copy)
+            Menu.Actions.Add(new MenuAction("content_copy", "Copy for your AI", "For ChatGPT, Claude or Gemini", new RelayCommand(() =>
+            {
+                CloseMenu?.Invoke();
+                copy();
+            })));
+        if (OnPasteNotes is { } paste)
+            Menu.Actions.Add(new MenuAction("content_paste", "Paste notes", "Notes a chat wrote, in place of these", new RelayCommand(() =>
+            {
+                CloseMenu?.Invoke();
+                paste();
+            })));
+        Menu.Actions.Add(new MenuAction("history", "History", "Every version, to put one back", OpenHistoryCommand));
+    }
+
     // --- Editing the notes by hand --------------------------------------------------------------------------------
 
     NoteEdit? edit;
@@ -474,6 +697,7 @@ public sealed partial class AiNotesModel : ObservableObject, IDisposable
 
     partial void OnEditingChanged(bool value)
     {
+        UndoChanged();
         OnPropertyChanged(nameof(ShowRewriteButton));
         OnPropertyChanged(nameof(ShowEditButton));
         OnPropertyChanged(nameof(ShowNotes));
@@ -488,7 +712,21 @@ public sealed partial class AiNotesModel : ObservableObject, IDisposable
 
     partial void OnEditProblemChanged(string value) => OnPropertyChanged(nameof(HasEditProblem));
 
-    partial void OnBusyChanged(bool value) => OnPropertyChanged(nameof(CanSaveEdit));
+    partial void OnBusyChanged(bool value)
+    {
+        OnPropertyChanged(nameof(CanSaveEdit));
+        UndoChanged();
+    }
+
+    /// <summary>Undo and Redo (their buttons, and ⌘Z) follow the last change, and whether anything else is going on.</summary>
+    void UndoChanged()
+    {
+        OnPropertyChanged(nameof(ShowChange));
+        OnPropertyChanged(nameof(CanUndo));
+        OnPropertyChanged(nameof(CanRedo));
+        UndoCommand.NotifyCanExecuteChanged();
+        RedoCommand.NotifyCanExecuteChanged();
+    }
 
     /// <summary>The editor's text as the edit began: the notes without the marks round the student's own words (they
     /// read as they do on the page; <see cref="TypedNotes.Remark"/> puts the marks back when it's saved).</summary>
@@ -616,4 +854,24 @@ public sealed partial class AiNotesModel : ObservableObject, IDisposable
     }
 
     public void Dispose() => StopPolling();
+}
+
+/// <summary>One version in a lecture's notes' History: what made it and who, in plain words ("Written by Claude", "Your
+/// edit", "Pasted from a chat", "Put back"), and when.</summary>
+public sealed partial class VersionRow(NotesKept version, DateTime now) : ObservableObject
+{
+    public string Id { get; } = version.Id;
+    public bool Current { get; } = version.Current;
+    public string Words { get; } = AiWords.VersionWords(version.Kind, version.By);
+    public string When { get; } = AiWords.VersionWhen(version.At, now) + (version.Current ? " · now" : "");
+    [ObservableProperty] public partial bool Selected { get; set; }
+}
+
+/// <summary>A line of History's comparison as it's shown: one the version would bring back (marked green), one it
+/// would take away (pink, struck through), one the same, or a fold of unchanged ones ("…").</summary>
+public sealed class DiffRow(DiffLine line)
+{
+    public string Text { get; } = line.Text.Length == 0 ? " " : line.Text;
+    public bool Added { get; } = line.Kind == DiffKind.Added;
+    public bool Removed { get; } = line.Kind == DiffKind.Removed;
 }

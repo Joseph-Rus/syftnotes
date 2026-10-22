@@ -22,10 +22,14 @@ public sealed partial class LibraryWeb
     /// <summary>The folders (outside the library) the AI may read, from folders.json beside config.toml.</summary>
     public Func<IReadOnlyList<string>> ReadDirs => () => Folders.Load(cfg.Home).Where(f => f.Ai && !f.Private).Select(f => f.Path).Where(Directory.Exists).ToList();
 
-    Chats LibraryChats => chats ??= new Chats(cfg.Home, cfg.PoolDir, options.Ai ?? new AiJobs(cfg.Home, () => cfg.OllamaHost), LibraryHistory, ReadDirs);
+    /// <summary>One for the library, even when two questions arrive at once: it's what keeps a chat to one turn at a time.</summary>
+    Chats LibraryChats => LazyInitializer.EnsureInitialized(ref chats,
+        () => new Chats(cfg.Home, cfg.PoolDir, options.Ai ?? new AiJobs(cfg.Home, () => cfg.OllamaHost), LibraryHistory, ReadDirs));
 
     /// <summary>Chat is in the sidebar once an AI is picked in Settings (or a chat exists).</summary>
     bool ChatOn => File.Exists(AiSettings.PathIn(cfg.Home)) || Directory.Exists(Path.Combine(cfg.Home, "chats"));
+
+    static string? NotEmpty(string? s) => string.IsNullOrWhiteSpace(s) ? null : s;
 
     static JsonObject EventJson(AiEvent e) => new() { ["kind"] = e.Kind, ["text"] = e.Text, ["name"] = e.Name, ["path"] = e.Path };
 
@@ -65,12 +69,32 @@ public sealed partial class LibraryWeb
     static JsonObject ChatJson(Chat c, bool full) => new()
     {
         ["id"] = c.Id, ["title"] = c.Title, ["class"] = c.ClassName, ["lecture"] = c.Lecture, ["updated"] = c.Updated, ["provider"] = c.Provider,
+        ["kind"] = c.Kind, ["scope"] = c.Scope, ["turns"] = c.Messages.Count(m => m.Role == "user"),
         ["messages"] = full ? new JsonArray(c.Messages.Select(m => (JsonNode)new JsonObject
         {
             ["role"] = m.Role, ["text"] = m.Text, ["when"] = m.When, ["tools"] = new JsonArray(m.Tools.Select(t => (JsonNode)t).ToArray()),
             ["changed"] = new JsonArray(m.Changed.Select(t => (JsonNode)t).ToArray()), ["change"] = m.Change, ["failed"] = m.Failed,
+            ["sources"] = System.Text.Json.JsonSerializer.SerializeToNode(m.Sources, AiRemote.Options), ["engine"] = m.Engine,
+            ["engine_name"] = m.EngineName, ["stopped"] = m.Stopped,
         }).ToArray()) : null,
     };
+
+    /// <summary>An Ask chat in a list: from the index, with its lecture's title for a folder's page or Home.</summary>
+    static JsonObject EntryJson(ChatEntry e, IReadOnlyDictionary<string, NoteRow> lectures) => new()
+    {
+        ["id"] = e.Id, ["title"] = e.Title, ["class"] = e.ClassName, ["lecture"] = e.Lecture, ["updated"] = e.Updated, ["kind"] = e.Kind,
+        ["scope"] = e.Scope, ["turns"] = e.Turns,
+        ["lecture_title"] = e.Lecture.Length > 0 && lectures.TryGetValue(e.Lecture, out var n) ? (!string.IsNullOrEmpty(n.LectureTitle) ? n.LectureTitle : n.Title) : "",
+    };
+
+    /// <summary>The app's Ask chats on a lecture's page, a folder's or Home: each lecture's by the folder it's in now,
+    /// read once for the whole list.</summary>
+    IResult AskChatList(string? lecture, string? cls)
+    {
+        var lectures = store.ListNotes().ToDictionary(r => r.Id);
+        var chats = LibraryChats.AskChats(lecture, cls, id => lectures.TryGetValue(id, out var n) ? n.ClassName : null);
+        return Http.Json(new JsonArray([.. chats.Take(200).Select(e => (JsonNode)EntryJson(e, lectures))]));
+    }
 
     void MapChat(WebApplication app)
     {
@@ -84,9 +108,24 @@ public sealed partial class LibraryWeb
             }
             await StreamTurn(ctx, await Http.JsonBodyAsync(ctx.Request));
         });
-        app.MapGet("/api/v2/chats", (HttpContext ctx) => Api(ctx, () => Http.Json(new JsonArray(LibraryChats.List().Select(c => (JsonNode)ChatJson(c, false)).ToArray()))));
+        // kind=ask: the app's Ask chats, from the index: a lecture's, a class's (its own and its lectures'), or all of them.
+        app.MapGet("/api/v2/chats", (HttpContext ctx, string? kind, string? lecture, string? @class) => Api(ctx, () => kind == Chats.AskKind
+            ? AskChatList(NotEmpty(lecture), NotEmpty(@class))
+            : Http.Json(new JsonArray(LibraryChats.List().Select(c => (JsonNode)ChatJson(c, false)).ToArray()))));
         app.MapGet("/api/v2/chats/{id}", (HttpContext ctx, string id) => Api(ctx, () => LibraryChats.Get(id) is { } c ? Http.Json(ChatJson(c, true)) : Http.Detail(404, "no such chat")));
+        // Renamed: {"title"}.
+        app.MapPost("/api/v2/chats/{id}", Http.Handle(ctx => ApiAsync(ctx, async () =>
+        {
+            string id = (string)ctx.Request.RouteValues["id"]!;
+            string title = Py.Strip(S((await Http.JsonBodyAsync(ctx.Request))?["title"])).ReplaceLineEndings(" ");
+            if (title.Length == 0) return Http.Detail(400, "what should it be called?");
+            if (title.Length > 200) return Http.Detail(400, "that name is too long: 200 characters at most");
+            return LibraryChats.Rename(id, title) is { } c ? Http.Json(ChatJson(c, false)) : Http.Detail(404, "no such chat");
+        })));
+        // Deleted, and kept a while so the app's Undo can bring it back.
         app.MapDelete("/api/v2/chats/{id}", (HttpContext ctx, string id) => Api(ctx, () => LibraryChats.Delete(id) ? Http.Json(new JsonObject { ["deleted"] = id }) : Http.Detail(404, "no such chat")));
+        app.MapPost("/api/v2/chats/{id}/restore", (HttpContext ctx, string id) => Api(ctx, () =>
+            LibraryChats.Restore(id) && LibraryChats.Get(id) is { } c ? Http.Json(ChatJson(c, false)) : Http.Detail(404, "It's no longer kept, so it can't come back.")));
         app.MapGet("/api/v2/history", (HttpContext ctx) => Api(ctx, () => Http.Json(new JsonArray(LibraryHistory.Log().Select(ch => (JsonNode)new JsonObject
         {
             ["id"] = ch.Sha, ["when"] = ch.When, ["title"] = ch.Title, ["by"] = ch.By, ["files"] = new JsonArray(ch.Files.Select(f => (JsonNode)f).ToArray()),
@@ -151,7 +190,8 @@ public sealed partial class LibraryWeb
         if (!ready) sb.Append($"<div class=\"notice\"><div>{Ui.Esc(why)} Pick another AI in <a href=\"/settings\">Settings</a>.</div></div>");
         if (chat is null)
         {
-            var recent = LibraryChats.List(20);
+            // Its own chats only (the app's Ask chats are the app's), the 20 newest, from the index: only those are read.
+            var recent = LibraryChats.Entries().Where(e => e.Kind != Chats.AskKind).Take(20).Select(e => LibraryChats.Get(e.Id)).OfType<Chat>().ToList();
             if (recent.Count > 0)
                 sb.Append("<h2>Recent chats</h2><div class=\"group\">" + string.Concat(recent.Select(r =>
                     $"<a class=\"row\" href=\"/chat/{r.Id}\"><div class=\"grow\"><div class=\"title\">{Ui.Esc(r.Title)}</div>"

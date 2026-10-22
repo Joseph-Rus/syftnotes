@@ -276,7 +276,11 @@ public static class Cli
                 cachedAt = DateTime.UtcNow;
                 return cached;
             }
-            await ClaudeTools.RunStdioAsync(new RemoteLibrary(url, key), stop.Token, tools => ToolAccess.Guard(tools, Access));
+            // Notes it saves are named as that app's ("Written by Claude"); an app Settings didn't connect is named by
+            // what it calls itself.
+            string? client = Option(McpClients.Option);
+            string? writer = client is not null && McpClients.Ids.Contains(client) ? McpClients.Writer(client) : null;
+            await ClaudeTools.RunStdioAsync(new RemoteLibrary(url, key), stop.Token, tools => ToolAccess.Guard(tools, Access), writer);
             return 0;
         }
 

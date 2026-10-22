@@ -21,7 +21,7 @@
           <ToggleButton AutomationProperties.Name="Let AI apps read your library" Grid.Column="1" Theme="{StaticResource AiToggle}" IsChecked="{Binding On}" VerticalAlignment="Center" />
         </Grid>
         <TextBlock Classes="ai-sub" MaxWidth="540" HorizontalAlignment="Left"
-                   Text="ChatGPT, Claude and other AI apps can read your lectures and notes to answer your questions. They can't change or delete anything." />
+                   Text="ChatGPT, Claude and other AI apps can read your lectures and notes to answer your questions, and save notes you ask them to write. They can't delete anything." />
         <TextBlock Classes="ai-sub" MaxWidth="540" HorizontalAlignment="Left" Foreground="{DynamicResource Warn}" IsVisible="{Binding Offline}"
                    Text="Can't reach your library right now, so what's below may be out of date." />
         <TextBlock Classes="ai-sub" MaxWidth="540" HorizontalAlignment="Left" IsVisible="{Binding OlderLibrary}"
@@ -189,6 +189,29 @@
             </Button>
           </StackPanel>
         </Border>
+      </StackPanel>
+
+      <!-- What they can change: the notes a student asks them to write, saved on the lecture's page (save_notes) -->
+      <StackPanel Spacing="8">
+        <TextBlock Classes="ai-section" Text="What they can change" Margin="4,0" />
+        <Border Classes="ai-group">
+          <StackPanel>
+            <Button Name="SaveNotesToggle" Classes="ai-textbtn ai-choice quiet" Command="{Binding ToggleSaveNotesCommand}" HorizontalContentAlignment="Stretch"
+                    AutomationProperties.Name="Save notes they write">
+              <Grid Classes="ai-row" ColumnDefinitions="Auto,12,*" MinHeight="52" Margin="16,0">
+                <Border Classes="ai-check" Classes.on="{Binding SaveNotes}" VerticalAlignment="Center">
+                  <c:Icon Glyph="check" Size="13" Foreground="{DynamicResource OnAccent}" IsVisible="{Binding SaveNotes}" />
+                </Border>
+                <Border Classes="focusring ai-checkring" />
+                <StackPanel Grid.Column="2" Classes="ai-row-text" VerticalAlignment="Center" Margin="0,8">
+                  <TextBlock Classes="ai-row-title" Text="{x:Static vm:AiAccessModel.SaveToggle}" />
+                  <TextBlock Classes="ai-row-sub" TextWrapping="Wrap" Text="{x:Static vm:AiAccessModel.SaveToggleSub}" />
+                </StackPanel>
+              </Grid>
+            </Button>
+          </StackPanel>
+        </Border>
+        <c:PageText Name="NoPlanLine" Classes="ai-sub" MaxWidth="560" HorizontalAlignment="Left" Margin="4,0" TextWrapping="Wrap" Text="{x:Static vm:AiAccessModel.NoPlanLine}" />
       </StackPanel>
 
       <!-- Claude and ChatGPT on the web and phone: Funnel on/off, the address to paste into them, steps, a live check, its

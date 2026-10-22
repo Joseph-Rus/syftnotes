@@ -251,26 +251,37 @@ public static partial class AiWords
 
     /// <summary>An answer's byline: the engine, then the moments in the lecture it drew on, earliest first ("Ollama ·
     /// from 18:05 and 18:40"), or just the engine when nothing carries a moment.</summary>
-    public static string AskByline(string engineName, IEnumerable<AskSource> sources) =>
-        string.Concat(AskBylineParts(engineName, [.. sources], null).Select(p => p.Text));
+    public static string AskByline(string engineName, IEnumerable<AskSource> sources, bool readChat = false) =>
+        string.Concat(AskBylineParts(engineName, [.. sources], null, readChat).Select(p => p.Text));
 
     /// <summary>The byline in the pieces it's shown in. With <paramref name="open"/> (the page can show a source),
     /// each moment is a link of its own that opens its source, so every one the answer drew on can be gone to; a
-    /// byline that names no moment opens the answer's first source, as one press.</summary>
-    public static List<BylinePart> AskBylineParts(string engineName, IReadOnlyList<AskSource> sources, Action<AskSource>? open)
+    /// byline that names no moment opens the answer's first source, as one press. <paramref name="readChat"/>: the
+    /// conversation above went to this AI with the question, where another AI (the free one, on the student's own
+    /// computer) answered it, and the byline says so (<see cref="ReadChat"/>).</summary>
+    public static List<BylinePart> AskBylineParts(string engineName, IReadOnlyList<AskSource> sources, Action<AskSource>? open, bool readChat = false)
     {
         // The moments the answer drew on, in the order they were said (an engine lists them by relevance), each once.
         var moments = sources.Where(s => s.At is not null).OrderBy(s => s.At!.Value).DistinctBy(s => TimedText.Clock(s.At!.Value)).ToList();
-        if (moments.Count == 0) return [new BylinePart(engineName, open is not null && sources.Count > 0 ? () => open(sources[0]) : null)];
-        var parts = new List<BylinePart> { new($"{engineName} · from ") };
+        var parts = new List<BylinePart>();
+        if (moments.Count == 0) parts.Add(new BylinePart(engineName, open is not null && sources.Count > 0 ? () => open(sources[0]) : null));
+        else parts.Add(new BylinePart($"{engineName} · from "));
         for (int i = 0; i < moments.Count; i++)
         {
             if (i > 0) parts.Add(new BylinePart(i == moments.Count - 1 ? " and " : ", "));
             var source = moments[i];
             parts.Add(new BylinePart(TimedText.Clock(source.At!.Value), open is null ? null : () => open(source), moment: true));
         }
+        if (readChat) parts.Add(new BylinePart(ReadChat));
         return parts;
     }
+
+    /// <summary>After an answer's byline, when the chat above went to an AI that hadn't had it (Claude asked after the
+    /// free AI answered, which kept it on the computer): " · also read the chat above".</summary>
+    public const string ReadChat = " · also read the chat above";
+
+    /// <summary>Under the first answer from a library too old to keep chats.</summary>
+    public const string NoHistoryOnOlderLibrary = "Your library runs an older Study Stash, so this chat isn't kept and follow-ups start fresh. Update it to keep your chats.";
 
     /// <summary>What a moment in a byline does: "Read the transcript at 01:52".</summary>
     public static string MomentTip(string time) => $"Read the transcript at {time}";
@@ -296,6 +307,59 @@ public static partial class AiWords
     public static string WrittenByline(string engineName, string updatedAtIso) =>
         engineName.Length == 0 ? "" // an older lecture that doesn't say who wrote its notes
         : ParseUntil(updatedAtIso) is { } at ? $"Written by {engineName} · {at:ddd H:mm}" : $"Written by {engineName}";
+
+    /// <summary>The line over the notes right after a change to them, by what made it: "Notes replaced by Claude",
+    /// "Notes pasted from a chat", "Your edit saved", "Earlier notes put back", "Undone".</summary>
+    public static string ChangeWords(string kind, string by) => kind switch
+    {
+        NotesChangeKind.App => $"Notes replaced by {Who(by)}",
+        NotesChangeKind.Paste => "Notes pasted from a chat",
+        NotesChangeKind.Edit => "Your edit saved",
+        NotesChangeKind.Restore => "Earlier notes put back",
+        NotesChangeKind.Undo => "Undone",
+        NotesChangeKind.Redo => "Redone",
+        NotesChangeKind.Rewrite => $"Notes rewritten by {Who(by)}",
+        NotesChangeKind.Diagrams => "Diagrams added",
+        NotesChangeKind.File => "Changed in the note's file",
+        _ => $"New notes from {Who(by)}",
+    };
+
+    /// <summary>Undo or Redo pressed after the notes changed on another device or in another app.</summary>
+    public const string ChangedElsewhere = "These notes changed on another device since this page showed them, so nothing was undone. Here they are now.";
+
+    /// <summary>A version in History, by what made it: "Written by Claude", "Your edit", "Pasted from a chat", "Put
+    /// back".</summary>
+    public static string VersionWords(string kind, string by) => kind switch
+    {
+        NotesChangeKind.Paste => "Pasted from a chat",
+        NotesChangeKind.Edit => "Your edit",
+        NotesChangeKind.Restore => "Put back",
+        NotesChangeKind.Undo => "Undo",
+        NotesChangeKind.Redo => "Redo",
+        NotesChangeKind.Rewrite => $"Rewritten by {Who(by)}",
+        NotesChangeKind.Diagrams => "Diagrams added",
+        NotesChangeKind.File => "Changed in the note's file",
+        _ => by.Length > 0 ? $"Written by {by}" : "Your notes",
+    };
+
+    static string Who(string by) => by.Length > 0 ? by : Engines.YourAi;
+
+    /// <summary>When a version was made: "Today 3:10 PM", "Yesterday 9:30 AM", "21 Oct 3:10 PM".</summary>
+    public static string VersionWhen(string atIso, DateTime now) => ParseUntil(atIso) is { } at
+        ? (at.Date == now.Date ? "Today " : at.Date == now.Date.AddDays(-1) ? "Yesterday " : at.ToString(at.Year == now.Year ? "d MMM " : "d MMM yyyy ", CultureInfo.InvariantCulture))
+          + at.ToString("h:mm tt", CultureInfo.InvariantCulture)
+        : "";
+
+    /// <summary>What putting a version back would change, in a line.</summary>
+    public static string DiffSummary(int added, int removed) => (added, removed) switch
+    {
+        (0, 0) => "The same words as the notes now.",
+        _ => "Against the notes now: " + string.Join(", ", new[]
+            {
+                added > 0 ? $"{added} line{(added == 1 ? "" : "s")} it brings back" : "",
+                removed > 0 ? $"{removed} line{(removed == 1 ? "" : "s")} it takes away" : "",
+            }.Where(x => x.Length > 0)) + ".",
+    };
 
     /// <summary>A ready draft's byline: "Claude Code · just now" (or "· 5 min ago", "· 2 h ago", a date).</summary>
     public static string DraftByline(string engineName, string atIso, DateTime now) => $"{engineName} · {History.Ago(atIso, now)}";

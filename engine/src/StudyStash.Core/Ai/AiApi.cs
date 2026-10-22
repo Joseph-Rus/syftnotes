@@ -76,9 +76,55 @@ public sealed record AskRequest(string Question)
     public string? Engine { get; init; }
     public string? Live { get; init; }
     public string? LiveTitle { get; init; }
+    /// <summary>The conversation so far, oldest first, when this is a follow-up and the library doesn't keep it
+    /// (<see cref="Chat"/> unset): the last few turns, each cut short (<see cref="AskMemory"/>). A library too old to
+    /// know it ignores it.</summary>
+    public List<AskTurn>? History { get; init; }
+    /// <summary>The kept conversation this question goes on: its id, or "new" to start one where <see cref="Place"/>
+    /// says. The library reads the turns before it from the chat itself and keeps this one in it. Null: nothing kept
+    /// (the phone, the quick panel). A library too old to keep chats ignores it, and its reply has no
+    /// <see cref="AskReply.Chat"/>.</summary>
+    public string? Chat { get; init; }
+    public AskPlace? Place { get; init; }
+}
+
+/// <summary>Where an Ask chat lives: a lecture's page ("lecture", with its folder), a folder's page ("class") or Home
+/// ("home"). The questions in it may still look further (the scope chip): this is where it's listed.</summary>
+public sealed record AskPlace(string Scope, string? Lecture = null, string? Class = null);
+
+/// <summary>A kept Ask conversation, as a list shows it (<see cref="Messages"/> null) or whole.</summary>
+public sealed record AskChat(string Id, string Title, string Updated)
+{
+    public string Kind { get; init; } = "";
+    public string Scope { get; init; } = "";
+    public string Class { get; init; } = "";
+    public string Lecture { get; init; } = "";
+    /// <summary>Its lecture's title, for a list on a folder's page or Home ("" when it has none, or it's gone).</summary>
+    public string LectureTitle { get; init; } = "";
+    public int Turns { get; init; }
+    public List<AskChatMessage>? Messages { get; init; }
+}
+
+/// <summary>One message in a kept Ask conversation: a question ("user") or its answer ("assistant"), with what the
+/// answer drew on and the AI that wrote it.</summary>
+public sealed record AskChatMessage(string Role, string Text)
+{
+    public List<AskSource> Sources { get; init; } = [];
+    public string Engine { get; init; } = "";
+    public string EngineName { get; init; } = "";
+    public bool Failed { get; init; }
+    public bool Stopped { get; init; }
 }
 
 public sealed record AskSource(string? Id, string Title, string? Class, string? Date, double? At, string Section);
+
+/// <summary>An earlier question in the same conversation and the answer it got, sent along with a follow-up so the AI
+/// knows what "that" or "the second one" means. Its sources are what the answer drew on: the follow-up reads them
+/// again.</summary>
+public sealed record AskTurn(string Question, string Answer)
+{
+    public List<AskSource> Sources { get; init; } = [];
+}
 
 public sealed record AskReply(string Answer, List<AskSource> Sources, string Engine, string EngineName)
 {
@@ -86,9 +132,32 @@ public sealed record AskReply(string Answer, List<AskSource> Sources, string Eng
     public string AskedName { get; init; } = "";
     public bool FellBack { get; init; }
     public string Why { get; init; } = "";
+    /// <summary>How many of the conversation's earlier turns went to the AI with this question (the most recent ones;
+    /// 0 for none). Null from a library too old to remember a conversation: it answered the question on its own.</summary>
+    public int? Remembered { get; init; }
+    /// <summary>The kept conversation this turn is in now (a new one's id when it started one). Null from a library too
+    /// old to keep chats.</summary>
+    public string? Chat { get; init; }
 }
 
 public sealed record NotesVersion(string Markdown, string By, string At);
+
+/// <summary>A version of a lecture's notes (History): its id (to look at it or put it back), what made it (written,
+/// rewrite, app, paste, edit, restore, undo, redo, diagrams, file), who wrote the notes ("Claude"; "" for the student's
+/// own), when, and whether it's the notes now. <see cref="Markdown"/> only when one version is asked for.</summary>
+public sealed record NotesKept(string Id, string Kind, string By, string At)
+{
+    public bool Current { get; init; }
+    public string Markdown { get; init; } = "";
+}
+
+/// <summary>The last change to a lecture's notes, as the notes' Undo line says it: what made it, who, when, and
+/// whether Undo (back to the notes before) and Redo (forward again, after an undo) can follow.</summary>
+public sealed record NotesChange(string Id, string Kind, string By, string At)
+{
+    public bool CanUndo { get; init; }
+    public bool CanRedo { get; init; }
+}
 
 /// <summary>state: none | working | ready | failed | cancelled</summary>
 public sealed record RewriteInfo(string Lecture, string State)
@@ -104,9 +173,19 @@ public sealed record RewriteInfo(string Lecture, string State)
     /// <summary>"adding" while the designer adds the current notes' diagrams (they follow the notes, a few minutes
     /// later); "" otherwise, and from a library older than that.</summary>
     public string Diagrams { get; init; } = "";
+    /// <summary>The last change to the lecture's notes (what made it, who, when), and whether Undo or Redo can follow
+    /// it. Null with none kept, and from a library older than notes' versions.</summary>
+    public NotesChange? Change { get; init; }
 }
 
-public sealed record ReadingScopes(bool Lectures = true, bool Notes = true, bool Canvas = true, bool Audio = false);
+/// <summary>What AI apps may read while tool access is on, and <see cref="SaveNotes"/>: whether they may save the notes
+/// a student asks them to write for a lecture (save_notes), on unless the student switches it off.</summary>
+public sealed record ReadingScopes(bool Lectures = true, bool Notes = true, bool Canvas = true, bool Audio = false, bool SaveNotes = true);
+
+/// <summary>How Study Stash writes a lecture's notes (<see cref="Summarize.Brief"/>), for an AI it doesn't run itself,
+/// and what "Copy for your AI" puts on the clipboard: the brief and the transcript, in one message or, for a lecture
+/// too long for one, in <see cref="Parts"/> of their own.</summary>
+public sealed record NotesBrief(string Brief, List<string> Parts);
 
 public sealed record ToolConnection(string Id, string Name, string Kind)
 {
@@ -166,6 +245,11 @@ public interface IAiLibrary
     /// each time more arrives. <paramref name="stop"/> ends it where it is. A library too old to stream (or a
     /// stand-in that doesn't) answers once, at the end.</summary>
     Task<AskReply?> AskAsync(AskRequest request, Action<string> answerSoFar, CancellationToken stop) => AskAsync(request);
+    /// <summary>Asks in a kept chat: <paramref name="inChat"/> hears first which one (a new one's id too), whatever
+    /// comes of the answer after, so a turn stopped or cut off is carried on in the same chat. A library too old to
+    /// keep chats never says.</summary>
+    Task<AskReply?> AskAsync(AskRequest request, Action<string> answerSoFar, Action<string> inChat, CancellationToken stop) =>
+        AskAsync(request, answerSoFar, stop);
     /// <summary>A student has started typing a question for <paramref name="engine"/> (null: the library's pick):
     /// the library gets that engine ready, so the answer starts sooner. Never fails: it's only a head start.</summary>
     Task WarmAsync(string? engine) => Task.CompletedTask;
@@ -179,12 +263,41 @@ public interface IAiLibrary
     /// refuses (412) rather than save over them; null saves over whatever is there. Null from a library too old to
     /// take edits.</summary>
     Task<RewriteInfo?> EditNotesAsync(string lecture, string markdown, string? basedOn) => Task.FromResult<RewriteInfo?>(null);
+    /// <summary>Saves notes the student pasted from a chat as the lecture's notes, tidied of what the chat put round
+    /// them, the student's typed lines kept in them. A lecture with notes keeps them unless <paramref name="replace"/>
+    /// (409); <paramref name="basedOn"/> as for an edit. Null from a library too old to take them.</summary>
+    Task<RewriteInfo?> SaveNotesAsync(string lecture, string markdown, bool replace, string? basedOn) => Task.FromResult<RewriteInfo?>(null);
+    /// <summary>Puts a version of the lecture's notes back as a new version (<paramref name="version"/>, a
+    /// <see cref="NotesKept.Id"/>, or the one before the notes now). Null from a library too old to.</summary>
+    Task<RewriteInfo?> RestoreNotesAsync(string lecture, string? version = null) => Task.FromResult<RewriteInfo?>(null);
+    /// <summary>Undo: the notes before the last change, put back. <paramref name="expect"/>: the version the app shows
+    /// (<see cref="NotesChange.Id"/>); changed elsewhere since, the library refuses (412) and nothing is undone. Null from
+    /// a library too old to.</summary>
+    Task<RewriteInfo?> UndoNotesAsync(string lecture, string? expect = null) => Task.FromResult<RewriteInfo?>(null);
+    /// <summary>Redo: the notes the last undo went back from, put back (412 as for Undo). Null from a library too old to.</summary>
+    Task<RewriteInfo?> RedoNotesAsync(string lecture, string? expect = null) => Task.FromResult<RewriteInfo?>(null);
+    /// <summary>The versions of the lecture's notes, newest first (History). Null from a library too old to.</summary>
+    Task<List<NotesKept>?> NotesVersionsAsync(string lecture) => Task.FromResult<List<NotesKept>?>(null);
+    /// <summary>One version, with its words. Null when there's no such version, or the library is too old.</summary>
+    Task<NotesKept?> NotesVersionAsync(string lecture, string version) => Task.FromResult<NotesKept?>(null);
+    /// <summary>What to ask a free chat for the lecture's notes, the transcript with it (<see cref="NotesBrief"/>). Null
+    /// from a library too old to say.</summary>
+    Task<NotesBrief?> NotesBriefAsync(string lecture) => Task.FromResult<NotesBrief?>(null);
     Task<ToolAccessInfo?> AccessAsync();
     Task<ToolAccessInfo?> SetAccessAsync(bool? on = null, ReadingScopes? reading = null);
     /// <summary>Turns Funnel on or off on the library's computer, then checks it from the internet.</summary>
     Task<ToolAccessInfo?> SetWebAsync(bool on);
     /// <summary>Checks again whether the library answers from the internet.</summary>
     Task<ToolAccessInfo?> CheckWebAsync();
+    /// <summary>The kept Ask chats on a lecture's page, a folder's (its own and its lectures') or, with neither, Home's
+    /// (all of them), newest first. Empty from a library too old to keep them.</summary>
+    Task<List<AskChat>> ChatsAsync(string? lecture, string? className) => Task.FromResult(new List<AskChat>());
+    /// <summary>One kept chat, whole; null when it's gone.</summary>
+    Task<AskChat?> ChatAsync(string id) => Task.FromResult<AskChat?>(null);
+    Task<AskChat?> RenameChatAsync(string id, string title) => Task.FromResult<AskChat?>(null);
+    /// <summary>Deletes a chat, kept a while for <see cref="RestoreChatAsync"/>; false when it was gone already.</summary>
+    Task<bool> DeleteChatAsync(string id) => Task.FromResult(false);
+    Task<bool> RestoreChatAsync(string id) => Task.FromResult(false);
 }
 
 /// <summary>The library's AI over its API (/api/v2/ai), the way the Study Stash app reads it. Like
@@ -209,11 +322,13 @@ public sealed class AiRemote(string serverUrl, Func<string> key, HttpClient? htt
 
     static readonly HttpClient Shared = new() { Timeout = Waits };
     readonly HttpClient client = http ?? Shared;
-    readonly string root = serverUrl.TrimEnd('/') + "/api/v2/ai";
+    readonly string server = serverUrl.TrimEnd('/');
+    string Root => server + "/api/v2/ai";
 
+    /// <summary>A path under /api/v2/ai, or, starting with "~", one of the library's own (~/api/v2/chats).</summary>
     HttpRequestMessage Request(HttpMethod method, string path, JsonNode? body)
     {
-        var request = new HttpRequestMessage(method, root + path);
+        var request = new HttpRequestMessage(method, path.StartsWith('~') ? server + path[1..] : Root + path);
         if (key() is { Length: > 0 } now) request.Headers.TryAddWithoutValidation("Authorization", "Bearer " + now);
         if (body is not null) request.Content = new StringContent(body.ToJsonString(), Encoding.UTF8, "application/json");
         return request;
@@ -289,7 +404,9 @@ public sealed class AiRemote(string serverUrl, Func<string> key, HttpClient? htt
 
     /// <summary>The answer as the library streams it (see the library's <c>/api/v2/ai/ask</c> with <c>stream</c>),
     /// read a line at a time as each arrives. Stopping closes the connection, which stops the engine too.</summary>
-    public async Task<AskReply?> AskAsync(AskRequest request, Action<string> answerSoFar, CancellationToken stop)
+    public Task<AskReply?> AskAsync(AskRequest request, Action<string> answerSoFar, CancellationToken stop) => AskAsync(request, answerSoFar, _ => { }, stop);
+
+    public async Task<AskReply?> AskAsync(AskRequest request, Action<string> answerSoFar, Action<string> inChat, CancellationToken stop)
     {
         var body = JsonSerializer.SerializeToNode(request, Options)!.AsObject();
         body["stream"] = true;
@@ -310,6 +427,9 @@ public sealed class AiRemote(string serverUrl, Func<string> key, HttpClient? htt
                     break;
                 case "answer":
                     answerSoFar(answer.Clear().Append(text).ToString());
+                    break;
+                case "chat" when Py.AsString(said["id"]) is { Length: > 0 } id:
+                    inChat(id);
                     break;
                 case "done":
                     return As<AskReply>(said["reply"]);
@@ -351,6 +471,27 @@ public sealed class AiRemote(string serverUrl, Func<string> key, HttpClient? htt
     public async Task<RewriteInfo?> EditNotesAsync(string lecture, string markdown, string? basedOn) => As<RewriteInfo>(await SendAsync(
         HttpMethod.Post, $"/rewrite/{Seg(lecture)}/edit", new JsonObject { ["markdown"] = markdown, ["based_on"] = basedOn }));
 
+    public async Task<RewriteInfo?> SaveNotesAsync(string lecture, string markdown, bool replace, string? basedOn) => As<RewriteInfo>(await SendAsync(
+        HttpMethod.Post, $"/rewrite/{Seg(lecture)}/save", new JsonObject { ["markdown"] = markdown, ["replace"] = replace, ["based_on"] = basedOn, ["from"] = "paste" }));
+
+    public async Task<RewriteInfo?> RestoreNotesAsync(string lecture, string? version = null) =>
+        As<RewriteInfo>(await SendAsync(HttpMethod.Post, $"/rewrite/{Seg(lecture)}/restore", new JsonObject { ["version"] = version }));
+
+    public async Task<RewriteInfo?> UndoNotesAsync(string lecture, string? expect = null) =>
+        As<RewriteInfo>(await SendAsync(HttpMethod.Post, $"/rewrite/{Seg(lecture)}/undo", new JsonObject { ["expect"] = expect }));
+
+    public async Task<RewriteInfo?> RedoNotesAsync(string lecture, string? expect = null) =>
+        As<RewriteInfo>(await SendAsync(HttpMethod.Post, $"/rewrite/{Seg(lecture)}/redo", new JsonObject { ["expect"] = expect }));
+
+    public async Task<List<NotesKept>?> NotesVersionsAsync(string lecture) =>
+        (await SendAsync(HttpMethod.Get, $"/rewrite/{Seg(lecture)}/versions"))?["versions"]?.Deserialize<List<NotesKept>>(Options);
+
+    public async Task<NotesKept?> NotesVersionAsync(string lecture, string version) =>
+        As<NotesKept>(await SendAsync(HttpMethod.Get, $"/rewrite/{Seg(lecture)}/versions/{Seg(version)}"));
+
+    public async Task<NotesBrief?> NotesBriefAsync(string lecture) =>
+        As<NotesBrief>(await SendAsync(HttpMethod.Get, $"/rewrite/{Seg(lecture)}/brief?for=chat"));
+
     public async Task<ToolAccessInfo?> AccessAsync() => As<ToolAccessInfo>(await SendAsync(HttpMethod.Get, "/access"));
 
     public async Task<ToolAccessInfo?> SetAccessAsync(bool? on = null, ReadingScopes? reading = null)
@@ -365,4 +506,51 @@ public sealed class AiRemote(string serverUrl, Func<string> key, HttpClient? htt
         As<ToolAccessInfo>(await SendAsync(HttpMethod.Post, "/access/web", new JsonObject { ["on"] = on }));
 
     public async Task<ToolAccessInfo?> CheckWebAsync() => As<ToolAccessInfo>(await SendAsync(HttpMethod.Post, "/access/web/check"));
+
+    /// <summary>A library too old to keep Ask chats lists only the ones it has (none with kind "ask"): an empty list.</summary>
+    public async Task<List<AskChat>> ChatsAsync(string? lecture, string? className)
+    {
+        string query = "?kind=ask" + (lecture is not null ? "&lecture=" + Seg(lecture) : className is not null ? "&class=" + Seg(className) : "");
+        var list = As<List<AskChat>>(await SendAsync(HttpMethod.Get, "~/api/v2/chats" + query)) ?? [];
+        return [.. list.Where(c => c.Kind == "ask")];
+    }
+
+    public async Task<AskChat?> ChatAsync(string id)
+    {
+        try
+        {
+            return As<AskChat>(await SendAsync(HttpMethod.Get, $"~/api/v2/chats/{Seg(id)}"));
+        }
+        catch (LibraryRefusedException e) when (e.Status == 404)
+        {
+            return null; // deleted meanwhile
+        }
+    }
+
+    public async Task<AskChat?> RenameChatAsync(string id, string title) =>
+        As<AskChat>(await SendAsync(HttpMethod.Post, $"~/api/v2/chats/{Seg(id)}", new JsonObject { ["title"] = title }));
+
+    public async Task<bool> DeleteChatAsync(string id)
+    {
+        try
+        {
+            return await SendAsync(HttpMethod.Delete, $"~/api/v2/chats/{Seg(id)}") is not null;
+        }
+        catch (LibraryRefusedException e) when (e.Status == 404)
+        {
+            return false;
+        }
+    }
+
+    public async Task<bool> RestoreChatAsync(string id)
+    {
+        try
+        {
+            return await SendAsync(HttpMethod.Post, $"~/api/v2/chats/{Seg(id)}/restore") is not null;
+        }
+        catch (LibraryRefusedException e) when (e.Status == 404)
+        {
+            return false;
+        }
+    }
 }
