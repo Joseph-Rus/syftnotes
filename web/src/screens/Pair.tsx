@@ -1,8 +1,8 @@
-import { useRef, useState } from 'preact/hooks';
+import { useEffect, useRef, useState } from 'preact/hooks';
 import type { Api } from '../api/client';
 import { ApiError } from '../api/client';
 import type { Me } from '../api/types';
-import { cleanCode } from '../boot';
+import { cleanCode, takeCodeFromAddress } from '../boot';
 import { currentDeviceName } from '../platform';
 import { Button } from '../ui/kit';
 import { BASE } from '../router';
@@ -18,6 +18,9 @@ export function Pair({ api, library, onPaired }: { api: Api; library: Me['librar
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const input = useRef<HTMLInputElement>(null);
+  // Opened from the QR code (or the Camera app scanning it): the address carries the code, so pair at once. On a
+  // failure the box is there as always, with the library's words above it.
+  const [scanned] = useState(takeCodeFromAddress);
 
   const submit = async (typed = code) => {
     if (typed.length !== 6 || busy) return;
@@ -34,6 +37,10 @@ export function Pair({ api, library, onPaired }: { api: Api; library: Me['librar
       setBusy(false);
     }
   };
+
+  useEffect(() => {
+    if (scanned) void submit(scanned);
+  }, []);
 
   return (
     <div class="pair">

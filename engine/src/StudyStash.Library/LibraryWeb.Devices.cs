@@ -65,7 +65,9 @@ public sealed partial class LibraryWeb
     /// Tailscale IP, whatever its DNS settings, so that's the address the QR code gives (plain http: Tailscale encrypts
     /// the traffic itself). Tailscale Serve is turned on too (https on <see cref="PhonePort"/>), and when it works the
     /// address carries it as <c>?https=</c>: a phone that can look the name up (MagicDNS) moves there, where the app
-    /// reads offline and installs as a real app. A library for this computer alone doesn't listen on the IP, so it
+    /// reads offline and installs as a real app. <c>url</c> is the address as text (no code in it); <c>qrUrl</c> is what the
+    /// QR code holds: the same address ending <c>#code=NNNNNN</c>, so one scan pairs. A fragment never reaches the server,
+    /// so the code stays out of request logs, and an older phone app that reads only <c>url</c> works as before. A library for this computer alone doesn't listen on the IP, so it
     /// gives the https address only. Why not, in words, when neither can be had.
     /// </summary>
     async Task<(JsonObject? Code, ReachProblem? Problem)> NewPhoneCodeAsync()
@@ -80,7 +82,7 @@ public sealed partial class LibraryWeb
         }
         string url = plainApp is null ? secureApp! : secureApp is null ? plainApp : plainApp + "?https=" + Uri.EscapeDataString(secureApp);
         var (code, expires) = Phones.NewCode();
-        return (new JsonObject { ["code"] = code, ["url"] = url, ["secureUrl"] = secureApp, ["expires"] = Iso(expires) }, null);
+        return (new JsonObject { ["code"] = code, ["url"] = url, ["qrUrl"] = url + "#code=" + code, ["secureUrl"] = secureApp, ["expires"] = Iso(expires) }, null);
     }
 
     /// <summary>http://&lt;Tailscale IP&gt;:&lt;port&gt;/app/, when Tailscale is up and the library listens beyond this

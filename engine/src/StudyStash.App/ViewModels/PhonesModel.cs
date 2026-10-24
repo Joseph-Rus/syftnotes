@@ -61,6 +61,7 @@ public sealed partial class PhonesModel : ObservableObject
     [ObservableProperty] public partial bool Asking { get; set; }
     /// <summary>"123 456", as it's typed.</summary>
     [ObservableProperty] public partial string Code { get; set; } = "";
+    /// <summary>The address as text (the tooltip): no code in it.</summary>
     [ObservableProperty] public partial string Url { get; set; } = "";
     /// <summary>The QR code's dark squares, in a square <see cref="QrSize"/> wide (margin included).</summary>
     [ObservableProperty] public partial Geometry? Qr { get; set; }
@@ -181,7 +182,7 @@ public sealed partial class PhonesModel : ObservableObject
             Url = Str(code["url"]);
             Code = digits.Length == 6 ? $"{digits[..3]} {digits[3..]}" : digits;
             until = When(code["expires"]) ?? now() + TimeSpan.FromMinutes(10);
-            var modules = StudyStash.Core.Qr.Modules(Url);
+            var modules = StudyStash.Core.Qr.Modules(code["qrUrl"] is { } q && Str(q) is { Length: > 0 } qr ? qr : Url);
             QrSize = modules.GetLength(0) + 2 * StudyStash.Core.Qr.Margin;
             Qr = Geometry.Parse(StudyStash.Core.Qr.PathData(modules));
             ticks = 0;

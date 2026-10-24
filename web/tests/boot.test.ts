@@ -1,5 +1,5 @@
 import { Api } from '../src/api/client';
-import { cleanCode, decide, type BootFacts } from '../src/boot';
+import { cleanCode, codeInAddress, decide, type BootFacts } from '../src/boot';
 import { deviceName, isTablet, platformOf } from '../src/platform';
 
 const IPHONE = 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 Version/18.0 Mobile/15E148 Safari/604.1';
@@ -95,4 +95,11 @@ test('a code is its six digits, however it was typed or pasted', () => {
   expect(cleanCode('Code: 123-456 (10 minutes)')).toBe('123456');
   expect(cleanCode('12a')).toBe('12');
   expect(cleanCode('12345678')).toBe('123456');
+});
+
+test('the code in a scanned address is read only when it is exactly six digits', () => {
+  expect(codeInAddress('#code=123456')).toBe('123456');
+  expect(codeInAddress('#code=12345')).toBeNull();
+  expect(codeInAddress('#code=1234567')).toBeNull();
+  expect(codeInAddress('')).toBeNull();
 });
