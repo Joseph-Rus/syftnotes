@@ -41,11 +41,11 @@ public sealed partial class LibraryWeb
             else if (pageCode is { } c && DateTimeOffset.Parse(c["expires"]!.GetValue<string>(), CultureInfo.InvariantCulture) is var until
                      && until > DateTimeOffset.UtcNow)
             {
-                string url = c["url"]!.GetValue<string>(), code = c["code"]!.GetValue<string>();
+                string url = c["url"]!.GetValue<string>(), code = c["code"]!.GetValue<string>(), qr = c["qrUrl"]?.GetValue<string>() ?? url;
                 shown = "<div class=\"group phone-code\"><div class=\"row\" style=\"gap:1.2rem;align-items:center;flex-wrap:wrap\">"
-                    + $"<div style=\"flex:none;line-height:0;border-radius:12px;overflow:hidden\">{Qr.Svg(url, 176, "QR code of the phone app's address")}</div>"
-                    + "<div class=\"grow\"><div class=\"subtitle\">1. In the Study Stash app on your iPhone or iPad, tap Scan the QR code. On Android, point the camera at it.</div>"
-                    + $"<div class=\"subtitle\">2. Type this code:</div>"
+                    + $"<div style=\"flex:none;line-height:0;border-radius:12px;overflow:hidden\">{Qr.Svg(qr, 176, "QR code of the phone app's address")}</div>"
+                    + "<div class=\"grow\"><div class=\"subtitle\">1. Scan this with your phone: in the Study Stash app on your iPhone or iPad, tap Scan the QR code. On Android, point the camera at it.</div>"
+                    + $"<div class=\"subtitle\">2. If it asks for a code, type this:</div>"
                     + $"<div style=\"font:600 2rem/1.2 var(--mono);letter-spacing:.18em;margin:.4rem 0\">{code[..3]} {code[3..]}</div>"
                     + $"<div class=\"subtitle\" id=\"phone-left\" data-until=\"{until.ToUnixTimeMilliseconds()}\">Works for 10 minutes, once.</div>"
                     + $"<div class=\"subtitle\">On Android, add the page that opens to your home screen.</div>"

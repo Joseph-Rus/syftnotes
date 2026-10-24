@@ -29,6 +29,11 @@ public class PhoneSettingsPageTests
         Assert.Contains($"http://100.64.0.9:{cfg.WebPort}/app/</div>", page);
         var shown = Regex.Match(page, @">(\d{3}) (\d{3})</div>");
         Assert.True(shown.Success);
+        // One scan pairs: the QR code holds the address ending #code=NNNNNN, while the address shown as text has no code.
+        string digits = shown.Groups[1].Value + shown.Groups[2].Value, plain = $"http://100.64.0.9:{cfg.WebPort}/app/?https=https%3A%2F%2Fmini.tail1234.ts.net%3A8443%2Fapp%2F";
+        Assert.Contains(StudyStash.Core.Qr.Svg(plain + "#code=" + digits, 176, "QR code of the phone app's address"), page);
+        Assert.DoesNotContain(StudyStash.Core.Qr.Svg(plain, 176, "QR code of the phone app's address"), page);
+        Assert.DoesNotContain("#code=", page);
 
         var pair = await site.Stranger().PostAsync("/api/v2/devices/pair",
             System.Net.Http.Json.JsonContent.Create(new { code = shown.Groups[1].Value + shown.Groups[2].Value, name = "Pixel 10" }));

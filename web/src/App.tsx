@@ -59,7 +59,7 @@ export function App() {
     // Opened from the QR code at the library's Tailscale IP: move to its https name if this phone can reach it.
     const secure = await secureAddress(window.location.href);
     if (secure) {
-      window.location.replace(secure);
+      window.location.replace(secure + window.location.hash); // the code in `#code=` goes along: it's this address that pairs
       return;
     }
     if (window.location.search.includes('https=')) history.replaceState(null, '', withoutOffer(window.location.href));

@@ -51,3 +51,16 @@ export async function decide(api: Api, facts: BootFacts): Promise<Gate> {
 export function cleanCode(text: string): string {
   return text.replace(/\D/g, '').slice(0, 6);
 }
+
+/** The six digits in an address's `#code=NNNNNN` (what the QR code carries), or null when it has none. */
+export function codeInAddress(hash: string): string | null {
+  const m = /^#code=(\d{6})$/.exec(hash);
+  return m?.[1] ?? null;
+}
+
+/** The code the address carries, taken out of the address bar at once so the browser doesn't keep it. */
+export function takeCodeFromAddress(): string | null {
+  const code = codeInAddress(location.hash);
+  if (code) history.replaceState(null, '', location.pathname + location.search);
+  return code;
+}

@@ -100,6 +100,9 @@ public class PhoneApiTests
         // The QR code opens the Tailscale IP, which any phone on the tailnet reaches, offering the https name to move to.
         Assert.Equal($"http://100.64.0.9:{cfg.WebPort}/app/?https=https%3A%2F%2Fmini.tail1234.ts.net%3A8443%2Fapp%2F", code["url"]!.GetValue<string>());
         Assert.Equal("https://mini.tail1234.ts.net:8443/app/", code["secureUrl"]!.GetValue<string>());
+        // The QR code's address ends in the code (a fragment: never sent to the server); `url`, shown as text, doesn't.
+        Assert.Equal(code["url"]!.GetValue<string>() + "#code=" + code["code"]!.GetValue<string>(), code["qrUrl"]!.GetValue<string>());
+        Assert.DoesNotContain("code", code["url"]!.GetValue<string>());
         var expires = DateTimeOffset.Parse(code["expires"]!.GetValue<string>(), System.Globalization.CultureInfo.InvariantCulture);
         Assert.InRange(expires - DateTimeOffset.UtcNow, TimeSpan.FromMinutes(9), TimeSpan.FromMinutes(10));
         Assert.Equal(["serve", "--bg", "--https=8443", $"http://127.0.0.1:{cfg.WebPort}"], served.Single());
