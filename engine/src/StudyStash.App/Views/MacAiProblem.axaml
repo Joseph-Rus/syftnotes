@@ -16,9 +16,9 @@
       <Grid ColumnDefinitions="Auto,12,*,10,Auto,8,Auto" VerticalAlignment="Center">
         <c:Icon Classes="ai-problem-icon" Classes.accent="{Binding IsAccent}" Classes.warn="{Binding IsWarn}"
                 Glyph="{Binding Icon}" Filled="True" Size="20" />
-        <StackPanel Grid.Column="2" VerticalAlignment="Center">
-          <TextBlock Classes="ai-problem-title" Text="{Binding Title}" />
-          <TextBlock Classes="ai-problem-message" Text="{Binding Message}" />
+        <StackPanel Grid.Column="2" VerticalAlignment="Center" c:TextSelection.Area="True">
+          <c:PageText Classes="ai-problem-title" Text="{Binding Title}" />
+          <c:PageText Classes="ai-problem-message" Text="{Binding Message}" />
         </StackPanel>
         <Button Grid.Column="4" Classes="ai-textbtn" Command="{Binding SecondaryCommand}"
                 IsVisible="{Binding SecondaryWords, Converter={x:Static c:Converters.NotEmpty}}">

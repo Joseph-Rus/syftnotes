@@ -330,17 +330,33 @@ public static partial class SelfTest
     }
 
     /// <summary>A first run opens guided setup on Pick your AI. The self-test finds no AI's CLI (it never installs one
-    /// or reaches an account), so it takes the first screen's picture and goes on by hand, as a student can.</summary>
-    static async Task ByHandAsync()
+    /// or reaches an account), so it takes the first screen's picture and goes on by hand, as a student can: by the
+    /// "Set up by hand" link, or with <paramref name="answer"/> (Gemini) picked and Continue, which opens "Get Gemini
+    /// ready" (Google's Antigravity CLI isn't here), whose picture it takes before that link; the notes step then
+    /// opens on that AI.</summary>
+    static async Task ByHandAsync(string answer = "")
     {
         if (Shell.Windows.Guided is not { } g) return;
         await Until(() => g.Screen == ViewModels.GuidedScreen.PickAi && g.Steps.Count > 0, 10);
-        Say($"guided setup: {g.Screen}, Claude here: {g.ClaudeHere}, ChatGPT here: {g.CodexHere}");
+        Say($"guided setup: {g.Screen}, Claude here: {g.ClaudeHere}, ChatGPT here: {g.CodexHere}, Gemini here: {g.GeminiHere}");
         await Wait(1);
         Shot(Shell.Windows.Setup, "setup-guided-pick");
+        if (answer.Length > 0)
+        {
+            g.PickCommand.Execute(answer);
+            if (g.PickedByHand || g.Steps.Count != 4) throw new InvalidOperationException($"{answer} on the first screen should go the guided way, in four steps");
+            await Wait(1);
+            Shot(Shell.Windows.Setup, $"setup-guided-pick-{answer}");
+            await g.ContinueCommand.ExecuteAsync(null);
+            bool install = await Until(() => g.Screen == ViewModels.GuidedScreen.Install, 5);
+            Say(install ? $"guided setup: {g.InstallTitle} ({g.Cli.Name}, {g.BrandGlyph})" : $"guided setup: expected Install, got {g.Screen}");
+            if (!install || g.Cli.Id != answer) throw new InvalidOperationException($"{answer} on the first screen should open its own install page");
+            await Wait(1);
+            Shot(Shell.Windows.Setup, $"setup-guided-install-{answer}");
+        }
         g.ByHandCommand.Execute(null);
         bool swapped = await Until(() => g.Screen == ViewModels.GuidedScreen.Manual, 5);
-        Say(swapped ? "set up by hand" : "setup by hand didn't open");
+        Say(swapped ? $"set up by hand{(answer.Length > 0 ? $", with {answer}" : "")}" : "setup by hand didn't open");
     }
 
     /// <summary>Just this computer: the welcome's first choice makes the library here (listening to this computer
@@ -351,7 +367,8 @@ public static partial class SelfTest
         bool opened = await Until(() => Shell.Windows.Setup is not null, 10);
         Say(opened ? "setup opened" : "setup didn't open");
         var m = Shell.Windows.SetupModel ?? throw new InvalidOperationException("no setup window");
-        await ByHandAsync();
+        // Gemini, answered on the first screen: its install page (no Antigravity CLI here), then setup by hand from there.
+        await ByHandAsync("gemini");
         await PastIntroAsync(m);
 
         m.ChooseOneComputerCommand.Execute(null);
@@ -399,6 +416,10 @@ public static partial class SelfTest
         Shot(Shell.Windows.Setup, "setup-notes");
         Say(loaded ? $"notes step: {string.Join(", ", m.Ai!.Engines.Select(e => $"{e.Name} ({e.State})"))}; no AI offered: {m.Ai.OffersNoAi}" : "notes step: the engines never loaded");
         if (!loaded) throw new InvalidOperationException("the notes step never read the library's engines");
+        // Gemini was the answer on the first screen: the step opens on it, its key box showing (no Gemini here).
+        Say($"notes step on Gemini: picked {m.Ai!.SelectedNotes}, key box for {(m.Ai.KeyOpen ? m.Ai.KeyFor : "nothing")}");
+        if (m.Ai.Engines.All(e => e.Id != "gemini")) throw new InvalidOperationException("the notes step doesn't offer Gemini");
+        if (m.Ai.SelectedNotes != "gemini" && m.Ai.KeyFor != "gemini") throw new InvalidOperationException("the notes step didn't open on Gemini, the first screen's answer");
         m.Go(SetupStep.Canvas);
 
         if (m.OnCanvas)

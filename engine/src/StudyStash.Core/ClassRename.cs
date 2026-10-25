@@ -132,7 +132,10 @@ public static class ClassRename
     {
         string dir = Path.Combine(home, "chats");
         if (!Directory.Exists(dir)) return;
-        foreach (string file in Directory.EnumerateFiles(dir, "*.json"))
+        // Deleted ones waiting for Undo too: one brought back afterwards is under the new name.
+        string trash = Path.Combine(dir, ".trash");
+        var files = Directory.EnumerateFiles(dir, "*.json").Concat(Directory.Exists(trash) ? Directory.EnumerateFiles(trash, "*.json") : []);
+        foreach (string file in files)
         {
             try
             {
@@ -147,6 +150,7 @@ public static class ClassRename
                 // A chat file that can't be read is left as it is.
             }
         }
+        Ai.Chats.IndexChanged(home); // their list is made again with the new name
     }
 
     /// <summary>This computer's own copies of a renamed class's name: the recorded lectures still waiting here. The app calls this for its home after the library renames; the library for its own.</summary>

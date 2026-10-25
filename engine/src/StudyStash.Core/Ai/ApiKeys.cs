@@ -63,12 +63,46 @@ public static class ApiKeys
         ("claude", _) => "claude-sonnet-5-5",
         ("codex", var m) when m.Length > 0 => m,
         ("codex", _) => "gpt-5",
-        ("gemini", var m) when m.StartsWith("gemini-", StringComparison.Ordinal) && !m.EndsWith("-medium", StringComparison.Ordinal) && !m.EndsWith("-high", StringComparison.Ordinal) => m,
-        ("gemini", var m) when m.Contains("pro", StringComparison.Ordinal) => "gemini-2.5-pro",
-        _ => "gemini-2.5-flash",
+        // Antigravity's names carry how hard it thinks ("gemini-3.8-flash-medium", "gemini-3.1-pro-high"): the API's don't.
+        ("gemini", var m) when GeminiName(m) is var api && api.Contains("pro", StringComparison.Ordinal) => GeminiPro,
+        ("gemini", var m) when GeminiName(m) is { Length: > 0 } api && api.StartsWith("gemini-", StringComparison.Ordinal) => api,
+        _ => GeminiFlash,
     };
 
-    static readonly HttpClient Http = new() { Timeout = Timeout.InfiniteTimeSpan };
+    /// <summary>What a Gemini key means for a student, said under its box (setup's notes step, Settings → Your AI):
+    /// Google's free tier may read what's sent, and who can have one. <paramref name="device"/>: "Mac", "PC" or
+    /// "computer".</summary>
+    public static string[] GeminiKeyNotes(string device) =>
+    [
+        $"Google's free tier may use what you send to improve its products, and people may read it. To keep lectures private, use the free AI on this {device}.",
+        "A free key needs a personal Google account (school accounts may not get the free tier), and you need to be 18 or over.",
+    ];
+
+    /// <summary>Gemini's models for a key. Google keeps the 2.5 models for keys that already used them: a new key gets
+    /// "no longer available to new users", so a key made in setup starts on 3.8 Flash. Flash-Lite answers when Flash's
+    /// free daily limit is used up; Pro has no free tier.</summary>
+    public const string GeminiFlash = "gemini-3.8-flash", GeminiFlashLite = "gemini-3.5-flash-lite", GeminiPro = "gemini-3.1-pro";
+
+    static string GeminiName(string picked) =>
+        System.Text.RegularExpressions.Regex.Replace(picked.Trim(), "-(minimal|low|medium|high)$", "");
+
+    static readonly HttpClient Shared = new() { Timeout = Timeout.InfiniteTimeSpan };
+
+    /// <summary>The model Gemini's key moves to when the one it asked turns it away, and why in a few plain words for
+    /// the answer's byline ("Gemini 3.5 Flash-Lite (Flash's free daily limit is used up)"); null when there's nothing
+    /// to move to. A model that's gone (404: "no longer available to new users") is the model's problem, not the
+    /// key's: the default is asked instead, once.</summary>
+    public static (string Model, string Note)? GeminiInstead(string model, int status, string body)
+    {
+        bool quota = System.Text.RegularExpressions.Regex.IsMatch(body, @"quota|billing|free.tier|RESOURCE_EXHAUSTED|paid|limit", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+        return (model, status) switch
+        {
+            (not GeminiFlash, 404) => (GeminiFlash, "Gemini 3.8 Flash (the model picked isn't offered to new keys)"),
+            (GeminiPro, 403 or 429) when quota => (GeminiFlash, "Gemini 3.8 Flash (Gemini 3.1 Pro needs a paid key)"),
+            (GeminiFlash, 429) => (GeminiFlashLite, "Gemini 3.5 Flash-Lite (Flash's free daily limit is used up)"),
+            _ => null,
+        };
+    }
 
     /// <summary>
     /// One request to the engine's API with a key: the prompt (and system prompt) in, the answer streamed back as
@@ -76,21 +110,40 @@ public static class ApiKeys
     /// sorting and Ask need. Ends with an <c>error</c> event when it fails (the API's own words, so an expired key reads
     /// as one).
     /// </summary>
-    public static async IAsyncEnumerable<AiEvent> RunAsync(string id, string key, AiRequest req, [EnumeratorCancellation] CancellationToken ct = default)
+    public static async IAsyncEnumerable<AiEvent> RunAsync(string id, string key, AiRequest req, [EnumeratorCancellation] CancellationToken ct = default,
+        HttpClient? http = null)
     {
         using var cts = CancellationTokenSource.CreateLinkedTokenSource(ct);
         cts.CancelAfter(req.Timeout);
         HttpResponseMessage? r = null;
         string? failed = null;
-        try
+        string model = Model(id, req.Model), note = "";
+        // Gemini: a model that's gone, Pro without a paid key, or Flash's free daily limit moves the request to the next
+        // model down (at most twice), and the answer says which wrote it.
+        for (int tries = 0; ; tries++)
         {
-            r = await Http.SendAsync(Request(id, key, req), HttpCompletionOption.ResponseHeadersRead, cts.Token);
-            if (!r.IsSuccessStatusCode)
-                failed = $"{Name(id)} API: {(int)r.StatusCode} {ErrorWords(await r.Content.ReadAsStringAsync(cts.Token))}".TrimEnd();
-        }
-        catch (Exception e) when (e is HttpRequestException or TaskCanceledException)
-        {
-            failed = ct.IsCancellationRequested ? "Stopped." : $"{Name(id)} API couldn't be reached: {e.Message}";
+            failed = null;
+            try
+            {
+                r = await (http ?? Shared).SendAsync(Request(id, key, req, model), HttpCompletionOption.ResponseHeadersRead, cts.Token);
+                if (!r.IsSuccessStatusCode)
+                {
+                    string body = await r.Content.ReadAsStringAsync(cts.Token);
+                    if (id == "gemini" && tries < 2 && GeminiInstead(model, (int)r.StatusCode, body) is { } instead)
+                    {
+                        r.Dispose();
+                        r = null;
+                        (model, note) = instead;
+                        continue;
+                    }
+                    failed = $"{Name(id)} API: {(int)r.StatusCode} {ErrorWords(body)}".TrimEnd();
+                }
+            }
+            catch (Exception e) when (e is HttpRequestException or TaskCanceledException)
+            {
+                failed = ct.IsCancellationRequested ? "Stopped." : $"{Name(id)} API couldn't be reached: {e.Message}";
+            }
+            break;
         }
         if (failed is not null || r is null)
         {
@@ -98,6 +151,7 @@ public static class ApiKeys
             yield return AiEvent.Error(failed ?? "no answer");
             yield break;
         }
+        if (note.Length > 0) yield return new AiEvent("note", note);
         using (r)
         {
             using var reader = new StreamReader(await r.Content.ReadAsStreamAsync(cts.Token));
@@ -128,9 +182,8 @@ public static class ApiKeys
 
     static string Name(string id) => id switch { "claude" => "Anthropic", "codex" => "OpenAI", _ => "Gemini" };
 
-    static HttpRequestMessage Request(string id, string key, AiRequest req)
+    static HttpRequestMessage Request(string id, string key, AiRequest req, string model)
     {
-        string model = Model(id, req.Model);
         HttpRequestMessage m;
         JsonObject body;
         switch (id)

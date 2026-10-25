@@ -60,6 +60,7 @@ public class ClassRenameTests
             }.ToJsonString());
         Directory.CreateDirectory(Path.Combine(cfg.Home, "chats"));
         File.WriteAllText(Path.Combine(cfg.Home, "chats", "c1.json"), $$"""{"id": "c1", "title": "Q", "class_name": "{{Cs}}", "messages": []}""");
+        Write(Path.Combine(cfg.Home, "chats", ".trash", "c2.json"), $$"""{"id": "c2", "title": "Deleted", "class_name": "{{Cs}}", "messages": []}""");
         return (cfg, store);
     }
 
@@ -111,6 +112,8 @@ public class ClassRenameTests
         using var _ = store;
         int before = store.ListNotes().Count;
         string oldFolder = store.ClassFolder(Cs);
+        var chats = new Ai.Chats(cfg.Home, cfg.PoolDir, new Ai.AiJobs(cfg.Home), new Ai.History(cfg.PoolDir));
+        Assert.Equal(Cs, Assert.Single(chats.Entries()).ClassName); // listed, by the chats' index
 
         var outcome = ClassRename.Apply(cfg, store, ClassRename.Plan(cfg, CanvasSettings.Load(cfg.Home)));
 
@@ -154,6 +157,9 @@ public class ClassRenameTests
             manifest.Select(kv => kv.Key).Order(StringComparer.Ordinal));
         // A chat about the class, and a lecture a laptop still sends under the old name.
         Assert.Equal("Software Engineering", JsonNode.Parse(File.ReadAllText(Path.Combine(cfg.Home, "chats", "c1.json")))!["class_name"]!.GetValue<string>());
+        Assert.Equal("Software Engineering", Assert.Single(chats.Entries()).ClassName); // and listed under its new name
+        Assert.True(chats.Restore("c2")); // one deleted meanwhile comes back under the new name too
+        Assert.Equal("Software Engineering", chats.Get("c2")!.ClassName);
         Assert.Equal("Software Engineering", Classify.ByRules(new Meeting("late") { Title = "Lecture", Folder = Cs }, cfg.Classes)!.ClassName);
         // Done: the preview is empty now.
         Assert.Empty(ClassRename.Plan(cfg, s));

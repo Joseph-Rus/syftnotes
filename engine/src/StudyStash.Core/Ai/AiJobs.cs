@@ -41,7 +41,51 @@ public sealed class AiJobs(string home, Func<string>? ollamaHost = null)
         return dir;
     }
 
-    async Task<string> AnswerAsync(string job, string prompt, CancellationToken ct = default)
+    /// <summary>
+    /// Whiteboard photos for the engine that writes a lecture's notes. Claude Code reads image files in its working
+    /// folder, so the photos are copied into it and the prompt names them; Codex takes them on its command line
+    /// (--image). Gemini (Antigravity) and Ollama get the words read from each photo instead. Returns what to delete
+    /// afterwards and the files to hand the engine.
+    /// </summary>
+    (string? Folder, List<string> Images) GivePhotos(Meeting m, string engine)
+    {
+        m.PhotoFiles = null;
+        if (m.Photos.Count == 0 || engine is not ("claude" or "codex")) return (null, []);
+        string rel = "photos-" + new string(m.Id.Where(char.IsLetterOrDigit).ToArray());
+        string dir = Path.Combine(Scratch(), rel);
+        var names = new Dictionary<string, string>();
+        var images = new List<string>();
+        try
+        {
+            Directory.CreateDirectory(dir);
+            foreach (var p in m.Photos.Where(p => File.Exists(p.Path)))
+            {
+                string file = Path.Combine(dir, p.Id + Path.GetExtension(p.Path));
+                File.Copy(p.Path, file, true);
+                images.Add(file);
+                names[p.Id] = engine == "claude" ? rel + "/" + Path.GetFileName(file) : Path.GetFileName(file);
+            }
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException)
+        {
+            return (dir, []); // no copies: the photos' words go in the prompt
+        }
+        if (names.Count > 0) m.PhotoFiles = names;
+        return (dir, engine == "claude" ? [] : images);
+    }
+
+    static void Forget(string? folder)
+    {
+        try
+        {
+            if (folder is not null) Directory.Delete(folder, true);
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException)
+        {
+        }
+    }
+
+    async Task<string> AnswerAsync(string job, string prompt, CancellationToken ct = default, IReadOnlyList<string>? images = null)
     {
         var settings = Settings;
         var choice = settings.For(job);
@@ -50,12 +94,18 @@ public sealed class AiJobs(string home, Func<string>? ollamaHost = null)
         var how = job == "notes" ? AiSpeed.ForNotes(choice.Provider, choice.Model, settings.Speed) : new AiSpeed.How(choice.Model, "", false);
         var result = await provider.CompleteAsync(new AiRequest(prompt, Scratch())
         {
-            Model = how.Model, Effort = how.Effort, Fast = how.Fast, Timeout = TimeSpan.FromMinutes(15),
+            Model = how.Model, Effort = how.Effort, Fast = how.Fast, Timeout = TimeSpan.FromMinutes(15), Images = images ?? [],
         }, ct);
         Proved(choice.Provider, result);
         if (!result.Ok) throw new InvalidOperationException($"{provider.Name}: {result.Text}");
+        if (job == "notes" && result.Note.Length > 0) notesNote = result.Note;
         return result.Text;
     }
+
+    /// <summary>The lecture's notes were written by another model than the one asked (Gemini's key moved to Flash-Lite
+    /// when Flash's free daily limit was used up): what the notes' byline says instead (<see cref="Describe"/>), until
+    /// the next lecture's notes start.</summary>
+    volatile string notesNote = "";
 
     /// <summary>What a job's run says about its AI, kept as <see cref="Record"/> keeps it: notes that fail because Claude
     /// is signed out make Settings say "Not signed in" (and offer Sign in), as Ask and the diagrams already did. A run
@@ -78,30 +128,32 @@ public sealed class AiJobs(string home, Func<string>? ollamaHost = null)
     /// <summary>Answering with a specific engine, not the one ai.json picks for a job — the "Answer with" menu's
     /// choice, and this class's own fallback to Ollama in <see cref="AskAsync"/>.</summary>
     async Task<string> AnswerWithAsync(string engine, string model, string prompt, CancellationToken ct, Action<string>? soFar = null,
-        string effort = "", bool fast = false)
+        string effort = "", bool fast = false, Action<string>? noted = null, IReadOnlyList<string>? images = null)
     {
         var provider = Provider(engine);
         var result = await provider.CompleteAsync(new AiRequest(prompt, Scratch())
         {
-            Model = model, Effort = effort, Fast = fast, Timeout = TimeSpan.FromMinutes(15),
+            Model = model, Effort = effort, Fast = fast, Timeout = TimeSpan.FromMinutes(15), Images = images ?? [],
         }, ct, soFar);
         Proved(engine, result);
         if (!result.Ok) throw new InvalidOperationException(result.Text);
+        if (result.Note.Length > 0) noted?.Invoke(result.Note);
         return result.Text;
     }
 
     async Task<string> JsonAnswerWithAsync(string engine, string model, string prompt, JsonObject schema, CancellationToken ct,
-        Action<string>? soFar = null)
+        Action<string>? soFar = null, Action<string>? noted = null)
     {
         string text = await AnswerWithAsync(engine, model, prompt + "\n\nAnswer with only a JSON object that fits this JSON schema, and nothing else:\n"
-            + schema.ToJsonString(), ct, soFar);
+            + schema.ToJsonString(), ct, soFar, noted: noted);
         return FirstObject(text) ?? throw new InvalidDataException("the answer wasn't JSON");
     }
 
     /// <summary>Ask a question with one named engine, ignoring ai.json's own "ask" pick. <paramref name="soFar"/>,
     /// when given, hears the engine's reply as it's written (all of it so far, each time more arrives).</summary>
-    public LibraryReader.AskChatFn AskWith(string engine, string model = "", CancellationToken ct = default, Action<string>? soFar = null) =>
-        (prompt, schema) => JsonAnswerWithAsync(engine, model, prompt, schema, ct, soFar);
+    public LibraryReader.AskChatFn AskWith(string engine, string model = "", CancellationToken ct = default, Action<string>? soFar = null,
+        Action<string>? noted = null) =>
+        (prompt, schema) => JsonAnswerWithAsync(engine, model, prompt, schema, ct, soFar, noted);
 
     /// <summary>A JSON answer from the AI picked for <paramref name="job"/>, for work that returns a plan.</summary>
     public Task<string> PlanAsync(string job, string prompt, JsonObject schema) => JsonAnswerAsync(job, prompt, schema);
@@ -165,6 +217,7 @@ public sealed class AiJobs(string home, Func<string>? ollamaHost = null)
     public async Task<string> SummarizeAsync(Meeting m, Config cfg)
     {
         var settings = Settings;
+        notesNote = "";
         bool onOllama = NotesOnOllama(settings);
         string engine = onOllama ? "ollama" : settings.For("notes").Provider;
         var (drawings, designer) = await DiagramPlanAsync(m, cfg, settings, engine);
@@ -177,11 +230,21 @@ public sealed class AiJobs(string home, Func<string>? ollamaHost = null)
                     chat: (_, _, prompt, _) => AnswerWithAsync("ollama", "", prompt, CancellationToken.None),
                     show: (_, _) => Task.FromResult<int?>(null), drawings: drawings);
         else
+        {
             // Other models read a whole lecture at once: tell the splitter their context is large.
-            notes = await Core.Summarize.SummarizeTranscriptAsync(m, cfg,
-                chat: (_, _, prompt, _) => AnswerAsync("notes", prompt),
-                show: (_, _) => Task.FromResult<int?>(200_000),
-                drawings: drawings);
+            var (folder, images) = GivePhotos(m, engine);
+            try
+            {
+                notes = await Core.Summarize.SummarizeTranscriptAsync(m, cfg,
+                    chat: (_, _, prompt, _) => AnswerAsync("notes", prompt, images: images),
+                    show: (_, _) => Task.FromResult<int?>(200_000),
+                    drawings: drawings);
+            }
+            finally
+            {
+                Forget(folder);
+            }
+        }
         if (designer is null) follow.TryRemove(m.Id, out _);
         else follow[m.Id] = engine;
         return notes;
@@ -384,17 +447,25 @@ public sealed class AiJobs(string home, Func<string>? ollamaHost = null)
         {
             var how = AiSpeed.ForNotes(engine, Settings.Models.GetValueOrDefault(engine, ""), Settings.Speed);
             const int ctx = 200_000; // other models read a whole lecture at once: tell the splitter their context is large
+            var (folder, images) = GivePhotos(m, engine);
             string text = Py.Strip(TimedText.Plain(m.Transcript));
             int budget = Core.Summarize.TranscriptBudget(ctx);
             parts = text.Length <= budget ? 1 : Core.Summarize.SplitTranscript(text, budget).Count;
             async Task<string> ChatAsync(Config c, string mdl, string prompt, int numCtx)
             {
-                string result = await AnswerWithAsync(engine, how.Model, prompt, ct, effort: how.Effort, fast: how.Fast);
+                string result = await AnswerWithAsync(engine, how.Model, prompt, ct, effort: how.Effort, fast: how.Fast, images: images);
                 progress?.Invoke(++done, Math.Max(done, parts));
                 return result;
             }
-            notes = await Core.Summarize.SummarizeTranscriptAsync(m, cfg, chat: ChatAsync, show: (_, _) => Task.FromResult<int?>(ctx),
-                drawings: drawings);
+            try
+            {
+                notes = await Core.Summarize.SummarizeTranscriptAsync(m, cfg, chat: ChatAsync, show: (_, _) => Task.FromResult<int?>(ctx),
+                    drawings: drawings);
+            }
+            finally
+            {
+                Forget(folder);
+            }
         }
         return (notes, designer is null ? null : engine);
     }
@@ -464,6 +535,8 @@ public sealed class AiJobs(string home, Func<string>? ollamaHost = null)
         if (c.Provider == "ollama" || (job == "notes" && NotesOnOllama(settings)))
             return job == "notes" ? cfg.EffectiveSummaryModel : cfg.OllamaModel;
         string model = job == "notes" ? AiSpeed.ForNotes(c.Provider, c.Model, settings.Speed).Model : c.Model;
+        // Written by another model than the one asked: the byline says which, and why (Engines.WrittenBy reads it).
+        if (job == "notes" && notesNote is { Length: > 0 } note) return $"{Provider(c.Provider).Name} · {note}";
         return Provider(c.Provider).Name + (model.Length > 0 ? " " + model : "");
     }
 
@@ -502,15 +575,21 @@ public sealed class AiJobs(string home, Func<string>? ollamaHost = null)
     }
 
     /// <summary>Have a provider say one word, so a person knows it's signed in before relying on it. Kept in ai.json.</summary>
+    /// <summary>How long a try waits for its one-word answer: well inside what the app waits for the library
+    /// (<see cref="AiRemote.Waits"/>), so a try that runs out says so instead of the app giving up on the library. A
+    /// CLI or an API answers one tiny question in seconds; the free AI may first have to load its model.</summary>
+    public static TimeSpan TryWithin(string providerId) => providerId == "ollama" ? TimeSpan.FromSeconds(130) : TimeSpan.FromSeconds(90);
+
     public async Task<(bool Ok, string Why)> TestAsync(string providerId, string model = "")
     {
         var provider = Provider(providerId);
         var r = await provider.CompleteAsync(new AiRequest("Reply with the single word: ready", Scratch())
         {
-            Model = model, Timeout = TimeSpan.FromMinutes(3),
+            Model = model, Timeout = TryWithin(providerId),
         });
         bool ok = r.Ok && r.Text.Contains("ready", StringComparison.OrdinalIgnoreCase);
-        string why = ok ? "" : r.Ok ? $"it answered \"{Py.Head(r.Text, 80)}\"" : r.Text;
+        // Worked, with another model than the one asked: what answered, and why, for the check to say.
+        string why = ok ? r.Note : r.Ok ? $"it answered \"{Py.Head(r.Text, 80)}\"" : r.Text;
         var s = Settings;
         bool back = ok && Engines.LooksLikeAuth(s.Tests.GetValueOrDefault(provider.Id, ""));
         s.Tests[provider.Id] = ok ? "works" : why;
@@ -687,10 +766,14 @@ public sealed class AiJobs(string home, Func<string>? ollamaHost = null)
         if (engine == "ollama" && !cfg.OllamaEnabled && Providers is null)
             throw new InvalidOperationException("Asking needs an AI: choose one in Settings → Your AI.");
 
-        string shown = "";
+        string shown = "", note = "";
+        int remembered = 0;
         async Task<JsonObject> RunAsync(string who, CancellationTokenSource timer)
         {
             string model = AskModel(who, settings, cfg);
+            // The conversation so far, as much of it as this AI is given (the free AI less: its model reads less at once).
+            var earlier = AskMemory.For(who, model, request.History);
+            remembered = earlier.Count;
             Action<string>? written = answerSoFar is null ? null : raw =>
             {
                 timer.CancelAfter(Timeout.InfiniteTimeSpan); // it's answering: from here it has as long as it needs
@@ -701,8 +784,10 @@ public sealed class AiJobs(string home, Func<string>? ollamaHost = null)
                 }
             };
             var answer = await reader.AskAsync(request.Question, request.Lecture, request.Class, request.Live,
-                request.LiveTitle is { Length: > 0 } t ? t : "This lecture", AskWith(who, model, timer.Token, written));
+                request.LiveTitle is { Length: > 0 } t ? t : "This lecture", AskWith(who, model, timer.Token, written, said => note = said), earlier,
+                request.Agenda);
             Record(who, true, "");
+            if (answer["remembered"] is JsonValue rv && rv.TryGetValue(out int n)) remembered = n;
             return answer;
         }
 
@@ -741,9 +826,10 @@ public sealed class AiJobs(string home, Func<string>? ollamaHost = null)
         var sources = (result["sources"] as JsonArray ?? []).Select(s => new AskSource(
             Py.AsString(s?["id"]), Py.AsString(s?["title"]) ?? "", Py.AsString(s?["class"]), Py.AsString(s?["date"]),
             s?["at"] is JsonValue av && av.TryGetValue(out double atv) ? atv : null, Py.AsString(s?["section"]) ?? "")).ToList();
-        return new AskReply(Py.AsString(result["answer"]) ?? "", sources, engine, Engines.Name(engine))
+        // Answered by another model than the one asked (Gemini's free daily limit): its byline says which, and why.
+        return new AskReply(Py.AsString(result["answer"]) ?? "", sources, engine, note.Length > 0 ? note : Engines.Name(engine))
         {
-            Asked = asked, AskedName = Engines.Name(asked), FellBack = fellBack, Why = why,
+            Asked = asked, AskedName = Engines.Name(asked), FellBack = fellBack, Why = why, Remembered = remembered,
         };
     }
 }

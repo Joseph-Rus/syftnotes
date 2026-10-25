@@ -386,7 +386,12 @@ public static partial class Shell
             page.Ask = kept;
             return;
         }
-        var ask = new AiAskModel(Ai()) { ClassName = cls, OpenSettings = () => ShowSettings("AI") };
+        var ask = new AiAskModel(Ai())
+        {
+            ClassName = cls, OpenSettings = () => ShowSettings("AI"), ToldDeleted = ChatDeleted,
+            // A folder's conversations are kept with it (its list has its lectures' too); Home's list has them all.
+            Place = cls is null ? new Core.Ai.AskPlace("home") : new Core.Ai.AskPlace("class", null, cls),
+        };
         if (cls is null) ask.OnlyScopes("all");
         else ask.OnlyScopes("class", "all");
         ask.NameScopes(page.Noun, cls is null ? null : ClassNames.Display(cls));

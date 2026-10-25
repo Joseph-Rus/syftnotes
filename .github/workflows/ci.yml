@@ -236,6 +236,10 @@ jobs:
           cache: npm
           cache-dependency-path: web/package-lock.json
       - name: Build Study Stash.app and its one DMG
+        # The laptop's Google sign-in secret (docs/phone-google.md) is built into the app; without it the app builds as
+        # usual and Connect with Google says this copy can't connect.
+        env:
+          GOOGLE_DESKTOP_CLIENT_SECRET: ${{ secrets.GOOGLE_DESKTOP_CLIENT_SECRET }}
         run: sh macos/build-app.sh dist/mac
       # Signing, only when the version job planned it. Each step that needs a secret has just its own.
       - name: Signing - the Developer ID certificate, in a keychain made for this run
@@ -466,6 +470,9 @@ jobs:
           cache-dependency-path: web/package-lock.json
       - name: Build win-x64 and win-arm64, and Study-Stash-Setup.exe
         shell: pwsh
+        # The laptop's Google sign-in secret, built into the app as on the Mac.
+        env:
+          GOOGLE_DESKTOP_CLIENT_SECRET: ${{ secrets.GOOGLE_DESKTOP_CLIENT_SECRET }}
         run: .\windows\build.ps1 -Out dist\windows ${{ needs.version.outputs.win_signing != 'off' && '-NoInstaller' || '' }}
       # Signing, only when the version job planned it. The secrets reach just the one step that signs.
       - name: Signing - a throwaway self-signed certificate, for the rehearsal

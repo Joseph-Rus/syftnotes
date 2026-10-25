@@ -2,6 +2,7 @@ using System.Globalization;
 using System.Text;
 using System.Text.Json.Nodes;
 using System.Text.RegularExpressions;
+using StudyStash.Core.Ai;
 using StudyStash.Core.Rich;
 
 namespace StudyStash.Core;
@@ -14,6 +15,9 @@ public sealed partial class LibraryReader(Config cfg, Store store)
 {
     public Config Cfg { get; } = cfg;
     public Store Store { get; } = store;
+
+    /// <summary>What the laptop says it is recording (see <see cref="RecordingNow"/>).</summary>
+    public RecordingNow Recording { get; init; } = new();
 
     /// <summary>The library's name, its classes (in the order they were added: their dot colors follow it), and how
     /// much is waiting.</summary>
@@ -56,6 +60,7 @@ public sealed partial class LibraryReader(Config cfg, Store store)
             // What it's for (empty until asked) and so whether it's for school: classes, Canvas and due dates, or folders.
             ["uses"] = new JsonArray(Cfg.Uses.Select(u => (JsonNode?)u).ToArray()),
             ["for_school"] = Cfg.ForSchool,
+            ["recording_now"] = Recording.Json(),
         };
     }
 
@@ -235,24 +240,38 @@ public sealed partial class LibraryReader(Config cfg, Store store)
     /// lecture, one class, or all), and while you record, what's been said so far. The answer names its sources, each
     /// with the moment in the recording when there is one. A question about one lecture reads that lecture and no
     /// other, the one being recorded too: the library doesn't have it yet, so what's been said so far is all of it.
+    /// <para>A follow-up comes with the conversation so far (<paramref name="earlier"/>, oldest first, already cut to
+    /// what the answering AI is given: <see cref="AskMemory.For"/>). Its search reads the previous question too, and the
+    /// passages the previous answer drew on are read again, so "explain that more simply" is about the same thing; the
+    /// AI reads the turns before the question. The answer says how many went with it ("remembered").</para>
     /// </summary>
     public async Task<JsonObject> AskAsync(string question, string? lectureId = null, string? className = null,
-        string? liveTranscript = null, string liveTitle = "This lecture", AskChatFn? chat = null)
+        string? liveTranscript = null, string liveTitle = "This lecture", AskChatFn? chat = null, IReadOnlyList<AskTurn>? earlier = null,
+        string? agenda = null)
     {
+        earlier ??= [];
+        // What to look for: the question, and with a follow-up the one before it ("and the second one?" says nothing of what).
+        string lookFor = earlier.Count > 0 ? question + "\n" + earlier[^1].Question : question;
         var picked = new List<(NoteRow? Note, Passage Passage)>();
         bool live = !string.IsNullOrWhiteSpace(liveTranscript);
-        if (live)
-            foreach (var p in BestOf(Passages.FromTranscript("live", liveTranscript!), question, 6)) picked.Add((null, p));
+        var heard = live ? Passages.FromTranscript("live", liveTranscript!) : [];
+        // The passages the previous answer drew on, first: what the conversation is about.
+        if (earlier.Count > 0) picked.AddRange(DrawnOn(earlier[^1].Sources, lectureId, className, heard));
+        void Add(NoteRow? note, Passage p)
+        {
+            if (!picked.Any(x => x.Passage == p)) picked.Add((note, p));
+        }
+        foreach (var p in BestOf(heard, lookFor, 6)) Add(null, p);
         if (lectureId is not null)
         {
             // A note that's being recorded again is in the library as it was: its notes are read too, and its
             // transcript came with the question, as far as it has got.
             if (Store.Get(lectureId) is { } one)
-                foreach (var p in BestOf([.. Store.PassagesOf(lectureId).Where(p => !live || p.Kind != Passage.TranscriptKind)], question, 8)) picked.Add((one, p));
+                foreach (var p in BestOf([.. Store.PassagesOf(lectureId).Where(p => !live || p.Kind != Passage.TranscriptKind)], lookFor, 8)) Add(one, p);
         }
-        else if (Passages.AnyWords(question) is string match)
+        else if (Passages.AnyWords(lookFor) is string match)
         {
-            foreach (var hit in Store.SearchPassages(match, className, limit: 10)) picked.Add((hit.Note, hit.Passage));
+            foreach (var hit in Store.SearchPassages(match, className, limit: 10)) Add(hit.Note, hit.Passage);
         }
         // What the student attached to the lecture (or anywhere in the class): the pieces that best match, too.
         var attachedTo = new Dictionary<Passage, Attachment>(ReferenceEqualityComparer.Instance);
@@ -263,19 +282,25 @@ public sealed partial class LibraryReader(Config cfg, Store store)
             attachedTo[p] = a;
             return p;
         })).ToList();
-        foreach (var p in BestOf(pieces, question, 4))
-            picked.Add((attachedTo[p].NoteId is { } id ? Store.Get(id) : null, p));
+        foreach (var p in BestOf(pieces, lookFor, 4))
+            Add(attachedTo[p].NoteId is { } id ? Store.Get(id) : null, p);
         var sources = new JsonArray();
-        if (picked.Count == 0) return new JsonObject { ["answer"] = NoAnswer, ["sources"] = sources };
+        // No notes matched: with the date and the Due list to go on ("what's due Sunday?"), the AI is still asked.
+        if (picked.Count == 0 && string.IsNullOrWhiteSpace(agenda)) return new JsonObject { ["answer"] = NoAnswer, ["sources"] = sources, ["remembered"] = 0 };
 
         var prompt = new StringBuilder("""
             You answer a student's question from their own lecture notes and transcripts, numbered below.
-            Use only these sources. If they don't answer the question, say so in one sentence.
+            Use only these sources (and the student's dates and due work, when they're below). If they don't answer the question, say so in one sentence.
             Answer in one to three plain sentences, the way a classmate who took good notes would. Don't mention the sources by number in the answer.
             Write any formula in LaTeX between $ signs; in the JSON, write each backslash twice (\\frac). If the student asks you to draw or show something, or the answer is a short process, you may add one small Mermaid flowchart after the sentences, in a ```mermaid block (flowchart LR or TD, a few words per box).
             Return JSON: answer (the answer), sources (the numbers of the sources you used, most important first).
 
             """);
+        if (!string.IsNullOrWhiteSpace(agenda))
+            prompt.Append("Also below, from the student's own Canvas and calendar, always up to date: today's date and what's due and coming up. ")
+                .Append("For a question about what's due, deadlines, dates or what's on, answer from this, with the day and time; ")
+                .Append("work out \"this Sunday\" or \"tomorrow\" from today's date. If nothing there answers it, say so.\n\n")
+                .Append(agenda.Trim()).Append("\n\n");
         // Asked what a formula looks like (or to plot one): the answer may draw it, exactly, as a plot to play with.
         if (PlotDesign.AsksForPlot(question))
             prompt.Append("If the student asks what a formula or function looks like, or asks you to plot or graph it, add one ```plot block after the sentences instead of a flowchart: ")
@@ -289,6 +314,14 @@ public sealed partial class LibraryReader(Config cfg, Store store)
                 : note is null ? liveTitle : $"{Title(note)} ({note.ClassName}, {note.Date})";
             string at = p.Start is double s ? $" at {TimedText.Clock(s)}" : p.Section.Length > 0 ? $", {p.Section}" : "";
             prompt.Append('[').Append(i + 1).Append("] ").Append(where).Append(at).Append(":\n").Append(p.Text).Append("\n\n");
+        }
+        if (earlier.Count > 0)
+        {
+            // Said last, just before the question: a small model heeds what it read most recently.
+            prompt.Append("The conversation so far, oldest first:\n\n");
+            foreach (var turn in earlier) prompt.Append("Student: ").Append(turn.Question).Append("\nYou: ").Append(turn.Answer).Append("\n\n");
+            prompt.Append("The new question follows on from it. Answer only the new question, from the sources above: when it says \"that\", \"it\" ")
+                .Append("or \"the second one\", work out from the conversation what it means, and don't repeat an earlier answer.\n");
         }
         prompt.Append("Question: ").Append(question.Trim());
         string text = await (chat ?? OllamaAsk)(prompt.ToString(), AnswerSchema);
@@ -323,7 +356,29 @@ public sealed partial class LibraryReader(Config cfg, Store store)
             }
             sources.Add(source);
         }
-        return new JsonObject { ["answer"] = answer, ["sources"] = sources };
+        return new JsonObject { ["answer"] = answer, ["sources"] = sources, ["remembered"] = earlier.Count };
+    }
+
+    /// <summary>The passages an earlier answer drew on, found again where the question looks now: one of this lecture's
+    /// (or another's, when the question looks further) by its moment, or a section of its notes whole (each bullet is a
+    /// passage of its own, and "the second one" is about the bullets the answer didn't name); one of what's being
+    /// recorded by its moment. An attached file's is found again by the search, if at all.</summary>
+    List<(NoteRow? Note, Passage Passage)> DrawnOn(IReadOnlyList<AskSource> sources, string? lectureId, string? className, List<Passage> heard)
+    {
+        static bool Same(Passage p, AskSource s) => s.At is double at ? p.Start is double start && Math.Abs(start - at) < 0.5
+            : p.Start is null && p.Kind == Passage.NotesKind && p.Section == s.Section;
+        var found = new List<(NoteRow?, Passage)>();
+        foreach (var s in sources.Take(4))
+        {
+            IEnumerable<Passage> again;
+            NoteRow? note = null;
+            if (s.Id is null || (s.Id == lectureId && heard.Count > 0 && s.At is not null)) again = heard.Where(p => Same(p, s)).Take(1);
+            else if ((lectureId is not null && s.Id != lectureId) || (note = Store.Get(s.Id)) is null || (className is not null && note.ClassName != className)) continue;
+            else again = Store.PassagesOf(s.Id).Where(p => Same(p, s)).Take(s.At is null ? 6 : 1);
+            foreach (var p in again)
+                if (!found.Any(f => f.Item2 == p)) found.Add((note, p));
+        }
+        return found.Count > 8 ? found[..8] : found; // what came before leaves room for what the new question finds
     }
 
     /// <summary>The answer's JSON; when it doesn't parse because its LaTeX kept single backslashes, it parses with

@@ -45,4 +45,28 @@ public static class McpClients
         {
         }
     }
+
+    /// <summary>
+    /// Who wrote notes an AI app saved through Study Stash (save_notes), as the notes' writer is named ("Written by
+    /// Claude"): by the app Settings connected (<paramref name="id"/>, the server's <c>--client</c>), or else by the
+    /// name the app gave itself when it connected; "your AI" when neither says.
+    /// </summary>
+    public static string Writer(string? id, string? clientName = null)
+    {
+        string? known = id switch
+        {
+            "claude-desktop" => "Claude (in the Claude app)",
+            "claude-code" => "Claude Code",
+            "codex" => "ChatGPT (Codex)",
+            "gemini" => "Gemini CLI",
+            _ => null,
+        };
+        if (known is not null) return known;
+        string name = (clientName ?? "").ToLowerInvariant();
+        return name.Contains("claude-code", StringComparison.Ordinal) ? "Claude Code"
+            : name.Contains("claude", StringComparison.Ordinal) ? "Claude (in the Claude app)"
+            : name.Contains("codex", StringComparison.Ordinal) || name.Contains("chatgpt", StringComparison.Ordinal) || name.Contains("openai", StringComparison.Ordinal) ? "ChatGPT (Codex)"
+            : name.Contains("gemini", StringComparison.Ordinal) ? "Gemini"
+            : Ai.Engines.YourAi + " (through an AI app)";
+    }
 }

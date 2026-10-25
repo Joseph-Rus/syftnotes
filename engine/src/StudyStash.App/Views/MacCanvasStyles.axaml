@@ -73,6 +73,7 @@
 
   <!-- A state's button: a tinted pill (Connect, Show me how), a plain raised pill (everything else with one), or
        plain text (Dismiss — no fill at all in the design). -->
+  <!-- (Each raised one's hairline is a border inside it: a button cuts off whatever it draws outside its own box.) -->
   <Style Selector="Button.cv-pill">
     <Setter Property="Theme" Value="{StaticResource Surface}" />
     <Setter Property="Height" Value="30" />
@@ -80,25 +81,20 @@
     <Setter Property="Padding" Value="14,0" />
     <Setter Property="FontSize" Value="13" />
     <Setter Property="Background" Value="{DynamicResource Raised}" />
-  </Style>
-  <Style Selector="Button.cv-pill /template/ Border#PART_Bg">
-    <Setter Property="BoxShadow" Value="{DynamicResource RaisedShadow}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource Line}" />
+    <Setter Property="BorderThickness" Value="1" />
   </Style>
   <Style Selector="Button.cv-pill.cv-primary">
     <Setter Property="Background" Value="{DynamicResource Tint}" />
     <Setter Property="Foreground" Value="{DynamicResource OnAccent}" />
+    <Setter Property="BorderThickness" Value="0" />
   </Style>
   <Style Selector="Button.cv-pill.cv-primary TextBlock">
     <Setter Property="FontWeight" Value="Medium" />
   </Style>
-  <Style Selector="Button.cv-pill.cv-primary /template/ Border#PART_Bg">
-    <Setter Property="BoxShadow" Value="{DynamicResource EdgeTint}" />
-  </Style>
   <Style Selector="Button.cv-pill.cv-plain">
     <Setter Property="Background" Value="Transparent" />
-  </Style>
-  <Style Selector="Button.cv-pill.cv-plain /template/ Border#PART_Bg">
-    <Setter Property="BoxShadow" Value="none" />
+    <Setter Property="BorderThickness" Value="0" />
   </Style>
 
   <!-- design 06: Settings -> Canvas -->
@@ -180,10 +176,9 @@
     <Setter Property="Padding" Value="12,0,8,0" />
     <Setter Property="FontSize" Value="13" />
     <Setter Property="Background" Value="{DynamicResource Raised}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource Line}" />
+    <Setter Property="BorderThickness" Value="1" />
     <Setter Property="HorizontalContentAlignment" Value="Stretch" />
-  </Style>
-  <Style Selector="Button.cv-select /template/ Border#PART_Bg">
-    <Setter Property="BoxShadow" Value="{DynamicResource RaisedShadow}" />
   </Style>
   <Style Selector="Button.cv-select-item">
     <Setter Property="Theme" Value="{StaticResource Surface}" />
@@ -324,12 +319,15 @@
     <Setter Property="Foreground" Value="{DynamicResource AccentText}" />
     <Setter Property="FontWeight" Value="Medium" />
   </Style>
+  <!-- (It sits in a button, which would cut off a ring round it: its hairline is a border, the padding a point less
+       so what's in it stays where it was.) -->
   <Style Selector="Border.cv-chip">
     <Setter Property="Height" Value="36" />
     <Setter Property="CornerRadius" Value="18" />
     <Setter Property="Background" Value="{DynamicResource Raised}" />
-    <Setter Property="Padding" Value="10,0,14,0" />
-    <Setter Property="BoxShadow" Value="{DynamicResource RaisedShadow}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource Line}" />
+    <Setter Property="BorderThickness" Value="1" />
+    <Setter Property="Padding" Value="9,0,13,0" />
   </Style>
   <Style Selector="TextBlock.cv-chip-name">
     <Setter Property="FontSize" Value="13" />
@@ -343,12 +341,11 @@
     <Setter Property="Height" Value="36" />
     <Setter Property="CornerRadius" Value="18" />
     <Setter Property="Background" Value="{DynamicResource Glass}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource Line}" />
+    <Setter Property="BorderThickness" Value="1" />
     <Setter Property="Padding" Value="12,0,14,0" />
     <Setter Property="FontSize" Value="13" />
     <Setter Property="FontWeight" Value="Medium" />
-  </Style>
-  <Style Selector="Button.cv-toolbtn /template/ Border#PART_Bg">
-    <Setter Property="BoxShadow" Value="{DynamicResource CtlGlassShadow}" />
   </Style>
   <Style Selector="Button.cv-toolicon">
     <Setter Property="Theme" Value="{StaticResource Surface}" />
@@ -356,10 +353,9 @@
     <Setter Property="Height" Value="36" />
     <Setter Property="CornerRadius" Value="18" />
     <Setter Property="Background" Value="{DynamicResource Glass}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource Line}" />
+    <Setter Property="BorderThickness" Value="1" />
     <Setter Property="HorizontalContentAlignment" Value="Center" />
-  </Style>
-  <Style Selector="Button.cv-toolicon /template/ Border#PART_Bg">
-    <Setter Property="BoxShadow" Value="{DynamicResource CtlGlassShadow}" />
   </Style>
 
   <!-- design 10/11: a Canvas-linked class's own page -->
@@ -387,9 +383,8 @@
   <Style Selector="Button.cv-seg-item.cv-on">
     <Setter Property="Foreground" Value="{DynamicResource Fg}" />
     <Setter Property="Background" Value="{DynamicResource Raised}" />
-  </Style>
-  <Style Selector="Button.cv-seg-item.cv-on /template/ Border#PART_Bg">
-    <Setter Property="BoxShadow" Value="{DynamicResource RaisedShadow}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource Line}" />
+    <Setter Property="BorderThickness" Value="1" />
   </Style>
 
   <!-- a tree section's own header row (Modules, Files, Announcements) -->

@@ -115,8 +115,12 @@ public class AccessibleNamesTests
             }
             m.Go(SetupStep.Welcome);
             Dispatcher.UIThread.RunJobs();
-            var welcome = Shown<Button>(view).Where(b => b.Classes.Contains("choice")).Select(Said).ToList();
-            Assert.Equal(["Just this computer", "This is my laptop", "This is my library"], welcome);
+            // A laptop for class and a computer at home are folded away under Advanced until it's opened.
+            List<string> Welcome() => Shown<Button>(view).Where(b => b.Classes.Contains("choice")).Select(Said).ToList();
+            Assert.Equal([m.OneComputerTitle], Welcome());
+            m.ToggleOtherComputersCommand.Execute(null);
+            Dispatcher.UIThread.RunJobs();
+            Assert.Equal([m.OneComputerTitle, "My laptop for class", "My computer at home"], Welcome());
             window.Close();
         }
         finally
@@ -139,8 +143,13 @@ public class AccessibleNamesTests
             window.Show();
             Dispatcher.UIThread.RunJobs();
             window.UpdateLayout();
-            Assert.Equal(("Claude", "ChatGPT", "I don't have a paid plan"),
-                (Said(view.FindControl<Button>("PickClaude")!), Said(view.FindControl<Button>("PickCodex")!), Said(view.FindControl<Button>("PickFree")!)));
+            // Every answer on the first screen, each saying what it is, and all of them (and the plan links under them)
+            // on the page as it opens, with nothing to scroll to.
+            string[] picks = ["PickClaude", "PickCodex", "PickGemini", "PickFree"];
+            Assert.Equal(["Claude", "ChatGPT", "Gemini", "I don't have a paid plan"], picks.Select(n => Said(view.FindControl<Button>(n)!)));
+            Assert.All(picks, n => Assert.True(view.FindControl<Button>(n)!.IsEffectivelyVisible, n));
+            var page = view.GetVisualDescendants().OfType<ScrollViewer>().First(v => v.IsEffectivelyVisible);
+            Assert.True(page.Extent.Height <= page.Viewport.Height + 0.5, $"the first screen scrolls: {page.Extent.Height:0} in {page.Viewport.Height:0}");
             // In the chat, the checklist beside it.
             foreach (string title in new[] { "Sign in", "Pick a model", "Add your classes" }) g.Checklist.Add(new ChecklistRow(title) { Title = title });
             g.Screen = GuidedScreen.Chat;

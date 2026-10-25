@@ -2,6 +2,7 @@
      from, and Not now. Draws no window: Windows/BrowserChoiceWindow gives it one. -->
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:c="using:StudyStash.App.Controls"
              xmlns:vm="using:StudyStash.App.ViewModels"
              x:Class="StudyStash.App.Views.MacBrowserChoice"
              x:DataType="vm:BrowserChoiceModel">
@@ -23,7 +24,7 @@
         </DataTemplate>
       </ItemsControl.ItemTemplate>
     </ItemsControl>
-    <TextBlock Classes="ai-sub" Foreground="{DynamicResource Warn}" Text="{Binding Problem}" IsVisible="{Binding HasProblem}" TextWrapping="Wrap" />
+    <c:PageText Classes="ai-sub" Foreground="{DynamicResource Warn}" Text="{Binding Problem}" IsVisible="{Binding HasProblem}" TextWrapping="Wrap" />
     <Button Name="Later" Classes="ai-pillbtn" Command="{Binding LaterCommand}" HorizontalAlignment="Left" Margin="-14,0,0,0">
       <Border Classes="ai-pill-plain"><TextBlock Text="Not now" Foreground="{DynamicResource Fg2}" /></Border>
     </Button>

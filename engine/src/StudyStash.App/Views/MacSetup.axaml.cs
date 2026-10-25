@@ -18,19 +18,19 @@ public partial class MacSetup : UserControl
             Fit(m);
             m.PropertyChanged += (_, e) =>
             {
-                if (e.PropertyName is nameof(SetupModel.Step) or nameof(SetupModel.HasCourses) or nameof(SetupModel.AiHelpOpen) or nameof(SetupModel.ShowWelcomeStatus)) Fit(m);
+                if (e.PropertyName is nameof(SetupModel.Step) or nameof(SetupModel.HasCourses) or nameof(SetupModel.AiHelpOpen) or nameof(SetupModel.ShowWelcomeStatus) or nameof(SetupModel.OtherComputersOpen)) Fit(m);
             };
         };
     }
 
     /// <summary>Each step's size: 760×580 for most (the library's type, a 30 px title and a 48 px Continue, needs the
     /// room), 900×780 for the AI engines and Canvas (900 tall while an engine's setup steps show), 640 tall for Classes
-    /// made from Canvas courses, and a little taller while the welcome says it's making the library, or why it
-    /// couldn't.</summary>
+    /// made from Canvas courses, 720 for the welcome with its Advanced open (a laptop and a computer at home), and a
+    /// little taller while the welcome says it's making the library, or why it couldn't.</summary>
     void Fit(SetupModel m)
     {
         Width = m.Wide ? 900 : 760;
-        Height = m.OnCanvas ? 780 : m.OnAi ? (m.AiHelpOpen ? 900 : 780) : m.OnClasses && m.HasCourses ? 640 : m.OnWelcome && m.ShowWelcomeStatus ? 620 : 580;
+        Height = m.OnCanvas ? 780 : m.OnAi ? (m.AiHelpOpen ? 900 : 780) : m.OnClasses && m.HasCourses ? 640 : m.OnWelcome ? (m.OtherComputersOpen ? 720 : 580) + (m.ShowWelcomeStatus ? 40 : 0) : 580;
     }
 
     /// <summary>A real window has the system's traffic lights (in its title bar), rounded corners and shadow;

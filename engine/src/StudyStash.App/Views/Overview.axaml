@@ -59,7 +59,7 @@
         <StackPanel>
           <TextBlock Name="Title" Classes="page-title" Text="{Binding Title}" IsVisible="{Binding !IsFolder}" />
           <c:Highlight Name="FolderTitle" Classes="page-title" Under="True" Text="{Binding Title}" Fill="{Binding Dot}" IsVisible="{Binding IsFolder}" HorizontalAlignment="Left" />
-          <TextBlock Name="Lede" Classes="page-lede" Text="{Binding Lede}" IsVisible="{Binding HasLede}" Margin="0,8,0,0" />
+          <c:PageText Name="Lede" Classes="page-lede" Text="{Binding Lede}" IsVisible="{Binding HasLede}" Margin="0,8,0,0" />
         </StackPanel>
         <StackPanel Name="Actions" Classes="ov-actions" Grid.Column="{Binding ActionsColumn}" Grid.Row="{Binding ActionsRow}" Orientation="Horizontal"
                     Spacing="8" VerticalAlignment="Bottom">
@@ -244,7 +244,7 @@
           <!-- When it next meets, from the calendar -->
           <StackPanel Name="NextMeets" IsVisible="{Binding HasNext}">
             <TextBlock Classes="rail-title" Text="{Binding NextHeading}" />
-            <TextBlock Classes="rail-text" Text="{Binding NextText}" />
+            <c:PageText Classes="rail-text" Text="{Binding NextText}" />
           </StackPanel>
           <!-- What's attached to the folder (drop files anywhere on the page) -->
           <StackPanel Name="FolderFiles" IsVisible="{Binding HasFiles}">

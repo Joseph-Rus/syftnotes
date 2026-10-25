@@ -54,14 +54,14 @@
       <Setter Property="MinWidth" Value="96" />
       <Setter Property="HorizontalContentAlignment" Value="Center" />
     </Style>
+    <!-- A hairline inside it, as Settings' pills have (one round it would be cut off by the button). -->
     <Style Selector=".mac Button.sk-keys">
       <Setter Property="Height" Value="30" />
       <Setter Property="CornerRadius" Value="15" />
       <Setter Property="Padding" Value="14,0" />
       <Setter Property="Background" Value="{DynamicResource Raised}" />
-    </Style>
-    <Style Selector=".mac Button.sk-keys /template/ Border#PART_Bg">
-      <Setter Property="BoxShadow" Value="{DynamicResource RaisedShadow}" />
+      <Setter Property="BorderBrush" Value="{DynamicResource Line}" />
+      <Setter Property="BorderThickness" Value="1" />
     </Style>
     <Style Selector=".win Button.sk-keys">
       <Setter Property="Height" Value="32" />

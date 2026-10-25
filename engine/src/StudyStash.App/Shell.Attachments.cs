@@ -12,6 +12,7 @@ public static partial class Shell
         if (note is null || host.Remote() is not { } lib)
         {
             library.LectureFiles = null;
+            Controls.NoteView.PhotoSource = null;
             return;
         }
         var files = new AttachmentsModel(lib, note.ClassName, note.Id)
@@ -23,6 +24,7 @@ public static partial class Shell
             }),
         };
         library.LectureFiles = files;
+        Controls.NoteView.PhotoSource = files.PhotoFileAsync;
         _ = files.LoadAsync();
     }
 }

@@ -757,9 +757,8 @@ public static partial class Shell
 
     /// <summary>
     /// The recorder's transcript: what's been said so far (<see cref="AppHost.LiveLines"/>, the transcript's own lines
-    /// and the live words after them), its last 200 lines. Only what changed is redrawn: lines that scrolled off the top
-    /// go, the lines that read the same stay, and the rest (the live words' newest line, or live words the transcript
-    /// has now written down) are drawn again.
+    /// and the live words after them), its last 200 lines. Only what changed changes (<see cref="RecorderModel.ShowHeard"/>):
+    /// the live words' newest line grows in place, so a selection in it stays.
     /// </summary>
     static void ShowLive()
     {
@@ -767,13 +766,7 @@ public static partial class Shell
         recorder.QuickWords = host.LiveWordsNow;
         var lines = host.LiveLines();
         if (lines.Count > 200) lines = lines[^200..];
-        while (recorder.Lines.Count > 0 && lines.Count > 0 && recorder.Lines[0].Start < lines[0].Start) recorder.Lines.RemoveAt(0);
-        int same = 0;
-        while (same < recorder.Lines.Count && same < lines.Count && recorder.Lines[same].Text == lines[same].Text
-               && recorder.Lines[same].Start == lines[same].Start && recorder.Lines[same].Latest == (same == lines.Count - 1)) same++;
-        while (recorder.Lines.Count > same) recorder.Lines.RemoveAt(recorder.Lines.Count - 1);
-        for (int i = same; i < lines.Count; i++)
-            recorder.Lines.Add(new HeardLine { Time = TimedText.Clock(lines[i].Start), Text = lines[i].Text, Start = lines[i].Start, Latest = i == lines.Count - 1 });
+        recorder.ShowHeard(lines);
         if (lines.Count > 0) panel.LastLine = $"“…{Trim(lines[^1].Text, 90)}”";
     }
 
@@ -792,6 +785,9 @@ public static partial class Shell
             // The scope's "This lecture" is this recording and nothing else in the library; its folder and All notes
             // look further, as they do under a note.
             LectureId = liveId, ClassName = cls.Length > 0 ? cls : null,
+            // Kept under the recording's own id, the lecture's once it's filed: after Stop it's on the lecture's page.
+            Place = new Core.Ai.AskPlace("lecture", liveId, cls.Length > 0 ? cls : null),
+            ToldDeleted = ChatDeleted,
             OpenSettings = () => ShowSettings("AI"),
             OnSource = s =>
             {
@@ -1080,6 +1076,12 @@ public static partial class Shell
         }
         // The small recorder floats only while this window isn't the one in front.
         w.Activated += (_, _) => ShowRecorderIfAway();
+        // Back from another app (the Claude app, a chat in the browser): the note on the page is read again, so notes
+        // written for it meanwhile show. (Read the same, the page stays as it is.)
+        w.Activated += (_, _) =>
+        {
+            if (library.ShowNotePage && library.Note is { Live: false, Local: false, Planned: false } && library.Notes is not { Editing: true }) RequestLibraryReload();
+        };
         w.Deactivated += (_, _) => ShowRecorderIfAway();
         w.Closing += (_, e) =>
         {
@@ -1408,9 +1410,14 @@ public static partial class Shell
                         WriteNotes = WriteNotesAsync,
                         NotesOn = NotesOnAsync,
                         ChosenBefore = model.Again,
-                        // "I don't have a paid plan" on guided setup's first screen comes here with the free AI on
-                        // this computer picked for the notes when it's here already.
-                        PreferFree = host.Settings.SetupAi == "ollama",
+                        // The answer on guided setup's first screen: "I don't have a paid plan" comes here with the
+                        // free AI on this computer picked for the notes when it's here already, Gemini with Gemini
+                        // (or its key showing), and Claude or ChatGPT, once guided setup got it ready, with that.
+                        Prefer = guidedSetup?.NotesPick ?? (host.Settings.SetupAi is "ollama" or "gemini" ? host.Settings.SetupAi : ""),
+                        // Claude, ChatGPT and Gemini can each run on an API key the student pastes on the step; carried
+                        // on from a plan other apps can't use, that AI's key box is open.
+                        TakesKeys = true,
+                        OpenKeyFor = guidedSetup?.NotesKeyFor ?? "",
                         // Claude and ChatGPT are got ready by guided setup's own two screens, with buttons, where
                         // setup's window has them.
                         SetUpPaid = guidedSetup is { } withButtons ? withButtons.GetReadyForNotesAsync : null,

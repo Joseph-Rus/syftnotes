@@ -32,13 +32,27 @@ public sealed partial class LibraryWeb
     public static readonly TimeSpan TrashKeeps = TimeSpan.FromMinutes(10);
 
     /// <summary>Lectures deleted longer ago than <see cref="TrashKeeps"/> are gone for good.</summary>
-    void EmptyOldTrash() => store.EmptyTrash(DateTimeOffset.UtcNow - TrashKeeps);
+    void EmptyOldTrash() => EmptyTrash(DateTimeOffset.UtcNow - TrashKeeps);
+
+    /// <summary>The trash emptied (what was deleted before <paramref name="before"/>; everything with none): a lecture
+    /// gone for good takes its chats with it.</summary>
+    int EmptyTrash(DateTimeOffset? before = null)
+    {
+        var trashed = store.Trashed();
+        int n = store.EmptyTrash(before);
+        if (n > 0)
+        {
+            var gone = store.Gone().ToHashSet();
+            foreach (string id in trashed.Where(gone.Contains)) LibraryChats.ForgetLecture(id);
+        }
+        return n;
+    }
 
     void MapApp(WebApplication app)
     {
         if (store.IndexMissing() is int n and > 0) Console.WriteLine($"[library] indexed {n} lecture(s) for search");
         // The trash lasts while the library runs: what was deleted before it started again is gone.
-        if (store.EmptyTrash() is int t and > 0) Console.WriteLine($"[library] emptied the trash ({t} lecture(s))");
+        if (EmptyTrash() is int t and > 0) Console.WriteLine($"[library] emptied the trash ({t} lecture(s))");
 
         app.MapGet("/api/v2/library", (HttpContext ctx) => Api(ctx, () =>
         {
@@ -51,6 +65,16 @@ public sealed partial class LibraryWeb
             overview["gone"] = new JsonArray([.. store.Gone().Select(id => (JsonNode)id)]);
             return Http.Json(overview);
         }));
+        // The laptop says what it is recording (at start, every 30 seconds, at stop): the phone's camera banner reads it.
+        app.MapPost("/api/v2/recording-now", Http.Handle(ctx => ApiAsync(ctx, async () =>
+        {
+            var body = await Http.JsonBodyAsync(ctx.Request);
+            string? id = Str(body, "id");
+            if (id is null) return Http.Detail(400, "which recording?");
+            Reader.Recording.Report(id, Str(body, "class") ?? "", Str(body, "title") ?? "", Str(body, "started") ?? "",
+                stopped: body?["stopped"] is JsonValue v && v.TryGetValue(out bool b) && b);
+            return Http.Json(new JsonObject { ["recording_now"] = Reader.Recording.Json() });
+        })));
         app.MapGet("/api/v2/lectures", (HttpContext ctx, string? @class, int? limit, string? before) =>
             Api(ctx, () => Http.Json(Reader.Lectures(@class, limit ?? 50, before))));
         app.MapGet("/api/v2/lectures/{id}", (HttpContext ctx, string id) =>

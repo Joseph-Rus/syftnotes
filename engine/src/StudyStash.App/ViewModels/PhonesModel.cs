@@ -61,6 +61,7 @@ public sealed partial class PhonesModel : ObservableObject
     [ObservableProperty] public partial bool Asking { get; set; }
     /// <summary>"123 456", as it's typed.</summary>
     [ObservableProperty] public partial string Code { get; set; } = "";
+    /// <summary>The address as text (the tooltip): no code in it.</summary>
     [ObservableProperty] public partial string Url { get; set; } = "";
     /// <summary>The QR code's dark squares, in a square <see cref="QrSize"/> wide (margin included).</summary>
     [ObservableProperty] public partial Geometry? Qr { get; set; }
@@ -71,7 +72,36 @@ public sealed partial class PhonesModel : ObservableObject
 
     public bool IsReady => State == LibrarySettingsState.Ready;
     public bool IsLoading => State == LibrarySettingsState.Loading;
-    public bool ShowProblem => State is LibrarySettingsState.Unreachable or LibrarySettingsState.Older or LibrarySettingsState.NoLibrary;
+    /// <summary>Just this computer: phones connect through the student's Google account (this, over the app's
+    /// PhoneDrive) instead of being added over Tailscale; phones added over Tailscale before stay listed.
+    /// Null on a laptop with its library elsewhere and on a library-only computer, where nothing changes.</summary>
+    public PhoneGoogleModel? Google
+    {
+        get;
+        set
+        {
+            field = value;
+            foreach (string p in new[] { nameof(ViaGoogle), nameof(Body), nameof(ShowTailscale), nameof(ShowAdd), nameof(ShowProblem), nameof(ShowLoading), nameof(PhonesTitle), nameof(RemoveLine) }) OnPropertyChanged(p);
+        }
+    }
+
+    public bool ViaGoogle => Google is not null;
+    /// <summary>What the phone does, under the page's title. Through Google it's the iPhone and iPad app: Android's web
+    /// app is served over Tailscale.</summary>
+    public string Body => ViaGoogle
+        ? "Record lectures, read your notes, search, ask and study, write by hand and add files from your phone: the Study Stash app on iPhone and iPad."
+        : "Record lectures, read your notes, search, ask and study, write by hand and add files from your phone: the Study Stash app on iPhone and iPad, or on Android the web app your library serves.";
+    /// <summary>Through Google, the Tailscale way is folded under "Other ways" (an Android phone, or the phone's web
+    /// page), closed until it's pressed; phones added over Tailscale stay listed either way.</summary>
+    [ObservableProperty] public partial bool OtherWays { get; set; }
+    public string OtherWaysAbout => "For an Android phone or the phone's web page: reach this computer over Tailscale.";
+    /// <summary>Adding a phone over Tailscale is on show: always, unless the phone connects through Google and Other
+    /// ways is closed.</summary>
+    public bool ShowTailscale => !ViaGoogle || OtherWays;
+    public bool ShowLoading => IsLoading && ShowTailscale;
+    public string PhonesTitle => ViaGoogle ? "Phones added over Tailscale" : "Phones";
+    public string RemoveLine => ViaGoogle ? "Removing a phone locks it out straight away." : "Removing a phone locks it out straight away. Add it again with a new code.";
+    public bool ShowProblem => ShowTailscale && State is LibrarySettingsState.Unreachable or LibrarySettingsState.Older or LibrarySettingsState.NoLibrary;
     public bool CanRetry => State == LibrarySettingsState.Unreachable;
     public string Problem => State switch
     {
@@ -81,16 +111,27 @@ public sealed partial class PhonesModel : ObservableObject
         _ => "",
     };
     public bool NoPhones => Phones.Count == 0;
-    public bool ShowAdd => IsReady && !Adding;
+    public bool ShowAdd => IsReady && !Adding && ShowTailscale;
     public string AddTitle => Phones.Count == 0 ? "Read your notes and lectures on your phone" : "Add another phone";
     public string AddSub => "Your phone reaches the library over Tailscale: install it on your phone and sign in to the same account.";
 
     partial void OnStateChanged(LibrarySettingsState value)
     {
-        foreach (string p in new[] { nameof(IsReady), nameof(IsLoading), nameof(ShowProblem), nameof(CanRetry), nameof(Problem), nameof(ShowAdd) }) OnPropertyChanged(p);
+        foreach (string p in new[] { nameof(IsReady), nameof(IsLoading), nameof(ShowLoading), nameof(ShowProblem), nameof(CanRetry), nameof(Problem), nameof(ShowAdd) }) OnPropertyChanged(p);
     }
 
     partial void OnAddingChanged(bool value) => OnPropertyChanged(nameof(ShowAdd));
+
+    partial void OnOtherWaysChanged(bool value)
+    {
+        // Folded away again: a code on show goes with it.
+        if (!value && Adding) Done();
+        foreach (string p in new[] { nameof(ShowTailscale), nameof(ShowAdd), nameof(ShowProblem), nameof(ShowLoading) }) OnPropertyChanged(p);
+    }
+
+    /// <summary>"Other ways": opens (or folds away) adding a phone over Tailscale.</summary>
+    [RelayCommand]
+    void ToggleOtherWays() => OtherWays = !OtherWays;
     partial void OnFixChanged(string? value) => OnPropertyChanged(nameof(HasFix));
 
     /// <summary>"Open the page": the one the library said fixes it.</summary>
@@ -181,7 +222,7 @@ public sealed partial class PhonesModel : ObservableObject
             Url = Str(code["url"]);
             Code = digits.Length == 6 ? $"{digits[..3]} {digits[3..]}" : digits;
             until = When(code["expires"]) ?? now() + TimeSpan.FromMinutes(10);
-            var modules = StudyStash.Core.Qr.Modules(Url);
+            var modules = StudyStash.Core.Qr.Modules(code["qrUrl"] is { } q && Str(q) is { Length: > 0 } qr ? qr : Url);
             QrSize = modules.GetLength(0) + 2 * StudyStash.Core.Qr.Margin;
             Qr = Geometry.Parse(StudyStash.Core.Qr.PathData(modules));
             ticks = 0;

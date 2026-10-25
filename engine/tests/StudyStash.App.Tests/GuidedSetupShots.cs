@@ -25,6 +25,7 @@ public sealed class GuidedSetupShots
     }
 
     static readonly AgentFound ClaudeHere = new("/Users/student/.local/bin/claude", new Version(2, 1, 260), "2.1.260 (Claude Code)");
+    static readonly AgentFound GeminiHere = new("/Users/student/.local/bin/agy", new Version(1, 4, 4), "1.4.4");
 
     /// <summary>Each state of the first three screens.</summary>
     internal static IEnumerable<(string Name, Func<SkinKind, GuidedSetupModel> Make)> States()
@@ -35,6 +36,13 @@ public sealed class GuidedSetupShots
         {
             var g = Guided(skin);
             g.PickCommand.Execute("free");
+            return g;
+        });
+        // Gemini: the same way as the other two, through Google's Antigravity CLI.
+        yield return ("pick-gemini", skin =>
+        {
+            var g = Guided(skin);
+            g.PickCommand.Execute("gemini");
             return g;
         });
         yield return ("pick-installed", skin =>
@@ -116,6 +124,33 @@ public sealed class GuidedSetupShots
             g.AiReady = true;
             return g;
         });
+        yield return ("install-gemini", skin =>
+        {
+            var g = Guided(skin);
+            g.Picked = "gemini";
+            g.Screen = GuidedScreen.Install;
+            return g;
+        });
+        yield return ("sign-in-gemini-waiting", skin =>
+        {
+            var g = Guided(skin);
+            g.GeminiFound = GeminiHere;
+            g.Picked = "gemini";
+            g.Screen = GuidedScreen.SignIn;
+            g.WaitingSignIn = true;
+            return g;
+        });
+        yield return ("sign-in-gemini-ready", skin =>
+        {
+            var g = Guided(skin);
+            g.GeminiFound = GeminiHere;
+            g.Picked = "gemini";
+            g.Screen = GuidedScreen.SignIn;
+            g.SignedIn = true;
+            g.AiReady = true;
+            g.AllowanceWords = "About 80% of this week's Gemini allowance is left.";
+            return g;
+        });
         yield return ("sign-in-plan", skin =>
         {
             var g = Guided(skin);
@@ -147,7 +182,7 @@ public sealed class GuidedSetupShots
         g.AiReady = true;
         g.Screen = GuidedScreen.Chat;
         string device = skin == SkinKind.Mac ? "Mac" : "PC";
-        var hi = new AiEntry("Claude") { Text = $"Hi! This takes about 5 minutes. Will you use Study Stash on just this {device}, or record on a laptop and keep your library on another computer?" };
+        var hi = new AiEntry("Claude") { Text = $"Hi! This takes about 5 minutes. First, where your lectures are kept: most people keep everything on this {device}." };
         hi.Chip("Checked your setup");
         g.Thread.Add(hi);
         if (chosen && role == AppRole.Both)
@@ -160,8 +195,8 @@ public sealed class GuidedSetupShots
         }
         else if (chosen)
         {
-            g.Thread.Add(new StudentEntry(role == AppRole.Library ? "This is my library" : "This is my laptop"));
-            g.Thread.Add(new NoteEntry(role == AppRole.Library ? "This is your library" : "This is your laptop", true));
+            g.Thread.Add(new StudentEntry(role == AppRole.Library ? "This is my computer at home" : "This is my laptop for class"));
+            g.Thread.Add(new NoteEntry(role == AppRole.Library ? "Your computer at home" : "Your laptop for class", true));
             g.RoleChosen = true;
             if (role == AppRole.Laptop) g.Setup.Address = "mac-mini:8787";
         }
@@ -227,7 +262,7 @@ public sealed class GuidedSetupShots
         return g;
     }
 
-    static Control View(SkinKind skin, GuidedSetupModel g) =>
+    internal static Control View(SkinKind skin, GuidedSetupModel g) =>
         skin == SkinKind.Mac ? new MacGuidedSetup { DataContext = g, DrawChrome = true } : new WinGuidedSetup { DataContext = g, DrawChrome = true };
 
     [AvaloniaFact]

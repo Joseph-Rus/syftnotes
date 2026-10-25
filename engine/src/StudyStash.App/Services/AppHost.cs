@@ -238,11 +238,12 @@ public sealed partial class AppHost : IDisposable, IProblemSource
     /// <paramref name="localLibrary"/> makes this computer's own library (a test's, on a spare port with no real child).
     /// <paramref name="hardware"/> says what this computer has, which picks its model (a test's pretend computer).
     /// <paramref name="voices"/> tells a lecture's voices apart (a test's pretend one).
+    /// <paramref name="phoneDrive"/> makes the phone's Google Drive link (a test's, over a folder kept in memory).
     /// </summary>
     public AppHost(string home, Func<IAudioSource>? microphone = null, Func<ITranscriber>? whisper = null, LaptopHost? laptop = null,
         Action<string>? log = null, ILoginItems? loginItems = null, ModelSetting? models = null, HttpClient? http = null,
         Func<LibraryService>? localLibrary = null, IMicPermissions? micPermissions = null, IHardwareProbe? hardware = null,
-        Func<ISpeakerLabeler>? voices = null, Func<GranolaOAuth, ILectureSource>? granola = null)
+        Func<ISpeakerLabeler>? voices = null, Func<GranolaOAuth, ILectureSource>? granola = null, Func<AppHost, PhoneDrive>? phoneDrive = null)
     {
         this.voices = voices;
         var probe = hardware ?? HardwareProbe.System;
@@ -287,6 +288,7 @@ public sealed partial class AppHost : IDisposable, IProblemSource
         Memos.Imported += _ => Changed?.Invoke();
         Granola = new GranolaImport(Path.Combine(Home, "granola-tokens.json"), Path.Combine(Home, "granola-client.json"),
             new GranolaLedger(Path.Combine(Home, "granola.json")), Client, net, granola, this.log);
+        Drive = phoneDrive?.Invoke(this) ?? new PhoneDrive(Home, LocalLibraryAddress, () => Settings.Role == AppRole.Both, this.log);
         Recorder.Changed += () => Changed?.Invoke();
         Recorder.Problem += why =>
         {
@@ -388,6 +390,19 @@ public sealed partial class AppHost : IDisposable, IProblemSource
     /// <summary>The student's Granola, once they've signed in to it in Settings: looked at for lectures Study Stash
     /// doesn't have (<see cref="Start"/> runs it), which Transfer brings over.</summary>
     public GranolaImport Granola { get; }
+
+    /// <summary>The phone over Google Drive, on just this computer (Settings → Phone's Connect with Google):
+    /// <see cref="Start"/> starts its link when an account is connected.</summary>
+    public PhoneDrive Drive { get; }
+
+    /// <summary>This computer's own library, as the phone link reaches it: on this computer, with its password. Null
+    /// while it has none.</summary>
+    (string Url, string Key)? LocalLibraryAddress()
+    {
+        if (LocalLibrary?.Cfg is { } c) return ($"http://127.0.0.1:{c.WebPort}", c.PoolPassword);
+        var cc = Client();
+        return Settings.Role == AppRole.Both && cc.ServerUrl.Length > 0 ? (cc.ServerUrl, cc.PoolKey) : null;
+    }
 
     /// <summary>The library over its API, once one is set up.</summary>
     public RemoteLibrary? Remote()
@@ -645,6 +660,8 @@ public sealed partial class AppHost : IDisposable, IProblemSource
         if (Settings.SetupDone && Settings.Role != AppRole.Library && !ModelReady) _ = DownloadModelAsync();
         else EnsureSpeakerModel();
         if (Settings.Role != AppRole.Laptop && Settings.SetupDone) _ = RefreshLocalLibraryAsync();
+        // The phone over Google Drive: only on just this computer, once Settings → Phone has connected an account.
+        if (Settings.Role == AppRole.Both) Drive.Start();
     }
 
     /// <summary>How often old recordings' audio is looked for while the app runs: a Mac's app can run for weeks.</summary>
@@ -973,7 +990,40 @@ public sealed partial class AppHost : IDisposable, IProblemSource
         awake ??= new KeepAwake("Recording a lecture");
         // Live, Whisper starts on it; after class, the look lets go of a model still loaded from the lecture before.
         Whisper.Wake();
+        TellLibraryRecording(true);
+        beat?.Dispose();
+        beat = new Timer(_ => TellLibraryRecording(false), null, TimeSpan.FromSeconds(30), TimeSpan.FromSeconds(30));
         return l;
+    }
+
+    Timer? beat;
+    string? toldRecording;
+
+    /// <summary>The library hears what this computer records: at the start, every 30 seconds, and at the stop, so a
+    /// phone's camera knows which lecture its photos belong to. Never throws, never waits.</summary>
+    void TellLibraryRecording(bool changed)
+    {
+        var l = Recorder.Current;
+        string? id = l?.State == LectureState.Recording || l?.State == LectureState.Paused ? l.Id : null;
+        if (id is null && toldRecording is null) { beat?.Dispose(); beat = null; return; }
+        string stoppedId = id ?? toldRecording!;
+        bool stopped = id is null;
+        if (stopped) { toldRecording = null; beat?.Dispose(); beat = null; changed = true; }
+        else { changed |= toldRecording != id; toldRecording = id; }
+        var lecture = l;
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                if (Remote() is { } lib)
+                    await lib.RecordingNowAsync(stoppedId, lecture?.ClassName ?? "", lecture?.Title ?? "", lecture?.Started ?? "", stopped);
+                if (changed) Drive.RefreshCopy();
+            }
+            catch (Exception e) when (e is HttpRequestException or TaskCanceledException or LibraryRefusedException)
+            {
+                log($"[app] couldn't tell the library what is recording: {e.Message}");
+            }
+        });
     }
 
     /// <summary>What the student has typed so far in the notes of the lecture being recorded: kept with the lecture,
@@ -1008,6 +1058,7 @@ public sealed partial class AppHost : IDisposable, IProblemSource
         awake?.Dispose();
         awake = null;
         Whisper.Wake();
+        TellLibraryRecording(true);
         return l;
     }
 
@@ -1258,6 +1309,7 @@ public sealed partial class AppHost : IDisposable, IProblemSource
         disposed = true;
         watchdog?.Dispose();
         pruning?.Dispose();
+        beat?.Dispose();
         try
         {
             if (Recorder.Current is not null) StopRecording();
@@ -1275,6 +1327,8 @@ public sealed partial class AppHost : IDisposable, IProblemSource
         }
         awake?.Dispose();
         awake = null;
+        // Before the library stops, so nothing the phone asked is cut off by it.
+        Drive.Dispose();
         if (LocalLibrary is { } lib)
         {
             // A clean stop (SIGTERM, then a moment to shut its database down) if it manages one in time; otherwise

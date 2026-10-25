@@ -2,6 +2,7 @@ using System.ComponentModel;
 using System.Globalization;
 using System.Net;
 using System.Text;
+using System.Text.Json;
 using System.Text.Json.Nodes;
 using ModelContextProtocol.Protocol;
 using ModelContextProtocol.Server;
@@ -40,6 +41,19 @@ public interface ILibrarySource
 
     /// <summary>One attachment's words ({id, name, text, reading}), or null when there's no such attachment.</summary>
     Task<JsonObject?> AttachmentTextAsync(string id) => Task.FromResult<JsonObject?>(null);
+
+    /// <summary>Whether notes an AI app writes can be saved here (save_notes): over the library's API, which says
+    /// whether the student lets AI apps save them, and keeps the notes they replace.</summary>
+    bool CanSaveNotes => false;
+
+    /// <summary>How the library writes this lecture's notes (<see cref="Ai.NotesBrief.Brief"/>), or null when there's no
+    /// such lecture. Throws <see cref="LibraryRefusedException"/> with the library's words when it can't say.</summary>
+    Task<string?> NotesBriefAsync(string id) => Task.FromResult<string?>(null);
+
+    /// <summary>Saves notes an AI app wrote as the lecture's notes, named as <paramref name="writer"/>'s. Throws
+    /// <see cref="LibraryRefusedException"/> with the library's words when it won't (the lecture has notes and
+    /// <paramref name="replace"/> isn't set, it's writing them itself, saving is switched off).</summary>
+    Task<Ai.RewriteInfo?> SaveNotesAsync(string id, string markdown, bool replace, string writer) => Task.FromResult<Ai.RewriteInfo?>(null);
 }
 
 /// <summary>The library on this computer.</summary>
@@ -228,6 +242,14 @@ public sealed class RemoteLibrary(string serverUrl, string key, HttpClient? http
     public async Task MoveAsync(string id, string className) =>
         await SendAsync(HttpMethod.Post, $"/lectures/{Q(id)}/class", new JsonObject { ["class"] = className });
 
+    /// <summary>Tells the library what this computer is recording (or, with <paramref name="stopped"/>, that it stopped),
+    /// so a phone's camera knows which lecture its photos are for.</summary>
+    public async Task RecordingNowAsync(string id, string className, string title, string started, bool stopped, CancellationToken stop = default) =>
+        await SendAsync(HttpMethod.Post, "/recording-now", new JsonObject
+        {
+            ["id"] = id, ["class"] = className, ["title"] = title, ["started"] = started, ["stopped"] = stopped,
+        }, stop);
+
     public async Task RewriteAsync(string id) => await SendAsync(HttpMethod.Post, $"/lectures/{Q(id)}/rewrite", new JsonObject());
 
     /// <summary>Gives a lecture a title of the student's own; the library keeps it from then on.</summary>
@@ -336,6 +358,17 @@ public sealed class RemoteLibrary(string serverUrl, string key, HttpClient? http
             stop: stop) as JsonObject;
 
     public async Task<JsonObject?> AttachmentTextAsync(string id) => await SendAsync(HttpMethod.Get, $"/attachments/{Q(id)}/text") as JsonObject;
+
+    public bool CanSaveNotes => true; // a library from before save_notes answers 404, said in words
+
+    public async Task<string?> NotesBriefAsync(string id) =>
+        (await SendAsync(HttpMethod.Get, $"/ai/rewrite/{Q(id)}/brief?for=app") as JsonObject)?["brief"] is JsonValue v && v.TryGetValue(out string? brief) ? brief : null;
+
+    public async Task<Ai.RewriteInfo?> SaveNotesAsync(string id, string markdown, bool replace, string writer) =>
+        (await SendAsync(HttpMethod.Post, $"/ai/rewrite/{Q(id)}/save", new JsonObject
+        {
+            ["markdown"] = markdown, ["replace"] = replace, ["from"] = "app", ["writer"] = writer,
+        }))?.Deserialize<Ai.RewriteInfo>(Ai.AiRemote.Options);
 
     /// <summary>Sends files to the library, for a lecture (when <paramref name="lectureId"/> is given) or a class. Hands
     /// back what it kept. A library older than attachments refuses it with a 404, said in words.</summary>
@@ -488,8 +521,9 @@ public sealed class RemoteLibrary(string serverUrl, string key, HttpClient? http
 }
 
 /// <summary>
-/// The tools Claude gets (Claude Code, Claude Desktop, claude.ai): read-only, over the library's lectures. They
-/// answer in short plain text with each lecture's id, so Claude can ask for more.
+/// The tools Claude gets (Claude Code, Claude Desktop, claude.ai): over the library's lectures, reading, but for
+/// save_notes (notes the student asks an AI app to write, saved in the library; the apps on the student's own computer
+/// only) and canvas_download. They answer in short plain text with each lecture's id, so Claude can ask for more.
 /// </summary>
 public static class ClaudeTools
 {
@@ -503,6 +537,8 @@ public static class ClaudeTools
         + "or a long hex string; pass them to get_lecture and get_transcript. When Canvas is linked, due_assignments, "
         + "get_assignment, class_modules, class_files and class_announcements read what Study Stash already mirrors from "
         + "Canvas; canvas_api, canvas_page and canvas_download read Canvas directly and never other students' data. "
+        + "When the student asks you to write notes for a lecture, read notes_brief and get_transcript for it, write the "
+        + "notes as notes_brief says, and save them with save_notes: they appear on the lecture's page in Study Stash. "
         + "If a tool says reading is switched off for AI apps, tell the user what it says: the student turns it on in Study Stash.";
 
     /// <summary>What the internet door tells Claude on the web and in the desktop app: nothing here writes, and
@@ -865,13 +901,56 @@ public static class ClaudeTools
         return sb.ToString().TrimEnd();
     }
 
+    /// <summary>How the library writes this lecture's notes, for an AI app about to write them (notes_brief).</summary>
+    public static async Task<string> NotesBriefAsync(ILibrarySource lib, string id)
+    {
+        try
+        {
+            return await lib.NotesBriefAsync(id.Trim()) is { } brief
+                ? brief + "\n\n" + ChatNotes.SaveWith
+                : "Your library runs an older Study Stash, without this. The student can update it, or ask you to write the notes here in the chat.";
+        }
+        catch (LibraryRefusedException e)
+        {
+            return "Couldn't: " + e.Message;
+        }
+    }
+
+    /// <summary>
+    /// Saves notes an AI app wrote as the lecture's notes (save_notes), and says what became of them: saved, where the
+    /// student finds them, and whether they replaced notes (which the student can put back); a diagram in them that
+    /// can't be drawn, so it can be fixed and saved again; or why nothing was saved, in the library's words.
+    /// </summary>
+    public static async Task<string> SaveNotesAsync(ILibrarySource lib, string id, string markdown, bool replace, string writer)
+    {
+        if (Py.Strip(markdown).Length == 0) return "Nothing was saved: the notes are empty.";
+        Ai.RewriteInfo? info;
+        try
+        {
+            info = await lib.SaveNotesAsync(id.Trim(), markdown, replace, writer);
+        }
+        catch (LibraryRefusedException e)
+        {
+            return "Nothing was saved: " + e.Message;
+        }
+        if (info is null) return "Nothing was saved: the student's library runs an older Study Stash, which can't take notes from here. They can update it, or copy these notes into Study Stash with Paste notes.";
+        var said = new StringBuilder("Saved. The notes are on the lecture's page in Study Stash now");
+        said.Append(info.Current is { By.Length: > 0 } cur ? $", written by {cur.By}." : ".");
+        if (info.Change is { CanUndo: true } && replace) said.Append(" The notes it had before are kept: the student can undo this, or put them back from the notes' History.");
+        var broken = Rich.NoteBlocks.Find(markdown).Where(b => b.IsDiagram && b.Closed)
+            .Select((b, i) => (Number: i + 1, Why: Summarize.DiagramProblem(b.Kind, b.Text))).Where(x => x.Why is not null).ToList();
+        foreach (var (n, why) in broken)
+            said.Append($" Diagram {n} can't be drawn ({why!.TrimEnd('.')}): fix it and save the notes again with replace set to true.");
+        return said.ToString();
+    }
+
     /// <summary>
     /// The tools, each saying what it returns, then when to use it, and where the ids it takes come from. Every one
-    /// only reads, except canvas_download, which is for the stdio server alone. <paramref name="web"/>: the set for
+    /// only reads, except save_notes and canvas_download, which are for the stdio server alone. <paramref name="web"/>: the set for
     /// the internet door (Claude on the web and the desktop app), which can't open files on this computer: no
     /// canvas_download, and read_file to read a file search found.
     /// </summary>
-    public static List<McpServerTool> Tools(ILibrarySource lib, bool web = false)
+    public static List<McpServerTool> Tools(ILibrarySource lib, bool web = false, string? writer = null)
     {
         static McpServerToolCreateOptions Named(string name, string title, string description, bool writes = false, bool live = false) =>
             new() { Name = name, Title = title, Description = description, ReadOnly = !writes, Destructive = false, Idempotent = !writes, OpenWorld = live };
@@ -926,6 +1005,29 @@ public static class ClaudeTools
                     + "read as text), up to 40,000 characters a call; a longer one ends with the offset to read on from. Use it to "
                     + "read the student's own notes or a lecture's slides. The id comes from list_attachments.")),
         ];
+        // Notes written here and saved in the library: through the library's API only (the stdio server), never the
+        // internet door, whose sign-ins only read.
+        if (!web && lib.CanSaveNotes)
+            tools.AddRange(
+            [
+                McpServerTool.Create(
+                    ([Description("The lecture's id, from list_lectures or search_notes.")] string lecture_id) => NotesBriefAsync(lib, lecture_id),
+                    Named("notes_brief", "How to write a lecture's notes", "How Study Stash writes study notes for one lecture: the "
+                        + "sections, how formulas and diagrams are written, and the lines the student typed during the lecture, which the "
+                        + "notes keep word for word, marked ==like this==. Read it, and the lecture's transcript (get_transcript), before "
+                        + "writing notes to save with save_notes. The id comes from list_lectures or search_notes.")),
+                McpServerTool.Create(
+                    ([Description("The lecture's id, from list_lectures or search_notes.")] string lecture_id,
+                     [Description("The study notes, in Markdown, written as notes_brief says: only the notes, with no words to the student before or after them.")] string markdown,
+                     [Description("True only when the student has said to replace the notes the lecture already has. Leave out otherwise.")] bool replace = false,
+                     McpServer? server = null) =>
+                        SaveNotesAsync(lib, lecture_id, markdown, replace, writer ?? McpClients.Writer(null, server?.ClientInfo?.Name)),
+                    Named("save_notes", "Save a lecture's notes", "Saves study notes you wrote as a lecture's notes in Study Stash, where "
+                        + "the student reads them, named as yours. Use it when the student asks you to write (or save) notes for a lecture: "
+                        + "read notes_brief and get_transcript first, write the notes as notes_brief says, then save them here. A lecture "
+                        + "that already has notes keeps them unless replace is true: ask the student before replacing them. Whatever "
+                        + "is replaced is kept, so the student can put it back.", writes: true)),
+            ]);
         if (!lib.HasCanvas) return tools;
         bool canRead = web && lib.CanReadFiles;
         tools.Add(McpServerTool.Create(
@@ -1038,14 +1140,17 @@ public static class ClaudeTools
 
     /// <summary>The MCP server over stdin and stdout: what Claude Code and Claude Desktop start (<c>Study Stash mcp</c>).
     /// <paramref name="wrapTools"/> lets a caller guard which tools may actually run (AI tool access, read from the
-    /// library); left out, every tool runs as listed.</summary>
-    public static async Task RunStdioAsync(ILibrarySource lib, CancellationToken stop, Func<List<McpServerTool>, List<McpServerTool>>? wrapTools = null)
+    /// library); left out, every tool runs as listed. <paramref name="writer"/>: who notes saved through it are written
+    /// by (<see cref="McpClients.Writer"/>); left out, the app's own name for itself says.</summary>
+    public static async Task RunStdioAsync(ILibrarySource lib, CancellationToken stop, Func<List<McpServerTool>, List<McpServerTool>>? wrapTools = null,
+        string? writer = null)
     {
         var options = Options(lib);
-        if (wrapTools is not null)
+        if (wrapTools is not null || writer is not null)
         {
             var tools = new McpServerPrimitiveCollection<McpServerTool>();
-            foreach (var t in wrapTools(Tools(lib))) tools.Add(t);
+            var made = Tools(lib, writer: writer);
+            foreach (var t in wrapTools is null ? made : wrapTools(made)) tools.Add(t);
             options.ToolCollection = tools;
         }
         await using var server = McpServer.Create(new StdioServerTransport(ServerName), options);

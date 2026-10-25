@@ -22,6 +22,8 @@ public sealed class FakeAiLibrary : IAiLibrary
     public Func<string, AiSaid?>? OnDownload { get; set; }
     public Func<string, AiSaid?>? OnSignIn { get; set; }
     public Func<string, string, AiSaid?>? OnCheck { get; set; }
+    /// <summary>(engine, key): what the library says to a key. Without it, a key works at once.</summary>
+    public Func<string, string, AiSaid?>? OnKey { get; set; }
     public Func<AiOverview?>? OnEngines { get; set; }
     public Func<string?, string?, bool?, AiOverview?>? OnDefaults { get; set; }
     public Func<AskRequest, AskReply?>? OnAsk { get; set; }
@@ -34,6 +36,21 @@ public sealed class FakeAiLibrary : IAiLibrary
     public Func<string, string, string?, RewriteInfo?>? OnEditNotes { get; set; }
     /// <summary>Each edit sent: the notes, and the fingerprint of the notes they were based on.</summary>
     public List<(string Markdown, string? BasedOn)> Edits { get; } = [];
+    /// <summary>(lecture, the notes pasted, replace, based on): what the library says to pasted notes. Without it,
+    /// they're tidied and saved as the library would (<see cref="ChatNotes.Clean"/>), written by "your AI".</summary>
+    public Func<string, string, bool, string?, RewriteInfo?>? OnSaveNotes { get; set; }
+    /// <summary>Each paste sent: the notes as pasted, whether they replace the lecture's, and what they were based on.</summary>
+    public List<(string Markdown, bool Replace, string? BasedOn)> Saves { get; } = [];
+    /// <summary>What "Copy for your AI" gets for a lecture; null: an older library.</summary>
+    public Func<string, NotesBrief?>? OnNotesBrief { get; set; }
+    /// <summary>(lecture, the version asked for, or null for the newest).</summary>
+    public Func<string, string?, RewriteInfo?>? OnRestoreNotes { get; set; }
+    public Func<string, RewriteInfo?>? OnUndoNotes { get; set; }
+    public Func<string, RewriteInfo?>? OnRedoNotes { get; set; }
+    /// <summary>A lecture's versions, newest first (History); null: an older library.</summary>
+    public Func<string, List<NotesKept>?>? OnNotesVersions { get; set; }
+    /// <summary>(lecture, version id): one version with its words.</summary>
+    public Func<string, string, NotesKept?>? OnNotesVersion { get; set; }
     public Func<ToolAccessInfo?>? OnAccess { get; set; }
     public Func<bool?, ReadingScopes?, ToolAccessInfo?>? OnSetAccess { get; set; }
     public Func<bool, ToolAccessInfo?>? OnSetWeb { get; set; }
@@ -118,6 +135,15 @@ public sealed class FakeAiLibrary : IAiLibrary
         return Task.FromResult<AiSaid?>(new AiSaid("Works.", Overview));
     }
 
+    public Task<AiSaid?> KeyAsync(string engine, string key)
+    {
+        Calls.Add($"key:{engine}");
+        if (OnKey is not null) return Task.FromResult(OnKey(engine, key));
+        if (Overview is null) return Task.FromResult<AiSaid?>(null);
+        Overview = Overview with { Engines = [.. Overview.Engines.Select(e => e.Id == engine ? e with { State = "ready", Installed = true, HasKey = true } : e)] };
+        return Task.FromResult<AiSaid?>(new AiSaid($"{Row(Overview, engine).Name} works with your API key.", Overview));
+    }
+
     public Task<AiOverview?> ModelAsync(string engine, string model)
     {
         Calls.Add($"model:{engine}:{model}");
@@ -197,6 +223,50 @@ public sealed class FakeAiLibrary : IAiLibrary
         Edits.Add((markdown, basedOn));
         return Task.FromResult(OnEditNotes is not null ? OnEditNotes(lecture, markdown, basedOn)
             : new RewriteInfo(lecture, "none") { Current = new NotesVersion(markdown, "Ollama", DateTime.Now.ToString("o")) });
+    }
+
+    public Task<RewriteInfo?> SaveNotesAsync(string lecture, string markdown, bool replace, string? basedOn)
+    {
+        Calls.Add($"save:{lecture}");
+        Saves.Add((markdown, replace, basedOn));
+        return Task.FromResult(OnSaveNotes is not null ? OnSaveNotes(lecture, markdown, replace, basedOn)
+            : new RewriteInfo(lecture, "none") { Current = new NotesVersion(ChatNotes.Clean(markdown), "your AI", DateTime.Now.ToString("o")) });
+    }
+
+    public Task<RewriteInfo?> RestoreNotesAsync(string lecture, string? version = null)
+    {
+        Calls.Add($"restore:{lecture}" + (version is null ? "" : $":{version}"));
+        return Task.FromResult(OnRestoreNotes?.Invoke(lecture, version));
+    }
+
+    public Task<RewriteInfo?> UndoNotesAsync(string lecture, string? expect = null)
+    {
+        Calls.Add($"undo:{lecture}");
+        return Task.FromResult(OnUndoNotes?.Invoke(lecture));
+    }
+
+    public Task<RewriteInfo?> RedoNotesAsync(string lecture, string? expect = null)
+    {
+        Calls.Add($"redo:{lecture}");
+        return Task.FromResult(OnRedoNotes?.Invoke(lecture));
+    }
+
+    public Task<List<NotesKept>?> NotesVersionsAsync(string lecture)
+    {
+        Calls.Add($"versions:{lecture}");
+        return Task.FromResult(OnNotesVersions?.Invoke(lecture));
+    }
+
+    public Task<NotesKept?> NotesVersionAsync(string lecture, string version)
+    {
+        Calls.Add($"version:{lecture}:{version}");
+        return Task.FromResult(OnNotesVersion?.Invoke(lecture, version));
+    }
+
+    public Task<NotesBrief?> NotesBriefAsync(string lecture)
+    {
+        Calls.Add($"brief:{lecture}");
+        return Task.FromResult(OnNotesBrief?.Invoke(lecture));
     }
 
     public Task<ToolAccessInfo?> AccessAsync()

@@ -19,9 +19,9 @@
         <TextBlock Text="{Binding Tone, Converter={x:Static vm:CanvasConverters.InfoBarGlyph}}" />
       </Border>
       <StackPanel Grid.Column="1" MinWidth="0" VerticalAlignment="Top">
-        <TextBlock Classes="cv-msg">
+        <c:PageText Classes="cv-msg">
           <Run Text="{Binding Title}" FontWeight="SemiBold" /><Run Text=" " /><Run Text="{Binding Text}" />
-        </TextBlock>
+        </c:PageText>
         <Border Classes="cv-track" IsVisible="{Binding HasProgress}">
           <Grid>
             <Grid.ColumnDefinitions>

@@ -219,11 +219,25 @@ public static class Ollama
 
     public static string PickDefaultModel(IEnumerable<string> installed, string fallback)
     {
-        var list = installed.ToList();
+        // An Ollama cloud model ("glm-5.2:cloud", "qwen3-coder:480b-cloud") sends the text to ollama.com: never picked
+        // for the free, private AI, whatever its name starts with.
+        var list = installed.Where(m => !IsCloud(m)).ToList();
         foreach (string pref in ModelPreference)
             foreach (string m in list)
                 if (m.ToLowerInvariant().StartsWith(pref, StringComparison.Ordinal)) return m;
         return fallback;
+    }
+
+    /// <summary>An Ollama cloud model: listed like the others, but it runs on ollama.com, not this computer.</summary>
+    public static bool IsCloud(string name) =>
+        name.EndsWith(":cloud", StringComparison.OrdinalIgnoreCase) || name.EndsWith("-cloud", StringComparison.OrdinalIgnoreCase);
+
+    /// <summary>The installed model the free AI writes with when the one it was given isn't here: the preferred one
+    /// that's installed, else the biggest, never a cloud model. Null when there's none on this computer.</summary>
+    public static string? LocalPick(IEnumerable<(string Name, double SizeGb)> installed)
+    {
+        var local = installed.Where(m => !IsCloud(m.Name)).OrderByDescending(m => m.SizeGb).ToList();
+        return local.Count == 0 ? null : PickDefaultModel(local.Select(m => m.Name), local[0].Name);
     }
 
     /// <summary>A model this computer can run, for when nothing suitable is installed yet.</summary>

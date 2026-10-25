@@ -65,9 +65,11 @@ public static class Shot
     /// <summary>
     /// Draws what <paramref name="build"/> makes 64 px in on the design's ground (the Mac's wallpaper, Windows' grey)
     /// and saves it as <c>&lt;name&gt;-&lt;light|dark&gt;.png</c>, the size of the design's picture of that section
-    /// (or <paramref name="size"/>). The glass blurs what's behind it here, as the design does.
+    /// (or <paramref name="size"/>). The glass blurs what's behind it here, as the design does. At a
+    /// <paramref name="scale"/> of 2 it's drawn as a Retina screen draws it, two pixels to a point (a picture twice the
+    /// size, cut pixel for pixel, never resampled).
     /// </summary>
-    public static Bitmap Take(string name, SkinKind skin, ThemeVariant variant, Func<Control> build, ColourTheme? theme = null, Size? size = null)
+    public static Bitmap Take(string name, SkinKind skin, ThemeVariant variant, Func<Control> build, ColourTheme? theme = null, Size? size = null, double scale = 1)
     {
         // The colour theme every time too, so one test's theme never shows up in another's picture.
         Skin.UseTheme(theme ?? ColourThemes.Default);
@@ -83,15 +85,37 @@ public static class Shot
         var window = new Window { Width = width + 400, Height = height + 400, RequestedThemeVariant = variant, Content = root };
         Glass.SetBlurBackdrop(window, true);
         Views.Look.Apply(window);
+        if (scale != 1) window.SetRenderScaling(scale);
         window.Show();
         DiagramsReady.Wait(window);
         var whole = window.CaptureRenderedFrame() ?? throw new InvalidOperationException("nothing rendered");
-        var frame = new RenderTargetBitmap(new PixelSize((int)width, (int)height));
-        using (var ctx = frame.CreateDrawingContext())
-            ctx.DrawImage(whole, new Rect(0, 0, width, height), new Rect(0, 0, width, height));
+        Bitmap frame;
+        if (scale == 1)
+        {
+            var rtb = new RenderTargetBitmap(new PixelSize((int)width, (int)height));
+            using (var ctx = rtb.CreateDrawingContext())
+                ctx.DrawImage(whole, new Rect(0, 0, width, height), new Rect(0, 0, width, height));
+            frame = rtb;
+        }
+        else frame = Cut(whole, new PixelSize((int)Math.Round(width * scale), (int)Math.Round(height * scale)));
         using (var file = File.Create(Path.Combine(Dir, $"{name}-{(variant == ThemeVariant.Dark ? "dark" : "light")}.png"))) frame.Save(file, PngBitmapEncoderOptions.Default);
         window.Close();
         return frame;
+    }
+
+    /// <summary>The top left <paramref name="size"/> of <paramref name="whole"/>, pixel for pixel, at its own scale.</summary>
+    static WriteableBitmap Cut(WriteableBitmap whole, PixelSize size)
+    {
+        var cut = new WriteableBitmap(size, whole.Dpi, whole.Format, whole.AlphaFormat);
+        using var from = whole.Lock();
+        using var to = cut.Lock();
+        var row = new byte[size.Width * 4];
+        for (int y = 0; y < size.Height; y++)
+        {
+            System.Runtime.InteropServices.Marshal.Copy(from.Address + y * from.RowBytes, row, 0, row.Length);
+            System.Runtime.InteropServices.Marshal.Copy(row, 0, to.Address + y * to.RowBytes, row.Length);
+        }
+        return cut;
     }
 
     public static StackPanel Side(params Control[] items)
@@ -583,6 +607,16 @@ public class SurfaceShots
                     Shot.Take($"{look}-05-setup-one-computer-ai-{what}", skin, t, () => skin == SkinKind.Mac ? new MacSetup { DataContext = free, DrawChrome = true } : new WinSetup { DataContext = free, DrawChrome = true },
                         size: new Size(1100, 928));
             }
+            // Gemini, the answer on guided setup's first screen and not on this computer: the step opens on its API key.
+            // And Claude not here, with its one button and "Use an API key" beside it.
+            foreach (var (what, engine, state, prefer) in new[] { ("gemini-key", "gemini", "not_installed", "gemini"), ("claude-key-link", "claude", "not_installed", "") })
+            {
+                var keyed = await SetupPage(skin, AppRole.Both, SetupStep.Ai);
+                keyed.Ai = AiDemo.SetupKeyed(skin == SkinKind.Win, engine, state, prefer);
+                foreach (var t in Themes)
+                    Shot.Take($"{look}-05-setup-one-computer-ai-{what}", skin, t, () => skin == SkinKind.Mac ? new MacSetup { DataContext = keyed, DrawChrome = true } : new WinSetup { DataContext = keyed, DrawChrome = true },
+                        size: new Size(1100, 1048));
+            }
             // Just this computer's welcome while its library is being made, and when it couldn't be.
             var making = SetupModel.For(skin);
             making.Connecting = true;
@@ -682,7 +716,7 @@ public class SurfaceShots
     }
 
     /// <summary>A settings window over a temp home (never a real one), for a section's shot; disposed after.</summary>
-    static (Services.SettingsModel Model, Services.AppHost Host, string Home) MakeSettings(string section, SkinKind skin = SkinKind.Mac)
+    internal static (Services.SettingsModel Model, Services.AppHost Host, string Home) MakeSettings(string section, SkinKind skin = SkinKind.Mac)
     {
         string home = Path.Combine(Path.GetTempPath(), "studystash-settings-" + Guid.NewGuid().ToString("N"));
         // "Recording": the models on a Mac with Apple silicon, or a PC with no graphics card Whisper can use, the one
@@ -729,7 +763,7 @@ public class SurfaceShots
             model.Lib.LaptopPassword = "correct-horse";
         }
         if (section == "One-computer-on")
-            model.Lib.LaptopSay = "Laptops can connect now. On your laptop, install Study Stash, choose “This is my laptop”, and enter one of the addresses below and this password.";
+            model.Lib.LaptopSay = "Laptops can connect now. On your laptop, install Study Stash, and in its setup open Advanced and choose “My laptop for class”. Then enter one of the addresses below and this password.";
         return (model, host, home);
     }
 

@@ -71,7 +71,7 @@ public class NoteViewRichTests
         var window = Show(note);
         var pieces = Pieces(note);
         Assert.Equal(
-            [typeof(DiagramView), typeof(SvgView), typeof(DiagramCard), typeof(DiagramView), typeof(DiagramCard), typeof(DiagramCard), typeof(SpokenText)],
+            [typeof(DiagramView), typeof(SvgView), typeof(DiagramCard), typeof(DiagramView), typeof(DiagramCard), typeof(DiagramCard), typeof(NoteText)],
             pieces.Select(p => p.GetType()));
         // The bullet's diagram sits inside the list, not after it.
         Assert.Contains(pieces[3].GetLogicalAncestors(), a => a is Grid);

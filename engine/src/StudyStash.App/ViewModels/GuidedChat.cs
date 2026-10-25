@@ -70,6 +70,8 @@ public sealed partial class CardEntry : ChatEntry
             "library" => "library",
             _ => "one",
         } : "";
+        // A laptop or a computer at home, suggested or already chosen, shows the Advanced it's under.
+        OtherOpen = Choice is "laptop" or "library";
     }
 
     public string Kind { get; }
@@ -87,6 +89,8 @@ public sealed partial class CardEntry : ChatEntry
     [ObservableProperty] public partial string? Problem { get; set; }
     /// <summary>The computer card's choice: "one", "laptop" or "library".</summary>
     [ObservableProperty] public partial string Choice { get; set; }
+    /// <summary>The computer card's Advanced (a laptop for class, a computer at home) is open: folded away at first.</summary>
+    [ObservableProperty] public partial bool OtherOpen { get; set; }
 
     /// <summary>The model card's list of other models is showing (its Change).</summary>
     [ObservableProperty] public partial bool Changing { get; set; }
@@ -95,7 +99,7 @@ public sealed partial class CardEntry : ChatEntry
     /// <summary>What the card is about, as its heading (and its line once folded, before anything came of it).</summary>
     public string Title => Kind switch
     {
-        "computer_setup" => "How will you use Study Stash?",
+        "computer_setup" => "Where should your lectures be kept?",
         "library_password" => "Name your library and give it a password",
         "library_connection" => "Connect to your library",
         "microphone_check" => "Let Study Stash hear your lectures",
@@ -145,6 +149,16 @@ public sealed partial class CardEntry : ChatEntry
 
     /// <summary>The finish card's recap: one line an item.</summary>
     public IReadOnlyList<string> Recap => owner.Recap();
+    string shownRecap = "";
+
+    /// <summary>The recap is read again when what it says has changed (the model's download moving on).</summary>
+    public void RefreshRecap()
+    {
+        string now = string.Join("\n", owner.Recap());
+        if (now == shownRecap) return;
+        shownRecap = now;
+        OnPropertyChanged(nameof(Recap));
+    }
 
     partial void OnOpenChanged(bool value) => OnPropertyChanged(nameof(Folded));
 
@@ -181,6 +195,9 @@ public sealed partial class CardEntry : ChatEntry
     {
         if (!owner.Setup.Again) Choice = choice;
     }
+
+    [RelayCommand]
+    void ToggleOther() => OtherOpen = !OtherOpen;
 }
 
 /// <summary>One checklist line as the sidebar shows it.</summary>

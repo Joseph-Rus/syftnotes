@@ -28,63 +28,63 @@
   </UserControl.Styles>
   <Panel ClipToBounds="True">
     <ScrollViewer VerticalScrollBarVisibility="Auto">
-      <StackPanel Classes="page" MaxWidth="600" Spacing="12" HorizontalAlignment="Center">
+      <StackPanel Classes="page" MaxWidth="600" Spacing="12" HorizontalAlignment="Center" c:TextSelection.Area="True">
         <StackPanel Orientation="Horizontal" Spacing="8">
           <c:Swatch Small="True" Fill="{Binding Dot}" VerticalAlignment="Center"/>
-          <TextBlock Classes="cv-meta" Text="{Binding Meta}" />
+          <c:PageText Classes="cv-meta" Text="{Binding Meta}" />
         </StackPanel>
-        <TextBlock Classes="cv-detail-title" c:Typography.Extra="-0.6" Text="{Binding Title}" TextWrapping="Wrap" Margin="0,0,0,8" />
+        <c:PageText Classes="cv-detail-title" c:Typography.Extra="-0.6" Text="{Binding Title}" TextWrapping="Wrap" Margin="0,0,0,8" />
 
         <Border Classes="cv-tiles">
           <Grid ColumnDefinitions="*,1,*,1,*">
             <StackPanel Grid.Column="0" Spacing="2" Margin="16,12">
-              <TextBlock Classes="cv-tile-label" Text="Due" />
-              <TextBlock Classes="cv-tile-value" Text="{Binding DueValue}" />
+              <c:PageText Classes="cv-tile-label" Text="Due" />
+              <c:PageText Classes="cv-tile-value" CopyJoin=": " Text="{Binding DueValue}" />
             </StackPanel>
             <Border Grid.Column="1" Classes="cv-tile-sep" IsVisible="{Binding IsAssignment}" />
             <StackPanel IsVisible="{Binding IsAssignment}" Grid.Column="2" Spacing="2" Margin="16,12">
-              <TextBlock Classes="cv-tile-label" Text="Points" />
-              <TextBlock Classes="cv-tile-value" Text="{Binding PointsValue}" />
+              <c:PageText Classes="cv-tile-label" Text="Points" />
+              <c:PageText Classes="cv-tile-value" CopyJoin=": " Text="{Binding PointsValue}" />
             </StackPanel>
             <Border Grid.Column="3" Classes="cv-tile-sep" IsVisible="{Binding IsAssignment}" />
             <StackPanel IsVisible="{Binding IsAssignment}" Grid.Column="4" Spacing="2" Margin="16,12">
-              <TextBlock Classes="cv-tile-label" Text="{Binding ThirdLabel}" />
-              <TextBlock Classes="cv-tile-value" Text="{Binding ThirdValue}" />
+              <c:PageText Classes="cv-tile-label" Text="{Binding ThirdLabel}" />
+              <c:PageText Classes="cv-tile-value" CopyJoin=": " Text="{Binding ThirdValue}" />
             </StackPanel>
           </Grid>
         </Border>
 
-        <TextBlock Classes="cv-h3" Text="Instructions" Margin="0,18,0,0" IsVisible="{Binding Instructions, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+        <c:PageText Classes="cv-h3" Text="Instructions" Margin="0,18,0,0" IsVisible="{Binding Instructions, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
         <c:NoteView Markdown="{Binding Instructions}" LinkHandler="{Binding LinkHandler}" IsVisible="{Binding Instructions, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
 
-        <TextBlock Classes="cv-h3" Text="Rubric" Margin="0,14,0,0" IsVisible="{Binding HasRubric}" />
+        <c:PageText Classes="cv-h3" Text="Rubric" Margin="0,14,0,0" IsVisible="{Binding HasRubric}" />
         <ItemsControl ItemsSource="{Binding Rubric}" IsVisible="{Binding HasRubric}">
           <ItemsControl.ItemTemplate>
             <DataTemplate x:DataType="vm:RubricRow">
               <StackPanel Spacing="2" Margin="0,10">
                 <Border Classes="cv-rule" Margin="0,-10,0,10" />
                 <Grid ColumnDefinitions="*,Auto">
-                  <TextBlock Classes="cv-rubric-crit" Text="{Binding Criterion}" TextWrapping="Wrap" />
-                  <TextBlock Grid.Column="1" Classes="cv-rubric-pts" Text="{Binding Right}" Margin="16,0,0,0" />
+                  <c:PageText Classes="cv-rubric-crit" Text="{Binding Criterion}" TextWrapping="Wrap" />
+                  <c:PageText Grid.Column="1" Classes="cv-rubric-pts" CopyJoin="&#9;" Text="{Binding Right}" Margin="16,0,0,0" />
                 </Grid>
-                <TextBlock Classes="cv-rubric-comment" Text="{Binding Comment}" IsVisible="{Binding Comment, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+                <c:PageText Classes="cv-rubric-comment" Text="{Binding Comment}" IsVisible="{Binding Comment, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
               </StackPanel>
             </DataTemplate>
           </ItemsControl.ItemTemplate>
         </ItemsControl>
 
-        <TextBlock Classes="cv-sub-detail" Text="{x:Static vm:AssignmentModel.TodoText}" TextWrapping="Wrap" Margin="0,6,0,0" IsVisible="{Binding IsTodo}" />
-        <TextBlock Classes="cv-h3" Text="Your submission" Margin="0,14,0,0" IsVisible="{Binding ShowSubmission}" />
+        <c:PageText Classes="cv-sub-detail" Text="{x:Static vm:AssignmentModel.TodoText}" TextWrapping="Wrap" Margin="0,6,0,0" IsVisible="{Binding IsTodo}" />
+        <c:PageText Classes="cv-h3" Text="Your submission" Margin="0,14,0,0" IsVisible="{Binding ShowSubmission}" />
         <Border Classes="cv-submission" IsVisible="{Binding ShowSubmission}">
           <StackPanel Spacing="12">
             <StackPanel Orientation="Horizontal" Spacing="10">
-              <TextBlock Classes="cv-sub-status" Text="{Binding SubmissionStatus}" />
-              <TextBlock Classes="cv-sub-detail" Text="{Binding SubmissionDetail}" IsVisible="{Binding HasSubmissionDetail}" VerticalAlignment="Bottom" />
+              <c:PageText Classes="cv-sub-status" Text="{Binding SubmissionStatus}" />
+              <c:PageText Classes="cv-sub-detail" Text="{Binding SubmissionDetail}" IsVisible="{Binding HasSubmissionDetail}" VerticalAlignment="Bottom" />
             </StackPanel>
-            <TextBlock Classes="cv-sub-detail" Text="{Binding SubmissionBody}" IsVisible="{Binding HasSubmissionBody}" TextWrapping="Wrap" />
+            <c:PageText Classes="cv-sub-detail" Text="{Binding SubmissionBody}" IsVisible="{Binding HasSubmissionBody}" TextWrapping="Wrap" />
             <StackPanel Spacing="2" IsVisible="{Binding HasComment}">
-              <TextBlock Classes="cv-comment" Text="{Binding CommentText}" />
-              <TextBlock Classes="cv-comment-author" Text="{Binding CommentAuthor}" />
+              <c:PageText Classes="cv-comment" Text="{Binding CommentText}" />
+              <c:PageText Classes="cv-comment-author" Text="{Binding CommentAuthor}" />
             </StackPanel>
             <ItemsControl ItemsSource="{Binding Files}" IsVisible="{Binding HasFiles}">
               <ItemsControl.ItemsPanel>

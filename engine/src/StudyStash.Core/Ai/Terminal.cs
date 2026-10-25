@@ -46,10 +46,29 @@ public static class Terminal
     /// <summary>Open it. The terminal's name, or throws InvalidOperationException saying why not.</summary>
     public static string Open(string home, string folder, string library, string? className, string terminal, string provider, IReadOnlyList<string> mcp)
     {
+        var (bin, args, env) = Command(folder, library, className, provider, mcp);
+        return LaunchInTerminal(home, folder, terminal, bin, args, env);
+    }
+
+    /// <summary>
+    /// What <see cref="Open"/> runs: the command, its arguments, and what its environment needs. Gemini's agy runs in
+    /// Study Stash's own home for it (signed in there, the library's tools there), never the student's own ~/.gemini,
+    /// where it would be signed out, without the library, and would make that folder.
+    /// </summary>
+    internal static (string Bin, List<string> Args, Dictionary<string, string> Env) Command(string folder, string library, string? className, string provider,
+        IReadOnlyList<string> mcp)
+    {
+        var env = new Dictionary<string, string>();
+        if (provider == "gemini")
+        {
+            new GeminiProvider().Prepare(mcp, [folder, library]);
+            var agy = new List<string> { "--agent", Antigravity.LibraryAgent };
+            if (!Py.SamePath(folder, library)) agy.AddRange(["--add-dir", library]);
+            return ("agy", agy, Antigravity.HomeEnv());
+        }
         var (bin, args) = provider switch
         {
             "codex" or "ollama" => ("codex", new List<string>()),
-            "gemini" => ("agy", new List<string>()),
             _ => ("claude", new List<string> { "--append-system-prompt", Briefing(library, folder, className) }),
         };
         if (bin == "claude" && mcp.Count > 0)
@@ -64,7 +83,7 @@ public static class Terminal
                 },
             }.ToJsonString()]);
         if (!Py.SamePath(folder, library)) args.AddRange(bin == "claude" ? ["--add-dir", library] : []);
-        return LaunchInTerminal(home, folder, terminal, bin, args);
+        return (bin, args, env);
     }
 
     /// <summary>Open a terminal on this computer running a plain command (a sign-in, e.g. `codex login`), for the
@@ -72,14 +91,33 @@ public static class Terminal
     public static string RunCommand(string home, string terminal, string exe, IReadOnlyList<string> args) =>
         LaunchInTerminal(home, home, terminal, exe, args);
 
-    static string LaunchInTerminal(string home, string folder, string terminal, string bin, IReadOnlyList<string> args)
+    /// <summary>The script a Mac terminal runs: into the folder, the command (with <paramref name="env"/> set for it
+    /// alone), then a shell.</summary>
+    internal static string MacScript(string folder, string exe, IReadOnlyList<string> args, IReadOnlyDictionary<string, string>? env = null)
+    {
+        string set = string.Concat((env ?? new Dictionary<string, string>()).Select(kv => $"{kv.Key}={Quote(kv.Value)} "));
+        return $"#!/bin/zsh -l\ncd {Quote(folder)} || exit 1\n{set}{Quote(exe)} {string.Join(" ", args.Select(Quote))}\nexec zsh -l\n";
+    }
+
+    /// <summary>Windows: a command with an environment of its own goes through PowerShell, which sets it first (a
+    /// terminal window doesn't pass the app's on).</summary>
+    internal static (string Program, IReadOnlyList<string> Args) WindowsWithEnv(string exe, IReadOnlyList<string> args, IReadOnlyDictionary<string, string> env)
+    {
+        static string Q(string s) => "'" + s.Replace("'", "''", StringComparison.Ordinal) + "'";
+        string set = string.Concat(env.Select(kv => $"$env:{kv.Key} = {Q(kv.Value)}; "));
+        return ("powershell.exe", ["-NoProfile", "-NoExit", "-Command", $"{set}& {Q(exe)} {string.Join(" ", args.Select(Q))}".TrimEnd()]);
+    }
+
+    static string LaunchInTerminal(string home, string folder, string terminal, string bin, IReadOnlyList<string> args,
+        IReadOnlyDictionary<string, string>? env = null)
     {
         string exe = AiProvider.Which(bin) ?? throw new InvalidOperationException($"{bin} isn't installed on this computer.");
         if (OperatingSystem.IsWindows())
         {
             // An npm-installed claude.cmd is seen through to its Node.js, so the brief reaches it whole: see WindowsCommand.
             var launch = WindowsCommand.For([exe, .. args]);
-            var (program, programArgs) = launch.CommandLine is null ? (launch.FileName, launch.Arguments) : (exe, args);
+            var (program, programArgs) = env is { Count: > 0 } ? WindowsWithEnv(exe, args, env)
+                : launch.CommandLine is null ? (launch.FileName, launch.Arguments) : (exe, args);
             var wt = new ProcessStartInfo("wt.exe") { UseShellExecute = true };
             foreach (string a in WindowsTerminalArgs(folder, program, programArgs)) wt.ArgumentList.Add(a);
             try
@@ -104,7 +142,7 @@ public static class Terminal
         Directory.CreateDirectory(dir);
         foreach (string old in Directory.EnumerateFiles(dir, "*.command").OrderByDescending(File.GetLastWriteTimeUtc).Skip(20)) File.Delete(old);
         string script = Path.Combine(dir, Convert.ToHexStringLower(RandomNumberGenerator.GetBytes(4)) + ".command");
-        File.WriteAllText(script, $"#!/bin/zsh -l\ncd {Quote(folder)} || exit 1\n{Quote(exe)} {string.Join(" ", args.Select(Quote))}\nexec zsh -l\n");
+        File.WriteAllText(script, MacScript(folder, exe, args, env));
         File.SetUnixFileMode(script, UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute);
         var open = t.Id == "ghostty"
             ? new ProcessStartInfo("open") { ArgumentList = { "-na", t.App, "--args", $"--working-directory={folder}", "-e", "/bin/zsh", script } }

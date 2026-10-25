@@ -17,7 +17,7 @@
 
       <TextBlock Classes="ai-title" Text="AI apps" />
       <TextBlock Classes="ai-sub" MaxWidth="560" Margin="0,4,0,0" HorizontalAlignment="Left"
-                 Text="ChatGPT, Claude and other AI apps can read your lectures and notes to answer your questions. They can't change or delete anything." />
+                 Text="ChatGPT, Claude and other AI apps can read your lectures and notes to answer your questions, and save notes you ask them to write. They can't delete anything." />
       <TextBlock Classes="ai-sub" MaxWidth="560" Margin="0,4,0,0" HorizontalAlignment="Left" Foreground="{DynamicResource Warn}" IsVisible="{Binding Offline}"
                  Text="Can't reach your library right now, so what's below may be out of date." />
       <TextBlock Classes="ai-sub" MaxWidth="560" Margin="0,4,0,0" HorizontalAlignment="Left" IsVisible="{Binding OlderLibrary}"
@@ -96,7 +96,7 @@
             <c:Icon Glyph="chat" Size="18" />
             <StackPanel Classes="ai-row-text" Grid.Column="2" VerticalAlignment="Center">
               <TextBlock Classes="ai-row-sub" Text="{Binding TryLead}" TextWrapping="Wrap" />
-              <TextBlock Classes="ai-row-title" Text="{x:Static vm:AiAccessModel.TryQuestion}" TextWrapping="Wrap" />
+              <c:PageText Classes="ai-row-title" Text="{x:Static vm:AiAccessModel.TryQuestion}" TextWrapping="Wrap" />
             </StackPanel>
             <Button Grid.Column="3" Classes="ai-pillbtn" Command="{Binding CopyTryCommand}" VerticalAlignment="Center" Margin="12,0,0,0"
                     AutomationProperties.Name="Copy the question">
@@ -117,22 +117,22 @@
                  Text="Nothing to type or paste: the app reads your library through this computer." />
       <TextBlock Classes="ai-sub" MaxWidth="560" Margin="0,4,0,0" HorizontalAlignment="Left" TextWrapping="Wrap"
                  Foreground="{DynamicResource Fg3}" Text="{Binding MissingApps}" IsVisible="{Binding ShowMissingApps}" />
-      <TextBlock Classes="ai-sub" MaxWidth="560" Margin="0,8,0,0" HorizontalAlignment="Left" TextWrapping="Wrap" Text="{Binding Say}" IsVisible="{Binding HasSay}" />
+      <c:PageText Classes="ai-sub" MaxWidth="560" Margin="0,8,0,0" HorizontalAlignment="Left" TextWrapping="Wrap" Text="{Binding Say}" IsVisible="{Binding HasSay}" />
       <Button Classes="ai-textbtn" Command="{Binding ToggleDetailsCommand}" IsVisible="{Binding HasWritten}" HorizontalAlignment="Left" Margin="0,4,0,0" Padding="0,2">
         <TextBlock Classes="ai-link" Text="{Binding DetailsWords}" />
       </Button>
       <Border Classes="ai-card" Margin="0,8,0,0" IsVisible="{Binding ShowWritten}">
-        <StackPanel Spacing="6">
+        <StackPanel Spacing="6" c:TextSelection.Area="True">
           <Grid ColumnDefinitions="*,Auto">
             <TextBlock Classes="ai-row-title" Text="What was written" VerticalAlignment="Center" />
             <Button Grid.Column="1" Classes="ai-textbtn" Command="{Binding CopyWrittenCommand}" IsVisible="{Binding HasWrittenText}">
               <TextBlock Text="Copy" FontSize="14" />
             </Button>
           </Grid>
-          <SelectableTextBlock Classes="ai-row-sub" Text="{Binding WrittenFile}" TextWrapping="Wrap" />
-          <TextBlock Classes="ai-row-sub" Text="{Binding WrittenBackupWords}" TextWrapping="Wrap" />
-          <SelectableTextBlock Text="{Binding WrittenText}" IsVisible="{Binding HasWrittenText}" TextWrapping="Wrap"
-                               FontFamily="Cascadia Mono, Consolas, SF Mono, Menlo, monospace" FontSize="12" Foreground="{DynamicResource Fg2}" />
+          <c:PageText Classes="ai-row-sub" Text="{Binding WrittenFile}" TextWrapping="Wrap" />
+          <c:PageText Classes="ai-row-sub" Text="{Binding WrittenBackupWords}" TextWrapping="Wrap" />
+          <c:PageText Text="{Binding WrittenText}" IsVisible="{Binding HasWrittenText}" TextWrapping="Wrap"
+                      FontFamily="Cascadia Mono, Consolas, SF Mono, Menlo, monospace" FontSize="12" Foreground="{DynamicResource Fg2}" />
         </StackPanel>
       </Border>
 
@@ -178,6 +178,27 @@
         </StackPanel>
       </Border>
 
+      <!-- What they can change: the notes a student asks them to write, saved on the lecture's page (save_notes) -->
+      <TextBlock Classes="ai-section" Text="What they can change" Margin="0,18,0,8" />
+      <Border Classes="ai-card">
+        <StackPanel>
+          <Button Name="SaveNotesToggle" Classes="ai-textbtn ai-choice quiet" Command="{Binding ToggleSaveNotesCommand}" HorizontalContentAlignment="Stretch"
+                  AutomationProperties.Name="Save notes they write">
+            <Grid ColumnDefinitions="Auto,12,*" MinHeight="52">
+              <Border Classes="ai-check" Classes.on="{Binding SaveNotes}" VerticalAlignment="Center">
+                <c:Icon Glyph="check" Size="14" Foreground="{DynamicResource OnAccent}" IsVisible="{Binding SaveNotes}" />
+              </Border>
+              <Border Classes="focusring ai-checkring" />
+              <StackPanel Grid.Column="2" Classes="ai-row-text" VerticalAlignment="Center" Margin="0,6">
+                <TextBlock Classes="ai-row-title" Text="{x:Static vm:AiAccessModel.SaveToggle}" />
+                <TextBlock Classes="ai-row-sub" TextWrapping="Wrap" Text="{x:Static vm:AiAccessModel.SaveToggleSub}" />
+              </StackPanel>
+            </Grid>
+          </Button>
+        </StackPanel>
+      </Border>
+      <c:PageText Name="NoPlanLine" Classes="ai-sub" MaxWidth="560" Margin="0,8,0,0" HorizontalAlignment="Left" TextWrapping="Wrap" Text="{x:Static vm:AiAccessModel.NoPlanLine}" />
+
       <TextBlock Classes="ai-section" Text="Claude and ChatGPT on the web and phone" Margin="0,18,0,8" />
       <Border Classes="ai-card">
         <StackPanel>
@@ -199,7 +220,7 @@
             <Grid ColumnDefinitions="20,16,*,Auto" MinHeight="36">
               <Grid Grid.Column="2" Classes="ai-field" ColumnDefinitions="64,*" VerticalAlignment="Center">
                 <TextBlock Classes="ai-row-sub" Text="Name" VerticalAlignment="Center" />
-                <TextBlock Grid.Column="1" Classes="ai-row-title" Text="{Binding WebName}" VerticalAlignment="Center" />
+                <c:PageText Grid.Column="1" Classes="ai-row-title" Text="{Binding WebName}" VerticalAlignment="Center" />
               </Grid>
               <Button Grid.Column="3" Classes="ai-pillbtn" Command="{Binding CopyWebNameCommand}">
                 <Border Classes="ai-pill"><TextBlock Text="Copy" /></Border>
@@ -208,7 +229,7 @@
             <Grid ColumnDefinitions="20,16,*,Auto" MinHeight="36">
               <Grid Grid.Column="2" Classes="ai-field" ColumnDefinitions="64,*" VerticalAlignment="Center">
                 <TextBlock Classes="ai-row-sub" Text="URL" VerticalAlignment="Center" />
-                <TextBlock Grid.Column="1" Classes="ai-row-title" Text="{Binding WebUrl}" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
+                <c:PageText Grid.Column="1" Classes="ai-row-title" Text="{Binding WebUrl}" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
               </Grid>
               <Button Grid.Column="3" Classes="ai-pillbtn" Command="{Binding CopyWebUrlCommand}">
                 <Border Classes="ai-pill"><TextBlock Text="Copy" /></Border>
@@ -233,7 +254,7 @@
             </StackPanel>
             <Grid ColumnDefinitions="20,16,*,Auto" MinHeight="36">
               <Ellipse Classes="ai-dot" Classes.good="{Binding WebStatusOk}" Classes.warn="{Binding WebStatusWarn}" HorizontalAlignment="Center" />
-              <TextBlock Grid.Column="2" Classes="ai-state" Classes.warn="{Binding WebStatusWarn}" Text="{Binding WebStatusWords}" VerticalAlignment="Center" />
+              <c:PageText Grid.Column="2" Classes="ai-state" Classes.warn="{Binding WebStatusWarn}" Text="{Binding WebStatusWords}" VerticalAlignment="Center" />
               <Button Grid.Column="3" Classes="ai-textbtn" Command="{Binding CheckWebAgainCommand}" VerticalAlignment="Center">
                 <TextBlock Text="Check again" FontSize="14" />
               </Button>
@@ -242,7 +263,7 @@
 
           <Grid IsVisible="{Binding ShowWebNote}" ColumnDefinitions="20,16,*,Auto" Margin="0,10,0,0" MinHeight="40">
             <c:Icon Glyph="warning" Filled="True" Size="18" Foreground="{DynamicResource Warn}" />
-            <TextBlock Grid.Column="2" Classes="ai-row-sub" TextWrapping="Wrap" Text="{Binding WebNote}" VerticalAlignment="Center" />
+            <c:PageText Grid.Column="2" Classes="ai-row-sub" TextWrapping="Wrap" Text="{Binding WebNote}" VerticalAlignment="Center" />
             <StackPanel Grid.Column="3" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center" IsVisible="{Binding ShowWebNoteAction}">
               <Button Classes="ai-textbtn" Command="{Binding CopyWebFixCommand}" VerticalAlignment="Center">
                 <TextBlock Text="Copy link" FontSize="14" />

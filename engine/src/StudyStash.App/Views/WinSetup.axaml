@@ -104,12 +104,12 @@
                     <TextBlock Classes="page-title step-title" Text="{Binding WelcomeTitle}" />
                     <TextBlock Classes="page-lede step-lede" Text="{Binding WelcomeBody}" />
                     <StackPanel Name="Choices" Spacing="10" Margin="0,22,0,0" MaxWidth="480" HorizontalAlignment="Stretch">
-                      <Button AutomationProperties.Name="Just this computer" AutomationProperties.HelpText="{Binding OneComputerAbout}" Name="OneComputer" Classes="choice" Classes.on="{Binding IsOneComputer}" Command="{Binding ChooseOneComputerCommand}" IsEnabled="{Binding CanChooseOneComputer}">
+                      <Button AutomationProperties.Name="{Binding OneComputerTitle}" AutomationProperties.HelpText="{Binding OneComputerAbout}" Name="OneComputer" Classes="choice" Classes.on="{Binding IsOneComputer}" Command="{Binding ChooseOneComputerCommand}" IsEnabled="{Binding CanChooseOneComputer}">
                         <Grid ColumnDefinitions="Auto,14,*,14,Auto">
                           <c:Icon Classes="choice-icon" Glyph="desktop_windows" />
                           <StackPanel Grid.Column="2" Spacing="3" VerticalAlignment="Center">
                             <StackPanel Orientation="Horizontal" Spacing="8">
-                              <TextBlock Classes="choice-title" Text="Just this computer" />
+                              <TextBlock Classes="choice-title" Text="{Binding OneComputerTitle}" />
                               <Border Classes="tag"><TextBlock Text="Recommended" /></Border>
                             </StackPanel>
                             <TextBlock Classes="choice-about" Text="{Binding OneComputerAbout}" />
@@ -117,26 +117,38 @@
                           <Border Grid.Column="4" Classes="radio" Classes.on="{Binding IsOneComputer}"><Ellipse /></Border>
                         </Grid>
                       </Button>
-                      <Button AutomationProperties.Name="This is my laptop" AutomationProperties.HelpText="{x:Static vm:SetupModel.LaptopAbout}" Name="Laptop" Classes="choice" Classes.on="{Binding IsLaptop}" Command="{Binding ChooseLaptopCommand}" IsEnabled="{Binding CanChooseLaptop}">
-                        <Grid ColumnDefinitions="Auto,14,*,14,Auto">
-                          <c:Icon Classes="choice-icon" Glyph="laptop_mac" />
-                          <StackPanel Grid.Column="2" Spacing="3" VerticalAlignment="Center">
-                            <TextBlock Classes="choice-title" Text="This is my laptop" />
-                            <TextBlock Classes="choice-about" Text="{x:Static vm:SetupModel.LaptopAbout}" />
-                          </StackPanel>
-                          <Border Grid.Column="4" Classes="radio" Classes.on="{Binding IsLaptop}"><Ellipse /></Border>
-                        </Grid>
+                      <!-- Advanced: a laptop for class and a computer at home, folded away (most students have one computer) -->
+                      <Button Name="OtherComputers" Classes="text-link" Margin="0,6,0,0" Command="{Binding ToggleOtherComputersCommand}"
+                              AutomationProperties.Name="{x:Static vm:SetupModel.OtherComputersLabel}">
+                        <StackPanel Orientation="Horizontal" Spacing="4">
+                          <c:Icon Glyph="chevron_right" Size="18" IsVisible="{Binding !OtherComputersOpen}" />
+                          <c:Icon Glyph="expand_more" Size="18" IsVisible="{Binding OtherComputersOpen}" />
+                          <TextBlock Text="{x:Static vm:SetupModel.OtherComputersLabel}" VerticalAlignment="Center" />
+                        </StackPanel>
                       </Button>
-                      <Button AutomationProperties.Name="This is my library" AutomationProperties.HelpText="{Binding LibraryAbout}" Name="Library" Classes="choice" Classes.on="{Binding IsLibrary}" Command="{Binding ChooseLibraryCommand}" IsEnabled="{Binding CanChooseLibrary}">
-                        <Grid ColumnDefinitions="Auto,14,*,14,Auto">
-                          <c:Icon Classes="choice-icon" Glyph="dns" />
-                          <StackPanel Grid.Column="2" Spacing="3" VerticalAlignment="Center">
-                            <TextBlock Classes="choice-title" Text="This is my library" />
-                            <TextBlock Classes="choice-about" Text="{Binding LibraryAbout}" />
-                          </StackPanel>
-                          <Border Grid.Column="4" Classes="radio" Classes.on="{Binding IsLibrary}"><Ellipse /></Border>
-                        </Grid>
-                      </Button>
+                      <StackPanel Spacing="10" IsVisible="{Binding OtherComputersOpen}">
+                        <TextBlock Classes="hint" Text="{x:Static vm:SetupModel.OtherComputersAbout}" Margin="0,0,0,2" />
+                        <Button AutomationProperties.Name="{x:Static vm:SetupModel.LaptopTitle}" AutomationProperties.HelpText="{x:Static vm:SetupModel.LaptopAbout}" Name="Laptop" Classes="choice" Classes.on="{Binding IsLaptop}" Command="{Binding ChooseLaptopCommand}" IsEnabled="{Binding CanChooseLaptop}">
+                          <Grid ColumnDefinitions="Auto,14,*,14,Auto">
+                            <c:Icon Classes="choice-icon" Glyph="laptop_mac" />
+                            <StackPanel Grid.Column="2" Spacing="3" VerticalAlignment="Center">
+                              <TextBlock Classes="choice-title" Text="{x:Static vm:SetupModel.LaptopTitle}" />
+                              <TextBlock Classes="choice-about" Text="{x:Static vm:SetupModel.LaptopAbout}" />
+                            </StackPanel>
+                            <Border Grid.Column="4" Classes="radio" Classes.on="{Binding IsLaptop}"><Ellipse /></Border>
+                          </Grid>
+                        </Button>
+                        <Button AutomationProperties.Name="{x:Static vm:SetupModel.LibraryTitle}" AutomationProperties.HelpText="{Binding LibraryAbout}" Name="Library" Classes="choice" Classes.on="{Binding IsLibrary}" Command="{Binding ChooseLibraryCommand}" IsEnabled="{Binding CanChooseLibrary}">
+                          <Grid ColumnDefinitions="Auto,14,*,14,Auto">
+                            <c:Icon Classes="choice-icon" Glyph="dns" />
+                            <StackPanel Grid.Column="2" Spacing="3" VerticalAlignment="Center">
+                              <TextBlock Classes="choice-title" Text="{x:Static vm:SetupModel.LibraryTitle}" />
+                              <TextBlock Classes="choice-about" Text="{Binding LibraryAbout}" />
+                            </StackPanel>
+                            <Border Grid.Column="4" Classes="radio" Classes.on="{Binding IsLibrary}"><Ellipse /></Border>
+                          </Grid>
+                        </Button>
+                      </StackPanel>
                     </StackPanel>
                     <!-- Just this computer: Continue makes the library here; while it does, and if it can't, say so. -->
                     <Grid ColumnDefinitions="Auto,8,*" Margin="0,14,0,0" MinHeight="20" MaxWidth="480" HorizontalAlignment="Left" IsVisible="{Binding ShowWelcomeStatus}">
@@ -398,7 +410,7 @@
                   <!-- The library's last page: how to connect your laptop -->
                   <StackPanel IsVisible="{Binding OnLibraryDone}">
                     <TextBlock Classes="page-title step-title" Text="Your library is ready" />
-                    <TextBlock Classes="page-lede step-lede" Text="Connect your laptop: install Study Stash on it, choose “This is my laptop”, and enter:" />
+                    <TextBlock Classes="page-lede step-lede" Text="Connect your laptop: install Study Stash on it, and in its setup open Advanced and choose “My laptop for class”. Then enter:" />
                     <Border Classes="group" Margin="0,22,0,0">
                       <StackPanel>
                         <ItemsControl ItemsSource="{Binding Addresses}">

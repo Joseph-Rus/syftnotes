@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.Runtime.CompilerServices;
 using System.Text;
@@ -16,6 +17,9 @@ public sealed record AiRequest(string Prompt, string Cwd)
 {
     public string System { get; init; } = "";
     public IReadOnlyList<string> ReadDirs { get; init; } = [];
+    /// <summary>Picture files the AI is to look at, for an engine that takes them on its command line (Codex's --image).
+    /// Claude Code reads image files in its working folder, which the prompt names, so it needs none here.</summary>
+    public IReadOnlyList<string> Images { get; init; } = [];
     public bool Write { get; init; }
     public string Model { get; init; } = "";
     /// <summary>How hard the model thinks ("high"), where its command takes a reasoning effort; "" for its own default.</summary>
@@ -39,7 +43,12 @@ public sealed record AiEvent(string Kind, string Text = "", string Name = "", st
 }
 
 /// <summary>A finished run: its answer (or why it failed) and the conversation id to continue it.</summary>
-public sealed record AiResult(bool Ok, string Text, string Session, IReadOnlyList<AiEvent> Tools);
+public sealed record AiResult(bool Ok, string Text, string Session, IReadOnlyList<AiEvent> Tools)
+{
+    /// <summary>Which model really answered, when it wasn't the one asked ("Gemini 3.5 Flash-Lite (Flash's free daily
+    /// limit is used up)"), in words for the answer's byline; "" otherwise.</summary>
+    public string Note { get; init; } = "";
+}
 
 /// <summary>
 /// One AI a person may pick. Each provider is its own command-line agent, signed in with the person's own account
@@ -100,8 +109,12 @@ public abstract class AiProvider
             yield return AiEvent.Error($"{Name} isn't installed on this computer ({Site}).");
             yield break;
         }
-        await foreach (var e in Spawn(Command(req, stream), req.Cwd, req.Timeout, Parse, Input(req), ct)) yield return e;
+        await foreach (var e in Spawn(Command(req, stream), req.Cwd, req.Timeout, Parse, Input(req), ct, Env(req))) yield return e;
     }
+
+    /// <summary>What the command's environment has besides the app's own (Claude's connectors kept out of a plain
+    /// answer, say).</summary>
+    protected virtual IReadOnlyDictionary<string, string> Env(AiRequest req) => new Dictionary<string, string>();
 
     /// <summary>Run to the end: the answer (the provider's final word, else everything it wrote), or why not. With
     /// <paramref name="soFar"/> it streams: that hears everything written so far each time more arrives (or the
@@ -109,7 +122,7 @@ public abstract class AiProvider
     public async Task<AiResult> CompleteAsync(AiRequest req, CancellationToken ct = default, Action<string>? soFar = null)
     {
         var text = new StringBuilder();
-        string final = "", session = "", error = "";
+        string final = "", session = "", error = "", note = "";
         var tools = new List<AiEvent>();
         await foreach (var e in RunAsync(req, stream: soFar is not null, ct))
         {
@@ -125,6 +138,7 @@ public abstract class AiProvider
                     break;
                 case "session" when e.Text.Length > 0: session = e.Text; break;
                 case "tool": tools.Add(e); break;
+                case "note": note = e.Text; break;
                 case "error": error = e.Text; break;
             }
         }
@@ -133,7 +147,7 @@ public abstract class AiProvider
         // Finished but said nothing (Antigravity does when print mode refuses a tool it wanted): that's no answer, so
         // nothing is saved as a lecture's notes and the job can try again or fall back.
         if (answer.Length == 0) return new AiResult(false, $"{Name} finished without answering.", session, tools);
-        return new AiResult(true, answer, session, tools);
+        return new AiResult(true, answer, session, tools) { Note = note };
     }
 
     // --- running a command ------------------------------------------------------------------------------------
@@ -141,7 +155,8 @@ public abstract class AiProvider
     /// <summary>Where these commands usually live: a background service starts with a short PATH. On Windows also
     /// the PATH as Windows has it now: an engine (or Node.js, which npm's claude.cmd and codex.cmd run on) installed
     /// while Study Stash was running isn't on the PATH it started with, and "Check again" in setup should find it.
-    /// Codex's own Windows installer puts it in %LOCALAPPDATA%\Programs\OpenAI\Codex\bin. Last of all, the copies the
+    /// Codex's own Windows installer puts it in %LOCALAPPDATA%\Programs\OpenAI\Codex\bin, Antigravity's in
+    /// %LOCALAPPDATA%\agy\bin. Last of all, the copies the
     /// ChatGPT and Claude desktop apps carry (<see cref="DesktopAppDirs"/>): one installed on its own comes first.</summary>
     public static string SearchPath()
     {
@@ -149,6 +164,7 @@ public abstract class AiProvider
         string[] extra = OperatingSystem.IsWindows()
             ? [.. WindowsPathNow(), Path.Combine(home, "AppData", "Roaming", "npm"), Path.Combine(home, ".local", "bin"),
                Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Programs", "OpenAI", "Codex", "bin"),
+               Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "agy", "bin"),
                Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles), "nodejs")]
             : ["/opt/homebrew/bin", "/usr/local/bin", "/usr/bin", "/bin", Path.Combine(home, ".local", "bin"),
                Path.Combine(home, ".npm-global", "bin"), Path.Combine(home, ".bun", "bin"), Path.Combine(home, ".claude", "local"),
@@ -228,7 +244,8 @@ public abstract class AiProvider
     /// <summary>Start a command and read its lines as they come, turning each into events. A command that fails
     /// without saying why ends with the tail of what it printed to stderr.</summary>
     protected static async IAsyncEnumerable<AiEvent> Spawn(List<string> cmd, string cwd, TimeSpan timeout,
-        Func<string, IEnumerable<AiEvent>> parse, string? input = null, [EnumeratorCancellation] CancellationToken ct = default)
+        Func<string, IEnumerable<AiEvent>> parse, string? input = null, [EnumeratorCancellation] CancellationToken ct = default,
+        IReadOnlyDictionary<string, string>? env = null)
     {
         // On Windows an npm-installed CLI is a .cmd, which cmd.exe would mangle the arguments of: see WindowsCommand.
         var launch = OperatingSystem.IsWindows() ? WindowsCommand.For(cmd) : new Launch(cmd[0], cmd[1..]);
@@ -243,6 +260,7 @@ public abstract class AiProvider
         else foreach (string a in launch.Arguments) psi.ArgumentList.Add(a);
         psi.Environment["PATH"] = SearchPath();
         psi.Environment.Remove("CLAUDECODE"); // started from inside Claude Code, claude would refuse to nest
+        foreach (var (k, v) in env ?? new Dictionary<string, string>()) psi.Environment[k] = v;
         Process? p;
         string? startError = null;
         try
@@ -289,7 +307,8 @@ public abstract class AiProvider
             }
             if (timedOut)
             {
-                yield return AiEvent.Error($"{Path.GetFileName(cmd[0])} didn't finish within {timeout.TotalMinutes:0} minutes.");
+                yield return AiEvent.Error($"{Path.GetFileName(cmd[0])} didn't finish within " +
+                    (timeout < TimeSpan.FromMinutes(2) ? $"{timeout.TotalSeconds:0} seconds." : $"{timeout.TotalMinutes:0} minutes."));
                 yield break;
             }
             if (!proc.WaitForExit(30_000)) yield break;
@@ -361,6 +380,112 @@ public sealed class ClaudeProvider : AiProvider
         full.Length > 1 && full[1] == ':' ? "/" + char.ToLowerInvariant(full[0]) + full[2..].Replace('\\', '/').TrimEnd('/')
             : "/" + full.TrimStart('/');
 
+    static readonly ConcurrentDictionary<string, Version?> Versions = new();
+
+    /// <summary>The installed Claude Code's version (its <c>--version</c>, asked once per program): a newer lockdown
+    /// flag is added only when it has it. The tests give their own.</summary>
+    public static Func<string, Version?> VersionOf { get; set; } = exe =>
+        Versions.GetOrAdd(exe, e => Machine.Run(e, ["--version"], TimeSpan.FromSeconds(20)) is { ExitCode: 0 } r ? AgentCli.ParseVersion(r.Stdout) : null);
+
+    /// <summary>How long a run waits before it's tried again when Claude Code stopped because another of its processes
+    /// was renewing the sign-in (<see cref="Engines.LooksLikeRefreshBusy"/>), up to <see cref="RefreshTries"/> tries in
+    /// all, about the minute Anthropic's docs say it takes. Study Stash starts several at once (notes, diagrams, Ask,
+    /// beside the student's own), and one it stopped halfway can leave the renewal locked for a while: without this the
+    /// lecture said "Claude needs you to sign in again" when it didn't. The tests make it short.</summary>
+    public TimeSpan RefreshWait { get; init; } = TimeSpan.FromSeconds(30);
+    public const int RefreshTries = 3;
+
+    /// <summary>How long a run Claude turned away as signed out waits before it's tried once more, as a fresh
+    /// <c>claude</c> that signs in alone (<see cref="SignInGate"/>). Another Claude Code may just have renewed the
+    /// sign-in and left this one holding the old one; only when the fresh run fails too is Claude signed out (the
+    /// lecture says so, with Sign in). Signed out for real, the fresh run stops at once on this computer, with
+    /// nothing sent. The tests make it short.</summary>
+    public TimeSpan SignedOutWait { get; init; } = TimeSpan.FromSeconds(5);
+
+    /// <summary>The gate this provider's runs go through; null for this process's own for the program
+    /// (<see cref="SignInGate.For"/>), which every Claude run of the library's shares. The tests give their own.</summary>
+    public SignInGate? Gate { get; init; }
+
+    /// <summary>
+    /// The run, through the <see cref="SignInGate"/>: after a quiet spell, or after Claude turned one away, it waits
+    /// while another run signs in, or signs in alone itself (streaming, so the others hear the moment Claude begins to
+    /// answer; a caller that didn't ask for the stream doesn't get its pieces). A run that stops before saying
+    /// anything is tried again: after <see cref="RefreshWait"/> while another Claude Code is renewing the sign-in (up
+    /// to <see cref="RefreshTries"/> tries), and once, after <see cref="SignedOutWait"/>, when it was turned away as
+    /// signed out. After that its words stand. An API key's run doesn't use the sign-in and goes straight through.
+    /// </summary>
+    public override async IAsyncEnumerable<AiEvent> RunAsync(AiRequest req, bool stream = true,
+        [EnumeratorCancellation] CancellationToken ct = default)
+    {
+        bool onKey = ApiKey is not null && (!Available() || !req.Tools && !req.Write);
+        if (onKey || Exe() is not { } exe)
+        {
+            await foreach (var e in base.RunAsync(req, stream, ct)) yield return e;
+            yield break;
+        }
+        var gate = Gate ?? SignInGate.For(exe);
+        int busy = 0;
+        bool againAlone = false;
+        while (true)
+        {
+            SignInGate.Turn turn;
+            try
+            {
+                turn = await gate.EnterAsync(ct);
+            }
+            catch (OperationCanceledException)
+            {
+                yield break;
+            }
+            TimeSpan? again = null;
+            using (turn)
+            {
+                bool said = false;
+                await foreach (var e in base.RunAsync(req, stream || turn.Leads, ct))
+                {
+                    // Claude has begun to answer: past sign-in, and never run twice from here (it may have used tools).
+                    if (e.Kind is "started" or "text" or "tool" or "final")
+                    {
+                        turn.Passed();
+                        said = true;
+                    }
+                    if (e.Kind == "started" || e.Kind == "text" && !stream) continue;
+                    if (e.Kind == "error" && !said)
+                    {
+                        bool renewing = Engines.LooksLikeRefreshBusy(e.Text), signedOut = !renewing && Engines.LooksSignedOut(e.Text);
+                        if (renewing || signedOut) gate.Cold(); // the next run, this one's again included, leads
+                        if (renewing && ++busy < RefreshTries) again = RefreshWait;
+                        else if (signedOut && !againAlone)
+                        {
+                            againAlone = true;
+                            again = SignedOutWait;
+                        }
+                        if (again is not null) break;
+                    }
+                    yield return e;
+                }
+            }
+            if (again is not { } wait) yield break;
+            bool stopped = false;
+            try
+            {
+                await Task.Delay(wait, ct);
+            }
+            catch (OperationCanceledException)
+            {
+                stopped = true;
+            }
+            if (stopped) yield break;
+        }
+    }
+
+    /// <summary>A plain answer (notes, Check, Ask) is the student's own Claude Code with nothing of theirs added: no MCP
+    /// servers of theirs, none of claude.ai's connectors, and, where the version has it, only managed settings
+    /// (<c>--restricted</c>), so their own hooks and settings don't run inside the library's work. Agent work
+    /// (<see cref="AiRequest.Tools"/>) is left as it was.</summary>
+    protected override IReadOnlyDictionary<string, string> Env(AiRequest req) =>
+        req.Tools ? new Dictionary<string, string>() : new Dictionary<string, string> { ["ENABLE_CLAUDEAI_MCP_SERVERS"] = "false" };
+
     public override List<string> Command(AiRequest req, bool stream)
     {
         // Edit and Write are allowed only inside the working folder: "//" makes the rule an absolute path.
@@ -374,8 +499,10 @@ public sealed class ClaudeProvider : AiProvider
         if (!PromptOnInput) cmd.Add(req.Prompt);
         cmd.AddRange(["--output-format", "stream-json", "--verbose"]);
         if (stream) cmd.Add("--include-partial-messages");
-        // A plain answer uses no tools: don't wait for the person's own MCP servers to start first.
+        // A plain answer uses no tools: don't wait for the person's own MCP servers to start first, and run none of
+        // their own hooks or settings in it (Claude Code 2.1.248 on).
         if (!req.Tools) cmd.Add("--strict-mcp-config");
+        if (!req.Tools && AgentCli.Has(VersionOf(exe), AgentCli.RestrictedSince)) cmd.Add("--restricted");
         if (req.Tools && req.McpCommand.Count > 0)
         {
             var server = new JsonObject { ["command"] = req.McpCommand[0], ["args"] = new JsonArray(req.McpCommand.Skip(1).Select(a => (JsonNode)a).ToArray()) };
@@ -409,6 +536,8 @@ public sealed class ClaudeProvider : AiProvider
         if (Json(line) is not { } e) yield break;
         string type = S(e["type"]);
         if (type == "system" && S(e["subtype"]) == "init") yield return new AiEvent("session", S(e["session_id"]));
+        // The model's answer has begun, so Claude Code got past its sign-in (for the SignInGate; not passed on).
+        else if (type == "stream_event" && S(e["event"]?["type"]) == "message_start") yield return new AiEvent("started");
         else if (type == "stream_event" && e["parent_tool_use_id"] is null)
         {
             var ev = e["event"];
@@ -446,21 +575,67 @@ public class CodexProvider : AiProvider
     /// <summary>Extra arguments before the prompt (a local model's, for <see cref="OllamaProvider"/>).</summary>
     protected virtual IEnumerable<string> ExtraArgs => [];
 
-    public override List<string> Command(AiRequest req, bool stream)
+    /// <summary>The student's own Codex config.toml (where its MCP servers are named).</summary>
+    public Func<string> ConfigPath { get; init; } = () => SetupChat.CodexConfig();
+
+    /// <summary>Codex programs whose plain answers read the student's own config.toml: their sign-in turned out to be
+    /// kept there (turned away as signed out without it, and with it worked), or they're older than
+    /// <c>--ignore-user-config</c> (turned away for the flag itself). Remembered for as long as the library runs.</summary>
+    static readonly ConcurrentDictionary<string, bool> KeptConfig = new();
+
+    string CodexExe() => (Id == "codex" ? Exe() : null) ?? Which("codex") ?? "codex";
+
+    /// <summary>A plain answer (notes, Check, Ask: no tools, no files to change) on ChatGPT's own Codex.</summary>
+    bool Plain(AiRequest req) => Id == "codex" && !req.Tools && !req.Write;
+
+    /// <summary>
+    /// Whether a plain answer reads the student's config.toml (with their MCP servers, hooks, notify and apps off): when
+    /// it has to (above), or when they point Codex at a model provider of their own there (its definition is in that
+    /// file, and without it the notes would go to another provider).
+    /// </summary>
+    bool ReadsConfig(AiRequest req) =>
+        !Plain(req) || KeptConfig.ContainsKey(CodexExe()) || SetupChat.CodexTopLevel(ConfigPath()).Provider is { Length: > 0 } p && p != "openai";
+
+    public override List<string> Command(AiRequest req, bool stream) => Command(req, stream, readConfig: ReadsConfig(req));
+
+    /// <summary>The command-line flag an older Codex turns away ("error: unexpected argument '--ignore-user-config'").</summary>
+    static bool RefusedTheFlag(string error) => error.Contains("--ignore-user-config", StringComparison.Ordinal);
+
+    /// <summary>
+    /// <paramref name="readConfig"/> off (a plain answer): the student's own config.toml is skipped, so nothing of
+    /// theirs (MCP servers, which can reach their library; hooks; notify) runs inside the library's work. On, for a
+    /// plain answer whose sign-in is kept there: it's read, but every MCP server it names stays off, and so do hooks
+    /// and notify. Agent work reads it as before.
+    /// </summary>
+    List<string> Command(AiRequest req, bool stream, bool readConfig)
     {
         // The next turn of a conversation is `codex exec [options] resume ID prompt`: -C and -s are exec's own options
         // and `resume` turns them away, so every option comes before it.
-        var cmd = new List<string> { Which("codex") ?? "codex", "exec" };
+        var cmd = new List<string> { CodexExe(), "exec" };
         cmd.AddRange(ExtraArgs);
-        cmd.AddRange(["--json", "--skip-git-repo-check", "-C", req.Cwd, "-s", req.Write ? "workspace-write" : "read-only",
-            "-c", "approval_policy=\"never\""]);
+        cmd.AddRange(["--json", "--skip-git-repo-check"]);
+        if (!readConfig) cmd.Add("--ignore-user-config");
+        cmd.AddRange(["-C", req.Cwd, "-s", req.Write ? "workspace-write" : "read-only", "-c", "approval_policy=\"never\""]);
+        // Nor the student's ChatGPT apps (connectors: their mail, drive…), as Claude's plain answers leave out claude.ai's.
+        if (Plain(req)) cmd.AddRange(["-c", "features.apps=false"]);
+        if (readConfig && Plain(req))
+        {
+            foreach (string own in SetupChat.CodexServers(ConfigPath())) cmd.AddRange(["-c", $"mcp_servers.{own}.enabled=false"]);
+            cmd.AddRange(["-c", "features.hooks=false", "-c", "notify=[]"]);
+        }
         foreach (string d in req.ReadDirs) cmd.AddRange(["--add-dir", d]);
+        foreach (string image in req.Images) cmd.Add("--image=" + image);
         if (req.Tools && req.McpCommand.Count > 0)
             cmd.AddRange(["-c", $"mcp_servers.{McpKey}.command={JsonSerializer.Serialize(req.McpCommand[0])}",
                 "-c", $"mcp_servers.{McpKey}.args={new JsonArray(req.McpCommand.Skip(1).Select(a => (JsonNode)a).ToArray()).ToJsonString()}"]);
-        if (req.Model.Length > 0) cmd.AddRange(["-m", req.Model]);
+        // The model: the one picked in Settings; else, with the student's config.toml skipped, the one they set there
+        // (otherwise the notes would quietly move to Codex's own default).
+        string model = req.Model.Length > 0 ? req.Model : !readConfig && Plain(req) ? SetupChat.CodexTopLevel(ConfigPath()).Model : "";
+        if (model.Length > 0) cmd.AddRange(["-m", model]);
         if (req.Effort.Length > 0 && Id == "codex") cmd.AddRange(["-c", $"model_reasoning_effort=\"{req.Effort}\""]);
         if (req.Session.Length > 0) cmd.AddRange(["resume", req.Session]);
+        // --image takes any number of files: "--" ends them, so they never swallow the prompt.
+        if (req.Images.Count > 0 && req.Session.Length == 0) cmd.Add("--");
         cmd.Add(PromptOnInput ? "-" : WithSystem(req));
         return cmd;
     }
@@ -514,12 +689,45 @@ public class CodexProvider : AiProvider
         return fresh.RunCoreAsync(req, stream, ct);
     }
 
-    protected virtual IAsyncEnumerable<AiEvent> RunCoreAsync(AiRequest req, bool stream, CancellationToken ct) =>
-        base.RunAsync(req, stream, ct);
+    /// <summary>A plain answer turned away without the student's config.toml, as signed out (their sign-in may be kept
+    /// there) or for the flag that skips it (a Codex older than it), is asked once more reading it, its MCP servers
+    /// off; that's remembered (an older Codex at once; a sign-in when it then works).</summary>
+    protected virtual async IAsyncEnumerable<AiEvent> RunCoreAsync(AiRequest req, bool stream, [EnumeratorCancellation] CancellationToken ct)
+    {
+        string exe = CodexExe();
+        bool retry = Plain(req) && ApiKey is null && !ReadsConfig(req) && Available();
+        bool signedOut = false;
+        await foreach (var e in base.RunAsync(req, stream, ct))
+        {
+            if (retry && e.Kind == "error" && RefusedTheFlag(e.Text))
+            {
+                KeptConfig[exe] = true;
+                signedOut = true;
+                break;
+            }
+            if (retry && e.Kind == "error" && Engines.LooksSignedOut(e.Text))
+            {
+                signedOut = true;
+                break;
+            }
+            yield return e;
+        }
+        if (!signedOut || ct.IsCancellationRequested) yield break;
+        last = "";
+        bool worked = true;
+        await foreach (var e in Spawn(Command(req, stream, readConfig: true), req.Cwd, req.Timeout, Parse, Input(req), ct, Env(req)))
+        {
+            if (e.Kind == "error") worked = !Engines.LooksSignedOut(e.Text);
+            yield return e;
+        }
+        if (worked) KeptConfig[exe] = true;
+    }
 }
 
 /// <summary>Gemini, through Google's Antigravity CLI (<c>agy -p</c>), which took over from Gemini CLI for
-/// personal Google accounts.</summary>
+/// personal Google accounts, in a home of Study Stash's own (<see cref="Antigravity.Home"/>): the student's own agy
+/// settings, MCP servers, plugins and skills don't run in the library's work, and Study Stash never changes theirs. The
+/// sign-in is kept in that home too: the one setup's "Sign in to Gemini" made.</summary>
 public sealed class GeminiProvider : AiProvider
 {
     public override string Id => "gemini";
@@ -530,60 +738,49 @@ public sealed class GeminiProvider : AiProvider
         [("", "Antigravity's default model"), ("gemini-3.8-flash-medium", "Gemini 3.8 Flash: fast"), ("gemini-3.1-pro-high", "Gemini 3.1 Pro: strongest")];
 
     /// <summary>
-    /// Antigravity keeps its MCP servers in its own settings: add Study Stash's once. In print mode it can't ask
-    /// before running a command or opening a file, so it refuses them and ends with an empty answer; allow the
-    /// commands that only read (ls, cat, grep…) and reading the turn's own folders (<paramref name="folders"/>), or a
-    /// turn that wants a look around comes back empty.
+    /// Agent work runs as Study Stash's library agent (<see cref="Antigravity.LibraryAgent"/>), which declares the
+    /// library's MCP server itself (<paramref name="mcp"/>), so it never sits in the home's global config, where it would
+    /// start in the setup chat's sessions too. In print mode agy can't ask before running a command or opening a file, so
+    /// it refuses them and ends with an empty answer; allow the commands that only read (ls, cat, grep…), reading the
+    /// turn's own folders (<paramref name="folders"/>) and the library's tools, or a turn that wants a look around comes
+    /// back empty.
     /// </summary>
     public void Prepare(IReadOnlyList<string> mcp, IEnumerable<string>? folders = null)
     {
-        string exe = Exe() ?? "agy";
-        // Once seen there, it stays: later turns don't wait for `agy mcp list` again before they start.
-        if (mcp.Count > 0 && !mcpAdded && Machine.Run(exe, ["mcp", "list"], TimeSpan.FromSeconds(20)) is { } listed)
-        {
-            mcpAdded = listed.Stdout.Contains(ClaudeTools.ServerName, StringComparison.Ordinal)
-                || Machine.Run(exe, ["mcp", "add", ClaudeTools.ServerName, .. mcp], TimeSpan.FromSeconds(20)) is { ExitCode: 0 };
-        }
-        AllowReading(Path.Combine(Py.UserHome(), ".gemini", "antigravity-cli", "settings.json"), folders);
+        Antigravity.PrepareLibrary(mcp);
+        AllowReading(Antigravity.SettingsPath(Antigravity.Home()), folders, create: true);
     }
 
-    /// <summary>Study Stash's MCP server is in Antigravity's settings (seen by this process, or added by it).</summary>
-    static bool mcpAdded;
+    /// <summary>agy's home of Study Stash's own.</summary>
+    protected override IReadOnlyDictionary<string, string> Env(AiRequest req) => Antigravity.HomeEnv();
 
     public static readonly string[] ReadOnlyCommands = ["ls", "cat", "head", "tail", "grep", "rg", "find", "wc", "pdftotext", "file", "stat"];
 
     /// <summary>Add read-only command rules, and reading each of <paramref name="folders"/> (Antigravity's
-    /// <c>read_file(/a/folder)</c>), to Antigravity's settings, keeping everything else in them. True when it changed them.</summary>
-    public static bool AllowReading(string settingsPath, IEnumerable<string>? folders = null)
+    /// <c>read_file(/a/folder)</c>), to Antigravity's settings, keeping everything else in them (made, with
+    /// <paramref name="create"/>, when there are none yet: Study Stash's own home). True when it changed them.</summary>
+    public static bool AllowReading(string settingsPath, IEnumerable<string>? folders = null, bool create = false)
     {
-        if (!File.Exists(settingsPath)) return false;
-        JsonObject root;
-        try
-        {
-            root = JsonNode.Parse(File.ReadAllText(settingsPath)) as JsonObject ?? [];
-        }
-        catch (JsonException)
-        {
-            return false; // not ours to repair
-        }
-        var perms = root["permissions"] as JsonObject ?? [];
-        var allow = perms["allow"] as JsonArray ?? [];
-        var have = allow.Select(S).ToHashSet();
-        bool changed = false;
+        if (!File.Exists(settingsPath) && !create) return false;
         var rules = ReadOnlyCommands.Select(c => $"command({c})")
             .Concat((folders ?? []).Where(f => f.Length > 0).Select(f => $"read_file({Path.TrimEndingDirectorySeparator(Path.GetFullPath(f))})"));
-        foreach (string rule in rules)
-            if (have.Add(rule)) { allow.Add(rule); changed = true; }
-        if (!changed) return false;
-        perms["allow"] = allow;
-        root["permissions"] = perms;
-        File.WriteAllText(settingsPath, root.ToJsonString(new JsonSerializerOptions { WriteIndented = true }));
-        return true;
+        return Antigravity.Allow(settingsPath, rules);
     }
+
+    /// <summary>A plain answer (notes, sorting, the Check: no tools, no files to change, no folders to look at): it runs
+    /// as Study Stash's answer agent, which has no tools to reach for (<see cref="Antigravity.AnswerAgentFile"/>).</summary>
+    static bool PlainAnswer(AiRequest req) => !req.Tools && !req.Write && req.ReadDirs.Count == 0;
 
     public override List<string> Command(AiRequest req, bool stream)
     {
-        var cmd = new List<string> { Exe() ?? "agy", "-p", WithSystem(req), "--output-format", "stream-json",
+        if (PlainAnswer(req))
+        {
+            var plain = new List<string> { Exe() ?? "agy", "-p", WithSystem(req), "--output-format", "stream-json", "--agent", Antigravity.AnswerAgent, "--disable-slash-commands" };
+            if (req.Model.Length > 0) plain.AddRange(["--model", req.Model]);
+            if (req.Session.Length > 0) plain.AddRange(["--conversation", req.Session]);
+            return plain;
+        }
+        var cmd = new List<string> { Exe() ?? "agy", "-p", WithSystem(req), "--output-format", "stream-json", "--agent", Antigravity.LibraryAgent,
             "--mode", req.Write ? "accept-edits" : "plan" };
         if (!req.Write) // read-only turns may look around the other folders; editing turns stay in the library
             foreach (string d in req.ReadDirs) cmd.AddRange(["--add-dir", d]);
@@ -594,7 +791,11 @@ public sealed class GeminiProvider : AiProvider
 
     public override IAsyncEnumerable<AiEvent> RunAsync(AiRequest req, bool stream = true, CancellationToken ct = default)
     {
-        if (Available()) Prepare(req.Tools ? req.McpCommand : [], [req.Cwd, .. req.ReadDirs]);
+        if (Available())
+        {
+            if (PlainAnswer(req)) Antigravity.PrepareAnswer();
+            else Prepare(req.Tools ? req.McpCommand : [], [req.Cwd, .. req.ReadDirs]);
+        }
         return base.RunAsync(req, stream, ct);
     }
 
@@ -686,14 +887,15 @@ public sealed class OllamaProvider(Func<string> host) : CodexProvider
         await foreach (var e in ChatAsync(req, model, ct)) yield return e;
     }
 
-    /// <summary>The model a run uses: the one asked for when it's installed, else the best one that is; null when
-    /// there's none (or Ollama isn't answering).</summary>
+    /// <summary>The model a run uses: the one asked for when it's installed, else the best one that is on this
+    /// computer (never an Ollama cloud model, which would send the lecture off it); null when there's none (or Ollama
+    /// isn't answering).</summary>
     async Task<string?> ModelAsync(string asked)
     {
         var have = await Ollama.ListModelsAsync(host()) ?? [];
         var names = have.Select(m => m.Name).ToList();
         if (asked.Length > 0 && Ollama.HasModel(names, asked)) return asked;
-        return have.Count == 0 ? null : Ollama.PickDefaultModel(names, have[0].Name);
+        return Ollama.LocalPick(have);
     }
 
     /// <summary>How long Ollama keeps the model loaded after a question, so a follow-up doesn't wait for it to load

@@ -294,21 +294,20 @@
       <Setter Property="HorizontalContentAlignment" Value="Center" />
       <Setter Property="HorizontalAlignment" Value="Left" />
     </Style>
+    <!-- Its hairline is a border inside it: a button cuts off whatever it draws outside its own box, so a ring
+         round it showed only on its round ends (and at a fraction of a pixel, along its top). -->
     <Style Selector=".mac Button.pill">
       <Setter Property="Height" Value="30" />
       <Setter Property="CornerRadius" Value="15" />
       <Setter Property="Padding" Value="14,0" />
       <Setter Property="Background" Value="{DynamicResource Raised}" />
-    </Style>
-    <Style Selector=".mac Button.pill /template/ Border#PART_Bg">
-      <Setter Property="BoxShadow" Value="{DynamicResource RaisedShadow}" />
+      <Setter Property="BorderBrush" Value="{DynamicResource Line}" />
+      <Setter Property="BorderThickness" Value="1" />
     </Style>
     <Style Selector=".mac Button.pill.primary">
       <Setter Property="Background" Value="{DynamicResource Tint}" />
       <Setter Property="Foreground" Value="{DynamicResource OnAccent}" />
-    </Style>
-    <Style Selector=".mac Button.pill.primary /template/ Border#PART_Bg">
-      <Setter Property="BoxShadow" Value="{DynamicResource EdgeTint}" />
+      <Setter Property="BorderThickness" Value="0" />
     </Style>
     <Style Selector=".win Button.pill">
       <Setter Property="Height" Value="32" />
@@ -337,9 +336,8 @@
       <Setter Property="CornerRadius" Value="14" />
       <Setter Property="Padding" Value="12,0,8,0" />
       <Setter Property="Background" Value="{DynamicResource Raised}" />
-    </Style>
-    <Style Selector=".mac Button.select /template/ Border#PART_Bg">
-      <Setter Property="BoxShadow" Value="{DynamicResource RaisedShadow}" />
+      <Setter Property="BorderBrush" Value="{DynamicResource Line}" />
+      <Setter Property="BorderThickness" Value="1" />
     </Style>
     <Style Selector=".win Button.select">
       <Setter Property="Height" Value="32" />
@@ -430,9 +428,8 @@
     <Style Selector=".mac Button.seg-item.on">
       <Setter Property="Foreground" Value="{DynamicResource Fg}" />
       <Setter Property="Background" Value="{DynamicResource Raised}" />
-    </Style>
-    <Style Selector=".mac Button.seg-item.on /template/ Border#PART_Bg">
-      <Setter Property="BoxShadow" Value="{DynamicResource RaisedShadow}" />
+      <Setter Property="BorderBrush" Value="{DynamicResource Line}" />
+      <Setter Property="BorderThickness" Value="1" />
     </Style>
 
     <!-- An accent-track, white-knob toggle: a plain ToggleButton, not the Fluent ToggleSwitch (which doesn't follow
@@ -744,7 +741,7 @@
                     <StackPanel>
                       <Border Classes="row">
                         <Grid ColumnDefinitions="*,Auto">
-                          <TextBlock Classes="row-title" Text="{Binding UpdateHereLine}" TextWrapping="Wrap" VerticalAlignment="Center" />
+                          <c:PageText Classes="row-title" Text="{Binding UpdateHereLine}" TextWrapping="Wrap" VerticalAlignment="Center" />
                           <StackPanel Grid.Column="1" Classes="act" Orientation="Horizontal" Spacing="8" Margin="12,0,0,0">
                             <Button Classes="pill" Command="{Binding CheckUpdateHereCommand}" IsEnabled="{Binding !UpdateHereBusy}">
                               <TextBlock Text="Check now" FontSize="13" />
@@ -775,7 +772,7 @@
                         <StackPanel>
                           <Border Classes="row">
                             <Grid ColumnDefinitions="*,Auto">
-                              <TextBlock Classes="row-title" Text="{Binding Lib.UpdateLine}" TextWrapping="Wrap" />
+                              <c:PageText Classes="row-title" Text="{Binding Lib.UpdateLine}" TextWrapping="Wrap" />
                               <Button Grid.Column="1" Classes="pill primary act" Command="{Binding Lib.UpdateNowCommand}" IsVisible="{Binding Lib.CanUpdateNow}" Margin="12,0,0,0">
                                 <TextBlock Text="Update now" FontSize="13" FontWeight="Medium" />
                               </Button>
@@ -800,7 +797,7 @@
                     <TextBlock Text="Search and Record work from any app" FontSize="13" />
                   </CheckBox>
                   <v:ShortcutsEditor DataContext="{Binding Keys}" />
-                  <TextBlock Classes="say" Text="{Binding ShortcutsSay}" IsVisible="{Binding ShortcutsSay, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" TextWrapping="Wrap" />
+                  <c:PageText Classes="say" Text="{Binding ShortcutsSay}" IsVisible="{Binding ShortcutsSay, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" TextWrapping="Wrap" />
                 </StackPanel>
                 <!-- What it's for: the library's, so every computer and phone goes by it. School brings Canvas and classes. -->
                 <StackPanel Spacing="8" IsVisible="{Binding Lib.IsReady}">
@@ -968,11 +965,11 @@
               <!-- Connection: which library this computer uses (and, where it runs one, that library's process) -->
               <StackPanel IsVisible="{Binding OnConnection}" Spacing="8">
                 <TextBlock Classes="h" Text="Connection" />
-                <TextBlock Classes="body" Text="{Binding LibraryLine}" />
+                <c:PageText Classes="body" Text="{Binding LibraryLine}" />
                 <!-- The library runs here: what it's doing, and its page. Nothing to connect to: using another computer's
                      library instead is This computer's choice, below. -->
                 <StackPanel Spacing="8" IsVisible="{Binding LibraryHere}">
-                  <TextBlock Classes="say" Text="{Binding LibraryServiceLine}" IsVisible="{Binding LibraryServiceLine, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+                  <c:PageText Classes="say" Text="{Binding LibraryServiceLine}" IsVisible="{Binding LibraryServiceLine, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
                   <StackPanel Orientation="Horizontal" Spacing="10" Margin="0,4,0,0">
                     <Button Classes="pill" Command="{Binding OpenLibraryPageCommand}"><TextBlock Text="Open the library's page" FontSize="13" /></Button>
                     <Button Classes="pill" Command="{Binding StartLibraryCommand}" IsVisible="{Binding CanStartLibrary}"><TextBlock Text="Start" FontSize="13" /></Button>
@@ -992,7 +989,7 @@
                     <Button Classes="pill" Command="{Binding OpenLibraryPageCommand}"><TextBlock Text="Open the library's page" FontSize="13" /></Button>
                   </StackPanel>
                 </StackPanel>
-                <TextBlock Classes="say" Text="{Binding LibrarySay}" IsVisible="{Binding LibrarySay, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+                <c:PageText Classes="say" Text="{Binding LibrarySay}" IsVisible="{Binding LibrarySay, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
                 <TextBlock Classes="section gap" Text="Your name in the library" />
                 <Border Classes="field" Width="240" HorizontalAlignment="Left"><TextBox Classes="bare" Text="{Binding DisplayName}" FontSize="13" /></Border>
                 <!-- This computer's role, switched any time after setup (docs/one-download.md) -->
@@ -1070,7 +1067,7 @@
                         HorizontalAlignment="Left" Margin="0,4,0,0">
                   <Border Width="{Binding BringBarWidth}" CornerRadius="2" Background="{DynamicResource Accent}" HorizontalAlignment="Left" />
                 </Border>
-                <TextBlock Classes="say" MaxWidth="560" Text="{Binding SwitchSay}" IsVisible="{Binding SwitchSay, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+                <c:PageText Classes="say" MaxWidth="560" Text="{Binding SwitchSay}" IsVisible="{Binding SwitchSay, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
               </StackPanel>
 
               <!-- Recording -->
@@ -1115,7 +1112,7 @@
                         HorizontalAlignment="Left" Margin="0,8,0,0">
                   <Border Width="{Binding ModelBarWidth}" CornerRadius="2" Background="{DynamicResource Accent}" HorizontalAlignment="Left" />
                 </Border>
-                <TextBlock Classes="say" Text="{Binding ModelLine}" />
+                <c:PageText Classes="say" Text="{Binding ModelLine}" />
                 <!-- A model no longer in use (after a switch) stays until the student presses its Remove in the list. -->
                 <StackPanel Spacing="8" Margin="0,8,0,0" IsVisible="{Binding ConfirmingRemove}">
                   <TextBlock Text="{Binding RemoveQuestion}" FontSize="12" Foreground="{DynamicResource Fg2}" TextWrapping="Wrap" MaxWidth="480" HorizontalAlignment="Left" />
@@ -1182,7 +1179,7 @@
                   <Border Classes="row">
                     <Grid ColumnDefinitions="Auto,12,*,12,Auto">
                       <c:Icon Glyph="info" Size="18" Foreground="{DynamicResource Fg2}" VerticalAlignment="Center" />
-                      <TextBlock Grid.Column="2" Classes="row-title" Text="{Binding Lib.Problem}" TextWrapping="Wrap" />
+                      <c:PageText Grid.Column="2" Classes="row-title" Text="{Binding Lib.Problem}" TextWrapping="Wrap" />
                       <StackPanel Grid.Column="4" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
                         <Button Classes="pill" Command="{Binding Lib.LoadCommand}" IsVisible="{Binding Lib.CanRetry}"><TextBlock Text="Try again" FontSize="13" /></Button>
                         <Button Classes="pill" Command="{Binding Lib.OpenLibraryPageCommand}" IsVisible="{Binding Lib.CanOpenPage}"><TextBlock Text="Open its page" FontSize="13" /></Button>
@@ -1191,7 +1188,7 @@
                     </Grid>
                   </Border>
                 </Border>
-                <TextBlock Classes="say" Text="{Binding Lib.Say}" IsVisible="{Binding Lib.Say, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+                <c:PageText Classes="say" Text="{Binding Lib.Say}" IsVisible="{Binding Lib.Say, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
 
                 <StackPanel IsVisible="{Binding Lib.IsReady}" Spacing="8">
                   <!-- Library -->
@@ -1229,7 +1226,7 @@
                         </Border>
                       </StackPanel>
                     </Border>
-                    <TextBlock Classes="say" Text="{Binding Lib.PasswordSay}" IsVisible="{Binding Lib.PasswordSay, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+                    <c:PageText Classes="say" Text="{Binding Lib.PasswordSay}" IsVisible="{Binding Lib.PasswordSay, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
 
                     <!-- A library on this computer: let laptops connect (a password, then the addresses below), or not -->
                     <StackPanel IsVisible="{Binding Lib.CanChangeLaptops}" Spacing="8">
@@ -1263,7 +1260,7 @@
                           </Grid>
                         </Border>
                       </Border>
-                      <TextBlock Classes="say" Text="{Binding Lib.LaptopSay}" IsVisible="{Binding Lib.LaptopSay, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+                      <c:PageText Classes="say" Text="{Binding Lib.LaptopSay}" IsVisible="{Binding Lib.LaptopSay, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
                     </StackPanel>
 
                     <TextBlock Classes="section gap" Text="How your laptop reaches it" IsVisible="{Binding Lib.ShowReach}" />
@@ -1275,7 +1272,7 @@
                             <Border Classes="rowsep itemsep" />
                             <Border Classes="row">
                               <Grid ColumnDefinitions="*,Auto">
-                                <SelectableTextBlock Classes="row-title" Text="{Binding}" VerticalAlignment="Center" />
+                                <c:PageText Classes="row-title" Text="{Binding}" VerticalAlignment="Center" />
                                 <Button Grid.Column="1" Classes="pill act" Command="{Binding $parent[UserControl].((s:SettingsModel)DataContext).Lib.CopyAddressCommand}" CommandParameter="{Binding}">
                                   <TextBlock Text="Copy" FontSize="13" />
                                 </Button>
@@ -1306,7 +1303,7 @@
                           <Grid ColumnDefinitions="*,Auto">
                             <StackPanel Spacing="2" VerticalAlignment="Center">
                               <TextBlock Classes="row-title" Text="Notes folder" />
-                              <TextBlock Classes="row-sub" Text="{Binding Lib.NotesFolder}" TextTrimming="PrefixCharacterEllipsis" />
+                              <c:PageText Classes="row-sub" Text="{Binding Lib.NotesFolder}" TextTrimming="PrefixCharacterEllipsis" />
                             </StackPanel>
                             <Button Grid.Column="1" Classes="pill act" Command="{Binding Lib.ShowNotesFolderCommand}" IsVisible="{Binding Lib.IsHere}" Margin="12,0,0,0">
                               <TextBlock Text="{Binding Lib.RevealLabel}" FontSize="13" />
@@ -1321,7 +1318,7 @@
                       <StackPanel>
                         <Border Classes="row">
                           <Grid ColumnDefinitions="*,Auto">
-                            <TextBlock Classes="row-title" Text="{Binding Lib.UpdateLine}" TextWrapping="Wrap" />
+                            <c:PageText Classes="row-title" Text="{Binding Lib.UpdateLine}" TextWrapping="Wrap" />
                             <Button Grid.Column="1" Classes="pill primary act" Command="{Binding Lib.UpdateNowCommand}" IsVisible="{Binding Lib.CanUpdateNow}" Margin="12,0,0,0">
                               <TextBlock Text="Update now" FontSize="13" FontWeight="Medium" />
                             </Button>
@@ -1516,7 +1513,7 @@
                         </Border>
                       </StackPanel>
                     </Border>
-                    <TextBlock Classes="say" Text="{Binding Lib.OllamaLine}" />
+                    <c:PageText Classes="say" Text="{Binding Lib.OllamaLine}" />
 
                     <TextBlock Classes="section gap" Text="Open in a terminal" IsVisible="{Binding Lib.HasTerminals}" />
                     <Border Classes="group" IsVisible="{Binding Lib.HasTerminals}">
@@ -1575,7 +1572,7 @@
                                   <c:Icon Glyph="folder" Size="18" Foreground="{DynamicResource Fg2}" VerticalAlignment="Center" />
                                   <StackPanel Grid.Column="2" Spacing="2" VerticalAlignment="Center">
                                     <TextBlock Classes="row-title" Text="{Binding Name}" />
-                                    <TextBlock Classes="row-sub" Text="{Binding Path}" TextTrimming="PrefixCharacterEllipsis" />
+                                    <c:PageText Classes="row-sub" Text="{Binding Path}" TextTrimming="PrefixCharacterEllipsis" />
                                   </StackPanel>
                                   <TextBlock Grid.Column="4" Classes="row-sub" Text="AI reads" VerticalAlignment="Center" />
                                   <ToggleButton AutomationProperties.Name="{Binding Name, StringFormat='AI reads {0}'}" Grid.Column="6" Classes="switch" IsChecked="{Binding Ai}" VerticalAlignment="Center" />
@@ -1651,7 +1648,7 @@
                       <Border Classes="row" IsVisible="{Binding SignedIn}">
                         <Grid ColumnDefinitions="*,16,Auto">
                           <StackPanel Spacing="2" VerticalAlignment="Center">
-                            <TextBlock Classes="row-title" Text="{Binding ConnectedLine}" TextTrimming="CharacterEllipsis" />
+                            <c:PageText Classes="row-title" Text="{Binding ConnectedLine}" TextTrimming="CharacterEllipsis" />
                             <TextBlock Classes="row-sub" Text="Study Stash looks for new lectures every few minutes." TextWrapping="Wrap" />
                           </StackPanel>
                           <Button Name="GranolaDisconnect" Grid.Column="2" Classes="pill" Command="{Binding DisconnectCommand}" VerticalAlignment="Center">
@@ -1671,7 +1668,7 @@
                       </Border>
                     </StackPanel>
                   </Border>
-                  <TextBlock Name="GranolaProblem" Classes="row-sub" Text="{Binding Problem}" IsVisible="{Binding HasProblem}" Foreground="{DynamicResource Warn}" TextWrapping="Wrap" Margin="4,0" />
+                  <c:PageText Name="GranolaProblem" Classes="row-sub" Text="{Binding Problem}" IsVisible="{Binding HasProblem}" Foreground="{DynamicResource Warn}" TextWrapping="Wrap" Margin="4,0" />
 
                   <!-- What's waiting in Granola -->
                   <StackPanel Spacing="8" IsVisible="{Binding SignedIn}">
@@ -1764,12 +1761,12 @@
             <!-- The field, at the bottom while the AI is ready -->
             <StackPanel DockPanel.Dock="Bottom" Spacing="8" IsVisible="{Binding IsReady}" Margin="0,12,0,0">
               <StackPanel Spacing="6" IsVisible="{Binding HasProblem}">
-                <TextBlock Classes="say" Text="{Binding Problem}" Foreground="{DynamicResource Warn}" Margin="0" />
+                <c:PageText Classes="say" Text="{Binding Problem}" Foreground="{DynamicResource Warn}" Margin="0" />
                 <Button Classes="pill" Command="{Binding SetUpCommand}" IsVisible="{Binding ProblemNeedsSetup}" HorizontalAlignment="Left"><TextBlock Text="Run setup" FontSize="13" /></Button>
               </StackPanel>
               <Border Classes="settings-ask">
                 <Grid ColumnDefinitions="*,6,Auto">
-                  <TextBox Name="AskBox" Classes="bare" Text="{Binding Draft}" PlaceholderText="{Binding Placeholder}" FontSize="13" VerticalAlignment="Center"
+                  <TextBox Name="AskBox" c:OneLinePaste.IsOn="True" Classes="bare" Text="{Binding Draft}" PlaceholderText="{Binding Placeholder}" FontSize="13" VerticalAlignment="Center"
                            TextWrapping="Wrap" MaxHeight="96" AutomationProperties.Name="Ask your AI">
                     <TextBox.KeyBindings>
                       <KeyBinding Gesture="Enter" Command="{Binding SendCommand}" />
@@ -1818,22 +1815,22 @@
                 </ItemsControl>
               </StackPanel>
 
-              <!-- The conversation, newest at the bottom -->
+              <!-- The conversation, newest at the bottom: one drag selects from message to message -->
               <ScrollViewer Name="AssistantThread" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" c:FollowEnd.IsOn="True"
                             IsVisible="{Binding Thread.Count, Converter={x:Static c:Converters.Some}}">
-                <ItemsControl ItemsSource="{Binding Thread}">
+                <ItemsControl ItemsSource="{Binding Thread}" c:TextSelection.Area="True">
                   <ItemsControl.ItemsPanel><ItemsPanelTemplate><StackPanel Spacing="14" /></ItemsPanelTemplate></ItemsControl.ItemsPanel>
                   <ItemsControl.DataTemplates>
                     <DataTemplate DataType="vm:StudentEntry">
                       <Border Classes="bubble">
-                        <TextBlock Text="{Binding Text}" FontSize="13" TextWrapping="Wrap" Foreground="{DynamicResource Fg}" />
+                        <c:PageText Text="{Binding Text}" FontSize="13" TextWrapping="Wrap" Foreground="{DynamicResource Fg}" />
                       </Border>
                     </DataTemplate>
                     <DataTemplate DataType="vm:AiEntry">
                       <StackPanel Spacing="6" HorizontalAlignment="Left" MaxWidth="520">
                         <TextBlock Text="{Binding Byline}" FontSize="11" FontWeight="SemiBold" Foreground="{DynamicResource Fg2}" />
-                        <SelectableTextBlock Text="{Binding Text}" FontSize="13" LineHeight="19" TextWrapping="Wrap" Foreground="{DynamicResource Fg}"
-                                             IsVisible="{Binding Text, Converter={x:Static c:Converters.NotEmpty}}" />
+                        <c:PageText Text="{Binding Text}" FontSize="13" LineHeight="19" TextWrapping="Wrap" Foreground="{DynamicResource Fg}"
+                                    IsVisible="{Binding Text, Converter={x:Static c:Converters.NotEmpty}}" />
                         <ItemsControl ItemsSource="{Binding Chips}" IsVisible="{Binding HasChips}">
                           <ItemsControl.ItemsPanel><ItemsPanelTemplate><WrapPanel /></ItemsPanelTemplate></ItemsControl.ItemsPanel>
                           <ItemsControl.ItemTemplate>

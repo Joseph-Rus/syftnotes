@@ -78,7 +78,7 @@ public interface ISetupDriver
     Task<string?> OfferAsync(SetupCard card);
     /// <summary>Adds a class to the library. Null when it's in; else why not.</summary>
     Task<string?> AddClassAsync(string name, string about);
-    /// <summary>Who writes the notes: "claude", "codex", "ollama" or "none". Null when set; else why not.</summary>
+    /// <summary>Who writes the notes: "claude", "codex", "gemini", "ollama" or "none". Null when set; else why not.</summary>
     Task<string?> SetNotesWriterAsync(string engine);
     /// <summary>Leaves an optional step for later. Null when done; else why not.</summary>
     Task<string?> SkipAsync(string step);
@@ -114,7 +114,7 @@ public sealed class SetupTools(ISetupDriver driver)
     };
 
     public static readonly string[] Roles = ["one_computer", "laptop", "library"];
-    public static readonly string[] Writers = ["claude", "codex", "ollama", "none"];
+    public static readonly string[] Writers = ["claude", "codex", "gemini", "ollama", "none"];
     public static readonly string[] Skippable = ["canvas", "classes", "ai_app", "start_at_login", "taskbar"];
 
     static CallToolResult Say(string text) => new() { Content = [new TextContentBlock { Text = text }] };
@@ -164,8 +164,9 @@ public sealed class SetupTools(ISetupDriver driver)
             ([Description("The choice to start on: one_computer, laptop or library. Leave out for one_computer.")] string? suggested = null) =>
                 OfferComputerAsync(suggested),
             Named("offer_computer_setup", "Offer: how you'll use it",
-                "Shows the card where the student picks how they'll use Study Stash: just this computer, a laptop (library elsewhere), or the "
-                + "library (a computer that stays on). They press Set up; just this computer also makes the library here.")),
+                "Shows the card where the student picks how they'll use Study Stash: just this computer (shown first, recommended), or under "
+                + "Advanced a laptop (library elsewhere) or the library (a computer that stays on); a suggested laptop or library opens "
+                + "Advanced. They press Set up; just this computer also makes the library here.")),
         McpServerTool.Create(() => OfferAsync("library_password"), Named("offer_library_password", "Offer: library password",
             "A library: shows the card where the student names the library and gives it a password, then creates it. The password never "
             + "reaches you.")),
@@ -206,9 +207,9 @@ public sealed class SetupTools(ISetupDriver driver)
             Named("add_class", "Add a class",
                 "Adds a class to the student's library, with what it covers. The student sees it at once and can change it in Settings → Classes.")),
         McpServerTool.Create(
-            ([Description("claude, codex, ollama, or none (transcripts only).")] string engine) => WriterAsync(engine),
+            ([Description("claude, codex, gemini, ollama, or none (transcripts only).")] string engine) => WriterAsync(engine),
             Named("set_notes_writer", "Choose who writes the notes",
-                "Who writes the study notes and answers questions: claude, codex, ollama, or none. Refused for one that isn't ready here.")),
+                "Who writes the study notes and answers questions: claude, codex, gemini, ollama, or none. Refused for one that isn't ready here.")),
         McpServerTool.Create(
             ([Description("canvas, classes, ai_app, start_at_login or taskbar.")] string step) => SkipAsync(step),
             Named("skip_step", "Leave a step for later", "Marks an optional step as left for later, when the student says so.")),
@@ -400,9 +401,9 @@ public sealed class SetupTools(ISetupDriver driver)
     async Task<CallToolResult> WriterAsync(string engine)
     {
         engine = (engine ?? "").Trim().ToLowerInvariant();
-        if (!Writers.Contains(engine)) return No("engine is claude, codex, ollama or none.");
+        if (!Writers.Contains(engine)) return No("engine is claude, codex, gemini, ollama or none.");
         if (await driver.SetNotesWriterAsync(engine) is { } refused) return No(refused);
-        return Say(engine == "none" ? "Notes are off for now: lectures keep their transcripts." : $"{(engine == "ollama" ? "Ollama" : AgentCli.Get(engine).Brand)} writes the notes now.");
+        return Say(engine == "none" ? "Notes are off for now: lectures keep their transcripts." : $"{Engines.Name(engine)} writes the notes now.");
     }
 
     async Task<CallToolResult> SkipAsync(string step)

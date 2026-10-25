@@ -117,11 +117,12 @@ public sealed class Rewrites(Config cfg, Store store, AiJobs ai, Action<string>?
     {
         var current = new NotesVersion(row.SummaryMd ?? "", Engines.WhoWrote(row.SummaryModel ?? ""), row.UpdatedAt ?? "");
         string adding = diagrams?.Adding(id) == true ? "adding" : "";
-        if (job is null) return new RewriteInfo(id, "none") { Current = current, Diagrams = adding };
+        var change = Change(id);
+        if (job is null) return new RewriteInfo(id, "none") { Current = current, Diagrams = adding, Change = change };
         return new RewriteInfo(id, job.State)
         {
             Engine = job.Engine, EngineName = Engines.Name(job.Engine), Started = job.Started, Error = job.Error,
-            Done = job.Done, Parts = job.Parts, Current = current, Diagrams = adding,
+            Done = job.Done, Parts = job.Parts, Current = current, Diagrams = adding, Change = change,
             Draft = job.State == "ready" && job.DraftMarkdown is { } md
                 ? new NotesVersion(md, Engines.WhoWrote(job.DraftModel), job.DraftAt) : null,
         };
@@ -147,7 +148,7 @@ public sealed class Rewrites(Config cfg, Store store, AiJobs ai, Action<string>?
             if (jobs.TryGetValue(id, out var running) && running.State == "working")
                 throw new RewriteRefusedException(409, "a rewrite is already running for this lecture.");
             var m = store.Meeting(row);
-            m.Attached = store.AttachedTo(id); // the new notes use what the student attached, too
+            store.Attach(m); // the new notes use what the student attached, too
             if (Py.Strip(m.Transcript).Length < Summarize.MinTranscriptChars && !Summarize.FromNotes(m))
                 throw new RewriteRefusedException(409, "this lecture doesn't have enough of a transcript to rewrite from.");
             if (row.Status is Store.Queued or Store.Working)
@@ -156,7 +157,7 @@ public sealed class Rewrites(Config cfg, Store store, AiJobs ai, Action<string>?
                 throw new RewriteRefusedException(409, $"{Engines.Name(engine)} isn't set up on your library's computer.");
 
             var cts = new CancellationTokenSource();
-            var job = new Job { Engine = engine, Started = ai.Checks.Now().ToString("o"), Cts = cts, AttachmentIds = [.. m.Attached.Select(a => a.Id)] };
+            var job = new Job { Engine = engine, Started = ai.Checks.Now().ToString("o"), Cts = cts, AttachmentIds = [.. m.Attached.Select(a => a.Id), .. m.Photos.Select(p => p.Id)] };
             jobs[id] = job;
             Persist(cfg.Home, id, job);
             _ = RunAsync(id, m, job, cts.Token);
@@ -266,7 +267,7 @@ public sealed class Rewrites(Config cfg, Store store, AiJobs ai, Action<string>?
             var m = store.Meeting(row);
             var c = new Classification(row.ClassName ?? "", row.Confidence ?? 1, row.ClassifiedBy ?? "human",
                 row.LectureTitle ?? "", JsonTopics(row.Topics));
-            store.Save(m, c, draft, job.DraftModel);
+            store.Save(m, c, draft, job.DraftModel, versionKind: NotesChangeKind.Rewrite);
             store.MarkAttachmentsUsed(job.AttachmentIds);
             jobs.Remove(id);
             Forget(cfg.Home, id);
@@ -308,5 +309,149 @@ public sealed class Rewrites(Config cfg, Store store, AiJobs ai, Action<string>?
             }
             return Build(id, store.Get(id) ?? row, jobs.GetValueOrDefault(id));
         }
+    }
+
+    // --- notes from an AI the library doesn't run: an AI app through Study Stash's connection, or a free chat ----------
+
+    /// <summary>
+    /// Notes an AI app wrote (save_notes) or the student pasted from a chat, saved as the lecture's notes the way an edit
+    /// is (<see cref="Store.EditNotes"/>), named as <paramref name="writer"/>'s: tidied first of what chats put round
+    /// notes (<see cref="ChatNotes.Clean"/>), every line the student typed during the lecture kept in them and marked
+    /// as theirs, as the library's own notes keep them (<see cref="Summarize.KeepTyped"/>), and the notes they replace
+    /// kept to put back. Refuses empty notes (400); a lecture with notes of its own, unless <paramref name="replace"/>
+    /// (409); while the pipeline is writing this lecture's notes (409); and, with <paramref name="basedOn"/>, notes
+    /// that changed since (412).
+    /// </summary>
+    public RewriteInfo Save(string id, string markdown, bool replace, string writer, string? basedOn = null, string kind = NotesChangeKind.App)
+    {
+        var row = Require(id);
+        string notes = ChatNotes.Clean(markdown);
+        if (notes.Length == 0) throw new RewriteRefusedException(400, "the notes are empty.");
+        lock (gate)
+        {
+            row = store.Get(id) ?? row;
+            if (row.Status is Store.Queued or Store.Working)
+                throw new RewriteRefusedException(409, "the library is writing this lecture's notes right now. Try again once they're done.");
+            var m = store.Meeting(row);
+            bool hasNotes = Py.Strip(row.SummaryMd).Length > 0 || Py.Strip(m.NotesMarkdown).Length > 0;
+            if (hasNotes && !replace)
+                throw new RewriteRefusedException(409, "this lecture already has notes. Ask the student whether to replace them; "
+                    + "if they say yes, save again with replace set to true (the notes it has now are kept, and the student can put them back).");
+            notes = Summarize.KeepTyped(notes, Summarize.Typed(m));
+            // An AI app putting its own draft right (a diagram fixed) keeps one version of it; a paste is always its own.
+            switch (store.EditNotes(id, notes, basedOn, writer, redraft: kind == NotesChangeKind.App, kind: kind))
+            {
+                case NotesEdited.Gone:
+                    throw new RewriteRefusedException(404, "there's no lecture with that id.");
+                case NotesEdited.Busy:
+                    throw new RewriteRefusedException(409, "the library is writing this lecture's notes right now. Try again once they're done.");
+                case NotesEdited.Changed:
+                    throw new RewriteRefusedException(412, "this lecture's notes changed meanwhile.");
+                case NotesEdited.Unwritten:
+                    throw new RewriteRefusedException(503, "the note's file couldn't be saved (another app may have it open).");
+            }
+            log($"[notes] '{m.Title}': notes saved, written by {writer}");
+            return Build(id, store.Get(id) ?? row, jobs.GetValueOrDefault(id));
+        }
+    }
+
+    static string Id(long seq) => seq.ToString(System.Globalization.CultureInfo.InvariantCulture);
+
+    static NotesKept Kept(NoteVersion v, bool current = false, bool words = false) =>
+        new(Id(v.Seq), v.Kind, v.Model.Length > 0 ? Engines.WhoWrote(v.Model) : "", v.At) { Current = current, Markdown = words ? v.Markdown : "" };
+
+    /// <summary>The last change to the lecture's notes, and whether Undo or Redo can follow it.</summary>
+    NotesChange? Change(string id)
+    {
+        // One row, without its words: asked on every page open and every poll.
+        if (store.NewestVersion(id) is not { } newest) return null;
+        return new NotesChange(Id(newest.Seq), newest.Kind, newest.Model.Length > 0 ? Engines.WhoWrote(newest.Model) : "", newest.At)
+        {
+            CanUndo = newest.UndoTo is not null, CanRedo = newest.RedoTo is not null,
+        };
+    }
+
+    /// <summary>The versions of the lecture's notes, newest first (the first is the notes now). A lecture from before
+    /// versions were kept gets its notes as they are as its first.</summary>
+    public List<NotesKept> Versions(string id)
+    {
+        Require(id);
+        store.EnsureFirstVersion(id);
+        return [.. store.NotesVersions(id).Select((v, i) => Kept(v, current: i == 0))];
+    }
+
+    /// <summary>One version, with its words; 404 when there's no such version.</summary>
+    public NotesKept Version(string id, string version)
+    {
+        Require(id);
+        var kept = long.TryParse(version, System.Globalization.NumberStyles.None, System.Globalization.CultureInfo.InvariantCulture, out long seq)
+            ? store.NotesVersion(id, seq) : null;
+        if (kept is null) throw new RewriteRefusedException(404, "there's no such version of these notes.");
+        return Kept(kept, current: store.NewestVersion(id)?.Seq == kept.Seq, words: true);
+    }
+
+    /// <summary>Puts a version of the lecture's notes back as a new version (<paramref name="version"/>, or the one before
+    /// the notes now: <see cref="Store.RestoreNotesVersion"/>), undone like any change. Refuses (409) with no such
+    /// version, or while the pipeline is writing this lecture's notes.</summary>
+    public RewriteInfo Restore(string id, string? version = null)
+    {
+        long? seq = long.TryParse(version, System.Globalization.NumberStyles.None, System.Globalization.CultureInfo.InvariantCulture, out long n) ? n : null;
+        if (version is { Length: > 0 } && seq is null) throw new RewriteRefusedException(409, "there are no such earlier notes to put back.");
+        return PutBack(id, () => store.RestoreNotesVersion(id, seq), "there are no earlier notes to put back.");
+    }
+
+    /// <summary>Undo: the notes before the last change, put back (409 with nothing to undo). <paramref name="expect"/>:
+    /// the version the student's app shows; when the notes changed elsewhere since, 412, and nothing is undone.</summary>
+    public RewriteInfo Undo(string id, string? expect = null) => PutBack(id, () => store.UndoNotes(id, Seq(expect)), "there's nothing to undo.");
+
+    /// <summary>Redo: the notes the last undo went back from, put back (409 with nothing to redo; 412 as for Undo).</summary>
+    public RewriteInfo Redo(string id, string? expect = null) => PutBack(id, () => store.RedoNotes(id, Seq(expect)), "there's nothing to redo.");
+
+    /// <summary>A version's id as the library numbers them; null for none (or one that isn't a number, which no version has).</summary>
+    static long? Seq(string? version) =>
+        long.TryParse(version, System.Globalization.NumberStyles.None, System.Globalization.CultureInfo.InvariantCulture, out long n) ? n : version is { Length: > 0 } ? -1 : null;
+
+    RewriteInfo PutBack(string id, Func<NotesEdited> run, string none)
+    {
+        var row = Require(id);
+        lock (gate)
+        {
+            switch (run())
+            {
+                case NotesEdited.Gone:
+                    throw new RewriteRefusedException(409, none);
+                case NotesEdited.Busy:
+                    throw new RewriteRefusedException(409, "the library is writing this lecture's notes right now.");
+                case NotesEdited.Changed:
+                    throw new RewriteRefusedException(412, "these notes changed meanwhile.");
+                case NotesEdited.Unwritten:
+                    throw new RewriteRefusedException(503, "the note's file couldn't be saved (another app may have it open).");
+            }
+            return Build(id, store.Get(id) ?? row, jobs.GetValueOrDefault(id));
+        }
+    }
+
+    /// <summary>
+    /// How Study Stash writes this lecture's notes, for an AI it doesn't run: its own notes prompt
+    /// (<see cref="Summarize.Brief"/>, with the lines the student typed), drawing what the rich notes switches allow. For
+    /// a free chat (<paramref name="chat"/>), flowcharts at most (SVG is beyond most of them), and the whole request to
+    /// copy, transcript and all, in as many parts as it takes (<see cref="ChatNotes.Request"/>). Refuses (409) a lecture
+    /// with nothing to write notes from.
+    /// </summary>
+    public NotesBrief Brief(string id, bool chat)
+    {
+        var row = Require(id);
+        var m = store.Meeting(row);
+        var kinds = ai.KindsNow();
+        var drawings = chat ? (kinds.HasFlag(RichKinds.Diagrams) ? Drawings.Flowcharts : Drawings.None) : AiJobs.NotesDrawings("claude", kinds);
+        string brief = Summarize.Brief(m, drawings);
+        if (Summarize.FromNotes(m))
+        {
+            // No transcript: what it came with is what the notes are written from.
+            string prompt = Summarize.NotesPrompt(m, Py.Head(Py.Strip(m.NotesMarkdown), ChatNotes.OneMessage));
+            return new NotesBrief(cfg.ForSchool ? brief : Summarize.ForMeetings(brief), [cfg.ForSchool ? prompt : Summarize.ForMeetings(prompt)]);
+        }
+        if (Py.Strip(m.Transcript).Length == 0) throw new RewriteRefusedException(409, "this lecture has no transcript to write notes from.");
+        return new NotesBrief(cfg.ForSchool ? brief : Summarize.ForMeetings(brief), chat ? ChatNotes.Request(brief, m.Transcript, cfg.ForSchool) : []);
     }
 }

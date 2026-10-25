@@ -22,6 +22,13 @@ public sealed class Meeting(string id)
     /// each: it helps write the notes. Kept by the library, never sent over the wire.</summary>
     public IReadOnlyList<AttachedText> Attached { get; set; } = [];
 
+    /// <summary>The whiteboard photos taken during the lecture, in the order they were taken (kept by the library).</summary>
+    public IReadOnlyList<PhotoRef> Photos { get; set; } = [];
+
+    /// <summary>When the AI is given the photos as image files: how the prompt names each one's file (by photo id).
+    /// Null when it can't take images, and the photos' words go in the prompt instead.</summary>
+    public IReadOnlyDictionary<string, string>? PhotoFiles { get; set; }
+
     /// <summary>In <see cref="Raw"/>: who named the lecture. <see cref="ByHand"/> when the student typed its title (on
     /// the recording, or renaming it later): then no AI names it from what was said. <see cref="Kept"/> when it came in
     /// again (it was kept recording) already named by the library: it isn't named a second time.</summary>
@@ -39,7 +46,16 @@ public sealed class Meeting(string id)
     {
         Title = Title, Date = Date, Owner = Owner, Attendees = Attendees, Folder = Folder,
         NotesMarkdown = notesMarkdown, PrivateNotes = PrivateNotes, Transcript = Transcript, Raw = Raw, Attached = Attached,
+        Photos = Photos, PhotoFiles = PhotoFiles,
     };
+}
+
+/// <summary>A whiteboard photo of a lecture: where its file is, how far into the lecture it was taken (when known),
+/// and the words read from it (the fallback for an AI that can't look at pictures).</summary>
+public sealed record PhotoRef(string Id, string Path, double? At, string Text)
+{
+    /// <summary>"12:34", or "1:02:03" past an hour; "" when the moment isn't known.</summary>
+    public string Moment => At is not { } s ? "" : TimeSpan.FromSeconds(s) is var t && t.TotalHours >= 1 ? $"{(int)t.TotalHours}:{t.Minutes:00}:{t.Seconds:00}" : $"{(int)t.TotalMinutes}:{t.Seconds:00}";
 }
 
 /// <summary>A lecture from ingest had no id, or was not an object. Python raised ValueError here.</summary>

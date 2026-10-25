@@ -54,7 +54,10 @@ public class AiTests
         var ro = claude.Command(new AiRequest("hi", "/lib"), stream: false);
         Assert.Contains("Edit", ro.SkipWhile(a => a != "--disallowedTools"));
         Assert.DoesNotContain("--include-partial-messages", ro);
+        // A plain answer runs none of the student's own hooks or settings (Claude Code 2.1.248 on).
+        Assert.Contains("--restricted", ro);
         var rw = claude.Command(new AiRequest("hi", "/lib") { Write = true, Tools = true, McpCommand = ["/app/studystash", "mcp"], Model = "sonnet" }, stream: true);
+        Assert.DoesNotContain("--restricted", rw);
         Assert.Contains("Edit(/" + ClaudeProvider.ClaudePath(Path.GetFullPath("/lib")) + "/**)", rw);
         Assert.Equal("/c/Users/sam/lib", ClaudeProvider.ClaudePath(@"C:\Users\sam\lib"));
         Assert.Equal("/lib", ClaudeProvider.ClaudePath("/lib"));
@@ -96,9 +99,82 @@ public class AiTests
         var cmd = new CodexProvider { PromptOnInput = false }.Command(new AiRequest("q", "/lib") { System = "brief" }, stream: false);
         Assert.Equal("read-only", cmd[cmd.IndexOf("-s") + 1]);
         Assert.StartsWith("brief", cmd[^1]);
+        // A plain answer skips the student's own config.toml (and the MCP servers it would start), and their ChatGPT apps.
+        Assert.Contains("--ignore-user-config", cmd);
+        Assert.Contains("features.apps=false", cmd);
         var local = new OllamaProvider().Command(new AiRequest("q", "/lib") { Write = true }, stream: false);
         Assert.Contains("--oss", local);
+        Assert.DoesNotContain("--ignore-user-config", local);
         Assert.Equal("workspace-write", local[local.IndexOf("-s") + 1]);
+    }
+
+    /// <summary>The library's plain answers (notes, Check, Ask) run the student's own AI with nothing of theirs in
+    /// it: Claude without claude.ai's connectors; ChatGPT's Codex without their config.toml, unless its sign-in turns
+    /// out to be kept there, and then with every MCP server it names turned off (Codex would start them all).</summary>
+    [Fact]
+    public async Task Plain_answers_run_nothing_of_the_students_own_and_codex_reads_its_config_only_for_a_sign_in_kept_there()
+    {
+        using var dir = new TempDir();
+        string claudeExe = FakeAgents.WriteCli(dir["claude"], "claude");
+        FakeAgents.Replay(dir["claude"], ["""{"type":"result","is_error":false,"result":"ready","session_id":"s1"}"""]);
+        Assert.True((await new ClaudeProvider { At = claudeExe }.CompleteAsync(new AiRequest("hi", dir.Path))).Ok);
+        Assert.Contains("ENABLE_CLAUDEAI_MCP_SERVERS", FakeAgents.EnvNames(dir["claude"], 1));
+        Assert.Contains("--restricted", FakeAgents.Argv(dir["claude"], 1));
+
+        string codexExe = FakeAgents.WriteCli(dir["codex"], "codex");
+        File.WriteAllText(dir["config.toml"], "[mcp_servers.study-stash]\ncommand = \"studystash\"\n");
+        FakeAgents.Replay(dir["codex"], ["""{"type":"thread.started","thread_id":"t-1"}""", """{"type":"turn.failed","error":{"message":"401 Unauthorized: not logged in"}}"""], 1);
+        string[] works = ["""{"type":"thread.started","thread_id":"t-2"}""", """{"type":"item.completed","item":{"type":"agent_message","text":"ready"}}""", """{"type":"turn.completed"}"""];
+        FakeAgents.Replay(dir["codex"], works, 2);
+        FakeAgents.Replay(dir["codex"], works, 3);
+        var codex = new CodexProvider { At = codexExe, ConfigPath = () => dir["config.toml"] };
+        var first = await codex.CompleteAsync(new AiRequest("hi", dir.Path));
+        Assert.True(first.Ok, first.Text);
+        Assert.Contains("--ignore-user-config", FakeAgents.Argv(dir["codex"], 1));
+        Assert.DoesNotContain("--ignore-user-config", FakeAgents.Argv(dir["codex"], 2));
+        Assert.Contains("mcp_servers.study-stash.enabled=false", FakeAgents.Argv(dir["codex"], 2));
+        Assert.Contains("notify=[]", FakeAgents.Argv(dir["codex"], 2));
+        Assert.Contains("features.apps=false", FakeAgents.Argv(dir["codex"], 2));
+        // Remembered: the next plain answer reads it at once, its servers still off.
+        Assert.True((await codex.CompleteAsync(new AiRequest("again", dir.Path))).Ok);
+        Assert.Equal(3, FakeAgents.Turns(dir["codex"]));
+        Assert.Contains("mcp_servers.study-stash.enabled=false", FakeAgents.Argv(dir["codex"], 3));
+    }
+
+    /// <summary>A Codex older than --ignore-user-config turns the flag itself away: the answer is asked again without
+    /// it (the student's MCP servers named off), and that's remembered. With the config skipped, the model the student
+    /// set there is still the one used; a model provider of their own keeps their config read.</summary>
+    [Fact]
+    public async Task An_older_codex_answers_without_the_flag_and_the_students_own_model_stays()
+    {
+        using var dir = new TempDir();
+        string[] works = ["""{"type":"thread.started","thread_id":"t"}""", """{"type":"item.completed","item":{"type":"agent_message","text":"ready"}}""", """{"type":"turn.completed"}"""];
+        string old = FakeAgents.WriteCli(dir["old"], "codex");
+        File.WriteAllText(Path.Combine(dir["old"], "refuse"), "--ignore-user-config");
+        FakeAgents.Replay(dir["old"], works);
+        File.WriteAllText(dir["old.toml"], "[mcp_servers.github]\ncommand = \"gh-mcp\"\n");
+        var codex = new CodexProvider { At = old, ConfigPath = () => dir["old.toml"] };
+        var first = await codex.CompleteAsync(new AiRequest("hi", dir.Path));
+        Assert.True(first.Ok, first.Text);
+        Assert.Contains("--ignore-user-config", FakeAgents.Argv(dir["old"], 1));
+        Assert.DoesNotContain("--ignore-user-config", FakeAgents.Argv(dir["old"], 2));
+        Assert.Contains("mcp_servers.github.enabled=false", FakeAgents.Argv(dir["old"], 2));
+        Assert.True((await codex.CompleteAsync(new AiRequest("again", dir.Path))).Ok);
+        Assert.Equal(3, FakeAgents.Turns(dir["old"])); // straight to it the next time
+
+        string now = FakeAgents.WriteCli(dir["now"], "codex");
+        FakeAgents.Replay(dir["now"], works);
+        File.WriteAllText(dir["model.toml"], "model = \"gpt-5.5\"\n\n[mcp_servers.github]\ncommand = \"gh-mcp\"\nmodel = \"not-this\"\n");
+        var cmd = new CodexProvider { At = now, ConfigPath = () => dir["model.toml"], PromptOnInput = true }.Command(new AiRequest("hi", dir.Path), stream: false);
+        Assert.Contains("--ignore-user-config", cmd);
+        Assert.Equal("gpt-5.5", cmd[cmd.IndexOf("-m") + 1]);
+        Assert.Equal("o-pick", new CodexProvider { At = now, ConfigPath = () => dir["model.toml"] }.Command(new AiRequest("hi", dir.Path) { Model = "o-pick" }, stream: false) is var picked ? picked[picked.IndexOf("-m") + 1] : "");
+
+        File.WriteAllText(dir["provider.toml"], "model_provider = 'azure'\nmodel = \"my-deployment\"\n[mcp_servers.github]\ncommand = \"gh-mcp\"\n");
+        var own = new CodexProvider { At = now, ConfigPath = () => dir["provider.toml"] }.Command(new AiRequest("hi", dir.Path), stream: false);
+        Assert.DoesNotContain("--ignore-user-config", own);
+        Assert.Contains("mcp_servers.github.enabled=false", own);
+        Assert.DoesNotContain("-m", own);
     }
 
     [Fact]
@@ -282,7 +358,12 @@ public class AiTests
         Assert.Empty(g.Parse("""{"event":"step_update","step_update":{"state":"DONE","step_type":"tool"}}"""));
         Assert.Equal("Done", g.Parse("""{"event":"result","result":{"status":"SUCCESS","response":"Done","conversation_id":"c1"}}""").Last().Text);
         Assert.Equal("error", g.Parse("""{"event":"result","result":{"status":"FAILED","error":"quota"}}""").Single().Kind);
-        Assert.Equal("plan", g.Command(new AiRequest("q", "/lib"), false)[g.Command(new AiRequest("q", "/lib"), false).IndexOf("--mode") + 1]);
+        // A plain answer runs as Study Stash's answer agent, with no tools to reach for; agent work in plan mode.
+        var plain = g.Command(new AiRequest("q", "/lib"), false);
+        Assert.Equal("study-stash-answer", plain[plain.IndexOf("--agent") + 1]);
+        Assert.DoesNotContain("--mode", plain);
+        var agent = g.Command(new AiRequest("q", "/lib") { Tools = true }, false);
+        Assert.Equal("plan", agent[agent.IndexOf("--mode") + 1]);
     }
 
     [Fact]

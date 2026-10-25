@@ -325,6 +325,20 @@
     <Setter Property="BorderThickness" Value="1" />
     <Setter Property="BoxShadow" Value="{DynamicResource Shadow}" />
   </Style>
+  <!-- A question in the answer card's conversation: the student's own words, in ink and heavier than the answers -->
+  <Style Selector="TextBlock.ai-q">
+    <Setter Property="FontSize" Value="14" />
+    <Setter Property="FontWeight" Value="SemiBold" />
+    <Setter Property="Foreground" Value="{DynamicResource Fg}" />
+    <Setter Property="TextWrapping" Value="Wrap" />
+  </Style>
+  <!-- New chat, at the head of the answer card and the recorder's chat -->
+  <Style Selector="Button.ai-newchat">
+    <Setter Property="Theme" Value="{StaticResource Surface}" />
+    <Setter Property="Height" Value="28" />
+    <Setter Property="Padding" Value="6,0,9,0" />
+    <Setter Property="CornerRadius" Value="4" />
+  </Style>
   <Style Selector="TextBlock.ai-asked">
     <Setter Property="FontSize" Value="12" />
     <Setter Property="Foreground" Value="{DynamicResource Fg2}" />

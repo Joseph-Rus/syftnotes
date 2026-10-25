@@ -50,10 +50,10 @@
       <Grid ColumnDefinitions="Auto,12,*">
         <Border Classes="ai-problem-glyph err" VerticalAlignment="Top" Margin="0,3,0,0"><TextBlock Text="✕" /></Border>
         <StackPanel Grid.Column="2" Spacing="8">
-          <TextBlock Classes="ai-problem-text">
+          <c:PageText Classes="ai-problem-text">
             <Run FontWeight="SemiBold" Text="{Binding FailedTitle}" />
             <Run Text=" " /><Run Text="{Binding FailedMessage}" />
-          </TextBlock>
+          </c:PageText>
           <StackPanel Orientation="Horizontal" Spacing="8">
             <Button Classes="ai-pillbtn" Command="{Binding TryAgainCommand}">
               <Border Classes="ai-pill"><TextBlock Text="Try again" /></Border>
@@ -66,10 +66,33 @@
       </Grid>
     </Border>
 
+    <!-- Right after a change to the notes (here, or an AI app's while the student was away): what it was, and Undo
+         (Redo after an undo). ⌘Z / Ctrl+Z on the page does the same. -->
+    <Border Name="ChangeBar" Classes="change-bar" IsVisible="{Binding ShowChange}">
+      <Grid ColumnDefinitions="Auto,10,*,8,Auto,Auto,Auto">
+        <c:Icon Glyph="history" Size="15" Foreground="{DynamicResource InkMuted}" VerticalAlignment="Center" />
+        <TextBlock Name="ChangeLine" Grid.Column="2" Classes="change-line" Text="{Binding ChangeLine}" />
+        <Button Name="UndoButton" Grid.Column="4" Classes="link-btn" Margin="6,0" Command="{Binding UndoCommand}" IsVisible="{Binding CanUndo}"
+                ToolTip.Tip="Put back the notes from before this change" AutomationProperties.Name="Undo">
+          <StackPanel Orientation="Horizontal" Spacing="6">
+            <c:Icon Glyph="undo" Size="14" VerticalAlignment="Center" />
+            <TextBlock Text="Undo" VerticalAlignment="Center" />
+          </StackPanel>
+        </Button>
+        <Button Name="RedoButton" Grid.Column="5" Classes="link-btn" Margin="6,0" Command="{Binding RedoCommand}" IsVisible="{Binding CanRedo}"
+                ToolTip.Tip="Put back the notes this undid" AutomationProperties.Name="Redo">
+          <TextBlock Text="Redo" VerticalAlignment="Center" />
+        </Button>
+        <Button Grid.Column="6" Classes="icon-btn sm" Command="{Binding DismissChangeCommand}" ToolTip.Tip="Hide this" AutomationProperties.Name="Hide">
+          <c:Icon Glyph="close" Size="13" />
+        </Button>
+      </Grid>
+    </Border>
+
     <!-- Whose words are whose: the student's in ink, what was added from the recording in grey (who wrote that, and
          when, on hover); with nothing added, just "What you wrote". On the right, Edit (while editing: Cancel and
          Save) and, under the dots, writing the notes again with another AI. -->
-    <Grid ColumnDefinitions="*,12,Auto,Auto" MinHeight="28">
+    <Grid ColumnDefinitions="*,12,Auto,Auto,Auto" MinHeight="28">
       <StackPanel Name="Legend" Orientation="Horizontal" Spacing="18" VerticalAlignment="Center" ToolTip.Tip="{Binding BylineTip}" Background="Transparent">
         <StackPanel Orientation="Horizontal" Spacing="6" IsVisible="{Binding HasMine}">
           <Border Width="14" Height="3" CornerRadius="2" Background="{DynamicResource Ink}" VerticalAlignment="Center" />
@@ -82,18 +105,25 @@
         <TextBlock Name="Byline" Classes="legend" Foreground="{DynamicResource InkSubtle}" Text="{Binding DiagramsLine}"
                    IsVisible="{Binding DiagramsLine, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
       </StackPanel>
-      <Button Name="EditButton" Grid.Column="2" Classes="link-btn" Margin="0,0,6,0" VerticalAlignment="Center" IsVisible="{Binding ShowEditButton}" Command="{Binding EditCommand}"
+      <Button Name="HistoryButton" Grid.Column="2" Classes="link-btn" Margin="0,0,10,0" VerticalAlignment="Center" IsVisible="{Binding ShowEditButton}"
+              Command="{Binding OpenHistoryCommand}" ToolTip.Tip="Every version of these notes: see one, or put it back" AutomationProperties.Name="History">
+        <StackPanel Orientation="Horizontal" Spacing="6">
+          <c:Icon Glyph="history" Size="15" VerticalAlignment="Center" />
+          <TextBlock Text="History" VerticalAlignment="Center" />
+        </StackPanel>
+      </Button>
+      <Button Name="EditButton" Grid.Column="3" Classes="link-btn" Margin="0,0,6,0" VerticalAlignment="Center" IsVisible="{Binding ShowEditButton}" Command="{Binding EditCommand}"
               ToolTip.Tip="Fix or add to these notes yourself" AutomationProperties.Name="Edit notes">
         <StackPanel Orientation="Horizontal" Spacing="6">
           <c:Icon Glyph="edit" Size="15" VerticalAlignment="Center" />
           <TextBlock Text="Edit" VerticalAlignment="Center" />
         </StackPanel>
       </Button>
-      <StackPanel Grid.Column="2" Grid.ColumnSpan="2" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center" IsVisible="{Binding Editing}">
+      <StackPanel Grid.Column="2" Grid.ColumnSpan="3" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center" HorizontalAlignment="Right" IsVisible="{Binding Editing}">
         <Button Classes="btn sm" Content="Cancel" Command="{Binding CancelEditCommand}" />
         <Button Classes="btn sm ink" Content="Save" Command="{Binding SaveEditCommand}" IsEnabled="{Binding CanSaveEdit}" />
       </StackPanel>
-      <Button Name="RewriteButton" Grid.Column="3" Classes="icon-btn sm" VerticalAlignment="Center" IsVisible="{Binding ShowRewriteButton}"
+      <Button Name="RewriteButton" Grid.Column="4" Classes="icon-btn sm" VerticalAlignment="Center" IsVisible="{Binding ShowRewriteButton}"
               ToolTip.Tip="Write these notes again" AutomationProperties.Name="Rewrite notes">
         <c:Icon Glyph="more_horiz" Size="16" />
         <Button.Flyout>
@@ -121,10 +151,10 @@
       <TextBlock Classes="ai-editor-hint" IsVisible="{Binding EditHasDiagrams}"
                  Text="A line like [Diagram 1] is a diagram. Move the line to move it, or delete the line to take it out." />
       <Border Classes="ai-editor">
-        <TextBox Name="Editor" Classes="bare ai-editor" Text="{Binding EditText}" AcceptsReturn="True" TextWrapping="Wrap"
+        <c:MarkdownBox Name="Editor" Classes="bare ai-editor" Text="{Binding EditText}" AcceptsReturn="True" TextWrapping="Wrap" WholeNotes="True"
                  AutomationProperties.Name="Notes" />
       </Border>
-      <TextBlock Classes="ai-editor-problem" IsVisible="{Binding HasEditProblem}" Text="{Binding EditProblem}" />
+      <c:PageText Classes="ai-editor-problem" IsVisible="{Binding HasEditProblem}" Text="{Binding EditProblem}" />
       <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Right">
         <Button Classes="ai-textbtn" Command="{Binding CancelEditCommand}">
           <Border Classes="ai-pill-plain"><TextBlock Text="Cancel" /></Border>
@@ -133,6 +163,54 @@
           <Border Classes="ai-pill" Classes.primary="True"><TextBlock Text="Save" /></Border>
         </Button>
       </StackPanel>
+    </StackPanel>
+
+
+    <!-- History: every version of the notes, newest first, and the one picked against the notes now; Restore puts it
+         back as a new version. -->
+    <StackPanel Name="HistoryPanel" Spacing="12" IsVisible="{Binding HistoryOpen}">
+      <Grid ColumnDefinitions="*,Auto">
+        <TextBlock Classes="free-ai-lead" Text="History of these notes" VerticalAlignment="Center" />
+        <Button Name="CloseHistory" Grid.Column="1" Classes="btn sm" Content="Done" Command="{Binding CloseHistoryCommand}" />
+      </Grid>
+      <c:PageText Classes="free-ai-more" Text="{x:Static vm:AiNotesModel.HistoryLine}" />
+      <ItemsControl Name="VersionList" ItemsSource="{Binding Versions}">
+        <ItemsControl.ItemTemplate>
+          <DataTemplate x:DataType="vm:VersionRow">
+            <Button Classes="version-row" Command="{Binding $parent[ItemsControl].((vm:AiNotesModel)DataContext).PickCommand, FallbackValue={x:Null}}"
+                    CommandParameter="{Binding}" AutomationProperties.Name="{Binding Words}">
+              <Border Classes="version-row" Classes.selected="{Binding Selected}">
+                <Grid ColumnDefinitions="*,12,Auto">
+                  <TextBlock Classes="version-words" Text="{Binding Words}" VerticalAlignment="Center" />
+                  <TextBlock Grid.Column="2" Classes="version-when" Text="{Binding When}" VerticalAlignment="Center" />
+                </Grid>
+              </Border>
+            </Button>
+          </DataTemplate>
+        </ItemsControl.ItemTemplate>
+      </ItemsControl>
+      <Border Classes="free-ai" IsVisible="{Binding HasPicked}">
+        <StackPanel Spacing="10">
+          <Grid ColumnDefinitions="*,12,Auto">
+            <StackPanel Spacing="2" VerticalAlignment="Center">
+              <TextBlock Classes="version-words" Text="{Binding Picked.Words, FallbackValue=''}" />
+              <c:PageText Classes="free-ai-more" Text="{Binding PickedSummary}" />
+            </StackPanel>
+            <Button Name="RestoreVersion" Grid.Column="2" Classes="btn sm ink" Content="Restore this version" Command="{Binding RestorePickedCommand}"
+                    IsVisible="{Binding !PickedIsNow}" VerticalAlignment="Center" />
+          </Grid>
+          <ItemsControl Name="PickedChanges" ItemsSource="{Binding PickedChanges}">
+            <ItemsControl.ItemTemplate>
+              <DataTemplate x:DataType="vm:DiffRow">
+                <Border Classes="diff-line" Classes.added="{Binding Added}" Classes.removed="{Binding Removed}" Margin="0,1">
+                  <TextBlock Classes="diff-text" Text="{Binding Text}" />
+                </Border>
+              </DataTemplate>
+            </ItemsControl.ItemTemplate>
+          </ItemsControl>
+          <c:NoteView Markdown="{Binding PickedMarkdown}" IsVisible="{Binding PickedIsNow}" />
+        </StackPanel>
+      </Border>
     </StackPanel>
 
     <!-- Compare: the current notes beside the new ones -->

@@ -86,7 +86,7 @@
         <TextBlock Name="CanvasHint" IsVisible="{Binding ShowCanvasHint}" Text="Choose something from the list to read it here." FontSize="14.5" Foreground="{DynamicResource InkSubtle}"
                    HorizontalAlignment="Center" VerticalAlignment="Center" />
         <!-- The library can't be read: why, in a sentence -->
-        <TextBlock Name="Empty" Classes="empty" IsVisible="{Binding ShowEmpty}" Text="{Binding Empty}" HorizontalAlignment="Center" VerticalAlignment="Center" TextAlignment="Center" />
+        <c:PageText Name="Empty" Classes="empty" IsVisible="{Binding ShowEmpty}" Text="{Binding Empty}" HorizontalAlignment="Center" VerticalAlignment="Center" TextAlignment="Center" />
         <!-- Narrow: back to the list -->
         <Button Classes="icon-btn" IsVisible="{Binding NarrowDetail}" Command="{Binding BackCommand}" ToolTip.Tip="Back to the list" AutomationProperties.Name="Back to the list"
                 HorizontalAlignment="Left" VerticalAlignment="Top" Margin="12,4,0,0">

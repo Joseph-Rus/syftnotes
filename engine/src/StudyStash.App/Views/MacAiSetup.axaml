@@ -48,6 +48,8 @@
                   </Button>
                   <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
                     <!-- Not ready yet: one button gets it ready (the free AI, Claude or ChatGPT), and nothing is left to do by hand -->
+                    <!-- Or an API key instead (Claude, ChatGPT, Gemini): the box for it opens under the list -->
+                    <Button AutomationProperties.Name="Use an API key" Classes="text-link small" VerticalAlignment="Center" Command="{Binding KeyCommand}" IsVisible="{Binding ShowKeyLink}" Content="Use an API key" />
                     <Button AutomationProperties.Name="{Binding OpenLabel}" Name="SetUpFree" Classes="btn sm" Command="{Binding OpenCommand}" IsVisible="{Binding ShowOneButton}" Content="{Binding OpenLabel}" />
                     <Button AutomationProperties.Name="Sign in" Classes="btn sm" Command="{Binding SignInCommand}" IsVisible="{Binding ShowSignIn}" Content="Sign in" />
                     <Button AutomationProperties.Name="{Binding HelpLabel}" Classes="btn sm" Command="{Binding ToggleHelpCommand}" IsVisible="{Binding HasHelp}" Content="{Binding HelpLabel}" />
@@ -102,6 +104,47 @@
           </DataTemplate>
         </ItemsControl.ItemTemplate>
       </ItemsControl>
+
+      <!-- An AI's API key (Claude, ChatGPT, Gemini): where to make one, the box, Save. Under the list, not in a row, so
+           what's typed stays put while the rows are drawn again. Gemini, not on this computer at all, also says its
+           other way: Google's own app, signed in. -->
+      <Border Classes="engine" Margin="0,10,0,0" IsVisible="{Binding KeyOpen}">
+        <StackPanel Spacing="10" Margin="2,4,2,4">
+          <Grid ColumnDefinitions="*,12,Auto">
+            <TextBlock Classes="choice-title" Text="{Binding KeyTitle}" VerticalAlignment="Center" />
+            <Button AutomationProperties.Name="Cancel" Grid.Column="2" Classes="text-link small" VerticalAlignment="Center" Command="{Binding CloseKeyCommand}" Content="Cancel" />
+          </Grid>
+          <TextBlock Classes="choice-about" Text="{Binding KeyLede}" />
+          <Button AutomationProperties.Name="{Binding KeyWhere, StringFormat='Open {0}'}" Classes="text-link small" HorizontalAlignment="Left" Command="{Binding GetKeyCommand}">
+            <StackPanel Orientation="Horizontal" Spacing="4">
+              <TextBlock Text="{Binding KeyWhere, StringFormat='Open {0}'}" />
+              <c:Icon Glyph="arrow_outward" Size="13" />
+            </StackPanel>
+          </Button>
+          <Grid ColumnDefinitions="*,8,Auto">
+            <Border Classes="field">
+              <TextBox Name="KeyBox" Classes="bare" Text="{Binding KeyDraft}" PasswordChar="•" PlaceholderText="Paste your key"
+                       AutomationProperties.Name="{Binding KeyTitle}">
+                <TextBox.KeyBindings>
+                  <KeyBinding Gesture="Enter" Command="{Binding SaveKeyCommand}" />
+                </TextBox.KeyBindings>
+              </TextBox>
+            </Border>
+            <Button Grid.Column="2" Classes="btn sm ink" VerticalAlignment="Center" Command="{Binding SaveKeyCommand}" IsEnabled="{Binding !Busy}" Content="Save" />
+          </Grid>
+          <!-- Gemini: what Google's free tier does with what's sent, and who can have a free key -->
+          <TextBlock Classes="hint" Text="{Binding KeyPrivacy}" IsVisible="{Binding HasKeyPrivacy}" TextWrapping="Wrap" FontSize="12.5" LineHeight="18" />
+          <Grid ColumnDefinitions="*,12,Auto" IsVisible="{Binding HasKeyAlternative}">
+            <TextBlock Classes="hint" Text="{Binding KeyAlternative}" TextWrapping="Wrap" VerticalAlignment="Center" />
+            <Button AutomationProperties.Name="Check again" Grid.Column="2" Classes="btn sm" VerticalAlignment="Center" Command="{Binding CheckKeyAlternativeCommand}">
+              <StackPanel Orientation="Horizontal" Spacing="6">
+                <c:Icon Glyph="refresh" Size="14" />
+                <TextBlock Text="Check again" VerticalAlignment="Center" />
+              </StackPanel>
+            </Button>
+          </Grid>
+        </StackPanel>
+      </Border>
 
       <!-- No AI for now: transcripts only, notes turned on later in Settings -->
       <Border Classes="engine" Classes.on="{Binding NoAi}" Margin="0,10,0,0" IsVisible="{Binding OffersNoAi}">

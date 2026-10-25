@@ -52,8 +52,11 @@ public sealed record EngineChecks
         DiskFreeGb = () => StudyStash.Core.Machine.DiskFreeGb(),
         OpenSignIn = (home, terminal, id) =>
         {
-            var (exe, args) = Engines.SignInCommand(id);
-            return $"Opened {Terminal.RunCommand(home, terminal, exe, args)} to sign in to {Engines.Name(id)}.";
+            // Gemini signs in to Study Stash's own home for agy, the one its notes run in.
+            var (exe, args) = id == "gemini" && AiProvider.Which(Antigravity.Binary) is { } agy
+                ? Antigravity.InTerminal(agy, OperatingSystem.IsWindows())
+                : Engines.SignInCommand(id);
+            return $"Opened {Terminal.RunCommand(home, terminal, exe, [.. args])} to sign in to {Engines.Name(id)}.";
         },
         Now = () => DateTime.Now,
     };
@@ -98,7 +101,7 @@ public static class Engines
     {
         "claude" => "Claude Code",
         "codex" => "Codex",
-        "gemini" => "Gemini CLI",
+        "gemini" => "Antigravity CLI",
         _ => Name(id),
     };
 
@@ -106,6 +109,8 @@ public static class Engines
     /// (<see cref="AiJobs.Describe"/>: an Ollama model like "qwen3:30b", or "Claude sonnet", "ChatGPT", "Gemini …").</summary>
     public static string WhoWrote(string notesModel) => notesModel switch
     {
+        // Notes the student brought back from a chat, or that an AI app saved without saying which it is.
+        _ when notesModel.StartsWith(YourAi, StringComparison.Ordinal) => YourAi,
         _ when notesModel.StartsWith("Claude", StringComparison.Ordinal) => "Claude",
         _ when notesModel.StartsWith("ChatGPT", StringComparison.Ordinal) || notesModel.StartsWith("Codex", StringComparison.Ordinal) => "ChatGPT",
         _ when notesModel.StartsWith("Gemini", StringComparison.Ordinal) => "Gemini",
@@ -113,7 +118,23 @@ public static class Engines
         _ => "",
     };
 
-    /// <summary>The command a terminal runs to sign in ("claude", "codex login", "agy").</summary>
+    /// <summary>Who wrote notes the library didn't write itself, when it can't say which AI: "your AI". The one place
+    /// this name is said (pasted notes, an AI app that doesn't say which it is): change it here and it changes in the
+    /// notes' byline, their file, the Undo line and History.</summary>
+    public const string YourAi = "your AI";
+
+    /// <summary>The writer of notes pasted from a chat ("Paste notes"), as the note's file and its byline name them.</summary>
+    public const string PastedWriter = YourAi + " (pasted from a chat)";
+
+    /// <summary>What a lecture's notes' byline names: the AI (<see cref="WhoWrote"/>), or, when another model than the
+    /// one asked wrote them ("Gemini · Gemini 3.5 Flash-Lite (Flash's free daily limit is used up)"), that model and
+    /// why.</summary>
+    public static string WrittenBy(string notesModel) =>
+        notesModel.IndexOf(" · ", StringComparison.Ordinal) is var at and > 0 && WhoWrote(notesModel) is { Length: > 0 } who && who != "Ollama"
+            ? notesModel[(at + 3)..] : WhoWrote(notesModel);
+
+    /// <summary>The command a terminal runs to sign in ("claude", "codex login"; Gemini's runs in Study Stash's own home
+    /// for agy, <see cref="Antigravity.InTerminal"/>, so "agy" here is only its name).</summary>
     public static (string Exe, string[] Args) SignInCommand(string id) => id switch
     {
         "codex" => ("codex", ["login"]),
@@ -121,8 +142,10 @@ public static class Engines
         _ => ("claude", []),
     };
 
+    /// <summary>The sign-in as words to type: Gemini's in Study Stash's own home for agy (<see cref="Antigravity.SignInLine"/>).</summary>
     public static string SignInWords(string id)
     {
+        if (id == "gemini") return Antigravity.SignInLine(OperatingSystem.IsWindows());
         var (exe, args) = SignInCommand(id);
         return args.Length == 0 ? exe : exe + " " + string.Join(' ', args);
     }
@@ -143,6 +166,16 @@ public static class Engines
 
     public static bool LooksLikeAuth(string error) => AuthLike.IsMatch(error);
     public static bool LooksLikeLimit(string error) => LimitLike.IsMatch(error);
+
+    // Claude Code's sign-in was being renewed by another of its processes on this computer (or one that stopped halfway
+    // left the renewal locked): "Failed to refresh OAuth token: another Claude Code process is refreshing it or exited
+    // mid-refresh. This is usually transient; retry in a minute…", "Could not refresh your login because another Claude
+    // Code process is refreshing it…". Not signed out: Anthropic's docs say to try again in a minute.
+    static readonly Regex RefreshBusy = new(@"another Claude Code process is refreshing", RegexOptions.IgnoreCase | RegexOptions.Compiled);
+
+    /// <summary>Whether Claude Code stopped only because another of its processes was renewing the sign-in, so the
+    /// same run works again a little later (<see cref="ClaudeProvider.RefreshWait"/>).</summary>
+    public static bool LooksLikeRefreshBusy(string error) => RefreshBusy.IsMatch(error);
 
     /// <summary>Whether an AI's error means the student has to sign in to it again (signed out, or its sign-in ran
     /// out): an auth error that isn't a turned-down API key.</summary>
@@ -204,7 +237,11 @@ public static class Engines
     static bool? Hinted(string id, EngineChecks checks) => id switch
     {
         "codex" => checks.FileExists(CodexAuthPath(checks)) || checks.Env("OPENAI_API_KEY") is { Length: > 0 },
-        "gemini" => checks.Env("GEMINI_API_KEY") is { Length: > 0 } || checks.FileExists(GeminiCredsPath),
+        // Gemini runs through Google's Antigravity (agy), in Study Stash's own home for it, where agy 1.4.5 keeps its
+        // sign-in in a file of its own (only whether it's there is looked at). Its absence proves nothing (another
+        // version may keep it elsewhere): without it or a key in the environment, it's unchecked until tried.
+        "gemini" => checks.Env("GEMINI_API_KEY") is { Length: > 0 } || checks.FileExists(GeminiCredsPath)
+            || checks.FileExists(Path.Combine(Antigravity.Home(), ".gemini", "antigravity-cli", "antigravity-oauth-token")) ? true : null,
         _ => null, // claude
     };
 
@@ -245,18 +282,35 @@ public static class Engines
     {
         bool installed = checks.OllamaInstalled();
         var installedModels = installed ? await checks.OllamaModels(cfg.OllamaHost) : null;
+        string usable = installedModels is null ? "" : UsableFreeModel(cfg, installedModels) ?? "";
         string state = !installed ? "not_installed"
             : installedModels is null ? "not_running"
-            : !Ollama.HasModel(installedModels.Select(m => m.Name).ToList(), cfg.EffectiveSummaryModel) ? "model_missing"
+            : usable.Length == 0 ? "model_missing"
             : "ready";
         var models = (installedModels ?? []).Select(m => new ModelOption(m.Name, $"{m.Name} ({Ollama.SizeLabel(m.SizeGb)})")).ToList();
         string wanted = FreeModel(cfg, checks);
         return new EngineInfo("ollama", Name("ollama"), state)
         {
-            Installed = installed, Model = cfg.EffectiveSummaryModel, Models = models, Site = AiProviders.Get("ollama").Site,
+            Installed = installed, Model = usable.Length > 0 ? usable : cfg.EffectiveSummaryModel, Models = models, Site = AiProviders.Get("ollama").Site,
             SetUpGb = state == "ready" ? 0 : Ollama.DownloadGb(wanted),
             Small = wanted == Ollama.SmallModel,
         };
+    }
+
+    /// <summary>Whether anyone chose the free AI's model on this library (in Settings, or setup's own download): a
+    /// new library's is only the built-in default.</summary>
+    public static bool FreeModelChosen(Config cfg) => cfg.SummaryModel.Length > 0 || cfg.OllamaModel != Config.DefaultOllamaModel;
+
+    /// <summary>
+    /// The model the free AI writes notes with as this computer is now (<paramref name="installed"/>, Ollama's list):
+    /// the library's own when it's installed; for a library nobody chose a model for, any model already on this
+    /// computer (the best of them, never a cloud one), as the notes themselves would use it; null when there's none,
+    /// and "Set it up" downloads one.
+    /// </summary>
+    public static string? UsableFreeModel(Config cfg, IReadOnlyList<(string Name, double SizeGb)> installed)
+    {
+        if (Ollama.HasModel(installed.Select(m => m.Name).ToList(), cfg.EffectiveSummaryModel)) return cfg.EffectiveSummaryModel;
+        return FreeModelChosen(cfg) ? null : Ollama.LocalPick(installed);
     }
 
     /// <summary>
@@ -266,7 +320,7 @@ public static class Engines
     /// laptop set up from the app was left to download that.)
     /// </summary>
     public static string FreeModel(Config cfg, EngineChecks checks) =>
-        cfg.SummaryModel.Length > 0 || cfg.OllamaModel != Config.DefaultOllamaModel ? cfg.EffectiveSummaryModel : Ollama.RecommendedModel(checks.RamGb());
+        FreeModelChosen(cfg) ? cfg.EffectiveSummaryModel : Ollama.RecommendedModel(checks.RamGb());
 
     static EngineInfo CliRow(string id, AiSettings settings, EngineChecks checks)
     {

@@ -75,13 +75,16 @@
     <Setter Property="Foreground" Value="{DynamicResource Warn}" />
   </Style>
 
-  <!-- The design's pill button: plain (Raised) or primary (Tint), 30 tall, r15. -->
+  <!-- The design's pill button: plain (Raised) or primary (Tint), 30 tall, r15. It sits in a button, which cuts off
+       whatever is drawn outside its own box, so the plain one's hairline is a border inside it (the padding a point
+       less, so its words stay where they were). -->
   <Style Selector="Border.ai-pill">
     <Setter Property="Height" Value="30" />
     <Setter Property="CornerRadius" Value="15" />
-    <Setter Property="Padding" Value="14,0" />
+    <Setter Property="Padding" Value="13,0" />
     <Setter Property="Background" Value="{DynamicResource Raised}" />
-    <Setter Property="BoxShadow" Value="{DynamicResource RaisedShadow}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource Line}" />
+    <Setter Property="BorderThickness" Value="1" />
   </Style>
   <Style Selector="Border.ai-pill > TextBlock">
     <Setter Property="FontSize" Value="13" />
@@ -96,7 +99,8 @@
   </Style>
   <Style Selector="Border.ai-pill.primary">
     <Setter Property="Background" Value="{DynamicResource Tint}" />
-    <Setter Property="BoxShadow" Value="{DynamicResource EdgeTint}" />
+    <Setter Property="BorderThickness" Value="0" />
+    <Setter Property="Padding" Value="14,0" />
   </Style>
   <Style Selector="Border.ai-pill.primary > TextBlock">
     <Setter Property="Foreground" Value="{DynamicResource OnAccent}" />
@@ -110,14 +114,16 @@
     <Setter Property="Theme" Value="{StaticResource Surface}" />
   </Style>
 
-  <!-- The design's select: a pill with a name and unfold_more, opening a Flyout. -->
+  <!-- The design's select: a pill with a name and unfold_more, opening a Flyout (its hairline a border inside it, as
+       the pill's). -->
   <Style Selector="Border.ai-select">
     <Setter Property="Height" Value="28" />
     <Setter Property="Width" Value="180" />
     <Setter Property="CornerRadius" Value="14" />
     <Setter Property="Background" Value="{DynamicResource Raised}" />
-    <Setter Property="BoxShadow" Value="{DynamicResource RaisedShadow}" />
-    <Setter Property="Padding" Value="12,0,8,0" />
+    <Setter Property="BorderBrush" Value="{DynamicResource Line}" />
+    <Setter Property="BorderThickness" Value="1" />
+    <Setter Property="Padding" Value="11,0,7,0" />
   </Style>
   <Style Selector="Border.ai-select TextBlock">
     <Setter Property="FontSize" Value="13" />
@@ -335,6 +341,20 @@
     <Setter Property="BorderBrush" Value="{DynamicResource PopupStroke}" />
     <Setter Property="BorderThickness" Value="1" />
     <Setter Property="BoxShadow" Value="{DynamicResource PopupShadow}" />
+  </Style>
+  <!-- A question in the answer card's conversation: the student's own words, in ink and heavier than the answers -->
+  <Style Selector="TextBlock.ai-q">
+    <Setter Property="FontSize" Value="13" />
+    <Setter Property="FontWeight" Value="SemiBold" />
+    <Setter Property="Foreground" Value="{DynamicResource Fg}" />
+    <Setter Property="TextWrapping" Value="Wrap" />
+  </Style>
+  <!-- New chat, at the head of the answer card and the recorder's chat -->
+  <Style Selector="Button.ai-newchat">
+    <Setter Property="Theme" Value="{StaticResource Surface}" />
+    <Setter Property="Height" Value="28" />
+    <Setter Property="Padding" Value="6,0,9,0" />
+    <Setter Property="CornerRadius" Value="14" />
   </Style>
   <Style Selector="TextBlock.ai-asked">
     <Setter Property="FontSize" Value="11" />

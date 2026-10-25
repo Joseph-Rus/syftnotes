@@ -17,13 +17,13 @@ Study-Stash.dmg / Study-Stash-Setup.exe            first run                    
 
 The build carries no role of its own: `Study-Stash.dmg`'s `Info.plist` has no `StudyStashRole` key, and Windows'
 `study-stash.ini` writes no `role=` line either (CI checks the DMG for exactly this — see `.github/workflows/ci.yml`).
-Setup still shows three starting choices — **Just this computer**, **This is my library**, **This is my laptop** —
+Setup still offers three starting choices — **Just this Mac** (or PC), and under Advanced **My computer at home** (the library) and **My laptop for class** —
 worked out fresh each time it opens (`Setup.StartingRole`, `engine/src/StudyStash.App/Services/Setup.cs`):
 
 - **A fresh install** has no saved role and no library connected yet, so setup suggests one:
-  `SetupModel.Suggested` picks **This is my library** only when an *old-style* role installer said so (`Apps.RolePreset`,
+  `SetupModel.Suggested` picks **My computer at home** (Advanced opens on it) only when an *old-style* role installer said so (`Apps.RolePreset`,
   which still reads a Laptop/Library build's Info.plist key or study-stash.ini line, kept for exactly this); otherwise it
-  suggests **Just this computer** — the friendliest default for a student who just wants to start.
+  suggests **Just this Mac** — the friendliest default for a student who just wants to start.
 - **An install that already finished setup** keeps its own role from `app.json` (`AppSettings.Role`), whatever the
   installer suggests: reopening setup (say, to change a class) never resets a working laptop or library.
 - **A laptop that's mid-setup and already connected somewhere else** (its `client.toml` points at another

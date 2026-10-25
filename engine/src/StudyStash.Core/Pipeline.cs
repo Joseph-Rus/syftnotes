@@ -65,7 +65,7 @@ public sealed class Pipeline(Config cfg, Store store, SortChatFn? chat = null,
     public async Task<string?> ProcessAsync(NoteRow row)
     {
         var m = store.Meeting(row);
-        m.Attached = store.AttachedTo(row.Id); // what the student attached, with the words read from it so far
+        store.Attach(m); // what the student attached, with the words read from it so far
         string summary = "", model = "", error = "";
         // Why this run writes no notes, for a lecture that keeps the ones it has (below).
         string unwritten = !Cfg.SummaryEnabled ? "The notes weren't rewritten: writing study notes is switched off in your library's Settings."
@@ -81,6 +81,8 @@ public sealed class Pipeline(Config cfg, Store store, SortChatFn? chat = null,
             try
             {
                 summary = await summarize(m, Cfg);
+                // What really wrote them (another model than the one asked, when a limit moved it): the byline's.
+                model = notesModel?.Invoke() ?? model;
                 // The engine just answered: say so now, before the row's status turns to "done" below, so anyone
                 // watching never sees a finished lecture next to a stale "isn't answering" message.
                 if (engineProblem is not null)
@@ -156,7 +158,7 @@ public sealed class Pipeline(Config cfg, Store store, SortChatFn? chat = null,
         // Nor is one that was kept recording named again: it has the name its first notes were filed under.
         if (m.TitleStays) c.LectureTitle = !string.IsNullOrEmpty(row.LectureTitle) ? row.LectureTitle : m.Title;
         string? path = store.Finish(row, m, c, summary, model, error);
-        if (path is not null && summary.Length > 0) store.MarkAttachmentsUsed(m.Attached.Select(a => a.Id));
+        if (path is not null && summary.Length > 0) store.MarkAttachmentsUsed(m.Attached.Select(a => a.Id).Concat(m.Photos.Select(p => p.Id)));
         log(path is null
             ? $"[pipeline] '{m.Title}' changed while it was being written; not saving the old result"
             : $"[pipeline] filed '{m.Title}' \u2192 {c.ClassName} ({c.By} {Py.FormatFixed(c.Confidence, 2)})");

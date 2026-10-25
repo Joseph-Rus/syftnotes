@@ -21,16 +21,26 @@
     <StackPanel Spacing="10">
       <!-- The conversation, with a close button (and Esc) that gives the transcript its room back; kept for this
            lecture, so asking again or "Show the chat" brings it back. A long one scrolls, newest at the bottom. -->
-      <Grid Name="ChatHeader" ColumnDefinitions="*,Auto" IsVisible="{Binding HasLatest}" Margin="0,0,0,-4">
+      <Grid Name="ChatHeader" ColumnDefinitions="*,Auto,2,Auto" IsVisible="{Binding HasLatest}" Margin="0,0,0,-4">
         <TextBlock Classes="ai-asked" Text="Chat" VerticalAlignment="Center" />
-        <Button Name="CloseChat" Grid.Column="1" Classes="ai-close" VerticalAlignment="Center" ToolTip.Tip="Close chat" AutomationProperties.Name="Close chat"
+        <!-- New chat: the next question starts afresh, the AI remembering nothing before it -->
+        <Button Name="NewChat" Grid.Column="1" Classes="ai-newchat" VerticalAlignment="Center" Command="{Binding NewChatCommand}"
+                AutomationProperties.Name="New chat">
+          <StackPanel Orientation="Horizontal" Spacing="4">
+            <c:Icon Glyph="add" Size="14" Foreground="{DynamicResource Fg2}" VerticalAlignment="Center" />
+            <TextBlock Classes="ai-asked" Text="New chat" VerticalAlignment="Center" />
+          </StackPanel>
+        </Button>
+        <Button Name="CloseChat" Grid.Column="3" Classes="ai-close" VerticalAlignment="Center" ToolTip.Tip="Close chat" AutomationProperties.Name="Close chat"
                 Command="{Binding CloseChatCommand}">
           <c:Icon Glyph="close" Size="14" Foreground="{DynamicResource Fg2}" />
         </Button>
       </Grid>
       <ScrollViewer Name="Thread" MaxHeight="240" VerticalScrollBarVisibility="Hidden" HorizontalScrollBarVisibility="Disabled" c:FollowEnd.IsOn="True"
                   IsVisible="{Binding HasLatest}">
-        <ItemsControl ItemsSource="{Binding Turns}">
+        <!-- The questions and answers select as one, a drag running on from a question into its answer; the room
+             between them is left to what's under it (the recorder's background moves it). -->
+        <ItemsControl ItemsSource="{Binding Turns}" Background="{x:Null}" c:TextSelection.Area="True">
           <ItemsControl.ItemsPanel>
             <ItemsPanelTemplate><StackPanel Spacing="10" /></ItemsPanelTemplate>
           </ItemsControl.ItemsPanel>
@@ -38,15 +48,16 @@
             <DataTemplate x:DataType="vm:AiTurn">
               <StackPanel Spacing="10">
                 <Border Classes="ai-bubble-q" MaxWidth="280">
-                  <TextBlock Text="{Binding Question}" />
+                  <c:PageText Text="{Binding Question}" />
                 </Border>
                 <Border Classes="ai-bubble-a" MaxWidth="317" IsVisible="{Binding !IsThinking}">
                   <StackPanel Spacing="6">
                     <c:NoteView Compact="True" BodySize="13" BodyLineHeight="18.85" Markdown="{Binding Answer}" IsVisible="{Binding Answer, Converter={x:Static c:Converters.NotEmpty}}" />
-                    <TextBlock Classes="ai-answer" Text="{Binding Failed}" Foreground="{DynamicResource Warn}"
+                    <c:PageText Classes="ai-answer" Text="{Binding Failed}" Foreground="{DynamicResource Warn}"
                                IsVisible="{Binding Failed, Converter={x:Static c:Converters.NotEmpty}}" />
                     <v:AiByline HorizontalAlignment="Left" IsVisible="{Binding Byline, Converter={x:Static c:Converters.NotEmpty}}" />
                     <TextBlock Classes="ai-byline" Text="{Binding FellBackNote}" IsVisible="{Binding FellBackNote, Converter={x:Static c:Converters.NotEmpty}}" />
+                    <TextBlock Classes="ai-byline" Text="{Binding OlderLibraryNote}" TextWrapping="Wrap" IsVisible="{Binding OlderLibraryNote, Converter={x:Static c:Converters.NotEmpty}}" />
                   </StackPanel>
                 </Border>
                 <StackPanel Orientation="Horizontal" Spacing="8" IsVisible="{Binding IsThinking}">
@@ -65,7 +76,7 @@
 
       <Border Classes="ai-field">
         <Grid ColumnDefinitions="*,6,Auto,6,Auto" VerticalAlignment="Center">
-          <TextBox Classes="bare" Text="{Binding Question}" PlaceholderText="{Binding Placeholder}" FontSize="13" VerticalAlignment="Center">
+          <TextBox Name="ChatInput" Classes="bare" Text="{Binding Question}" c:OneLinePaste.IsOn="True" PlaceholderText="{Binding Placeholder}" FontSize="13" VerticalAlignment="Center">
             <TextBox.KeyBindings>
               <KeyBinding Gesture="Enter" Command="{Binding AskCommand}" />
             </TextBox.KeyBindings>

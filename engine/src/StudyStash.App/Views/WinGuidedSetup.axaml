@@ -11,7 +11,7 @@
              x:Class="StudyStash.App.Views.WinGuidedSetup"
              x:DataType="vm:GuidedSetupModel"
              Classes="in-setup"
-             Width="760" Height="600">
+             Width="760" Height="640">
   <UserControl.Styles>
     <StyleInclude Source="avares://StudyStash/Views/WinAiStyles.axaml" />
     <StyleInclude Source="avares://StudyStash/Views/WinCanvasStyles.axaml" />
@@ -21,6 +21,10 @@
     <Style Selector="Border#Frame.framed">
       <Setter Property="CornerRadius" Value="8" />
       <Setter Property="BoxShadow" Value="{DynamicResource ShadowLg}" />
+    </Style>
+    <Style Selector="StackPanel.picks > Button.choice">
+      <Setter Property="MinHeight" Value="62" />
+      <Setter Property="Padding" Value="16,10" />
     </Style>
   </UserControl.Styles>
 
@@ -55,7 +59,7 @@
           <!-- The chat's checklist: only the app ticks it; a line not done yet asks the AI to go there. -->
           <DockPanel Margin="6,6,6,0" IsVisible="{Binding OnChat}">
             <StackPanel DockPanel.Dock="Top" Classes="flow" Orientation="Horizontal" Spacing="8">
-              <c:Icon Glyph="auto_awesome" Size="16" VerticalAlignment="Center" />
+              <c:Icon Glyph="{Binding BrandGlyph}" Size="16" VerticalAlignment="Center" />
               <TextBlock Classes="side-group" Text="{Binding SidebarTitle}" />
             </StackPanel>
             <StackPanel DockPanel.Dock="Bottom" Spacing="16" Margin="4,12,4,10">
@@ -111,9 +115,10 @@
                     <StackPanel IsVisible="{Binding OnPick}">
                       <TextBlock Classes="page-title step-title" Text="{Binding PickTitle}" />
                       <TextBlock Classes="page-lede step-lede" Text="{x:Static vm:GuidedSetupModel.PickLede}" />
-                      <!-- Three answers in the student's own terms: what they pay for, or nothing. The tools underneath
-                           (Claude Code, Codex, Ollama) aren't named here. -->
-                      <StackPanel Spacing="10" Margin="0,20,0,0" MaxWidth="480" HorizontalAlignment="Stretch">
+                      <!-- The answers in the student's own terms: the AI they use, or no paid plan. The tools underneath
+                           (Claude Code, Codex, Antigravity, Ollama) aren't named here. Four of them: a little closer
+                           together than a card's choices elsewhere, so they and the plan links fit the page. -->
+                      <StackPanel Classes="picks" Spacing="8" Margin="0,18,0,0" MaxWidth="480" HorizontalAlignment="Stretch">
                         <Button AutomationProperties.Name="Claude" Name="PickClaude" Classes="choice" Classes.on="{Binding PickedClaude}" Command="{Binding PickCommand}" CommandParameter="claude">
                           <Grid ColumnDefinitions="*,14,Auto">
                             <StackPanel Spacing="3" VerticalAlignment="Center">
@@ -150,6 +155,25 @@
                             <Border Grid.Column="2" Classes="radio" Classes.on="{Binding PickedCodex}"><Ellipse /></Border>
                           </Grid>
                         </Button>
+                        <!-- Gemini: the same path as Claude and ChatGPT (get it ready, sign in with Google, the chat), through Google's Antigravity CLI. -->
+                        <Button AutomationProperties.Name="Gemini" Name="PickGemini" Classes="choice" Classes.on="{Binding PickedGemini}" Command="{Binding PickCommand}" CommandParameter="gemini">
+                          <Grid ColumnDefinitions="*,14,Auto">
+                            <StackPanel Spacing="3" VerticalAlignment="Center">
+                              <StackPanel Orientation="Horizontal" Spacing="8">
+                                <c:Icon Glyph="brand:gemini" Size="18" VerticalAlignment="Center" />
+                                <TextBlock Classes="choice-title" Text="Gemini" />
+                                <Border Classes="tag" IsVisible="{Binding GeminiHere}">
+                                  <StackPanel Orientation="Horizontal" Spacing="4">
+                                    <c:Icon Glyph="check" Size="12" />
+                                    <TextBlock Text="{Binding AlreadyHere}" />
+                                  </StackPanel>
+                                </Border>
+                              </StackPanel>
+                              <TextBlock Classes="choice-about" Text="{x:Static vm:GuidedSetupModel.GeminiLine}" />
+                            </StackPanel>
+                            <Border Grid.Column="2" Classes="radio" Classes.on="{Binding PickedGemini}"><Ellipse /></Border>
+                          </Grid>
+                        </Button>
                         <Button AutomationProperties.Name="I don't have a paid plan" Name="PickFree" Classes="choice" Classes.on="{Binding PickedFree}" Command="{Binding PickCommand}" CommandParameter="free">
                           <Grid ColumnDefinitions="*,14,Auto">
                             <StackPanel Spacing="3" VerticalAlignment="Center">
@@ -172,7 +196,10 @@
 
                     <!-- Screen 2 · Install -->
                     <StackPanel IsVisible="{Binding OnInstall}">
-                      <TextBlock Classes="page-title step-title" Text="{Binding InstallTitle}" />
+                      <Grid ColumnDefinitions="Auto,12,*">
+                        <c:Icon Name="InstallMark" Glyph="{Binding BrandGlyph}" Size="28" VerticalAlignment="Top" Margin="0,10,0,0" />
+                        <TextBlock Grid.Column="2" Classes="page-title step-title" Text="{Binding InstallTitle}" />
+                      </Grid>
                       <TextBlock Classes="page-lede step-lede" Text="{Binding InstallLede}" />
                       <StackPanel Orientation="Horizontal" Spacing="14" Margin="0,24,0,0" IsVisible="{Binding ShowInstallButton}">
                         <Button Name="Install" Classes="btn sm ink" Command="{Binding InstallCommand}" Content="{Binding InstallButton}" />
@@ -213,7 +240,10 @@
 
                     <!-- Screen 3 · Sign in -->
                     <StackPanel IsVisible="{Binding OnSignIn}">
-                      <TextBlock Classes="page-title step-title" Text="{Binding SignInTitle}" />
+                      <Grid ColumnDefinitions="Auto,12,*">
+                        <c:Icon Name="SignInMark" Glyph="{Binding BrandGlyph}" Size="28" VerticalAlignment="Top" Margin="0,10,0,0" />
+                        <TextBlock Grid.Column="2" Classes="page-title step-title" Text="{Binding SignInTitle}" />
+                      </Grid>
                       <TextBlock Classes="page-lede step-lede" Text="{Binding SignInLede}" />
                       <Button Name="OpenSignIn" Classes="btn sm ink" HorizontalAlignment="Left" Margin="0,24,0,0" Command="{Binding OpenSignInCommand}" IsVisible="{Binding ShowOpenSignIn}" Content="Open sign-in page" />
                       <StackPanel Spacing="8" Margin="0,24,0,0" IsVisible="{Binding WaitingSignIn}">
@@ -236,6 +266,8 @@
                         <c:Icon Classes="ok" Size="18" />
                         <TextBlock Classes="say" Text="{Binding ReadyWords}" FontWeight="Bold" />
                       </StackPanel>
+                      <!-- How much of the account's allowance is left, when the AI says (Gemini's). -->
+                      <TextBlock Name="Allowance" Classes="hint" Margin="26,6,0,0" Text="{Binding AllowanceWords}" IsVisible="{Binding HasAllowance}" />
                       <Border Classes="problem" Margin="0,18,0,0" IsVisible="{Binding HasSignInProblem}">
                         <Grid ColumnDefinitions="Auto,10,*,10,Auto">
                           <c:Icon Classes="warn" Size="18" VerticalAlignment="Center" />
@@ -371,7 +403,7 @@
                               <StackPanel Spacing="12">
                                 <TextBlock Classes="card-title" Text="{Binding Title}" />
 
-                                <!-- How you'll use it -->
+                                <!-- Where lectures are kept: just this computer, and under Advanced a laptop or a computer at home -->
                                 <StackPanel Spacing="6" IsVisible="{Binding IsComputer}">
                                   <Button AutomationProperties.Name="{Binding JustThis}" Classes="choice row" Classes.on="{Binding ChoseOne}" Command="{Binding ChooseCommand}" CommandParameter="one">
                                     <Grid ColumnDefinitions="Auto,12,*">
@@ -382,18 +414,30 @@
                                       </StackPanel>
                                     </Grid>
                                   </Button>
-                                  <Button AutomationProperties.Name="This is my laptop" Classes="choice row" Classes.on="{Binding ChoseLaptop}" Command="{Binding ChooseCommand}" CommandParameter="laptop">
-                                    <Grid ColumnDefinitions="Auto,12,*">
-                                      <Border Classes="radio" Classes.on="{Binding ChoseLaptop}"><Ellipse /></Border>
-                                      <TextBlock Grid.Column="2" Classes="choice-title"><Run Text="This is my laptop" /><Run Text="  (library elsewhere)" FontWeight="Normal" Foreground="{DynamicResource InkMuted}" /></TextBlock>
-                                    </Grid>
+                                  <!-- Advanced: a laptop for class and a computer at home, folded away (most students have one computer) -->
+                                  <Button Classes="text-link small" Margin="0,4,0,0" Command="{Binding ToggleOtherCommand}"
+                                          AutomationProperties.Name="{x:Static vm:SetupModel.OtherComputersLabel}">
+                                    <StackPanel Orientation="Horizontal" Spacing="4">
+                                      <c:Icon Glyph="chevron_right" Size="16" IsVisible="{Binding !OtherOpen}" />
+                                      <c:Icon Glyph="expand_more" Size="16" IsVisible="{Binding OtherOpen}" />
+                                      <TextBlock Text="{x:Static vm:SetupModel.OtherComputersLabel}" VerticalAlignment="Center" />
+                                    </StackPanel>
                                   </Button>
-                                  <Button AutomationProperties.Name="This is my library" Classes="choice row" Classes.on="{Binding ChoseLibrary}" Command="{Binding ChooseCommand}" CommandParameter="library">
-                                    <Grid ColumnDefinitions="Auto,12,*">
-                                      <Border Classes="radio" Classes.on="{Binding ChoseLibrary}"><Ellipse /></Border>
-                                      <TextBlock Grid.Column="2" Classes="choice-title"><Run Text="This is my library" /><Run Text="  (a computer that stays on)" FontWeight="Normal" Foreground="{DynamicResource InkMuted}" /></TextBlock>
-                                    </Grid>
-                                  </Button>
+                                  <StackPanel Spacing="6" IsVisible="{Binding OtherOpen}">
+                                    <TextBlock Classes="hint" Text="{x:Static vm:SetupModel.OtherComputersAbout}" />
+                                    <Button AutomationProperties.Name="{x:Static vm:SetupModel.LaptopTitle}" AutomationProperties.HelpText="{x:Static vm:SetupModel.LaptopAbout}" Classes="choice row" Classes.on="{Binding ChoseLaptop}" Command="{Binding ChooseCommand}" CommandParameter="laptop">
+                                      <Grid ColumnDefinitions="Auto,12,*">
+                                        <Border Classes="radio" Classes.on="{Binding ChoseLaptop}"><Ellipse /></Border>
+                                        <TextBlock Grid.Column="2" Classes="choice-title"><Run Text="{x:Static vm:SetupModel.LaptopTitle}" /><Run Text="  (lectures kept on your computer at home)" FontWeight="Normal" Foreground="{DynamicResource InkMuted}" /></TextBlock>
+                                      </Grid>
+                                    </Button>
+                                    <Button AutomationProperties.Name="{x:Static vm:SetupModel.LibraryTitle}" AutomationProperties.HelpText="{Binding Setup.LibraryAbout}" Classes="choice row" Classes.on="{Binding ChoseLibrary}" Command="{Binding ChooseCommand}" CommandParameter="library">
+                                      <Grid ColumnDefinitions="Auto,12,*">
+                                        <Border Classes="radio" Classes.on="{Binding ChoseLibrary}"><Ellipse /></Border>
+                                        <TextBlock Grid.Column="2" Classes="choice-title"><Run Text="{x:Static vm:SetupModel.LibraryTitle}" /><Run Text="  (stays on and keeps them)" FontWeight="Normal" Foreground="{DynamicResource InkMuted}" /></TextBlock>
+                                      </Grid>
+                                    </Button>
+                                  </StackPanel>
                                   <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Right" Margin="0,6,0,0">
                                     <c:Spinner IsVisible="{Binding Busy}" Width="14" Height="14" Foreground="{DynamicResource InkMuted}" VerticalAlignment="Center" />
                                     <Button Classes="btn sm ink" Command="{Binding PressCommand}" CommandParameter="setup" IsEnabled="{Binding !Busy}" Content="Set up" />

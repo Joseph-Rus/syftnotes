@@ -270,6 +270,35 @@ public class AiApiTests
         Assert.Equal(model, Configs.Load(cfg.Home).EffectiveSummaryModel); // kept: the library writes notes with it from now on
     }
 
+    /// <summary>"I don't have a paid plan" on a computer that already has a model in Ollama (the small one, here): the
+    /// free AI is ready as it is, with nothing to download, and picking it makes that model the library's own. An
+    /// Ollama cloud model (it runs on ollama.com) never counts as the free, private AI.</summary>
+    [Fact]
+    public async Task A_new_library_writes_with_a_model_already_here_never_a_cloud_one_and_keeps_it()
+    {
+        using var dir = new TempDir();
+        var cfg = new Config(dir["home"], dir["pool"]) { PoolPassword = "pw", OllamaEnabled = true }; // nobody chose its model
+        Configs.Save(cfg);
+        using var store = new Store(cfg.DbPath, cfg.PoolDir);
+        var models = new List<(string Name, double SizeGb)> { ("glm-5.2:cloud", 0) };
+        var checks = new FakeChecks().Build() with
+        {
+            OllamaInstalled = () => true,
+            OllamaModels = _ => Task.FromResult<List<(string Name, double SizeGb)>?>(models.ToList()),
+            RamGb = () => 18,
+        };
+        await using var site = await Site(cfg, store, new AiJobs(cfg.Home) { Checks = checks });
+        var remote = new AiRemote("http://localhost", "pw", site.Client);
+        Assert.Equal("model_missing", (await remote.EnginesAsync())!.Engines.Single(e => e.Id == "ollama").State);
+
+        models.Add(("qwen3:1.7b", 1.4));
+        var free = (await remote.EnginesAsync())!.Engines.Single(e => e.Id == "ollama");
+        Assert.Equal(("ready", "qwen3:1.7b"), (free.State, free.Model));
+        await remote.DefaultsAsync(notes: "ollama");
+        Assert.Equal("qwen3:1.7b", Configs.Load(cfg.Home).EffectiveSummaryModel);
+        Assert.Null(Ollama.LocalPick([("glm-5.2:cloud", 0), ("qwen3-coder:480b-cloud", 0)]));
+    }
+
     [Fact]
     public async Task A_computer_without_room_for_the_free_AI_is_told_before_anything_is_downloaded()
     {

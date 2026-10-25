@@ -2,20 +2,25 @@ using System.Collections.ObjectModel;
 using Avalonia.Media;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using StudyStash.Core;
 
 namespace StudyStash.App.ViewModels;
 
-/// <summary>A line of the live transcript: when it was said, and what.</summary>
+/// <summary>A line of the live transcript: when it was said, and what (the live words' newest line grows as they
+/// come, in place, so a selection in it stays).</summary>
 public sealed partial class HeardLine : ObservableObject
 {
     public string Time { get; init; } = "";
-    public string Text { get; init; } = "";
+    [ObservableProperty] public partial string Text { get; set; } = "";
     /// <summary>Seconds into the lecture it was said at, where the transcript has times.</summary>
     public double? Start { get; init; }
     /// <summary>The line a diagram's "where was this said" (or its moment) points to, marked until another is.</summary>
     [ObservableProperty] public partial bool Here { get; set; }
     /// <summary>The newest line reads in the full text color; older ones fade to secondary.</summary>
-    public bool Latest { get; init; }
+    [ObservableProperty] public partial bool Latest { get; set; }
+    /// <summary>What the line is copied with in front when a selection takes it from its start: its time, as a
+    /// downloaded transcript writes it ("[12:30] ").</summary>
+    public string? CopyLead => Time.Length > 0 ? $"[{Time}] " : null;
 }
 
 /// <summary>A moment an answer points to: "18:05", to play the recording from there.</summary>
@@ -95,6 +100,29 @@ public sealed partial class RecorderModel : ObservableObject
     public bool ShowResume => Hovered && IsPaused;
 
     static string Quote(string s) => $"“{(s.Length <= 140 ? s : s[..140].TrimEnd() + "…")}”";
+
+    /// <summary>
+    /// Shows what's been said so far (the transcript's own lines and the live words after them). Only what changed
+    /// changes: lines that scrolled off the top go; a line said at the same moment as one already shown is that line,
+    /// its words and whether it's the newest updated in place (the live words' newest line grows every second or so,
+    /// and a selection in it stays); the rest (live words the transcript has now written down its own way) are new.
+    /// </summary>
+    public void ShowHeard(IReadOnlyList<Spoken> lines)
+    {
+        while (Lines.Count > 0 && lines.Count > 0 && Lines[0].Start < lines[0].Start) Lines.RemoveAt(0);
+        int same = 0;
+        for (; same < Lines.Count && same < lines.Count && Lines[same].Start == lines[same].Start; same++)
+        {
+            Lines[same].Text = lines[same].Text;
+            Lines[same].Latest = same == lines.Count - 1;
+        }
+        while (Lines.Count > same) Lines.RemoveAt(Lines.Count - 1);
+        for (int i = same; i < lines.Count; i++)
+            Lines.Add(new HeardLine { Time = TimedText.Clock(lines[i].Start), Text = lines[i].Text, Start = lines[i].Start, Latest = i == lines.Count - 1 });
+        // The pill's card quotes the newest two, which may have grown with no line added.
+        OnPropertyChanged(nameof(EarlierLine));
+        OnPropertyChanged(nameof(NewestLine));
+    }
 
     public RecorderModel()
     {

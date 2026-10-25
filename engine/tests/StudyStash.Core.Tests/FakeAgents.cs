@@ -1,15 +1,20 @@
+using System.Text.Json.Nodes;
 using StudyStash.Core.Ai;
 
 namespace StudyStash.Core.Tests;
 
 /// <summary>
-/// Stand-ins for Claude Code and Codex, and for their makers' installers, as small scripts in a test's own folder (sh
+/// Stand-ins for Claude Code, Codex and Antigravity's agy, and for their makers' installers, as small scripts in a test's own folder (sh
 /// on a Mac, a .cmd with PowerShell behind it on Windows): nothing here ever reaches a real installer, account or the
 /// network. A fake CLI answers <c>--version</c>, its sign-in and status commands (a <c>signed-in</c> file beside it
 /// is the sign-in), and runs a "turn" the way <c>claude -p</c> / <c>codex exec</c> would: it writes down its
 /// arguments, the names (never the values) of its environment variables and its input, then prints
 /// <c>replay-N.jsonl</c> (or <c>replay.jsonl</c>) line by line. Files beside it change what it does: <c>broken</c>
-/// (its --version fails), <c>login-fails</c>, <c>sleep</c> (seconds to wait before answering), <c>exit</c>.
+/// (its --version fails), <c>login-fails</c>, <c>sleep</c> (seconds to wait before answering), <c>exit</c>,
+/// <c>refuse</c> (an argument it doesn't know, as an older version: a turn given it stops with clap's error). The fake
+/// agy also answers <c>models</c> (its status) and <c>-p=/usage</c> (its sign-in, then <c>usage.json</c>; with a
+/// <c>region</c> file, Google's refusal for the country), and writes
+/// down the HOME each turn had (<c>home-N.txt</c>).
 /// </summary>
 public static class FakeAgents
 {
@@ -21,29 +26,37 @@ public static class FakeAgents
     /// <summary>Finds a command only in <paramref name="bin"/>.</summary>
     public static Func<string, string?> Which(string bin) => name => File.Exists(ExePath(bin, name)) ? ExePath(bin, name) : null;
 
-    public static string VersionOf(string id) => id == "codex" ? "codex-cli 0.46.0" : "2.1.260 (Claude Code)";
+    public static string VersionOf(string id) => id switch { "codex" => "codex-cli 0.46.0", "gemini" => "1.4.4", _ => "2.1.260 (Claude Code)" };
 
-    /// <summary>Writes a fake <paramref name="id"/> ("claude" or "codex") into <paramref name="bin"/>; its path.</summary>
+    /// <summary>The command an AI's CLI is: agy for Gemini, else its id.</summary>
+    public static string BinaryOf(string id) => id == "gemini" ? "agy" : id;
+
+    /// <summary>Writes a fake <paramref name="id"/> ("claude", "codex" or "gemini", which is agy) into
+    /// <paramref name="bin"/>; its path.</summary>
     public static string WriteCli(string bin, string id, string? version = null)
     {
         Directory.CreateDirectory(bin);
         version ??= VersionOf(id);
+        string name = BinaryOf(id);
         if (OperatingSystem.IsWindows())
         {
-            File.WriteAllText(Path.Combine(bin, id + ".ps1"), PowerShellCli(id, version));
+            File.WriteAllText(Path.Combine(bin, name + ".ps1"), PowerShellCli(id, version));
             // Its arguments go to PowerShell in the environment, as the command line cmd.exe was given, and are split there
             // the way a Windows program splits its own: PowerShell's -File would read a bare "-" (Codex's "the prompt is on
             // the input") as a parameter with no name, and refuse to start.
-            File.WriteAllText(ExePath(bin, id),
-                $"@echo off\r\nset FAKE_ARGS=%*\r\npowershell -NoProfile -NonInteractive -ExecutionPolicy Bypass -File \"%~dp0{id}.ps1\"\r\nexit /b %ERRORLEVEL%\r\n");
+            File.WriteAllText(ExePath(bin, name),
+                $"@echo off\r\nset FAKE_ARGS=%*\r\npowershell -NoProfile -NonInteractive -ExecutionPolicy Bypass -File \"%~dp0{name}.ps1\"\r\nexit /b %ERRORLEVEL%\r\n");
         }
         else
         {
-            File.WriteAllText(ExePath(bin, id), ShCli(id, version));
-            File.SetUnixFileMode(ExePath(bin, id), UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute);
+            File.WriteAllText(ExePath(bin, name), ShCli(id, version));
+            File.SetUnixFileMode(ExePath(bin, name), UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute);
         }
-        return ExePath(bin, id);
+        return ExePath(bin, name);
     }
+
+    /// <summary>What the fake agy's <c>-p=/usage</c> says when the test gives none (<c>usage.json</c>).</summary>
+    public const string Usage = """{"status":"SUCCESS","command":{"name":"usage","data":{"groups":[{"name":"Gemini Models","buckets":[{"id":"gemini-weekly","window":"weekly","remaining_fraction":0.8,"reset_time":"2026-10-29T05:47:53Z"}]},{"name":"Claude and GPT models","buckets":[{"id":"3p-weekly","window":"weekly","remaining_fraction":0,"reset_time":"2026-10-29T05:47:53Z"}]}]}}}""";
 
     /// <summary>Scripted output for turn <paramref name="turn"/> (0: every turn without its own).</summary>
     public static void Replay(string bin, IEnumerable<string> lines, int turn = 0) =>
@@ -74,6 +87,7 @@ public static class FakeAgents
         #!/bin/sh
         D="$(cd "$(dirname "$0")" && pwd)"
         if [ "$1" = "--version" ]; then
+          echo "$HOME" > "$D/version-home.txt"
           [ -f "$D/broken" ] && { echo "dyld: Library not loaded" >&2; exit 1; }
           echo "{{version}}"; exit 0
         fi
@@ -85,6 +99,26 @@ public static class FakeAgents
           if [ -f "$D/signed-in" ]; then echo "Logged in using an API key - sk-proj-***FAKEKEY42"; exit 0; fi
           echo "Not logged in"; exit 1
         fi
+        if [ "{{id}}" = gemini ] && [ "$1" = models ]; then
+          if [ -f "$D/signed-in" ]; then echo "gemini-3.8-flash"; exit 0; fi
+          echo "Error: Please sign in to view available models. Launch the CLI without arguments to sign in." >&2; exit 1
+        fi
+        if [ "{{id}}" = gemini ] && [ "$1" = "-p=/usage" ]; then
+          echo "$HOME" > "$D/usage-home.txt"
+          if [ -f "$D/region" ]; then
+            echo '{"conversation_id":"","status":"ERROR","response":"","error":"User location is not supported for the API use."}'
+            echo "Error: User location is not supported for the API use." >&2; exit 1
+          fi
+          if [ ! -f "$D/signed-in" ]; then
+            echo "Authentication required. Please visit the URL to log in:" >&2
+            echo "  https://accounts.google.com/o/oauth2/auth?fake=1" >&2
+            [ -f "$D/login-fails" ] && { echo "Error: authentication required. Run 'agy' to log in, then retry." >&2; exit 1; }
+            sleep "$(cat "$D/login-delay" 2>/dev/null || echo 1)"
+            touch "$D/signed-in"
+          fi
+          if [ -f "$D/usage.json" ]; then cat "$D/usage.json"; else echo '{{Usage}}'; fi
+          exit 0
+        fi
         if { [ "{{id}}" = claude ] && [ "$1" = auth ] && [ "$2" = login ]; } || { [ "{{id}}" = codex ] && [ "$1" = login ]; }; then
           echo "Opening your browser to sign in: https://example.com/fake-sign-in?code=abc"
           [ -f "$D/login-fails" ] && { echo "Raw mode is not supported on the current process.stdin" >&2; exit 1; }
@@ -94,6 +128,12 @@ public static class FakeAgents
         n=$(( $(cat "$D/turns" 2>/dev/null || echo 0) + 1 )); echo "$n" > "$D/turns"; echo $$ > "$D/pid-$n"
         for a in "$@"; do printf '%s\n' "$a"; done > "$D/argv-$n.txt"
         env | cut -d= -f1 | sort > "$D/env-$n.txt"
+        echo "$HOME" > "$D/home-$n.txt"; pwd > "$D/cwd-$n.txt"
+        [ -f "$HOME/.gemini/config/agents/study-stash-setup/agent.md" ] && echo yes > "$D/setup-agent-$n.txt"
+        if [ -f "$D/refuse" ]; then
+          r="$(cat "$D/refuse")"
+          for a in "$@"; do [ "$a" = "$r" ] && { echo "error: unexpected argument '$r' found" >&2; exit 2; }; done
+        fi
         cat > "$D/stdin-$n.txt"
         f="$D/replay-$n.jsonl"; [ -f "$f" ] || f="$D/replay.jsonl"
         if [ -f "$D/sleep" ]; then
@@ -139,6 +179,7 @@ public static class FakeAgents
         }
         $argv = Split-Args ([string]$env:FAKE_ARGS)
         if ($argv.Count -gt 0 -and $argv[0] -eq '--version') {
+          Set-Content "$D\version-home.txt" $env:USERPROFILE
           if (Test-Path "$D\broken") { [Console]::Error.WriteLine('it will not start'); exit 1 }
           '{{version}}'; exit 0
         }
@@ -149,6 +190,27 @@ public static class FakeAgents
         if ($ID -eq 'codex' -and $argv[0] -eq 'login' -and $argv[1] -eq 'status') {
           if (Test-Path "$D\signed-in") { 'Logged in using an API key - sk-proj-***FAKEKEY42'; exit 0 }
           'Not logged in'; exit 1
+        }
+        if ($ID -eq 'gemini' -and $argv[0] -eq 'models') {
+          if (Test-Path "$D\signed-in") { 'gemini-3.8-flash'; exit 0 }
+          [Console]::Error.WriteLine('Error: Please sign in to view available models. Launch the CLI without arguments to sign in.'); exit 1
+        }
+        if ($ID -eq 'gemini' -and $argv[0] -eq '-p=/usage') {
+          Set-Content "$D\usage-home.txt" $env:USERPROFILE
+          if (Test-Path "$D\region") {
+            '{"conversation_id":"","status":"ERROR","response":"","error":"User location is not supported for the API use."}'
+            [Console]::Error.WriteLine('Error: User location is not supported for the API use.'); exit 1
+          }
+          if (-not (Test-Path "$D\signed-in")) {
+            [Console]::Error.WriteLine('Authentication required. Please visit the URL to log in:')
+            [Console]::Error.WriteLine('  https://accounts.google.com/o/oauth2/auth?fake=1')
+            if (Test-Path "$D\login-fails") { [Console]::Error.WriteLine("Error: authentication required. Run 'agy' to log in, then retry."); exit 1 }
+            $delay = 1; if (Test-Path "$D\login-delay") { $delay = [int](Get-Content "$D\login-delay") }
+            Start-Sleep -Seconds $delay
+            New-Item -ItemType File -Force "$D\signed-in" | Out-Null
+          }
+          if (Test-Path "$D\usage.json") { Get-Content "$D\usage.json" -Raw } else { '{{Usage}}' }
+          exit 0
         }
         if (($ID -eq 'claude' -and $argv[0] -eq 'auth' -and $argv[1] -eq 'login') -or ($ID -eq 'codex' -and $argv[0] -eq 'login')) {
           'Opening your browser to sign in: https://example.com/fake-sign-in?code=abc'
@@ -162,6 +224,13 @@ public static class FakeAgents
         Set-Content "$D\pid-$n" $PID
         $argv | Set-Content "$D\argv-$n.txt"
         Get-ChildItem env: | ForEach-Object { $_.Name } | Sort-Object | Set-Content "$D\env-$n.txt"
+        Set-Content "$D\home-$n.txt" $env:USERPROFILE
+        Set-Content "$D\cwd-$n.txt" (Get-Location).Path
+        if (Test-Path "$env:USERPROFILE\.gemini\config\agents\study-stash-setup\agent.md") { Set-Content "$D\setup-agent-$n.txt" 'yes' }
+        if (Test-Path "$D\refuse") {
+          $r = (Get-Content "$D\refuse" -Raw).Trim()
+          if ($argv -contains $r) { [Console]::Error.WriteLine("error: unexpected argument '$r' found"); exit 2 }
+        }
         [Console]::In.ReadToEnd() | Set-Content "$D\stdin-$n.txt"
         $f = "$D\replay-$n.jsonl"; if (-not (Test-Path $f)) { $f = "$D\replay.jsonl" }
         if (Test-Path "$D\sleep") {
@@ -172,6 +241,61 @@ public static class FakeAgents
         exit ([int](Get-Content "$D\exit" -ErrorAction SilentlyContinue))
 
         """;
+
+    /// <summary>Lines agy's stream-json prints, for a fake agy's turn to replay.</summary>
+    public static class Agy
+    {
+        /// <summary>agy's init: the conversation, and the agent running (agy's own when <paramref name="agent"/> is
+        /// empty). Its tool list is everything agy has, whichever agent runs.</summary>
+        public static string Init(string agent = "study-stash-setup")
+        {
+            var init = new JsonObject
+            {
+                ["cwd"] = "/x", ["permission_mode"] = "request-review",
+                ["tools"] = new JsonArray("call_mcp_tool", "list_resources", "read_resource", "manage_task", "run_command", "view_file", "search_web", "browser_subagent"),
+            };
+            if (agent.Length > 0) init["agent"] = agent;
+            return new JsonObject { ["event"] = "init", ["conversation_id"] = "c-1", ["init"] = init }.ToJsonString();
+        }
+
+        public static string Words(int step, string delta) => new JsonObject
+        {
+            ["event"] = "step_update",
+            ["step_update"] = new JsonObject { ["conversation_id"] = "c-1", ["step_index"] = step, ["state"] = "ACTIVE", ["step_type"] = "agent_response", ["text_delta"] = delta },
+        }.ToJsonString();
+
+        public static string Mcp(int step, string server, string tool, JsonObject? args = null) => new JsonObject
+        {
+            ["event"] = "step_update",
+            ["step_update"] = new JsonObject
+            {
+                ["conversation_id"] = "c-1", ["step_index"] = step, ["state"] = "ACTIVE", ["step_type"] = "tool", ["tool_name"] = "call_mcp_tool",
+                ["tool_info"] = new JsonObject
+                {
+                    ["name"] = "call_mcp_tool",
+                    ["parameters"] = new JsonObject { ["Arguments"] = args ?? [], ["ServerName"] = server, ["ToolName"] = tool },
+                },
+            },
+        }.ToJsonString();
+
+        public static string Builtin(int step, string tool) => new JsonObject
+        {
+            ["event"] = "step_update",
+            ["step_update"] = new JsonObject
+            {
+                ["conversation_id"] = "c-1", ["step_index"] = step, ["state"] = "ACTIVE", ["step_type"] = "tool", ["tool_name"] = tool,
+                ["tool_info"] = new JsonObject { ["name"] = tool, ["parameters"] = new JsonObject { ["CommandLine"] = "cat ~/.ssh/id_rsa" } },
+            },
+        }.ToJsonString();
+
+        public static string Result(string response, string status = "SUCCESS", JsonArray? denied = null)
+        {
+            var r = new JsonObject { ["conversation_id"] = "c-1", ["status"] = status, ["response"] = response };
+            if (status != "SUCCESS") r["error"] = response;
+            if (denied is not null) r["denied_actions"] = denied;
+            return new JsonObject { ["event"] = "result", ["result"] = r }.ToJsonString();
+        }
+    }
 
     /// <summary>
     /// A fake installer that prints what the real one prints and, when it works, puts the CLI written to

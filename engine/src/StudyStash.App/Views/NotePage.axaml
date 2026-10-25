@@ -12,6 +12,10 @@
              x:Class="StudyStash.App.Views.NotePage"
              x:DataType="vm:LibraryModel">
   <UserControl.Styles>
+    <!-- A lecture's Attach is the one beside its tabs: the attachments' own (a class page's) isn't shown twice. -->
+    <Style Selector="c|BySkin#LectureAttachments Button#Attach">
+      <Setter Property="IsVisible" Value="False" />
+    </Style>
     <!-- The page is one column the notes' width, centred in the pane however wide it is (the sidebar shut, a big
          screen); the ask bar keeps to the same column. -->
     <Style Selector="StackPanel.np-page">
@@ -152,7 +156,7 @@
                     ToolTip.Tip="Change folder" AutomationProperties.Name="Change folder">
               <c:Icon Glyph="expand_more" Size="14" />
             </Button>
-            <TextBlock Name="CrumbWords" Classes="crumb" Text="{Binding Crumb}" />
+            <c:PageText Name="CrumbWords" Classes="crumb" Text="{Binding Crumb}" />
           </WrapPanel>
 
           <!-- The title: typed over to rename it -->
@@ -199,23 +203,92 @@
           <Border Classes="rule" />
 
           <!-- What's attached to it (drop files anywhere on the page) -->
-          <Panel IsVisible="{Binding $parent[UserControl].((vm:LibraryModel)DataContext).LectureFiles.ShowHeader, FallbackValue=False}" Margin="0,14,0,0" MaxWidth="680" HorizontalAlignment="Left">
+          <Panel IsVisible="{Binding $parent[UserControl].((vm:LibraryModel)DataContext).LectureFiles.ShowHeader, FallbackValue=False}" Margin="0,14,0,0" HorizontalAlignment="Stretch">
             <c:BySkin Name="LectureAttachments" Mac="{x:Type v:MacAttachments}" Win="{x:Type v:WinAttachments}"
                       DataContext="{Binding $parent[UserControl].((vm:LibraryModel)DataContext).LectureFiles}" />
           </Panel>
 
           <!-- The notes: 68 characters wide (704), 16 on 26 -->
           <StackPanel Name="NotesBody" IsVisible="{Binding ShowNotes}" MaxWidth="704" HorizontalAlignment="Left" Margin="0,18,0,0">
-            <!-- While it records: the student's own, kept as they type. A line that starts "# " becomes a heading,
-                 "- " a bullet, as the space is typed. -->
+            <!-- While it records: the student's own, kept as they type, in Markdown that shows formatted. A line that
+                 starts "# " becomes a heading, "- " a bullet, "[ ] " a checkbox, as the space is typed. -->
             <StackPanel IsVisible="{Binding Typing}" Spacing="18">
               <c:TypedEditor Name="Typed" Text="{Binding Typed}" Placeholder="Your notes" MinHeight="120" />
-              <TextBlock Name="TypedHint" Classes="notes-hint" Text="{Binding TypedHint}" />
+              <StackPanel Spacing="4">
+                <TextBlock Name="TypedHint" Classes="notes-hint" Text="{Binding TypedHint}" />
+                <TextBlock Name="FormatHint" Classes="notes-hint" FontSize="13" Text="{x:Static vm:NoteModel.FormatHint}" />
+              </StackPanel>
             </StackPanel>
             <StackPanel IsVisible="{Binding Saved}" Spacing="14">
-              <TextBlock Name="Pending" IsVisible="{Binding HasPending}" Text="{Binding Pending}" FontSize="14.5" LineHeight="22" Foreground="{DynamicResource InkMuted}" TextWrapping="Wrap" />
+              <c:PageText Name="Pending" IsVisible="{Binding HasPending}" Text="{Binding Pending}" FontSize="14.5" LineHeight="22" Foreground="{DynamicResource InkMuted}" TextWrapping="Wrap" />
               <!-- A rewrite the library couldn't do: why, over the notes it left as they were -->
-              <TextBlock Name="NotRewritten" IsVisible="{Binding WasNotRewritten}" Text="{Binding NotRewritten}" FontSize="14.5" LineHeight="22" Foreground="{DynamicResource InkMuted}" TextWrapping="Wrap" />
+              <c:PageText Name="NotRewritten" IsVisible="{Binding WasNotRewritten}" Text="{Binding NotRewritten}" FontSize="14.5" LineHeight="22" Foreground="{DynamicResource InkMuted}" TextWrapping="Wrap" />
+              <!-- Notes from an AI Study Stash doesn't run: over a lecture with none, that the Claude app (or any free
+                   chat) can write them, with Copy for your AI and Paste notes; a long lecture's copy a part at a time;
+                   and the box a chat's notes are pasted into (from here, or the notes' ⋯ menu). -->
+              <StackPanel Name="FreeAi" Spacing="12" DataContext="{Binding $parent[UserControl].((vm:LibraryModel)DataContext).FreeAi}" x:DataType="vm:FreeAiModel"
+                          IsVisible="{Binding $parent[UserControl].((vm:LibraryModel)DataContext).FreeAi, Converter={x:Static ObjectConverters.IsNotNull}}">
+                <Border Name="FreeAiOffer" Classes="free-ai" IsVisible="{Binding ShowOffer}">
+                  <StackPanel Spacing="8">
+                    <c:PageText Name="OfferLine" Classes="free-ai-lead" Text="{Binding OfferLine}" />
+                    <c:PageText Classes="free-ai-more" Text="{x:Static vm:FreeAiModel.OfferMore}" />
+                    <WrapPanel Margin="0,6,0,0">
+                      <Button Name="CopyForAi" Classes="btn sm" Margin="0,0,8,8" Command="{Binding CopyForAiCommand}" AutomationProperties.Name="Copy for your AI"
+                              ToolTip.Tip="Copies what to ask, and the transcript, for ChatGPT, Claude or Gemini on the web">
+                        <StackPanel Orientation="Horizontal" Spacing="8">
+                          <c:Icon Glyph="content_copy" Size="15" VerticalAlignment="Center" />
+                          <TextBlock Text="Copy for your AI" VerticalAlignment="Center" />
+                        </StackPanel>
+                      </Button>
+                      <Button Name="PasteNotes" Classes="btn sm" Margin="0,0,8,8" Command="{Binding PasteCommand}" AutomationProperties.Name="Paste notes"
+                              ToolTip.Tip="Paste the notes a chat wrote, and they become this lecture's notes">
+                        <StackPanel Orientation="Horizontal" Spacing="8">
+                          <c:Icon Glyph="content_paste" Size="15" VerticalAlignment="Center" />
+                          <TextBlock Text="Paste notes" VerticalAlignment="Center" />
+                        </StackPanel>
+                      </Button>
+                    </WrapPanel>
+                  </StackPanel>
+                </Border>
+                <Border Name="CopyParts" Classes="free-ai" IsVisible="{Binding HasParts}">
+                  <StackPanel Spacing="10">
+                    <c:PageText Classes="free-ai-more" Text="{Binding PartsLine}" />
+                    <ItemsControl ItemsSource="{Binding Parts}">
+                      <ItemsControl.ItemsPanel>
+                        <ItemsPanelTemplate><WrapPanel /></ItemsPanelTemplate>
+                      </ItemsControl.ItemsPanel>
+                      <ItemsControl.ItemTemplate>
+                        <DataTemplate x:DataType="vm:CopyPart">
+                          <Button Classes="btn sm" Margin="0,0,8,8" AutomationProperties.Name="{Binding Words, StringFormat='Copy {0}'}"
+                                  Command="{Binding $parent[ItemsControl].((vm:FreeAiModel)DataContext).CopyPartOfCommand, FallbackValue={x:Null}}" CommandParameter="{Binding}">
+                            <StackPanel Orientation="Horizontal" Spacing="8">
+                              <c:Icon Glyph="{Binding Glyph}" Size="15" VerticalAlignment="Center" />
+                              <TextBlock Text="{Binding Words}" VerticalAlignment="Center" />
+                            </StackPanel>
+                          </Button>
+                        </DataTemplate>
+                      </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                  </StackPanel>
+                </Border>
+                <c:PageText Name="FreeAiSaid" Classes="free-ai-more" Text="{Binding Say}" IsVisible="{Binding HasSay}" />
+                <Border Name="PastePanel" Classes="free-ai" IsVisible="{Binding Pasting}">
+                  <StackPanel Spacing="10">
+                    <TextBlock Classes="free-ai-lead" Text="Paste the notes your AI wrote" />
+                    <c:PageText Classes="free-ai-more" Text="{x:Static vm:FreeAiModel.PasteHint}" />
+                    <c:PageText Classes="free-ai-more" Text="{Binding ReplacesWords}" IsVisible="{Binding HasReplacesWords}" />
+                    <Border Classes="paste-box">
+                      <TextBox Name="PasteBox" Classes="bare paste-box" Text="{Binding PasteText}" AcceptsReturn="True" TextWrapping="Wrap"
+                               PlaceholderText="Paste here" AutomationProperties.Name="Notes to paste" />
+                    </Border>
+                    <c:PageText Classes="free-ai-problem" Text="{Binding PasteProblem}" IsVisible="{Binding HasPasteProblem}" />
+                    <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Right">
+                      <Button Name="CancelPaste" Classes="btn sm" Content="Cancel" Command="{Binding CancelPasteCommand}" />
+                      <Button Name="SavePaste" Classes="btn sm ink" Content="Save notes" Command="{Binding SavePasteCommand}" IsEnabled="{Binding CanSavePaste}" />
+                    </StackPanel>
+                  </StackPanel>
+                </Border>
+              </StackPanel>
               <Panel IsVisible="{Binding $parent[UserControl].((vm:LibraryModel)DataContext).HasNotes}">
                 <c:BySkin Name="AiNotes" Mac="{x:Type v:MacAiNotes}" Win="{x:Type v:WinAiNotes}" DataContext="{Binding $parent[UserControl].((vm:LibraryModel)DataContext).Notes}" />
               </Panel>
@@ -230,8 +303,10 @@
             </StackPanel>
           </StackPanel>
 
-          <!-- The transcript: each line's time, then what was said; while it records, what's been heard so far -->
-          <StackPanel Name="TranscriptBody" IsVisible="{Binding ShowTranscript}" MaxWidth="704" HorizontalAlignment="Left" Margin="0,18,0,0">
+          <!-- The transcript: each line's time, then what was said; while it records, what's been heard so far. One drag
+               selects from line to line, as the notes do; copied, a line taken from its start keeps its time. -->
+          <StackPanel Name="TranscriptBody" IsVisible="{Binding ShowTranscript}" MaxWidth="704" HorizontalAlignment="Left" Margin="0,18,0,0"
+                      c:TextSelection.Area="True">
             <TextBlock Name="NoTranscript" IsVisible="{Binding NoTranscript}" Text="{Binding NoTranscriptText}" FontSize="14.5" LineHeight="22" Foreground="{DynamicResource InkMuted}" TextWrapping="Wrap" />
             <ItemsControl Name="TranscriptLines" ItemsSource="{Binding Lines}">
               <ItemsControl.ItemsPanel>
@@ -244,7 +319,7 @@
                     <Grid ColumnDefinitions="Auto,*">
                       <Button Classes="heard-time num" Content="{Binding Time}" IsVisible="{Binding Time, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" Click="OnTime"
                               AutomationProperties.Name="{Binding Time}" />
-                      <SelectableTextBlock Grid.Column="1" Text="{Binding Text}" FontSize="16" LineHeight="26.4" TextWrapping="Wrap" SelectionBrush="{DynamicResource Hl}" />
+                      <c:PageText Grid.Column="1" Text="{Binding Text}" CopyLead="{Binding CopyLead}" FontSize="16" LineHeight="26.4" TextWrapping="Wrap" />
                     </Grid>
                   </Border>
                 </DataTemplate>

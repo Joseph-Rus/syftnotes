@@ -30,7 +30,8 @@ public static class EngineSetupWords
         _ => "",
     };
 
-    /// <summary>What to run to sign in.</summary>
+    /// <summary>What to run to sign in. Not Gemini: typed by hand, <c>agy</c> signs in to the student's own home, not
+    /// Study Stash's own one for it that its notes use, so its row has a Sign in button instead.</summary>
     public static string SignInCommand(string id) => id switch
     {
         "claude" => "claude",
@@ -51,9 +52,11 @@ public static class EngineSetupWords
     public static IReadOnlyList<HowToStep> Steps(string id, string state, bool windows)
     {
         string where = TerminalName(windows);
-        HowToStep SignIn() => id == "claude"
-            ? new HowToStep("Sign in: run this, then sign in with your Claude account in the browser", SignInCommand(id), Plan(id))
-            : new HowToStep("Sign in: run this and choose Sign in with ChatGPT", SignInCommand(id), Plan(id));
+        HowToStep SignIn() => id switch
+        {
+            "claude" => new HowToStep("Sign in: run this, then sign in with your Claude account in the browser", SignInCommand(id), Plan(id)),
+            _ => new HowToStep("Sign in: run this and choose Sign in with ChatGPT", SignInCommand(id), Plan(id)),
+        };
         return (id, state) switch
         {
             // The free AI has no steps to follow: its row's one button gets it ready (AiSetupModel).
@@ -62,6 +65,8 @@ public static class EngineSetupWords
                 new HowToStep($"Install it: paste this into {where}", InstallCommand(id, windows), $"Or with npm: {NpmCommand(id)}"),
                 SignIn(),
             ],
+            // Gemini signed out has no command to paste: its row's Sign in button signs in to Study Stash's own home for
+            // agy (setup's sign-in screen, or a terminal the library opens with that home).
             ("claude" or "codex", "not_signed_in") => [SignIn()],
             _ => [],
         };

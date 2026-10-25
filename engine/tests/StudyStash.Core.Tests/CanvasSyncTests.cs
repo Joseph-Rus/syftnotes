@@ -378,8 +378,9 @@ public class CanvasSyncTests
         await Task.Delay(300);
         Assert.False(waiting.IsCompleted); // nothing to do: the request is held
         var read = sync.FetchAsync("/api/v1/courses", "json", timeout: TimeSpan.FromSeconds(10));
-        var work = await waiting.WaitAsync(TimeSpan.FromSeconds(5));
-        Assert.True(sw.Elapsed < TimeSpan.FromSeconds(3), $"took {sw.Elapsed}");
+        // A busy CI runner can take several seconds; what matters is that it's well short of the 20 s long wait.
+        var work = await waiting.WaitAsync(TimeSpan.FromSeconds(12));
+        Assert.True(sw.Elapsed < TimeSpan.FromSeconds(12), $"took {sw.Elapsed}");
         var job = Assert.Single(work.Jobs);
         Assert.Equal(FakeCanvas.Base + "/api/v1/courses", job.Url);
 

@@ -76,9 +76,13 @@ never from a request, and the `device` cookie is set Secure regardless (the brow
 
 1. On a computer that's in (the app's Settings → Phone, or the library's web Settings page), **Add a phone**:
    `POST /api/v2/devices/code` (the laptop's key, or a paired phone's cookie) →
-   `{code: "042917", url: "https://mini.tail1234.ts.net:8443/app/", expires: "2026-09-28T12:10:00.0000000+00:00"}`.
-   Settings shows a QR code of `url`, the code as "042 917", and how long it has left, counting down.
-2. The phone's camera opens `url`; the web app asks `GET /api/v2/me`, sees `paired: false`, and asks for the code.
+   `{code: "042917", url: "https://mini.tail1234.ts.net:8443/app/", qrUrl: "…/app/#code=042917", expires: "…"}`.
+   Settings shows a QR code of `qrUrl` (the address ending `#code=`, so one scan pairs; a fragment never reaches the
+   server, so the code stays out of request logs), the code as "042 917" for typing, and how long it has left. `url`,
+   the address as text, carries no code, and an older phone app that reads only `url` works as before.
+2. The phone opens the address (the iPhone app's own scanner, or the camera). If it carries `#code=`, the phone pairs
+   with it at once (the web app first takes it out of the address bar); if not, or if that code is refused, the phone
+   asks for the code, with the library's words.
 3. `POST /api/v2/devices/pair {code, name}`. Right: `200 {device: {id, name, added}}` and
    `Set-Cookie: device=<secret>; max-age=34560000; path=/; secure; samesite=strict; httponly`. Wrong: `401 {error}`.
    Too many wrong codes: `429 {error}`.
@@ -203,6 +207,11 @@ and inside Mermaid labels, and check none comes out.
   scale), the code large in a monospace font, "Works for 9:41 more, once." counting down, the three steps, **Done**,
   and **New code** once it runs out. Then **Phones**: each with when it was added and last used, and **Remove**. A
   refused code (no Tailscale) shows the library's words under it.
+- **Just this computer** (the app's own library, on 127.0.0.1): Settings → Phone connects the phone through the
+  student's Google account first, with **Connect with Google**; **Add a phone** over Tailscale (an Android phone, or
+  the phone's web page) is folded under **Other ways** beneath it, closed until pressed, and works as above once open.
+  Phones added over Tailscale stay listed, under "Phones added over Tailscale". See
+  [The phone over Google Drive](phone-google.md).
 - **The library's page** (`/settings#phone`, "Your phone"): the same, server-drawn: **Add a phone** posts
   `/settings/phone`, the page after shows the QR code (an inline SVG from `Qr.Svg`), the code and a countdown; each
   phone has **Remove** (`/settings/phone/{id}/remove`).

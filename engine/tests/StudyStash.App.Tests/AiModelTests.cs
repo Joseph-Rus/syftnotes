@@ -61,7 +61,10 @@ public class AiWordsTests
         // The list names each one as a student would: what they have, or what it is. The tools' names are in the line under.
         Assert.Equal(("Free AI on this Mac", "Claude", "ChatGPT", "Gemini"),
             (AiWords.SetupName("ollama", "Ollama", "Mac"), AiWords.SetupName("claude", "Claude Code"), AiWords.SetupName("codex", "Codex"), AiWords.SetupName("gemini", "Gemini")));
-        Assert.Equal("Installed on this computer.", AiWords.SetupAbout("gemini", "unchecked"));
+        // Gemini through Google's Antigravity, or on an API key; one the student gave a key says so.
+        Assert.Equal("Through Google's Antigravity. Installed on this computer.", AiWords.SetupAbout("gemini", "unchecked"));
+        Assert.Equal("With an API key, or Google's Antigravity app. Not on this Mac yet.", AiWords.SetupAbout("gemini", "not_installed", "Mac"));
+        Assert.Equal("With your API key. It works.", AiWords.SetupAbout("claude", "ready", hasKey: true));
         Assert.Equal("With your paid Claude plan, through Claude Code. Not on this Mac yet.", AiWords.SetupAbout("claude", "not_installed", "Mac"));
         Assert.Equal("Free and private (Ollama). Study Stash downloads it for you: a few gigabytes, once.", AiWords.SetupAbout("ollama", "not_installed", "PC"));
     }
@@ -319,7 +322,8 @@ public class AiSetupModelTests
 
         await model.Load();
 
-        Assert.Equal(["ollama", "claude", "codex"], model.Engines.Select(r => r.Id));
+        // Every AI is listed, Gemini too (it can run on an API key with nothing installed).
+        Assert.Equal(["ollama", "claude", "codex", "gemini"], model.Engines.Select(r => r.Id));
         var ollama = model.Engines.Single(r => r.Id == "ollama");
         Assert.True(ollama.Advanced);
         Assert.True(ollama.Selected);
@@ -442,8 +446,8 @@ public class AiSetupModelTests
         var mac = new AiSetupModel(lib) { Windows = false };
         await mac.Load();
 
-        // Both always show, ready or not; Gemini only once it's installed.
-        Assert.Equal(["ollama", "claude", "codex"], mac.Engines.Select(r => r.Id));
+        // Every AI shows, ready or not.
+        Assert.Equal(["ollama", "claude", "codex", "gemini"], mac.Engines.Select(r => r.Id));
         var claude = mac.Engines.Single(r => r.Id == "claude");
         Assert.False(claude.CanWrite);
         Assert.Equal("With your paid Claude plan, through Claude Code. Not on this Mac yet.", claude.About);
@@ -670,14 +674,58 @@ public class AiSetupModelTests
         Assert.NotEqual("claude", model.SelectedNotes);
     }
 
+    /// <summary>An AI that's only installed is tried once before setup saves it: a signed-out one stops on the step,
+    /// saying so, where it used to pass setup and leave the notes to fail later.</summary>
+    [AvaloniaFact]
+    public async Task Setup_tries_an_ai_thats_only_installed_before_it_saves_it()
+    {
+        var lib = new FakeAiLibrary { Overview = With(("claude", "unchecked")) };
+        var model = new AiSetupModel(lib) { Windows = false, WriteNotes = _ => Task.FromResult(true) };
+        await model.Load();
+        model.Engines.Single(r => r.Id == "claude").SelectCommand.Execute(null);
+        Assert.Equal("claude", model.SelectedNotes);
+
+        lib.OnCheck = (id, _) => new AiSaid("Not logged in · Please run /login", lib.Overview = With((id, "not_signed_in")));
+        Assert.False(await model.SaveAsync());
+        Assert.Equal("Claude isn't signed in on this Mac. Sign in from its row, or pick another.", model.Say);
+        Assert.Empty(lib.DefaultsCalls);
+        // Continue again: still not saved, saying so again, and without asking Claude again (it's known signed out).
+        Assert.False(await model.SaveAsync());
+        Assert.Equal("Claude isn't signed in on this Mac. Sign in from its row, or pick another.", model.Say);
+        Assert.Empty(lib.DefaultsCalls);
+        Assert.Single(lib.Calls, c => c == "check:claude");
+
+        // A try that outlasts the app's wait for the library: Claude was slow, the library's fine.
+        lib.Overview = With(("claude", "unchecked"));
+        await model.Load();
+        lib.OnCheck = (_, _) => throw new TaskCanceledException("The request was canceled due to the configured HttpClient.Timeout of 150 seconds elapsing.");
+        Assert.False(await model.SaveAsync());
+        Assert.Equal("Claude didn't answer in time: try again, or pick another.", model.Say);
+        Assert.False(model.Offline);
+        // The library's own try gives up first, and says so.
+        Assert.All(Core.Ai.Engines.Order, id => Assert.True(Core.Ai.AiJobs.TryWithin(id) < Core.Ai.AiRemote.Waits, id));
+        lib.OnCheck = (id, _) => new AiSaid("claude didn't finish within 90 seconds.", lib.Overview = With((id, "failed")));
+        Assert.False(await model.SaveAsync());
+        Assert.Equal("Claude didn't answer in time: try again, or pick another.", model.Say);
+
+        lib.OnCheck = (id, _) => new AiSaid("Claude is ready.", lib.Overview = With((id, "ready")));
+        lib.Overview = With(("claude", "unchecked"));
+        await model.Load();
+        Assert.True(await model.SaveAsync());
+        Assert.Equal("claude", lib.DefaultsCalls[^1].Notes);
+        Assert.Equal(4, lib.Calls.Count(c => c == "check:claude"));
+    }
+
     [AvaloniaFact]
     public async Task The_notes_step_opens_on_what_the_library_does_now_and_a_first_run_picks_nothing_that_cant_write()
     {
         // The free AI's app is on this Mac without what it writes notes with, and nothing has been chosen yet.
         var lib = new FakeAiLibrary { Overview = Nothing("model_missing") };
-        var first = new AiSetupModel(lib) { Windows = false, WriteNotes = _ => Task.FromResult(true), NotesOn = () => Task.FromResult<bool?>(true), PreferFree = true };
+        var first = new AiSetupModel(lib) { Windows = false, WriteNotes = _ => Task.FromResult(true), NotesOn = () => Task.FromResult<bool?>(true), Prefer = "ollama" };
         await first.Load();
         Assert.True(first.NoAi);
+        // "I don't have a paid plan" was the answer: the step says where the free AI's button is, without pressing it.
+        Assert.Equal("To have the free AI write your notes, press “Set it up” on its row.", first.Say);
         // Its row says to press its button (which starts the download); a click alone doesn't pick it.
         var free = first.Engines.Single(r => r.Id == "ollama");
         free.SelectCommand.Execute(null);

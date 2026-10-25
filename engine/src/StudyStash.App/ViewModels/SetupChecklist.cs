@@ -16,7 +16,7 @@ public sealed record ChecklistFacts
     /// <summary>The student pressed Set up on the computer card (or setup is run again, or the library's already
     /// made or reached).</summary>
     public bool RoleChosen { get; init; }
-    /// <summary>Who writes the notes: "claude", "codex", "ollama", "none", or "" not set yet.</summary>
+    /// <summary>Who writes the notes: "claude", "codex", "gemini", "ollama", "none", or "" not set yet.</summary>
     public string NotesWriter { get; init; } = "";
     public IReadOnlySet<string> Skipped { get; init; } = new HashSet<string>();
     public bool TaskbarDone { get; init; }
@@ -56,7 +56,7 @@ public static class SetupChecklist
             new("ai", $"{AgentCli.Get(f.Ai).Brand} is ready", f.AiReady ? ChecklistState.Done : ChecklistState.Todo),
         };
 
-        string title = !chosen ? "How you'll use it" : m.IsLaptop ? "This is my laptop" : m.IsLibrary ? "This is my library" : $"Just this {device}";
+        string title = !chosen ? "Where lectures are kept" : m.IsLaptop ? SetupModel.LaptopTitle : m.IsLibrary ? SetupModel.LibraryTitle : $"Just this {device}";
         bool computerDone = chosen && (m.IsLibrary || m.LibraryOk);
         string computerDetail = !chosen ? "" : m.IsLaptop
             ? m.LibraryOk ? (m.LibraryResult ?? "").TrimEnd('.') : m.Connecting ? "Connecting…" : "Not connected yet"
@@ -100,7 +100,8 @@ public static class SetupChecklist
                 "" => "",
                 "none" => "Transcripts only for now",
                 "ollama" => "Written by Ollama",
-                var e => $"Written by {AgentCli.Get(e).Brand}",
+                // By the AI's own name: Claude, ChatGPT, Gemini.
+                var e => $"Written by {Engines.Name(e)}",
             };
             items.Add(new("notes", "Notes", f.NotesWriter.Length > 0 ? ChecklistState.Done : ChecklistState.Todo, writer));
         }

@@ -605,7 +605,7 @@ public sealed partial class LibrarySettingsModel : ObservableObject
             AddingLaptop = false;
             LaptopPassword = "";
             PasswordChanged?.Invoke(password);
-            LaptopSay = "Laptops can connect now. On your laptop, install Study Stash, choose “This is my laptop”, and enter one of the addresses below and this password.";
+            LaptopSay = "Laptops can connect now. On your laptop, install Study Stash, and in its setup open Advanced and choose “My laptop for class”. Then enter one of the addresses below and this password.";
         }
     }
 
