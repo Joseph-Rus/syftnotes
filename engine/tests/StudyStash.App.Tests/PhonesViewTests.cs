@@ -192,4 +192,56 @@ public class PhonesViewTests
             w.Close();
         }
     }
+
+    [AvaloniaTheory]
+    [InlineData(SkinKind.Mac)]
+    [InlineData(SkinKind.Win)]
+    public async Task Other_ways_opens_adding_a_phone_over_tailscale(SkinKind skin)
+    {
+        ((App)Application.Current!).UseSkin(skin);
+        var (drive, home) = await GoogleDrive(account: false);
+        using var _ = home;
+        using var __ = drive;
+        var model = new PhonesModel(() => Library(paired: false)) { Google = new PhoneGoogleModel(drive) };
+        await model.Load();
+        Control view = skin == SkinKind.Mac ? new MacPhones { DataContext = model } : new WinPhones { DataContext = model };
+        var w = new Window { Width = 760, Height = 1000, Content = view };
+        w.Show();
+        try
+        {
+            Dispatcher.UIThread.RunJobs();
+            Button? Visible(string text) => view.GetVisualDescendants().OfType<Button>()
+                .FirstOrDefault(b => b.IsEffectivelyVisible && b.GetVisualDescendants().OfType<TextBlock>().Any(t => t.Text == text));
+            // Closed: Google first, and a quiet Other ways under it that says what it's for.
+            Assert.NotNull(Visible("Connect with Google"));
+            Assert.Null(Visible("Add a phone"));
+            var other = Visible("Other ways")!;
+            Assert.Contains(view.GetVisualDescendants().OfType<TextBlock>(), t => t.Text == model.OtherWaysAbout && t.IsEffectivelyVisible);
+
+            other.Command!.Execute(null);
+            Dispatcher.UIThread.RunJobs();
+            var add = Visible("Add a phone")!;
+            Assert.Same(model.AddPhoneCommand, add.Command);
+            Assert.True(add.IsEffectivelyEnabled);
+            Assert.NotNull(Visible("Connect with Google")); // still first
+
+            // The Tailscale way as it always was: the code and its QR code, black on white.
+            await model.AddPhoneCommand.ExecuteAsync(null);
+            Dispatcher.UIThread.RunJobs();
+            Assert.Equal("042 917", view.GetVisualDescendants().OfType<SelectableTextBlock>().Single(t => t.Name == "PhoneCode").Text);
+            var card = view.GetVisualDescendants().OfType<Border>().Single(b => b.Name == "QrCard");
+            Assert.True(card.IsEffectivelyVisible);
+            Assert.Equal(Colors.White, ((ISolidColorBrush)card.Background!).Color);
+
+            // Folded away again, the code goes with it.
+            other.Command.Execute(null);
+            Dispatcher.UIThread.RunJobs();
+            Assert.False(model.Adding);
+            Assert.Null(Visible("Add a phone"));
+        }
+        finally
+        {
+            w.Close();
+        }
+    }
 }

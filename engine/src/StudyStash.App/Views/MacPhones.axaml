@@ -1,9 +1,10 @@
 <!-- Settings -> Phone, Mac: "Add a phone" (a QR code of the phone app's address beside the 6-digit code and the time
      it has left), then the phones already added, one rounded card with a Remove on each. On just this computer the
-     phone connects through the student's Google account instead (docs/phone-google.md): Connect with Google, then the
-     account, a QR code that opens the phone app with it, Disconnect, and the phones that use it; phones added over
-     Tailscale before stay listed below. Draws no outer padding — SettingsView gives the margins, as it does every
-     section's. The QR codes are always black on white: that's what a camera reads, in light and dark alike. -->
+     phone connects through the student's Google account first (docs/phone-google.md): Connect with Google, then the
+     account, a QR code that opens the phone app with it, Disconnect, and the phones that use it; adding a phone over
+     Tailscale is under "Other ways", closed until pressed, and phones added over Tailscale before stay listed below.
+     Draws no outer padding — SettingsView gives the margins, as it does every section's. The QR codes are always black
+     on white: that's what a camera reads, in light and dark alike. -->
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="using:StudyStash.App.ViewModels"
@@ -13,17 +14,6 @@
   <StackPanel Spacing="8">
     <TextBlock Classes="h" Text="Phone" />
     <TextBlock Classes="body" Text="{Binding Body}" />
-    <TextBlock Classes="say" Text="Asking your library…" IsVisible="{Binding ShowLoading}" />
-    <Border Classes="group" IsVisible="{Binding ShowProblem}">
-      <Border Classes="row">
-        <Grid ColumnDefinitions="Auto,12,*,12,Auto">
-          <c:Icon Glyph="info" Size="18" Foreground="{DynamicResource Fg2}" VerticalAlignment="Center" />
-          <TextBlock Grid.Column="2" Classes="row-title" Text="{Binding Problem}" TextWrapping="Wrap" />
-          <Button Grid.Column="4" Classes="pill" Command="{Binding LoadCommand}" IsVisible="{Binding CanRetry}" VerticalAlignment="Center"><TextBlock Text="Try again" FontSize="13" /></Button>
-        </Grid>
-      </Border>
-    </Border>
-
     <!-- Just this computer: through the student's Google account -->
     <Panel IsVisible="{Binding ViaGoogle}">
       <StackPanel Name="GooglePhone" DataContext="{Binding Google}" x:DataType="vm:PhoneGoogleModel" Spacing="8">
@@ -112,6 +102,29 @@
         <c:PageText Classes="say" Text="{Binding Say}" IsVisible="{Binding Say, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" TextWrapping="Wrap" />
       </StackPanel>
     </Panel>
+
+    <!-- Just this computer: the Tailscale way (an Android phone, or the phone's web page) folded under "Other ways",
+         closed until it's pressed -->
+    <StackPanel Spacing="2" IsVisible="{Binding ViaGoogle}" Margin="0,4,0,0">
+      <Button Name="OtherWays" Classes="text-link" FontSize="13" Command="{Binding ToggleOtherWaysCommand}" AutomationProperties.Name="Other ways">
+        <StackPanel Orientation="Horizontal" Spacing="4">
+          <c:Icon Glyph="chevron_right" Size="16" IsVisible="{Binding !OtherWays}" VerticalAlignment="Center" />
+          <c:Icon Glyph="expand_more" Size="16" IsVisible="{Binding OtherWays}" VerticalAlignment="Center" />
+          <TextBlock Text="Other ways" VerticalAlignment="Center" />
+        </StackPanel>
+      </Button>
+      <TextBlock Classes="say" Text="{Binding OtherWaysAbout}" TextWrapping="Wrap" />
+    </StackPanel>
+    <TextBlock Classes="say" Text="Asking your library…" IsVisible="{Binding ShowLoading}" />
+    <Border Classes="group" IsVisible="{Binding ShowProblem}">
+      <Border Classes="row">
+        <Grid ColumnDefinitions="Auto,12,*,12,Auto">
+          <c:Icon Glyph="info" Size="18" Foreground="{DynamicResource Fg2}" VerticalAlignment="Center" />
+          <TextBlock Grid.Column="2" Classes="row-title" Text="{Binding Problem}" TextWrapping="Wrap" />
+          <Button Grid.Column="4" Classes="pill" Command="{Binding LoadCommand}" IsVisible="{Binding CanRetry}" VerticalAlignment="Center"><TextBlock Text="Try again" FontSize="13" /></Button>
+        </Grid>
+      </Border>
+    </Border>
 
     <StackPanel IsVisible="{Binding IsReady}" Spacing="8">
       <!-- Adding one -->

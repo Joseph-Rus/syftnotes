@@ -20,8 +20,11 @@ phone through their own Google Drive instead of Tailscale. No server of ours, no
 
 **Not changed:** a laptop whose library is on another computer, and a library-only computer, keep Tailscale exactly as
 today (Settings → Phone → Add a phone, `/api/v2/devices/*`, Tailscale Serve). In just-this-computer mode, phones paired
-over Tailscale before keep working and stay listed (under "Phones added over Tailscale"), and **Add a phone** isn't
-offered there any more: Connect with Google takes its place.
+over Tailscale before keep working and stay listed (under "Phones added over Tailscale"). Connect with Google comes
+first; **Add a phone** over Tailscale is still there, folded under a quiet **Other ways** beneath it ("For an Android
+phone or the phone's web page: reach this computer over Tailscale."), closed until it's pressed. Open, it's the
+Tailscale way exactly as before: Add a phone, the 6-digit code and its QR code, and the library's words with **Open
+the page** when Tailscale is missing. Folding it away again puts a code on show away.
 
 ```
 phone (iPhone app)                     Google Drive, appDataFolder                laptop (Study Stash, just this computer)
@@ -342,10 +345,13 @@ personal Gmail on both."
   Ask is written in growing pieces at most once a second and ends `done`; Disconnect revokes, deletes the laptop's
   files and google.json, and nothing is answered or written after.
 - `PhonesViewTests`: Settings → Phone through Google in both looks and both themes (the QR card black on white, the
-  account, Disconnect asking first, the phones with Remove, the Tailscale phones below, no Add a phone), and before
-  connecting (Connect with Google, or greyed out with the words when the build has no secret).
-- `PhonesShots`: `shots/mac-settings-phone-google-{not-connected,connected,phones}-{light,dark}.png` and the `win-`
-  ones, kept (cropped to the window) in `docs/qa/2026-10-24/`. Their QR codes were decoded with macOS's CoreImage
+  account, Disconnect asking first, the phones with Remove, the Tailscale phones below, Add a phone folded away),
+  before connecting (Connect with Google, or greyed out with the words when the build has no secret), and Other ways
+  opening Add a phone over Tailscale in both looks (the code and its QR code, black on white; folded away again, the
+  code goes).
+- `PhonesShots`: `shots/mac-settings-phone-google-{not-connected,connected,phones,other-ways}-{light,dark}.png` and
+  the `win-` ones (other-ways: Other ways open with a code on show for an Android phone), kept (cropped to the window)
+  in `docs/qa/2026-10-24/`. Their QR codes were decoded with macOS's CoreImage
   detector.
 - `PhoneDriveRealCheck`: the table above, against real Drive; skipped unless `STUDYSTASH_DRIVE_CHECK_TOKEN` names a
   test account's token file (`client_id`, `client_secret`, `refresh_token`; never printed). It deletes every file with
