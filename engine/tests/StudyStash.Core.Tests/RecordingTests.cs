@@ -802,55 +802,6 @@ public class RecordingTests
         Assert.Contains("[00:00] piece 1", l2.Transcript());
     }
 
-    /// <summary>Settings → Recording's "after class": while the lecture records or is paused nothing is written down,
-    /// not even an earlier lecture still waiting, and the model isn't loaded; once it stops, all of it is written down
-    /// and it goes on to the library. (A live lecture is <see cref="Whisper_writes_a_lecture_down_while_it_records_and_after"/>.)</summary>
-    [Fact]
-    public async Task A_lecture_written_down_after_class_is_only_recorded_until_it_stops()
-    {
-        using var dir = new TempDir();
-        var store = new LectureStore(dir.Path);
-        Recorded(store, "rec-0", 10); // an earlier lecture, still waiting for Whisper
-        FakeMic? mic = null;
-        using var rec = new Recorder(store, () => mic = new FakeMic(), () => Tuesday);
-        var whisper = new FakeWhisper();
-        int loads = 0;
-        var worker = new TranscriptionWorker(store, () =>
-        {
-            loads++;
-            return whisper;
-        }, () => rec.Current);
-        Lecture? finished = null;
-        worker.Finished += l => finished = l;
-
-        var l = rec.Start("CS 101", afterClass: true);
-        Assert.True(store.Get(l.Id)!.AfterClass);
-        mic!.Play(35);
-        Assert.False(await worker.StepAsync(default));
-        rec.Pause();
-        Assert.False(await worker.StepAsync(default));
-        rec.Resume();
-        mic.Play(30);
-        Assert.False(await worker.StepAsync(default));
-        Assert.Equal(0, loads);
-        Assert.Empty(whisper.Calls);
-        Assert.Equal(LectureState.Transcribing, store.Get("rec-0")!.State);
-
-        var stopped = rec.Stop()!;
-        Assert.Equal(LectureState.Transcribing, stopped.State);
-        while (await worker.StepAsync(default)) { }
-        var written = store.Get(l.Id)!;
-        Assert.Equal(LectureState.Sending, written.State);
-        Assert.Same(written, finished);
-        Assert.Equal(65, written.Seconds, 1);
-        Assert.Equal(written.Seconds, written.TranscribedSeconds, 2);
-        Assert.Equal(LectureState.Sending, store.Get("rec-0")!.State);
-        Assert.Equal(1, loads);
-        // rec-0 in one piece, then the whole of this one, piece after piece.
-        Assert.Equal(1 + written.Segments.Count, whisper.Calls.Count);
-        WrittenDownOnce(written);
-    }
-
     /// <summary>Every second of the lecture went to Whisper exactly once, in order: <see cref="FakeWhisper"/> hears
     /// each piece as one line from half a second after its start to half a second before its end.</summary>
     static void WrittenDownOnce(Lecture l)

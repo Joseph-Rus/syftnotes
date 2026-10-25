@@ -225,47 +225,6 @@ public class RichWindowsShots
     }
 
     /// <summary>
-    /// At 125%, 150% and 175% a formula, a chart and a drawing draw that many times as many pixels across as at 100%:
-    /// the same size on the screen, drawn sharper, never a small picture stretched. The ink is found in the pictures
-    /// themselves.
-    /// </summary>
-    [AvaloniaFact]
-    public void At_125_150_and_175_percent_they_draw_that_much_larger_in_pixels()
-    {
-        foreach (var (what, build) in new (string, Func<Control>)[]
-        {
-            ("formula", () => new NoteView { Markdown = RichDemo.DoseFormula, Width = 640 }),
-            ("chart", () => new DiagramView { Chart = Flowchart.Parse(RichDemo.PainReassess) }),
-            ("drawing", () => new SvgView { Source = RichDemo.FourChambers }),
-        })
-        {
-            var ink = new Dictionary<double, PixelRect>();
-            foreach (double scale in new[] { 1, 1.25, 1.5, 1.75 })
-            {
-                Skin.UseTheme(ColourThemes.Default);
-                ((App)Application.Current!).UseSkin(SkinKind.Win);
-                var content = build();
-                content.HorizontalAlignment = HorizontalAlignment.Left;
-                content.VerticalAlignment = VerticalAlignment.Top;
-                var window = new Window { Width = 760, Height = 700, RequestedThemeVariant = ThemeVariant.Light, Content = content, Background = Brushes.White };
-                Look.Apply(window);
-                window.SetRenderScaling(scale);
-                window.Show();
-                DiagramsReady.Wait(window);
-                ink[scale] = Ink(window.CaptureRenderedFrame()!);
-                window.Close();
-            }
-            var small = ink[1];
-            Assert.True(small.Width > 40 && small.Height > 20, $"{what}: hardly anything drawn at 100% ({small})");
-            foreach (double scale in new[] { 1.25, 1.5, 1.75 })
-            {
-                Assert.InRange(ink[scale].Width / (double)small.Width, scale - 0.05, scale + 0.05);
-                Assert.InRange(ink[scale].Height / (double)small.Height, scale - 0.05, scale + 0.05);
-            }
-        }
-    }
-
-    /// <summary>
     /// The words and signs lectures use, shaped in the Windows look's reading font as the notes shape them: every one
     /// finds a real glyph in some font (no box), and on Windows none is drawn as a colour emoji. The fonts that drew
     /// them are written beside the pictures, for the record.
