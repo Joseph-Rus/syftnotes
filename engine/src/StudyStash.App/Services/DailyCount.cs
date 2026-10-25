@@ -15,8 +15,21 @@ public sealed class DailyCount
 {
     const string Endpoint = "https://firestore.googleapis.com/v1/projects/study-stash-app/databases/(default)/documents/pings";
 
-    /// <summary>For tests: the real endpoint is never asked.</summary>
-    public static bool Off { get; set; }
+    /// <summary>Never counted: the app trying itself (STUDYSTASH_SELFTEST, as CI's self-tests run the real app on every
+    /// merge and release), anything under CI, a Debug build (lanes, a developer's copies), and tests. Only students'
+    /// copies count.</summary>
+    public static bool Off { get; set; } = CountsNothing();
+
+    static bool CountsNothing()
+    {
+#if DEBUG
+        return true;
+#else
+        return Environment.GetEnvironmentVariable("STUDYSTASH_SELFTEST") is { Length: > 0 }
+            || Environment.GetEnvironmentVariable("CI") is { Length: > 0 }
+            || Environment.GetEnvironmentVariable("GITHUB_ACTIONS") is { Length: > 0 };
+#endif
+    }
 
     public static readonly TimeSpan First = TimeSpan.FromMinutes(1);
     public static readonly TimeSpan Every = TimeSpan.FromHours(3);

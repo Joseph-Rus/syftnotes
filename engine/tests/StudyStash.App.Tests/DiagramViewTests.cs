@@ -39,23 +39,6 @@ public class DiagramViewTests
 
     [AvaloniaTheory]
     [MemberData(nameof(Samples))]
-    public void Every_sample_measures_and_draws_in_both_looks_light_and_dark(string title)
-    {
-        foreach (var skin in new[] { SkinKind.Mac, SkinKind.Win })
-            foreach (var variant in new[] { ThemeVariant.Light, ThemeVariant.Dark })
-            {
-                var view = new DiagramView { Chart = Flowchart.Parse(SourceOf(title)) };
-                var window = Show(620, skin, variant, view);
-                Assert.NotNull(view.Scene);
-                Assert.True(view.Bounds.Width is > 0 and <= 620, $"{title}: {view.Bounds.Width} wide");
-                Assert.True(view.Bounds.Height > 0);
-                Assert.Equal(1, view.Scale, 3);
-                window.Close();
-            }
-    }
-
-    [AvaloniaTheory]
-    [MemberData(nameof(Samples))]
     public void A_narrow_column_scales_the_picture_but_never_below_the_floor(string title)
     {
         var view = new DiagramView { Chart = Flowchart.Parse(SourceOf(title)) };

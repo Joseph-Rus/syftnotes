@@ -46,8 +46,9 @@ stage_dmg() {
   hdi create -volname "$volname" -srcfolder "$stage" -ov -format UDRW "$rw"
   if hdiutil attach -quiet -nobrowse -mountpoint "$mnt" "$rw"; then
     SetFile -a C "$mnt" 2>/dev/null || true
-    # A volume something is still looking at won't let go: asked three times, then made to.
-    hdi detach "$mnt" || hdiutil detach -force "$mnt"
+    # A volume something is still looking at won't let go: asked three times, then made to. One that's no longer
+    # mounted is done ("No such file or directory": CI's runner sometimes lets go of it by itself, 0.18.5's run).
+    hdi detach "$mnt" || hdiutil detach -force "$mnt" || ! mount | grep -qF " on $mnt ("
   fi
   rm -f "$dmg"
   hdi convert "$rw" -format UDZO -ov -o "$dmg"

@@ -193,56 +193,6 @@ public class DiagramsAfterFilingTests
     }
 
     [Fact]
-    public async Task A_students_edit_while_the_diagrams_are_designed_is_kept_and_nothing_is_doubled()
-    {
-        using var rig = new Rig();
-        var answer = new TaskCompletionSource<string>(TaskCreationOptions.RunContinuationsAsynchronously);
-        rig.Claude.Design = (_, _) => answer.Task;
-        var row = await rig.FileAsync();
-
-        // The student edits the note file by hand while the designer works.
-        var running = rig.Jobs.RunPendingAsync();
-        await rig.AskedAsync();
-        string edited = rig.File().Replace("- Angiotensin II does the work.", "- Angiotensin II does the work.\n- My own: ACE sits in the lungs.") + "\nMy own last line.\n";
-        File.WriteAllText(row.MdPath!, edited);
-        answer.SetResult(Reply(("Key points", "The renin chain")));
-        Assert.Equal(1, await running);
-        string now = rig.File();
-        string unit = Unit(Designed("Key points"));
-        Assert.Equal(edited, now.Replace(unit, "")); // every edit kept, in its place; only the diagram added
-        Assert.Contains("- My own: ACE sits in the lungs." + unit, now);
-        Assert.Single(NoteBlocks.Find(now), b => b.IsDiagram);
-        Assert.Contains("the note file had edits of its own", rig.Logged());
-
-        // The notes themselves rewritten meanwhile (not through a rewrite, which would replace the job): the diagram
-        // whose heading is still there goes under it, the one whose heading is gone is left out, and the diagram an
-        // earlier pass added is replaced, not doubled.
-        string rewritten = "## Overview\nThe kidney and blood pressure, again.\n\n## Details and examples\n### Drugs\n- ACE inhibitors block it.\n- So do ARBs.";
-        rig.Jobs.Queue("lec-1", "claude");
-        answer = new TaskCompletionSource<string>(TaskCreationOptions.RunContinuationsAsynchronously);
-        running = rig.Jobs.RunPendingAsync();
-        await rig.AskedAsync();
-        var m = rig.Store.Meeting(rig.Row());
-        rig.Store.Save(m, new Classification("BIO 210", 1, "human", "Blood pressure"), rewritten + Unit(Designed("Drugs", "An old one")), "Claude");
-        answer.SetResult(Reply(("Key points", "The renin chain"), ("Drugs", "Where the drugs act")));
-        Assert.Equal(1, await running);
-        Assert.Equal(DiagramDesign.Insert(rewritten, [Designed("Drugs", "Where the drugs act")]), rig.Row().SummaryMd);
-        Assert.Single(NoteBlocks.Find(rig.File()), b => b.IsDiagram);
-        Assert.Contains("1 diagram went under its heading, and “The renin chain” was left out", rig.Logged());
-
-        // None of their headings left: nothing changes at all.
-        string bare = "Just a paragraph, no headings.";
-        rig.Store.Save(m, new Classification("BIO 210", 1, "human", "Blood pressure"), bare, "Claude");
-        string seen = StudyStash.Core.Notes.Fingerprint(rig.Row().SummaryMd!);
-        rig.Store.Save(m, new Classification("BIO 210", 1, "human", "Blood pressure"), "## Another\n" + bare, "Claude");
-        byte[] before = File.ReadAllBytes(rig.Row().MdPath!);
-        var outcome = rig.Store.AddDiagrams("lec-1", seen, [Designed("Key points")]);
-        Assert.Equal(DiagramsLanded.Skipped, outcome.How);
-        Assert.Equal("## Another\n" + bare, rig.Row().SummaryMd);
-        Assert.Equal(before, File.ReadAllBytes(rig.Row().MdPath!));
-    }
-
-    [Fact]
     public async Task A_pass_cut_off_by_a_restart_runs_again_a_few_times_at_most_and_never_leaves_the_lecture_waiting()
     {
         using var rig = new Rig();

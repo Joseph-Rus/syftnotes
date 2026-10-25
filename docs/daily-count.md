@@ -29,6 +29,12 @@ Anyone may *create* `pings/<code>_<day>` holding exactly `d`, `v` and `p`, where
 at most 20 characters, and `p` is mac, windows or linux. Nobody outside the project can read, list, change or delete
 them. A copy can't be counted twice on one day: the second create is a 409.
 
+## Never counted
+
+The app trying itself (`STUDYSTASH_SELFTEST`: CI's self-tests run the real app on every merge and release, and
+counted themselves until 0.18.5), anything under CI (`CI`, `GITHUB_ACTIONS`), Debug builds (lanes, a developer's
+copies) and the tests. Only students' copies count.
+
 ## Turning it off
 
 Settings → General → **Count this copy** (on by default). Off: nothing is sent, and `count-code` is deleted, so turning

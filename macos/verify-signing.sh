@@ -22,12 +22,27 @@ for arg; do
 done
 fail() { echo "verify-signing.sh: $*" >&2; exit 1; }
 # stapler validate asks Apple's ticket service (CloudKit) online, and a CI runner's connection to it sometimes drops
-# ("The network connection was lost", error 68): tried three times, 20 seconds apart, before it counts as a failure.
+# ("The network connection was lost", error 68), once for minutes (0.18.5's Intel run): tried six times, waiting
+# longer each time (about 4 minutes in all). If Apple still can't be reached, Gatekeeper's own assessment decides,
+# offline: it reads the ticket stapled inside, and only a stapled, notarized file says "Notarized Developer ID".
 staple_ok() {
-  for try in 1 2 3; do
-    if xcrun stapler validate "$1"; then return 0; fi
-    [ "$try" = 3 ] || { echo "verify-signing.sh: stapler validate didn't answer for $1; trying again in 20 seconds" >&2; sleep 20; }
+  last=""
+  for try in 1 2 3 4 5 6; do
+    if last=$(xcrun stapler validate "$1" 2>&1); then echo "$last"; return 0; fi
+    echo "$last" >&2
+    case "$last" in
+      *"connection was lost"*|*NSURLErrorDomain*|*"could not be reached"*|*CloudKit*) ;;
+      *) break ;;  # a real answer (no ticket), not the network: don't wait for it to change
+    esac
+    [ "$try" = 6 ] || { echo "verify-signing.sh: Apple's ticket service didn't answer for $1; trying again in $((try * 15)) seconds" >&2; sleep $((try * 15)); }
   done
+  case "$last" in
+    *"connection was lost"*|*NSURLErrorDomain*|*"could not be reached"*|*CloudKit*)
+      echo "verify-signing.sh: Apple couldn't be reached; Gatekeeper checks the stapled ticket offline instead" >&2
+      if spctl -a -vvv -t open --context context:primary-signature "$1" 2>&1 | tee /dev/stderr | grep -q "Notarized Developer ID"; then
+        return 0
+      fi ;;
+  esac
   fail "the notarization ticket isn't stapled to $1 (or Apple couldn't be reached to check it)"
 }
 
