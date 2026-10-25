@@ -22,6 +22,19 @@
     <EmbeddedResource Include="Rich/PartsLibrary.xml" LogicalName="StudyStash.Core.Rich.PartsLibrary.xml" />
   </ItemGroup>
 
+  <!-- The laptop's Google sign-in secret (the Desktop client of docs/phone-google.md), built in for GoogleClient.Secret.
+       Never in the repo: CI passes the repository secret GOOGLE_DESKTOP_CLIENT_SECRET as an environment variable, and a
+       build on a computer of our own can read it from engine/google-desktop-client-secret.txt (git-ignored). Without
+       either the app builds as usual, and Connect with Google says this copy can't connect. -->
+  <PropertyGroup>
+    <GoogleSecretFile>$(MSBuildThisFileDirectory)../../google-desktop-client-secret.txt</GoogleSecretFile>
+    <GoogleDesktopClientSecret Condition="'$(GOOGLE_DESKTOP_CLIENT_SECRET)' != ''">$(GOOGLE_DESKTOP_CLIENT_SECRET)</GoogleDesktopClientSecret>
+    <GoogleDesktopClientSecret Condition="'$(GoogleDesktopClientSecret)' == '' and Exists('$(GoogleSecretFile)')">$([System.IO.File]::ReadAllText('$(GoogleSecretFile)').Trim())</GoogleDesktopClientSecret>
+  </PropertyGroup>
+  <ItemGroup Condition="'$(GoogleDesktopClientSecret)' != ''">
+    <AssemblyMetadata Include="GoogleDesktopClientSecret" Value="$(GoogleDesktopClientSecret)" />
+  </ItemGroup>
+
   <ItemGroup>
     <InternalsVisibleTo Include="StudyStash.Core.Tests" />
   </ItemGroup>

@@ -2,6 +2,8 @@
 *.db-*
 tokens.json
 oauth_client.json
+# the laptop's Google sign-in secret, read by StudyStash.Core.csproj (docs/phone-google.md); CI uses a repository secret
+engine/google-desktop-client-secret.txt
 .claude/settings.local.json
 build/
 
