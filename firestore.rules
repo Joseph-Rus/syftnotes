@@ -1,0 +1,15 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // The laptop app's daily count (docs/daily-count.md): one record a day per copy, named "<its random code>_<day>",
+    // holding only the day, the app's version and the computer kind. Anyone may add one; nobody outside may read,
+    // change or delete them (they're counted with the project owner's own access).
+    match /pings/{id} {
+      allow create: if id.matches('^[0-9a-f]{32}_[0-9]{4}-[0-9]{2}-[0-9]{2}$')
+        && request.resource.data.keys().hasOnly(['d', 'v', 'p'])
+        && request.resource.data.d is string && id.split('_')[1] == request.resource.data.d
+        && request.resource.data.v is string && request.resource.data.v.size() <= 20
+        && request.resource.data.p in ['mac', 'windows', 'linux'];
+    }
+  }
+}

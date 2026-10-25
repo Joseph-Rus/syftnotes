@@ -10,7 +10,7 @@
 <meta property="og:type" content="article">
 <meta property="og:site_name" content="Study Stash">
 <meta property="og:title" content="Study Stash privacy policy">
-<meta property="og:description" content="Everything stays on your own computers. No accounts, no servers, no analytics.">
+<meta property="og:description" content="Everything stays on your own computers. No accounts, no servers, no tracking: one anonymous daily count.">
 <link rel="icon" type="image/png" href="../assets/favicon.png">
 <link rel="apple-touch-icon" href="../assets/apple-touch-icon.png">
 <link rel="stylesheet" href="../assets/site.css?v=3">
@@ -39,7 +39,7 @@
       <p class="kicker">Privacy policy</p>
       <h1>Everything stays on your own computers.</h1>
       <p class="lede">Study Stash is an app you run yourself, not a service. There's no Study Stash account, no Study
-        Stash server and no analytics. This page says exactly what the app reads, where it keeps it, and how to take it
+        Stash server and no tracking: only one anonymous count a day (below). This page says exactly what the app reads, where it keeps it, and how to take it
         back.</p>
       <p class="updated">Last updated 25 October 2026</p>
       <ul class="toc" aria-label="On this page">
@@ -63,8 +63,7 @@
           make Study Stash, and we have no way to see it.</li>
         <li><strong>The audio never leaves the computer that recorded it.</strong> It's transcribed on that computer,
           by Whisper, NVIDIA Parakeet or Cactus Whistle, depending on the computer and the model you choose.</li>
-        <li><strong>No analytics, tracking, advertising or crash reporting.</strong> The app has no code that reports
-          on you, and this website has no cookies, trackers or third-party scripts.</li>
+        <li><strong>No tracking, advertising or crash reporting.</strong> The app has no code that reports what you do, what you record or what's in your notes. The one thing it sends is a daily count, described under <a href="#network">What the app contacts</a>, which you can turn off.</li>
         <li><strong>Calendars and Canvas are read-only</strong> and reached with your own sign-in. What Study Stash reads
           goes only to your own library, and you can revoke it at any time.</li>
         <li><strong>The AI that writes your notes is the one you choose.</strong> With Ollama, nothing leaves your
@@ -251,9 +250,14 @@
           the KaTeX maths typesetter from it.</li>
         <li><strong>Cloudflare's public DNS</strong>, only when you check whether claude.ai can reach your library, to
           look your library's address up the way the internet would.</li>
+        <li><strong>Study Stash's daily count</strong>, kept in Google's Firestore in Study Stash's own project: once a
+          day, the computer app sends one record with a random code made for this copy of the app (not linked to you,
+          your accounts or your computer's name), the day, the app's version and whether it's a Mac or a PC. That's
+          all it holds, and nothing outside the project can read it. It tells us how many copies are in use. Turn it
+          off in <strong>Settings → General → Count this copy</strong>.</li>
       </ul>
       <p>None of these requests include your notes, recordings, calendar or Canvas data, and none identify you beyond
-        what any web request does (your IP address).</p>
+        what any web request does (your IP address). The daily count doesn't keep your IP address.</p>
       <p><strong>Granola</strong> is contacted only if you connect it in <strong>Settings → Granola</strong>, to bring
         over lectures you recorded there. You sign in on Granola's own page in your browser, so Study Stash never sees
         your Granola password. It then looks at your lectures in Granola every few minutes, through Granola's own
