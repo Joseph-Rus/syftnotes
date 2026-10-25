@@ -424,3 +424,66 @@ short:
 - An attachment's JSON gains `taken`, `at` (seconds from the lecture's start, worked out by the library once the lecture is there, else `null`) and `kind`.
 - Notes writing gives the photos to the AI as images (Claude Code: files copied into its working folder and named in the prompt; Codex: `--image`);
   Gemini and Ollama get each photo's OCR text. A note may embed `![Whiteboard at 12:34](attachment:<id>)`; every renderer shows only that lecture's own pictures.
+
+## The iPhone side, as built (`ios/StudyStash/Drive/`)
+
+- `GoogleSignIn.swift`: Continue with Google through `ASWebAuthenticationSession` (SwiftUI's `webAuthenticationSession`),
+  PKCE S256, `login_hint` when the QR code named an account (else `prompt=select_account`), no secret, no Google SDK.
+  The client is the build setting `GOOGLE_IOS_CLIENT_ID` (Info.plist `GoogleClientID`) and its reversed form
+  `GOOGLE_IOS_URL_SCHEME` (a URL type); both are placeholders (`…-replace-me`) until the iOS client exists, and while
+  they are, Continue with Google says "Continue with Google isn't set up in this copy of Study Stash yet." The account
+  (email from the id_token, the refresh token) is one Keychain item, after-first-unlock, this device only; the widgets
+  don't need it. A reply without the `drive.appdata` scope (the Drive box unticked on Google's page) is refused in
+  words; `admin_policy_enforced` / `org_internal` get the school words. Sign out (Settings) deletes the phone's box,
+  uploads and answer files from the folder, revokes the token and forgets the copy; recordings not sent stay.
+- `DriveFiles.swift`: the folder through Drive's REST v3. Files over 4 MB go up resumable (one PUT).
+- `DriveLink.swift` (an actor): the copy, the box, requests and answers. `DriveLibrary.swift`: the `URLProtocol` for
+  `drive.studystash.app`, on the app's session next to `DemoLibrary`, so `APIClient` and every screen are unchanged.
+  An attachment opens through that session (`ClassView` downloads `/attachments/<id>/raw`, then Quick Look shows the
+  file on the phone), so it goes the same way: a request, the laptop's `blob-` file, kept on the phone after.
+- The copy is kept in the app group container (`drive/`, `drive-<prefix>/` for a test space): `laptop.json` as last
+  read, each copied body under the same 16-hex name, an index of their shas. A read whose key the laptop lists but the
+  phone hasn't fetched yet (the first copy still coming, or changed since) is fetched by id on the spot, one trip, not
+  asked of the laptop. Keys are matched decoded (the laptop escapes ids in paths; the phone sends them escaped too).
+- The library's own rules for what the phone filters itself (`LibraryReader.Lectures`, `Store.ListAttachments`):
+  - `GET /lectures`: from the one key `GET /lectures?limit=…`; `class` is an exact match on each lecture's `class`
+    ("Unsorted" too); `before` keeps lectures whose `date` sorts before it as text (ordinal); `limit` is 50 when not
+    given, held to 1…500; the list's order (newest first, then title) is kept.
+  - `GET /attachments`: from `GET /attachments`; with `lecture`, the ones whose `lecture` is it (`class` then ignored);
+    else with `class`, the ones whose `class` is it; else all; the list's order kept. (The library also says
+    `rewrite` for one lecture's list; the phone doesn't read it, so the filtered answer leaves it out.)
+  - `GET /me` is the phone's own: `{"paired": <laptop.json is in the folder>, "library": {"name", "version"}}`.
+- Requests: the answer file first, then the `upload-` file, then the box (one writer at a time). The request is kept
+  on the phone (with an upload's bytes) from the moment it's made, so a write survives the app closing and is sent
+  when it can be. A multipart upload with several files becomes one request a file (the box carries one file a
+  request); their answers' `attachments` are put together. `POST /ai/warm` also makes the spare answer file; the next
+  Ask or chat uses it (within an hour), so asking is one write.
+- Giving up, as above, plus: with no internet the screen hears "This phone isn't online…" at once (a write is kept);
+  with no laptop in the folder a read hears "Your laptop isn't connected to Google yet…" at once; a streamed answer
+  that stops changing for 2 minutes is given up. A write the laptop does after its screen stopped waiting is kept as
+  done (the last 50, by method, path and body): sending the same again answers from it instead of asking twice (a
+  recording's Send again, RecordingStore's resend). A write already waiting that the laptop hasn't done is joined and
+  given up on after one look, not another 25 s.
+- While the app is in front: the copy every 10 s, the box every 60 s (`open_until` 90 s ahead), writes no screen waits
+  for looked at every 3 s. To the back: `open_until` now. The system's app refresh (`app.studystash.ios.refresh`, the
+  same task as the reminders) reads the copy, sends what's waiting and looks at it. Once a day the phone deletes
+  `upload-` files older than a day that no request of its own points at.
+- Setup: Welcome is Continue with Google (ink), "Use the same Google account as on your laptop.", Scan the code on
+  your laptop, and Other ways (Connect over Tailscale; Try it with sample classes). The scanner (and the Camera app,
+  through the `studystash://` scheme) takes `studystash://google?account=<email>` as well as a library's address.
+  Signed in with no laptop in the folder: "Now connect your laptop", which looks every 3 s and goes on by itself to
+  What it's for / You're in. Settings shows the phone, Google Drive and the laptop, the account, "Your laptop was last
+  here 3 hours ago." when `seen` is over 3 minutes old, what's on its way, and Sign out of Google.
+- The laptop lane's changes (below), on the phone: (1) the filters are exactly those rules (`class`/`lecture` trimmed);
+  (2) a phone that finds its id in `removed` stops, signs out of Google (which forgets its id, so the next sign-in is a
+  new box) and Welcome says "Your laptop removed this phone. Sign in again to use it."; (3) a copy that hashes ahead
+  of laptop.json is kept, and fetched again only until laptop.json agrees; (4) the QR link as given, `space` taken by
+  debug builds only; (5) a body that's a JSON string with a non-JSON `type` is handed on as its text, an Ask/chat
+  answered with `body` (no `lines`) is a plain answer; (6) `phone.name` is `UIDevice.current.name`, which iOS gives as
+  "iPhone"/"iPad" (no entitlement for the owner's name); (7) a request in a new box's first minute can give up before
+  the laptop finds the box (a write stays waiting); (8) a waiting write whose answer file is gone (the laptop
+  disconnected) gets a new answer file and is sent again; (9) the box keeps requests in the order asked, and a
+  multi-file upload puts all its files in the box at once, in order; one not answered leaves the rest waiting.
+- Debug builds only: `-drive-token-file <path>` (JSON with `client_id`, `client_secret`, `token_uri`,
+  `refresh_token`; refreshed with those, never put in the Keychain or revoked) and `-drive-space <prefix>`; a test
+  laptop's QR code's `&space=<prefix>` does the same as `-drive-space`.
