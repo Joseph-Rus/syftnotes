@@ -784,7 +784,8 @@ public sealed class AiJobs(string home, Func<string>? ollamaHost = null)
                 }
             };
             var answer = await reader.AskAsync(request.Question, request.Lecture, request.Class, request.Live,
-                request.LiveTitle is { Length: > 0 } t ? t : "This lecture", AskWith(who, model, timer.Token, written, said => note = said), earlier);
+                request.LiveTitle is { Length: > 0 } t ? t : "This lecture", AskWith(who, model, timer.Token, written, said => note = said), earlier,
+                request.Agenda);
             Record(who, true, "");
             if (answer["remembered"] is JsonValue rv && rv.TryGetValue(out int n)) remembered = n;
             return answer;

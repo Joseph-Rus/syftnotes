@@ -325,6 +325,7 @@ public sealed partial class LibraryWeb
             {
                 Lecture = Str(body, "lecture"), Class = Str(body, "class"), Engine = Str(body, "engine"),
                 Live = Str(body, "live"), LiveTitle = Str(body, "live_title"), History = AskHistory(body?["history"]),
+                Agenda = AskAgenda(Str(body, "class")),
             };
             // A kept chat: the turns before this one come from it, and this one is kept in it. One turn at a time: a
             // question in a chat that's still answering one (asked on another device) waits its turn.
