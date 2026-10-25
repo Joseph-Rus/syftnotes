@@ -383,7 +383,8 @@
     <Setter Property="Height" Value="24" />
   </Style>
 
-  <!-- The sidebar's rows. The chosen one is a white chip with a hairline round it and bold words. -->
+  <!-- The sidebar's rows. The chosen one is a white chip with a hairline round it and bold words. The hairline is a
+       border inside the row: a ring outside it was cut off by the row itself and by the list it scrolls in. -->
   <Style Selector="Button.nav-item">
     <Setter Property="Theme" Value="{StaticResource Surface}" />
     <Setter Property="Height" Value="34" />
@@ -406,9 +407,8 @@
     <Setter Property="Background" Value="{DynamicResource Surface}" />
     <Setter Property="Foreground" Value="{DynamicResource Ink}" />
     <Setter Property="FontWeight" Value="Bold" />
-  </Style>
-  <Style Selector="Button.nav-item.selected /template/ Border#PART_Bg">
-    <Setter Property="BoxShadow" Value="{DynamicResource LineRing}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource Line}" />
+    <Setter Property="BorderThickness" Value="1" />
   </Style>
   <!-- A count beside a row: plain grey figures, no badge behind them. -->
   <Style Selector="TextBlock.count">
@@ -712,20 +712,20 @@
     <Setter Property="Height" Value="1" />
     <Setter Property="Background" Value="{DynamicResource Line}" />
   </Style>
-  <!-- A quiet button with words (Open in Canvas): white, a hairline round it, the control's corners. -->
+  <!-- A quiet button with words (Open in Canvas): white, a hairline round it, the control's corners. The hairline is a
+       border inside it: the page's toolbar cut off a ring round it. -->
   <Style Selector="Button.plain">
     <Setter Property="Theme" Value="{StaticResource Surface}" />
     <Setter Property="Height" Value="34" />
     <Setter Property="Padding" Value="12,0" />
     <Setter Property="CornerRadius" Value="{DynamicResource RadiusControl}" />
     <Setter Property="Background" Value="{DynamicResource Surface}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource Line}" />
+    <Setter Property="BorderThickness" Value="1" />
     <Setter Property="Foreground" Value="{DynamicResource Ink}" />
     <Setter Property="FontSize" Value="14" />
     <Setter Property="FontWeight" Value="Bold" />
     <Setter Property="ClipToBounds" Value="False" />
-  </Style>
-  <Style Selector="Button.plain /template/ Border#PART_Bg">
-    <Setter Property="BoxShadow" Value="{DynamicResource LineRing}" />
   </Style>
 
   <!-- Ask: docked at the foot of the page, floating on its shadow; with the caret in it, ringed in ink. -->

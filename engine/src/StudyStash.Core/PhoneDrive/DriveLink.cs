@@ -90,6 +90,16 @@ public sealed partial class DriveLink
     readonly HashSet<string> answeredSet = new(StringComparer.Ordinal);
     readonly HashSet<string> removed = new(StringComparer.Ordinal);
     readonly HashSet<string> doing = new(StringComparer.Ordinal);
+    /// <summary>Streamed answers being written now, by request id: the phone's Stop takes the request out of its box,
+    /// and the laptop stops answering once it's been missing from two reads in a row (one stale read isn't enough).</summary>
+    readonly Dictionary<string, Streaming> streams = new(StringComparer.Ordinal);
+
+    sealed class Streaming(string phone, CancellationTokenSource stop)
+    {
+        public string Phone { get; } = phone;
+        public CancellationTokenSource Stop { get; } = stop;
+        public int Missing { get; set; }
+    }
     readonly Dictionary<string, DateTimeOffset> notBefore = new(StringComparer.Ordinal);
     readonly Dictionary<string, Box> boxes = new(StringComparer.Ordinal);
     /// <summary>Files found in the folder at the start, by name: copies and blobs this laptop wrote before.</summary>

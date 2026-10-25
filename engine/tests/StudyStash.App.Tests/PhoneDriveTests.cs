@@ -4,6 +4,7 @@ using System.Text.Json.Nodes;
 using StudyStash.App.Services;
 using StudyStash.Core;
 using StudyStash.Core.Ai;
+using StudyStash.Core.Canvas;
 using StudyStash.Core.PhoneDrive;
 using StudyStash.Core.Tests;
 
@@ -75,6 +76,9 @@ public class PhoneDriveTests
             phone.Ask("GET", "http://127.0.0.1/api/v2/settings"),
         };
         string allowed = phone.Ask("GET", "/library");
+        // A chat renamed, or brought back after Delete's undo, from the phone.
+        Assert.NotNull(PhoneCalls.Check("POST", "/chats/c-1"));
+        Assert.NotNull(PhoneCalls.Check("POST", "/chats/c-1/restore"));
 
         foreach (string r in refused)
         {
@@ -87,6 +91,32 @@ public class PhoneDriveTests
         Assert.NotNull(library["body"]!["classes"]);
         // Nothing reached the library's settings: its password is the one it had.
         Assert.NotNull(await rig.RawAsync("/api/v2/settings"));
+        stop.Cancel();
+        await running;
+    }
+
+    [Fact]
+    public async Task The_due_tab_sees_canvas_and_asks_it_to_sync_but_cant_change_where_it_is()
+    {
+        await using var rig = await LibraryRig.StartAsync();
+        CanvasSettings.Update(rig.Home, s => s.Url = "https://school.example.edu");
+        var drive = new FakeDrive();
+        var link = Link(drive, rig);
+        using var stop = new CancellationTokenSource();
+        var running = link.RunAsync(stop.Token);
+        var phone = new FakePhone(drive);
+
+        var state = await phone.DoneAsync(phone.Ask("GET", "/canvas/state"));
+        Assert.Equal(200, (int)state["status"]!);
+        var sync = await phone.DoneAsync(phone.Ask("POST", "/canvas", new JsonObject
+        {
+            ["sync"] = true, ["url"] = "https://elsewhere.example.com", ["courses"] = new JsonObject { ["CS 101"] = 999 },
+        }));
+        Assert.NotEqual(403, (int)sync["status"]!);
+        // Only "sync now" reached the library: Canvas is where it was, and no course was linked.
+        var after = CanvasSettings.Load(rig.Home);
+        Assert.Equal("https://school.example.edu", after.Url);
+        Assert.Empty(after.Courses);
         stop.Cancel();
         await running;
     }
@@ -285,6 +315,47 @@ public class PhoneDriveTests
         Assert.True(times.Zip(times.Skip(1)).Take(partial.Count - 1).All(t => t.Second - t.First >= TimeSpan.FromMilliseconds(950)),
             string.Join(", ", times.Zip(times.Skip(1)).Select(t => (t.Second - t.First).TotalMilliseconds)));
         Assert.True(writes[^1]["done"]!.GetValue<bool>());
+        stop.Cancel();
+        await running;
+    }
+
+    [Fact]
+    public async Task Stop_on_the_phone_stops_the_answer_on_the_laptop()
+    {
+        using var dir = new TempDir();
+        var claude = new ScriptedAi("claude", "Claude")
+        {
+            Script =
+            [
+                new AiEvent("text", "{\"answer\": \"Recursion is"), .. Enumerable.Range(0, 14).Select(_ => new AiEvent("text", " a function calling itself,")),
+                new AiEvent("text", " to stop.\", \"sources\": []}"),
+            ],
+            Pause = TimeSpan.FromMilliseconds(700),
+        };
+        var ai = new AiJobs(dir.Path) { Providers = id => id == "claude" ? claude : new ScriptedAi(id), Checks = new FakeChecks().Installed("claude").Build() };
+        await using var rig = await LibraryRig.StartAsync(ai);
+        var drive = new FakeDrive();
+        var said = new List<string>();
+        using var stop = new CancellationTokenSource();
+        var link = new DriveLink(drive, new LibraryCalls(() => (rig.Url, LibraryRig.Password)), () => ("laptop-1", "Joey's MacBook Air", "0.18.1"),
+            log: l => { lock (said) said.Add(l); }) { Times = Quick };
+        var running = link.RunAsync(stop.Token);
+        var phone = new FakePhone(drive);
+
+        string ask = phone.Ask("POST", "/ai/ask", new JsonObject
+        {
+            ["question"] = "What's recursion?", ["engine"] = "claude", ["stream"] = true,
+            ["live"] = "Recursion is a function calling itself, with a base case to stop.",
+        });
+        string answer = new DriveNames().Answer(ask);
+        await Until(() => drive.History(answer).Count >= 2, "the answer started");
+        phone.Stop(ask);
+        await Until(() => { lock (said) return said.Any(l => l.Contains("stopped on the phone")); }, "the laptop stopped");
+        int writes = drive.History(answer).Count;
+        await Task.Delay(1500, TestContext.Current.CancellationToken);
+        // Nothing more is written once stopped, and it never ends as a whole answer.
+        Assert.Equal(writes, drive.History(answer).Count);
+        Assert.NotEqual(true, JsonNode.Parse(drive.History(answer)[^1])!["done"]?.GetValue<bool>());
         stop.Cancel();
         await running;
     }
@@ -555,6 +626,13 @@ public sealed class FakePhone(FakeDrive drive, string id = "7f3e2a10-phone", str
 
     /// <summary>The box written with everything asked so far (several requests in one write).</summary>
     public void Send() => Write();
+
+    /// <summary>Stop: the request taken out of the box, as the app does when the student presses Stop.</summary>
+    public void Stop(string rid)
+    {
+        requests.Remove(requests.First(r => (string?)r!["id"] == rid));
+        Write();
+    }
 
     (byte[] Data, string Name) Pending = ([], "");
 
