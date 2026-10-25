@@ -7,9 +7,17 @@ question was whether `claude setup-token` could keep Claude signed in for Study 
 **Short answer.** On the technical side it would work. Anthropic's rules forbid it, though. `setup-token` prints a
 one-year token, and Claude Code runs on it through `CLAUDE_CODE_OAUTH_TOKEN`. But Anthropic's legal page says an app
 like Study Stash "may not collect, store, or intermediate Claude.ai credentials or session tokens". A button that
-runs `setup-token` and keeps the token does exactly that. So it isn't built. What was built instead is smaller: a
-false "signed out" that Study Stash could cause itself is now tried again instead (see
-[What changed](#what-changed-on-this-branch)). The other ways to keep Claude working are listed below.
+runs `setup-token` and keeps the token does exactly that. So it isn't built.
+
+What was built instead goes after the failure Joey's library really had, "OAuth session expired and could not be
+refreshed" (see [that section](#oauth-session-expired-and-could-not-be-refreshed)):
+
+- after a quiet spell, Study Stash's Claude runs sign in one at a time, so they don't race each other to renew the
+  sign-in;
+- a run turned away as signed out is tried once more, alone, before Study Stash calls Claude signed out;
+- a run that hit another Claude Code renewing the sign-in is tried again a little later.
+
+See [What changed](#what-changed-on-this-branch). The other ways to keep Claude working are listed below.
 
 Checked on 2026-10-24 against Anthropic's docs and Claude Code 2.1.310's own `--help`. Nothing here ran
 `setup-token`, `login` or `logout`, or read a credential.
@@ -92,8 +100,12 @@ with the person keeping their own token. It's not an app collecting one.
      minute…` ([Errors](https://code.claude.com/docs/en/errors#could-not-refresh-your-login-because-another-claude-code-process-is-refreshing-it)).
      Study Stash runs several at once (notes, diagrams, Ask, beside the student's own). It also stops one halfway when
      a question is cancelled or a run times out. Until this branch, those words read as signed out. The lecture said
-     "Claude needs you to sign in again", and the notes were written once the next job worked, with no sign-in. That
-     matches Joey's log line. **Fixed on this branch.**
+     "Claude needs you to sign in again", and the notes were written once the next job worked, with no sign-in.
+     **Fixed on this branch.** (Joey's own log says something else; see
+     [the next section](#oauth-session-expired-and-could-not-be-refreshed).)
+   - *Several Claude Codes renewing the sign-in at the same moment.* That's what Joey's log points to. **Prevented on
+     this branch** as far as Study Stash's own runs go; see
+     [that section](#oauth-session-expired-and-could-not-be-refreshed).
    - *An old Claude Code.* "Before v2.1.211, waking the machine from sleep could cause two sessions to renew with the
      same token, which revoked the saved login"
      ([Troubleshooting](https://code.claude.com/docs/en/troubleshoot-install#not-logged-in-or-token-expired)). The
@@ -111,17 +123,113 @@ with the person keeping their own token. It's not an app collecting one.
    plain words, **Sign in**, the notes written afterwards and the Ollama stand-in cover that. The newer wording of
    these errors (Claude Code 2.1.287 on) is covered too; tests now check it.
 
+## "OAuth session expired and could not be refreshed"
+
+Joey's library log has this twice, each time before "Claude is signed in again":
+
+```text
+[pipeline] Summary with Claude sonnet failed: Claude: Failed to authenticate: OAuth session expired and could not be refreshed
+```
+
+**What it means.** Anthropic's docs: "Claude Code tried to renew your saved claude.ai login and the OAuth service
+rejected the stored refresh token, so Claude Code cleared the saved credentials. After that, each model request stops
+locally with this message before it reaches the API, because only `/login` can create new credentials"
+([Login expired](https://code.claude.com/docs/en/errors#login-expired)).
+
+**Why a refresh token gets turned away on one computer.**
+
+*Several Claude Codes renewing at once.* Claude Code's access token lasts about eight hours, and the refresh token
+that renews it changes each time it's used. The first runs after the access token has run out can each try to renew
+with the same refresh token. The server takes the reused one as a replay and turns the sign-in away. Reports on
+anthropics/claude-code:
+
+- [#91708](https://github.com/anthropics/claude-code/issues/91708), open, labelled "has repro":
+  - seen on Claude Code 2.1.258 to 2.1.296, "still reproducing on 2.1.282 / 2.1.283, now with the cross-process lock
+    in place";
+  - one reporter: "Each failure was the first start after the access token expired";
+  - what helped: a scheduled task that runs one `claude -p` at log-in "avoids the morning race".
+- [#80585](https://github.com/anthropics/claude-code/issues/80585), macOS Keychain, 2.1.218: the failed refresh
+  "clears the keychain credential, which forces every session … to re-authenticate". The lock there "does not cover
+  independently-launched foreground sessions".
+- [#41507](https://github.com/anthropics/claude-code/issues/41507), macOS Keychain: one session writes the new
+  refresh token, the others send the old one, and the server revokes the session as a replay.
+- [#88947](https://github.com/anthropics/claude-code/issues/88947), 2.1.228 to 2.1.240, 10 to 24 sessions sharing
+  `~/.claude`: every session drops to "Login expired" about once a week.
+- [#102811](https://github.com/anthropics/claude-code/issues/102811), open, October 2026, macOS: `claude -p` fails
+  with this exact message within hours of signing in. Claude Desktop's own Claude Code on the same Mac keeps working.
+  The suspected cause is that Desktop rotated the refresh token.
+
+Anthropic's docs say instead that "Parallel sessions on one machine share a saved login and coordinate its renewal so
+that only one process refreshes the token at a time"
+([Troubleshooting](https://code.claude.com/docs/en/troubleshoot-install#not-logged-in-or-token-expired)). The issues
+show it still happens on versions that have that lock.
+
+*Other documented causes*, mostly fixed by the Claude Code on Joey's Mac (2.1.310; see the
+[changelog](https://github.com/anthropics/claude-code/blob/main/CHANGELOG.md)):
+
+- sleep and wake renewing twice: fixed in 2.1.211;
+- a process closed or killed while renewing: fixed in 2.1.265 and 2.1.282;
+- an older Claude Code build on the same computer logging the current one out: fixed in 2.1.277;
+- a locked Keychain right after wake deleting the entry: fixed in 2.1.281;
+- a short command such as `claude auth status` exiting while renewing: fixed in 2.1.301;
+- the sign-in's own end: the 3-day warning.
+
+When Joey's two failures happened, and which version ran then, isn't known here. So those causes aren't ruled out for
+them.
+
+**The race, checked.**
+
+- *Confirmed.* Several Claude Codes racing to renew the sign-in, at the first start after the access token ran out,
+  is the most-reported cause of this exact message. That includes current versions and the macOS Keychain.
+- *Refuted in one part.* The run that loses doesn't leave the Keychain holding good new tokens. The docs say Claude
+  Code then clears the saved sign-in, and the issues say the server often turns the whole sign-in away. So a fresh
+  run usually fails too, and only signing in again fixes it. Preventing the race is what matters. Trying again
+  rescues only the runs that lost before anything was cleared; #91708 has those too: "the token refresh completes on
+  its own in about 40 s".
+- *Study Stash's part.* After a quiet spell, the library's runs start close together: sorting and notes for a new
+  lecture, then diagrams, or an Ask. Joey's Mac also runs many other Claude Codes (his own sessions, agents, Claude
+  Desktop's own copy), and Study Stash can't line those up.
+
+**What's built.** It stays inside the rules: the unmodified `claude`, and no credential read or kept.
+
+- *A gate* (`SignInGate`, used by `ClaudeProvider`):
+  - The next run signs in alone when no run has got past sign-in for five minutes, or after any run was turned away.
+  - The others wait until it has begun to answer (its first `message_start`, which only comes once the sign-in
+    worked), or has finished, or two minutes have gone.
+  - The one signing in alone streams, so the others hear at once.
+  - Notes, sorting, diagrams, rewrites, Check and Ask all go through it: they all run in the library, through
+    `ClaudeProvider`.
+- *A retry.* A run turned away as signed out, before it said anything, is tried once more after 5 seconds, as a fresh
+  `claude` that signs in alone. Only if that fails too is Claude signed out, with the Sign in flow as before.
+- *What it costs.*
+  - After a quiet spell, a run waits a few seconds for another to begin answering. It waits longer behind a long
+    lecture's notes, two minutes at most.
+  - When Claude really is signed out, there's one extra run 5 seconds later, which stops on the computer at once.
+- *What it can't do.* Line up Joey's other Claude Codes. Fewer of them running at the day's first start would help,
+  or letting the library's run go first. That's what the issues' workaround of one `claude -p` at log-in does.
+
 ## What changed on this branch
 
-- `ClaudeProvider.RunAsync` (`engine/src/StudyStash.Core/Ai/Providers.cs`): a run that stops before saying anything
-  because another Claude Code is renewing the sign-in is tried again after 30 seconds, three tries in all, which is
-  about the minute the docs give. If it says so every time, its words stand and read as signed out, as before. The
-  docs say that's when to sign in again.
-- `Engines.LooksLikeRefreshBusy` (`engine/src/StudyStash.Core/Ai/Engines.cs`) reads those words.
+- `engine/src/StudyStash.Core/Ai/SignInGate.cs` (new): the gate. It lets one run lead after a quiet spell or a run
+  turned away. The others wait for it to begin answering, or to finish, for two minutes at most. There's one gate per
+  Claude Code program in the library's process.
+- `ClaudeProvider.RunAsync` (`engine/src/StudyStash.Core/Ai/Providers.cs`):
+  - every run goes through the gate;
+  - the one leading streams;
+  - `Parse` reports `message_start` as `started`, which isn't passed on;
+  - a run that stops before saying anything is tried again: after 30 seconds while another Claude Code is renewing
+    the sign-in (three tries in all, about the minute the docs give), and once, after 5 seconds and alone, when it
+    was turned away as signed out;
+  - after that its words stand, and signed-out words read as signed out, as before.
+- `Engines.LooksLikeRefreshBusy` (`engine/src/StudyStash.Core/Ai/Engines.cs`) reads the "another process" words.
 - `engine/tests/StudyStash.Core.Tests/SignInAgainTests.cs`:
   - busy then working is tried again and answers;
   - busy every time stops after three tries;
-  - really signed out is said at once;
+  - "couldn't be refreshed" then working answers on the fresh run;
+  - "couldn't be refreshed" twice stops after two runs and reads as signed out;
+  - a burst after a quiet spell: the second run doesn't start until the first has begun to answer, and only the
+    first streams;
+  - the gate on its own: who leads, who waits, five minutes, `Cold`;
   - the 2.1.287 wording of revoked, expired and can't-be-renewed counts as signed out.
 
 ## If Anthropic says yes: the design
