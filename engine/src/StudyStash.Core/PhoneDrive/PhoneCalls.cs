@@ -32,6 +32,8 @@ public static class PhoneCalls
     [
         ("GET", "/me", PhoneAnswerKind.Json, false),
         ("GET", "/library", PhoneAnswerKind.Json, false),
+        // Which AI answers Ask (jobs.ask.provider), so the phone shows its mark while it thinks; no keys in it.
+        ("GET", "/ai", PhoneAnswerKind.Json, false),
         ("GET", "/lectures", PhoneAnswerKind.Json, false),
         ("GET", "/lectures/{}", PhoneAnswerKind.Json, false),
         ("GET", "/lectures/{}/rendered", PhoneAnswerKind.Json, false),
