@@ -275,6 +275,8 @@ public sealed partial class DriveLink
                 var body = r.Json?.DeepClone() ?? new JsonObject();
                 // A lecture recorded on the phone is that phone's, as it is when it comes over Tailscale.
                 if (call.Route == "/lectures" && body is JsonObject o && o["owner"] is null) o["owner"] = phoneName;
+                // POST /canvas also sets Canvas's address and links courses to classes: from a phone it only syncs.
+                if (call.Route == "/canvas") body = new JsonObject { ["sync"] = true };
                 content = new StringContent(body.ToJsonString(), Encoding.UTF8, "application/json");
             }
             using var limit = CancellationTokenSource.CreateLinkedTokenSource(ct);

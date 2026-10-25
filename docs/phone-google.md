@@ -157,7 +157,7 @@ The laptop asks its own library (`GET http://127.0.0.1:<port>/api/v2/…` with t
 | `GET /lectures?limit=1000` | **every** lecture, newest first, however many (the library gives at most 500 a page: the laptop asks page by page and joins them) |
 | `GET /lectures/<id>`, `GET /lectures/<id>/rendered` | for every lecture in the list; `<id>` percent-encoded as the iPhone's `APIClient.segment` does (everything but letters, digits and `-._~`) |
 | `GET /chats`, `GET /chats/<id>` | every chat (the list without a query, as the phone asks it) |
-| `GET /canvas/due`, `GET /calendar/upcoming` | |
+| `GET /canvas/due`, `GET /canvas/state`, `GET /calendar/upcoming` | |
 | `GET /attachments` | every attached file (no query) |
 | `GET /voice-memos` | |
 
@@ -267,16 +267,17 @@ stray files of its own kind older than a day.
 
 ### What the laptop does for the phone (and nothing else)
 
-Exactly the iPhone app's own calls (`ios/StudyStash/API/APIClient.swift`), replayed against the local library
+Exactly the iPhone app's own calls (`ios/StudyStash/API/APIClient.swift`, and the two the Due tab makes itself), replayed against the local library
 (`PhoneCalls.cs`):
 
 - GET: `/me`, `/library`, `/lectures`, `/lectures/{id}`, `/lectures/{id}/rendered`, `/search`, `/chats`,
-  `/chats/{id}`, `/canvas/due`, `/canvas/assignment`, `/calendar/upcoming`, `/attachments`, `/attachments/{id}/raw`,
+  `/chats/{id}`, `/canvas/due`, `/canvas/state`, `/canvas/assignment`, `/calendar/upcoming`, `/attachments`, `/attachments/{id}/raw`,
   `/voice-memos`
 - POST: `/lectures` (a recording written down on the phone; idempotent by its `phone-…` id), `/lectures/{id}/class`,
   `/lectures/{id}/title`, `/lectures/{id}/restore`, `/lectures/{id}/rewrite`, `/ai/ask` (streamed), `/ai/warm`,
   `/chat` (streamed), `/classes/alias`, `/uses`, `/attachments` (multipart from `upload`), `/voice-memos` (multipart
-  from `upload`), `/voice-memos/{id}/retry`
+  from `upload`), `/voice-memos/{id}/retry`, `/canvas` (the Due tab's sync now: whatever the phone sends, the
+  library is sent only `{"sync": true}`, so a phone can't change Canvas's address or which course is which class)
 - DELETE: `/lectures/{id}`, `/chats/{id}`, `/attachments/{id}`, `/voice-memos/{id}`
 
 Never settings, passwords, AI engines or keys, Canvas tokens, devices, Claude connections, history, files, or

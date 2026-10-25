@@ -4,6 +4,7 @@ using System.Text.Json.Nodes;
 using StudyStash.App.Services;
 using StudyStash.Core;
 using StudyStash.Core.Ai;
+using StudyStash.Core.Canvas;
 using StudyStash.Core.PhoneDrive;
 using StudyStash.Core.Tests;
 
@@ -87,6 +88,32 @@ public class PhoneDriveTests
         Assert.NotNull(library["body"]!["classes"]);
         // Nothing reached the library's settings: its password is the one it had.
         Assert.NotNull(await rig.RawAsync("/api/v2/settings"));
+        stop.Cancel();
+        await running;
+    }
+
+    [Fact]
+    public async Task The_due_tab_sees_canvas_and_asks_it_to_sync_but_cant_change_where_it_is()
+    {
+        await using var rig = await LibraryRig.StartAsync();
+        CanvasSettings.Update(rig.Home, s => s.Url = "https://school.example.edu");
+        var drive = new FakeDrive();
+        var link = Link(drive, rig);
+        using var stop = new CancellationTokenSource();
+        var running = link.RunAsync(stop.Token);
+        var phone = new FakePhone(drive);
+
+        var state = await phone.DoneAsync(phone.Ask("GET", "/canvas/state"));
+        Assert.Equal(200, (int)state["status"]!);
+        var sync = await phone.DoneAsync(phone.Ask("POST", "/canvas", new JsonObject
+        {
+            ["sync"] = true, ["url"] = "https://elsewhere.example.com", ["courses"] = new JsonObject { ["CS 101"] = 999 },
+        }));
+        Assert.NotEqual(403, (int)sync["status"]!);
+        // Only "sync now" reached the library: Canvas is where it was, and no course was linked.
+        var after = CanvasSettings.Load(rig.Home);
+        Assert.Equal("https://school.example.edu", after.Url);
+        Assert.Empty(after.Courses);
         stop.Cancel();
         await running;
     }

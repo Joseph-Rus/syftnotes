@@ -19,6 +19,7 @@ public sealed partial class DriveLink
         ("GET /library", "/library"),
         ("GET /chats", "/chats"),
         ("GET /canvas/due", "/canvas/due"),
+        ("GET /canvas/state", "/canvas/state"),
         ("GET /calendar/upcoming", "/calendar/upcoming"),
         ("GET /attachments", "/attachments"),
         ("GET /voice-memos", "/voice-memos"),
