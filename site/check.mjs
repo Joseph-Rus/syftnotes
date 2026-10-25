@@ -65,7 +65,8 @@ async function idsOf(url) {
 }
 
 const files = await walk(root);
-const pages = files.filter(f => f.endsWith(".html"));
+// Google Search Console's verification file (googleXXXX.html) is a one-line token, not a page.
+const pages = files.filter(f => f.endsWith(".html") && !/(^|\/)google[0-9a-f]+\.html$/.test(f));
 const checked = new Set();
 let links = 0;
 
