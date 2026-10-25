@@ -1,7 +1,9 @@
 <!-- Settings -> Phone, Mac: "Add a phone" (a QR code of the phone app's address beside the 6-digit code and the time
-     it has left), then the phones already added, one rounded card with a Remove on each. Draws no outer padding —
-     SettingsView gives the margins, as it does every section's. The QR code is always black on white: that's what a
-     camera reads, in light and dark alike. -->
+     it has left), then the phones already added, one rounded card with a Remove on each. On just this computer the
+     phone connects through the student's Google account instead (docs/phone-google.md): Connect with Google, then the
+     account, a QR code that opens the phone app with it, Disconnect, and the phones that use it; phones added over
+     Tailscale before stay listed below. Draws no outer padding — SettingsView gives the margins, as it does every
+     section's. The QR codes are always black on white: that's what a camera reads, in light and dark alike. -->
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="using:StudyStash.App.ViewModels"
@@ -10,8 +12,8 @@
              x:DataType="vm:PhonesModel">
   <StackPanel Spacing="8">
     <TextBlock Classes="h" Text="Phone" />
-    <TextBlock Classes="body" Text="Record lectures, read your notes, search, ask and study, write by hand and add files from your phone: the Study Stash app on iPhone and iPad, or on Android the web app your library serves." />
-    <TextBlock Classes="say" Text="Asking your library…" IsVisible="{Binding IsLoading}" />
+    <TextBlock Classes="body" Text="{Binding Body}" />
+    <TextBlock Classes="say" Text="Asking your library…" IsVisible="{Binding ShowLoading}" />
     <Border Classes="group" IsVisible="{Binding ShowProblem}">
       <Border Classes="row">
         <Grid ColumnDefinitions="Auto,12,*,12,Auto">
@@ -21,6 +23,95 @@
         </Grid>
       </Border>
     </Border>
+
+    <!-- Just this computer: through the student's Google account -->
+    <Panel IsVisible="{Binding ViaGoogle}">
+      <StackPanel Name="GooglePhone" DataContext="{Binding Google}" x:DataType="vm:PhoneGoogleModel" Spacing="8">
+        <Border Classes="group" IsVisible="{Binding ShowConnect}">
+          <Border Classes="row">
+            <Grid ColumnDefinitions="Auto,12,*,12,Auto">
+              <c:Icon Glyph="cloud" Size="18" Foreground="{DynamicResource Fg2}" VerticalAlignment="Center" />
+              <StackPanel Grid.Column="2" Spacing="2" VerticalAlignment="Center">
+                <TextBlock Classes="row-title" Text="{Binding Title}" TextWrapping="Wrap" />
+                <TextBlock Classes="row-sub" Text="{Binding Lede}" TextWrapping="Wrap" />
+                <TextBlock Classes="row-sub" Text="{Binding CantConnect}" IsVisible="{Binding !CanConnect}" TextWrapping="Wrap" Margin="0,4,0,0" />
+              </StackPanel>
+              <Button Grid.Column="4" Classes="pill primary" Command="{Binding ConnectCommand}" IsEnabled="{Binding CanConnect}" VerticalAlignment="Center">
+                <TextBlock Text="Connect with Google" FontSize="13" FontWeight="Medium" />
+              </Button>
+            </Grid>
+          </Border>
+        </Border>
+        <Border Classes="group" IsVisible="{Binding Connecting}">
+          <Border Classes="row">
+            <Grid ColumnDefinitions="Auto,12,*,12,Auto">
+              <c:Icon Glyph="open_in_new" Size="18" Foreground="{DynamicResource Fg2}" VerticalAlignment="Center" />
+              <StackPanel Grid.Column="2" Spacing="2" VerticalAlignment="Center">
+                <TextBlock Classes="row-title" Text="Finish in your browser" />
+                <TextBlock Classes="row-sub" Text="Pick your Google account there and press Allow. Then come back here." TextWrapping="Wrap" />
+              </StackPanel>
+              <Button Grid.Column="4" Classes="pill" Command="{Binding CancelConnectCommand}" VerticalAlignment="Center"><TextBlock Text="Cancel" FontSize="13" /></Button>
+            </Grid>
+          </Border>
+        </Border>
+        <Border Classes="group" IsVisible="{Binding ShowConnected}">
+          <StackPanel>
+            <Grid ColumnDefinitions="Auto,24,*" Margin="20">
+              <Border Name="GoogleQrCard" Background="White" CornerRadius="12" Padding="0" Width="184" Height="184" ClipToBounds="True" VerticalAlignment="Top"
+                      ToolTip.Tip="{Binding QrLink}">
+                <Viewbox Stretch="Uniform">
+                  <Canvas Width="{Binding QrSize}" Height="{Binding QrSize}">
+                    <Path Data="{Binding Qr}" Fill="Black" RenderOptions.EdgeMode="Aliased" />
+                  </Canvas>
+                </Viewbox>
+              </Border>
+              <StackPanel Grid.Column="2" Spacing="6" VerticalAlignment="Center">
+                <TextBlock Classes="row-title" Text="{Binding Account}" TextTrimming="CharacterEllipsis" />
+                <TextBlock Classes="row-sub" Text="{Binding StepOne, StringFormat='1. {0}'}" TextWrapping="Wrap" />
+                <TextBlock Classes="row-sub" Text="{Binding StepTwo, StringFormat='2. {0}'}" TextWrapping="Wrap" />
+                <TextBlock Classes="row-sub" Text="{Binding HowItWorks}" TextWrapping="Wrap" Margin="0,4,0,0" />
+                <TextBlock Classes="row-sub" Text="{Binding Status}" IsVisible="{Binding Status, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" TextWrapping="Wrap" />
+                <StackPanel Orientation="Horizontal" Spacing="8" Margin="0,6,0,0" IsVisible="{Binding !ConfirmingDisconnect}">
+                  <Button Classes="pill primary" Command="{Binding ConnectCommand}" IsVisible="{Binding SignedOut}"><TextBlock Text="Connect again" FontSize="13" FontWeight="Medium" /></Button>
+                  <Button Classes="pill" Command="{Binding AskDisconnectCommand}" IsEnabled="{Binding !Busy}"><TextBlock Text="Disconnect…" FontSize="13" /></Button>
+                </StackPanel>
+                <StackPanel Spacing="8" Margin="0,6,0,0" IsVisible="{Binding ConfirmingDisconnect}">
+                  <TextBlock Classes="say" Text="{Binding ConfirmWords}" TextWrapping="Wrap" />
+                  <StackPanel Orientation="Horizontal" Spacing="8">
+                    <Button Classes="pill" Command="{Binding KeepConnectedCommand}"><TextBlock Text="Cancel" FontSize="13" /></Button>
+                    <Button Classes="pill primary" Command="{Binding DisconnectCommand}"><TextBlock Text="Disconnect" FontSize="13" FontWeight="Medium" /></Button>
+                  </StackPanel>
+                </StackPanel>
+              </StackPanel>
+            </Grid>
+            <!-- The phones that use it -->
+            <ItemsControl ItemsSource="{Binding Phones}" IsVisible="{Binding HasPhones}">
+              <ItemsControl.ItemTemplate>
+                <DataTemplate x:DataType="vm:DrivePhoneRow">
+                  <StackPanel>
+                    <Border Classes="rowsep" />
+                    <Border Classes="row">
+                      <Grid ColumnDefinitions="Auto,12,*,12,Auto">
+                        <c:Icon Glyph="smartphone" Size="18" Foreground="{DynamicResource Fg2}" VerticalAlignment="Center" />
+                        <StackPanel Grid.Column="2" Spacing="2" VerticalAlignment="Center">
+                          <TextBlock Classes="row-title" Text="{Binding Name}" TextTrimming="CharacterEllipsis" />
+                          <TextBlock Classes="row-sub" Text="{Binding Meta}" />
+                        </StackPanel>
+                        <Button Grid.Column="4" Classes="pill" VerticalAlignment="Center"
+                                Command="{Binding $parent[ItemsControl].((vm:PhoneGoogleModel)DataContext).RemoveCommand}" CommandParameter="{Binding}">
+                          <TextBlock Text="Remove" FontSize="13" />
+                        </Button>
+                      </Grid>
+                    </Border>
+                  </StackPanel>
+                </DataTemplate>
+              </ItemsControl.ItemTemplate>
+            </ItemsControl>
+          </StackPanel>
+        </Border>
+        <c:PageText Classes="say" Text="{Binding Say}" IsVisible="{Binding Say, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" TextWrapping="Wrap" />
+      </StackPanel>
+    </Panel>
 
     <StackPanel IsVisible="{Binding IsReady}" Spacing="8">
       <!-- Adding one -->
@@ -65,7 +156,7 @@
       <Button Classes="pill" Command="{Binding OpenFixCommand}" IsVisible="{Binding HasFix}" HorizontalAlignment="Left"><TextBlock Text="Open the page" FontSize="13" /></Button>
 
       <!-- The phones already added -->
-      <TextBlock Classes="section gap" Text="Phones" IsVisible="{Binding !NoPhones}" />
+      <TextBlock Classes="section gap" Text="{Binding PhonesTitle}" IsVisible="{Binding !NoPhones}" />
       <Border Classes="group" IsVisible="{Binding !NoPhones}">
         <ItemsControl ItemsSource="{Binding Phones}">
           <ItemsControl.ItemTemplate>
@@ -90,7 +181,7 @@
           </ItemsControl.ItemTemplate>
         </ItemsControl>
       </Border>
-      <TextBlock Classes="say" Text="Removing a phone locks it out straight away. Add it again with a new code." IsVisible="{Binding !NoPhones}" />
+      <TextBlock Classes="say" Text="{Binding RemoveLine}" IsVisible="{Binding !NoPhones}" />
     </StackPanel>
   </StackPanel>
 </UserControl>

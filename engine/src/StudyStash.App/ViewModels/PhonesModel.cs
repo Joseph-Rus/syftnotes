@@ -72,7 +72,29 @@ public sealed partial class PhonesModel : ObservableObject
 
     public bool IsReady => State == LibrarySettingsState.Ready;
     public bool IsLoading => State == LibrarySettingsState.Loading;
-    public bool ShowProblem => State is LibrarySettingsState.Unreachable or LibrarySettingsState.Older or LibrarySettingsState.NoLibrary;
+    /// <summary>Just this computer: phones connect through the student's Google account (this, over the app's
+    /// PhoneDrive) instead of being added over Tailscale; phones added over Tailscale before stay listed.
+    /// Null on a laptop with its library elsewhere and on a library-only computer, where nothing changes.</summary>
+    public PhoneGoogleModel? Google
+    {
+        get;
+        set
+        {
+            field = value;
+            foreach (string p in new[] { nameof(ViaGoogle), nameof(Body), nameof(ShowAdd), nameof(ShowProblem), nameof(ShowLoading), nameof(PhonesTitle), nameof(RemoveLine) }) OnPropertyChanged(p);
+        }
+    }
+
+    public bool ViaGoogle => Google is not null;
+    /// <summary>What the phone does, under the page's title. Through Google it's the iPhone and iPad app: Android's web
+    /// app is served over Tailscale.</summary>
+    public string Body => ViaGoogle
+        ? "Record lectures, read your notes, search, ask and study, write by hand and add files from your phone: the Study Stash app on iPhone and iPad."
+        : "Record lectures, read your notes, search, ask and study, write by hand and add files from your phone: the Study Stash app on iPhone and iPad, or on Android the web app your library serves.";
+    public bool ShowLoading => IsLoading && !ViaGoogle;
+    public string PhonesTitle => ViaGoogle ? "Phones added over Tailscale" : "Phones";
+    public string RemoveLine => ViaGoogle ? "Removing a phone locks it out straight away." : "Removing a phone locks it out straight away. Add it again with a new code.";
+    public bool ShowProblem => !ViaGoogle && State is LibrarySettingsState.Unreachable or LibrarySettingsState.Older or LibrarySettingsState.NoLibrary;
     public bool CanRetry => State == LibrarySettingsState.Unreachable;
     public string Problem => State switch
     {
@@ -82,13 +104,13 @@ public sealed partial class PhonesModel : ObservableObject
         _ => "",
     };
     public bool NoPhones => Phones.Count == 0;
-    public bool ShowAdd => IsReady && !Adding;
+    public bool ShowAdd => IsReady && !Adding && !ViaGoogle;
     public string AddTitle => Phones.Count == 0 ? "Read your notes and lectures on your phone" : "Add another phone";
     public string AddSub => "Your phone reaches the library over Tailscale: install it on your phone and sign in to the same account.";
 
     partial void OnStateChanged(LibrarySettingsState value)
     {
-        foreach (string p in new[] { nameof(IsReady), nameof(IsLoading), nameof(ShowProblem), nameof(CanRetry), nameof(Problem), nameof(ShowAdd) }) OnPropertyChanged(p);
+        foreach (string p in new[] { nameof(IsReady), nameof(IsLoading), nameof(ShowLoading), nameof(ShowProblem), nameof(CanRetry), nameof(Problem), nameof(ShowAdd) }) OnPropertyChanged(p);
     }
 
     partial void OnAddingChanged(bool value) => OnPropertyChanged(nameof(ShowAdd));

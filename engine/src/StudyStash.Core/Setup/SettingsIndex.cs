@@ -177,7 +177,7 @@ public static class SettingsIndex
             "files documents search private reads slides pdfs"),
 
         Page("Phone", "Read your notes and lectures, search and ask, and add files from your phone.",
-            "iphone android mobile qr code home screen app"),
+            "iphone android mobile qr code home screen app google drive gmail"),
         new() { Section = "Phone", Title = "Add a phone", Detail = "Scan the code in the Study Stash app on your iPhone or iPad.", Words = "iphone android mobile qr code" },
     ];
 

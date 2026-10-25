@@ -240,7 +240,7 @@ public sealed partial class SettingsModel : ObservableObject, IDisposable
     /// <summary>For a test or a shot: Phone asks <paramref name="phones"/> instead of the connected library.</summary>
     public SettingsModel WithPhones(Func<LibrarySettingsModel.Call?> phones)
     {
-        Phones = new PhonesModel(phones);
+        Phones = new PhonesModel(phones) { Google = Phones.Google };
         return this;
     }
 
@@ -423,6 +423,8 @@ public sealed partial class SettingsModel : ObservableObject, IDisposable
         Calendars = new CalendarSettingsModel(host.Home, wake: () => host.Calendars.Wake());
         Granola = new ViewModels.GranolaSettingsModel(host.Granola, () => host.Settings.GranolaNotify, on => host.Save(x => x.GranolaNotify = on));
         Phones = new PhonesModel(() => host.Remote() is { } phonesLib ? (m, path, body) => phonesLib.DevicesAsync(m, path, body) : null);
+        // Just this computer: the phone connects through the student's Google account (docs/phone-google.md).
+        if (host.Settings.Role == AppRole.Both) Phones.Google = new PhoneGoogleModel(host.Drive);
         Keys = new ShortcutsModel(() => host.Settings.Keys, change => host.Save(s => change(s.Keys)), Skin.Current == SkinKind.Mac, records);
         Phones.Ticking = Phones.UiTicking();
         Assistant = new SettingsChatModel(new SettingsChatServices
@@ -1108,6 +1110,7 @@ public sealed partial class SettingsModel : ObservableObject, IDisposable
         Assistant.Dispose();
         Canvas.Dispose();
         Granola.Dispose();
+        Phones.Google?.Dispose();
         // Settings has closed: nobody is waiting to see an AI app's row turn to Connected.
         Access.StopWatchingApps();
     }
