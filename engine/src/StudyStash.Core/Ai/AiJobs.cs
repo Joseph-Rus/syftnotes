@@ -41,7 +41,51 @@ public sealed class AiJobs(string home, Func<string>? ollamaHost = null)
         return dir;
     }
 
-    async Task<string> AnswerAsync(string job, string prompt, CancellationToken ct = default)
+    /// <summary>
+    /// Whiteboard photos for the engine that writes a lecture's notes. Claude Code reads image files in its working
+    /// folder, so the photos are copied into it and the prompt names them; Codex takes them on its command line
+    /// (--image). Gemini (Antigravity) and Ollama get the words read from each photo instead. Returns what to delete
+    /// afterwards and the files to hand the engine.
+    /// </summary>
+    (string? Folder, List<string> Images) GivePhotos(Meeting m, string engine)
+    {
+        m.PhotoFiles = null;
+        if (m.Photos.Count == 0 || engine is not ("claude" or "codex")) return (null, []);
+        string rel = "photos-" + new string(m.Id.Where(char.IsLetterOrDigit).ToArray());
+        string dir = Path.Combine(Scratch(), rel);
+        var names = new Dictionary<string, string>();
+        var images = new List<string>();
+        try
+        {
+            Directory.CreateDirectory(dir);
+            foreach (var p in m.Photos.Where(p => File.Exists(p.Path)))
+            {
+                string file = Path.Combine(dir, p.Id + Path.GetExtension(p.Path));
+                File.Copy(p.Path, file, true);
+                images.Add(file);
+                names[p.Id] = engine == "claude" ? rel + "/" + Path.GetFileName(file) : Path.GetFileName(file);
+            }
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException)
+        {
+            return (dir, []); // no copies: the photos' words go in the prompt
+        }
+        if (names.Count > 0) m.PhotoFiles = names;
+        return (dir, engine == "claude" ? [] : images);
+    }
+
+    static void Forget(string? folder)
+    {
+        try
+        {
+            if (folder is not null) Directory.Delete(folder, true);
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException)
+        {
+        }
+    }
+
+    async Task<string> AnswerAsync(string job, string prompt, CancellationToken ct = default, IReadOnlyList<string>? images = null)
     {
         var settings = Settings;
         var choice = settings.For(job);
@@ -50,7 +94,7 @@ public sealed class AiJobs(string home, Func<string>? ollamaHost = null)
         var how = job == "notes" ? AiSpeed.ForNotes(choice.Provider, choice.Model, settings.Speed) : new AiSpeed.How(choice.Model, "", false);
         var result = await provider.CompleteAsync(new AiRequest(prompt, Scratch())
         {
-            Model = how.Model, Effort = how.Effort, Fast = how.Fast, Timeout = TimeSpan.FromMinutes(15),
+            Model = how.Model, Effort = how.Effort, Fast = how.Fast, Timeout = TimeSpan.FromMinutes(15), Images = images ?? [],
         }, ct);
         Proved(choice.Provider, result);
         if (!result.Ok) throw new InvalidOperationException($"{provider.Name}: {result.Text}");
@@ -84,12 +128,12 @@ public sealed class AiJobs(string home, Func<string>? ollamaHost = null)
     /// <summary>Answering with a specific engine, not the one ai.json picks for a job — the "Answer with" menu's
     /// choice, and this class's own fallback to Ollama in <see cref="AskAsync"/>.</summary>
     async Task<string> AnswerWithAsync(string engine, string model, string prompt, CancellationToken ct, Action<string>? soFar = null,
-        string effort = "", bool fast = false, Action<string>? noted = null)
+        string effort = "", bool fast = false, Action<string>? noted = null, IReadOnlyList<string>? images = null)
     {
         var provider = Provider(engine);
         var result = await provider.CompleteAsync(new AiRequest(prompt, Scratch())
         {
-            Model = model, Effort = effort, Fast = fast, Timeout = TimeSpan.FromMinutes(15),
+            Model = model, Effort = effort, Fast = fast, Timeout = TimeSpan.FromMinutes(15), Images = images ?? [],
         }, ct, soFar);
         Proved(engine, result);
         if (!result.Ok) throw new InvalidOperationException(result.Text);
@@ -186,11 +230,21 @@ public sealed class AiJobs(string home, Func<string>? ollamaHost = null)
                     chat: (_, _, prompt, _) => AnswerWithAsync("ollama", "", prompt, CancellationToken.None),
                     show: (_, _) => Task.FromResult<int?>(null), drawings: drawings);
         else
+        {
             // Other models read a whole lecture at once: tell the splitter their context is large.
-            notes = await Core.Summarize.SummarizeTranscriptAsync(m, cfg,
-                chat: (_, _, prompt, _) => AnswerAsync("notes", prompt),
-                show: (_, _) => Task.FromResult<int?>(200_000),
-                drawings: drawings);
+            var (folder, images) = GivePhotos(m, engine);
+            try
+            {
+                notes = await Core.Summarize.SummarizeTranscriptAsync(m, cfg,
+                    chat: (_, _, prompt, _) => AnswerAsync("notes", prompt, images: images),
+                    show: (_, _) => Task.FromResult<int?>(200_000),
+                    drawings: drawings);
+            }
+            finally
+            {
+                Forget(folder);
+            }
+        }
         if (designer is null) follow.TryRemove(m.Id, out _);
         else follow[m.Id] = engine;
         return notes;
@@ -393,17 +447,25 @@ public sealed class AiJobs(string home, Func<string>? ollamaHost = null)
         {
             var how = AiSpeed.ForNotes(engine, Settings.Models.GetValueOrDefault(engine, ""), Settings.Speed);
             const int ctx = 200_000; // other models read a whole lecture at once: tell the splitter their context is large
+            var (folder, images) = GivePhotos(m, engine);
             string text = Py.Strip(TimedText.Plain(m.Transcript));
             int budget = Core.Summarize.TranscriptBudget(ctx);
             parts = text.Length <= budget ? 1 : Core.Summarize.SplitTranscript(text, budget).Count;
             async Task<string> ChatAsync(Config c, string mdl, string prompt, int numCtx)
             {
-                string result = await AnswerWithAsync(engine, how.Model, prompt, ct, effort: how.Effort, fast: how.Fast);
+                string result = await AnswerWithAsync(engine, how.Model, prompt, ct, effort: how.Effort, fast: how.Fast, images: images);
                 progress?.Invoke(++done, Math.Max(done, parts));
                 return result;
             }
-            notes = await Core.Summarize.SummarizeTranscriptAsync(m, cfg, chat: ChatAsync, show: (_, _) => Task.FromResult<int?>(ctx),
-                drawings: drawings);
+            try
+            {
+                notes = await Core.Summarize.SummarizeTranscriptAsync(m, cfg, chat: ChatAsync, show: (_, _) => Task.FromResult<int?>(ctx),
+                    drawings: drawings);
+            }
+            finally
+            {
+                Forget(folder);
+            }
         }
         return (notes, designer is null ? null : engine);
     }

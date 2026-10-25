@@ -102,7 +102,7 @@ public sealed partial class LibraryWeb
         try
         {
             var files = new List<(string Sent, string Staged, long Size, byte[] Head)>();
-            string? className = null, lecture = null;
+            string? className = null, lecture = null, taken = null, kind = null;
             long total = 0;
             var reader = new MultipartReader(boundary, ctx.Request.Body);
             try
@@ -120,12 +120,14 @@ public sealed partial class LibraryWeb
                         total += size;
                         files.Add((HeaderUtilities.RemoveQuotes(part.FileNameStar.HasValue ? part.FileNameStar : part.FileName).Value ?? "", staged, size, head));
                     }
-                    else if (field is "class" or "lecture")
+                    else if (field is "class" or "lecture" or "taken" or "kind")
                     {
                         using var text = new StreamReader(section.Body, Encoding.UTF8);
                         char[] buffer = new char[1024];
                         string value = new string(buffer, 0, await text.ReadBlockAsync(buffer, ctx.RequestAborted)).Trim();
                         if (field == "class") className = value.Length > 0 ? value : null;
+                        else if (field == "taken") taken = value.Length > 0 ? value : null;
+                        else if (field == "kind") kind = value.Length > 0 ? value : null;
                         else lecture = value.Length > 0 ? value : null;
                     }
                 }
@@ -142,10 +144,16 @@ public sealed partial class LibraryWeb
             if (files.Count == 0) return Http.Detail(400, "there's no file in it (send each as a part named \"file\")");
             if (files.FirstOrDefault(f => f.Size == 0) is { Staged: not null } empty) return Http.Detail(400, $"“{Attachments.SafeName(empty.Sent)}” is empty");
             string target;
+            if (taken is not null && !DateTimeOffset.TryParse(taken, CultureInfo.InvariantCulture, DateTimeStyles.None, out _))
+                return Http.Detail(400, "\"taken\" is when the photo was taken, like 2026-10-24T10:02:12-07:00");
+            if (kind is not null && kind != Attachment.Whiteboard) return Http.Detail(400, "the only kind is \"whiteboard\"");
             if (lecture is not null)
             {
-                if (store.Get(lecture) is not { } row) return Http.Detail(404, "no such lecture");
-                target = string.IsNullOrEmpty(row.ClassName) ? Configs.Unsorted : row.ClassName;
+                if (store.Get(lecture) is { } row) target = string.IsNullOrEmpty(row.ClassName) ? Configs.Unsorted : row.ClassName;
+                // The laptop's recording isn't in the library until it's written down: its photos wait under its id.
+                else if (Reader.Recording.ClassOf(lecture) is { } recorded)
+                    target = recorded.Length > 0 && cfg.ClassNames().Contains(recorded) ? recorded : Configs.Unsorted;
+                else return Http.Detail(404, "no such lecture");
             }
             else if (className is not null)
             {
@@ -162,7 +170,7 @@ public sealed partial class LibraryWeb
                 string name = Attachments.SafeName(f.Sent);
                 string file = Attachments.FreeName(dir, name);
                 File.Move(f.Staged, Path.Combine(dir, file));
-                var a = new Attachment(Http.TokenUrlSafe(9), name, file, target, lecture, f.Size, Attachments.Sniff(f.Head, name), added);
+                var a = new Attachment(Http.TokenUrlSafe(9), name, file, target, lecture, f.Size, Attachments.Sniff(f.Head, name), added, Taken: taken ?? "", Kind: kind ?? "");
                 store.AddAttachment(a);
                 ReadLater(a);
                 kept.Add(a.ToJson());
@@ -181,6 +189,17 @@ public sealed partial class LibraryWeb
         }
     }
 
+    /// <summary>"12:34" into the lecture, else "".</summary>
+    static string Moment(Attachment a) => a.At is { } s ? new PhotoRef(a.Id, "", s, "").Moment : "";
+
+    /// <summary>Where a note's <c>![alt](attachment:ID)</c> pictures are, for that lecture's own pictures only; any other id is null.</summary>
+    Func<string, string?> OwnPhotos(string noteId, string before, string after)
+    {
+        HashSet<string>? mine = null;
+        return id => (mine ??= [.. store.ListAttachments(noteId: noteId).Where(a => a.Type.StartsWith("image/", StringComparison.Ordinal)).Select(a => a.Id)])
+            .Contains(id) ? before + Ui.Quote(id, "") + after : null;
+    }
+
     /// <summary>"Reading your handwriting…" while an attachment's words are read.</summary>
     public const string ReadingWords = "Reading your handwriting…";
 
@@ -194,7 +213,12 @@ public sealed partial class LibraryWeb
         var titles = new Dictionary<string, string>();
         string Of(string id) => titles.TryGetValue(id, out var t) ? t
             : titles[id] = store.Get(id) is { } r ? FirstOf(r.LectureTitle, r.Title, "a lecture") : "a lecture";
-        string rows = string.Concat(list.Select(a =>
+        // Whiteboard photos sit in a strip in the order they were taken, each labelled with its moment.
+        var photos = list.Where(a => a.IsPhoto && a.Type.StartsWith("image/", StringComparison.Ordinal)).OrderBy(a => a.Taken, StringComparer.Ordinal).ToList();
+        string strip = photos.Count == 0 ? "" : "<div class=\"photos\">" + string.Concat(photos.Select(a =>
+            $"<a href=\"/attachments/{Ui.Quote(a.Id, "")}\"><img src=\"/attachments/{Ui.Quote(a.Id, "")}\" alt=\"Whiteboard {Ui.Esc(Moment(a))}\" loading=\"lazy\">"
+            + $"<span>{Ui.Esc(Moment(a))}</span></a>")) + "</div>";
+        string rows = string.Concat(list.Where(a => !photos.Contains(a)).Select(a =>
         {
             string state = a.State == Attachment.Reading ? ReadingWords : a.HasText ? "" : "No words to read in it";
             string about = string.Join(" · ", new[]
@@ -209,7 +233,7 @@ public sealed partial class LibraryWeb
             ? $"<form class=\"row\" method=\"post\" action=\"/note/{Ui.Quote(noteId, "")}/resummarize\"><span class=\"grow\">Your notes were written before some of these came.</span>"
               + "<button>Rewrite notes with your attachments</button></form>"
             : "";
-        return $"<h2>Attachments</h2><div class=\"group\"{(reading ? " data-refresh=\"15\"" : "")}>{rows}{rewrite}</div>";
+        return $"<h2>Attachments</h2>{strip}" + (rows.Length + rewrite.Length == 0 ? "" : $"<div class=\"group\"{(reading ? " data-refresh=\"15\"" : "")}>{rows}{rewrite}</div>");
     }
 
     static IResult TooBig() => Http.Detail(StatusCodes.Status413PayloadTooLarge, "That's more than 200 MB at once. Attach fewer files, or smaller ones.");

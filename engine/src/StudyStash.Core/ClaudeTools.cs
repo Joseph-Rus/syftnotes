@@ -242,6 +242,14 @@ public sealed class RemoteLibrary(string serverUrl, string key, HttpClient? http
     public async Task MoveAsync(string id, string className) =>
         await SendAsync(HttpMethod.Post, $"/lectures/{Q(id)}/class", new JsonObject { ["class"] = className });
 
+    /// <summary>Tells the library what this computer is recording (or, with <paramref name="stopped"/>, that it stopped),
+    /// so a phone's camera knows which lecture its photos are for.</summary>
+    public async Task RecordingNowAsync(string id, string className, string title, string started, bool stopped, CancellationToken stop = default) =>
+        await SendAsync(HttpMethod.Post, "/recording-now", new JsonObject
+        {
+            ["id"] = id, ["class"] = className, ["title"] = title, ["started"] = started, ["stopped"] = stopped,
+        }, stop);
+
     public async Task RewriteAsync(string id) => await SendAsync(HttpMethod.Post, $"/lectures/{Q(id)}/rewrite", new JsonObject());
 
     /// <summary>Gives a lecture a title of the student's own; the library keeps it from then on.</summary>

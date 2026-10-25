@@ -462,6 +462,8 @@ public sealed partial class NoteView : StackPanel
             case MathBlock mb:
                 // A formula still being written (an answer arriving in pieces) is typeset once its $$ closes.
                 return mb.ClosingFencedCharCount == 0 && AtEnd(mb) ? Pending(FormulaWords) : DisplayMath(mb.Lines.ToString());
+            case ParagraphBlock p when OwnPhoto(p) is { } photo:
+                return Photo(photo.Id, photo.Alt);
             case ParagraphBlock p:
                 return Paragraph(p.Inline);
             case ListBlock list:
@@ -667,6 +669,51 @@ public sealed partial class NoteView : StackPanel
         t.Text = words;
         t.Bind(TextBlock.ForegroundProperty, t.GetResourceObservable("Fg3"));
         return t;
+    }
+
+    /// <summary>Gives <c>![alt](attachment:ID)</c> its picture: the id's file on this computer, once the open lecture's
+    /// attachments say the id is its own (null for any other id). Set by the shell for the lecture on the page.</summary>
+    public static Func<string, Task<string?>>? PhotoSource { get; set; }
+
+    const string AttachmentScheme = "attachment:";
+
+    /// <summary>A paragraph that is just one <c>![alt](attachment:ID)</c>.</summary>
+    static (string Id, string Alt)? OwnPhoto(ParagraphBlock p)
+    {
+        var parts = p.Inline?.Where(i => i is not LineBreakInline).ToList();
+        if (parts is not [LinkInline { IsImage: true, Url: { } url } link] || !url.StartsWith(AttachmentScheme, StringComparison.OrdinalIgnoreCase)) return null;
+        return (url[AttachmentScheme.Length..].Trim(), string.Concat(link.Descendants<LiteralInline>().Select(l => l.Content.ToString())));
+    }
+
+    /// <summary>A photo the notes embed: the picture under its words ("Whiteboard at 12:34"); the words alone if the
+    /// photo isn't this lecture's or can't be fetched.</summary>
+    Control Photo(string id, string alt)
+    {
+        var picture = new Image { Stretch = Stretch.Uniform, MaxHeight = 440, HorizontalAlignment = HorizontalAlignment.Left, IsVisible = false };
+        var caption = Text("TextFont", Mac ? 12 : 13, 1.4);
+        caption.Text = alt;
+        caption.Bind(TextBlock.ForegroundProperty, caption.GetResourceObservable("Fg2"));
+        AutomationProperties.SetName(picture, alt.Length > 0 ? alt : "Whiteboard photo");
+        var frame = new Border { CornerRadius = new CornerRadius(10), ClipToBounds = true, HorizontalAlignment = HorizontalAlignment.Left, Child = picture };
+        var box = new StackPanel { Spacing = 6, Children = { frame, caption } };
+        box.AttachedToVisualTree += async (_, _) =>
+        {
+            if (picture.Source is not null || PhotoSource is not { } source) return;
+            try
+            {
+                if (await source(id) is { } path && File.Exists(path))
+                {
+                    using var stream = File.OpenRead(path);
+                    picture.Source = Avalonia.Media.Imaging.Bitmap.DecodeToWidth(stream, 1400);
+                    picture.IsVisible = true;
+                }
+            }
+            catch (Exception e) when (e is IOException or UnauthorizedAccessException or ArgumentException or NotSupportedException)
+            {
+                // The words stay; the notes still read.
+            }
+        };
+        return box;
     }
 
     public const string DrawingWords = "Drawing the diagram…";

@@ -413,3 +413,14 @@ short:
    a recording, then a notebook page attached to its lecture, works only in that order (the library says 404 for an
    attachment to a lecture it hasn't got yet). So the phone keeps its box's requests in the order it asked them,
    and a write that stays waiting holds the writes behind it until it's done.
+
+## Whiteboard photos (laptop and library side)
+
+- The laptop's app tells its own library what it records: `POST /api/v2/recording-now` `{id, class, title, started, stopped}` at start, every 30 s and at stop.
+  The library keeps it in memory for 90 s after the last report (`RecordingNow`) and answers `GET /api/v2/library` with
+  `"recording_now": {"id","class","title","started"}` or `null`. The app also makes the phone link's copy of `/library` look again at once (`DriveLink.CopyNow`).
+- `POST /api/v2/attachments` takes `lecture`, `taken` (ISO 8601 with offset) and `kind` (`whiteboard`). `lecture` may be a lecture the library has, or
+  the id of the current or a recent (24 h) recording-now: the photo waits under that id, in the recording's class (else Unsorted), and is that lecture's once it arrives.
+- An attachment's JSON gains `taken`, `at` (seconds from the lecture's start, worked out by the library once the lecture is there, else `null`) and `kind`.
+- Notes writing gives the photos to the AI as images (Claude Code: files copied into its working folder and named in the prompt; Codex: `--image`);
+  Gemini and Ollama get each photo's OCR text. A note may embed `![Whiteboard at 12:34](attachment:<id>)`; every renderer shows only that lecture's own pictures.

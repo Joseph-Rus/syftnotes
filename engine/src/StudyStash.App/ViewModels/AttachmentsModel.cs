@@ -47,6 +47,15 @@ public sealed partial class AttachmentItem : ObservableObject
     [ObservableProperty] public partial bool Opening { get; set; }
 }
 
+/// <summary>One whiteboard photo in the strip: its moment in the lecture ("12:34") and its picture, once fetched.</summary>
+public sealed partial class PhotoItem : ObservableObject
+{
+    public string Id { get; init; } = "";
+    public string Name { get; init; } = "";
+    public string Label { get; init; } = "";
+    [ObservableProperty] public partial Avalonia.Media.Imaging.Bitmap? Thumb { get; set; }
+}
+
 /// <summary>
 /// What's attached to a lecture (or a class): the files, an Attach button and a place to drop files, "Reading your
 /// handwriting…" while the library reads them, and for a lecture whose notes came first, "Rewrite notes with your
@@ -59,6 +68,14 @@ public sealed partial class AttachmentsModel(IAttachmentLibrary library, string?
     public string? ClassName { get; } = className;
     public string? LectureId { get; } = lectureId;
     public ObservableCollection<AttachmentItem> Items { get; } = [];
+    /// <summary>The lecture's whiteboard photos, in the order they were taken.</summary>
+    public ObservableCollection<PhotoItem> Photos { get; } = [];
+    public bool HasPhotos => Photos.Count > 0;
+    public string HeaderText => HasItems ? AttachmentWords.Heading : "Whiteboard photos";
+
+    /// <summary>Ids of this lecture's pictures from the last listing: the only ones its notes may show.</summary>
+    HashSet<string> pictures = [];
+    readonly TaskCompletionSource listed = new(TaskCreationOptions.RunContinuationsAsynchronously);
 
     [ObservableProperty] public partial bool Reading { get; set; }
     [ObservableProperty] public partial bool Busy { get; set; }
@@ -69,7 +86,7 @@ public sealed partial class AttachmentsModel(IAttachmentLibrary library, string?
     public bool HasItems => Items.Count > 0;
     /// <summary>The "Attachments" row with its Attach button, once something's attached; until then the page's own
     /// Attach (beside a lecture's Notes and Transcript, beside a class's name) is the way in.</summary>
-    public bool ShowHeader => HasItems;
+    public bool ShowHeader => HasItems || HasPhotos;
     public bool HasProblem => !string.IsNullOrEmpty(Problem);
     public bool HasSaid => !string.IsNullOrEmpty(Said);
 
@@ -122,10 +139,12 @@ public sealed partial class AttachmentsModel(IAttachmentLibrary library, string?
         {
             Problem = AttachmentWords.OlderLibrary;
             Reading = false;
+            listed.TrySetResult();
             return;
         }
         Problem = null;
         Show(list["attachments"] as JsonArray ?? []);
+        listed.TrySetResult();
         OfferRewrite = list["rewrite"] is JsonValue r && r.TryGetValue(out bool offer) && offer;
     }
 
@@ -135,9 +154,18 @@ public sealed partial class AttachmentsModel(IAttachmentLibrary library, string?
     void Show(JsonArray list)
     {
         Items.Clear();
+        var shown = Photos.Select(p => p.Id).ToHashSet();
+        var photos = new List<(string Taken, PhotoItem Item)>();
+        pictures = [.. list.OfType<JsonObject>().Where(a => S(a["type"]).StartsWith("image/", StringComparison.Ordinal)).Select(a => S(a["id"]))];
         foreach (var a in list.OfType<JsonObject>())
         {
             string name = S(a["name"]), type = S(a["type"]);
+            if (S(a["kind"]) == Attachment.Whiteboard && type.StartsWith("image/", StringComparison.Ordinal))
+            {
+                double? at = a["at"] is JsonValue av && av.TryGetValue(out double seconds) ? seconds : null;
+                photos.Add((S(a["taken"]), new PhotoItem { Id = S(a["id"]), Name = name, Label = new PhotoRef("", "", at, "").Moment }));
+                continue;
+            }
             long size = a["size"] is JsonValue sv ? sv.TryGetValue(out long bytes) ? bytes : sv.TryGetValue(out int small) ? small : 0 : 0;
             Items.Add(new AttachmentItem
             {
@@ -146,8 +174,69 @@ public sealed partial class AttachmentsModel(IAttachmentLibrary library, string?
             });
         }
         Reading = Items.Any(i => i.Reading);
+        var ordered = photos.OrderBy(p => p.Taken, StringComparer.Ordinal).Select(p => p.Item).ToList();
+        if (!ordered.Select(p => p.Id).SequenceEqual(Photos.Select(p => p.Id)))
+        {
+            Photos.Clear();
+            foreach (var p in ordered) Photos.Add(p);
+            foreach (var p in ordered) _ = LoadThumb(p);
+            OnPropertyChanged(nameof(HasPhotos));
+        }
         OnPropertyChanged(nameof(HasItems));
         OnPropertyChanged(nameof(ShowHeader));
+    }
+
+    /// <summary>The file of one of this lecture's pictures on this computer, fetched from the library the first time; null
+    /// for an id that isn't one of this lecture's own attachments or can't be fetched.</summary>
+    public async Task<string?> PhotoFileAsync(string id)
+    {
+        await listed.Task;
+        if (!pictures.Contains(id) || stop.IsCancellationRequested) return null;
+        string path = Path.Combine(CacheDir, id, "photo");
+        try
+        {
+            if (!File.Exists(path)) await library.DownloadAttachmentAsync(id, path, stop.Token);
+            return path;
+        }
+        catch (Exception e) when (e is HttpRequestException or TaskCanceledException or LibraryRefusedException or IOException or UnauthorizedAccessException)
+        {
+            return null;
+        }
+    }
+
+    async Task LoadThumb(PhotoItem item)
+    {
+        if (await PhotoFileAsync(item.Id) is not { } path) return;
+        try
+        {
+            using var stream = File.OpenRead(path);
+            var bitmap = Avalonia.Media.Imaging.Bitmap.DecodeToHeight(stream, 200);
+            Avalonia.Threading.Dispatcher.UIThread.Post(() => item.Thumb = bitmap);
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException or ArgumentException or NotSupportedException)
+        {
+        }
+    }
+
+    /// <summary>A tapped photo opens full size, with the computer's own picture viewer.</summary>
+    [RelayCommand]
+    async Task OpenPhoto(PhotoItem item)
+    {
+        if (await PhotoFileAsync(item.Id) is not { } path)
+        {
+            Problem = $"Couldn't open {item.Name}.";
+            return;
+        }
+        string named = Path.Combine(CacheDir, item.Id, Attachments.SafeName(item.Name));
+        try
+        {
+            File.Copy(path, named, true);
+            OpenFile(named);
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException)
+        {
+            Problem = $"Couldn't open {item.Name}.";
+        }
     }
 
     [RelayCommand]

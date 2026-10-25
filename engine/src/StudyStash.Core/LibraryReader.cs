@@ -16,6 +16,9 @@ public sealed partial class LibraryReader(Config cfg, Store store)
     public Config Cfg { get; } = cfg;
     public Store Store { get; } = store;
 
+    /// <summary>What the laptop says it is recording (see <see cref="RecordingNow"/>).</summary>
+    public RecordingNow Recording { get; init; } = new();
+
     /// <summary>The library's name, its classes (in the order they were added: their dot colors follow it), and how
     /// much is waiting.</summary>
     public JsonObject Overview()
@@ -57,6 +60,7 @@ public sealed partial class LibraryReader(Config cfg, Store store)
             // What it's for (empty until asked) and so whether it's for school: classes, Canvas and due dates, or folders.
             ["uses"] = new JsonArray(Cfg.Uses.Select(u => (JsonNode?)u).ToArray()),
             ["for_school"] = Cfg.ForSchool,
+            ["recording_now"] = Recording.Json(),
         };
     }
 

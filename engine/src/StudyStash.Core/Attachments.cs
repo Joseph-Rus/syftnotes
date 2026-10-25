@@ -13,9 +13,16 @@ namespace StudyStash.Core;
 /// <param name="NoteId">The lecture it belongs to, or null for the whole class.</param>
 /// <param name="State">"reading" while its words are being read, "read" once they are, "unread" when there were none to read.</param>
 /// <param name="Used">The lecture's notes were written with its words.</param>
+/// <param name="Taken">For a photo: when it was taken (ISO 8601 with offset), else "".</param>
+/// <param name="Kind">"whiteboard" for a photo of the board, else "".</param>
+/// <param name="At">Seconds from the lecture's start to <paramref name="Taken"/>, worked out by the library.</param>
 public sealed record Attachment(string Id, string Name, string File, string ClassName, string? NoteId, long Size, string Type,
-    string Added, string Text = "", string State = Attachment.Reading, bool Used = false)
+    string Added, string Text = "", string State = Attachment.Reading, bool Used = false, string Taken = "", string Kind = "", double? At = null)
 {
+    public const string Whiteboard = "whiteboard";
+
+    public bool IsPhoto => Kind == Whiteboard;
+
     public const string Reading = "reading", Read = "read", Unread = "unread";
 
     public bool HasText => Text.Length > 0;
@@ -26,6 +33,8 @@ public sealed record Attachment(string Id, string Name, string File, string Clas
     {
         ["id"] = Id, ["name"] = Name, ["class"] = ClassName, ["lecture"] = NoteId, ["size"] = Size, ["type"] = Type,
         ["added"] = Added, ["hasText"] = HasText, ["reading"] = State == Reading,
+        // A photo taken during a lecture: when, how many seconds into the lecture (once the lecture is known), and what for.
+        ["taken"] = Taken.Length > 0 ? Taken : null, ["at"] = At, ["kind"] = Kind.Length > 0 ? Kind : null,
     };
 }
 

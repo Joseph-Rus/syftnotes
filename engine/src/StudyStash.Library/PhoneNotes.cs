@@ -17,7 +17,7 @@ public static partial class PhoneNotes
     [GeneratedRegex("(?:<p>)?B(\\d+)(?:</p>)?")]
     private static partial Regex BlockMark();
 
-    public static string Render(string? markdown)
+    public static string Render(string? markdown, Func<string, string?>? photo = null)
     {
         string[] lines = NoteBlocks.Lines(markdown ?? "");
         var blocks = new List<string>();
@@ -35,7 +35,7 @@ public static partial class PhoneNotes
             at = block.Last + 1;
         }
         for (; at < lines.Length; at++) output.Add(lines[at]);
-        string html = Ui.RenderMd(string.Join("\n", output), Formula);
+        string html = Ui.RenderMd(string.Join("\n", output), Formula, photo);
         return BlockMark().Replace(html, m => blocks[int.Parse(m.Groups[1].Value, CultureInfo.InvariantCulture)]);
     }
 

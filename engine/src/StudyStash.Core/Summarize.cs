@@ -1,3 +1,4 @@
+using System.Text;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using System.Text.RegularExpressions;
@@ -456,7 +457,7 @@ public static partial class Summarize
     /// writes notes for the library, and what "Copy for your AI" puts before the transcript.</summary>
     public static string Brief(Meeting m, Drawings drawings = Drawings.Flowcharts, string attached = "") =>
         "You are an expert note-taker for university lectures. Write study notes for this lecture "
-        + $"from its transcript.\n\n{Shape(m)}\n\n{Drawing(drawings)}\n\n{Rules}\n\n{Header(m)}{TypedPart(m)}{AttachedPart(attached)}";
+        + $"from its transcript.\n\n{Shape(m)}\n\n{Drawing(drawings)}\n\n{Rules}\n\n{Header(m)}{TypedPart(m)}{AttachedPart(attached)}{PhotosPart(m)}";
 
     /// <summary>What the student typed during the lecture, as they typed it (never more than a few pages of it).</summary>
     public static string Typed(Meeting m) => Py.Head(Py.Strip(m.PrivateNotes), MaxTypedChars);
@@ -484,8 +485,32 @@ public static partial class Summarize
     public static string NotesPrompt(Meeting m, string notes, string attached = "") =>
         "You are an expert note-taker for university lectures. There is no transcript of this lecture: another app took "
         + "the notes below while it was given. Rewrite them as study notes.\n\n"
-        + $"{Shape(m)}\n\n{Drawing(Drawings.None)}\n\n{NotesRules}\n\n{Header(m)}{TypedPart(m)}{AttachedPart(attached)}"
+        + $"{Shape(m)}\n\n{Drawing(Drawings.None)}\n\n{NotesRules}\n\n{Header(m)}{TypedPart(m)}{AttachedPart(attached)}{PhotosPart(m)}"
         + $"\n\nThe notes it came with:\n{notes}";
+
+    /// <summary>The whiteboard photos: the AI looks at the image files when it has them, else reads the words taken from
+    /// them. Each goes into the notes where it was written, as notes; a drawing that won't convert is embedded instead.</summary>
+    public static string PhotosPart(Meeting m)
+    {
+        if (m.Photos.Count == 0) return "";
+        var sb = new StringBuilder("\n\nThe student photographed the whiteboard during the lecture. ");
+        sb.Append(m.PhotoFiles is null
+            ? "Here are the words read from each photo, with the moment in the lecture it was taken:\n\n"
+            : "Look at each image (they are attached, and the files are named here; open a file with your file-reading tool if you cannot see it). Each is listed with the moment in the lecture it was taken:\n\n");
+        foreach (var p in m.Photos)
+        {
+            string when = p.Moment.Length > 0 ? $"at {p.Moment}" : "(moment unknown)";
+            sb.Append($"- Photo {when}, id {p.Id}");
+            if (m.PhotoFiles is not null && m.PhotoFiles.TryGetValue(p.Id, out var file)) sb.Append($", file {file}");
+            else if (p.Text.Trim().Length > 0) sb.Append($", words: {Py.Head(Py.Strip(p.Text), 1500)}");
+            sb.Append('\n');
+        }
+        sb.Append("\nFor each photo, put what is on the board into the notes at the point where it was written (by its moment): "
+            + "equations as the notes' maths, diagrams as the Mermaid or SVG the notes already draw, lists and tables as Markdown. "
+            + "When a drawing doesn't convert well, embed the photo instead with exactly `![Whiteboard at 12:34](attachment:ID)`, "
+            + "using the photo's own id and moment.");
+        return sb.ToString();
+    }
 
     /// <summary>What the student attached, under its own heading, for the notes to draw on; nothing when there's none.</summary>
     static string AttachedPart(string attached) => attached.Length == 0 ? ""
@@ -513,7 +538,7 @@ public static partial class Summarize
         string joined = string.Join("\n\n", notes.Select((n, i) => $"### Part {i + 1}\n{n}"));
         return "You are an expert note-taker for university lectures. Below are notes on consecutive parts of one "
             + "lecture. Merge them into one set of study notes, removing repetition and keeping every distinct "
-            + $"fact.\n\n{Shape(m)}\n\n{Drawing(drawings)}\n\n{Rules}\n\n{Header(m)}{TypedPart(m)}{AttachedPart(attached)}\n\n{joined}";
+            + $"fact.\n\n{Shape(m)}\n\n{Drawing(drawings)}\n\n{Rules}\n\n{Header(m)}{TypedPart(m)}{AttachedPart(attached)}{PhotosPart(m)}\n\n{joined}";
     }
 
     /// <summary>What a line starts with before its words: a heading's #s, a bullet (and its checkbox), a number, a quote's &gt;.</summary>
@@ -892,7 +917,7 @@ public static partial class Summarize
         int budget = TranscriptBudget(ctx);
         // What the student attached takes part of the room (never more than a third), and the transcript the rest.
         string attached = Attachments.Context(m.Attached, Math.Min(Attachments.MaxContextChars, budget / AttachedShare));
-        budget -= attached.Length + Typed(m).Length;
+        budget -= attached.Length + Typed(m).Length + PhotosPart(m).Length;
         if (FromNotes(m))
         {
             // No transcript: the notes are written from the ones it came with, which fit in one call (cut to fit if
