@@ -92,9 +92,8 @@ public class SignInAgainTests
         using var dir = new TempDir();
         string exe = FakeAgents.WriteCli(dir["claude"], "claude");
         FakeAgents.Replay(dir["claude"], [Failed(RefreshBusy)], 1);
-        FakeAgents.Replay(dir["claude"], ["""{"type":"result","is_error":false,"result":"## Recursion","session_id":"s2"}"""], 2);
-        var claude = new ClaudeProvider { At = exe, RefreshWait = TimeSpan.Zero };
-        var r = await claude.CompleteAsync(new AiRequest("notes", dir.Path));
+        FakeAgents.Replay(dir["claude"], [Answer("## Recursion")], 2);
+        var r = await Claude(exe).CompleteAsync(new AiRequest("notes", dir.Path));
         Assert.True(r.Ok, r.Text);
         Assert.Equal("## Recursion", r.Text);
         Assert.Equal(2, FakeAgents.Turns(dir["claude"]));
@@ -103,17 +102,119 @@ public class SignInAgainTests
         using var again = new TempDir();
         exe = FakeAgents.WriteCli(again["claude"], "claude");
         FakeAgents.Replay(again["claude"], [Failed(RefreshBusy)]);
-        r = await new ClaudeProvider { At = exe, RefreshWait = TimeSpan.Zero }.CompleteAsync(new AiRequest("notes", again.Path));
+        r = await Claude(exe).CompleteAsync(new AiRequest("notes", again.Path));
         Assert.False(r.Ok);
         Assert.Contains("another Claude Code process", r.Text);
         Assert.Equal(ClaudeProvider.RefreshTries, FakeAgents.Turns(again["claude"]));
+    }
 
-        // Signed out for real is said at once, never tried again.
-        using var signedOut = new TempDir();
-        exe = FakeAgents.WriteCli(signedOut["claude"], "claude");
-        FakeAgents.Replay(signedOut["claude"], [Failed("Failed to authenticate: OAuth token revoked. Please log in again or contact your administrator.")]);
-        r = await new ClaudeProvider { At = exe, RefreshWait = TimeSpan.Zero }.CompleteAsync(new AiRequest("notes", signedOut.Path));
+    /// <summary>A sign-in that "couldn't be refreshed" is tried once more as a fresh claude, alone: another Claude Code
+    /// may just have renewed it. Only when that fails too is Claude signed out, and the lecture says so.</summary>
+    [Fact]
+    public async Task A_sign_in_that_couldnt_be_renewed_is_tried_once_more_alone_before_it_counts_as_signed_out()
+    {
+        const string Expired = "Failed to authenticate: OAuth session expired and could not be refreshed";
+        using var dir = new TempDir();
+        string exe = FakeAgents.WriteCli(dir["claude"], "claude");
+        FakeAgents.Replay(dir["claude"], [Failed(Expired)], 1);
+        FakeAgents.Replay(dir["claude"], [Answer("## Recursion")], 2);
+        var gate = new SignInGate();
+        var r = await Claude(exe, gate).CompleteAsync(new AiRequest("notes", dir.Path));
+        Assert.True(r.Ok, r.Text);
+        Assert.Equal(2, FakeAgents.Turns(dir["claude"]));
+        Assert.True(gate.Warm); // it worked: the next runs start at once
+
+        // Signed out for real: the fresh run fails too, and then the words stand, as signed out.
+        using var gone = new TempDir();
+        exe = FakeAgents.WriteCli(gone["claude"], "claude");
+        FakeAgents.Replay(gone["claude"], [Failed(Expired)]);
+        gate = new SignInGate();
+        r = await Claude(exe, gate).CompleteAsync(new AiRequest("notes", gone.Path));
+        Assert.False(r.Ok);
         Assert.True(Engines.LooksSignedOut(r.Text));
-        Assert.Equal(1, FakeAgents.Turns(signedOut["claude"]));
+        Assert.Equal(2, FakeAgents.Turns(gone["claude"]));
+        Assert.False(gate.Warm); // the next run signs in alone again
+    }
+
+    /// <summary>After a quiet spell the first Claude run signs in alone: a second started at the same moment waits
+    /// until the first has begun to answer (its sign-in renewed), then runs. The one leading streams, so the wait ends
+    /// as soon as Claude begins, not when it's done; the one that waited doesn't stream, as it didn't ask to.</summary>
+    [Fact]
+    public async Task After_a_quiet_spell_one_claude_signs_in_alone_and_the_next_waits_for_it()
+    {
+        using var dir = new TempDir();
+        string bin = dir["claude"], exe = FakeAgents.WriteCli(bin, "claude");
+        // Each run prints its first line, waits two seconds (as if renewing the sign-in), then begins to answer.
+        FakeAgents.Replay(bin, [
+            """{"type":"system","subtype":"init","session_id":"s1"}""",
+            """{"type":"stream_event","event":{"type":"message_start","message":{}},"parent_tool_use_id":null}""",
+            Answer("ready"),
+        ]);
+        File.WriteAllText(Path.Combine(bin, "sleep"), "2");
+        var claude = Claude(exe, new SignInGate());
+
+        var first = claude.CompleteAsync(new AiRequest("notes", dir.Path));
+        await Until(() => FakeAgents.Turns(bin) == 1);
+        var second = claude.CompleteAsync(new AiRequest("a question", dir.Path));
+        await Task.Delay(700);
+        Assert.Equal(1, FakeAgents.Turns(bin)); // the first is still signing in: the second hasn't started
+        Assert.True((await first).Ok);
+        Assert.True((await second).Ok);
+        Assert.Equal(2, FakeAgents.Turns(bin));
+        Assert.Contains("--include-partial-messages", FakeAgents.Argv(bin, 1));
+        Assert.DoesNotContain("--include-partial-messages", FakeAgents.Argv(bin, 2));
+    }
+
+    /// <summary>The gate on its own: who leads, who waits, and when it goes cold again.</summary>
+    [Fact]
+    public async Task The_sign_in_gate_lets_one_lead_after_a_quiet_spell_or_a_turned_away_run()
+    {
+        var now = new DateTime(2026, 10, 24, 9, 0, 0, DateTimeKind.Utc);
+        var gate = new SignInGate { Now = () => now };
+        var lead = await gate.EnterAsync();
+        Assert.True(lead.Leads);
+        var second = gate.EnterAsync();
+        var third = gate.EnterAsync();
+        await Task.Delay(100);
+        Assert.False(second.IsCompleted || third.IsCompleted); // waiting for the one signing in
+
+        // It finished without getting past sign-in (turned away): one of the others leads, the last still waits.
+        lead.Dispose();
+        var winner = await Task.WhenAny(second, third);
+        var next = await winner;
+        Assert.True(next.Leads);
+        var last = winner == second ? third : second;
+        await Task.Delay(100);
+        Assert.False(last.IsCompleted);
+
+        // This one gets past sign-in: the last goes at once, without leading, and so does the next for five minutes.
+        next.Passed();
+        Assert.False((await last).Leads);
+        Assert.False((await gate.EnterAsync()).Leads);
+        now = now.AddMinutes(6);
+        using (var after = await gate.EnterAsync()) Assert.True(after.Leads); // a quiet spell: lead again
+        (await gate.EnterAsync()).Passed();
+        Assert.True(gate.Warm);
+        gate.Cold(); // a run was turned away
+        using var once = await gate.EnterAsync();
+        Assert.True(once.Leads);
+    }
+
+    static ClaudeProvider Claude(string exe, SignInGate? gate = null) =>
+        new() { At = exe, RefreshWait = TimeSpan.Zero, SignedOutWait = TimeSpan.Zero, Gate = gate ?? new SignInGate() };
+
+    static string Answer(string text) => new System.Text.Json.Nodes.JsonObject
+    {
+        ["type"] = "result", ["is_error"] = false, ["result"] = text, ["session_id"] = "s2",
+    }.ToJsonString();
+
+    static async Task Until(Func<bool> done)
+    {
+        var waited = System.Diagnostics.Stopwatch.StartNew();
+        while (!done())
+        {
+            if (waited.Elapsed > TimeSpan.FromSeconds(20)) throw new TimeoutException("the fake claude didn't start");
+            await Task.Delay(25);
+        }
     }
 }

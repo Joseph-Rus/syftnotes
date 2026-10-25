@@ -392,30 +392,81 @@ public sealed class ClaudeProvider : AiProvider
     public TimeSpan RefreshWait { get; init; } = TimeSpan.FromSeconds(30);
     public const int RefreshTries = 3;
 
-    /// <summary>The run, tried again (after <see cref="RefreshWait"/>) when it stopped before saying anything because
-    /// another Claude Code was renewing the sign-in. Once the tries are used up, its words stand, and they read as
-    /// signed out, as Anthropic's docs say they then are.</summary>
+    /// <summary>How long a run Claude turned away as signed out waits before it's tried once more, as a fresh
+    /// <c>claude</c> that signs in alone (<see cref="SignInGate"/>). Another Claude Code may just have renewed the
+    /// sign-in and left this one holding the old one; only when the fresh run fails too is Claude signed out (the
+    /// lecture says so, with Sign in). Signed out for real, the fresh run stops at once on this computer, with
+    /// nothing sent. The tests make it short.</summary>
+    public TimeSpan SignedOutWait { get; init; } = TimeSpan.FromSeconds(5);
+
+    /// <summary>The gate this provider's runs go through; null for this process's own for the program
+    /// (<see cref="SignInGate.For"/>), which every Claude run of the library's shares. The tests give their own.</summary>
+    public SignInGate? Gate { get; init; }
+
+    /// <summary>
+    /// The run, through the <see cref="SignInGate"/>: after a quiet spell, or after Claude turned one away, it waits
+    /// while another run signs in, or signs in alone itself (streaming, so the others hear the moment Claude begins to
+    /// answer; a caller that didn't ask for the stream doesn't get its pieces). A run that stops before saying
+    /// anything is tried again: after <see cref="RefreshWait"/> while another Claude Code is renewing the sign-in (up
+    /// to <see cref="RefreshTries"/> tries), and once, after <see cref="SignedOutWait"/>, when it was turned away as
+    /// signed out. After that its words stand. An API key's run doesn't use the sign-in and goes straight through.
+    /// </summary>
     public override async IAsyncEnumerable<AiEvent> RunAsync(AiRequest req, bool stream = true,
         [EnumeratorCancellation] CancellationToken ct = default)
     {
-        for (int attempt = 1; ; attempt++)
+        bool onKey = ApiKey is not null && (!Available() || !req.Tools && !req.Write);
+        if (onKey || Exe() is not { } exe)
         {
-            bool said = false, busy = false;
-            await foreach (var e in base.RunAsync(req, stream, ct))
+            await foreach (var e in base.RunAsync(req, stream, ct)) yield return e;
+            yield break;
+        }
+        var gate = Gate ?? SignInGate.For(exe);
+        int busy = 0;
+        bool againAlone = false;
+        while (true)
+        {
+            SignInGate.Turn turn;
+            try
             {
-                if (e.Kind == "error" && !said && attempt < RefreshTries && Engines.LooksLikeRefreshBusy(e.Text))
-                {
-                    busy = true;
-                    break;
-                }
-                said |= e.Kind is "text" or "tool" or "final";
-                yield return e;
+                turn = await gate.EnterAsync(ct);
             }
-            if (!busy) yield break;
+            catch (OperationCanceledException)
+            {
+                yield break;
+            }
+            TimeSpan? again = null;
+            using (turn)
+            {
+                bool said = false;
+                await foreach (var e in base.RunAsync(req, stream || turn.Leads, ct))
+                {
+                    // Claude has begun to answer: past sign-in, and never run twice from here (it may have used tools).
+                    if (e.Kind is "started" or "text" or "tool" or "final")
+                    {
+                        turn.Passed();
+                        said = true;
+                    }
+                    if (e.Kind == "started" || e.Kind == "text" && !stream) continue;
+                    if (e.Kind == "error" && !said)
+                    {
+                        bool renewing = Engines.LooksLikeRefreshBusy(e.Text), signedOut = !renewing && Engines.LooksSignedOut(e.Text);
+                        if (renewing || signedOut) gate.Cold(); // the next run, this one's again included, leads
+                        if (renewing && ++busy < RefreshTries) again = RefreshWait;
+                        else if (signedOut && !againAlone)
+                        {
+                            againAlone = true;
+                            again = SignedOutWait;
+                        }
+                        if (again is not null) break;
+                    }
+                    yield return e;
+                }
+            }
+            if (again is not { } wait) yield break;
             bool stopped = false;
             try
             {
-                await Task.Delay(RefreshWait, ct);
+                await Task.Delay(wait, ct);
             }
             catch (OperationCanceledException)
             {
@@ -482,6 +533,8 @@ public sealed class ClaudeProvider : AiProvider
         if (Json(line) is not { } e) yield break;
         string type = S(e["type"]);
         if (type == "system" && S(e["subtype"]) == "init") yield return new AiEvent("session", S(e["session_id"]));
+        // The model's answer has begun, so Claude Code got past its sign-in (for the SignInGate; not passed on).
+        else if (type == "stream_event" && S(e["event"]?["type"]) == "message_start") yield return new AiEvent("started");
         else if (type == "stream_event" && e["parent_tool_use_id"] is null)
         {
             var ev = e["event"];
