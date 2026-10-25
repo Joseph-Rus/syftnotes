@@ -65,6 +65,8 @@ public static class SettingsIndex
             Words = "start startup login boot launch automatically background", Key = "start_at_login", Short = "Open at login", Takes = OnOff },
         new() { Section = "General", Title = "Update automatically", Detail = "This laptop installs each new version by itself.",
             Words = "updates upgrade new version auto", Key = "auto_update", Short = "Updates", Takes = OnOff, Only = "laptop" },
+        new() { Section = "General", Title = "Count this copy", Detail = "Once a day, one anonymous count of this copy.",
+            Words = "count anonymous users usage ping daily privacy analytics tracking statistics" },
         new() { Section = "General", Title = "Run setup again", Detail = "The first-run steps, with what's set up already kept.",
             Words = "setup wizard onboarding guided start over" },
         new() { Section = "General", Title = "Quit Study Stash", Words = "exit close stop app" },
