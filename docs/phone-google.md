@@ -58,12 +58,12 @@ reading by id every 0.5 s):
 |---|---|
 | laptop.json found by the phone after the link starts | 1.8-2.0 s |
 | the copy's `GET /library` read by the phone | 4.1-4.4 s |
-| the first copy complete (12 lectures, 31 files, four at a time) | 7.6-7.9 s (29.4 s one at a time) |
+| the first copy complete (12 lectures, 31 files, four at a time) | 7.6-8.3 s (29.4 s one at a time) |
 | Ask: the box written (one write) | 0.8-1.0 s |
-| Ask: the first line on the phone, from the moment it starts writing its box | 3.1-4.2 s (six asks) |
-| Ask: done on the phone | 5.0-6.6 s |
+| Ask: the first line on the phone, from the moment it starts writing its box | 3.1-4.2 s in 11 of 12 asks (four runs); one 5.9 s |
+| Ask: done on the phone | 5.0-7.6 s |
 | a rename: answered / in the copy with laptop.json agreeing | 2.7-3.0 s / 7.0-8.2 s |
-| a 6 MB file phone → laptop (uploaded, in the library) / laptop → phone (a blob, read back the same) | 6.5-7.5 s / 6.3-7.7 s |
+| a 6 MB file phone → laptop (uploaded, in the library) / laptop → phone (a blob, read back the same) | 5.6-7.5 s / 6.2-7.7 s |
 
 ## Google
 
@@ -224,6 +224,10 @@ The phone's box, `phone-<phoneId>.json`:
 - The phone takes a request out of its box when its answer is `done`, or when it gives up on it (below). The laptop
   ignores ids in its `answered`. Seeing a box for the first time after it starts, the laptop reads the answer of each
   request in it before doing it (one read, only then): one answered just before a restart isn't done again.
+- A phone's changes (every request but a GET, `/ai/warm`, and a streamed Ask/chat) are done one at a time, in the
+  order they are in its box, as they are over Tailscale where the app awaits each: a recording, then a notebook page
+  attached to its lecture, only works in that order. Reads and Ask don't wait for them. Once a change is done, its
+  box is read again straight away for the next.
 - `upload.fields`: string values only (others are left out); the file goes as the part `file` named `upload.name`
   with type `upload.type`, after the fields, the multipart form the iPhone app makes. The laptop deletes the upload
   once the library has answered (whatever it said); a request with no upload, or whose upload isn't there, is
@@ -392,3 +396,8 @@ short:
    from the copy at once.
 8. **Disconnect** also deletes the answer files (they hold the library's words), as well as laptop.json, copies and
    blobs. Boxes and uploads stay: the phone's.
+9. **A phone's changes are done one at a time, in the order they are in its box** (every request but a GET,
+   `/ai/warm`, and a streamed Ask/chat, which don't wait), as they are over Tailscale, where the app awaits each:
+   a recording, then a notebook page attached to its lecture, works only in that order (the library says 404 for an
+   attachment to a lecture it hasn't got yet). So the phone keeps its box's requests in the order it asked them,
+   and a write that stays waiting holds the writes behind it until it's done.
