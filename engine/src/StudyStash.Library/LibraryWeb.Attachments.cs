@@ -215,8 +215,10 @@ public sealed partial class LibraryWeb
             : titles[id] = store.Get(id) is { } r ? FirstOf(r.LectureTitle, r.Title, "a lecture") : "a lecture";
         // Whiteboard photos sit in a strip in the order they were taken, each labelled with its moment.
         var photos = list.Where(a => a.IsPhoto && a.Type.StartsWith("image/", StringComparison.Ordinal)).OrderBy(a => a.Taken, StringComparer.Ordinal).ToList();
-        string strip = photos.Count == 0 ? "" : "<div class=\"photos\">" + string.Concat(photos.Select(a =>
-            $"<a href=\"/attachments/{Ui.Quote(a.Id, "")}\"><img src=\"/attachments/{Ui.Quote(a.Id, "")}\" alt=\"Whiteboard {Ui.Esc(Moment(a))}\" loading=\"lazy\">"
+        // Styled in place, not in the pages' shared style, so every page without photos stays exactly as it was.
+        string strip = photos.Count == 0 ? "" : "<div class=\"photos\" style=\"display:flex;gap:.6rem;overflow-x:auto;padding:.2rem 0 .8rem\">" + string.Concat(photos.Select(a =>
+            $"<a href=\"/attachments/{Ui.Quote(a.Id, "")}\" style=\"flex:none;text-decoration:none;color:var(--label-2);font-size:.8125rem;text-align:center\">"
+            + $"<img src=\"/attachments/{Ui.Quote(a.Id, "")}\" alt=\"Whiteboard {Ui.Esc(Moment(a))}\" loading=\"lazy\" style=\"display:block;height:6.5rem;width:auto;border-radius:10px;border:1px solid var(--sep)\">"
             + $"<span>{Ui.Esc(Moment(a))}</span></a>")) + "</div>";
         string rows = string.Concat(list.Where(a => !photos.Contains(a)).Select(a =>
         {
