@@ -384,6 +384,47 @@ public sealed class ClaudeProvider : AiProvider
     public static Func<string, Version?> VersionOf { get; set; } = exe =>
         Versions.GetOrAdd(exe, e => Machine.Run(e, ["--version"], TimeSpan.FromSeconds(20)) is { ExitCode: 0 } r ? AgentCli.ParseVersion(r.Stdout) : null);
 
+    /// <summary>How long a run waits before it's tried again when Claude Code stopped because another of its processes
+    /// was renewing the sign-in (<see cref="Engines.LooksLikeRefreshBusy"/>), up to <see cref="RefreshTries"/> tries in
+    /// all, about the minute Anthropic's docs say it takes. Study Stash starts several at once (notes, diagrams, Ask,
+    /// beside the student's own), and one it stopped halfway can leave the renewal locked for a while: without this the
+    /// lecture said "Claude needs you to sign in again" when it didn't. The tests make it short.</summary>
+    public TimeSpan RefreshWait { get; init; } = TimeSpan.FromSeconds(30);
+    public const int RefreshTries = 3;
+
+    /// <summary>The run, tried again (after <see cref="RefreshWait"/>) when it stopped before saying anything because
+    /// another Claude Code was renewing the sign-in. Once the tries are used up, its words stand, and they read as
+    /// signed out, as Anthropic's docs say they then are.</summary>
+    public override async IAsyncEnumerable<AiEvent> RunAsync(AiRequest req, bool stream = true,
+        [EnumeratorCancellation] CancellationToken ct = default)
+    {
+        for (int attempt = 1; ; attempt++)
+        {
+            bool said = false, busy = false;
+            await foreach (var e in base.RunAsync(req, stream, ct))
+            {
+                if (e.Kind == "error" && !said && attempt < RefreshTries && Engines.LooksLikeRefreshBusy(e.Text))
+                {
+                    busy = true;
+                    break;
+                }
+                said |= e.Kind is "text" or "tool" or "final";
+                yield return e;
+            }
+            if (!busy) yield break;
+            bool stopped = false;
+            try
+            {
+                await Task.Delay(RefreshWait, ct);
+            }
+            catch (OperationCanceledException)
+            {
+                stopped = true;
+            }
+            if (stopped) yield break;
+        }
+    }
+
     /// <summary>A plain answer (notes, Check, Ask) is the student's own Claude Code with nothing of theirs added: no MCP
     /// servers of theirs, none of claude.ai's connectors, and, where the version has it, only managed settings
     /// (<c>--restricted</c>), so their own hooks and settings don't run inside the library's work. Agent work

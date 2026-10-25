@@ -65,9 +65,55 @@ public class SignInAgainTests
     [InlineData("Invalid API key · Please run /login", true)]
     [InlineData("OAuth token has expired. Please obtain a new token or refresh your existing token.", true)]
     [InlineData("API Error: 401 {\"type\":\"error\",\"error\":{\"type\":\"authentication_error\",\"message\":\"OAuth token has expired.\"}}", true)]
+    // Claude Code 2.1.287 on, in -p (Anthropic's docs, errors: "OAuth token revoked or expired", "Login expired").
+    [InlineData("Failed to authenticate: OAuth token revoked. Please log in again or contact your administrator.", true)]
+    [InlineData("Failed to authenticate. API Error: 401 OAuth token has expired", true)]
+    [InlineData("Failed to authenticate: OAuth session expired and could not be refreshed", true)]
     [InlineData("Invalid API key · Fix external API key", false)] // a key turned down: signing in doesn't fix it
     [InlineData("Claude AI usage limit reached, resets at 3pm", false)]
     [InlineData("Request timed out", false)]
     public void What_counts_as_needing_to_sign_in_again(string error, bool signedOut) =>
         Assert.Equal(signedOut, Engines.LooksSignedOut(error));
+
+    const string RefreshBusy = "Failed to refresh OAuth token: another Claude Code process is refreshing it or exited mid-refresh. "
+        + "This is usually transient; retry in a minute, and if it persists close other Claude Code processes or sign in again";
+
+    static string Failed(string why) => new System.Text.Json.Nodes.JsonObject
+    {
+        ["type"] = "result", ["is_error"] = true, ["result"] = why, ["session_id"] = "s1",
+    }.ToJsonString();
+
+    /// <summary>Another Claude Code renewing the sign-in isn't Claude signed out: the run is tried again a little later
+    /// and the notes are written, where the lecture used to say "Claude needs you to sign in again". Only when it keeps
+    /// saying so for every try do its words stand (and read as signed out, as Anthropic's docs then say it is).</summary>
+    [Fact]
+    public async Task Claude_busy_renewing_its_sign_in_elsewhere_is_tried_again_not_called_signed_out()
+    {
+        using var dir = new TempDir();
+        string exe = FakeAgents.WriteCli(dir["claude"], "claude");
+        FakeAgents.Replay(dir["claude"], [Failed(RefreshBusy)], 1);
+        FakeAgents.Replay(dir["claude"], ["""{"type":"result","is_error":false,"result":"## Recursion","session_id":"s2"}"""], 2);
+        var claude = new ClaudeProvider { At = exe, RefreshWait = TimeSpan.Zero };
+        var r = await claude.CompleteAsync(new AiRequest("notes", dir.Path));
+        Assert.True(r.Ok, r.Text);
+        Assert.Equal("## Recursion", r.Text);
+        Assert.Equal(2, FakeAgents.Turns(dir["claude"]));
+
+        // Busy every time: three tries, then its own words.
+        using var again = new TempDir();
+        exe = FakeAgents.WriteCli(again["claude"], "claude");
+        FakeAgents.Replay(again["claude"], [Failed(RefreshBusy)]);
+        r = await new ClaudeProvider { At = exe, RefreshWait = TimeSpan.Zero }.CompleteAsync(new AiRequest("notes", again.Path));
+        Assert.False(r.Ok);
+        Assert.Contains("another Claude Code process", r.Text);
+        Assert.Equal(ClaudeProvider.RefreshTries, FakeAgents.Turns(again["claude"]));
+
+        // Signed out for real is said at once, never tried again.
+        using var signedOut = new TempDir();
+        exe = FakeAgents.WriteCli(signedOut["claude"], "claude");
+        FakeAgents.Replay(signedOut["claude"], [Failed("Failed to authenticate: OAuth token revoked. Please log in again or contact your administrator.")]);
+        r = await new ClaudeProvider { At = exe, RefreshWait = TimeSpan.Zero }.CompleteAsync(new AiRequest("notes", signedOut.Path));
+        Assert.True(Engines.LooksSignedOut(r.Text));
+        Assert.Equal(1, FakeAgents.Turns(signedOut["claude"]));
+    }
 }
