@@ -207,6 +207,9 @@ and inside Mermaid labels, and check none comes out.
   scale), the code large in a monospace font, "Works for 9:41 more, once." counting down, the three steps, **Done**,
   and **New code** once it runs out. Then **Phones**: each with when it was added and last used, and **Remove**. A
   refused code (no Tailscale) shows the library's words under it.
+- **Just this computer** (the app's own library, on 127.0.0.1): Settings → Phone connects the phone through the
+  student's Google account instead, with **Connect with Google** in place of **Add a phone**; phones added over
+  Tailscale before stay listed, under "Phones added over Tailscale". See [The phone over Google Drive](phone-google.md).
 - **The library's page** (`/settings#phone`, "Your phone"): the same, server-drawn: **Add a phone** posts
   `/settings/phone`, the page after shows the QR code (an inline SVG from `Qr.Svg`), the code and a countdown; each
   phone has **Remove** (`/settings/phone/{id}/remove`).

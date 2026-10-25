@@ -70,18 +70,19 @@ public sealed class LibraryRig : IAsyncDisposable
     /// <summary>The app's client for this library, with the library password.</summary>
     public CanvasClient Client() => new(Url, Password, http);
 
-    public static async Task<LibraryRig> StartAsync()
+    /// <param name="ai">The library's AIs (a scripted one, for Ask): none by default.</param>
+    public static async Task<LibraryRig> StartAsync(StudyStash.Core.Ai.AiJobs? ai = null)
     {
         var rig = new LibraryRig();
-        await rig.StartLibraryAsync();
+        await rig.StartLibraryAsync(ai);
         return rig;
     }
 
-    async Task StartLibraryAsync()
+    async Task StartLibraryAsync(StudyStash.Core.Ai.AiJobs? ai)
     {
         var cfg = new Config(dir.Path, dir["pool"])
         {
-            PoolPassword = Password, OllamaEnabled = false,
+            PoolPassword = Password, OllamaEnabled = ai is not null,
             Classes = [new ClassDef("CS 101", ["cs101"]), new ClassDef("BIO 110", ["bio110"])],
         };
         store = new Store(cfg.DbPath, cfg.PoolDir);
@@ -90,7 +91,7 @@ public sealed class LibraryRig : IAsyncDisposable
         var options = new LibraryWebOptions
         {
             Canvas = Sync, ListModels = _ => Task.FromResult<List<(string, double)>?>(null), Tailscale = () => new TailscaleInfo(),
-            Latest = _ => Task.FromResult<Release?>(null), RamGb = () => 16, HostName = () => "library-pc", Nonce = () => "NONCE",
+            Latest = _ => Task.FromResult<Release?>(null), RamGb = () => 16, HostName = () => "library-pc", Nonce = () => "NONCE", Ai = ai,
         };
         var builder = WebApplication.CreateSlimBuilder();
         builder.Logging.ClearProviders();
