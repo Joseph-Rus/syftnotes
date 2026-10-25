@@ -11,6 +11,8 @@ static class TestSafety
     internal static void TurnOffSystemChanges()
     {
         Platform.Desktop.SystemChangesOff = true;
+        // The daily count never asks the real Firestore from a test; its own tests give it a fake handler.
+        Services.DailyCount.Off = true;
         // The app's home, and so its log, is a folder of the tests' own: nothing a test logs reaches the real one.
         Program.Home = System.IO.Path.Combine(System.IO.Path.GetTempPath(), "studystash-app-tests", "home");
         Directory.CreateDirectory(System.IO.Path.Combine(Program.Home, "logs"));

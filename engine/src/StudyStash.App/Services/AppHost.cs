@@ -62,6 +62,8 @@ public sealed class AppSettings
     [JsonIgnore]
     public bool LibraryHere => Role != AppRole.Laptop;
     public bool Shortcuts { get; set; } = true;
+    /// <summary>Once a day, one anonymous count of this copy (docs/daily-count.md). Off also deletes its code.</summary>
+    public bool CountThisCopy { get; set; } = true;
     /// <summary>Shortcuts changed from their defaults, by <see cref="KeyAction"/> name: {"Record": "Control+Shift+R"}.</summary>
     public Dictionary<string, string> Keys { get; set; } = [];
     public double? RecorderX { get; set; }
@@ -662,7 +664,15 @@ public sealed partial class AppHost : IDisposable, IProblemSource
         if (Settings.Role != AppRole.Laptop && Settings.SetupDone) _ = RefreshLocalLibraryAsync();
         // The phone over Google Drive: only on just this computer, once Settings → Phone has connected an account.
         if (Settings.Role == AppRole.Both) Drive.Start();
+        // The daily count, in every role: one anonymous post a day unless Settings → General switched it off.
+        var count = Counter = new DailyCount(Home, () => Settings.CountThisCopy, countHttp, Core.Engine.Version, log: log);
+        running.Add(Task.Run(() => count.RunAsync(stop.Token)));
     }
+
+    static readonly HttpClient countHttp = new() { Timeout = TimeSpan.FromSeconds(20) };
+
+    /// <summary>The daily count, once the app has started (Settings' switch deletes its code).</summary>
+    public DailyCount? Counter { get; private set; }
 
     /// <summary>How often old recordings' audio is looked for while the app runs: a Mac's app can run for weeks.</summary>
     internal static readonly TimeSpan PruneEvery = TimeSpan.FromHours(6);

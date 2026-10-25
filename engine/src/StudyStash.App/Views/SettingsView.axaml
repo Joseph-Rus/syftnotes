@@ -791,6 +791,18 @@
                         </StackPanel>
                       </Border>
                 </StackPanel>
+                <!-- The daily count: every role, beside the updates. -->
+                <Border Classes="group">
+                  <Border Classes="row">
+                    <Grid ColumnDefinitions="*,Auto">
+                      <StackPanel Spacing="2" VerticalAlignment="Center">
+                        <TextBlock Classes="row-title" Text="Count this copy" />
+                        <TextBlock Classes="row-sub" Text="{Binding CountThisCopySub}" TextWrapping="Wrap" />
+                      </StackPanel>
+                      <ToggleButton AutomationProperties.Name="Count this copy" Grid.Column="1" Classes="switch act" IsChecked="{Binding CountThisCopy}" Margin="12,0,0,0" />
+                    </Grid>
+                  </Border>
+                </Border>
                 <StackPanel Spacing="8">
                   <TextBlock Classes="section gap" Text="Shortcuts" />
                                   <CheckBox IsChecked="{Binding Shortcuts}" Margin="0,4,0,4">

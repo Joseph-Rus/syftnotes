@@ -209,6 +209,8 @@ public sealed partial class SettingsModel : ObservableObject, IDisposable
     [ObservableProperty] public partial string SpeakersLine { get; set; } = "";
     [ObservableProperty] public partial string KeepAudio { get; set; } = "30";
     [ObservableProperty] public partial bool Shortcuts { get; set; }
+    [ObservableProperty] public partial bool CountThisCopy { get; set; } = true;
+    public string CountThisCopySub => "Once a day, send one anonymous count (a random code for this copy, the version and Mac or Windows) so we know how many people use Study Stash.";
     /// <summary>Which shortcut (if either) another app already has, once the toggle's had a moment to try them.</summary>
     [ObservableProperty] public partial string? ShortcutsSay { get; set; }
     public bool CanRecordComputerAudio => host.CanRecordComputerAudio;
@@ -445,6 +447,7 @@ public sealed partial class SettingsModel : ObservableObject, IDisposable
         SpeakersLine = SpeakersWords(host);
         KeepAudio = host.Settings.KeepAudioDays.ToString(System.Globalization.CultureInfo.InvariantCulture);
         Shortcuts = host.Settings.Shortcuts;
+        CountThisCopy = host.Settings.CountThisCopy;
         StartAtLogin = host.LoginItems.StartsAtLogin(host.Home);
         AutoUpdateHere = cc.AutoUpdate;
         UpdateHereLine = $"Study Stash {Version} on this laptop";
@@ -714,6 +717,13 @@ public sealed partial class SettingsModel : ObservableObject, IDisposable
         if (host.DownloadProblem is { } problem && host.DownloadingModel?.Id == WhisperModels.Speakers.Id) return problem;
         if (host.Downloading is { } d && host.DownloadingModel?.Id == WhisperModels.Speakers.Id) return $"Downloading the voice model: {d.Amount}.";
         return $"On. The voice model ({size}) downloads once the transcription model is here.";
+    }
+
+    partial void OnCountThisCopyChanged(bool value)
+    {
+        if (loading) return;
+        host.Save(s => s.CountThisCopy = value);
+        if (!value) (host.Counter ?? new DailyCount(host.Home, () => false, new HttpClient(), "")).Forget();
     }
 
     partial void OnShortcutsChanged(bool value)
