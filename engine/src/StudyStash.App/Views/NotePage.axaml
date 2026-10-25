@@ -12,6 +12,10 @@
              x:Class="StudyStash.App.Views.NotePage"
              x:DataType="vm:LibraryModel">
   <UserControl.Styles>
+    <!-- A lecture's Attach is the one beside its tabs: the attachments' own (a class page's) isn't shown twice. -->
+    <Style Selector="c|BySkin#LectureAttachments Button#Attach">
+      <Setter Property="IsVisible" Value="False" />
+    </Style>
     <!-- The page is one column the notes' width, centred in the pane however wide it is (the sidebar shut, a big
          screen); the ask bar keeps to the same column. -->
     <Style Selector="StackPanel.np-page">
@@ -199,7 +203,7 @@
           <Border Classes="rule" />
 
           <!-- What's attached to it (drop files anywhere on the page) -->
-          <Panel IsVisible="{Binding $parent[UserControl].((vm:LibraryModel)DataContext).LectureFiles.ShowHeader, FallbackValue=False}" Margin="0,14,0,0" MaxWidth="680" HorizontalAlignment="Left">
+          <Panel IsVisible="{Binding $parent[UserControl].((vm:LibraryModel)DataContext).LectureFiles.ShowHeader, FallbackValue=False}" Margin="0,14,0,0" HorizontalAlignment="Stretch">
             <c:BySkin Name="LectureAttachments" Mac="{x:Type v:MacAttachments}" Win="{x:Type v:WinAttachments}"
                       DataContext="{Binding $parent[UserControl].((vm:LibraryModel)DataContext).LectureFiles}" />
           </Panel>
