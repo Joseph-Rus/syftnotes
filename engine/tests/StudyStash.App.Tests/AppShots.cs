@@ -34,7 +34,7 @@ public class AppShots
     }
 
     /// <summary>An assignment on a page of its own, as Due's calendar opens it.</summary>
-    static LibraryModel DueApp()
+    internal static LibraryModel DueApp()
     {
         var m = Sidebar("CS 101");
         m.Assignment = CanvasShots.Detail("assignment-9001");
@@ -53,7 +53,7 @@ public class AppShots
     }
 
     /// <summary>A class's lists on Canvas: the list on the left, the assignment picked from it beside it.</summary>
-    static LibraryModel ClassApp(bool narrow, ClassTab tab = ClassTab.Assignments)
+    internal static LibraryModel ClassApp(bool narrow, ClassTab tab = ClassTab.Assignments)
     {
         var m = Sidebar("CS 101");
         var cls = CanvasShots.ClassModel();
@@ -69,7 +69,7 @@ public class AppShots
 
     /// <summary>Design 04's lecture, its notes now under "Summary · Written by Ollama" with "Rewrite notes", and the
     /// ask bar picking its engine.</summary>
-    static LibraryModel LectureApp()
+    internal static LibraryModel LectureApp()
     {
         var m = Demo.Library();
         m.Notes = AiDemo.LectureNotes(Demo.Notes);
@@ -201,7 +201,7 @@ public class AppShots
     }
 
     /// <summary>Library setup at the AI engines (design 15).</summary>
-    static SetupModel SetupAi(SkinKind skin)
+    internal static SetupModel SetupAi(SkinKind skin)
     {
         var m = SetupModel.For(skin, AppRole.Library);
         m.Ai = AiDemo.Setup();

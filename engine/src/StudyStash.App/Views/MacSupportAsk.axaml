@@ -23,11 +23,11 @@
       <Setter Property="Padding" Value="12,0" />
       <Setter Property="FontSize" Value="12" />
     </Style>
+    <!-- A hairline inside it, as Settings' pills have (one round it would be cut off by the button). -->
     <Style Selector="Button.ask-tip">
       <Setter Property="Background" Value="{DynamicResource Raised}" />
-    </Style>
-    <Style Selector="Button.ask-tip /template/ Border#PART_Bg">
-      <Setter Property="BoxShadow" Value="{DynamicResource RaisedShadow}" />
+      <Setter Property="BorderBrush" Value="{DynamicResource Line}" />
+      <Setter Property="BorderThickness" Value="1" />
     </Style>
     <Style Selector="Button.ask-tip TextBlock">
       <Setter Property="FontWeight" Value="Medium" />

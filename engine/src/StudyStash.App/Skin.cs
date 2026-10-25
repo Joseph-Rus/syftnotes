@@ -188,10 +188,11 @@ public static class Skin
             B("Hl" + hue, p.Highlighters[hue]);
             B("Swatch" + hue, p.Swatches[hue]);
         }
-        r["ShadowToday"] = Shadows([Outer(0, 0, 0, 1, p.Line), Outer(0, 6, 14, -8, Black(p.TodayShade))]);
-        r["ShadowFloat"] = Shadows([Outer(0, 0, 0, 1, p.Line), Outer(0, 10, 30, -12, Black(p.FloatShade))]);
+        // Each hairline last, over its soft shadow (see Shadows).
+        r["ShadowToday"] = Shadows([Outer(0, 6, 14, -8, Black(p.TodayShade)), Outer(0, 0, 0, 1, p.Line)]);
+        r["ShadowFloat"] = Shadows([Outer(0, 10, 30, -12, Black(p.FloatShade)), Outer(0, 0, 0, 1, p.Line)]);
         // The same, ringed in ink: the ask bar with the caret in it.
-        r["ShadowFloatFocus"] = Shadows([Outer(0, 0, 0, 1.5, p.Ink), Outer(0, 10, 30, -12, Black(p.FloatShade))]);
+        r["ShadowFloatFocus"] = Shadows([Outer(0, 10, 30, -12, Black(p.FloatShade)), Outer(0, 0, 0, 1.5, p.Ink)]);
         r["LineRing"] = Shadows([Outer(0, 0, 0, 1, p.Line)]);
         r["SubtleRing"] = Shadows([Outer(0, 0, 0, 1, p.InkSubtle)]);
         r["RecordRing"] = Shadows([Outer(0, 0, 0, 1.5, p.Record)]);
@@ -281,13 +282,13 @@ public static class Skin
         r["GShadow"] = Shadows([drop]);
         r["SideShadow"] = None;
         r["CtlShadow"] = None;
-        r["GlassShadow"] = Shadows([ring, drop]);
+        r["GlassShadow"] = Shadows([drop, ring]);
         r["SideGlassShadow"] = None;
         r["CtlGlassShadow"] = Shadows([ring]);
         r["RaisedShadow"] = Shadows([ring]);
         r["SegShadow"] = Shadows([ring]);
         r["WindowShadow"] = Shadows([Outer(0, 18, 50, 0, Black(dark ? 0.5 : 0.16)), Outer(0, 2, 8, 0, Black(dark ? 0.3 : 0.06)), ring]);
-        r["PillShadow"] = Shadows([ring, drop]);
+        r["PillShadow"] = Shadows([drop, ring]);
         // The dot's ring on a highlighted row: white on a dark accent, near-black ink on a light one — never a tint.
         r["OnAccentRing"] = Shadows([Outer(0, 0, 0, 1.5, lt ? Rgba(0x17, 0x17, 0x17, 1) : Colors.White)]);
     }
@@ -360,7 +361,7 @@ public static class Skin
         r["PopupShadow"] = Shadows([Outer(0, 8, 16, 0, Black(dark ? 0.3 : 0.14))]);
         r["Shadow"] = Shadows([drop]);
         r["ShadowLg"] = Shadows([Outer(0, 32, 64, 0, Black(dark ? 0.4 : 0.18)), Outer(0, 2, 21, 0, Black(dark ? 0.3 : 0.14))]);
-        r["PillShadow"] = Shadows([ring, drop]);
+        r["PillShadow"] = Shadows([drop, ring]);
         // The caption buttons Avalonia draws in a Windows window's title bar (Fluent's keys): our ink, hover and press.
         r["CaptionButtonForeground"] = r["Fg"];
         r["CaptionButtonBackground"] = r["Hover"];
@@ -444,5 +445,10 @@ public static class Skin
     /// </summary>
     public static double Blur(double css) => Math.Max(0, (css / 2 - 0.5) / 0.288675);
 
+    /// <summary>
+    /// Several shadows on one element. Avalonia paints them in the order given, each over the ones before (CSS paints
+    /// the first on top), so a hairline ring goes last: listed first, the soft shadow under it was painted over its
+    /// lower half, and in dark it read as an edge lit from above.
+    /// </summary>
     static BoxShadows Shadows(BoxShadow[] s) => s.Length == 1 ? new BoxShadows(s[0]) : new BoxShadows(s[0], s[1..]);
 }
