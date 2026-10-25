@@ -262,7 +262,7 @@ public sealed class GuidedSetupShots
         return g;
     }
 
-    static Control View(SkinKind skin, GuidedSetupModel g) =>
+    internal static Control View(SkinKind skin, GuidedSetupModel g) =>
         skin == SkinKind.Mac ? new MacGuidedSetup { DataContext = g, DrawChrome = true } : new WinGuidedSetup { DataContext = g, DrawChrome = true };
 
     [AvaloniaFact]

@@ -294,21 +294,20 @@
       <Setter Property="HorizontalContentAlignment" Value="Center" />
       <Setter Property="HorizontalAlignment" Value="Left" />
     </Style>
+    <!-- Its hairline is a border inside it: a button cuts off whatever it draws outside its own box, so a ring
+         round it showed only on its round ends (and at a fraction of a pixel, along its top). -->
     <Style Selector=".mac Button.pill">
       <Setter Property="Height" Value="30" />
       <Setter Property="CornerRadius" Value="15" />
       <Setter Property="Padding" Value="14,0" />
       <Setter Property="Background" Value="{DynamicResource Raised}" />
-    </Style>
-    <Style Selector=".mac Button.pill /template/ Border#PART_Bg">
-      <Setter Property="BoxShadow" Value="{DynamicResource RaisedShadow}" />
+      <Setter Property="BorderBrush" Value="{DynamicResource Line}" />
+      <Setter Property="BorderThickness" Value="1" />
     </Style>
     <Style Selector=".mac Button.pill.primary">
       <Setter Property="Background" Value="{DynamicResource Tint}" />
       <Setter Property="Foreground" Value="{DynamicResource OnAccent}" />
-    </Style>
-    <Style Selector=".mac Button.pill.primary /template/ Border#PART_Bg">
-      <Setter Property="BoxShadow" Value="{DynamicResource EdgeTint}" />
+      <Setter Property="BorderThickness" Value="0" />
     </Style>
     <Style Selector=".win Button.pill">
       <Setter Property="Height" Value="32" />
@@ -337,9 +336,8 @@
       <Setter Property="CornerRadius" Value="14" />
       <Setter Property="Padding" Value="12,0,8,0" />
       <Setter Property="Background" Value="{DynamicResource Raised}" />
-    </Style>
-    <Style Selector=".mac Button.select /template/ Border#PART_Bg">
-      <Setter Property="BoxShadow" Value="{DynamicResource RaisedShadow}" />
+      <Setter Property="BorderBrush" Value="{DynamicResource Line}" />
+      <Setter Property="BorderThickness" Value="1" />
     </Style>
     <Style Selector=".win Button.select">
       <Setter Property="Height" Value="32" />
@@ -430,9 +428,8 @@
     <Style Selector=".mac Button.seg-item.on">
       <Setter Property="Foreground" Value="{DynamicResource Fg}" />
       <Setter Property="Background" Value="{DynamicResource Raised}" />
-    </Style>
-    <Style Selector=".mac Button.seg-item.on /template/ Border#PART_Bg">
-      <Setter Property="BoxShadow" Value="{DynamicResource RaisedShadow}" />
+      <Setter Property="BorderBrush" Value="{DynamicResource Line}" />
+      <Setter Property="BorderThickness" Value="1" />
     </Style>
 
     <!-- An accent-track, white-knob toggle: a plain ToggleButton, not the Fluent ToggleSwitch (which doesn't follow
