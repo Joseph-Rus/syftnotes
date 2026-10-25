@@ -17,6 +17,7 @@ public sealed partial class DriveLink
     static readonly (string Key, string Path)[] Lists =
     [
         ("GET /library", "/library"),
+        ("GET /ai", "/ai"),
         ("GET /chats", "/chats"),
         ("GET /canvas/due", "/canvas/due"),
         ("GET /canvas/state", "/canvas/state"),

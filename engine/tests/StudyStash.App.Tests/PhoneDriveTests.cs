@@ -62,6 +62,7 @@ public class PhoneDriveTests
         var refused = new[]
         {
             phone.Ask("GET", "/settings"),
+            phone.Ask("POST", "/ai", new JsonObject { ["provider"] = "ollama" }),
             phone.Ask("POST", "/settings/password", new JsonObject { ["password"] = "taken over" }),
             phone.Ask("GET", "/devices"),
             phone.Ask("POST", "/devices/code", new JsonObject()),
@@ -76,6 +77,7 @@ public class PhoneDriveTests
             phone.Ask("GET", "http://127.0.0.1/api/v2/settings"),
         };
         string allowed = phone.Ask("GET", "/library");
+        string engine = phone.Ask("GET", "/ai");
         // A chat renamed, or brought back after Delete's undo, from the phone.
         Assert.NotNull(PhoneCalls.Check("POST", "/chats/c-1"));
         Assert.NotNull(PhoneCalls.Check("POST", "/chats/c-1/restore"));
@@ -89,6 +91,10 @@ public class PhoneDriveTests
         var library = await phone.DoneAsync(allowed);
         Assert.Equal(200, (int)library["status"]!);
         Assert.NotNull(library["body"]!["classes"]);
+        // Which AI answers Ask can be read (the phone shows its mark), but never changed from the phone.
+        var ai = await phone.DoneAsync(engine);
+        Assert.Equal(200, (int)ai["status"]!);
+        Assert.NotNull(ai["body"]!["jobs"]!["ask"]!["provider"]);
         // Nothing reached the library's settings: its password is the one it had.
         Assert.NotNull(await rig.RawAsync("/api/v2/settings"));
         stop.Cancel();

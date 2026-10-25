@@ -157,7 +157,7 @@ The laptop asks its own library (`GET http://127.0.0.1:<port>/api/v2/…` with t
 | `GET /lectures?limit=1000` | **every** lecture, newest first, however many (the library gives at most 500 a page: the laptop asks page by page and joins them) |
 | `GET /lectures/<id>`, `GET /lectures/<id>/rendered` | for every lecture in the list; `<id>` percent-encoded as the iPhone's `APIClient.segment` does (everything but letters, digits and `-._~`) |
 | `GET /chats`, `GET /chats/<id>` | every chat (the list without a query, as the phone asks it) |
-| `GET /canvas/due`, `GET /canvas/state`, `GET /calendar/upcoming` | |
+| `GET /canvas/due`, `GET /canvas/state`, `GET /calendar/upcoming`, `GET /ai` | |
 | `GET /attachments` | every attached file (no query) |
 | `GET /voice-memos` | |
 
@@ -270,7 +270,7 @@ stray files of its own kind older than a day.
 Exactly the iPhone app's own calls (`ios/StudyStash/API/APIClient.swift`, and the two the Due tab makes itself), replayed against the local library
 (`PhoneCalls.cs`):
 
-- GET: `/me`, `/library`, `/lectures`, `/lectures/{id}`, `/lectures/{id}/rendered`, `/search`, `/chats`,
+- GET: `/me`, `/library`, `/ai` (which AI answers each job, no keys: the phone shows Ask's AI while it thinks), `/lectures`, `/lectures/{id}`, `/lectures/{id}/rendered`, `/search`, `/chats`,
   `/chats/{id}`, `/canvas/due`, `/canvas/state`, `/canvas/assignment`, `/calendar/upcoming`, `/attachments`, `/attachments/{id}/raw`,
   `/voice-memos`
 - POST: `/lectures` (a recording written down on the phone; idempotent by its `phone-…` id), `/lectures/{id}/class`,
