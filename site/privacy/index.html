@@ -41,7 +41,7 @@
       <p class="lede">Study Stash is an app you run yourself, not a service. There's no Study Stash account, no Study
         Stash server and no analytics. This page says exactly what the app reads, where it keeps it, and how to take it
         back.</p>
-      <p class="updated">Last updated 13 October 2026</p>
+      <p class="updated">Last updated 25 October 2026</p>
       <ul class="toc" aria-label="On this page">
         <li><a href="#short">In short</a></li>
         <li><a href="#stays">What stays on your computers</a></li>
@@ -96,6 +96,27 @@
         at any time. Tailscale is a separate service with its own
         <a href="https://tailscale.com/privacy-policy">privacy policy</a>; it sees which of your devices are connected,
         not what they send each other.</p>
+      <h3 id="phone">Your iPhone or iPad, through your own Google Drive</h3>
+      <p>The Study Stash app on an iPhone or iPad works with the Study Stash on your computer through a private folder
+        in <strong>your own Google Drive</strong>. You connect it on both, each time with Google's own sign-in, and you
+        can stop at any time (Settings → Phone → Disconnect on the computer, or Sign out on the phone).</p>
+      <ul>
+        <li><strong>The folder.</strong> Study Stash asks Google for one permission only: its own hidden app folder
+          in your Drive (Google calls it the application data folder). Only Study Stash can see it, not you in Drive,
+          not other apps, and not us. It's in your Google account and counts towards your Drive storage.</li>
+        <li><strong>What's in it.</strong> A copy of what the phone shows (your classes, lectures and their notes,
+          chats, what's due and your calendar), the phone's requests to your computer (a recording's transcript and
+          your typed notes, a renamed lecture, a question, a file or photo you add) and your computer's answers.
+          Your computer removes requests once it has done them.</li>
+        <li><strong>On the phone.</strong> A lecture recorded on the phone is written down on the phone, with Apple's
+          own speech recognition, and the recording stays on the phone; the words and your typed notes go to your
+          computer through the folder. Whiteboard photos you take, and files you add, go the same way. The microphone
+          is used only while you record, and the camera only while you take a photo.</li>
+        <li><strong>Without Google.</strong> Under Other ways, a phone can instead reach your computer over
+          Tailscale, as described above, or try the app with sample classes that never leave the phone.</li>
+      </ul>
+      <p>Google's own <a href="https://myaccount.google.com/connections">Third-party connections</a> page shows
+        Study Stash and lets you remove its access, which also lets Google delete its folder.</p>
       <p><strong>Deleting it.</strong> Delete a lecture, a class or a phone in the app. To remove everything, delete
         both folders: your notes folder and <code>.study-stash</code> (and, on a Mac, the Canvas extension's own
         folder, <code>~/Study Stash/Chrome extension</code>). Uninstalling the app leaves them in place, so your notes
@@ -159,12 +180,12 @@
           <a href="https://developers.google.com/terms/api-services-user-data-policy">Google API Services User Data
           Policy</a>, including the Limited Use requirements.</p>
       </div>
-      <p>In particular, data Study Stash receives from Google Calendar is:</p>
+      <p>In particular, data Study Stash receives from Google Calendar and Google Drive is:</p>
       <ul>
         <li>used only to provide the features described above, which you can see in the app;</li>
-        <li>transferred only to your own Study Stash library (a computer you control), and only to provide those
-          features; never to the developers of Study Stash or any other third party, except as needed to comply with
-          the law;</li>
+        <li>transferred only to your own Study Stash library (a computer you control) and your own phone or iPad, and
+          only to provide those features; never to the developers of Study Stash or any other third party, except as
+          needed to comply with the law;</li>
         <li>never used or transferred for advertising, including retargeting or personalised or interest-based
           advertising;</li>
         <li>never used to train or improve AI or machine learning models, general or otherwise;</li>
@@ -197,7 +218,8 @@
         <li><strong>Ollama</strong> runs entirely on your computer. Nothing leaves it.</li>
         <li><strong>Claude Code, Codex or Gemini</strong> are programs from Anthropic, OpenAI and Google that you install
           and sign in to with your own account and plan. When you choose one, Study Stash gives it the lecture's
-          transcript (or the notes and passages a question needs) and the company's service writes the answer. That
+          transcript (or the notes and passages a question needs, and your whiteboard photos when it writes a lecture's
+          notes) and the company's service writes the answer. That
           company handles it under its terms and privacy policy, with your account. Study Stash's developers never
           see it.</li>
         <li><strong>An API key</strong> for Claude, ChatGPT or Gemini can be used instead, if you give Study Stash one
