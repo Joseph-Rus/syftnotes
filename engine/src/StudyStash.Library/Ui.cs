@@ -4,6 +4,7 @@ using System.Text;
 using System.Text.Json.Nodes;
 using System.Text.RegularExpressions;
 using Markdig;
+using Markdig.Renderers.Html;
 using Markdig.Syntax;
 using Markdig.Syntax.Inlines;
 using StudyStash.Core;
@@ -163,7 +164,12 @@ public static partial class Ui
         foreach (var image in doc.Descendants<LinkInline>().Where(l => l.IsImage && (l.Url ?? "").StartsWith(AttachmentScheme, StringComparison.OrdinalIgnoreCase)).ToList())
         {
             string? url = photo?.Invoke(image.Url![AttachmentScheme.Length..].Trim());
-            if (url is not null) image.Url = url;
+            if (url is not null)
+            {
+                image.Url = url;
+                // Styled in place, as the strip is: the pages' shared style stays as it was.
+                image.GetAttributes().AddPropertyIfNotExist("style", "max-width:100%;height:auto;border-radius:10px");
+            }
             else image.ReplaceBy(new LiteralInline(string.Concat(image.Descendants<LiteralInline>().Select(x => x.Content.ToString()))));
         }
         foreach (var link in doc.Descendants<LinkInline>())
