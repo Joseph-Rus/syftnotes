@@ -108,7 +108,7 @@ public sealed partial class LibraryWeb
             return Http.Json(new JsonObject
             {
                 ["id"] = id, ["title"] = l["title"]?.DeepClone(), ["class"] = l["class"]?.DeepClone(), ["date"] = l["date"]?.DeepClone(),
-                ["html"] = PhoneNotes.Render(l["notes"] is JsonValue v && v.TryGetValue(out string? notes) ? notes : ""),
+                ["html"] = PhoneNotes.Render(l["notes"] is JsonValue v && v.TryGetValue(out string? notes) ? notes : "", OwnPhotos(id, "/api/v2/attachments/", "/raw")),
             });
         }));
         // The app's pages need no sign-in (they're the same for everyone); what they show asks /api/v2, which does.

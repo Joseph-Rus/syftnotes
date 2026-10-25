@@ -65,6 +65,16 @@ public sealed partial class LibraryWeb
             overview["gone"] = new JsonArray([.. store.Gone().Select(id => (JsonNode)id)]);
             return Http.Json(overview);
         }));
+        // The laptop says what it is recording (at start, every 30 seconds, at stop): the phone's camera banner reads it.
+        app.MapPost("/api/v2/recording-now", Http.Handle(ctx => ApiAsync(ctx, async () =>
+        {
+            var body = await Http.JsonBodyAsync(ctx.Request);
+            string? id = Str(body, "id");
+            if (id is null) return Http.Detail(400, "which recording?");
+            Reader.Recording.Report(id, Str(body, "class") ?? "", Str(body, "title") ?? "", Str(body, "started") ?? "",
+                stopped: body?["stopped"] is JsonValue v && v.TryGetValue(out bool b) && b);
+            return Http.Json(new JsonObject { ["recording_now"] = Reader.Recording.Json() });
+        })));
         app.MapGet("/api/v2/lectures", (HttpContext ctx, string? @class, int? limit, string? before) =>
             Api(ctx, () => Http.Json(Reader.Lectures(@class, limit ?? 50, before))));
         app.MapGet("/api/v2/lectures/{id}", (HttpContext ctx, string id) =>

@@ -213,6 +213,7 @@ public sealed partial class Store : IDisposable
         Migrate();
         HasPassages = CreatePassages();
         CreateAttachments();
+        MigrateAttachments();
         CreateNotesVersions();
         MigrateNotesVersions();
     }

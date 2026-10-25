@@ -16,6 +16,9 @@ public sealed partial class LibraryReader(Config cfg, Store store)
     public Config Cfg { get; } = cfg;
     public Store Store { get; } = store;
 
+    /// <summary>What the laptop says it is recording (see <see cref="RecordingNow"/>).</summary>
+    public RecordingNow Recording { get; init; } = new();
+
     /// <summary>The library's name, its classes (in the order they were added: their dot colors follow it), and how
     /// much is waiting.</summary>
     public JsonObject Overview()
@@ -57,6 +60,7 @@ public sealed partial class LibraryReader(Config cfg, Store store)
             // What it's for (empty until asked) and so whether it's for school: classes, Canvas and due dates, or folders.
             ["uses"] = new JsonArray(Cfg.Uses.Select(u => (JsonNode?)u).ToArray()),
             ["for_school"] = Cfg.ForSchool,
+            ["recording_now"] = Recording.Json(),
         };
     }
 
@@ -242,7 +246,8 @@ public sealed partial class LibraryReader(Config cfg, Store store)
     /// AI reads the turns before the question. The answer says how many went with it ("remembered").</para>
     /// </summary>
     public async Task<JsonObject> AskAsync(string question, string? lectureId = null, string? className = null,
-        string? liveTranscript = null, string liveTitle = "This lecture", AskChatFn? chat = null, IReadOnlyList<AskTurn>? earlier = null)
+        string? liveTranscript = null, string liveTitle = "This lecture", AskChatFn? chat = null, IReadOnlyList<AskTurn>? earlier = null,
+        string? agenda = null)
     {
         earlier ??= [];
         // What to look for: the question, and with a follow-up the one before it ("and the second one?" says nothing of what).
@@ -280,16 +285,22 @@ public sealed partial class LibraryReader(Config cfg, Store store)
         foreach (var p in BestOf(pieces, lookFor, 4))
             Add(attachedTo[p].NoteId is { } id ? Store.Get(id) : null, p);
         var sources = new JsonArray();
-        if (picked.Count == 0) return new JsonObject { ["answer"] = NoAnswer, ["sources"] = sources, ["remembered"] = 0 };
+        // No notes matched: with the date and the Due list to go on ("what's due Sunday?"), the AI is still asked.
+        if (picked.Count == 0 && string.IsNullOrWhiteSpace(agenda)) return new JsonObject { ["answer"] = NoAnswer, ["sources"] = sources, ["remembered"] = 0 };
 
         var prompt = new StringBuilder("""
             You answer a student's question from their own lecture notes and transcripts, numbered below.
-            Use only these sources. If they don't answer the question, say so in one sentence.
+            Use only these sources (and the student's dates and due work, when they're below). If they don't answer the question, say so in one sentence.
             Answer in one to three plain sentences, the way a classmate who took good notes would. Don't mention the sources by number in the answer.
             Write any formula in LaTeX between $ signs; in the JSON, write each backslash twice (\\frac). If the student asks you to draw or show something, or the answer is a short process, you may add one small Mermaid flowchart after the sentences, in a ```mermaid block (flowchart LR or TD, a few words per box).
             Return JSON: answer (the answer), sources (the numbers of the sources you used, most important first).
 
             """);
+        if (!string.IsNullOrWhiteSpace(agenda))
+            prompt.Append("Also below, from the student's own Canvas and calendar, always up to date: today's date and what's due and coming up. ")
+                .Append("For a question about what's due, deadlines, dates or what's on, answer from this, with the day and time; ")
+                .Append("work out \"this Sunday\" or \"tomorrow\" from today's date. If nothing there answers it, say so.\n\n")
+                .Append(agenda.Trim()).Append("\n\n");
         // Asked what a formula looks like (or to plot one): the answer may draw it, exactly, as a plot to play with.
         if (PlotDesign.AsksForPlot(question))
             prompt.Append("If the student asks what a formula or function looks like, or asks you to plot or graph it, add one ```plot block after the sentences instead of a flowchart: ")

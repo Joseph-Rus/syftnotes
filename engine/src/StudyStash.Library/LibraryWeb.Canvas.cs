@@ -138,17 +138,7 @@ public sealed partial class LibraryWeb
         app.MapGet("/api/v2/canvas/state", (HttpContext ctx) => Api(ctx, () => Http.Json(CanvasView.State(Canvas, Canvas.Clock(), refusedAt))));
         app.MapGet("/api/v2/canvas/classes", (HttpContext ctx) => Api(ctx, () =>
             Http.Json(CanvasView.Classes(cfg.ClassNames(), Canvas.Settings, cfg.Home, ScoutOf, Canvas.Clock()))));
-        app.MapGet("/api/v2/canvas/due", (HttpContext ctx) => Api(ctx, () =>
-        {
-            var s = Canvas.Settings;
-            var all = Assignments.Load(cfg.Home).ToList();
-            // A planner to-do with no assignment of its own rides along as a "todo" row (kind, never graded).
-            var graded = all.ToList();
-            foreach (string cls in cfg.ClassNames())
-                if (CourseIndex.Load(cfg.Home, cls) is { } index)
-                    all.AddRange(Assignments.Todos(cls, index.Todos, graded, Canvas.Zone));
-            return Http.Json(CanvasView.Due(all, s.LastDone, Canvas.Clock(), Canvas.Zone, Canvas.Crawl.AssignmentFolder));
-        }));
+        app.MapGet("/api/v2/canvas/due", (HttpContext ctx) => Api(ctx, () => Http.Json(DueList())));
         app.MapGet("/api/v2/canvas/assignments", (HttpContext ctx, string? @class) => Api(ctx, () =>
         {
             if (@class is null || !cfg.ClassNames().Contains(@class)) return Http.Detail(400, "unknown class");
@@ -680,4 +670,16 @@ public sealed partial class LibraryWeb
         Canvas.Nudge();
         return Http.SeeOther("/settings?canvas=saved#canvas");
     });
+
+    /// <summary>The Due list, as the app's and the phone's Due tabs show it (and Ask is told): every class's assignments,
+    /// with a planner to-do that has no assignment of its own riding along as a "todo" row (kind, never graded).</summary>
+    JsonObject DueList()
+    {
+        var all = Assignments.Load(cfg.Home).ToList();
+        var graded = all.ToList();
+        foreach (string cls in cfg.ClassNames())
+            if (CourseIndex.Load(cfg.Home, cls) is { } index)
+                all.AddRange(Assignments.Todos(cls, index.Todos, graded, Canvas.Zone));
+        return CanvasView.Due(all, Canvas.Settings.LastDone, Canvas.Clock(), Canvas.Zone, Canvas.Crawl.AssignmentFolder);
+    }
 }

@@ -36,6 +36,10 @@ public sealed partial class DriveLink
     DateTimeOffset copyAt = DateTimeOffset.MinValue;
     int sweepAt;
 
+    /// <summary>Something the phone reads changed without a phone's request (the laptop started or stopped recording):
+    /// the copy looks again straight away.</summary>
+    public void CopyNow() => CopySoon(null);
+
     /// <summary>A request changed something: the copy looks again straight away, at <paramref name="lecture"/> first.</summary>
     void CopySoon(string? lecture)
     {

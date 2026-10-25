@@ -148,7 +148,7 @@ public sealed class Rewrites(Config cfg, Store store, AiJobs ai, Action<string>?
             if (jobs.TryGetValue(id, out var running) && running.State == "working")
                 throw new RewriteRefusedException(409, "a rewrite is already running for this lecture.");
             var m = store.Meeting(row);
-            m.Attached = store.AttachedTo(id); // the new notes use what the student attached, too
+            store.Attach(m); // the new notes use what the student attached, too
             if (Py.Strip(m.Transcript).Length < Summarize.MinTranscriptChars && !Summarize.FromNotes(m))
                 throw new RewriteRefusedException(409, "this lecture doesn't have enough of a transcript to rewrite from.");
             if (row.Status is Store.Queued or Store.Working)
@@ -157,7 +157,7 @@ public sealed class Rewrites(Config cfg, Store store, AiJobs ai, Action<string>?
                 throw new RewriteRefusedException(409, $"{Engines.Name(engine)} isn't set up on your library's computer.");
 
             var cts = new CancellationTokenSource();
-            var job = new Job { Engine = engine, Started = ai.Checks.Now().ToString("o"), Cts = cts, AttachmentIds = [.. m.Attached.Select(a => a.Id)] };
+            var job = new Job { Engine = engine, Started = ai.Checks.Now().ToString("o"), Cts = cts, AttachmentIds = [.. m.Attached.Select(a => a.Id), .. m.Photos.Select(p => p.Id)] };
             jobs[id] = job;
             Persist(cfg.Home, id, job);
             _ = RunAsync(id, m, job, cts.Token);

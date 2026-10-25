@@ -66,6 +66,9 @@ public sealed class PhoneDrive : IDisposable
     public DriveLink? Link { get; private set; }
 
     /// <summary>The phones that use the folder.</summary>
+    /// <summary>The phone's copy of the library looks again straight away (a recording started or stopped here).</summary>
+    public void RefreshCopy() => Link?.CopyNow();
+
     public IReadOnlyList<DrivePhone> Phones => Link?.Phones ?? [];
 
     /// <summary>What the link is doing or what's wrong (Google signed this laptop out), in the student's words.</summary>

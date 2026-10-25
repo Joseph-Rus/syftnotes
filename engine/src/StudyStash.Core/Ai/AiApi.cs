@@ -86,6 +86,9 @@ public sealed record AskRequest(string Question)
     /// <see cref="AskReply.Chat"/>.</summary>
     public string? Chat { get; init; }
     public AskPlace? Place { get; init; }
+    /// <summary>What the library knows that isn't in the notes, said to the AI with every question: today's date, the
+    /// Due list and today's and tomorrow's calendar (LibraryWeb.AskAgenda). Never sent by the app; the library sets it.</summary>
+    [System.Text.Json.Serialization.JsonIgnore] public string? Agenda { get; init; }
 }
 
 /// <summary>Where an Ask chat lives: a lecture's page ("lecture", with its folder), a folder's page ("class") or Home

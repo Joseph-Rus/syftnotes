@@ -627,7 +627,7 @@ public sealed partial class LibraryWeb
 
         var docs = new List<(string Id, string Label, string Html)>();
         if (!string.IsNullOrEmpty(r.SummaryMd))
-            docs.Add(("summary", "Summary", $"<div class=\"prose\">{Ui.RenderMd(r.SummaryMd)}</div>"
+            docs.Add(("summary", "Summary", $"<div class=\"prose\">{Ui.RenderMd(r.SummaryMd, photo: OwnPhotos(noteId, "/attachments/", ""))}</div>"
                 + $"<p class=\"byline\">Written by {Ui.Esc(r.SummaryModel)} from {(Summarize.FromNotes(m) ? "the notes it came with" : "the transcript")}.</p>"));
         else if (cameWithNotes) docs.Add(("notes", "Notes", $"<div class=\"prose\">{Ui.RenderMd(m.NotesMarkdown)}</div>"));
         if (Py.Strip(m.PrivateNotes).Length > 0) docs.Add(("typed", "Typed notes", $"<div class=\"prose\">{Ui.RenderMd(m.PrivateNotes)}</div>"));
