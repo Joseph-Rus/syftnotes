@@ -32,7 +32,7 @@ answer pieces arrive ~1.6 s behind. Do nothing that adds a trip on Ask's path.
 ## Google
 
 - Project `study-stash-app` (number 1073354844610). Drive API is on. Consent screen "Study Stash", External, in
-  Testing (test user russelljoey147@gmail.com).
+  Testing (one test user, an account of our own).
 - Scopes, both sides: `openid email https://www.googleapis.com/auth/drive.appdata`. Nothing else.
 - Everything lives in Drive's hidden **appDataFolder** (`parents: ["appDataFolder"]`, `spaces=appDataFolder`). It's
   per Google project: the laptop's and the phone's sign-in IDs are in the same project, so they see the same folder.
@@ -290,7 +290,7 @@ what it built). What the phone needs to know:
    laptop.json about a second later. If the body the phone downloaded doesn't hash to laptop.json's sha, keep it
    anyway (it's newer) and expect the next laptop.json to agree; don't discard it or loop.
 4. **The QR link**: `studystash://google?account=<the email, percent-encoded as a URL query value>`, e.g.
-   `studystash://google?account=joey.russell%40gmail.com`. A test run (STUDYSTASH_DRIVE_SPACE set) adds
+   `studystash://google?account=sam%40example.com`. A test run (STUDYSTASH_DRIVE_SPACE set) adds
    `&space=<prefix>`: a debug build may take it as `-drive-space`; a release build ignores it.
 5. **Answers, in detail**: every answer has `type` (the library's content type). A body that isn't JSON comes as a
    JSON string (success) or `{"detail": "<text>"}` (error); an empty one as `null`. An Ask/chat the library answers
