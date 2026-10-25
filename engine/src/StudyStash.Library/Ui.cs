@@ -135,6 +135,8 @@ public static partial class Ui
     static readonly MarkdownPipeline Markdown = new MarkdownPipelineBuilder()
         .UsePipeTables().UseFootnotes().UseDefinitionLists().UseAbbreviations().DisableHtml().Build();
 
+    const string AttachmentScheme = "attachment:";
+
     static bool SafeUrl(string? url)
     {
         string u = Py.Strip(url);
@@ -148,7 +150,7 @@ public static partial class Ui
     /// model's output: it may never inject HTML or scripts. <paramref name="math"/> writes each formula (as written,
     /// $ signs and all) as HTML instead; it must escape what it writes.
     /// </summary>
-    public static string RenderMd(string? text, Func<string, string>? math = null)
+    public static string RenderMd(string? text, Func<string, string>? math = null, Func<string, string?>? photo = null)
     {
         var maths = new List<string>();
         string stashed = MathSpan().Replace(text ?? "", m =>
@@ -157,6 +159,13 @@ public static partial class Ui
             return $"\uE000M{maths.Count - 1}\uE001";
         });
         var doc = Markdig.Markdown.Parse(stashed, Markdown);
+        // ![alt](attachment:<id>): a picture of the lecture's own (photo says where, null for any other id); else just its words.
+        foreach (var image in doc.Descendants<LinkInline>().Where(l => l.IsImage && (l.Url ?? "").StartsWith(AttachmentScheme, StringComparison.OrdinalIgnoreCase)).ToList())
+        {
+            string? url = photo?.Invoke(image.Url![AttachmentScheme.Length..].Trim());
+            if (url is not null) image.Url = url;
+            else image.ReplaceBy(new LiteralInline(string.Concat(image.Descendants<LiteralInline>().Select(x => x.Content.ToString()))));
+        }
         foreach (var link in doc.Descendants<LinkInline>())
             if (!SafeUrl(link.Url)) link.Url = "#";
         foreach (var link in doc.Descendants<AutolinkInline>())

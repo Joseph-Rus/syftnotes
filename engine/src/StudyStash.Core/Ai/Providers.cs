@@ -17,6 +17,9 @@ public sealed record AiRequest(string Prompt, string Cwd)
 {
     public string System { get; init; } = "";
     public IReadOnlyList<string> ReadDirs { get; init; } = [];
+    /// <summary>Picture files the AI is to look at, for an engine that takes them on its command line (Codex's --image).
+    /// Claude Code reads image files in its working folder, which the prompt names, so it needs none here.</summary>
+    public IReadOnlyList<string> Images { get; init; } = [];
     public bool Write { get; init; }
     public string Model { get; init; } = "";
     /// <summary>How hard the model thinks ("high"), where its command takes a reasoning effort; "" for its own default.</summary>
@@ -621,6 +624,7 @@ public class CodexProvider : AiProvider
             cmd.AddRange(["-c", "features.hooks=false", "-c", "notify=[]"]);
         }
         foreach (string d in req.ReadDirs) cmd.AddRange(["--add-dir", d]);
+        foreach (string image in req.Images) cmd.Add("--image=" + image);
         if (req.Tools && req.McpCommand.Count > 0)
             cmd.AddRange(["-c", $"mcp_servers.{McpKey}.command={JsonSerializer.Serialize(req.McpCommand[0])}",
                 "-c", $"mcp_servers.{McpKey}.args={new JsonArray(req.McpCommand.Skip(1).Select(a => (JsonNode)a).ToArray()).ToJsonString()}"]);
@@ -630,6 +634,8 @@ public class CodexProvider : AiProvider
         if (model.Length > 0) cmd.AddRange(["-m", model]);
         if (req.Effort.Length > 0 && Id == "codex") cmd.AddRange(["-c", $"model_reasoning_effort=\"{req.Effort}\""]);
         if (req.Session.Length > 0) cmd.AddRange(["resume", req.Session]);
+        // --image takes any number of files: "--" ends them, so they never swallow the prompt.
+        if (req.Images.Count > 0 && req.Session.Length == 0) cmd.Add("--");
         cmd.Add(PromptOnInput ? "-" : WithSystem(req));
         return cmd;
     }

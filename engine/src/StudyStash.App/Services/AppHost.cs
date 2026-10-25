@@ -990,7 +990,40 @@ public sealed partial class AppHost : IDisposable, IProblemSource
         awake ??= new KeepAwake("Recording a lecture");
         // Live, Whisper starts on it; after class, the look lets go of a model still loaded from the lecture before.
         Whisper.Wake();
+        TellLibraryRecording(true);
+        beat?.Dispose();
+        beat = new Timer(_ => TellLibraryRecording(false), null, TimeSpan.FromSeconds(30), TimeSpan.FromSeconds(30));
         return l;
+    }
+
+    Timer? beat;
+    string? toldRecording;
+
+    /// <summary>The library hears what this computer records: at the start, every 30 seconds, and at the stop, so a
+    /// phone's camera knows which lecture its photos belong to. Never throws, never waits.</summary>
+    void TellLibraryRecording(bool changed)
+    {
+        var l = Recorder.Current;
+        string? id = l?.State == LectureState.Recording || l?.State == LectureState.Paused ? l.Id : null;
+        if (id is null && toldRecording is null) { beat?.Dispose(); beat = null; return; }
+        string stoppedId = id ?? toldRecording!;
+        bool stopped = id is null;
+        if (stopped) { toldRecording = null; beat?.Dispose(); beat = null; changed = true; }
+        else { changed |= toldRecording != id; toldRecording = id; }
+        var lecture = l;
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                if (Remote() is { } lib)
+                    await lib.RecordingNowAsync(stoppedId, lecture?.ClassName ?? "", lecture?.Title ?? "", lecture?.Started ?? "", stopped);
+                if (changed) Drive.RefreshCopy();
+            }
+            catch (Exception e) when (e is HttpRequestException or TaskCanceledException or LibraryRefusedException)
+            {
+                log($"[app] couldn't tell the library what is recording: {e.Message}");
+            }
+        });
     }
 
     /// <summary>What the student has typed so far in the notes of the lecture being recorded: kept with the lecture,
@@ -1025,6 +1058,7 @@ public sealed partial class AppHost : IDisposable, IProblemSource
         awake?.Dispose();
         awake = null;
         Whisper.Wake();
+        TellLibraryRecording(true);
         return l;
     }
 
@@ -1275,6 +1309,7 @@ public sealed partial class AppHost : IDisposable, IProblemSource
         disposed = true;
         watchdog?.Dispose();
         pruning?.Dispose();
+        beat?.Dispose();
         try
         {
             if (Recorder.Current is not null) StopRecording();

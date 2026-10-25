@@ -28,7 +28,7 @@
 
   <StackPanel Spacing="6">
     <Grid ColumnDefinitions="*,Auto" VerticalAlignment="Center" IsVisible="{Binding ShowHeader}">
-      <TextBlock Text="Attachments" FontSize="13" FontWeight="Bold" Foreground="{DynamicResource InkSubtle}" VerticalAlignment="Center" IsVisible="{Binding HasItems}" />
+      <TextBlock Text="{Binding HeaderText}" FontSize="13" FontWeight="Bold" Foreground="{DynamicResource InkSubtle}" VerticalAlignment="Center" Margin="0,0,24,0" />
       <Button Name="Attach" Grid.Column="1" Classes="ai-pillbtn" Command="{Binding AttachCommand}" IsEnabled="{Binding !Busy}"
               ToolTip.Tip="Attach your notes, slides or a handout (or drop files here)" AutomationProperties.Name="Attach">
         <Border Classes="ai-pill">
@@ -48,6 +48,27 @@
       <c:Spinner Width="12" Height="12" Foreground="{DynamicResource Fg2}" />
       <TextBlock Text="Reading your handwriting…" FontSize="12" Foreground="{DynamicResource Fg2}" />
     </StackPanel>
+
+    <ScrollViewer HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Disabled" IsVisible="{Binding HasPhotos}">
+      <ItemsControl ItemsSource="{Binding Photos}">
+        <ItemsControl.ItemsPanel>
+          <ItemsPanelTemplate><StackPanel Orientation="Horizontal" Spacing="10" /></ItemsPanelTemplate>
+        </ItemsControl.ItemsPanel>
+        <ItemsControl.ItemTemplate>
+          <DataTemplate x:DataType="vm:PhotoItem">
+            <Button Classes="file" Padding="4" HorizontalAlignment="Left" Command="{Binding $parent[UserControl].((vm:AttachmentsModel)DataContext).OpenPhotoCommand}"
+                    CommandParameter="{Binding}" ToolTip.Tip="Open" AutomationProperties.Name="{Binding Name}">
+              <StackPanel Spacing="4">
+                <Border CornerRadius="6" ClipToBounds="True" Height="100" MinWidth="72">
+                  <Image Source="{Binding Thumb}" Height="100" Stretch="Uniform" />
+                </Border>
+                <TextBlock Text="{Binding Label}" FontSize="11" Foreground="{DynamicResource Fg2}" HorizontalAlignment="Center" />
+              </StackPanel>
+            </Button>
+          </DataTemplate>
+        </ItemsControl.ItemTemplate>
+      </ItemsControl>
+    </ScrollViewer>
 
     <ItemsControl ItemsSource="{Binding Items}">
       <ItemsControl.ItemTemplate>

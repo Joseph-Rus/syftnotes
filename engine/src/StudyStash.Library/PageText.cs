@@ -180,6 +180,9 @@ internal static class PageText
         ".prose code{background:var(--fill-2);padding:.1em .3em;border-radius:4px}\n" +
         ".prose pre{background:var(--fill-2);padding:.9rem 1rem;border-radius:10px;overflow-x:auto;line-height:1.45}\n" +
         ".prose pre code{background:none;padding:0}\n" +
+        ".prose img{max-width:100%;height:auto;border-radius:10px}\n" +
+        ".photos{display:flex;gap:.6rem;overflow-x:auto;padding:.2rem 0 .8rem}.photos a{flex:none;text-decoration:none;color:var(--label-2);font-size:.8125rem;text-align:center}\n" +
+        ".photos img{display:block;height:6.5rem;width:auto;border-radius:10px;border:1px solid var(--sep)}\n" +
         ".prose blockquote{margin:1rem 0;padding-left:1rem;border-left:3px solid var(--sep);color:var(--label-2)}\n" +
         ".prose table{border-collapse:collapse;display:block;overflow-x:auto}\n" +
         ".prose td,.prose th{border:1px solid var(--sep);padding:.35rem .6rem}\n" +

@@ -27,6 +27,17 @@ public sealed partial class Store
         CREATE INDEX IF NOT EXISTS attachments_class ON attachments(class_name);
         """);
 
+    /// <summary>The photo columns, added to a library made before whiteboard photos.</summary>
+    void MigrateAttachments()
+    {
+        var cols = new HashSet<string>();
+        using (var cmd = Command("PRAGMA table_info(attachments)"))
+        using (var r = cmd.ExecuteReader())
+            while (r.Read()) cols.Add(r.GetString(r.GetOrdinal("name")));
+        foreach (string c in new[] { "taken", "kind" })
+            if (!cols.Contains(c)) Exec($"ALTER TABLE attachments ADD COLUMN {c} TEXT");
+    }
+
     /// <summary>A class's Attachments folder, made if it isn't there yet.</summary>
     public string AttachmentsDir(string? className)
     {
@@ -46,21 +57,32 @@ public sealed partial class Store
         using var cmd = Command(sql, args);
         using var r = cmd.ExecuteReader();
         var rows = new List<Attachment>();
+        var starts = new Dictionary<string, DateTimeOffset?>();
         string S(int i) => r.IsDBNull(i) ? "" : r.GetString(i);
         while (r.Read())
             rows.Add(new Attachment(S(0), S(1), S(2), S(3), r.IsDBNull(4) ? null : r.GetString(4), r.IsDBNull(5) ? 0 : r.GetInt64(5),
-                S(6), S(7), S(8), S(9) is { Length: > 0 } state ? state : Attachment.Unread, !r.IsDBNull(10) && r.GetInt64(10) != 0));
+                S(6), S(7), S(8), S(9) is { Length: > 0 } state ? state : Attachment.Unread, !r.IsDBNull(10) && r.GetInt64(10) != 0, S(11), S(12)));
+        r.Close();
+        // A photo's moment in its lecture, once the lecture is here.
+        for (int i = 0; i < rows.Count; i++)
+        {
+            var a = rows[i];
+            if (a.Taken.Length == 0 || a.NoteId is null || !DateTimeOffset.TryParse(a.Taken, System.Globalization.CultureInfo.InvariantCulture, System.Globalization.DateTimeStyles.None, out var taken)) continue;
+            if (!starts.TryGetValue(a.NoteId, out var start))
+                starts[a.NoteId] = start = Get(a.NoteId)?.Date is { } d && DateTimeOffset.TryParse(d, System.Globalization.CultureInfo.InvariantCulture, System.Globalization.DateTimeStyles.None, out var s0) && d.Contains('T') ? s0 : null;
+            if (start is { } st) rows[i] = a with { At = Math.Max(0, Math.Round((taken - st).TotalSeconds)) };
+        }
         return rows;
     }
 
-    const string AttachmentColumns = "id, name, file, class_name, note_id, size, type, added, text, state, used";
+    const string AttachmentColumns = "id, name, file, class_name, note_id, size, type, added, text, state, used, taken, kind";
 
     /// <summary>Keep a new attachment (its file already in place).</summary>
     public void AddAttachment(Attachment a)
     {
         lock (gate)
-            Exec($"INSERT INTO attachments({AttachmentColumns}) VALUES(?,?,?,?,?,?,?,?,?,?,?)",
-                a.Id, a.Name, a.File, a.ClassName, a.NoteId, a.Size, a.Type, a.Added, a.Text, a.State, a.Used ? 1L : 0L);
+            Exec($"INSERT INTO attachments({AttachmentColumns}) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)",
+                a.Id, a.Name, a.File, a.ClassName, a.NoteId, a.Size, a.Type, a.Added, a.Text, a.State, a.Used ? 1L : 0L, a.Taken, a.Kind);
     }
 
     public Attachment? GetAttachment(string id)
@@ -168,10 +190,21 @@ public sealed partial class Store
 
     /// <summary>What a lecture's attachments add to its notes: each one's kind, name and words (those with words only).</summary>
     public List<AttachedText> AttachedTo(string noteId) =>
-        [.. ListAttachments(noteId: noteId).Where(a => a.HasText).Select(a => new AttachedText(a.Id, Attachments.KindOf(a.Name, a.Type), a.Name, a.Text))];
+        [.. ListAttachments(noteId: noteId).Where(a => a.HasText && !a.IsPhoto).Select(a => new AttachedText(a.Id, Attachments.KindOf(a.Name, a.Type), a.Name, a.Text))];
+
+    /// <summary>Gives a lecture what its attachments add to its notes: their words, and its whiteboard photos.</summary>
+    public void Attach(Meeting m)
+    {
+        m.Attached = AttachedTo(m.Id);
+        m.Photos = [.. PhotosOf(m.Id).Select(a => new PhotoRef(a.Id, AttachmentPath(a), a.At, a.Text))];
+    }
 
     /// <summary>The lecture has notes written without some of its attachments' words: rewriting would use them.</summary>
-    public bool AttachmentsUnused(string noteId) => ListAttachments(noteId: noteId).Any(a => a.HasText && !a.Used);
+    public bool AttachmentsUnused(string noteId) => ListAttachments(noteId: noteId).Any(a => (a.HasText || a.IsPhoto) && !a.Used);
+
+    /// <summary>A lecture's whiteboard photos, in the order they were taken.</summary>
+    public List<Attachment> PhotosOf(string noteId) =>
+        [.. ListAttachments(noteId: noteId).Where(a => a.IsPhoto && a.Type.StartsWith("image/", StringComparison.Ordinal)).OrderBy(a => a.Taken, StringComparer.Ordinal)];
 
     /// <summary>Removes an attachment: its file and its row. False when there's no such attachment.</summary>
     public bool RemoveAttachment(string id)
