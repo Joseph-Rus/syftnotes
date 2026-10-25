@@ -275,10 +275,15 @@ Exactly the iPhone app's own calls (`ios/StudyStash/API/APIClient.swift`, and th
   `/voice-memos`
 - POST: `/lectures` (a recording written down on the phone; idempotent by its `phone-…` id), `/lectures/{id}/class`,
   `/lectures/{id}/title`, `/lectures/{id}/restore`, `/lectures/{id}/rewrite`, `/ai/ask` (streamed), `/ai/warm`,
-  `/chat` (streamed), `/classes/alias`, `/uses`, `/attachments` (multipart from `upload`), `/voice-memos` (multipart
+  `/chat` (streamed), `/chats/{id}` (rename), `/chats/{id}/restore` (Delete's undo), `/classes/alias`, `/uses`, `/attachments` (multipart from `upload`), `/voice-memos` (multipart
   from `upload`), `/voice-memos/{id}/retry`, `/canvas` (the Due tab's sync now: whatever the phone sends, the
   library is sent only `{"sync": true}`, so a phone can't change Canvas's address or which course is which class)
 - DELETE: `/lectures/{id}`, `/chats/{id}`, `/attachments/{id}`, `/voice-memos/{id}`
+
+**Stop.** The phone's Stop takes a streamed request (Ask, chat) out of its box. While the laptop is writing that
+answer, it checks the box on each read: once the request has been missing from two reads running (one stale read of
+Drive isn't enough), it drops its request to the library, which stops the AI as the app's own Stop does, and it
+writes nothing more to the answer. A request the phone gave up on (25 s, no answer) stops the same way.
 
 Never settings, passwords, AI engines or keys, Canvas tokens, devices, Claude connections, history, files, or
 anything outside `/api/v2`. A path is checked segment by segment after decoding: an empty segment, `.` or `..`, a

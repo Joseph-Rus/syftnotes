@@ -124,6 +124,26 @@ public sealed partial class DriveLink
         box.First = false;
         if (changed) Changed?.Invoke();
         lock (gate) box.Waiting = [.. parsed.Requests.Select(r => r.Id).Where(id => !answeredSet.Contains(id))];
+        // Stop on the phone: a streamed answer whose request has left the box (twice running) is stopped here too.
+        var present = parsed.Requests.Select(r => r.Id).ToHashSet(StringComparer.Ordinal);
+        var stopping = new List<CancellationTokenSource>();
+        lock (gate)
+            foreach (var (rid, st) in streams)
+            {
+                if (st.Phone != phone) continue;
+                st.Missing = present.Contains(rid) ? 0 : st.Missing + 1;
+                if (st.Missing >= 2) stopping.Add(st.Stop);
+            }
+        foreach (var st in stopping)
+        {
+            try
+            {
+                st.Cancel();
+            }
+            catch (ObjectDisposedException)
+            {
+            }
+        }
         // A phone's changes are done one at a time, in the order it asked (a recording, then a page attached to it),
         // as they are when it asks over Tailscale; reads and streamed answers don't wait for them.
         bool writeAhead = false;
@@ -162,6 +182,7 @@ public sealed partial class DriveLink
     {
         bool done = false;
         PhoneCall? call = null;
+        CancellationTokenSource? stopped = null;
         try
         {
             await requests.WaitAsync(ct);
@@ -182,7 +203,24 @@ public sealed partial class DriveLink
                     done = true;
                     return;
                 }
-                int status = await ReplayAsync(call, r, phoneName, answer, ct);
+                if (call.Kind == PhoneAnswerKind.Stream)
+                {
+                    stopped = CancellationTokenSource.CreateLinkedTokenSource(ct);
+                    lock (gate) streams[r.Id] = new Streaming(phone, stopped);
+                }
+                int status;
+                try
+                {
+                    status = await ReplayAsync(call, r, phoneName, answer, stopped?.Token ?? ct);
+                }
+                // However the dropped reply ends (cancelled, or the stream cut off mid-read), it was the phone's Stop.
+                catch (Exception) when (stopped is { IsCancellationRequested: true } && !ct.IsCancellationRequested)
+                {
+                    // The library stops writing the answer when its request is dropped, as the app's own Stop does.
+                    log($"[drive] {call.Method} {call.Route} from {LibraryCalls.Ascii(phoneName)}: stopped on the phone");
+                    done = true;
+                    return;
+                }
                 log($"[drive] {call.Method} {call.Route} from {LibraryCalls.Ascii(phoneName)}: {status}");
                 done = true;
             }
@@ -205,6 +243,7 @@ public sealed partial class DriveLink
             lock (gate)
             {
                 doing.Remove(r.Id);
+                streams.Remove(r.Id);
                 if (done)
                 {
                     Answered(r.Id);
@@ -215,6 +254,7 @@ public sealed partial class DriveLink
                 }
             }
             if (done && call is { Changes: true }) CopySoon(call.Lecture);
+            stopped?.Dispose();
         }
     }
 

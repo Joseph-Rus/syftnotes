@@ -55,6 +55,8 @@ public static class PhoneCalls
         // The Due tab's "sync now": DriveLink sends only {"sync": true}, never Canvas's address or which course is which class.
         ("POST", "/canvas", PhoneAnswerKind.Json, false),
         ("POST", "/chat", PhoneAnswerKind.Stream, false),
+        ("POST", "/chats/{}", PhoneAnswerKind.Json, false),
+        ("POST", "/chats/{}/restore", PhoneAnswerKind.Json, false),
         ("POST", "/classes/alias", PhoneAnswerKind.Json, false),
         ("POST", "/uses", PhoneAnswerKind.Json, false),
         ("POST", "/attachments", PhoneAnswerKind.Json, true),
