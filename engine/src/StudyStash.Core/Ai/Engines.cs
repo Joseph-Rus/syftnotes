@@ -167,6 +167,16 @@ public static class Engines
     public static bool LooksLikeAuth(string error) => AuthLike.IsMatch(error);
     public static bool LooksLikeLimit(string error) => LimitLike.IsMatch(error);
 
+    // Claude Code's sign-in was being renewed by another of its processes on this computer (or one that stopped halfway
+    // left the renewal locked): "Failed to refresh OAuth token: another Claude Code process is refreshing it or exited
+    // mid-refresh. This is usually transient; retry in a minute…", "Could not refresh your login because another Claude
+    // Code process is refreshing it…". Not signed out: Anthropic's docs say to try again in a minute.
+    static readonly Regex RefreshBusy = new(@"another Claude Code process is refreshing", RegexOptions.IgnoreCase | RegexOptions.Compiled);
+
+    /// <summary>Whether Claude Code stopped only because another of its processes was renewing the sign-in, so the
+    /// same run works again a little later (<see cref="ClaudeProvider.RefreshWait"/>).</summary>
+    public static bool LooksLikeRefreshBusy(string error) => RefreshBusy.IsMatch(error);
+
     /// <summary>Whether an AI's error means the student has to sign in to it again (signed out, or its sign-in ran
     /// out): an auth error that isn't a turned-down API key.</summary>
     public static bool LooksSignedOut(string error) =>
