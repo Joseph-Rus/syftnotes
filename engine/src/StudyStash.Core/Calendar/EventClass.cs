@@ -20,9 +20,10 @@ public static partial class EventClass
     [GeneratedRegex(@"([a-z]) (\d)")]
     private static partial Regex LetterSpaceDigit();
 
-    /// <summary>Lower case, words only, and a code's letters joined to its number ("cs 101" → "cs101"), so "CS-101",
-    /// "cs101" and "CS 101" read the same.</summary>
-    static string Squash(string s) => LetterSpaceDigit().Replace(Classify.Norm(s), "$1$2");
+    /// <summary>Lower case, words only, "&amp;" as "and", and a code's letters joined to its number ("cs 101" →
+    /// "cs101"), so "CS-101", "cs101" and "CS 101" read the same, and so do "Theory of Computation and Compilers" and
+    /// "Theory Of Computation &amp; Compilers".</summary>
+    static string Squash(string s) => LetterSpaceDigit().Replace(Classify.Norm(s.Replace("&", " and ", StringComparison.Ordinal)), "$1$2");
 
     /// <summary>The class this event title is for, or null when none clearly is.</summary>
     public static string? For(string title, IReadOnlyList<ClassHint> classes)

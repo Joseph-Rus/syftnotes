@@ -53,6 +53,18 @@ public class EventClassTests
     }
 
     [Fact]
+    public void An_ampersand_reads_as_and()
+    {
+        List<ClassHint> classes = [new("Theory of Computation and Compilers", []), new("Machine Learning", []), new("R&D", [])];
+        Assert.Equal("Theory of Computation and Compilers", EventClass.For("Theory Of Computation & Compilers", classes));
+        Assert.Equal("Theory of Computation and Compilers", EventClass.For("Theory of Computation and Compilers", classes));
+        Assert.Equal("R&D", EventClass.For("R & D sync", classes));
+        // An extra word is still only suggested, for the student to confirm.
+        Assert.Null(EventClass.For("Machine & Deep Learning", classes));
+        Assert.Equal("Machine Learning", EventClass.Suggest("Machine & Deep Learning", classes));
+    }
+
+    [Fact]
     public void A_loose_match_two_classes_share_is_no_match()
     {
         List<ClassHint> classes = [new("Biology 110", []), new("Biochemistry 110", [])];
