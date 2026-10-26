@@ -59,6 +59,23 @@ public class NoteViewMathTests
     }
 
     [AvaloniaFact]
+    public void A_display_formula_in_a_bullet_with_its_latex_beside_the_dollars_is_typeset_whole()
+    {
+        // The AI sometimes writes $$ against the formula's first and last line inside a bullet: Markdig alone took
+        // the first line for the fence's info, never found the close, and the bullet's text and formula were lost.
+        var note = new NoteView { Markdown = "- Assume that the claim holds for $y$:\n  $$\\widehat{\\Delta}(A,xy)\n  =\n  \\widehat{\\Delta}\\bigl(\\widehat{\\Delta}(A,x),y\\bigr).$$\n\n- Next" };
+        var window = Show(note);
+        var display = Assert.Single(note.GetLogicalDescendants().OfType<MathDisplay>());
+        var mv = Assert.Single(display.GetLogicalDescendants().OfType<MathView>());
+        Assert.Null(mv.ErrorMessage);
+        Assert.Contains(@"\widehat{\Delta}(A,xy)", mv.Latex);
+        Assert.DoesNotContain("$$", mv.Latex);
+        var texts = note.GetLogicalDescendants().OfType<TextBlock>().Select(t => string.Concat(t.Inlines?.OfType<Run>().Select(r => r.Text) ?? [])).ToList();
+        Assert.Contains(texts, t => t.Contains("Assume that the claim holds"));
+        window.Close();
+    }
+
+    [AvaloniaFact]
     public void A_formula_csharpmath_cannot_typeset_shows_its_source_calmly_instead()
     {
         var note = new NoteView { Markdown = "An inline one that fails: $\\frac{a}{$ here.\n\n$$\n\\frac{a}{\n$$" };

@@ -64,7 +64,7 @@ public static class NoteExport
         string stem = System.IO.Path.GetFileNameWithoutExtension(name) is { Length: > 0 } st ? st : name;
         var assets = new List<ExportAsset>();
         int diagramIndex = 0;
-        string body = notes.Length == 0 ? "_No notes yet._" : DrawDiagrams(MathText.DollarDelimiters(notes), stem, mermaidSvg, assets, ref diagramIndex);
+        string body = notes.Length == 0 ? "_No notes yet._" : DrawDiagrams(MathText.FenceFormulas(MathText.DollarDelimiters(notes)), stem, mermaidSvg, assets, ref diagramIndex);
 
         var date = ParseDate(dateRaw);
         string duration = TimedText.Length(seconds);

@@ -102,6 +102,20 @@ public class MathTextTests
     public void DollarDelimiters_turns_backslash_parens_into_dollars_outside_code(string markdown, string converted) =>
         Assert.Equal(converted, MathText.DollarDelimiters(markdown));
 
+    [Theory]
+    [InlineData("- Assume:\n  $$\\hat{D}(A,xy)\n  =\n  \\hat{D}(B,y).$$\n\n- Next", "- Assume:\n\n  $$\n  \\hat{D}(A,xy)\n  =\n  \\hat{D}(B,y).\n  $$\n\n- Next")]
+    [InlineData("$$\nx = 1\n$$", "$$\nx = 1\n$$")]
+    [InlineData("Then:\n$$\nx = 1\n$$\nso x is one.", "Then:\n\n$$\nx = 1\n$$\n\nso x is one.")]
+    [InlineData("Inline $$x$$ and\n$$y$$ alone", "Inline $$x$$ and\n$$y$$ alone")]
+    [InlineData("$$a\n= b\n$$", "$$\na\n= b\n$$")]
+    [InlineData("$$\na\n= b$$", "$$\na\n= b\n$$")]
+    public void FenceFormulas_puts_each_dollar_fence_on_its_own_line(string markdown, string fenced) =>
+        Assert.Equal(fenced, MathText.FenceFormulas(markdown));
+
+    [Fact]
+    public void Prepare_drops_bracket_sizes_and_keeps_the_brackets() =>
+        Assert.Equal(@"\hat{D}(\hat{D}(A,x),y)\{a\}", MathText.Prepare(@"\hat{D}\bigl(\hat{D}(A,x),y\bigr)\Bigl\{a\Bigr\}"));
+
     [Fact]
     public void Prepare_never_throws_on_garbled_input()
     {

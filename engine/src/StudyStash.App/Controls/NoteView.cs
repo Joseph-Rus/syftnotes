@@ -351,7 +351,7 @@ public sealed partial class NoteView : StackPanel
         diagrams = [];
         var kept = blocks;
         blocks = [];
-        string markdown = source = Markdown ?? "";
+        string markdown = source = MathText.FenceFormulas(Markdown ?? "");
         var doc = Markdig.Markdown.Parse(markdown, Pipeline);
         bool first = true;
         string section = "";

@@ -81,6 +81,10 @@ public static class MathText
                 case "lvert" or "rvert":
                     sb.Append('|');
                     break;
+                case "big" or "Big" or "bigg" or "Bigg" or "bigl" or "Bigl" or "biggl" or "Biggl" or "bigr" or "Bigr" or "biggr"
+                    or "Biggr" or "bigm" or "Bigm" or "biggm" or "Biggm":
+                    // dropped: CSharpMath doesn't know them, and they only size the bracket after them, which stays
+                    break;
                 case "lVert" or "rVert":
                     sb.Append("\\|");
                     break;
@@ -381,6 +385,41 @@ public static class MathText
             i++;
         }
         return sb.ToString();
+    }
+
+    /// <summary>
+    /// A <c>$$</c> formula over several lines with its LaTeX on the same line as an opening or closing <c>$$</c>
+    /// (<c>$$\hat{x}</c> … <c>y.$$</c>, often inside a bullet) with each <c>$$</c> on a line of its own: Markdig only
+    /// reads a lone <c>$$</c> as a formula's fence, and otherwise takes the first line for the fence's info (dropped)
+    /// and never finds the close. A blank line goes between the formula and prose right against it too, since a
+    /// formula can't break into a paragraph (it would be read as more of the paragraph's words). Everything else is
+    /// left exactly as it was.
+    /// </summary>
+    public static string FenceFormulas(string markdown)
+    {
+        string[] lines = NoteBlocks.Lines(markdown);
+        var blocks = NoteBlocks.Find(lines).Where(b => b.Kind == NoteBlockKind.Math && b.Last > b.First).ToList();
+        if (blocks.Count == 0) return markdown;
+        var output = new List<string>(lines.Length + 4 * blocks.Count);
+        int at = 0;
+        foreach (var block in blocks)
+        {
+            for (; at < block.First; at++) output.Add(lines[at]);
+            if (output.Count > 0 && output[^1].Trim().Length > 0) output.Add("");
+            string indent = lines[block.First][..(lines[block.First].Length - lines[block.First].TrimStart().Length)];
+            if (lines[block.First].Trim() == "$$" && (!block.Closed || lines[block.Last].Trim() == "$$"))
+                for (; at <= block.Last; at++) output.Add(lines[at]);
+            else
+            {
+                output.Add(indent + "$$");
+                foreach (string line in block.Text.Split('\n')) output.Add(indent + line);
+                if (block.Closed) output.Add(indent + "$$");
+                at = block.Last + 1;
+            }
+            if (at < lines.Length && lines[at].Trim().Length > 0) output.Add("");
+        }
+        for (; at < lines.Length; at++) output.Add(lines[at]);
+        return string.Join("\n", output);
     }
 
     /// <summary>Commands a JSON decoder swallowed the backslash-letter of, inside <c>$…$</c> only: a control
