@@ -35,7 +35,7 @@ public sealed record ChecklistFacts
     /// <summary>The ChatGPT and Claude desktop apps on this computer, by name ("ChatGPT", "Claude"): each can be let
     /// read the library with one press.</summary>
     public IReadOnlyList<string> AiApps { get; init; } = [];
-    /// <summary>Every one of them has Study Stash in its settings.</summary>
+    /// <summary>Every one of them has Egghead Notes in its settings.</summary>
     public bool AiAppsConnected { get; init; }
 }
 

@@ -2,8 +2,13 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
+    <!-- The bundle stays "Study Stash.app" (installed copies update in place by that name). macOS shows the English
+         name in en.lproj/InfoPlist.strings, "Egghead Notes", only while these match the file's own name, so they say
+         Study Stash and Finder, the Dock, Launchpad and the menu bar all say Egghead Notes. -->
     <key>CFBundleName</key><string>Study Stash</string>
     <key>CFBundleDisplayName</key><string>Study Stash</string>
+    <key>CFBundleDevelopmentRegion</key><string>en</string>
+    <key>LSHasLocalizedDisplayName</key><true/>
     <key>CFBundleIdentifier</key><string>com.study-stash.app</string>
     <key>CFBundleExecutable</key><string>StudyStash</string>
     <key>CFBundleIconFile</key><string>AppIcon</string>
@@ -15,8 +20,8 @@
     <key>LSApplicationCategoryType</key><string>public.app-category.education</string>
     <key>NSHighResolutionCapable</key><true/>
     <key>NSHumanReadableCopyright</key><string>MIT License.</string>
-    <key>NSMicrophoneUsageDescription</key><string>Study Stash records your lectures so it can write them down. The recording stays on this computer.</string>
-    <key>NSAudioCaptureUsageDescription</key><string>Study Stash can also record what this computer plays, like a lecture on Zoom.</string>
-    <key>NSLocalNetworkUsageDescription</key><string>Study Stash opens your library on your Mac mini.</string>
+    <key>NSMicrophoneUsageDescription</key><string>Egghead Notes records your lectures so it can write them down. The recording stays on this computer.</string>
+    <key>NSAudioCaptureUsageDescription</key><string>Egghead Notes can also record what this computer plays, like a lecture on Zoom.</string>
+    <key>NSLocalNetworkUsageDescription</key><string>Egghead Notes opens your library on your Mac mini.</string>
 </dict>
 </plist>

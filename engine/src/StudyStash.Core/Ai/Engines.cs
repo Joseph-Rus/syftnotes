@@ -52,7 +52,7 @@ public sealed record EngineChecks
         DiskFreeGb = () => StudyStash.Core.Machine.DiskFreeGb(),
         OpenSignIn = (home, terminal, id) =>
         {
-            // Gemini signs in to Study Stash's own home for agy, the one its notes run in.
+            // Gemini signs in to Egghead Notes' own home for agy, the one its notes run in.
             var (exe, args) = id == "gemini" && AiProvider.Which(Antigravity.Binary) is { } agy
                 ? Antigravity.InTerminal(agy, OperatingSystem.IsWindows())
                 : Engines.SignInCommand(id);
@@ -84,8 +84,8 @@ public static class Engines
 {
     public static readonly string[] Order = ["ollama", "claude", "codex", "gemini"];
 
-    /// <summary>An AI's name, as the person using Study Stash knows it: who wrote a lecture's notes, who answered, who
-    /// is at its limit. Claude and ChatGPT, not the tools Study Stash reaches them through (<see cref="Tool"/>).</summary>
+    /// <summary>An AI's name, as the person using Egghead Notes knows it: who wrote a lecture's notes, who answered, who
+    /// is at its limit. Claude and ChatGPT, not the tools Egghead Notes reaches them through (<see cref="Tool"/>).</summary>
     public static string Name(string id) => id switch
     {
         "ollama" => "Ollama",
@@ -95,7 +95,7 @@ public static class Engines
         _ => id,
     };
 
-    /// <summary>The tool Study Stash reaches an AI through, for the few places that are about the tool itself (what
+    /// <summary>The tool Egghead Notes reaches an AI through, for the few places that are about the tool itself (what
     /// is installed, what a terminal runs): Claude Code for Claude, Codex for ChatGPT.</summary>
     public static string Tool(string id) => id switch
     {
@@ -133,7 +133,7 @@ public static class Engines
         notesModel.IndexOf(" · ", StringComparison.Ordinal) is var at and > 0 && WhoWrote(notesModel) is { Length: > 0 } who && who != "Ollama"
             ? notesModel[(at + 3)..] : WhoWrote(notesModel);
 
-    /// <summary>The command a terminal runs to sign in ("claude", "codex login"; Gemini's runs in Study Stash's own home
+    /// <summary>The command a terminal runs to sign in ("claude", "codex login"; Gemini's runs in Egghead Notes' own home
     /// for agy, <see cref="Antigravity.InTerminal"/>, so "agy" here is only its name).</summary>
     public static (string Exe, string[] Args) SignInCommand(string id) => id switch
     {
@@ -142,7 +142,7 @@ public static class Engines
         _ => ("claude", []),
     };
 
-    /// <summary>The sign-in as words to type: Gemini's in Study Stash's own home for agy (<see cref="Antigravity.SignInLine"/>).</summary>
+    /// <summary>The sign-in as words to type: Gemini's in Egghead Notes' own home for agy (<see cref="Antigravity.SignInLine"/>).</summary>
     public static string SignInWords(string id)
     {
         if (id == "gemini") return Antigravity.SignInLine(OperatingSystem.IsWindows());
@@ -237,7 +237,7 @@ public static class Engines
     static bool? Hinted(string id, EngineChecks checks) => id switch
     {
         "codex" => checks.FileExists(CodexAuthPath(checks)) || checks.Env("OPENAI_API_KEY") is { Length: > 0 },
-        // Gemini runs through Google's Antigravity (agy), in Study Stash's own home for it, where agy 1.4.5 keeps its
+        // Gemini runs through Google's Antigravity (agy), in Egghead Notes' own home for it, where agy 1.4.5 keeps its
         // sign-in in a file of its own (only whether it's there is looked at). Its absence proves nothing (another
         // version may keep it elsewhere): without it or a key in the environment, it's unchecked until tried.
         "gemini" => checks.Env("GEMINI_API_KEY") is { Length: > 0 } || checks.FileExists(GeminiCredsPath)

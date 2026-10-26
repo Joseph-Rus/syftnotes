@@ -41,13 +41,13 @@ public sealed class GuidedServices
     /// <summary>How far the model's download has got, while it downloads.</summary>
     public Func<double?> Downloading { get; init; } = () => null;
     public Func<DateTime> Now { get; init; } = () => DateTime.Now;
-    /// <summary>A line in the app's log (a turn Study Stash stopped, and why).</summary>
+    /// <summary>A line in the app's log (a turn Egghead Notes stopped, and why).</summary>
     public Action<string> Log { get; init; } = _ => { };
     /// <summary>Runs something on the window's thread (a CLI's events come from its own).</summary>
     public Action<Action> Post { get; init; } = a => Dispatcher.UIThread.Post(a);
     /// <summary>The ChatGPT and Claude desktop apps on this computer, as their own settings stand (read only).</summary>
     public Func<IReadOnlyList<AiAppState>> AiApps { get; init; } = () => [];
-    /// <summary>Adds Study Stash to one of those apps' settings, as Settings → AI tool access's Connect does.</summary>
+    /// <summary>Adds Egghead Notes to one of those apps' settings, as Settings → AI tool access's Connect does.</summary>
     public Func<string, AiAppChange>? ConnectAiApp { get; init; }
 
     public AgentInstall MakeInstaller(AgentCliInfo cli) =>
@@ -65,9 +65,9 @@ public interface IGuidedActions
 
 /// <summary>
 /// Guided setup (the design's Pick your AI → Install → Sign in → chat): the student picks Claude, ChatGPT or Gemini,
-/// Study Stash installs its CLI with its maker's installer only when they press Install, they sign in on the
-/// provider's own page, and then their own AI, run headless and locked to Study Stash's setup tools, walks them through
-/// the rest in a chat, with a checklist beside it that only Study Stash ticks. "I don't have a paid plan" is an answer
+/// Egghead Notes installs its CLI with its maker's installer only when they press Install, they sign in on the
+/// provider's own page, and then their own AI, run headless and locked to Egghead Notes' setup tools, walks them through
+/// the rest in a chat, with a checklist beside it that only Egghead Notes ticks. "I don't have a paid plan" is an answer
 /// too, with no chat (a small free model can't follow the brief): it goes to setup by hand, whose notes step opens on
 /// the free AI (<see cref="NotesPick"/>). "Set up by hand" (today's setup, over the same <see cref="SetupModel"/>, so
 /// nothing done is lost) is one click away throughout.
@@ -111,7 +111,7 @@ public sealed partial class GuidedSetupModel : ObservableObject, IDisposable
     public SetupDoor? Door { get; set; }
     /// <summary>What the student's presses in a card do.</summary>
     public IGuidedActions? Actions { get; set; }
-    /// <summary>Open Study Stash: setup is finished (the window saves it and closes).</summary>
+    /// <summary>Open Egghead Notes: setup is finished (the window saves it and closes).</summary>
     public Action? OnFinish { get; set; }
 
     [ObservableProperty] public partial GuidedScreen Screen { get; set; } = GuidedScreen.PickAi;
@@ -158,7 +158,7 @@ public sealed partial class GuidedSetupModel : ObservableObject, IDisposable
     [ObservableProperty] public partial bool ReadyToFinish { get; set; }
     [ObservableProperty] public partial CardEntry? OpenCard { get; set; }
 
-    // Facts only Study Stash sets (the checklist reads them)
+    // Facts only Egghead Notes sets (the checklist reads them)
     [ObservableProperty] public partial bool RoleChosen { get; set; }
     [ObservableProperty] public partial string NotesWriter { get; set; } = "";
     [ObservableProperty] public partial bool TaskbarDone { get; set; }
@@ -200,8 +200,8 @@ public sealed partial class GuidedSetupModel : ObservableObject, IDisposable
 
     // --- the words each screen shows (the design's) ------------------------------------------------------------------
 
-    public string PickTitle => Again ? "Set up Study Stash again" : "Welcome to Study Stash";
-    public static string PickLede => "An AI sets up Study Stash with you, writes your notes and answers your questions. Which do you have?";
+    public string PickTitle => Again ? "Set up Egghead Notes again" : "Welcome to Egghead Notes";
+    public static string PickLede => "An AI sets up Egghead Notes with you, writes your notes and answers your questions. Which do you have?";
     // The answers, in the student's own terms: what they pay for, never the tools underneath (Claude Code, Codex,
     // Antigravity, Ollama), which the next screens name once, where they're installed.
     public static string ClaudeLine => "I have a paid Claude plan (Pro or Max).";
@@ -209,7 +209,7 @@ public sealed partial class GuidedSetupModel : ObservableObject, IDisposable
     /// <summary>Gemini works with a personal Google account, free or paid (a free one has a small weekly allowance).</summary>
     public static string GeminiLine => "I use Gemini with my Google account (free or Google AI Pro).";
     public static string FreeTitle => "I don't have a paid plan";
-    public string FreeLine => $"That's fine: Study Stash still records and transcribes. Advanced: a free AI on this {Device} (Ollama), or an API key.";
+    public string FreeLine => $"That's fine: Egghead Notes still records and transcribes. Advanced: a free AI on this {Device} (Ollama), or an API key.";
     public string AlreadyHere => $"Already on this {Device}";
     public bool ClaudeHere => ClaudeFound.Works;
     public bool CodexHere => CodexFound.Works;
@@ -248,7 +248,7 @@ public sealed partial class GuidedSetupModel : ObservableObject, IDisposable
     };
 
     public string InstallTitle => $"Get {Brand} ready";
-    public string InstallLede => $"Study Stash talks to {Brand} through {Cli.Name}, {Cli.Maker}'s own helper for apps. Study Stash will download it and set it up in your account. You won't need an administrator password.";
+    public string InstallLede => $"Egghead Notes talks to {Brand} through {Cli.Name}, {Cli.Maker}'s own helper for apps. Egghead Notes will download it and set it up in your account. You won't need an administrator password.";
     public string InstallButton => "Download and set up";
     public string InstallSource => $"Installs with {Cli.Maker}'s own installer from {Cli.Site}";
     public string InstallLine => (Windows ? Cli.WindowsInstaller : Cli.MacInstaller).Line;
@@ -267,8 +267,8 @@ public sealed partial class GuidedSetupModel : ObservableObject, IDisposable
             _ => "Your browser will open Claude's sign-in page. Sign in with the account that has your Pro or Max plan, then come back here.",
         };
     public string Privacy => Cli.Id == "gemini"
-        ? $"Study Stash never sees your password. The sign-in is Google's own, and stays on this {Device}."
-        : $"Study Stash never sees your password. The sign-in is {Brand}'s own, and stays on this {Device}.";
+        ? $"Egghead Notes never sees your password. The sign-in is Google's own, and stays on this {Device}."
+        : $"Egghead Notes never sees your password. The sign-in is {Brand}'s own, and stays on this {Device}.";
     public string PlanNote => Cli.Id == "gemini" ? "Your chat with Gemini uses a little of your Google account's Gemini allowance." : $"Your chat with {Brand} uses your {Brand} plan.";
     public string ReadyWords => $"{Brand} is ready.";
     public bool HasAllowance => AllowanceWords.Length > 0 && ShowReady;
@@ -278,16 +278,16 @@ public sealed partial class GuidedSetupModel : ObservableObject, IDisposable
     public string PlanTooSmallTitle => Cli.Id == "gemini" ? "This Google account can't use Gemini from other apps" : $"This {Brand} account is on a plan that other apps can't use";
     public string PlanTooSmallText => Cli.Id switch
     {
-        "codex" => "Study Stash needs ChatGPT Plus or higher. Without one, it still records and transcribes your lectures. Have an API key? Carry on, and add it on the notes step.",
-        "gemini" => "A personal Google account works; school and work accounts often don't. Without one, Study Stash still records and transcribes your lectures. Have an API key? Carry on, and add it on the notes step.",
-        _ => "Study Stash needs Claude Pro or Max. Without one, it still records and transcribes your lectures. Have an API key? Carry on, and add it on the notes step.",
+        "codex" => "Egghead Notes needs ChatGPT Plus or higher. Without one, it still records and transcribes your lectures. Have an API key? Carry on, and add it on the notes step.",
+        "gemini" => "A personal Google account works; school and work accounts often don't. Without one, Egghead Notes still records and transcribes your lectures. Have an API key? Carry on, and add it on the notes step.",
+        _ => "Egghead Notes needs Claude Pro or Max. Without one, it still records and transcribes your lectures. Have an API key? Carry on, and add it on the notes step.",
     };
     public bool ShowOpenSignIn => !WaitingSignIn && !SignedIn && !CheckingSignIn && PlanProblem == ChatProblem.None;
     public bool HasSignInProblem => !string.IsNullOrEmpty(SignInProblem);
     public bool HasPlanProblem => PlanProblem != ChatProblem.None;
     public bool PlanIsPlan => PlanProblem == ChatProblem.Plan;
 
-    public string HeaderTitle => Again ? "Set up Study Stash again" : "Let's set up Study Stash";
+    public string HeaderTitle => Again ? "Set up Egghead Notes again" : "Let's set up Egghead Notes";
     public string SidebarTitle => $"Setup with {Brand}";
     public string FieldHint => $"Reply to {Brand}…";
     public string Thinking => $"{Brand} is thinking…";
@@ -319,8 +319,8 @@ public sealed partial class GuidedSetupModel : ObservableObject, IDisposable
         // Without a paid plan there's nothing to install or sign in to here: setup by hand comes next. Nothing picked
         // yet, the steps don't name an AI the student hasn't chosen.
         string ai = PickedClaude || PickedCodex || PickedGemini ? Brand : "";
-        string[] titles = PickedByHand ? ["Pick your AI", "Set up Study Stash"]
-            : ["Pick your AI", ai.Length > 0 ? $"Get {ai} ready" : "Get your AI ready", ai.Length > 0 ? $"Sign in to {ai}" : "Sign in", "Set up Study Stash"];
+        string[] titles = PickedByHand ? ["Pick your AI", "Set up Egghead Notes"]
+            : ["Pick your AI", ai.Length > 0 ? $"Get {ai} ready" : "Get your AI ready", ai.Length > 0 ? $"Sign in to {ai}" : "Sign in", "Set up Egghead Notes"];
         if (PickedByHand) at = Math.Min(at, 1);
         if (Steps.Count != titles.Length)
         {
@@ -426,7 +426,7 @@ public sealed partial class GuidedSetupModel : ObservableObject, IDisposable
             {
                 SignedIn = true;
                 AiReady = true;
-                StartChat(Again ? "[Study Stash] Setup was opened again from Settings." : session.Length > 0 ? "[Study Stash] Setup was reopened." : "[Study Stash] Setup was opened.");
+                StartChat(Again ? "[Egghead Notes] Setup was opened again from Settings." : session.Length > 0 ? "[Egghead Notes] Setup was reopened." : "[Egghead Notes] Setup was opened.");
                 return;
             }
             Screen = GuidedScreen.SignIn;
@@ -443,7 +443,7 @@ public sealed partial class GuidedSetupModel : ObservableObject, IDisposable
         Refresh();
     }
 
-    /// <summary>Looks again at which of the ChatGPT and Claude apps are here, and whether each has Study Stash.</summary>
+    /// <summary>Looks again at which of the ChatGPT and Claude apps are here, and whether each has Egghead Notes.</summary>
     public void LoadAiApps()
     {
         aiApps = ReadAiApps();
@@ -466,16 +466,16 @@ public sealed partial class GuidedSetupModel : ObservableObject, IDisposable
     public IReadOnlyList<string> AiAppNames => [.. aiApps.Select(a => ClaudeSetup.DesktopApp(a.Id)?.Name ?? a.Name)];
     public bool AiAppsConnected => aiApps.Count > 0 && aiApps.All(a => a.Added && !a.OtherCopy);
 
-    /// <summary>The AI app card's Connect: Study Stash goes into each app's own settings (as Settings → AI tool access
+    /// <summary>The AI app card's Connect: Egghead Notes goes into each app's own settings (as Settings → AI tool access
     /// does it, keeping everything else in the file). Null when they're all connected; else why not, for the card.</summary>
     public string? ConnectAiApps()
     {
         const string later = "You can connect it later in Settings → AI apps.";
-        if (services.ConnectAiApp is not { } connect) return "Study Stash can't change that app's settings here. " + later;
+        if (services.ConnectAiApp is not { } connect) return "Egghead Notes can't change that app's settings here. " + later;
         foreach (var app in aiApps.Where(a => !a.Added || a.OtherCopy || a.Outdated))
             if (!connect(app.Id).Ok) services.Log($"[setup] connecting {app.Name} didn't work");
         LoadAiApps();
-        return AiAppsConnected ? null : "Study Stash couldn't change that app's settings. " + later;
+        return AiAppsConnected ? null : "Egghead Notes couldn't change that app's settings. " + later;
     }
 
     [RelayCommand]
@@ -581,7 +581,7 @@ public sealed partial class GuidedSetupModel : ObservableObject, IDisposable
         if (!AiReady || !chatStarted)
         {
             Screen = Picked.Length > 0 && AiReady ? GuidedScreen.Chat : GuidedScreen.PickAi;
-            if (Screen == GuidedScreen.Chat) StartChat("[Study Stash] Setup was opened.");
+            if (Screen == GuidedScreen.Chat) StartChat("[Egghead Notes] Setup was opened.");
             return;
         }
         Screen = GuidedScreen.Chat;
@@ -611,7 +611,7 @@ public sealed partial class GuidedSetupModel : ObservableObject, IDisposable
                 BackToNotes();
                 break;
             case GuidedScreen.SignIn when AiReady:
-                StartChat("[Study Stash] Setup was opened.");
+                StartChat("[Egghead Notes] Setup was opened.");
                 break;
         }
     }
@@ -714,7 +714,7 @@ public sealed partial class GuidedSetupModel : ObservableObject, IDisposable
         await ToSignInAsync();
         if (!AiReady || Screen != GuidedScreen.SignIn) return;
         if (ForNotes) BackToNotes();
-        else StartChat("[Study Stash] Setup was opened.");
+        else StartChat("[Egghead Notes] Setup was opened.");
     }
 
     /// <summary>The sign-in screen: already signed in goes straight to the plan check.</summary>
@@ -781,7 +781,7 @@ public sealed partial class GuidedSetupModel : ObservableObject, IDisposable
     {
         signIn?.Stop();
         if (Found.Exe is not { } exe) return;
-        // Gemini's sign-in runs in Study Stash's own home for agy, in the terminal as well.
+        // Gemini's sign-in runs in Egghead Notes' own home for agy, in the terminal as well.
         if (Cli.Id == "gemini")
         {
             var (program, args) = Antigravity.InTerminal(exe, Windows);
@@ -834,7 +834,7 @@ public sealed partial class GuidedSetupModel : ObservableObject, IDisposable
                 PlanProblem = ChatProblem.Limit;
                 break;
             case ChatProblem.Offline:
-                PlanProblemTitle = $"Study Stash couldn't reach {Brand}. Check your internet connection.";
+                PlanProblemTitle = $"Egghead Notes couldn't reach {Brand}. Check your internet connection.";
                 PlanProblemText = "";
                 PlanProblem = ChatProblem.Offline;
                 break;
@@ -891,17 +891,17 @@ public sealed partial class GuidedSetupModel : ObservableObject, IDisposable
 
     /// <summary>A checklist line clicked: the AI is asked to go there.</summary>
     [RelayCommand]
-    Task ClickItem(ChecklistRow row) => row.Clickable ? SendAsync($"[Study Stash] The student clicked {row.Title} in the checklist.") : Task.CompletedTask;
+    Task ClickItem(ChecklistRow row) => row.Clickable ? SendAsync($"[Egghead Notes] The student clicked {row.Title} in the checklist.") : Task.CompletedTask;
 
     /// <summary>
-    /// A note from Study Stash about what happened (a card's button, a download that finished): a quiet line in the
+    /// A note from Egghead Notes about what happened (a card's button, a download that finished): a quiet line in the
     /// thread, and the AI hears it, as a turn now or with the next one.
     /// </summary>
     public void Note(string shown, string forAi, bool good = true)
     {
         Thread.Add(new NoteEntry(shown, good));
         Refresh();
-        _ = SendAsync("[Study Stash] " + forAi);
+        _ = SendAsync("[Egghead Notes] " + forAi);
     }
 
     readonly List<StudentEntry> queued = [];
@@ -1071,8 +1071,8 @@ public sealed partial class GuidedSetupModel : ObservableObject, IDisposable
             ChatProblem.Region => RegionWords,
             ChatProblem.Limit => $"{Brand} is at its usage limit until {UntilWords(Engines.UntilFrom(said, services.Now()))}. You can finish by hand; what's done stays done.",
             ChatProblem.NoAnswer => $"{Brand} didn't answer.",
-            ChatProblem.Guard => $"Study Stash stopped {Brand}: it tried to use a tool it isn't allowed here.",
-            ChatProblem.Tools => $"Study Stash couldn't connect {Brand} to setup.",
+            ChatProblem.Guard => $"Egghead Notes stopped {Brand}: it tried to use a tool it isn't allowed here.",
+            ChatProblem.Tools => $"Egghead Notes couldn't connect {Brand} to setup.",
             _ => $"{Brand} stopped: {Py.Head(said, 160).TrimEnd('.')}.",
         };
     }
@@ -1119,7 +1119,7 @@ public sealed partial class GuidedSetupModel : ObservableObject, IDisposable
     /// <summary>open_manual_setup: setup by hand at that item, the chat kept to come back to.</summary>
     public void OpenManual(string item) => ByHandAt(item);
 
-    /// <summary>Open Study Stash (the finish card, or the checklist's own button once everything needed is done).</summary>
+    /// <summary>Open Egghead Notes (the finish card, or the checklist's own button once everything needed is done).</summary>
     [RelayCommand]
     void Finish()
     {

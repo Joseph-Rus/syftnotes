@@ -144,7 +144,7 @@ public class LibraryMoveTests
         // What a 0.8 library answers for a route it hasn't got.
         using var older = new HttpClient(new Answer(HttpStatusCode.NotFound, "{\"detail\":\"Not Found\"}")) { BaseAddress = new Uri("http://old") };
         var e = await Assert.ThrowsAsync<InvalidOperationException>(() => LibraryMove.CopyAsync(older, "pw", fresh.Client, "new-pw"));
-        Assert.Equal("Your old library runs an older Study Stash. Update it, then bring your lectures over.", e.Message);
+        Assert.Equal("Your old library runs an older Egghead Notes. Update it, then bring your lectures over.", e.Message);
         using var gone = new HttpClient(new Answer(null, "")) { BaseAddress = new Uri("http://old") };
         e = await Assert.ThrowsAsync<InvalidOperationException>(() => LibraryMove.CopyAsync(gone, "pw", fresh.Client, "new-pw"));
         Assert.Equal("Can't reach your old library. Is its computer on, and is Tailscale connected?", e.Message);

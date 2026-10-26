@@ -61,17 +61,17 @@ public class NoticeWordsTests
     [Fact]
     public void A_saved_recording_says_where_it_goes_from_here()
     {
-        Assert.Equal("Study Stash is writing it down; the library files it and writes your notes.", NoticeWords.Saved(LibraryState.Connected, mac: true));
-        Assert.Equal("Study Stash is writing it down. It waits on this Mac and goes to your library when it's back.", NoticeWords.Saved(LibraryState.Unreachable, mac: true));
+        Assert.Equal("Egghead Notes is writing it down; the library files it and writes your notes.", NoticeWords.Saved(LibraryState.Connected, mac: true));
+        Assert.Equal("Egghead Notes is writing it down. It waits on this Mac and goes to your library when it's back.", NoticeWords.Saved(LibraryState.Unreachable, mac: true));
         Assert.Contains("this PC", NoticeWords.Saved(LibraryState.Unreachable, mac: false));
         Assert.Contains("new password in Settings", NoticeWords.Saved(LibraryState.WrongPassword, mac: true));
         Assert.Contains("Connect to your library in Settings", NoticeWords.Saved(LibraryState.NotSetUp, mac: false));
         // One too short for notes says so, and one that could go either way isn't promised any.
-        Assert.Equal("Too short for notes: Study Stash writes them from about a minute and a half of speech. The library files it with its transcript.",
+        Assert.Equal("Too short for notes: Egghead Notes writes them from about a minute and a half of speech. The library files it with its transcript.",
             NoticeWords.Saved(LibraryState.Connected, mac: true, notes: false));
-        Assert.Equal("Study Stash is writing it down, and the library files it.", NoticeWords.Saved(LibraryState.Connected, mac: true, notes: null));
+        Assert.Equal("Egghead Notes is writing it down, and the library files it.", NoticeWords.Saved(LibraryState.Connected, mac: true, notes: null));
         // A library that writes no notes (setup's "No AI for now") promises none, however long the recording.
-        Assert.Equal("Study Stash is writing it down, and the library files it. Notes are off, so it has just its transcript.",
+        Assert.Equal("Egghead Notes is writing it down, and the library files it. Notes are off, so it has just its transcript.",
             NoticeWords.Saved(LibraryState.Connected, mac: true, notes: true, off: true));
         Assert.Equal("Notes are off, so your library files this recording without any. The transcript is in the Transcript tab. To have notes written, choose an AI in Settings → Your AI, "
             + "then turn on “Write study notes from each lecture” and “Sort lectures into classes with AI” in Settings → Notes and sorting.", NoteModel.NotesAreOff(Nouns.Recording, transcript: true));
@@ -82,9 +82,9 @@ public class NoticeWordsTests
         Assert.True(Summarize.WillHaveNotes(3000, 2998, 48_000));
         Assert.Null(Summarize.WillHaveNotes(120, 0, 0));
         // The note's page says the same, and names Keep recording only where it has the button.
-        Assert.Equal("This recording is too short for notes: Study Stash writes them from about a minute and a half of speech. The transcript is in the Transcript tab; Keep recording adds to it.",
+        Assert.Equal("This recording is too short for notes: Egghead Notes writes them from about a minute and a half of speech. The transcript is in the Transcript tab; Keep recording adds to it.",
             NoteModel.TooShort(Nouns.Recording, transcript: true, canContinue: true));
-        Assert.Equal("This lecture is too short for notes: Study Stash writes them from about a minute and a half of speech. The transcript is in the Transcript tab.",
+        Assert.Equal("This lecture is too short for notes: Egghead Notes writes them from about a minute and a half of speech. The transcript is in the Transcript tab.",
             NoteModel.TooShort(Nouns.Lecture, transcript: true, canContinue: false));
     }
 
@@ -119,9 +119,9 @@ public class NoticeWordsTests
     [Fact]
     public void A_newer_version_starting_says_it_updated_once_and_nothing_else_does()
     {
-        Assert.Equal(("Study Stash updated to 0.10.1", "Everything is just as you left it.", "What's new"),
+        Assert.Equal(("Egghead Notes updated to 0.10.1", "Everything is just as you left it.", "What's new"),
             NoticeWords.Updated("0.10.0", "0.10.1"));
-        Assert.Equal("Study Stash updated to 1.0.0", NoticeWords.Updated("0.9.1", "v1.0.0")!.Value.Title);
+        Assert.Equal("Egghead Notes updated to 1.0.0", NoticeWords.Updated("0.9.1", "v1.0.0")!.Value.Title);
         Assert.Null(NoticeWords.Updated("", "0.9.2")); // the very first start
         Assert.Null(NoticeWords.Updated("0.9.2", "0.9.2"));
         Assert.Null(NoticeWords.Updated("0.10.0", "0.9.2")); // an older copy
@@ -132,7 +132,7 @@ public class NoticeWordsTests
     [Fact]
     public void An_update_that_didnt_take_is_said_on_the_next_start()
     {
-        Assert.Equal(("Study Stash couldn't update", "You're still on 0.10.0. It tries again later, or you can download 0.10.1 now.", "Download"),
+        Assert.Equal(("Egghead Notes couldn't update", "You're still on 0.10.0. It tries again later, or you can download 0.10.1 now.", "Download"),
             NoticeWords.UpdateDidntTake("0.10.1", "0.10.0"));
         Assert.Null(NoticeWords.UpdateDidntTake("0.10.1", "0.10.1"));
         Assert.Null(NoticeWords.UpdateDidntTake("", "0.10.0"));
@@ -169,7 +169,7 @@ public class NoticeWordsTests
             IconWords.WhereItIs(mac: false, hidden: false).Text,
             IconWords.WhereItIs(mac: true, hidden: true).Text,
             NoticeWords.UpdateReady("10.10.10").Text,
-            NoticeWords.UpdateBlocked("10.10.10", "Move Study Stash into Applications, then open it again, so it can update itself.").Text,
+            NoticeWords.UpdateBlocked("10.10.10", "Move Egghead Notes into Applications, then open it again, so it can update itself.").Text,
             NoticeWords.UpdateFailed("10.10.10", "10.10.9").Text,
         };
         // About 46 characters a line at the notification's width: four lines.

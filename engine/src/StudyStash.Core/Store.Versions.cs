@@ -11,7 +11,7 @@ public static class NotesChangeKind
     public const string Written = "written";
     /// <summary>Rewritten with another AI ("Rewrite notes with", then Use new).</summary>
     public const string Rewrite = "rewrite";
-    /// <summary>An AI app saved them through Study Stash's connection (save_notes).</summary>
+    /// <summary>An AI app saved them through Egghead Notes' connection (save_notes).</summary>
     public const string App = "app";
     /// <summary>Pasted from a chat (Paste notes).</summary>
     public const string Paste = "paste";

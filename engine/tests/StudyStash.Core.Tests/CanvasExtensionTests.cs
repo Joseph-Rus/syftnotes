@@ -32,7 +32,7 @@ public class CanvasExtensionTests
         Extension.Prepare(ext, "http://mini.tail.ts.net:8787", "k3y", "https://canvas.test/");
         string[] hosts = ["https://canvas.test/*", "https://*.inscloudgate.net/*", "http://mini.tail.ts.net:8787/*"];
 
-        // As an older Study Stash left it: version 1.2, its own scripts, a config.js from before the list of file hosts.
+        // As an older Egghead Notes left it: version 1.2, its own scripts, a config.js from before the list of file hosts.
         var manifest = JsonNode.Parse(Manifest(ext))!.AsObject();
         manifest["version"] = "1.2";
         File.WriteAllText(Path.Combine(ext, "manifest.json"), manifest.ToJsonString());
@@ -298,7 +298,7 @@ public class CanvasExtensionTests
         await JsonOf(await AsExtension($"/api/v2/canvas/work?v={Extension.Version()}&p={Extension.Protocol}"));
         Assert.Null((await AsApp(HttpMethod.Get))["extension_update"]);
 
-        // A copy from the Chrome Web Store (or Firefox's) is updated by its store, often days after a new Study Stash
+        // A copy from the Chrome Web Store (or Firefox's) is updated by its store, often days after a new Egghead Notes
         // has a newer folder: older than this library's, it still gets work and is never told to reload by hand.
         now = now.AddMinutes(1);
         work = await JsonOf(await AsExtension($"/api/v2/canvas/work?v=1.5&p={Extension.Protocol}&b=Chrome&force=1"));

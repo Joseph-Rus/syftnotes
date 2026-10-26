@@ -192,7 +192,7 @@ public class IllustrationTests
         var d = Assert.Single(result.Drawn);
         Assert.Equal(NoteBlockKind.Svg, d.Kind);
         var block = NoteBlocks.Find(result.Notes).Single();
-        Assert.StartsWith("<!-- Study Stash diagram, from 00:20 -->", block.Text);
+        Assert.StartsWith("<!-- Egghead Notes diagram, from 00:20 -->", block.Text);
         var drawing = SafeSvg.Clean(block.Text);
         Assert.Equal(["frame", "motor", "battery"], drawing.Parts.Select(p => p.Id));
         // Its callouts were spaced out on the way in.

@@ -412,7 +412,7 @@ public class CanvasWordsTests
     [InlineData("state-syncing", "Syncing… 3 left", "BIO 110, CALC II and HIST 210.")]
     [InlineData("state-connected", "Connected", "Last sync 10:24. Next at 11:24.")]
     [InlineData("state-updated", "The extension in Chrome updated itself", "Now version 1.4. Nothing to do.")]
-    [InlineData("state-error", "Canvas didn’t answer", "school.instructure.com didn’t respond at 10:24. Study Stash will try again at 11:24.")]
+    [InlineData("state-error", "Canvas didn’t answer", "school.instructure.com didn’t respond at 10:24. Egghead Notes will try again at 11:24.")]
     public void Describe_matches_the_design_s_words_for_every_state(string fixture, string title, string text)
     {
         var s = CanvasFixtures.Load<CanvasApi.State>(fixture);

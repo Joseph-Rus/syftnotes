@@ -37,9 +37,14 @@ public static partial class Updates
     public const string LatestApi = $"https://api.github.com/repos/{RepoSlug}/releases/latest";
 
     // One download per system: the same app whatever the computer is for (setup asks, and Settings can change it).
-    public const string MacAsset = "Study-Stash.dmg";
-    public const string WindowsAsset = "Study-Stash-Setup.exe";
+    public const string MacAsset = "Egghead-Notes.dmg";
+    public const string WindowsAsset = "Egghead-Notes-Setup.exe";
     public const string ChecksumsAsset = "SHA256SUMS.txt";
+
+    // The one download's names before the rename to Egghead Notes: copies 0.18.x and older ask for these when they
+    // update themselves, so every release still carries them, byte for byte the one download.
+    public const string StudyStashMacAsset = "Study-Stash.dmg";
+    public const string StudyStashWindowsAsset = "Study-Stash-Setup.exe";
 
     // D2's four role installers. Copies 0.8.x and older ask for by name, when they update themselves and on an old
     // library's "Connect your laptop" links, so every release still carries them: byte for byte the one download.
@@ -48,10 +53,10 @@ public static partial class Updates
     public const string WindowsLaptopAsset = "Study-Stash-Laptop-Setup.exe";
     public const string WindowsLibraryAsset = "Study-Stash-Library-Setup.exe";
 
-    /// <summary>What a release holds for installing: the two downloads, then the four old names kept for older copies.</summary>
+    /// <summary>What a release holds for installing: the two downloads, then the six old names kept for older copies.</summary>
     public static readonly IReadOnlyList<string> Installers = [MacAsset, WindowsAsset, .. OldInstallers()];
 
-    static string[] OldInstallers() => [MacLaptopAsset, MacLibraryAsset, WindowsLaptopAsset, WindowsLibraryAsset];
+    static string[] OldInstallers() => [StudyStashMacAsset, StudyStashWindowsAsset, MacLaptopAsset, MacLibraryAsset, WindowsLaptopAsset, WindowsLibraryAsset];
 
     /// <summary>The download this system installs from, whatever the computer is for, or null when it doesn't update
     /// itself (Linux).</summary>

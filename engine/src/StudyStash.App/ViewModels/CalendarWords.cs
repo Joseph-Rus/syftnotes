@@ -7,7 +7,7 @@ namespace StudyStash.App.ViewModels;
 public static class CalendarWords
 {
     public const string Title = "Calendars";
-    public const string Lede = "Study Stash reads your calendars to show what's coming up, and names a lecture you record during a class after it.";
+    public const string Lede = "Egghead Notes reads your calendars to show what's coming up, and names a lecture you record during a class after it.";
     public const string AddFeedTitle = "Add a calendar feed";
     public const string AddFeedLine = "Paste a calendar's address: Google's secret address in iCal format, an iCloud public calendar, your school's timetable, or Canvas's calendar feed. It starts with webcal:// or https://.";
     public const string FeedPlaceholder = "webcal://… or https://….ics";

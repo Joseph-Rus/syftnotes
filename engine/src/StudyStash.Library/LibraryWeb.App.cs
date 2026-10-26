@@ -7,7 +7,7 @@ using StudyStash.Core.Ai;
 namespace StudyStash.Library;
 
 /// <summary>
-/// /api/v2: the library for the Study Stash app (and Claude, through <see cref="RemoteLibrary"/>). Everything takes the
+/// /api/v2: the library for the Egghead Notes app (and Claude, through <see cref="RemoteLibrary"/>). Everything takes the
 /// laptop's key (Authorization: Bearer &lt;library password&gt;), like /api/ingest.
 /// </summary>
 public sealed partial class LibraryWeb
@@ -168,7 +168,7 @@ public sealed partial class LibraryWeb
             return Http.Json(Reader.Overview());
         })));
 
-        // What Study Stash is for ({uses: ["student", "work", ...]}), as setup or the phone asked: not a student, and
+        // What Egghead Notes is for ({uses: ["student", "work", ...]}), as setup or the phone asked: not a student, and
         // it's folders rather than classes, without Canvas.
         app.MapPost("/api/v2/uses", Http.Handle(ctx => ApiAsync(ctx, async () =>
         {

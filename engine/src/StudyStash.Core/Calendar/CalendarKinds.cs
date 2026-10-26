@@ -3,7 +3,7 @@ using StudyStash.Core.Calendar.Ics;
 namespace StudyStash.Core.Calendar;
 
 /// <summary>
-/// One kind of calendar source Study Stash knows: its kind ("ics", "apple", "google", "microsoft"), what Settings calls
+/// One kind of calendar source Egghead Notes knows: its kind ("ics", "apple", "google", "microsoft"), what Settings calls
 /// it, how to make a source from what calendars.json keeps (<see cref="Create"/>), and, for a kind the student
 /// connects with a button ("Connect Google"), what that button says and does (<see cref="Connect"/>: sign in or ask
 /// the system, then hand back the new source's settings, or null when the student backed out). An iCalendar feed has
@@ -75,6 +75,6 @@ public sealed class CalendarKinds
     public IReadOnlyList<CalendarKind> Connectable => [.. All.Where(k => k.Connect is not null)];
 
     /// <summary>The source these settings describe, or null when its kind isn't known here (Apple Calendar's settings
-    /// read on Windows, or a kind from a newer Study Stash).</summary>
+    /// read on Windows, or a kind from a newer Egghead Notes).</summary>
     public ICalendarSource? Create(CalendarSourceSettings s) => Find(s.Kind)?.Create(s);
 }

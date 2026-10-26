@@ -1,7 +1,7 @@
-# Study Stash laptop settings. Change them in the Study Stash app.
+# Egghead Notes laptop settings. Change them in the Egghead Notes app.
 server_url = "http://mini.example.ts.net:8787"
 pool_key = "tulip 2027"
 pool_name = "Fall"
 display_name = "Sam \u2615"
-# Install new releases of Study Stash automatically.
+# Install new releases of Egghead Notes automatically.
 auto_update = true

@@ -7,9 +7,9 @@ using StudyStash.Core.Rich;
 namespace StudyStash.Core;
 
 /// <summary>
-/// Composing an illustration from ready-made parts instead of drawing it: Study Stash shortlists the library's parts
+/// Composing an illustration from ready-made parts instead of drawing it: Egghead Notes shortlists the library's parts
 /// that fit the plan (by its words; no model asked), a fast model answers with a small scene (which parts, where, a few
-/// simple shapes where no part exists, which part each label points at), and Study Stash draws it (<see cref="PartsScene"/>).
+/// simple shapes where no part exists, which part each label points at), and Egghead Notes draws it (<see cref="PartsScene"/>).
 /// Seconds where a drawing takes minutes. When the library has nothing for the subject, or the composer says it can't,
 /// the illustration is drawn as before.
 /// </summary>
@@ -53,7 +53,7 @@ public static partial class IllustrationDesign
     public static string ComposePrompt(Meeting m, IllustrationPlan plan, IReadOnlyList<LibraryPart> catalogue)
     {
         var sb = new StringBuilder();
-        sb.Append("You compose a labelled illustration for a university student's study notes from ready-made parts, the way a textbook figure is assembled: you pick parts from the catalogue, place and size them, add a few simple shapes only for what no part shows, and say which part or region each label points at. You don't draw: Study Stash draws the parts and the labels from your plan.\n\n");
+        sb.Append("You compose a labelled illustration for a university student's study notes from ready-made parts, the way a textbook figure is assembled: you pick parts from the catalogue, place and size them, add a few simple shapes only for what no part shows, and say which part or region each label points at. You don't draw: Egghead Notes draws the parts and the labels from your plan.\n\n");
         sb.Append("<lecture>\n").Append(Summarize.Header(m)).Append("\n</lecture>\n\n");
         sb.Append("## The figure\n\nTitle: ").Append(plan.Title).Append("\nWhat it shows: ").Append(plan.Subject).Append("\nLayout: ").Append(plan.Layout).Append('\n');
         sb.Append("Labels, one for each of these parts (id: name, what the lecture said of it):\n");

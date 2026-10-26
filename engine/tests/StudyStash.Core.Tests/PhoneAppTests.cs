@@ -7,7 +7,7 @@ namespace StudyStash.Core.Tests;
 /// rules, its own content security policy, and a plain page when this copy was built without it.</summary>
 public class PhoneAppTests
 {
-    const string Index = "<!doctype html><title>Study Stash</title><script type=\"module\" src=\"/app/assets/index-a1b2c3.js\"></script>";
+    const string Index = "<!doctype html><title>Egghead Notes</title><script type=\"module\" src=\"/app/assets/index-a1b2c3.js\"></script>";
 
     /// <summary>A built phone app, as Vite leaves it in web/dist.</summary>
     static string BuiltApp(TempDir dir)
@@ -16,7 +16,7 @@ public class PhoneAppTests
         Directory.CreateDirectory(Path.Combine(web, "assets"));
         File.WriteAllText(Path.Combine(web, "index.html"), Index);
         File.WriteAllText(Path.Combine(web, "sw.js"), "self.addEventListener('fetch',()=>{});");
-        File.WriteAllText(Path.Combine(web, "manifest.webmanifest"), "{\"name\":\"Study Stash\",\"start_url\":\"/app/\"}");
+        File.WriteAllText(Path.Combine(web, "manifest.webmanifest"), "{\"name\":\"Egghead Notes\",\"start_url\":\"/app/\"}");
         File.WriteAllText(Path.Combine(web, "assets", "index-a1b2c3.js"), "console.log('hi')");
         File.WriteAllText(Path.Combine(web, "assets", "index-d4e5f6.css"), "body{}");
         File.WriteAllBytes(Path.Combine(web, "icon-192.png"), [0x89, 0x50, 0x4E, 0x47]);

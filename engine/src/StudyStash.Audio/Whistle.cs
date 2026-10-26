@@ -180,7 +180,7 @@ static unsafe class Needle
     public static void Bind()
     {
         if (library != 0) return;
-        string path = LibraryPath() ?? throw new DllNotFoundException($"Study Stash has no Cactus Whistle engine for {RuntimeInformation.OSDescription} on {RuntimeInformation.ProcessArchitecture}.");
+        string path = LibraryPath() ?? throw new DllNotFoundException($"Egghead Notes has no Cactus Whistle engine for {RuntimeInformation.OSDescription} on {RuntimeInformation.ProcessArchitecture}.");
         // needle's README says its binary counts usage unless this is 0. The engine library imports nothing that reaches
         // the network (its usage counts are the Python package's, not used here), but it costs nothing to say no.
         Environment.SetEnvironmentVariable("NEEDLE_TELEMETRY", "0");

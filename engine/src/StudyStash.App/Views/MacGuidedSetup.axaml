@@ -30,7 +30,7 @@
 
   <Border Name="Chrome" Classes="chrome" Background="{DynamicResource Canvas}" ClipToBounds="True">
     <DockPanel>
-      <c:WindowHeader Name="Header" DockPanel.Dock="Top" CanResize="False" Title="Set up Study Stash" />
+      <c:WindowHeader Name="Header" DockPanel.Dock="Top" CanResize="False" Title="Set up Egghead Notes" />
       <Grid ColumnDefinitions="228,*" Margin="8,0,8,8">
         <!-- The steps before the chat, or the chat's checklist: straight on the canvas, as the library's sidebar is. -->
         <Panel>
@@ -63,7 +63,7 @@
               <TextBlock Classes="side-group" Text="{Binding SidebarTitle}" />
             </StackPanel>
             <StackPanel DockPanel.Dock="Bottom" Spacing="16" Margin="4,12,4,10">
-              <Button Name="FinishSide" Classes="btn ink" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" IsVisible="{Binding ReadyToFinish}" Command="{Binding FinishCommand}" Content="Open Study Stash" />
+              <Button Name="FinishSide" Classes="btn ink" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" IsVisible="{Binding ReadyToFinish}" Command="{Binding FinishCommand}" Content="Open Egghead Notes" />
               <Button Name="ByHandChat" Classes="text-link" Margin="6,0" Command="{Binding ByHandCommand}" Content="Set up by hand" />
             </StackPanel>
             <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
@@ -306,7 +306,7 @@
                 </ScrollViewer>
               </DockPanel>
 
-              <!-- Screen 4 · The chat: the AI's words and the student's, Study Stash's notes, and the cards the AI opens. -->
+              <!-- Screen 4 · The chat: the AI's words and the student's, Egghead Notes' notes, and the cards the AI opens. -->
               <DockPanel IsVisible="{Binding OnChat}">
                 <StackPanel DockPanel.Dock="Top" Margin="32,26,32,0">
                   <TextBlock Classes="step-label" Text="{Binding StepLabel}" />
@@ -355,7 +355,10 @@
                       </ItemsControl.ItemsPanel>
                       <ItemsControl.DataTemplates>
                         <DataTemplate DataType="vm:AiEntry">
-                          <StackPanel Spacing="4" HorizontalAlignment="Left" MaxWidth="540">
+                          <!-- The egghead says it: his face beside each of the AI's messages -->
+                          <Grid ColumnDefinitions="Auto,12,*" HorizontalAlignment="Left">
+                          <c:Doodle Art="head" Size="34" VerticalAlignment="Top" Margin="0,2,0,0" />
+                          <StackPanel Grid.Column="2" Spacing="4" HorizontalAlignment="Left" MaxWidth="540">
                             <TextBlock Classes="ai-byline" Text="{Binding Byline}" />
                             <TextBlock Classes="ai-answer" Text="{Binding Text}" />
                             <ItemsControl ItemsSource="{Binding Chips}" IsVisible="{Binding HasChips}" Margin="0,4,0,0">
@@ -374,6 +377,7 @@
                               </ItemsControl.ItemTemplate>
                             </ItemsControl>
                           </StackPanel>
+                          </Grid>
                         </DataTemplate>
                         <DataTemplate DataType="vm:StudentEntry">
                           <Border Classes="ai-bubble-q" MaxWidth="420" Classes.queued="{Binding Queued}">
@@ -664,7 +668,7 @@
                                       <v:ShortcutsEditor DataContext="{Binding Setup.Keys}" />
                                     </Panel>
                                   </StackPanel>
-                                  <Button Classes="btn sm ink" HorizontalAlignment="Right" Command="{Binding PressCommand}" CommandParameter="finish" Content="Open Study Stash" />
+                                  <Button Classes="btn sm ink" HorizontalAlignment="Right" Command="{Binding PressCommand}" CommandParameter="finish" Content="Open Egghead Notes" />
                                 </StackPanel>
 
                                 <Grid ColumnDefinitions="Auto,8,*" IsVisible="{Binding HasProblem}">
@@ -677,8 +681,8 @@
                         </DataTemplate>
                       </ItemsControl.DataTemplates>
                     </ItemsControl>
-                    <StackPanel Orientation="Horizontal" Spacing="8" IsVisible="{Binding Busy}">
-                      <c:Spinner Width="14" Height="14" Foreground="{DynamicResource InkMuted}" VerticalAlignment="Center" />
+                    <StackPanel Orientation="Horizontal" Spacing="12" IsVisible="{Binding Busy}">
+                      <c:Doodle Art="thinking" Size="44" Busy="{Binding Busy}" VerticalAlignment="Center" />
                       <TextBlock Classes="ai-thinking" Text="{Binding Thinking}" VerticalAlignment="Center" />
                     </StackPanel>
                   </StackPanel>

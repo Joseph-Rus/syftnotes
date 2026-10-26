@@ -42,7 +42,7 @@ public class BrowserChoiceTests
         }
         var stranger = new BrowserChoiceModel(["Safari"], Choose) { OnDone = picked => done = picked };
         await stranger.Options[0].Pick.ExecuteAsync(null);
-        Assert.Equal(("Study Stash hasn't heard from the extension in that browser.", "nothing yet"), (stranger.Problem, done));
+        Assert.Equal(("Egghead Notes hasn't heard from the extension in that browser.", "nothing yet"), (stranger.Problem, done));
 
         var model = new BrowserChoiceModel(ask.Browsers, Choose) { OnDone = picked => done = picked };
         await model.Options[1].Pick.ExecuteAsync(null);
@@ -79,7 +79,7 @@ public class BrowserChoiceTests
     {
         string? done = "nothing yet";
         var model = new BrowserChoiceModel(["Chrome", "Edge"], _ => throw new HttpRequestException("no route")) { OnDone = picked => done = picked };
-        Assert.StartsWith("The Study Stash extension is in both Chrome and Edge.", model.Lede);
+        Assert.StartsWith("The Egghead Notes extension is in both Chrome and Edge.", model.Lede);
         Assert.Equal("Chrome, Edge and Firefox", BrowserChoiceModel.Join(["Chrome", "Edge", "Firefox"]));
 
         await model.Options[0].Pick.ExecuteAsync(null);
@@ -139,7 +139,7 @@ public class BrowserChoiceTests
             Assert.Equal(["Chrome", null], picks);
 
             // A refusal keeps it open with the reason.
-            var (refused, no) = Open(_ => Task.FromResult<string?>("Study Stash hasn't heard from the extension in that browser."), picks.Add);
+            var (refused, no) = Open(_ => Task.FromResult<string?>("Egghead Notes hasn't heard from the extension in that browser."), picks.Add);
             double before = refused.ClientSize.Height;
             no.Options[1].Pick.Execute(null);
             Dispatcher.UIThread.RunJobs();
@@ -176,7 +176,7 @@ public class BrowserChoiceTests
                 break;
             case "refused, then closed":
                 model.Options[0].Pick.Execute(null);
-                answer.SetResult("Study Stash hasn't heard from the extension in that browser.");
+                answer.SetResult("Egghead Notes hasn't heard from the extension in that browser.");
                 Dispatcher.UIThread.RunJobs();
                 w.Close();
                 break;

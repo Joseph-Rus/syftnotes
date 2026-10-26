@@ -53,14 +53,14 @@ public sealed partial class AiAppRow : ObservableObject
         _ => "desktop_windows",
     };
     [ObservableProperty] public partial string Status { get; set; } = "";
-    /// <summary>Connected: an app started Study Stash since it was added.</summary>
+    /// <summary>Connected: an app started Egghead Notes since it was added.</summary>
     [ObservableProperty] public partial bool Ok { get; set; }
     [ObservableProperty] public partial bool CanConnect { get; set; }
     [ObservableProperty] public partial bool CanDisconnect { get; set; }
-    /// <summary>"Connect", "Fix" when the app has another copy of Study Stash set up, or "Update" when it has this
+    /// <summary>"Connect", "Fix" when the app has another copy of Egghead Notes set up, or "Update" when it has this
     /// one the way it was pasted in by hand.</summary>
     [ObservableProperty] public partial string ConnectWords { get; set; } = "Connect";
-    /// <summary>Added, but the app hasn't loaded it yet, and it's a desktop app Study Stash can quit and open again
+    /// <summary>Added, but the app hasn't loaded it yet, and it's a desktop app Egghead Notes can quit and open again
     /// (a Mac): the row offers to, since closing a Mac app's window doesn't quit it.</summary>
     [ObservableProperty] public partial bool CanReopen { get; set; }
     /// <summary>The app as its own menu bar names it ("Claude", "ChatGPT"): what the words about it say.</summary>
@@ -79,7 +79,7 @@ public sealed partial class AiAppRow : ObservableObject
     partial void OnStatusChanged(string value) => OnPropertyChanged(nameof(WinDetail));
 
     /// <summary>Where an app stands, in words: not here, not connected, added but not loaded yet, connected (and when
-    /// it last started Study Stash), set up for another copy of Study Stash, or set up by hand.</summary>
+    /// it last started Egghead Notes), set up for another copy of Egghead Notes, or set up by hand.</summary>
     public void Show(AiAppState s, DateTime now)
     {
         Ok = false;
@@ -89,8 +89,8 @@ public sealed partial class AiAppRow : ObservableObject
         bool waiting = false;
         if (!s.Installed) Status = "Not on this computer";
         else if (!s.Added) Status = "Not connected yet";
-        else if (s.OtherCopy) Status = "Set up for another copy of Study Stash. Choose Fix to use this one.";
-        else if (s.Outdated) Status = "Set up by hand, so Study Stash can't tell when it's connected. Choose Update.";
+        else if (s.OtherCopy) Status = "Set up for another copy of Egghead Notes. Choose Fix to use this one.";
+        else if (s.Outdated) Status = "Set up by hand, so Egghead Notes can't tell when it's connected. Choose Update.";
         else if (s.Started is { } started && (s.AddedAt is null || started >= s.AddedAt))
         {
             Ok = true;
@@ -109,7 +109,7 @@ public sealed partial class AiAppRow : ObservableObject
     /// Stash only once a chat in Codex begins, so its row says that too.</summary>
     string WaitingWords(bool canReopen) => Id switch
     {
-        "claude-desktop" => canReopen ? "Almost done. Reopen Claude so it loads Study Stash." : "Almost done. Quit Claude completely, then open it again.",
+        "claude-desktop" => canReopen ? "Almost done. Reopen Claude so it loads Egghead Notes." : "Almost done. Quit Claude completely, then open it again.",
         "codex" => canReopen ? "Almost done. Reopen ChatGPT, then start a chat in Codex." : "Almost done. Quit ChatGPT and open it again, then start a chat in Codex.",
         "claude-code" => "Almost done. Start a new Claude Code session.",
         _ => $"Almost done. Start {Name} again.",
@@ -176,7 +176,7 @@ public sealed partial class AiAccessModel : ObservableObject
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(WebStatusWords))]
     public partial bool WebChecking { get; set; }
-    public string WebName => "Study Stash";
+    public string WebName => "Egghead Notes";
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(ShowWebReady))]
     public partial string? WebUrl { get; set; }
@@ -240,13 +240,13 @@ public sealed partial class AiAccessModel : ObservableObject
     public Func<string, Task>? Copy { get; set; }
     /// <summary>Reads every AI app's settings on this computer (read only), asked fresh each <see cref="Load"/>.</summary>
     public Func<IReadOnlyList<AiAppState>>? ReadApps { get; set; }
-    /// <summary>Adds Study Stash to one app's settings, or takes it out; answers what happened.</summary>
+    /// <summary>Adds Egghead Notes to one app's settings, or takes it out; answers what happened.</summary>
     public Func<string, AiAppChange>? ConnectApp { get; set; }
     public Func<string, AiAppChange>? DisconnectApp { get; set; }
     /// <summary>Quits one app and opens it again (a Mac); answers whether it did, with the words to show if not.</summary>
     public Func<string, Task<AiAppChange>>? ReopenApp { get; set; }
 
-    /// <summary>The apps Study Stash looked for and didn't find, in one quiet line under the ones it did.</summary>
+    /// <summary>The apps Egghead Notes looked for and didn't find, in one quiet line under the ones it did.</summary>
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(ShowMissingApps))]
     public partial string? MissingApps { get; set; }
@@ -281,7 +281,7 @@ public sealed partial class AiAccessModel : ObservableObject
     }
 
     /// <summary>The "what was written" panel after a change: the app's settings file, the copy of it from before, and
-    /// the setup that went in (no secrets: the apps start Study Stash, which reads its own settings).</summary>
+    /// the setup that went in (no secrets: the apps start Egghead Notes, which reads its own settings).</summary>
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(ShowWritten), nameof(HasWritten))]
     public partial string? WrittenFile { get; set; }
@@ -501,7 +501,7 @@ public sealed partial class AiAccessModel : ObservableObject
         OnPropertyChanged(nameof(TryLead));
     }
 
-    /// <summary>The row's Reopen: quits the app and opens it again, then keeps looking for it to load Study Stash.</summary>
+    /// <summary>The row's Reopen: quits the app and opens it again, then keeps looking for it to load Egghead Notes.</summary>
     async Task ReopenAppAsync(string id)
     {
         if (ReopenApp is null || Apps.FirstOrDefault(a => a.Id == id) is not { } row) return;
@@ -566,7 +566,7 @@ public sealed partial class AiAccessModel : ObservableObject
         appWatch = null;
     }
 
-    /// <summary>After Connect or Reopen, the app still has to load Study Stash (ChatGPT, once a chat in Codex starts).
+    /// <summary>After Connect or Reopen, the app still has to load Egghead Notes (ChatGPT, once a chat in Codex starts).
     /// Looks again every few seconds for five minutes, so the row turns to Connected by itself the moment it does,
     /// with Settings still open.</summary>
     void WatchApp(string id)

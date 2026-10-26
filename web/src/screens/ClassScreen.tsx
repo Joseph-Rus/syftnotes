@@ -3,7 +3,8 @@ import type { Attachment, DueList, LectureSummary } from '../api/types';
 import { useResource } from '../data/resource';
 import { dueWhen, lectureMeta, groupBy, lectureGroup } from '../format';
 import { href } from '../router';
-import { Doc, Paperclip, PlusCircle } from '../ui/icons';
+import { Paperclip, PlusCircle } from '../ui/icons';
+import { Doodle } from '../ui/Doodle';
 import { Empty, IconButton, Problem, Row, Screen, Section, SkeletonRows } from '../ui/kit';
 import { AttachmentRow } from './attachments';
 import { statusWord } from './Home';
@@ -35,7 +36,13 @@ export function ClassScreen({ api, className }: { api: Api; className: string })
       }
     >
       <ToHandIn className={className} list={due.data} />
-      <Lectures className={className} lectures={lectures.data} loading={lectures.loading} error={lectures.error} onRetry={lectures.refresh} />
+      <Lectures
+        className={className}
+        lectures={lectures.data}
+        loading={lectures.loading}
+        error={lectures.error}
+        onRetry={lectures.refresh}
+      />
       <ClassFiles className={className} files={classAttachments} loading={attachments.loading} />
     </Screen>
   );
@@ -57,7 +64,11 @@ function ToHandIn({ className, list }: { className: string; list: DueList | unde
           href={href({ name: 'assignment', class: i.class, id: String(i.id) })}
           title={i.name}
           subtitle={i.points ? `${i.points} pts` : undefined}
-          detail={<span class={i.overdue || i.missing ? 'due-state missing' : 'due-state'}>{i.due ? dueWhen(i.due) : 'No due date'}</span>}
+          detail={
+            <span class={i.overdue || i.missing ? 'due-state missing' : 'due-state'}>
+              {i.due ? dueWhen(i.due) : 'No due date'}
+            </span>
+          }
           chevron
         />
       ))}
@@ -82,7 +93,7 @@ function Lectures({
   if (loading && !lectures) return <SkeletonRows count={6} />;
   if (!lectures || lectures.length === 0)
     return (
-      <Empty icon={<Doc size={40} />} title="No lectures yet">
+      <Empty icon={<Doodle name="chicklet" />} title="No lectures yet">
         Record a lecture in {className} on your library computer.
       </Empty>
     );
@@ -112,18 +123,26 @@ function ClassFiles({ className, files, loading }: { className: string; files: A
   return (
     <Section
       title="Files"
-      footer={
-        files.length === 0 ? `Add slides, handouts or scans to ${className} — up to 200 MB at once.` : undefined
-      }
+      footer={files.length === 0 ? `Add slides, handouts or scans to ${className} — up to 200 MB at once.` : undefined}
     >
       {files.length === 0 ? (
-        <Row href={href({ name: 'upload', class: className, lecture: null })} lead={<Paperclip size={20} />} title="Add files" chevron />
+        <Row
+          href={href({ name: 'upload', class: className, lecture: null })}
+          lead={<Paperclip size={20} />}
+          title="Add files"
+          chevron
+        />
       ) : (
         <>
           {files.map((a) => (
             <AttachmentRow key={a.id} attachment={a} url={undefined} />
           ))}
-          <Row href={href({ name: 'upload', class: className, lecture: null })} lead={<Paperclip size={20} />} title="Add more files" chevron />
+          <Row
+            href={href({ name: 'upload', class: className, lecture: null })}
+            lead={<Paperclip size={20} />}
+            title="Add more files"
+            chevron
+          />
         </>
       )}
     </Section>

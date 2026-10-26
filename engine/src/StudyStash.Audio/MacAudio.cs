@@ -169,7 +169,7 @@ public sealed unsafe class MacMicrophone : IAudioSource
     public void Dispose() => Stop();
 }
 
-/// <summary>Whether macOS lets Study Stash use the microphone (AVCaptureDevice's answer).</summary>
+/// <summary>Whether macOS lets Egghead Notes use the microphone (AVCaptureDevice's answer).</summary>
 public enum MicAccess
 {
     Unknown,

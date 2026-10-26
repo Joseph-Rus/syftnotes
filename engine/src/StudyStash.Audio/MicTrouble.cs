@@ -5,9 +5,9 @@ namespace StudyStash.Audio;
 /// <summary>Why the microphone didn't start, as the student needs to hear it.</summary>
 public enum MicTroubleKind
 {
-    /// <summary>The system says no: Study Stash isn't allowed the microphone.</summary>
+    /// <summary>The system says no: Egghead Notes isn't allowed the microphone.</summary>
     Denied,
-    /// <summary>A Mac says Study Stash is allowed but won't hand the microphone over (an updated app it still
+    /// <summary>A Mac says Egghead Notes is allowed but won't hand the microphone over (an updated app it still
     /// remembers by its old signature).</summary>
     NotHandedOver,
     /// <summary>There is no microphone to record from.</summary>
@@ -34,10 +34,10 @@ public sealed record MicTrouble(MicTroubleKind Kind, string Title, string Detail
 
     public bool HasAction => ActionLabel.Length > 0;
 
-    /// <summary>The system doesn't let Study Stash use the microphone.</summary>
+    /// <summary>The system doesn't let Egghead Notes use the microphone.</summary>
     public static MicTrouble Denied(bool windows) => windows
-        ? new(MicTroubleKind.Denied, "Study Stash can't use the microphone", RecordingWords.CantHearWindows, "Open Settings", WindowsPrivacyUrl)
-        : new(MicTroubleKind.Denied, "Study Stash can't use the microphone",
+        ? new(MicTroubleKind.Denied, "Egghead Notes can't use the microphone", RecordingWords.CantHearWindows, "Open Settings", WindowsPrivacyUrl)
+        : new(MicTroubleKind.Denied, "Egghead Notes can't use the microphone",
             "Allow it in System Settings → Privacy & Security → Microphone.", "Open System Settings", MacPrivacyUrl);
 
     public static MicTrouble Denied() => Denied(OperatingSystem.IsWindows());
@@ -69,10 +69,10 @@ public sealed record MicTrouble(MicTroubleKind Kind, string Title, string Detail
         : hresult == DeviceInUse ? InUse()
         : Other(windows: true);
 
-    /// <summary>A Mac that says yes but won't hand the microphone over: switching Study Stash off and on again makes
+    /// <summary>A Mac that says yes but won't hand the microphone over: switching Egghead Notes off and on again makes
     /// macOS remember this copy of the app.</summary>
     public static MicTrouble NotHandedOver() => new(MicTroubleKind.NotHandedOver, "macOS didn't hand over the microphone",
-        "In System Settings → Privacy & Security → Microphone, turn Study Stash off and on again, then press Record.",
+        "In System Settings → Privacy & Security → Microphone, turn Egghead Notes off and on again, then press Record.",
         "Open System Settings", MacPrivacyUrl);
 
     /// <summary>Something else went wrong: trying again usually works.</summary>

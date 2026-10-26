@@ -1,6 +1,6 @@
-# Study Stash: Calendars
+# Egghead Notes: Calendars
 
-Study Stash reads the student's calendars to show what's coming up, and to name and file a recording by the class
+Egghead Notes reads the student's calendars to show what's coming up, and to name and file a recording by the class
 it's for. Calendars run on the computer that records (the laptop; on a one-computer setup, that's the library too),
 and everything is read-only: nothing is ever created, changed or deleted in a calendar.
 
@@ -96,7 +96,7 @@ their other names, and their Canvas course codes (`ClassHint`, `EventClass.From(
 - A class matches by its own name, one of its other names, or its Canvas course code appearing in the title.
 - Failing that, a shared course number *and* a shared word between the title and a class's name can match (so
   "COMP 101 Lecture" matches a class named "CS 101" only when something else ties them, e.g. a shared code).
-- A loose match, or one that could equally be two different classes, is no match at all — Study Stash would rather
+- A loose match, or one that could equally be two different classes, is no match at all — Egghead Notes would rather
   show no class than the wrong one.
 
 The same matcher runs in three places: the laptop, before it sends its week to the library (so a library that's
@@ -189,13 +189,13 @@ a recording's class catch up without waiting for the next five-minute tick.
 
 ## Privacy
 
-Calendars are **read-only** everywhere in Study Stash: nothing is ever created, changed or deleted in a calendar,
+Calendars are **read-only** everywhere in Egghead Notes: nothing is ever created, changed or deleted in a calendar,
 whatever the source. Calendars are read by the laptop that records; it keeps what it read on that computer and sends
 only the next seven days (title, times, location, and the class it matched) to its own library — never to the
-developers of Study Stash or anyone else. It isn't sold, used for advertising, or handed to the AI engine that writes
+developers of Egghead Notes or anyone else. It isn't sold, used for advertising, or handed to the AI engine that writes
 notes; only the name of the class it matched is used. Removing a source in Settings deletes its calendars and its
 switches from that computer at once; once Apple, Google or Microsoft sources land, revoking access from the
-account itself stops Study Stash reading anything more. This matches the website's privacy policy
+account itself stops Egghead Notes reading anything more. This matches the website's privacy policy
 (`site/privacy/index.html`, "Calendars").
 
 ## Testing

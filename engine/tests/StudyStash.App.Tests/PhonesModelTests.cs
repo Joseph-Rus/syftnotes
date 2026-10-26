@@ -188,6 +188,6 @@ public class PhonesModelTests
         var older = new PhonesModel(() => old.Call);
         await older.Load();
         Assert.Equal(LibrarySettingsState.Older, older.State);
-        Assert.Contains("older Study Stash", older.Problem);
+        Assert.Contains("older Egghead Notes", older.Problem);
     }
 }

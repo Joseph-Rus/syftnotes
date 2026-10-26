@@ -297,7 +297,7 @@ public sealed partial class LibraryWeb
         if (terminal is not null && Terminal.Available().All(t => t.Id != terminal)) return Http.Detail(400, $"There's no terminal called {terminal} on the library's computer.");
         bool? atLogin = Bool(body["start_at_login"]);
         if (atLogin is not null && options.StartAtLogin is null)
-            return Http.Detail(409, "This library runs without the Study Stash app, so it can't start at login from here.");
+            return Http.Detail(409, "This library runs without the Egghead Notes app, so it can't start at login from here.");
         List<ReadFolder>? folders = null;
         if (body["folders"] is JsonArray folderList || body["add_folder"] is not null)
         {

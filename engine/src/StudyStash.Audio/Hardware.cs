@@ -4,7 +4,7 @@ using StudyStash.Core;
 
 namespace StudyStash.Audio;
 
-/// <summary>The kind of computer Study Stash is on.</summary>
+/// <summary>The kind of computer Egghead Notes is on.</summary>
 public enum HostOs
 {
     Mac,
@@ -26,7 +26,7 @@ public sealed record HardwareProfile(HostOs Os, Architecture Arch, int Cores, bo
 {
     public bool AppleSilicon => Os == HostOs.Mac && Arch == Architecture.Arm64;
 
-    /// <summary>The card Whisper runs on, or null when it runs on the processor. Study Stash's Windows build has
+    /// <summary>The card Whisper runs on, or null when it runs on the processor. Egghead Notes' Windows build has
     /// Whisper's Vulkan runtime for x64 only (none exists for ARM), so it takes an x64 PC, Vulkan, and a real card
     /// with memory of its own: graphics built into the processor share the processor's memory and help too little.</summary>
     public GraphicsCard? WhisperCard =>
@@ -41,7 +41,7 @@ public sealed record HardwareProfile(HostOs Os, Architecture Arch, int Cores, bo
         Os == HostOs.Windows ? (Vulkan ? "Vulkan" : "no Vulkan") : null,
     }.OfType<string>());
 
-    /// <summary>"Mac", "PC" or "computer", as Study Stash says this one.</summary>
+    /// <summary>"Mac", "PC" or "computer", as Egghead Notes says this one.</summary>
     public string DeviceWord => Os switch { HostOs.Mac => "Mac", HostOs.Windows => "PC", _ => "computer" };
 }
 
@@ -108,7 +108,7 @@ public sealed class HardwareProbe(Func<IReadOnlyList<DisplayAdapter>>? adapters 
         }
         catch (Exception)
         {
-            // A driver that answers badly never stops the app: Study Stash just can't tell, and plays it safe.
+            // A driver that answers badly never stops the app: Egghead Notes just can't tell, and plays it safe.
             return otherwise;
         }
     }

@@ -1,6 +1,6 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
-  <!-- The Study Stash app: the menu bar (or tray) panel, the recorder, the quick panel, the library, and setup. One
+  <!-- The Egghead Notes app: the menu bar (or tray) panel, the recorder, the quick panel, the library, and setup. One
        codebase draws the Mac look and the Windows look, each in light and dark. Given a command (serve, mcp, ...) it
        runs the engine instead, so the app bundle has one program. -->
   <PropertyGroup>
@@ -33,6 +33,8 @@
 
   <ItemGroup>
     <AvaloniaResource Include="Assets\**" />
+    <!-- The egghead's doodles (Controls/Doodle.cs), from assets/egghead at the repo's root (tools/egghead/make_art.py) -->
+    <AvaloniaResource Include="..\..\..\assets\egghead\*.svg" Link="Assets\Egghead\%(Filename)%(Extension)" />
   </ItemGroup>
 
   <ItemGroup>

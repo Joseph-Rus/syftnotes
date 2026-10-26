@@ -1,15 +1,15 @@
-# Study Stash for Canvas in Firefox
+# Egghead Notes for Canvas in Firefox
 
 The Canvas extension is one set of files (`extension/`) that runs in two families of browser:
 
 - **Chrome and the browsers built on it** (Edge, Brave, Arc, Opera, Vivaldi, Chromium). Chrome, Edge, Brave, Arc and
   Vivaldi add the copy published on the Chrome Web Store ([chrome-web-store.md](chrome-web-store.md)); Opera and
-  Chromium load the folder Study Stash writes ("Load unpacked", see [canvas.md](canvas.md#the-extension)).
+  Chromium load the folder Egghead Notes writes ("Load unpacked", see [canvas.md](canvas.md#the-extension)).
 - **Firefox and the browsers built on it** (Zen, LibreWolf, Waterfox). This page.
 
 Version 1.6 is published on addons.mozilla.org (submitted 2026-10-06, public by the listing's own date on
-2026-10-09): [Study Stash for Canvas](https://addons.mozilla.org/firefox/addon/study-stash-for-canvas/).
-`Extension.FirefoxPublishedAt` names that page, so from Study Stash 0.16.3 the Canvas step offers Firefox and the
+2026-10-09): [Egghead Notes for Canvas](https://addons.mozilla.org/firefox/addon/study-stash-for-canvas/).
+`Extension.FirefoxPublishedAt` names that page, so from Egghead Notes 0.16.3 the Canvas step offers Firefox and the
 browsers built on it. This page is what's built, what a student sees, how it was tried, and what publishing took.
 
 ## Why Firefox can't use the folder
@@ -17,7 +17,7 @@ browsers built on it. This page is what's built, what a student sees, how it was
 Firefox only keeps an add-on that Mozilla has signed. It can load a folder ("Load Temporary Add-on" in
 `about:debugging`), but that copy is gone the next time Firefox starts, and Canvas would stop syncing without a word.
 So the Firefox copy is a packed, signed add-on, and it's connected the way a Chrome Web Store copy is: the student
-pastes a code from Study Stash.
+pastes a code from Egghead Notes.
 
 ## What's built
 
@@ -47,7 +47,7 @@ pastes a code from Study Stash.
 - **Where the code is shown.** The library's Settings page, under Canvas, **Set up the extension on this computer**
   (the code for a browser on the library's computer). In the app, the Canvas connect step shows it when the student's
   browser is Firefox.
-- **A Study Stash that doesn't know where the add-on is.** With `Extension.FirefoxPublishedAt` empty (as it was
+- **An Egghead Notes that doesn't know where the add-on is.** With `Extension.FirefoxPublishedAt` empty (as it was
   through 0.16.2, and would be again if the listing ever had to come down) the step says Firefox can't run the
   extension yet and uses another browser. A student whose usual browser is Firefox (or one built on it) also gets
   **I already have it in Firefox**: the step becomes that browser's, with the code to paste and nothing to add.
@@ -60,11 +60,11 @@ there, as release Firefox 157 words it:
 1. **Mozilla's page.** A blue **Add to Firefox** button. Above it sits Mozilla's notice for every add-on it hasn't
    picked as Recommended: "This add-on is not actively monitored for security by Mozilla. Make sure you trust it
    before installing."
-2. **Firefox asks to add it.** "Add Study Stash for Canvas", with "The developer says this extension collects:
+2. **Firefox asks to add it.** "Add Egghead Notes for Canvas", with "The developer says this extension collects:
    website content, personal communications" ([what it says it sends](#4-what-it-says-it-sends)). **Add**, or Cancel.
 3. **The add-on's button**, under the puzzle-piece Extensions button until it's pinned. Its popup says "Paste the
-   code from Study Stash". Paste, **Connect**.
-4. **Firefox asks for the sites.** "Study Stash for Canvas requests additional settings", listing the school's
+   code from Egghead Notes". Paste, **Connect**.
+4. **Firefox asks for the sites.** "Egghead Notes for Canvas requests additional settings", listing the school's
    Canvas, `inscloudgate.net` and the library's address. **Allow**, or Deny.
 
 The add-on checks in with the library within a second or two of Allow, and the step moves on to the courses. The
@@ -148,13 +148,13 @@ to "do you need to submit source code": the scripts and the popup are hand-writt
   into any of the categories**.
 - **Add-on URL (slug)**: `study-stash-for-canvas`, so the page is
   `https://addons.mozilla.org/firefox/addon/study-stash-for-canvas/`.
-- **Description**: what it does (copies your Canvas courses into your own Study Stash library), that it only reads and
-  uses your own sign-in, that it does nothing until you paste a code from Study Stash, and that nothing goes anywhere
+- **Description**: what it does (copies your Canvas courses into your own Egghead Notes library), that it only reads and
+  uses your own sign-in, that it does nothing until you paste a code from Egghead Notes, and that nothing goes anywhere
   except your library.
 - **License**: the repo's.
 - **Privacy policy**: required, because it sends data out of the browser. The site's privacy page says what's read
   and where it goes.
-- **Notes to reviewer**: it needs a Study Stash library to do anything. Say how to get one (the app's download
+- **Notes to reviewer**: it needs an Egghead Notes library to do anything. Say how to get one (the app's download
   link), that the code is shown in Settings, Canvas, and that every site it asks for comes from that code.
 
 ### 4. What it says it sends
@@ -179,8 +179,8 @@ nothing a student sees depends on an add-on that isn't there.
 ### Signing it without listing it
 
 `web-ext sign --channel=unlisted` (with an API key from the developer hub) returns a signed `.xpi` in a few minutes,
-with no listing and no human review. Study Stash would then have to host that file and hand it out, and Firefox
-updates such an add-on only if its manifest names an `update_url` that Study Stash keeps current. Neither is built.
+with no listing and no human review. Egghead Notes would then have to host that file and hand it out, and Firefox
+updates such an add-on only if its manifest names an `update_url` that Egghead Notes keeps current. Neither is built.
 Listing it is less to run.
 
 ## Updates

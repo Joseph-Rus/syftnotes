@@ -1,4 +1,4 @@
-# Study Stash installer (Windows PowerShell only; on a Mac, run install.sh instead).
+# Egghead Notes installer (Windows PowerShell only; on a Mac, run install.sh instead).
 #     irm https://raw.githubusercontent.com/Joseph-Rus/study-stash/main/install.ps1 | iex
 # The same app for every computer: when it opens, setup asks whether it's just this computer, your laptop or your
 # library. (An old STUDYSTASH_ROLE is still accepted, and changes nothing.)
@@ -15,11 +15,11 @@
   $Slug = "Joseph-Rus/study-stash"
 
   # One download for every role: setup asks.
-  $Name = "Study-Stash-Setup.exe"
+  $Name = "Egghead-Notes-Setup.exe"
 
   function Fail($Message) {
     Write-Host ""
-    Write-Host "Study Stash install failed: $Message" -ForegroundColor Red
+    Write-Host "Egghead Notes install failed: $Message" -ForegroundColor Red
     throw $Message
   }
 
@@ -49,11 +49,11 @@
     }
   }
 
-  Write-Host "Installing Study Stash..."
+  Write-Host "Installing Egghead Notes..."
   $Proc = Start-Process -FilePath $Setup -ArgumentList "/VERYSILENT", "/SUPPRESSMSGBOXES", "/NORESTART" -PassThru -Wait
   if ($Proc.ExitCode -ne 0) { Fail "the installer exited with code $($Proc.ExitCode)" }
 
   $Exe = Join-Path $env:LOCALAPPDATA "Programs\Study Stash\StudyStash.exe"
-  Write-Host "Installed Study Stash."
+  Write-Host "Installed Egghead Notes."
   if (Test-Path $Exe) { Start-Process $Exe }
 }

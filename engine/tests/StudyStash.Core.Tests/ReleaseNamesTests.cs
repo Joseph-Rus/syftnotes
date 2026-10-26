@@ -1,6 +1,6 @@
 namespace StudyStash.Core.Tests;
 
-/// <summary>Study Stash's four installer names and its checksums file name live in one place, <see
+/// <summary>Egghead Notes' four installer names and its checksums file name live in one place, <see
 /// cref="Updates"/> (D2). ci.yml's release step and the build scripts that produce those files must use the
 /// same names, or a release could ship something the updater doesn't recognize.</summary>
 public class ReleaseNamesTests
@@ -37,9 +37,21 @@ public class ReleaseNamesTests
     {
         // Copies 0.8.x and older update themselves by these names: every release must still carry them, the same bytes.
         string ci = Read(".github", "workflows", "ci.yml");
-        Assert.Contains("cp dist/Study-Stash.dmg \"dist/Study-Stash-$role.dmg\"", ci);
-        Assert.Contains("cp dist/Study-Stash-Setup.exe \"dist/Study-Stash-$role-Setup.exe\"", ci);
+        Assert.Contains("cp dist/Egghead-Notes.dmg \"dist/Study-Stash-$role.dmg\"", ci);
+        Assert.Contains("cp dist/Egghead-Notes-Setup.exe \"dist/Study-Stash-$role-Setup.exe\"", ci);
         Assert.Contains("for role in Laptop Library", ci);
+    }
+
+    [Fact]
+    public void Ci_publishes_the_names_from_before_egghead_notes_as_copies_of_the_one_download()
+    {
+        // Copies 0.18.x and older update themselves by Study-Stash.dmg and Study-Stash-Setup.exe: every release carries
+        // them too, the same bytes, and lists them in its checksums and its files.
+        string ci = Read(".github", "workflows", "ci.yml");
+        Assert.Contains($"cp dist/{Updates.MacAsset} dist/{Updates.StudyStashMacAsset}", ci);
+        Assert.Contains($"cp dist/{Updates.WindowsAsset} dist/{Updates.StudyStashWindowsAsset}", ci);
+        Assert.Contains("sha256sum Egghead-Notes* Study-Stash*", ci);
+        Assert.Contains($"dist/{Updates.StudyStashMacAsset} dist/{Updates.StudyStashWindowsAsset}", ci);
     }
 
     [Fact]

@@ -264,7 +264,7 @@ public class AppHostTests
         Assert.Null(start.Lecture);
         Assert.Null(host.Recorder.Current);
         Assert.Equal(MicTroubleKind.Denied, start.Trouble!.Kind);
-        Assert.Equal("Study Stash can't use the microphone", start.Trouble.Title);
+        Assert.Equal("Egghead Notes can't use the microphone", start.Trouble.Title);
         Assert.Equal(OperatingSystem.IsWindows() ? "Open Settings" : "Open System Settings", start.Trouble.ActionLabel);
     }
 

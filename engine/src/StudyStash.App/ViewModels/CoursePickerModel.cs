@@ -164,7 +164,7 @@ public sealed partial class CoursePickerModel(CanvasContext context) : Observabl
             var answer = await client.ChooseAsync([.. Ticked.Select(c => c.Id)], keep, match);
             if (answer is null)
             {
-                Say = "Your library runs an older Study Stash: update it to choose courses.";
+                Say = "Your library runs an older Egghead Notes: update it to choose courses.";
                 return false;
             }
             Fill(answer);

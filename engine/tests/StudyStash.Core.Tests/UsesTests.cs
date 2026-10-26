@@ -4,7 +4,7 @@ using System.Text.Json.Nodes;
 
 namespace StudyStash.Core.Tests;
 
-/// <summary>What Study Stash is for: kept in config.toml, said in /api/v2/library, set with POST /api/v2/uses.</summary>
+/// <summary>What Egghead Notes is for: kept in config.toml, said in /api/v2/library, set with POST /api/v2/uses.</summary>
 public class UsesTests
 {
     [Fact]

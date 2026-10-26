@@ -47,10 +47,13 @@
         <Grid ColumnDefinitions="Auto,8,*,Auto,2,Auto">
           <Ellipse Width="6" Height="6" Classes="status" Classes.warn="{Binding !StatusGood}" VerticalAlignment="Center" IsVisible="{Binding ShowStatus}" />
           <TextBlock Grid.Column="2" Text="{Binding Status}" ToolTip.Tip="{Binding Status}" c:Tips.WhenCut="True" IsVisible="{Binding ShowStatus}" FontSize="12" Foreground="{DynamicResource Fg2}" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
-          <!-- "Open", not "Open Study Stash": the words beside it ("Library running on this PC · Model ready") are shown whole -->
-          <Button Name="OpenApp" AutomationProperties.Name="Open Study Stash" Grid.Column="3" Theme="{StaticResource Surface}" Height="32" CornerRadius="4" Padding="8,0"
+          <!-- "Open", not "Open Egghead Notes": the words beside it ("Library running on this PC · Model ready") are shown whole -->
+          <Button Name="OpenApp" AutomationProperties.Name="Open Egghead Notes" Grid.Column="3" Theme="{StaticResource Surface}" Height="32" CornerRadius="4" Padding="8,0"
                   Command="{Binding OpenAppCommand}">
-            <TextBlock Text="Open" FontSize="13" VerticalAlignment="Center" />
+            <StackPanel Orientation="Horizontal" Spacing="6">
+              <c:Doodle Art="head" Size="18" VerticalAlignment="Center" />
+              <TextBlock Text="Open" FontSize="13" VerticalAlignment="Center" />
+            </StackPanel>
           </Button>
           <!-- Quick Settings' own gear, at the footer's right -->
           <Button Name="Settings" AutomationProperties.Name="Settings" Grid.Column="5" Theme="{StaticResource Surface}" Width="32" Height="32" CornerRadius="4" Padding="0"
@@ -121,9 +124,10 @@
                 <TextBlock Text="Show recorder" FontSize="12" Foreground="{DynamicResource AccentText}" />
               </Button>
             </Grid>
-            <Grid ColumnDefinitions="Auto,12,*">
-              <TextBlock Classes="num" Text="{Binding Elapsed}" FontFamily="{DynamicResource DisplayFont}" FontSize="28" FontWeight="Light" VerticalAlignment="Center" />
-              <c:Waveform Grid.Column="2" Height="22" Bars="20" Levels="{Binding Levels}" Foreground="{DynamicResource Fg2}" VerticalAlignment="Center" />
+            <Grid ColumnDefinitions="Auto,10,Auto,12,*">
+              <c:Doodle Art="listening" Size="34" Busy="{Binding IsRecording}" VerticalAlignment="Center" />
+              <TextBlock Grid.Column="2" Classes="num" Text="{Binding Elapsed}" FontFamily="{DynamicResource DisplayFont}" FontSize="28" FontWeight="Light" VerticalAlignment="Center" />
+              <c:Waveform Grid.Column="4" Height="22" Bars="20" Levels="{Binding Levels}" Foreground="{DynamicResource Fg2}" VerticalAlignment="Center" />
             </Grid>
             <TextBlock Text="{Binding LastLine}" IsVisible="{Binding HasLastLine}" FontSize="12" LineHeight="16" TextWrapping="Wrap" MaxLines="2"
                        TextTrimming="CharacterEllipsis" Foreground="{DynamicResource Fg2}" />

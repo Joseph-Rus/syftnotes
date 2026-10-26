@@ -4,6 +4,7 @@ import { useResource } from '../data/resource';
 import { clock, lectureMeta } from '../format';
 import { href, navigate } from '../router';
 import { Doc, Search as SearchIcon } from '../ui/icons';
+import { Doodle } from '../ui/Doodle';
 import { Dot, Empty, Problem, Row, Screen, Section, SkeletonRows } from '../ui/kit';
 import { useClassColors } from './classColors';
 
@@ -50,7 +51,7 @@ export function SearchScreen({ api, q }: { api: Api; q: string }) {
         />
       </div>
       {!key ? (
-        <Empty icon={<SearchIcon size={36} />} title="Search your library">
+        <Empty icon={<Doodle name="search" />} title="Search your library">
           Any word from your notes and transcripts, or a class's name.
         </Empty>
       ) : results.error && !data ? (
@@ -58,7 +59,7 @@ export function SearchScreen({ api, q }: { api: Api; q: string }) {
       ) : !data ? (
         <SkeletonRows count={5} />
       ) : data.lectures.length === 0 && data.passages.length === 0 && data.classes.length === 0 ? (
-        <Empty icon={<SearchIcon size={36} />} title="Nothing found">
+        <Empty icon={<Doodle name="scrambled" />} title="Nothing found">
           Nothing in your library says “{q.trim()}”. Try another word.
         </Empty>
       ) : (
@@ -66,7 +67,14 @@ export function SearchScreen({ api, q }: { api: Api; q: string }) {
           {data.classes.length > 0 ? (
             <Section title="Classes">
               {data.classes.map((c) => (
-                <Row key={c.name} href={href({ name: 'class', class: c.name })} lead={<Dot color={colorOf(c.name)} size={12} />} title={c.name} subtitle={c.code || undefined} chevron />
+                <Row
+                  key={c.name}
+                  href={href({ name: 'class', class: c.name })}
+                  lead={<Dot color={colorOf(c.name)} size={12} />}
+                  title={c.name}
+                  subtitle={c.code || undefined}
+                  chevron
+                />
               ))}
             </Section>
           ) : null}
@@ -92,7 +100,9 @@ export function SearchScreen({ api, q }: { api: Api; q: string }) {
                   href={p.id ? href({ name: 'lecture', id: p.id }) : undefined}
                   lead={<Dot color={colorOf(p.class)} />}
                   title={p.text}
-                  subtitle={[p.title, p.kind === 'transcript' && p.at != null ? `said at ${clock(p.at)}` : p.section].filter(Boolean).join(' · ')}
+                  subtitle={[p.title, p.kind === 'transcript' && p.at != null ? `said at ${clock(p.at)}` : p.section]
+                    .filter(Boolean)
+                    .join(' · ')}
                   lines={2}
                   class="passage"
                   chevron={!!p.id}

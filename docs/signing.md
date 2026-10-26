@@ -1,4 +1,4 @@
-# Signing Study Stash
+# Signing Egghead Notes
 
 Today the Mac app is signed "ad hoc" and the Windows installer isn't signed, so a Mac asks you to go to System
 Settings → Privacy & Security → Open Anyway, and Windows says "Windows protected your PC". The CI pipeline can
@@ -12,7 +12,7 @@ Nothing here costs anything until you do the setup, and the code needs no change
 
 | | Today | Signed and notarized (Mac), signed (Windows) |
 |---|---|---|
-| **Mac, opening the DMG's app** | "Apple could not verify…" then a trip to Privacy & Security → Open Anyway | One ordinary question the first time ("Study Stash is an app downloaded from the Internet. Open?") with an **Open** button. No trip to Settings. |
+| **Mac, opening the DMG's app** | "Apple could not verify…" then a trip to Privacy & Security → Open Anyway | One ordinary question the first time ("Egghead Notes is an app downloaded from the Internet. Open?") with an **Open** button. No trip to Settings. |
 | **Mac, the microphone** | macOS asks once | macOS asks once, the same. Signing doesn't skip it: macOS asks every app. |
 | **Mac, "record what this computer plays"** | macOS asks once | The same: once. |
 | **Mac, permissions after an update** | Probably asked again after each update (below) | Kept across updates (below), but asked once more on the first update that switches from ad hoc to Developer ID |
@@ -69,7 +69,7 @@ You need a Mac (you have one), and you do this once.
 1. Go to <https://developer.apple.com/programs/enroll/> and enroll with your Apple ID (two-factor authentication on).
 2. Enroll as an **individual**. Apple checks your identity, which can take minutes or a couple of days, and charges
    $99 a year. The certificate then carries **your legal name** (visible to anyone who runs `codesign -dvv` on the
-   app, not in the Gatekeeper dialog). To have "Study Stash" there instead you would enroll as an organization,
+   app, not in the Gatekeeper dialog). To have "Egghead Notes" there instead you would enroll as an organization,
    which needs a registered legal entity and a D-U-N-S number.
 3. Only the **Account Holder** (you) can create the certificate below.
 
@@ -91,7 +91,7 @@ Notarization is Apple scanning the app and handing back a ticket. CI logs in wit
 
 1. At <https://appstoreconnect.apple.com/access/integrations/api> choose **Team Keys → Generate API Key**
    (you may be asked to request access to the API first).
-2. Name it "Study Stash CI". Access: **Developer**. (Apple's docs don't say which role notarization needs. Reports
+2. Name it "Egghead Notes CI". Access: **Developer**. (Apple's docs don't say which role notarization needs. Reports
    agree that Developer is enough; one older guide says App Manager. If the first notarization is refused with a 401
    or 403, make a new key with App Manager.)
 3. Copy the **Issuer ID** (a UUID, above the list of keys) and the **Key ID** (ten characters).
@@ -138,7 +138,7 @@ Setup, in the Azure portal (<https://portal.azure.com>):
    you pick and the account name.
 3. In the account: **Identity validation → New identity → Individual**, and finish the check.
 4. Once it's approved: **Certificate profiles → Create → Public Trust**, using that identity. Remember the profile name.
-5. **Microsoft Entra ID → App registrations → New registration** (call it "Study Stash CI"). On its page, copy the
+5. **Microsoft Entra ID → App registrations → New registration** (call it "Egghead Notes CI"). On its page, copy the
    **Directory (tenant) ID** and **Application (client) ID**, then **Certificates & secrets → New client secret**
    and copy the secret's **Value** now (it's shown once, and expires: put the date in your calendar).
 6. In the signing account: **Access control (IAM) → Add role assignment →
@@ -179,7 +179,7 @@ EV certificates cost more ($400 and up) and since 2024 don't get past SmartScree
 ### C. A free one for open source
 
 [SignPath Foundation](https://signpath.io) signs open source projects for free, with its own signing service. It
-isn't wired in here, and I haven't checked whether Study Stash qualifies (they set conditions on the project and its
+isn't wired in here, and I haven't checked whether Egghead Notes qualifies (they set conditions on the project and its
 history), so it's one to look at if the $10 a month matters.
 
 ## What CI does
@@ -243,8 +243,8 @@ It publishes nothing and its installers can never be published.
 signs for real, notarizes, publishes nothing, and leaves the installers as run artifacts (`mac-installers`,
 `windows-installers`). Download them and check them on your own computers:
 
-    sh macos/verify-signing.sh "/Volumes/Study Stash/Study Stash.app"    # after mounting the DMG
-    powershell -File windows\verify-signing.ps1 Study-Stash-Setup.exe
+    sh macos/verify-signing.sh "/Volumes/Egghead Notes/Study Stash.app"    # after mounting the DMG
+    powershell -File windows\verify-signing.ps1 Egghead-Notes-Setup.exe
 
 and open them the way a student would (download from a browser, so they're quarantined). If it passed, a later
 release can reuse exactly those installers (`reuse_run`), as before. Do the real rehearsal **before** the release

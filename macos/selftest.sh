@@ -48,7 +48,7 @@ while kill -0 "$pid" 2>/dev/null; do
   seconds=$((seconds + 1))
   if [ "$seconds" -ge 480 ]; then
     kill -9 "$pid" 2>/dev/null || true
-    echo "selftest.sh: Study Stash didn't exit within 480 s" >&2
+    echo "selftest.sh: Egghead Notes didn't exit within 480 s" >&2
     exit 1
   fi
   sleep 1
@@ -57,7 +57,7 @@ code=0
 wait "$pid" || code=$?
 
 TXT="$OUT/selftest.txt"
-[ -f "$TXT" ] || { echo "selftest.sh: Study Stash exited ($code) without writing selftest.txt" >&2; exit 1; }
+[ -f "$TXT" ] || { echo "selftest.sh: Egghead Notes exited ($code) without writing selftest.txt" >&2; exit 1; }
 cat "$TXT"
 
 last=$(tail -n 1 "$TXT")

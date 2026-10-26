@@ -12,7 +12,7 @@
     <InternalsVisibleTo Include="StudyStash.Core.Tests" />
   </ItemGroup>
 
-  <!-- The Study Stash icon, from assets/ at the repo's root: each page's favicon and home-screen icon. -->
+  <!-- The Egghead Notes icon, from assets/ at the repo's root: each page's favicon and home-screen icon. -->
   <ItemGroup>
     <EmbeddedResource Include="..\..\..\assets\study-stash.ico" LogicalName="study-stash.ico" />
     <EmbeddedResource Include="..\..\..\assets\icon.png" LogicalName="icon.png" />

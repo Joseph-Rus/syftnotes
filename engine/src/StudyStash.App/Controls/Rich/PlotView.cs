@@ -606,7 +606,7 @@ public sealed class PlotView : Decorator
 
     IDiagramHost? Host => DiagramHost.Find(Origin ?? this);
 
-    /// <summary>The moment the plot comes from ("%% Study Stash diagram, from 12:34"), in seconds.</summary>
+    /// <summary>The moment the plot comes from ("%% Egghead Notes diagram, from 12:34"), in seconds.</summary>
     public double? At => DiagramMoment.From(Source);
 
     static string Quote(string s) => "“" + s + "”";

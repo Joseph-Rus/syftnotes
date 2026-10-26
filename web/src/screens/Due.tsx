@@ -4,7 +4,8 @@ import type { DueItem, DueList, Upcoming } from '../api/types';
 import { ago, dayLabel, dueWhen, parseWhen, relative, timeRange } from '../format';
 import { useResource } from '../data/resource';
 import { href } from '../router';
-import { Calendar, Checklist, ChevronRight } from '../ui/icons';
+import { Calendar, ChevronRight } from '../ui/icons';
+import { Doodle } from '../ui/Doodle';
 import { Dot, Empty, Problem, Row, Screen, Section, SkeletonRows } from '../ui/kit';
 import { useClassColors } from './classColors';
 
@@ -101,15 +102,15 @@ function Groups({ list, colorOf }: { list: DueList; colorOf: (c: string | null) 
   const done = list.groups.find((g) => g.key === 'handed_in')?.items ?? [];
   if (todo.length === 0 && done.length === 0)
     return (
-      <Empty icon={<Checklist size={40} />} title="Nothing due">
-        Link your classes to Canvas in Study Stash on your computer, and what's due shows up here.
+      <Empty icon={<Doodle name="sleepy" />} title="Nothing due">
+        Link your classes to Canvas in Egghead Notes on your computer, and what's due shows up here.
       </Empty>
     );
   return (
     <>
       {todo.length === 0 ? (
-        <Empty icon={<Checklist size={40} />} title="All caught up">
-          Nothing left to hand in.
+        <Empty icon={<Doodle name="overeasy" />} title="All caught up">
+          Nothing left to hand in. Assignments, over easy.
         </Empty>
       ) : null}
       {todo.map((g) => (

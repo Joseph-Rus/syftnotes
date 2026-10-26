@@ -14,7 +14,7 @@ public enum SpeechEngine { Whisper, Parakeet, Whistle }
 public sealed record ModelPart(string Name, long Bytes, string Sha256, string? From = null);
 
 /// <summary>
-/// A speech-to-text model Study Stash can download: a Whisper model (whisper.cpp's files on Hugging Face) or
+/// A speech-to-text model Egghead Notes can download: a Whisper model (whisper.cpp's files on Hugging Face) or
 /// Parakeet, which is a folder of several files (the name is from the first model there was).
 /// </summary>
 public sealed record WhisperModel(string Id, string Name, string File, long Bytes, string Sha256, string About)
@@ -46,7 +46,7 @@ public sealed record WhisperModel(string Id, string Name, string File, long Byte
     /// <summary>"3.1 GB", "550 MB".</summary>
     public string Size => SizeOf(Bytes);
 
-    /// <summary>An amount of bytes the way Study Stash says it: "1.9 GB", "550 MB".</summary>
+    /// <summary>An amount of bytes the way Egghead Notes says it: "1.9 GB", "550 MB".</summary>
     public static string SizeOf(long bytes) => bytes >= 1_000_000_000 ? $"{bytes / 1e9:0.0} GB" : $"{bytes / 1e6:0} MB";
 }
 
@@ -314,7 +314,7 @@ public static class ModelDownload
     {
         string path = WhisperModels.PathFor(home, m);
         if (m.Bundled)
-            return WhisperModels.IsDownloaded(home, m) ? path : throw new InvalidDataException($"{m.Name} is missing from this copy of Study Stash: install it again.");
+            return WhisperModels.IsDownloaded(home, m) ? path : throw new InvalidDataException($"{m.Name} is missing from this copy of Egghead Notes: install it again.");
         Directory.CreateDirectory(m.Parts is null ? Path.GetDirectoryName(path)! : path);
         if (WhisperModels.IsDownloaded(home, m)) return path;
         if (m.Parts is not null)

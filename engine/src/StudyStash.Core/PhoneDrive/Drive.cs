@@ -6,10 +6,10 @@ using System.Text.Json.Nodes;
 
 namespace StudyStash.Core.PhoneDrive;
 
-/// <summary>A file in Study Stash's hidden folder of the student's Google Drive.</summary>
+/// <summary>A file in Egghead Notes' hidden folder of the student's Google Drive.</summary>
 public sealed record DriveFile(string Id, string Name, DateTimeOffset Modified, long Size);
 
-/// <summary>Study Stash's hidden folder in Google Drive (the appDataFolder): the few things the phone link does with
+/// <summary>Egghead Notes' hidden folder in Google Drive (the appDataFolder): the few things the phone link does with
 /// it. <see cref="GoogleDrive"/> is the real one; tests keep one in memory.</summary>
 public interface IDrive
 {

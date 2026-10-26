@@ -15,7 +15,7 @@ using StudyStash.App.Views;
 namespace StudyStash.App.Tests;
 
 /// <summary>
-/// What a Study Stash window on Windows shows at its top. On Windows, Avalonia draws the caption buttons itself (its
+/// What an Egghead Notes window on Windows shows at its top. On Windows, Avalonia draws the caption buttons itself (its
 /// "drawn decorations", laid over the window's content), and by default the window's title too — over ours, so the
 /// app's name came out twice, overlapping ("StSdy Stash"). The headless platform draws no decorations, so these tests
 /// lay Avalonia's over the view the way the real window does.
@@ -35,7 +35,7 @@ public class WinChromeTests
             if (Decorations is not null) return;
             Children.Add(content);
             Resources["CaptionButtonHeight"] = height;
-            var d = Decorations = new WindowDrawnDecorations { Theme = theme, Title = "Study Stash" };
+            var d = Decorations = new WindowDrawnDecorations { Theme = theme, Title = "Egghead Notes" };
             // What Windows asks for: the title bar only (Avalonia keeps these internal).
             var parts = typeof(WindowDrawnDecorations).GetProperty("EnabledParts", BindingFlags.NonPublic | BindingFlags.Instance)!;
             parts.SetValue(d, Enum.ToObject(parts.PropertyType, 4));
@@ -123,7 +123,7 @@ public class WinChromeTests
             }
             // The one title left is the header's, beside the app's mark.
             var header = ((Visual)window.Content!).GetVisualDescendants().OfType<WindowHeader>().Single();
-            Assert.Equal("Study Stash", header.Title);
+            Assert.Equal("Egghead Notes", header.Title);
             // The caption buttons sit in the room the header keeps for them, on its right.
             var close = Part(ours, "PART_CloseButton");
             var right = close.TranslatePoint(new Point(close.Bounds.Width, 0), window)!.Value.X;

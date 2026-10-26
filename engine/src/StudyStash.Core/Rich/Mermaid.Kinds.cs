@@ -108,7 +108,7 @@ public static partial class Mermaid
         {
             if (nodes.TryGetValue(id, out var node)) return node;
             if (nodes.Count >= Flowchart.MaxNodes)
-                throw new MermaidException($"This diagram has more than {Flowchart.MaxNodes} boxes; Study Stash draws up to {Flowchart.MaxNodes}.", LineNumber);
+                throw new MermaidException($"This diagram has more than {Flowchart.MaxNodes} boxes; Egghead Notes draws up to {Flowchart.MaxNodes}.", LineNumber);
             node = new MutNode(id);
             nodes[id] = node;
             roles[id] = role;
@@ -124,13 +124,13 @@ public static partial class Mermaid
         void Edge(FlowEdge e)
         {
             if (edges.Count >= Flowchart.MaxEdges)
-                throw new MermaidException($"This diagram has more than {Flowchart.MaxEdges} arrows; Study Stash draws up to {Flowchart.MaxEdges}.", LineNumber);
+                throw new MermaidException($"This diagram has more than {Flowchart.MaxEdges} arrows; Egghead Notes draws up to {Flowchart.MaxEdges}.", LineNumber);
             edges.Add(e);
         }
 
         MutGroup Group(string id, string groupTitle)
         {
-            if (open.Count >= 2) throw new MermaidException($"Line {LineNumber} puts a group inside a group inside a group; Study Stash draws two levels.", LineNumber);
+            if (open.Count >= 2) throw new MermaidException($"Line {LineNumber} puts a group inside a group inside a group; Egghead Notes draws two levels.", LineNumber);
             var g = new MutGroup(id, groupTitle, open.Count > 0 ? open.Peek() : null);
             groups.Add(g);
             open.Push(g);

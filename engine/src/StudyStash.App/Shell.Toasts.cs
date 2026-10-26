@@ -9,7 +9,7 @@ using StudyStash.Core;
 namespace StudyStash.App;
 
 /// <summary>The shell's notifications: what the app says, and when. They're the computer's own (a Mac's Notification
-/// Center, Windows' notifications, through <see cref="SystemNotices"/>) wherever it will have them; Study Stash's own
+/// Center, Windows' notifications, through <see cref="SystemNotices"/>) wherever it will have them; Egghead Notes' own
 /// cards (<see cref="ToastShelf"/>) where it won't (a build run from its folder, a copy opened from its disk image).</summary>
 public static partial class Shell
 {
@@ -51,7 +51,7 @@ public static partial class Shell
         }
         WinNotifications.Log = Program.Log;
         var made = WinNotifications.Make(icon: icon, program: Desktop.Program);
-        if (made is null) Program.Log($"[notifications] Windows won't have them here ({WinNotifications.LastError ?? "no reason given"}): Study Stash shows its own");
+        if (made is null) Program.Log($"[notifications] Windows won't have them here ({WinNotifications.LastError ?? "no reason given"}): Egghead Notes shows its own");
         return made;
     }
 
@@ -75,7 +75,7 @@ public static partial class Shell
         if (ToastWords.HadCodes(title) || ToastWords.HadCodes(text)) Program.Log($"[toast] {title}: {text}");
         Notify(new Notice
         {
-            Title = ToastWords.Plain(title) is { Length: > 0 } plain ? plain : "Study Stash", Text = ToastWords.Plain(text),
+            Title = ToastWords.Plain(title) is { Length: > 0 } plain ? plain : "Egghead Notes", Text = ToastWords.Plain(text),
             ActionLabel = action, Act = run, Stay = stay,
         });
     }
@@ -125,8 +125,8 @@ public static partial class Shell
         return Placement.FromAppKit(f.X + f.Width / 2, f.Y + f.Height / 2, main.Bounds.Height);
     }
 
-    /// <summary>After a click on a notification: on a Mac, if it opened none of Study Stash's windows, the app you were
-    /// in comes back to the front (AppKit brought Study Stash forward for the click).</summary>
+    /// <summary>After a click on a notification: on a Mac, if it opened none of Egghead Notes' windows, the app you were
+    /// in comes back to the front (AppKit brought Egghead Notes forward for the click).</summary>
     static void AfterToastClick()
     {
         if (!OperatingSystem.IsMacOS()) return;
@@ -178,7 +178,7 @@ public static partial class Shell
         }
     }
 
-    /// <summary>The first start after Study Stash updated itself says so, once, with the release's notes a click away;
+    /// <summary>The first start after Egghead Notes updated itself says so, once, with the release's notes a click away;
     /// a start after quitting for an update that didn't take (Windows' Setup.exe stopped short) says that instead.
     /// Every start remembers its version.</summary>
     static void SayIfUpdated()

@@ -49,7 +49,7 @@ public class ClaudeSetupTests
         var added = setup.Connect(id);
 
         Assert.True(added.Ok, added.Say);
-        Assert.StartsWith("Added Study Stash to ", added.Say);
+        Assert.StartsWith("Added Egghead Notes to ", added.Say);
         if (!OperatingSystem.IsWindows()) Assert.NotNull(new FileInfo(path).LinkTarget); // still a link
         var config = JsonNode.Parse(File.ReadAllText(real))!;
         Assert.Equal("dark", config["theme"]!.GetValue<string>());
@@ -99,13 +99,13 @@ public class ClaudeSetupTests
         var added = setup.Connect("codex");
 
         Assert.True(added.Ok, added.Say);
-        Assert.Equal("Added Study Stash to ChatGPT.", added.Say);
+        Assert.Equal("Added Egghead Notes to ChatGPT.", added.Say);
         string text = File.ReadAllText(setup.CodexConfig);
         Assert.StartsWith(before.TrimEnd('\n'), text);
         Assert.Contains($"[mcp_servers.{ClaudeTools.ServerName}]\ncommand = \"{Program}\"\nargs = [\"--home\", \"{home["study-stash"].Replace("\\", "\\\\")}\", \"mcp\", \"--client\", \"codex\"]", text);
         Assert.True(setup.State("codex").Added);
 
-        // Connecting again (another copy of the app, say) replaces Study Stash's table rather than adding a second.
+        // Connecting again (another copy of the app, say) replaces Egghead Notes' table rather than adding a second.
         var other = Setup(home, "/elsewhere/StudyStash");
         Assert.True(other.State("codex").OtherCopy);
         Assert.True(other.Connect("codex").Ok);
@@ -240,10 +240,10 @@ public class ClaudeSetupTests
         Assert.False(row.CanReopen);
         Assert.True(row.CanDisconnect);
         row.Show(State(addedAt: now.AddMinutes(-1), reopen: true), now);
-        Assert.Equal("Almost done. Reopen Claude so it loads Study Stash.", row.Status);
+        Assert.Equal("Almost done. Reopen Claude so it loads Egghead Notes.", row.Status);
         Assert.True(row.CanReopen);
         Assert.Equal("Reopen Claude", row.ReopenWords);
-        // ChatGPT starts Study Stash only when a chat in Codex begins, so its row says that too.
+        // ChatGPT starts Egghead Notes only when a chat in Codex begins, so its row says that too.
         var chatgpt = new AiAppRow { Id = "codex", Name = "ChatGPT" };
         chatgpt.Show(new AiAppState("codex", "ChatGPT", true, true, false, now, null, "", CanReopen: true), now);
         Assert.Equal("Almost done. Reopen ChatGPT, then start a chat in Codex.", chatgpt.Status);
@@ -282,7 +282,7 @@ public class ClaudeSetupTests
         var stuck = await setup.ReopenAsync("codex");
         Assert.False(stuck.Ok);
         Assert.Contains("Quit it yourself", stuck.Say);
-        // Where Study Stash can't reopen apps (Windows), no row offers to.
+        // Where Egghead Notes can't reopen apps (Windows), no row offers to.
         Assert.False(Setup(home).State("codex").CanReopen);
     }
 

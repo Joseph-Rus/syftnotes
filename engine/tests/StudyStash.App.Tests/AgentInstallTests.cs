@@ -60,7 +60,7 @@ public sealed class AgentInstallTests
     }
 
     [Theory]
-    [InlineData("offline", InstallFailure.Offline, "Study Stash couldn't reach claude.ai. Check your internet connection, then try again.")]
+    [InlineData("offline", InstallFailure.Offline, "Egghead Notes couldn't reach claude.ai. Check your internet connection, then try again.")]
     [InlineData("region", InstallFailure.Region, "Claude Code isn't offered in your country yet.")]
     [InlineData("other", InstallFailure.Other, "The installer stopped: Checksum verification failed.")]
     [InlineData("broken", InstallFailure.WontStart, "Claude Code installed but won't start.")]

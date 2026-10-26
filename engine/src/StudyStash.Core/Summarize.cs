@@ -319,7 +319,7 @@ public static partial class Summarize
     /// <summary>What a student is told of a recording that's <see cref="TooShort"/>: that it is, and how much speech
     /// notes are written from. <paramref name="it"/> names it ("This lecture"); with no name, "Too short for notes: …".</summary>
     public static string TooShortWords(string it = "") =>
-        $"{(it.Length > 0 ? $"{it} is too short" : "Too short")} for notes: Study Stash writes them from about {MinSpeech} of speech.";
+        $"{(it.Length > 0 ? $"{it} is too short" : "Too short")} for notes: Egghead Notes writes them from about {MinSpeech} of speech.";
 
     /// <summary>
     /// Whether a recording that just stopped will have notes written for it, as far as its length and what's been
@@ -452,7 +452,7 @@ public static partial class Summarize
     public static string WholePrompt(Meeting m, string transcript, Drawings drawings = Drawings.Flowcharts, string attached = "") =>
         $"{Brief(m, drawings, attached)}\n\nTranscript:\n{transcript}";
 
-    /// <summary>The notes prompt without the transcript: how Study Stash writes a lecture's notes (its sections, its
+    /// <summary>The notes prompt without the transcript: how Egghead Notes writes a lecture's notes (its sections, its
     /// diagrams and formulas, the student's typed lines kept and marked as theirs). What an AI app is told before it
     /// writes notes for the library, and what "Copy for your AI" puts before the transcript.</summary>
     public static string Brief(Meeting m, Drawings drawings = Drawings.Flowcharts, string attached = "") =>

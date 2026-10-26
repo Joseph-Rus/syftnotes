@@ -1,17 +1,20 @@
-// Draws Study Stash's icons, all from the one mark below: a round-stroked "S" with a dot at its lower right ("S.").
+// Draws Egghead Notes' icons, all from the one mark: Eli's egghead (his glasses, bow tie and egg, in his own pen
+// strokes: assets/egghead/mark.json, which tools/egghead/make_art.py writes from his drawing).
 //   swift make_icon.swift out.iconset         the Mac app icon (light), every size iconutil wants
 //   swift make_icon.swift out.png             one 1024-px Mac app icon (light); out-dark.png draws the dark one
-//   swift make_icon.swift out.tiles           icon-<px>.png: the Windows / web tile (cream, the S in navy), no margin
+//   swift make_icon.swift out.tiles           icon-<px>.png: the Windows / web tile (white, the egghead on it), no margin
 //   swift make_icon.swift out.ico             the Windows icon: the tile at 16–256 px in one .ico
-//   swift make_icon.swift out.marks           mark-<px>.png: the monochrome "S." for the menu bar and the tray
+//   swift make_icon.swift out.marks           mark-<px>.png: the monochrome egghead for the menu bar and the tray
 //   swift make_icon.swift out.ios             AppIcon-1024.png and AppIcon-1024-dark.png for the iPhone/iPad app:
 //                                             the tile filling a square picture (iOS rounds the corners itself)
 //   swift make_icon.swift out.chrome          icon-<px>.png for the Chrome extension (copy them into extension/):
-//                                             16, 32 and 48 a bold navy "S." on a flat cream tile (the toolbar, the
-//                                             extensions page), 128 the tile at 96 px with Chrome's 16-px margin
-// Light: a warm cream squircle with a fine paper grain, the S pressed into it in deep navy and the dot pressed in
-// cream. Dark: a glossy near-black squircle, the S and dot in brushed copper. On Apple's macOS grid: an 824-pt
-// rounded square on a 1024 canvas. The icons in assets/ and the app's Assets/ are made with this script.
+//                                             16, 32 and 48 the egg and its glasses, bold, on a flat white tile (the
+//                                             toolbar, the extensions page), 128 the tile at 96 px with Chrome's 16-px margin
+// Light: a flat white squircle, the egg in eggshell, Eli's lines in near-black ink, and four loose pen strokes under the
+// egg for its shadow. Dark: a flat near-black squircle, the egg dim and the lines chalk white, so his glasses still show
+// where they reach past the egg. Below 128 px the egg keeps only its glasses (the face turns to mud), below 48 the
+// shadow goes too, and the lines get bolder as the picture gets smaller. On Apple's macOS grid: an 824-pt rounded square on a 1024 canvas.
+// The icons in assets/ and the app's Assets/ are made with this script.
 
 import AppKit
 
@@ -32,35 +35,77 @@ func rounded(_ r: CGRect, _ radius: CGFloat) -> CGPath {
     CGPath(roundedRect: r, cornerWidth: radius, cornerHeight: radius, transform: nil)
 }
 
-// ---- the mark, in 1024 units with y going down (as drawn on paper); flipped into CoreGraphics' y-up below ----
+let pen: UInt32 = 0x1d1d1f, shell: UInt32 = 0xf3ead9, chalk: UInt32 = 0xf1eadb, darkShell: UInt32 = 0x3a3a3e
 
-/// The S's centre line: in from the top right, round the upper bowl, down the spine, round the lower bowl, out at the
-/// bottom left. Stroked with round ends.
-func sLine() -> CGPath {
+// ---- the egghead: his strokes in GoodNotes page points (y down), fitted into 1024 design units below ----
+
+/// One pen stroke: its centre line and its nib width, in his page points.
+struct Ink { let w: CGFloat; let pts: [CGPoint] }
+
+/// The menu bar's clean lines (see `mark`): the egg's outline, the two lenses' boxes and the eyes, in his page points.
+struct MenuBar { let egg: [CGPoint]; let lenses: [CGRect]; let eyes: [CGPoint] }
+
+struct Egghead { let egg: [CGPoint]; let full: [Ink]; let small: [Ink]; let shadow: [Ink]; let menubar: MenuBar }
+
+let egghead: Egghead = {
+    let here = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
+    let file = here.appendingPathComponent("../assets/egghead/mark.json").standardizedFileURL
+    let json = try! JSONSerialization.jsonObject(with: Data(contentsOf: file)) as! [String: Any]
+    func points(_ a: Any) -> [CGPoint] { (a as! [[Double]]).map { CGPoint(x: $0[0], y: $0[1]) } }
+    func inks(_ a: Any) -> [Ink] { (a as! [[String: Any]]).map { Ink(w: CGFloat($0["w"] as! Double), pts: points($0["pts"]!)) } }
+    let bar = json["menubar"] as! [String: Any]
+    let lenses = (bar["lenses"] as! [[Double]]).map { CGRect(x: $0[0], y: $0[1], width: $0[2] - $0[0], height: $0[3] - $0[1]) }
+    return Egghead(egg: points(json["egg"]!), full: inks(json["full"]!), small: inks(json["small"]!), shadow: inks(json["shadow"]!),
+                   menubar: MenuBar(egg: points(bar["egg"]!), lenses: lenses, eyes: points(bar["eyes"]!)))
+}()
+
+/// Where the head goes: `inks`' bounds fitted to `side` design units, centred on `centre` (design units, y down),
+/// then flipped into CoreGraphics' y-up on the 1024 canvas. The scale comes back too, for the nib widths.
+func fit(_ inks: [Ink], side: CGFloat, centre: CGPoint) -> (CGAffineTransform, CGFloat) {
+    let all = inks.flatMap(\.pts)
+    let minX = all.map(\.x).min()!, maxX = all.map(\.x).max()!, minY = all.map(\.y).min()!, maxY = all.map(\.y).max()!
+    let scale = side / max(maxX - minX, maxY - minY)
+    let t = CGAffineTransform(translationX: -(minX + maxX) / 2, y: -(minY + maxY) / 2)
+        .concatenating(CGAffineTransform(scaleX: scale, y: -scale))
+        .concatenating(CGAffineTransform(translationX: centre.x, y: 1024 - centre.y))
+    return (t, scale)
+}
+
+func eggPath(_ t: CGAffineTransform) -> CGPath {
     let p = CGMutablePath()
-    p.move(to: CGPoint(x: 662, y: 352))
-    p.addCurve(to: CGPoint(x: 506, y: 318), control1: CGPoint(x: 630, y: 328), control2: CGPoint(x: 570, y: 318))
-    p.addCurve(to: CGPoint(x: 398, y: 414), control1: CGPoint(x: 440, y: 318), control2: CGPoint(x: 398, y: 358))
-    p.addCurve(to: CGPoint(x: 512, y: 506), control1: CGPoint(x: 398, y: 468), control2: CGPoint(x: 446, y: 488))
-    p.addCurve(to: CGPoint(x: 636, y: 604), control1: CGPoint(x: 588, y: 526), control2: CGPoint(x: 636, y: 548))
-    p.addCurve(to: CGPoint(x: 504, y: 700), control1: CGPoint(x: 636, y: 664), control2: CGPoint(x: 582, y: 700))
-    p.addCurve(to: CGPoint(x: 366, y: 648), control1: CGPoint(x: 444, y: 700), control2: CGPoint(x: 394, y: 680))
+    p.addLines(between: egghead.egg, transform: t)
+    p.closeSubpath()
     return p
 }
-let strokeWidth: CGFloat = 104
-let dotCentre = CGPoint(x: 702, y: 694)
-let dotRadius: CGFloat = 40
 
-/// y-down design units → CoreGraphics' y-up, on a 1024 canvas.
-let flip = CGAffineTransform(a: 1, b: 0, c: 0, d: -1, tx: 0, ty: 1024)
-
-func sOutline(width: CGFloat = strokeWidth) -> CGPath {
-    sLine().copy(strokingWithWidth: width, lineCap: .round, lineJoin: .round, miterLimit: 10, transform: flip)
+/// His lines, each at its own nib width times `weight`.
+func strokeInks(_ ctx: CGContext, _ inks: [Ink], _ t: CGAffineTransform, scale: CGFloat, weight: CGFloat, _ ink: CGColor) {
+    ctx.saveGState()
+    ctx.setLineCap(.round)
+    ctx.setLineJoin(.round)
+    ctx.setStrokeColor(ink)
+    for s in inks where s.pts.count > 1 {
+        let p = CGMutablePath()
+        p.addLines(between: s.pts, transform: t)
+        ctx.addPath(p)
+        ctx.setLineWidth(max(0.6, s.w) * scale * weight)
+        ctx.strokePath()
+    }
+    ctx.restoreGState()
 }
 
-func dotPath(radius: CGFloat = dotRadius) -> CGPath {
-    let c = dotCentre.applying(flip)
-    return CGPath(ellipseIn: CGRect(x: c.x - radius, y: c.y - radius, width: 2 * radius, height: 2 * radius), transform: nil)
+/// The egghead on a tile: the egg filled in `egg`, his lines in `ink`, and (from 48 px up) the pen strokes of its
+/// shadow under it, the whole drawing centred. Small pictures draw only the egg and its glasses, bolder.
+func drawHead(_ ctx: CGContext, px: Int, ink: CGColor, egg: CGColor, side: CGFloat? = nil) {
+    let small = px < 128
+    let inks = small ? egghead.small : egghead.full
+    let shadow = px >= 48 ? egghead.shadow : []
+    let (t, scale) = fit(inks + shadow, side: side ?? (small ? 720 : 700), centre: CGPoint(x: 512, y: 512))
+    ctx.addPath(eggPath(t))
+    ctx.setFillColor(egg)
+    ctx.fillPath()
+    let weight: CGFloat = px <= 20 ? 6.5 : px <= 32 ? 6 : px < 128 ? 5 : 5.4
+    strokeInks(ctx, inks + shadow, t, scale: scale, weight: weight, ink)
 }
 
 // ---- drawing helpers ----
@@ -81,60 +126,6 @@ var unit: CGFloat = 1
 /// A shadow given in design units.
 func shadow(_ ctx: CGContext, dx: CGFloat, dy: CGFloat, blur: CGFloat, _ c: CGColor) {
     ctx.setShadow(offset: CGSize(width: dx * unit, height: dy * unit), blur: blur * unit, color: c)
-}
-
-/// A shape pressed into the surface: its lower edge catches the light (a pale lip just below it), its fill, then a
-/// soft shadow along its upper inside edge.
-func deboss(_ ctx: CGContext, _ shape: CGPath, fill: CGColor, lip: CGColor, depth: CGFloat) {
-    ctx.saveGState()
-    ctx.translateBy(x: 0, y: -depth * 0.6)
-    ctx.addPath(shape)
-    ctx.setFillColor(lip)
-    ctx.fillPath()
-    ctx.restoreGState()
-
-    ctx.addPath(shape)
-    ctx.setFillColor(fill)
-    ctx.fillPath()
-
-    ctx.saveGState()
-    ctx.addPath(shape)
-    ctx.clip()
-    let around = CGMutablePath()
-    around.addRect(CGRect(x: -200, y: -200, width: 1424, height: 1424))
-    around.addPath(shape)
-    shadow(ctx, dx: 0, dy: -depth, blur: depth * 1.6, color(0x000000, 0.55))
-    ctx.addPath(around)
-    ctx.setFillColor(color(0x000000, 1))
-    ctx.fillPath(using: .evenOdd)
-    ctx.restoreGState()
-}
-
-/// Deterministic noise (the same grain on every build).
-struct Grain {
-    var state: UInt64 = 0x5eed_1234_abcd
-    mutating func next() -> CGFloat {
-        state = state &* 6364136223846793005 &+ 1442695040888963407
-        return CGFloat((state >> 33) & 0xffffff) / CGFloat(0xffffff)
-    }
-}
-
-func paperGrain(_ ctx: CGContext, in tile: CGPath, px: Int) {
-    ctx.saveGState()
-    ctx.addPath(tile)
-    ctx.clip()
-    var g = Grain()
-    // One device pixel per speck, over about a tenth of the tile, whatever the size.
-    let size: CGFloat = max(1.2, 1024 / CGFloat(px))
-    let side = 824 / size
-    let dots = Int(0.1 * side * side)
-    for _ in 0..<dots {
-        let x = 100 + g.next() * 824, y = 100 + g.next() * 824
-        let light = g.next() > 0.5
-        ctx.setFillColor(light ? color(0xffffff, 0.10 * g.next()) : color(0x5a4a30, 0.07 * g.next()))
-        ctx.fill(CGRect(x: x, y: y, width: size, height: size))
-    }
-    ctx.restoreGState()
 }
 
 enum Look { case light, dark, tile }
@@ -164,8 +155,6 @@ func iconRep(_ px: Int, _ look: Look) -> NSBitmapImageRep {
         ctx.scaleBy(x: CGFloat(px) / 1024, y: CGFloat(px) / 1024)
         unit = CGFloat(px) / 1024
     }
-    // Below 128 px the grain and the relief turn to mud: a flat S (a little bolder at Finder-list and taskbar sizes).
-    let flat = px < 128, small = px <= 32
     let tile = rounded(tileRect, radius)
 
     if look == .dark {
@@ -179,96 +168,22 @@ func iconRep(_ px: Int, _ look: Look) -> NSBitmapImageRep {
         ctx.saveGState()
         ctx.addPath(tile)
         ctx.clip()
-        ctx.drawLinearGradient(gradient([color(0x2c2c2f), color(0x1a1a1c), color(0x0f0f11)]), start: CGPoint(x: 0, y: tileRect.maxY),
-                               end: CGPoint(x: 0, y: tileRect.minY), options: [])
-        let sheen = CGMutablePath()
-        sheen.move(to: CGPoint(x: tileRect.minX, y: tileRect.maxY))
-        sheen.addLine(to: CGPoint(x: tileRect.minX, y: tileRect.maxY - 250))
-        sheen.addQuadCurve(to: CGPoint(x: tileRect.maxX, y: tileRect.maxY - 250), control: CGPoint(x: 512, y: tileRect.maxY - 330))
-        sheen.addLine(to: CGPoint(x: tileRect.maxX, y: tileRect.maxY))
-        sheen.closeSubpath()
-        ctx.addPath(sheen)
-        ctx.clip()
-        ctx.drawLinearGradient(gradient([color(0xffffff, 0.10), color(0xffffff, 0.03)]), start: CGPoint(x: 0, y: tileRect.maxY),
-                               end: CGPoint(x: 0, y: tileRect.maxY - 320), options: [])
+        ctx.setFillColor(color(0x1d1d1f))
+        ctx.fill(tileRect)
         ctx.restoreGState()
 
-        // The S and dot in brushed copper, lifted off the tile by a soft shadow.
-        let mark = CGMutablePath()
-        mark.addPath(sOutline(width: small ? strokeWidth * 1.15 : strokeWidth))
-        mark.addPath(dotPath())
-        ctx.saveGState()
-        shadow(ctx, dx: 0, dy: -10, blur: 24, color(0x000000, 0.55))
-        ctx.addPath(mark)
-        ctx.setFillColor(color(0xb8744a))
-        ctx.fillPath()
-        ctx.restoreGState()
-        ctx.saveGState()
-        ctx.addPath(mark)
-        ctx.clip()
-        ctx.drawLinearGradient(gradient([color(0xf7d2b0), color(0xdb996c), color(0xb56d45), color(0xe8b38c), color(0xc98158)],
-                                        [0, 0.3, 0.55, 0.78, 1]),
-                               start: CGPoint(x: 330, y: 780), end: CGPoint(x: 720, y: 280), options: [.drawsBeforeStartLocation, .drawsAfterEndLocation])
-        if !flat {
-            var g = Grain(state: 0xc0ffee)
-            for i in 0..<420 {  // the brushing: fine, faint streaks along the metal
-                let y = 250 + CGFloat(i) * 1.3
-                ctx.setFillColor(g.next() > 0.5 ? color(0xffffff, 0.07 * g.next()) : color(0x6a3418, 0.08 * g.next()))
-                ctx.fill(CGRect(x: 300, y: y, width: 460, height: 0.8))
-            }
-            // A soft sheen along the upper side of the stroke.
-            shadow(ctx, dx: -4, dy: 8, blur: 30, color(0xfff1e0, 0.35))
-            ctx.addPath(sLine().copy(strokingWithWidth: strokeWidth * 0.2, lineCap: .round, lineJoin: .round, miterLimit: 10,
-                                     transform: flip.translatedBy(x: -6, y: -12)))
-            ctx.setFillColor(color(0xffe6cc, 0.14))
-            ctx.fillPath()
-        }
-        ctx.restoreGState()
+        // The egg dim, his lines chalk white: the glasses still show where they reach past the egg.
+        drawHead(ctx, px: px, ink: color(chalk), egg: color(darkShell))
     } else {
-        // A warm cream tile (on its shadow on the Mac), a faint paper grain, a soft light across the top.
+        // A flat white tile (on its shadow on the Mac).
         ctx.saveGState()
         if look == .light { shadow(ctx, dx: 0, dy: -12, blur: 30, color(0x000000, 0.28)) }
         ctx.addPath(tile)
-        ctx.setFillColor(color(0xe4ded2))
+        ctx.setFillColor(color(0xffffff))
         ctx.fillPath()
         ctx.restoreGState()
-        ctx.saveGState()
-        ctx.addPath(tile)
-        ctx.clip()
-        ctx.drawLinearGradient(gradient([color(0xf1ede5), color(0xe7e1d6), color(0xdbd4c6)]), start: CGPoint(x: 0, y: tileRect.maxY),
-                               end: CGPoint(x: 0, y: tileRect.minY), options: [])
-        ctx.restoreGState()
-        if !flat {
-            paperGrain(ctx, in: tile, px: px)
-            ctx.saveGState()
-            ctx.addPath(tile)
-            ctx.clip()
-            ctx.drawLinearGradient(gradient([color(0xffffff, 0.35), color(0xffffff, 0)]), start: CGPoint(x: 0, y: tileRect.maxY),
-                                   end: CGPoint(x: 0, y: tileRect.maxY - 300), options: [])
-            ctx.restoreGState()
-        }
 
-        let navy = color(0x2f4a7a)
-        if flat {
-            ctx.addPath(sOutline(width: small ? strokeWidth * 1.18 : strokeWidth))
-            ctx.setFillColor(navy)
-            ctx.fillPath()
-            if !small {
-                ctx.addPath(dotPath())
-                ctx.setFillColor(color(0xcfc7b7))
-                ctx.fillPath()
-            }
-        } else {
-            // The S pressed in, in navy; the dot pressed in, in the tile's own cream.
-            deboss(ctx, sOutline(), fill: navy, lip: color(0xffffff, 0.75), depth: 9)
-            ctx.saveGState()
-            ctx.addPath(sOutline())
-            ctx.clip()
-            ctx.drawLinearGradient(gradient([color(0x000000, 0.10), color(0xffffff, 0.03)]), start: CGPoint(x: 0, y: 760),
-                                   end: CGPoint(x: 0, y: 280), options: [])
-            ctx.restoreGState()
-            deboss(ctx, dotPath(), fill: color(0xe2dccf), lip: color(0xffffff, 0.8), depth: 7)
-        }
+        drawHead(ctx, px: px, ink: color(pen), egg: color(shell))
 
         // The fine edge along the tile, as on Apple's icons.
         ctx.addPath(rounded(tileRect.insetBy(dx: 1.5, dy: 1.5), radius - 1))
@@ -280,27 +195,54 @@ func iconRep(_ px: Int, _ look: Look) -> NSBitmapImageRep {
     return NSBitmapImageRep(cgImage: ctx.makeImage()!)
 }
 
-/// The monochrome "S." for the menu bar (a template image: black on clear, the menu bar tints it) and the Windows
-/// tray (the app tints it white or black): the mark alone, filling most of a `px`-pixel square, room at its top right
-/// for the recording badge.
+/// The monochrome egghead for the menu bar (a template image: black on clear, the menu bar tints it) and the Windows
+/// tray (the app tints it white or black): one clean line each, taken from his drawing (mark.json's "menubar": the
+/// egg's smoothed outline, his two lenses with the bridge between them, his eyes), at the system symbols' weight of
+/// 1.5 pt. His sketchy double passes blur to grey at this size. It fills most of a `px`-pixel square, room at its top
+/// right for the recording badge.
 func mark(_ px: Int) -> Data {
     let ctx = canvas(px)
-    // The mark spans x 314…730, y 266…752 (design units): fit its height to 84% of the square, centred.
-    let height: CGFloat = 752 - 266, scale = 0.84 * CGFloat(px) / height
-    let midX: CGFloat = (314 + 730) / 2, midY: CGFloat = 1024 - (266 + 752) / 2
-    ctx.translateBy(x: CGFloat(px) / 2 - midX * scale, y: CGFloat(px) / 2 - midY * scale)
-    ctx.scaleBy(x: scale, y: scale)
-    let m = CGMutablePath()
-    m.addPath(sOutline(width: strokeWidth * 1.12))
-    m.addPath(dotPath(radius: dotRadius * 1.15))
-    ctx.addPath(m)
+    let m = egghead.menubar
+    // His page points → this picture's pixels (y up): the egg and lenses together fill 90% of the square's height.
+    let all = m.egg + m.lenses.flatMap { [CGPoint(x: $0.minX, y: $0.minY), CGPoint(x: $0.maxX, y: $0.maxY)] }
+    let minX = all.map(\.x).min()!, maxX = all.map(\.x).max()!, minY = all.map(\.y).min()!, maxY = all.map(\.y).max()!
+    let side = CGFloat(px)
+    let scale = 0.9 * side / max(maxX - minX, maxY - minY)
+    let t = CGAffineTransform(translationX: -(minX + maxX) / 2, y: -(minY + maxY) / 2)
+        .concatenating(CGAffineTransform(scaleX: scale, y: -scale))
+        .concatenating(CGAffineTransform(translationX: side / 2 - side * 0.03, y: side / 2))
+    let line = side / 12   // 1.5 pt: 3 px in the 36-px (18-pt @2x) picture, 1.5 px at 18
+    ctx.setStrokeColor(color(0x000000))
     ctx.setFillColor(color(0x000000))
-    ctx.fillPath()
+    ctx.setLineWidth(line)
+    ctx.setLineJoin(.round)
+    ctx.setLineCap(.round)
+    let egg = CGMutablePath()
+    egg.addLines(between: m.egg, transform: t)
+    egg.closeSubpath()
+    ctx.addPath(egg)
+    ctx.strokePath()
+    // The lenses, a line's width apart at the bridge so they don't run into one bar, and the bridge across.
+    let gap = line / scale
+    let left = m.lenses[0].divided(atDistance: gap / 2, from: .maxXEdge).remainder
+    let right = m.lenses[1].divided(atDistance: gap / 2, from: .minXEdge).remainder
+    for lens in [left, right] {
+        ctx.addPath(CGPath(roundedRect: lens.applying(t).standardized, cornerWidth: line * 0.8, cornerHeight: line * 0.8, transform: nil))
+        ctx.strokePath()
+    }
+    let bridgeY = (left.midY + right.midY) / 2
+    ctx.move(to: CGPoint(x: left.maxX, y: bridgeY).applying(t))
+    ctx.addLine(to: CGPoint(x: right.minX, y: bridgeY).applying(t))
+    ctx.strokePath()
+    for eye in m.eyes {
+        let c = eye.applying(t), r = line * 0.75
+        ctx.fillEllipse(in: CGRect(x: c.x - r, y: c.y - r, width: 2 * r, height: 2 * r))
+    }
     return NSBitmapImageRep(cgImage: ctx.makeImage()!).representation(using: .png, properties: [:])!
 }
 
-/// The Chrome toolbar's "S.": the S and its dot both in navy, bolder and larger on a flat cream tile than on the app
-/// icon, so the mark still reads at 16 px on a light or a dark toolbar.
+/// The Chrome toolbar's egghead: the egg and its glasses, bold, on a flat white tile, larger than on the app icon, so
+/// it still reads at 16 px on a light or a dark toolbar.
 func toolbarIcon(_ px: Int) -> Data {
     let ctx = canvas(px)
     let side = CGFloat(px)
@@ -308,20 +250,12 @@ func toolbarIcon(_ px: Int) -> Data {
     let tile = rounded(CGRect(x: inset, y: inset, width: side - 2 * inset, height: side - 2 * inset), side * 0.22)
     ctx.addPath(tile)
     ctx.clip()
-    ctx.drawLinearGradient(gradient([color(0xf1ede5), color(0xe4ded2)]), start: CGPoint(x: 0, y: side), end: CGPoint(x: 0, y: 0), options: [])
+    ctx.setFillColor(color(0xffffff))
+    ctx.fill(CGRect(x: 0, y: 0, width: side, height: side))
     ctx.resetClip()
-    // The mark (x 314…742, y 266…752 in design units) fills 70% of the tile's height, centred.
-    let height: CGFloat = 752 - 266, scale = 0.70 * side / height
-    let midX: CGFloat = (314 + 742) / 2, midY: CGFloat = 1024 - (266 + 752) / 2
     ctx.saveGState()
-    ctx.translateBy(x: side / 2 - midX * scale, y: side / 2 - midY * scale)
-    ctx.scaleBy(x: scale, y: scale)
-    let m = CGMutablePath()
-    m.addPath(sOutline(width: strokeWidth * (side <= 16 ? 1.12 : 1.06)))
-    m.addPath(dotPath(radius: dotRadius * 1.1))
-    ctx.addPath(m)
-    ctx.setFillColor(color(0x2f4a7a))
-    ctx.fillPath()
+    ctx.scaleBy(x: side / 1024, y: side / 1024)
+    drawHead(ctx, px: px, ink: color(pen), egg: color(shell), side: 860)
     ctx.restoreGState()
     ctx.addPath(rounded(CGRect(x: inset, y: inset, width: side - 2 * inset, height: side - 2 * inset).insetBy(dx: 0.5, dy: 0.5), side * 0.22 - 0.5))
     ctx.setLineWidth(1)
@@ -330,7 +264,7 @@ func toolbarIcon(_ px: Int) -> Data {
     return NSBitmapImageRep(cgImage: ctx.makeImage()!).representation(using: .png, properties: [:])!
 }
 
-/// The Chrome Web Store's and the extensions page's 128-px icon: the full tile (its paper and relief, drawn large and
+/// The Chrome Web Store's and the extensions page's 128-px icon: the full tile (its paper and face, drawn large and
 /// scaled down) at 96 px, centred, with the 16-px clear margin Chrome asks for.
 func storeIcon() -> Data {
     let ctx = canvas(128)
@@ -379,7 +313,7 @@ case "png":
     try! icon(1024, out.lastPathComponent.hasSuffix("-dark.png") ? .dark : .light).write(to: out)
 case "tiles":
     try? FileManager.default.createDirectory(at: out, withIntermediateDirectories: true)
-    for px in [16, 20, 24, 32, 40, 48, 64, 128, 180, 256, 512] {
+    for px in [16, 20, 24, 32, 40, 48, 64, 128, 180, 192, 256, 512] {
         try! icon(px, .tile).write(to: out.appendingPathComponent("icon-\(px).png"))
     }
 case "ico":

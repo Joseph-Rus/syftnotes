@@ -1,11 +1,11 @@
-# Study Stash and AI apps (MCP)
+# Egghead Notes and AI apps (MCP)
 
-Study Stash's library speaks MCP, so AI apps can search and read your lectures, notes and Canvas work. Every tool
+Egghead Notes' library speaks MCP, so AI apps can search and read your lectures, notes and Canvas work. Every tool
 only reads. There are two ways in, and which you need depends on where the AI app runs:
 
 | The AI app | Where it runs | How it reaches your library | Needs Tailscale? |
 |---|---|---|---|
-| Claude Desktop, Claude Code, ChatGPT (the desktop app, and Codex in the terminal or your editor), Gemini CLI | On your computer | It starts Study Stash's MCP server itself (stdio) | No |
+| Claude Desktop, Claude Code, ChatGPT (the desktop app, and Codex in the terminal or your editor), Gemini CLI | On your computer | It starts Egghead Notes' MCP server itself (stdio) | No |
 | claude.ai in a browser, the Claude phone app | Anthropic's servers | A custom connector at an internet address | Yes (Funnel) |
 | chatgpt.com in a browser (a custom MCP server, added as a plugin) | OpenAI's servers | The same internet address | Yes (Funnel). Not yet tried with a real ChatGPT account |
 
@@ -15,32 +15,32 @@ This is all a computer on its own needs ("Use just this computer", or a library 
 
 **In setup:** when the ChatGPT or Claude app is on the computer, guided setup's chat offers it as a step of its own,
 "Let ChatGPT read your lectures?", with **Connect** and **Not now**. Connect does what step 2 below does. The app
-loads Study Stash the next time it opens. Afterwards it's all in Settings:
+loads Egghead Notes the next time it opens. Afterwards it's all in Settings:
 
-1. Open Study Stash → Settings → **AI tool access**. **AI apps on this computer** is the first thing on the page,
-   with a row for each AI app Study Stash found here. The ones it didn't find are named in one line underneath; if it
+1. Open Egghead Notes → Settings → **AI tool access**. **AI apps on this computer** is the first thing on the page,
+   with a row for each AI app Egghead Notes found here. The ones it didn't find are named in one line underneath; if it
    found none, the page offers **Get ChatGPT** and **Get Claude** instead.
-2. Choose **Connect** next to the app. Study Stash adds itself to that app's own settings file. There's nothing to
+2. Choose **Connect** next to the app. Egghead Notes adds itself to that app's own settings file. There's nothing to
    type or paste. (**Show what changed** shows what it wrote, and where.)
 3. The row now says the one step left, since an app only reads its settings when it starts:
-   - **On a Mac**, choose **Reopen Claude** or **Reopen ChatGPT**. Study Stash quits the app the way its own Quit menu
+   - **On a Mac**, choose **Reopen Claude** or **Reopen ChatGPT**. Egghead Notes quits the app the way its own Quit menu
      does and opens it again. (Closing an app's window on a Mac doesn't quit it, which is why this is a button.) If
      the app won't quit, because it's asking about unsaved work, say, nothing is forced and the page says so.
    - **On Windows**, quit the app completely and open it again.
-   - **ChatGPT** starts Study Stash when a chat in Codex begins, so its row adds: then start a chat in Codex.
+   - **ChatGPT** starts Egghead Notes when a chat in Codex begins, so its row adds: then start a chat in Codex.
    - Claude Code, Codex in a terminal and Gemini CLI: start a new session.
 4. The row turns to **Connected** by itself: Settings keeps looking for five minutes after Connect or Reopen. The
    page then gives a first question to ask ("What did my last lecture cover?"), with **Copy**.
 
-**Disconnect** takes Study Stash out again. If the app has another copy of Study Stash set up (an old download, say),
-the row says so and offers **Fix**. If you pasted Study Stash into the app's settings by hand, it works, but the row
+**Disconnect** takes Egghead Notes out again. If the app has another copy of Egghead Notes set up (an old download, say),
+the row says so and offers **Fix**. If you pasted Egghead Notes into the app's settings by hand, it works, but the row
 can't tell when it's connected: it says so and offers **Update**, which writes it the way Connect does.
 
 ### ChatGPT
 
 The **ChatGPT** row is for the ChatGPT desktop app that has Codex built in (the one OpenAI released in July 2026, for
 Mac and Windows), and for Codex in the terminal or your editor. They share one settings file, Codex's, so one
-**Connect** covers all of them. After ChatGPT is reopened, Study Stash is under ChatGPT's own Settings → MCP servers,
+**Connect** covers all of them. After ChatGPT is reopened, Egghead Notes is under ChatGPT's own Settings → MCP servers,
 and ChatGPT can use it where it works on this computer: its **Codex** mode. Ask it something like "search my Study
 Stash lectures for recursion". ChatGPT's plain Chat mode runs on OpenAI's servers, which can't start an app on your
 computer: that's what the internet address below is for.
@@ -50,13 +50,13 @@ new ChatGPT app, or use the internet address below.
 
 ### What it writes, and where
 
-Each app gets one entry, `study-stash`, that starts the Study Stash app as an MCP server over stdio:
+Each app gets one entry, `study-stash`, that starts the Egghead Notes app as an MCP server over stdio:
 `StudyStash mcp --client <app>` (with `--home <folder>` if your settings aren't in the usual place). No password,
 token or address goes into the app's settings: the server reads your library through this computer with the
-password Study Stash already keeps in its own settings (`~/.study-stash`), and `--client` only lets Settings show
+password Egghead Notes already keeps in its own settings (`~/.study-stash`), and `--client` only lets Settings show
 which app started it.
 
-| App | File | Where Study Stash goes |
+| App | File | Where Egghead Notes goes |
 |---|---|---|
 | Claude Desktop | Mac: `~/Library/Application Support/Claude/claude_desktop_config.json`. Windows: `%APPDATA%\Claude\claude_desktop_config.json`, or, for the Microsoft Store build, `%LOCALAPPDATA%\Packages\Claude_…\LocalCache\Roaming\Claude\claude_desktop_config.json` | `mcpServers.study-stash` |
 | Claude Code | `~/.claude.json` (or `$CLAUDE_CONFIG_DIR/.claude.json`), the servers for every project, as `claude mcp add --scope user` keeps them | `mcpServers.study-stash` |
@@ -70,8 +70,8 @@ How each change is made:
 - **A merge, never a replace.** Everything else in the file (the app's other MCP servers, its settings) stays. In
   `config.toml` every other line stays exactly as it was, comments included.
 - **The file as it was is kept** next to it, as `<file>.study-stash-backup`, before each change.
-- **A file Study Stash can't rewrite safely is left alone**: JSON that isn't valid, JSON with comments (a rewrite
-  would drop them), TOML that isn't valid, or Study Stash set up by hand in a form it won't rewrite. Settings says
+- **A file Egghead Notes can't rewrite safely is left alone**: JSON that isn't valid, JSON with comments (a rewrite
+  would drop them), TOML that isn't valid, or Egghead Notes set up by hand in a form it won't rewrite. Settings says
   why and shows the setup to add by hand.
 - A settings file that's a link (a dotfiles setup) is followed: the file it points to changes, and the link stays.
 - **Copy setup** (for any other MCP app) copies the same `mcpServers` JSON, to paste into that app's settings.
@@ -102,21 +102,21 @@ app on the web has no custom MCP servers.
 ## On the web: claude.ai, the Claude phone app and chatgpt.com
 
 claude.ai, the Claude phone app and chatgpt.com reach your library from Anthropic's and OpenAI's servers, so the
-library needs an address on the internet. Study Stash makes one with Tailscale Funnel. A computer with no Tailscale doesn't have one, so the card
+library needs an address on the internet. Egghead Notes makes one with Tailscale Funnel. A computer with no Tailscale doesn't have one, so the card
 says what it needs (Tailscale, free, installed and signed in) and links to it, instead of showing an address that
 goes nowhere. Nothing goes on the internet until you turn the switch on, and turning it on needs a library password.
 
-Study Stash doesn't set up other tunnels. Funnel is the one it can turn on and off for you, check from the internet,
+Egghead Notes doesn't set up other tunnels. Funnel is the one it can turn on and off for you, check from the internet,
 and keep to the one port alone.
 
 ## For students
 
 ### What the switch does
 
-The **Claude and ChatGPT on the web and phone** card is in Study Stash → Settings → AI tool access. Its switch is
+The **Claude and ChatGPT on the web and phone** card is in Egghead Notes → Settings → AI tool access. Its switch is
 **Let Claude and ChatGPT reach your library from the internet**. When you turn it on:
 
-- Study Stash asks Tailscale to turn on **Funnel** for the library's Claude port. That gives it one HTTPS address on
+- Egghead Notes asks Tailscale to turn on **Funnel** for the library's Claude port. That gives it one HTTPS address on
   the internet, `https://<your computer>.<your tailnet>.ts.net`. Nothing else on the computer is exposed: the
   library's own pages stay on your tailnet.
 - The card shows the address to paste, ending in `/mcp`, with a **Copy** button.
@@ -129,24 +129,24 @@ until you turn it back on. Only someone who knows your library password can let 
 ### The three steps
 
 1. In Claude, open **Settings → Connectors** and choose **Add custom connector**.
-2. Paste the name (`Study Stash`) and the URL from the card (`https://mini.tail1234.ts.net/mcp`, say), then choose
+2. Paste the name (`Egghead Notes`) and the URL from the card (`https://mini.tail1234.ts.net/mcp`, say), then choose
    **Continue**. Leave the advanced settings as they are.
-3. A Study Stash page opens: "Claude wants to read your lectures". It says where it will send you back to
+3. An Egghead Notes page opens: "Claude wants to read your lectures". It says where it will send you back to
    (claude.ai). Type your library password and choose **Allow**.
 
-Claude lists Study Stash's tools, and you can use them in any chat. You can also ask for them by name: "search my
-Study Stash lectures for recursion".
+Claude lists Egghead Notes' tools, and you can use them in any chat. You can also ask for them by name: "search my
+Egghead Notes lectures for recursion".
 
 ### The same, in ChatGPT
 
 1. In a browser, open [chatgpt.com/plugins](https://chatgpt.com/plugins), choose **+**, then **Add custom MCP
    server**. If it isn't there, turn on **Developer mode** in ChatGPT's settings first (it needs a paid ChatGPT plan,
    and on a school or work account an admin has to allow custom MCP servers).
-2. Give it the name (`Study Stash`) and the URL from the card, ending in `/mcp`, then choose **Create as a plugin**.
-3. The same Study Stash page opens: "ChatGPT wants to read your lectures", identified by chatgpt.com. Type your
+2. Give it the name (`Egghead Notes`) and the URL from the card, ending in `/mcp`, then choose **Create as a plugin**.
+3. The same Egghead Notes page opens: "ChatGPT wants to read your lectures", identified by chatgpt.com. Type your
    library password and choose **Allow**.
 
-In a chat, type `@` and pick Study Stash. ChatGPT's own menus change often: if these names have moved, OpenAI's
+In a chat, type `@` and pick Egghead Notes. ChatGPT's own menus change often: if these names have moved, OpenAI's
 [Connect from ChatGPT](https://developers.openai.com/apps-sdk/deploy/connect-chatgpt) page has today's.
 
 ### What Claude can read
@@ -161,16 +161,16 @@ What it can read follows the toggles under **What they can read** on the same pa
 
 Every tool only reads. None of them can change, move or delete anything, and each one is marked read-only for Claude.
 The one tool that saves Canvas files into the library, `canvas_download`, isn't offered on the internet at all.
-With **AI tool access** off, Claude stays connected, but every tool answers "AI tool access is off in Study Stash"
+With **AI tool access** off, Claude stays connected, but every tool answers "AI tool access is off in Egghead Notes"
 until you turn it back on. You don't need to reconnect.
 
 ### Disconnecting
 
 Any of these ends the connection:
 
-- **In Claude:** Settings → Connectors → Study Stash → Disconnect (or Remove). Claude tells the library to forget its
+- **In Claude:** Settings → Connectors → Egghead Notes → Disconnect (or Remove). Claude tells the library to forget its
   sign-in.
-- **In Study Stash:** on the Claude and ChatGPT on the web and phone card, choose **Remove** next to Claude (or ChatGPT). Its token stops working at once, and Claude asks you to
+- **In Egghead Notes:** on the Claude and ChatGPT on the web and phone card, choose **Remove** next to Claude (or ChatGPT). Its token stops working at once, and Claude asks you to
   sign in again next time.
 - **Everything at once:** turn the Claude switch off. The address stops answering on the internet.
 
@@ -184,14 +184,14 @@ A sign-in also ends on its own after 30 days without use.
 | "Your tailnet doesn't have HTTPS certificates turned on yet" | Funnel needs HTTPS certificates. Open the card's link (it goes to the Tailscale admin console), turn them on, then turn the switch on again. |
 | "Tailscale hasn't given this computer a name yet" | Turn on **MagicDNS** in the Tailscale admin console (DNS page). The address comes from it. |
 | "The internet can't find … yet" right after turning it on | A new Funnel name takes a minute or two to reach public DNS. Wait, then choose **Check again**. If Claude already tried and failed, wait about 5 minutes before choosing Connect in Claude again, because Claude remembers what it found for a few minutes. |
-| "… answers, but not with Study Stash" | Something else is using port 443 on this computer through Tailscale. Turn the Claude switch off (this also clears a Tailscale Serve setup on port 443), then on again. |
+| "… answers, but not with Egghead Notes" | Something else is using port 443 on this computer through Tailscale. Turn the Claude switch off (this also clears a Tailscale Serve setup on port 443), then on again. |
 | Claude says it couldn't connect, but the card says it's reachable | Check that the URL in Claude ends in `/mcp` and starts with `https://`. Remove the connector in Claude and add it again. |
 | "That isn't your library password" | This is the library password from Settings → Library, not your Tailscale or Claude password. After 10 different wrong passwords from one place, the sign-in stops looking at passwords from there for up to 10 minutes, and says how long ("Too many wrong passwords. Try again in 10 minutes."). Signing in from anywhere else isn't held up by it. |
-| "Your library has no password yet" | Set one in Study Stash → Settings → Library. The switch can't be turned on without it. |
+| "Your library has no password yet" | Set one in Egghead Notes → Settings → Library. The switch can't be turned on without it. |
 
 Things you don't need to change:
 
-- **Ports.** Funnel only serves ports 443, 8443 and 10000. Study Stash uses 443, so the address has no port number.
+- **Ports.** Funnel only serves ports 443, 8443 and 10000. Egghead Notes uses 443, so the address has no port number.
 - **Firewall and router.** Funnel connects out from your computer to Tailscale, and Tailscale brings the requests
   in. You don't open a port, and there's no router setup. Claude's requests come from Anthropic's servers
   (160.79.104.0/21), not from your phone or laptop. You only need to know that if you run your own proxy in front
@@ -199,7 +199,7 @@ Things you don't need to change:
 
 ## Conformance checklist
 
-These are the requirements for Claude's custom connector and where Study Stash meets each one.
+These are the requirements for Claude's custom connector and where Egghead Notes meets each one.
 
 **Sources:**
 - **MCP**: the Model Context Protocol specification, revision 2026-07-28 (sections: authorization,
@@ -209,7 +209,7 @@ These are the requirements for Claude's custom connector and where Study Stash m
 All the tests are in `engine/tests/StudyStash.Core.Tests`. `ConnectorTests.` is shortened to `C.`, and
 `ClaudeTests.` to `CT.`
 
-| Requirement | Source | How Study Stash meets it | Proved by |
+| Requirement | Source | How Egghead Notes meets it | Proved by |
 |---|---|---|---|
 | Protected resource metadata (RFC 9728), and a 401 that points to it and names the scope | MCP authorization §2.3; Claude "Authentication" | `POST /mcp` without a valid token gets `401` with `WWW-Authenticate: Bearer resource_metadata="…/.well-known/oauth-protected-resource/mcp", scope="library:read"`. A bad token also gets `error="invalid_token"` and `error_description`. | `C.Discovery_advertises_every_field_on_the_ts_net_https_address`, `C.Claude_adds_Study_Stash_as_a_custom_connector` (step 1) |
 | Metadata at the path-suffixed and the root well-known address | MCP authorization §2.3.2 | Both `/.well-known/oauth-protected-resource/mcp` and `/.well-known/oauth-protected-resource` answer. `resource` is the pasted URL. | `C.Discovery_…`, `C.Claude_adds_…` (step 2) |
@@ -232,7 +232,7 @@ All the tests are in `engine/tests/StudyStash.Core.Tests`. `ConnectorTests.` is 
 | Off switch: AI tool access off, or a reading toggle off | Claude "Troubleshoot" (a bare 403 reads as a broken connector) | The connection stays up and the tools stay listed. Each call answers `isError` in words that name the setting. It's checked on every call, so turning it back on needs no reconnect. The sign-in page says so up front. | `C.Tool_access_off_still_connects_and_every_call_says_why_in_words`, `C.Canvas_off_refuses_every_tool_that_reads_canvas_naming_the_setting`, `C.Sign_in_page_names_the_library_the_redirect_and_what_it_reads`, `CT.A_reading_toggle_off_refuses_only_the_tools_that_need_it`, `AiToolAccessTests.*` |
 | No redirects on the MCP URL | Claude "Troubleshoot" (redirects on the server URL break connecting) | `/mcp` answers directly, with no redirect to `/mcp/` and none from http to https inside the library. | `C.Claude_adds_…` (its client never follows a redirect, yet every MCP call succeeds) |
 | The sign-in page names the client and where it returns | MCP security considerations (consent) | The page shows the library's name, "<client> wants to read your lectures", "will return to <host>", the published identity's host, and what the toggles let it read. It escapes everything the client chose. It is sent with `no-store`, `frame-ancestors 'none'`, `X-Frame-Options: DENY` and `Referrer-Policy: no-referrer`. | `C.Sign_in_page_names_the_library_the_redirect_and_what_it_reads`, `C.Sign_in_page_escapes_a_self_asserted_name`, `C.Sign_in_page_words_for_a_wrong_password_a_lockout_and_no_password`, `CT.Guessing_the_password_gets_locked_out` |
-| Funnel on and off, with Tailscale's problems in plain words, and a check from the internet | (Study Stash) | See the card above. The check looks the name up with public DNS (not MagicDNS), then reads the PRM and AS metadata at the public address. | `ReachTests.*` |
+| Funnel on and off, with Tailscale's problems in plain words, and a check from the internet | (Egghead Notes) | See the card above. The check looks the name up with public DNS (not MagicDNS), then reads the PRM and AS metadata at the public address. | `ReachTests.*` |
 
 ## What was verified, and how
 
@@ -262,11 +262,11 @@ All the tests are in `engine/tests/StudyStash.Core.Tests`. `ConnectorTests.` is 
 Codex 0.160.1, signed in to a real ChatGPT account). The library was a throwaway one on 127.0.0.1 with the two
 made-up lectures.
 
-- ChatGPT's Codex (`codex exec`, with Study Stash given as `mcp_servers.study-stash` exactly as Connect writes it)
+- ChatGPT's Codex (`codex exec`, with Egghead Notes given as `mcp_servers.study-stash` exactly as Connect writes it)
   started `StudyStash mcp --client codex` over stdio and called `list_classes` and `search_notes`; both answered from
   the library, and the note that turns the row to **Connected** was written.
 - **Connect** on a copy of that ChatGPT's real `config.toml` (it already holds ChatGPT's own `node_repl` server and
-  its plugins) added only Study Stash's table, `codex mcp list` then showed both servers, and **Disconnect** put the
+  its plugins) added only Egghead Notes' table, `codex mcp list` then showed both servers, and **Disconnect** put the
   file back byte for byte.
 - Reopen (2026-10-06, on a Mac): tried on a real app, Calculator, both open and closed. It quit and a new copy
   opened, with no system permission asked for. Not tried on ChatGPT or Claude themselves.

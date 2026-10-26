@@ -8,8 +8,8 @@ using StudyStash.Core;
 namespace StudyStash.App.Platform;
 
 /// <summary>
-/// Settings from anywhere. On a Mac, while a Study Stash window is in front, the menu bar has the app's own menu
-/// (About Study Stash, Settings… ⌘, and the system's Hide and Quit ⌘Q) and a Window menu; every window, the dropdown
+/// Settings from anywhere. On a Mac, while an Egghead Notes window is in front, the menu bar has the app's own menu
+/// (About Egghead Notes, Settings… ⌘, and the system's Hide and Quit ⌘Q) and a Window menu; every window, the dropdown
 /// and the quick panel included, opens Settings with ⌘, (Ctrl+, on Windows, where the tray's menu has Settings too).
 /// </summary>
 public static class AppMenu
@@ -42,19 +42,19 @@ public static class AppMenu
         return menu;
     }
 
-    /// <summary>Makes <paramref name="menu"/> the app menu's own items (About Study Stash, Settings… ⌘,), in place: the
+    /// <summary>Makes <paramref name="menu"/> the app menu's own items (About Egghead Notes, Settings… ⌘,), in place: the
     /// menu bar follows a menu it already shows (Avalonia's default, "About Avalonia", if the app's was set too late).</summary>
     public static void Fill(NativeMenu menu, Action about, Action settings)
     {
         menu.Items.Clear();
-        menu.Add(Item("About Study Stash", about));
+        menu.Add(Item("About Egghead Notes", about));
         menu.Add(new NativeMenuItemSeparator());
         var item = Item("Settings…", settings, SettingsGesture);
         settingsItems.Add(item);
         menu.Add(item);
     }
 
-    /// <summary>The app's menu is Study Stash's own: set on the app before the menu bar first reads it, or filled in
+    /// <summary>The app's menu is Egghead Notes' own: set on the app before the menu bar first reads it, or filled in
     /// where it already shows Avalonia's default.</summary>
     public static void Use(Avalonia.Application app, Action about, Action settings)
     {
@@ -85,7 +85,7 @@ public static class AppMenu
         })));
         items.Add(Item("Close", () => On(w => w.Close()), new KeyGesture(Key.W, KeyModifiers.Meta)));
         items.Add(new NativeMenuItemSeparator());
-        items.Add(Item("Study Stash library", library));
+        items.Add(Item("Egghead Notes library", library));
         items.Add(Item("Settings…", settings));
         var bar = new NativeMenu();
         bar.Add(new NativeMenuItem("Window") { Menu = items });
@@ -147,7 +147,7 @@ public static class AppMenu
     static string Str(IntPtr nsString) =>
         nsString == IntPtr.Zero ? "" : Marshal.PtrToStringUTF8(Send(nsString, sel_registerName("UTF8String"))) ?? "";
 
-    /// <summary>A Mac's standard About panel, named Study Stash with this version (a copy run from the build folder
+    /// <summary>A Mac's standard About panel, named Egghead Notes with this version (a copy run from the build folder
     /// would otherwise say dotnet).</summary>
     public static void ShowAbout()
     {
@@ -155,7 +155,7 @@ public static class AppMenu
         try
         {
             var options = Send(objc_getClass("NSMutableDictionary"), sel_registerName("dictionary"));
-            SendIdId(options, sel_registerName("setObject:forKey:"), NS("Study Stash"), NS("ApplicationName"));
+            SendIdId(options, sel_registerName("setObject:forKey:"), NS("Egghead Notes"), NS("ApplicationName"));
             SendIdId(options, sel_registerName("setObject:forKey:"), NS(Engine.Version), NS("ApplicationVersion"));
             SendIdId(options, sel_registerName("setObject:forKey:"), NS(""), NS("Version"));
             Desktop.Activate();
@@ -195,7 +195,7 @@ public static class AppMenu
     }
 
     /// <summary>What the Mac's menu bar holds right now, for the log: each menu's title and its items, with their
-    /// shortcuts ("Study Stash: About Study Stash, Settings… ⌘, …, Quit Study Stash ⌘Q | Window: …").</summary>
+    /// shortcuts ("Egghead Notes: About Egghead Notes, Settings… ⌘, …, Quit Egghead Notes ⌘Q | Window: …").</summary>
     public static string Describe()
     {
         if (!OperatingSystem.IsMacOS()) return "";

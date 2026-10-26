@@ -4,7 +4,7 @@ using StudyStash.Core.Ai;
 namespace StudyStash.Core.Tests;
 
 /// <summary>Guided setup's chat on Gemini, through a fake agy that writes down how it was started and replays a scripted
-/// turn: run in Study Stash's own home for agy as the setup agent (no tools of agy's own, the setup tools its one MCP
+/// turn: run in Egghead Notes' own home for agy as the setup agent (no tools of agy's own, the setup tools its one MCP
 /// server), the token only in that agent's private file, and stopped at once when it reaches for anything else.</summary>
 public class GeminiSetupChatTests
 {
@@ -34,11 +34,11 @@ public class GeminiSetupChatTests
     {
         using var dir = new TempDir();
         using var agyHome = Antigravity.Use(dir["agy"]); // this test's own, whatever runs beside it
-        var t = Turn(dir, "agy", session: "c-9", prompt: "[Study Stash] Setup was opened.");
+        var t = Turn(dir, "agy", session: "c-9", prompt: "[Egghead Notes] Setup was opened.");
         var cmd = SetupChat.Command(t);
         Assert.Equal(["agy", "--agent", "study-stash-setup", "--output-format", "stream-json", "--disable-slash-commands", "--sandbox"], cmd[..7]);
         Assert.Equal("c-9", cmd[cmd.IndexOf("--conversation") + 1]);
-        Assert.Equal("-p=[Study Stash] Setup was opened.", cmd[^1]);
+        Assert.Equal("-p=[Egghead Notes] Setup was opened.", cmd[^1]);
         Assert.DoesNotContain(cmd, a => a.Contains(Token, StringComparison.Ordinal) || a.Contains("dangerously", StringComparison.OrdinalIgnoreCase)
             || a is "--add-dir" or "--mode");
 
@@ -57,7 +57,7 @@ public class GeminiSetupChatTests
             "commandExecutionPolicy: \"off\"", "tools: []", "  - name: study_stash_setup", $"    url: \"{Url}\"", $"      Authorization: \"Bearer {Token}\"",
         })
             Assert.Contains(line + "\n", agent);
-        Assert.Contains("You are Study Stash's setup guide.", agent);
+        Assert.Contains("You are Egghead Notes' setup guide.", agent);
         Assert.Contains("call set_notes_writer with \"gemini\"", agent);
         // The folder it works in is empty, and the agent's file (with the token) is this account's alone.
         Assert.Empty(Directory.EnumerateFileSystemEntries(Antigravity.SetupWorkspace(t.WorkDir)));
@@ -84,7 +84,7 @@ public class GeminiSetupChatTests
             FakeAgents.Agy.Words(4, "Which classes are you taking?"),
             FakeAgents.Agy.Result("Which classes are you taking?"),
         ]);
-        var t = Turn(dir, exe, prompt: "[Study Stash] Setup was opened.");
+        var t = Turn(dir, exe, prompt: "[Egghead Notes] Setup was opened.");
         var events = await Run(t);
 
         Assert.Equal("c-1", events.First(e => e.Kind == "Session").Text);
@@ -93,12 +93,12 @@ public class GeminiSetupChatTests
         Assert.Equal(["Checked your setup", "Added BIO 110"], events.Where(e => e.Kind == "Tool").Select(e => e.Chip));
         Assert.Equal(("Final", "Which classes are you taking?"), (events[^1].Kind, events[^1].Text));
 
-        // Study Stash's home for agy and an empty folder to work in; the prompt on its command line, nothing on its input, and the
+        // Egghead Notes' home for agy and an empty folder to work in; the prompt on its command line, nothing on its input, and the
         // token in neither its arguments nor its environment.
         string bin = dir["bin"];
         Assert.Equal(Antigravity.Home(), File.ReadAllText(Path.Combine(bin, "home-1.txt")).Trim());
         Assert.EndsWith(Path.Combine("setup-chat", "gemini-workspace"), File.ReadAllText(Path.Combine(bin, "cwd-1.txt")).Trim()); // (a Mac's temp folder is behind a link)
-        Assert.Contains("-p=[Study Stash] Setup was opened.", FakeAgents.Argv(bin, 1));
+        Assert.Contains("-p=[Egghead Notes] Setup was opened.", FakeAgents.Argv(bin, 1));
         Assert.Equal("", FakeAgents.Input(bin, 1).Trim());
         Assert.DoesNotContain(FakeAgents.Argv(bin, 1), a => a.Contains(Token, StringComparison.Ordinal));
         Assert.DoesNotContain(SetupChat.TokenVar, FakeAgents.EnvNames(bin, 1));
@@ -147,7 +147,7 @@ public class GeminiSetupChatTests
         Assert.Equal(shared, Antigravity.Home());
     }
 
-    /// <summary>The library's notes on Gemini run agy in Study Stash's own home for it (the library's home's gemini
+    /// <summary>The library's notes on Gemini run agy in Egghead Notes' own home for it (the library's home's gemini
     /// folder), never the student's own ~/.gemini: what main did, and how a test run made the owner's ~/.gemini once.</summary>
     [Fact]
     public async Task The_librarys_notes_on_gemini_run_in_study_stashs_own_home_for_agy()
@@ -209,9 +209,9 @@ public class GeminiSetupChatTests
             """{"event": "init", "conversation_id": "4b10267c", "init": {"cwd": "/x/setup-chat/gemini-workspace", "agent": "study-stash-setup", "tools": ["ask_custom_permission", "call_mcp_tool", "run_command"], "permission_mode": "request-review"}}""",
             """{"event": "step_update", "step_update": {"conversation_id": "4b10267c", "step_index": 2, "state": "ACTIVE", "step_type": "tool", "tool_name": "call_mcp_tool", "tool_info": {"name": "call_mcp_tool", "parameters": {"Arguments": {}, "ServerName": "study_stash_setup", "ToolName": "get_setup_status"}}}}""",
             """{"event": "step_update", "step_update": {"conversation_id": "4b10267c", "step_index": 2, "state": "DONE", "step_type": "tool", "tool_name": "call_mcp_tool", "duration_seconds": 0.031491, "tool_info": {"name": "call_mcp_tool", "parameters": {"Arguments": {}, "ServerName": "study_stash_setup", "ToolName": "get_setup_status"}, "output": "Computer: Mac"}}}""",
-            """{"event": "step_update", "step_update": {"conversation_id": "4b10267c", "step_index": 3, "state": "ACTIVE", "step_type": "agent_response", "text_delta": "Welcome to Study Stash!"}}""",
+            """{"event": "step_update", "step_update": {"conversation_id": "4b10267c", "step_index": 3, "state": "ACTIVE", "step_type": "agent_response", "text_delta": "Welcome to Egghead Notes!"}}""",
             """{"event": "step_update", "step_update": {"conversation_id": "4b10267c", "step_index": 4, "state": "ACTIVE", "step_type": "tool", "tool_name": "call_mcp_tool", "tool_info": {"name": "call_mcp_tool", "parameters": {"Arguments": {}, "ServerName": "study_stash_setup", "ToolName": "offer_microphone_check"}}}}""",
-            """{"event": "result", "result": {"conversation_id": "4b10267c", "status": "SUCCESS", "response": "Welcome to Study Stash!\n", "duration_seconds": 7.3, "num_turns": 1}}""",
+            """{"event": "result", "result": {"conversation_id": "4b10267c", "status": "SUCCESS", "response": "Welcome to Egghead Notes!\n", "duration_seconds": 7.3, "num_turns": 1}}""",
         ];
         var parser = new SetupChatParser("gemini");
         var events = real.SelectMany(parser.Parse).ToList();
@@ -282,7 +282,7 @@ public class GeminiSetupChatTests
         Assert.True(check.Ok, check.Said);
         // Only the Gemini group counts (agy's Claude and GPT group has its own allowance, here used up).
         Assert.Equal("About 80% of this week's Gemini allowance is left.", check.Words);
-        // Both in Study Stash's own home for agy, where it signed in; the turn as the setup agent, with no MCP server.
+        // Both in Egghead Notes' own home for agy, where it signed in; the turn as the setup agent, with no MCP server.
         Assert.Equal(Antigravity.Home(), File.ReadAllText(Path.Combine(bin, "usage-home.txt")).Trim());
         Assert.Equal(Antigravity.Home(), File.ReadAllText(Path.Combine(bin, "home-1.txt")).Trim());
         Assert.Contains("--agent", FakeAgents.Argv(bin, 1));

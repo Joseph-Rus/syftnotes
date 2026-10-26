@@ -6,7 +6,7 @@ using System.Text.Json.Serialization;
 namespace StudyStash.Core.Canvas;
 
 /// <summary>
-/// Everything Study Stash knows about one class's Canvas course, as the last sync left it: the Canvas screens, the API
+/// Everything Egghead Notes knows about one class's Canvas course, as the last sync left it: the Canvas screens, the API
 /// and Claude's tools read this instead of Canvas. One JSON file per class at <c>home/canvas/&lt;class&gt;.json</c>.
 /// While a sync runs, the crawl fills a staged copy beside it (<c>&lt;class&gt;.sync.json</c>, saved as it goes, so a
 /// restart carries on); when the sync finishes each listing is promoted on its own (<see cref="Promoted"/>): read

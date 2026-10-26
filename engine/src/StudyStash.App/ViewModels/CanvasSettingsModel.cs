@@ -118,7 +118,7 @@ public sealed partial class CanvasSettingsModel : ObservableObject, IDisposable
     public CanvasStatusModel Status { get; }
 
     [ObservableProperty] public partial bool Busy { get; set; }
-    /// <summary>"Your library didn't answer." or "Your library runs an older Study Stash: update it to use
+    /// <summary>"Your library didn't answer." or "Your library runs an older Egghead Notes: update it to use
     /// Canvas." — set instead of loading the rows below.</summary>
     [ObservableProperty] public partial string? Say { get; set; }
 
@@ -146,7 +146,7 @@ public sealed partial class CanvasSettingsModel : ObservableObject, IDisposable
     /// <summary>The extension runs in two browsers here (Chrome and Edge, say): the row offers the choice between
     /// them, whether or not it's been made.</summary>
     [ObservableProperty] public partial bool CanChooseBrowser { get; set; }
-    /// <summary>"The extension is in Chrome and Edge: pick the one Study Stash reads Canvas through".</summary>
+    /// <summary>"The extension is in Chrome and Edge: pick the one Egghead Notes reads Canvas through".</summary>
     [ObservableProperty] public partial string ChooseBrowserTip { get; set; } = "";
     CanvasApi.BrowserQuestion? browsers;
 
@@ -202,7 +202,7 @@ public sealed partial class CanvasSettingsModel : ObservableObject, IDisposable
             await Task.WhenAll(stateTask, overviewTask, classesTask);
             if (await stateTask is not { } state || await overviewTask is not { } overview)
             {
-                Say = "Your library runs an older Study Stash: update it to use Canvas.";
+                Say = "Your library runs an older Egghead Notes: update it to use Canvas.";
                 return;
             }
             Say = null;
@@ -228,7 +228,7 @@ public sealed partial class CanvasSettingsModel : ObservableObject, IDisposable
         ExtensionLabel = state.Extension?.Browser is { Length: > 0 } named ? $"{named} extension" : "Browser extension";
         browsers = state.Extension?.Browsers is { Browsers.Count: > 1 } two ? two : null;
         CanChooseBrowser = browsers is not null;
-        ChooseBrowserTip = browsers is null ? "" : $"The extension is in {BrowserChoiceModel.Join(browsers.Browsers)}: pick the one Study Stash reads Canvas through";
+        ChooseBrowserTip = browsers is null ? "" : $"The extension is in {BrowserChoiceModel.Join(browsers.Browsers)}: pick the one Egghead Notes reads Canvas through";
         SyncRuns = $"Runs while {CanvasWords.Browser(state)} is open";
         PollMinutes = state.PollMinutes > 0 ? state.PollMinutes : overview.PollMinutes;
 

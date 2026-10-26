@@ -169,7 +169,10 @@
             </Button.Flyout>
           </Button>
         </Grid>
-        <TextBlock Name="NoNotes" Classes="empty" Text="{Binding NotesEmpty}" IsVisible="{Binding NoNotes}" MaxWidth="560" />
+        <StackPanel Orientation="Horizontal" Spacing="18" IsVisible="{Binding NoNotes}">
+          <c:Doodle Art="hello" Size="96" VerticalAlignment="Center" />
+          <TextBlock Name="NoNotes" Classes="empty" Text="{Binding NotesEmpty}" IsVisible="{Binding NoNotes}" MaxWidth="560" VerticalAlignment="Center" />
+        </StackPanel>
         <ItemsControl Name="NoteRows" ItemsSource="{Binding Notes}" ClipToBounds="False">
           <ItemsControl.ItemTemplate>
             <DataTemplate x:DataType="vm:NoteItem">
@@ -185,7 +188,10 @@
       <Grid Name="Folder" Classes.narrow="{Binding Narrow}" IsVisible="{Binding IsFolder}" ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto" Margin="0,36,0,0">
         <StackPanel>
           <TextBlock Name="FolderNotes" Classes="h2" Text="{Binding NotesHeading}" Margin="0,0,0,14" />
-          <TextBlock Classes="empty" Text="{Binding NotesEmpty}" IsVisible="{Binding NoNotes}" />
+          <StackPanel Orientation="Horizontal" Spacing="18" IsVisible="{Binding NoNotes}">
+            <c:Doodle Art="chicklet" Size="80" VerticalAlignment="Center" />
+            <TextBlock Classes="empty" Text="{Binding NotesEmpty}" IsVisible="{Binding NoNotes}" VerticalAlignment="Center" />
+          </StackPanel>
           <ItemsControl ItemsSource="{Binding Groups}" ClipToBounds="False">
             <ItemsControl.ItemTemplate>
               <DataTemplate x:DataType="vm:NoteGroup">
@@ -287,7 +293,7 @@
         <v:DueCalendar Name="Calendar" DataContext="{Binding Calendar}" />
       </StackPanel>
 
-      <!-- Home: Study Stash is free, and a tip for the two students who build it goes to their Ko-fi page -->
+      <!-- Home: Egghead Notes is free, and a tip for the two students who build it goes to their Ko-fi page -->
       <Button Name="Support" Classes="text-link" Content="{x:Static s:SupportAsk.Button}" Command="{Binding SupportCommand}" IsVisible="{Binding CanSupport}"
               ToolTip.Tip="{x:Static s:SupportAsk.HomeTip}" Margin="0,36,0,0" />
     </StackPanel>

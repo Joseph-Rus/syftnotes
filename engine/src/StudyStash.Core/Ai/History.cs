@@ -31,7 +31,7 @@ public sealed class History(string root, Runner? run = null)
         Directory.CreateDirectory(root);
         if (Git("init", "-q") is null) return false;
         File.WriteAllText(Path.Combine(root, ".gitignore"), ".DS_Store\n*.zip\n*.mp4\n*.mov\n*.wav\n*.m4a\n");
-        Git("config", "user.name", "Study Stash");
+        Git("config", "user.name", "Egghead Notes");
         Git("config", "user.email", "study-stash@localhost");
         return Git("add", ".gitignore") is not null && Git("commit", "-q", "-m", "Start keeping the library's history") is not null;
     }

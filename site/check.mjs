@@ -6,7 +6,7 @@
 //  - a link, image, script or stylesheet on the site doesn't resolve, or a #fragment names no id on its page;
 //  - a link starts with "/" (the site must also work under <user>.github.io/study-stash/, so links are relative);
 //  - a page loads anything from another site (the privacy policy promises this site loads nothing from others);
-//  - the downloads aren't the two release assets, Study-Stash.dmg and Study-Stash-Setup.exe, or the home page
+//  - the downloads aren't the two release assets, Egghead-Notes.dmg and Egghead-Notes-Setup.exe, or the home page
 //    doesn't offer both.
 import { createServer } from "node:http";
 import { readFile, readdir, stat } from "node:fs/promises";
@@ -15,7 +15,7 @@ import { fileURLToPath } from "node:url";
 
 const root = dirname(fileURLToPath(import.meta.url));
 const releases = "https://github.com/Joseph-Rus/study-stash/releases/latest/download/";
-const downloads = [releases + "Study-Stash.dmg", releases + "Study-Stash-Setup.exe"];
+const downloads = [releases + "Egghead-Notes.dmg", releases + "Egghead-Notes-Setup.exe"];
 const types = {
   ".html": "text/html; charset=utf-8", ".css": "text/css", ".js": "text/javascript", ".mjs": "text/javascript",
   ".png": "image/png", ".webp": "image/webp", ".svg": "image/svg+xml", ".ico": "image/x-icon", ".md": "text/plain",

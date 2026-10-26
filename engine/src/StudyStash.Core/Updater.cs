@@ -51,8 +51,8 @@ public sealed class UpdateHost
             appDir = Apps.MacBundleOf(baseDir, out string problem) ?? "";
             reason = problem switch
             {
-                "translocated" => "Move Study Stash into Applications, then open it again, so it can update itself.",
-                "unwritable" => "Study Stash's folder isn't writable, so it can't update itself here.",
+                "translocated" => "Move Egghead Notes into Applications, then open it again, so it can update itself.",
+                "unwritable" => "Egghead Notes' folder isn't writable, so it can't update itself here.",
                 _ => reason,
             };
             cantReplace = appDir.Length == 0 && problem is "translocated" or "unwritable";
@@ -104,7 +104,7 @@ public static partial class Updates
     public static string? WhyNotUpdatable(UpdateHost host) =>
         host.System switch
         {
-            "Linux" => "Study Stash updates itself on a Mac or a Windows PC.",
+            "Linux" => "Egghead Notes updates itself on a Mac or a Windows PC.",
             _ => host.AppDir.Length > 0 ? null : host.NotInstalledReason,
         };
 
@@ -248,7 +248,7 @@ public static partial class Updates
     static async Task<bool> ApplyWindowsAsync(Release release, string home, UpdateHost host, string asset, string url,
         IReadOnlyDictionary<string, string>? checksums, Func<bool> ready, Action<string> log)
     {
-        string dir = Path.Combine(host.TempDir, "Study Stash update");
+        string dir = Path.Combine(host.TempDir, "Egghead Notes update");
         Directory.CreateDirectory(dir);
         string setup = Path.Combine(dir, asset);
         try
@@ -303,7 +303,7 @@ public static partial class Updates
         }
         if (Installer(host.System) is not { } asset)
         {
-            log("Study Stash updates itself on a Mac or a Windows PC.");
+            log("Egghead Notes updates itself on a Mac or a Windows PC.");
             return false;
         }
         string url = release.Assets?.GetValueOrDefault(asset) ?? "";

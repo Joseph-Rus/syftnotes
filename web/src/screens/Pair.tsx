@@ -5,7 +5,7 @@ import type { Me } from '../api/types';
 import { cleanCode, takeCodeFromAddress } from '../boot';
 import { currentDeviceName } from '../platform';
 import { Button } from '../ui/kit';
-import { BASE } from '../router';
+import { Doodle } from '../ui/Doodle';
 
 /**
  * The 6-digit code from Settings → Add a phone. Reachable-but-not-paired (`GET /me` said `paired: false`) means
@@ -45,11 +45,11 @@ export function Pair({ api, library, onPaired }: { api: Api; library: Me['librar
   return (
     <div class="pair">
       <div class="pair-body">
-        <img class="install-icon" src={`${BASE}icon-192.png`} alt="" />
+        <Doodle name="hello" size={120} />
         <h1>{library ? `Add this phone to ${library.name}` : 'Add this phone'}</h1>
         <p class="lede">
-          In Study Stash on your computer, open Settings → Phone → <strong>Add a phone</strong>, then type the 6-digit code
-          it shows.
+          In Egghead Notes on your computer, open Settings → Phone → <strong>Add a phone</strong>, then type the 6-digit
+          code it shows.
         </p>
         <input
           ref={input}

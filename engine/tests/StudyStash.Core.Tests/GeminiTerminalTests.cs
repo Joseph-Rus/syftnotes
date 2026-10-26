@@ -2,7 +2,7 @@ using StudyStash.Core.Ai;
 
 namespace StudyStash.Core.Tests;
 
-/// <summary>"Open in Antigravity": agy in a terminal runs in Study Stash's own home for it, where it's signed in and has
+/// <summary>"Open in Antigravity": agy in a terminal runs in Egghead Notes' own home for it, where it's signed in and has
 /// the library's tools, never the student's own ~/.gemini (signed out, no library, and a folder made there).</summary>
 public class GeminiTerminalTests
 {

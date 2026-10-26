@@ -185,7 +185,7 @@ public static partial class IllustrationDesign
     /// <summary>
     /// What the illustrator is asked: the lecture (its notes, and its transcript to the length allowed), the plan, the
     /// look (a textbook figure in soft flat colour with gentle shading, true to the real thing), the order to draw it
-    /// in, the callouts, the structure Study Stash reads its parts by, and the few rules that keep it safe to show.
+    /// in, the callouts, the structure Egghead Notes reads its parts by, and the few rules that keep it safe to show.
     /// </summary>
     public static string DrawPrompt(Meeting m, string notes, IllustrationPlan plan, int maxChars = int.MaxValue)
     {
@@ -232,7 +232,7 @@ public static partial class IllustrationDesign
             {{palette}}  Outline every shape in the outline colour of its own material (never black): 1.5 units for a part's outline, 0.75 to 1 for detail lines, stroke-linejoin="round". No background: the figure sits on the page, so nothing fills the whole canvas, and no white shapes (use the light tints). #1D1D1F and #6E6E73 are only for the callouts' words and lines.
             - Callouts: every part above gets one: a thin leader line from a point on the part (a small dot there) out to its name, in the margin. Labels go in columns along the left and right of the figure (or above and below a wide one), never on top of the drawing, in the order their parts sit so no two leader lines cross, at least 22 units apart. A name is 14 units, #1D1D1F; a key fact the lecture stressed (a direction, a number) may go on a second line under it at 12 units in #6E6E73, on a few labels at most. The canvas is wide enough for every label: at least 10 units between any word and the edge.
 
-            ## Structure (Study Stash reads the parts by it: keep to it exactly)
+            ## Structure (Egghead Notes reads the parts by it: keep to it exactly)
 
             ```svg
             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {{Width}} H">
@@ -274,10 +274,10 @@ public static partial class IllustrationDesign
     public static string RevisePrompt(IllustrationPlan plan, string svg, IReadOnlyList<string> problems)
     {
         var sb = new StringBuilder();
-        sb.Append("You drew this illustration for a university student's study notes. Study Stash measured it and found the problems listed under it. ")
+        sb.Append("You drew this illustration for a university student's study notes. Egghead Notes measured it and found the problems listed under it. ")
             .Append("Fix every problem, keeping everything that was right: the same parts with the same ids, the same look, the same callouts' words. ")
             .Append("Send back only what changes: each part's group (<g id=\"...\">, whole, with everything in it) and each callout's group (<g id=\"label-...\">) that you redraw or add, ")
-            .Append("and a <defs> with any new gradients; Study Stash puts each one in place of the group with its id. If the whole drawing must change, send all of it.\n\n");
+            .Append("and a <defs> with any new gradients; Egghead Notes puts each one in place of the group with its id. If the whole drawing must change, send all of it.\n\n");
         sb.Append($"Title: {plan.Title}\nWhat it shows: {plan.Subject}\nIts parts:\n");
         foreach (var p in plan.Parts) sb.Append($"- id \"{p.Id}\": {p.Name}\n");
         sb.Append("\n```svg\n").Append(svg.Trim()).Append("\n```\n\nProblems:\n");

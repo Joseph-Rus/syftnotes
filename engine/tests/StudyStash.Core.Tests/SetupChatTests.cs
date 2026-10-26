@@ -123,7 +123,7 @@ public class SetupChatTests
         // The brief goes in whole, as one TOML string on one line.
         string dev = set.Single(s => s.StartsWith("developer_instructions=", StringComparison.Ordinal));
         Assert.DoesNotContain('\n', dev);
-        Assert.Contains("You are Study Stash's setup guide.", dev);
+        Assert.Contains("You are Egghead Notes' setup guide.", dev);
         Assert.DoesNotContain(cmd, a => a.Contains(Token, StringComparison.Ordinal) || a.Contains("dangerously", StringComparison.OrdinalIgnoreCase));
     }
 
@@ -183,14 +183,14 @@ public class SetupChatTests
             ToolUse("mcp__study_stash_setup__offer_computer_setup", []),
             Result("Hi! This takes about 5 minutes."),
         ]);
-        var events = await Run(Turn(dir, "claude", exe, prompt: "[Study Stash] Setup was opened."));
+        var events = await Run(Turn(dir, "claude", exe, prompt: "[Egghead Notes] Setup was opened."));
 
         Assert.Equal("s-1", events.First(e => e.Kind == "Session").Text);
         Assert.Equal("Hi! This takes about 5 minutes.", Text(events));
         Assert.Equal(["get_setup_status", "add_class", "offer_computer_setup"], events.Where(e => e.Kind == "Tool").Select(e => e.Tool));
         Assert.Equal(["Checked your setup", "Added BIO 110", ""], events.Where(e => e.Kind == "Tool").Select(e => e.Chip));
         Assert.Equal("Final", events[^1].Kind);
-        Assert.Equal("[Study Stash] Setup was opened.", FakeAgents.Input(dir["bin"], 1).Trim());
+        Assert.Equal("[Egghead Notes] Setup was opened.", FakeAgents.Input(dir["bin"], 1).Trim());
 
         string[] argv = FakeAgents.Argv(dir["bin"], 1);
         Assert.DoesNotContain(argv, a => a.Contains(Token, StringComparison.Ordinal));

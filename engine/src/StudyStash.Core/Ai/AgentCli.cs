@@ -19,7 +19,7 @@ public sealed record AgentInstaller(string Program, IReadOnlyList<string> Args, 
 public sealed record AgentSignedIn(bool SignedIn, string AuthMethod = "", string Plan = "");
 
 /// <summary>
-/// One AI a student can set Study Stash up with: Claude (through Claude Code), ChatGPT (through Codex) or Gemini
+/// One AI a student can set Egghead Notes up with: Claude (through Claude Code), ChatGPT (through Codex) or Gemini
 /// (through Google's Antigravity CLI). Everything
 /// guided setup needs to know about it, in one place: what it's called, which plan it needs, its maker's documented
 /// installer for each computer, and the commands that sign in and say whether it's signed in.
@@ -34,7 +34,7 @@ public sealed record AgentCliInfo
     public required string Brand { get; init; }
     public required string Maker { get; init; }
     public required string Binary { get; init; }
-    /// <summary>Where its installer comes from ("claude.ai"), for "Study Stash couldn't reach claude.ai".</summary>
+    /// <summary>Where its installer comes from ("claude.ai"), for "Egghead Notes couldn't reach claude.ai".</summary>
     public required string Site { get; init; }
     /// <summary>The plans that include it, as the Pick screen says it: "Pro or Max", "Plus or higher".</summary>
     public required string Plans { get; init; }
@@ -52,7 +52,7 @@ public sealed record AgentCliInfo
     /// <summary>The sign-in waits for the browser this long and then gives up by itself (agy's print mode: a minute);
     /// null when it waits as long as it's left running.</summary>
     public TimeSpan? SignInGivesUp { get; init; }
-    /// <summary>What its commands' environment needs besides the app's own: agy's home of Study Stash's own
+    /// <summary>What its commands' environment needs besides the app's own: agy's home of Egghead Notes' own
     /// (<see cref="Antigravity.Home"/>). Asked each time (the tests move that home).</summary>
     public Func<IReadOnlyDictionary<string, string>> Env { get; init; } = () => new Dictionary<string, string>();
 
@@ -101,8 +101,8 @@ public static partial class AgentCli
     /// <summary>
     /// Gemini, through Google's Antigravity CLI: a personal Google account signs in (free, with a small weekly allowance,
     /// or Google AI Pro and Ultra with more). Its own installer, per-user, no Node.js: one program in ~/.local/bin, or
-    /// %LOCALAPPDATA%\agy\bin on Windows. Every command it runs for Study Stash has Study Stash's own home for agy,
-    /// where its sign-in is kept too (so a student who already uses agy signs in once more, for Study Stash).
+    /// %LOCALAPPDATA%\agy\bin on Windows. Every command it runs for Egghead Notes has Egghead Notes' own home for agy,
+    /// where its sign-in is kept too (so a student who already uses agy signs in once more, for Egghead Notes).
     /// </summary>
     public static readonly AgentCliInfo Gemini = new()
     {
@@ -248,7 +248,7 @@ public enum InstallFailure
     /// <summary>It took longer than setup waits.</summary>
     TimedOut,
     Cancelled,
-    /// <summary>Study Stash is running as an administrator, and a per-user install would go to the wrong account.</summary>
+    /// <summary>Egghead Notes is running as an administrator, and a per-user install would go to the wrong account.</summary>
     Elevated,
     Other,
 }

@@ -293,7 +293,7 @@ export class Api {
     }
     if (result.status < 200 || result.status >= 300) {
       if (result.status === 401) this.onUnauthorized?.();
-      if (result.status === 404) throw new ApiError(404, 'Your library is older than this: update Study Stash on your computer to send voice memos.');
+      if (result.status === 404) throw new ApiError(404, 'Your library is older than this: update Egghead Notes on your computer to send voice memos.');
       throw new ApiError(result.status, body.detail ?? defaultWords(result.status));
     }
     return body as VoiceMemo;

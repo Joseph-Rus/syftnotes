@@ -99,7 +99,7 @@ public class AiShots
         var titleBar = new Grid { ColumnDefinitions = new ColumnDefinitions("Auto,Auto,*"), Height = 32, Margin = new Thickness(16, 0, 0, 0) };
         var badge = new AppIcon { VerticalAlignment = VerticalAlignment.Center };
         titleBar.Children.Add(badge);
-        var titleText = new TextBlock { Text = "Study Stash settings", FontSize = 12, Margin = new Thickness(10, 0, 0, 0), VerticalAlignment = VerticalAlignment.Center };
+        var titleText = new TextBlock { Text = "Egghead Notes settings", FontSize = 12, Margin = new Thickness(10, 0, 0, 0), VerticalAlignment = VerticalAlignment.Center };
         Grid.SetColumn(titleText, 1);
         titleBar.Children.Add(titleText);
 

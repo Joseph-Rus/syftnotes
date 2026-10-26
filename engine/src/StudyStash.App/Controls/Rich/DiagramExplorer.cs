@@ -943,7 +943,7 @@ sealed class DiagramExplorer
     /// <summary>The page's host, if it has one (the lecture's page).</summary>
     public IDiagramHost? Host => DiagramHost.Find(view.Origin ?? view);
 
-    /// <summary>The moment the diagram comes from ("%% Study Stash diagram, from 12:34"), in seconds.</summary>
+    /// <summary>The moment the diagram comes from ("%% Egghead Notes diagram, from 12:34"), in seconds.</summary>
     public double? At => DiagramMoment.From(view.Source);
 
     public bool CanAsk => Host?.CanAsk == true;

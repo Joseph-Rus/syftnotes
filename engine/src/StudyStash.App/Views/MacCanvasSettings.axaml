@@ -30,7 +30,7 @@
           </StackPanel>
         </Button>
       </Grid>
-      <TextBlock Classes="cv-intro" Text="Study Stash only reads from Canvas. Nothing there changes, and everything stays in your library." />
+      <TextBlock Classes="cv-intro" Text="Egghead Notes only reads from Canvas. Nothing there changes, and everything stays in your library." />
       <Border IsVisible="{Binding !Status.IsCompact}">
         <v:MacCanvasStatus DataContext="{Binding Status}" />
       </Border>

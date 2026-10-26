@@ -78,7 +78,7 @@ public sealed class FakeLibrarySettings
                 Settings["classes"] = new JsonArray(((JsonArray)value!).OfType<JsonObject>().Select(c => (JsonNode?)new JsonObject
                 {
                     ["name"] = c["name"]!.DeepClone(), ["aliases"] = c["aliases"]!.DeepClone(), ["description"] = c["description"]!.DeepClone(),
-                    ["folder"] = "/Users/sam/Study Stash/Lecture notes/" + c["name"]!.GetValue<string>(), ["lectures"] = 0,
+                    ["folder"] = "/Users/sam/Egghead Notes/Lecture notes/" + c["name"]!.GetValue<string>(), ["lectures"] = 0,
                 }).ToArray());
             }
         }
@@ -94,7 +94,7 @@ public sealed class FakeLibrarySettings
             foreach (var c in ((JsonArray)Settings["classes"]!).OfType<JsonObject>().Where(c => c["name"]!.GetValue<string>() == r["from"]!.GetValue<string>()))
             {
                 c["name"] = r["to"]!.DeepClone();
-                c["folder"] = "/Users/sam/Study Stash/Lecture notes/" + r["to"]!.GetValue<string>();
+                c["folder"] = "/Users/sam/Egghead Notes/Lecture notes/" + r["to"]!.GetValue<string>();
                 lectures += r["lectures"]!.GetValue<int>();
             }
         Settings["course_names"] = new JsonObject { ["blocked"] = null, ["renames"] = new JsonArray() };
@@ -123,12 +123,12 @@ public sealed class FakeLibrarySettings
     /// <summary>The design's example library: Sam's, on a Mac mini, with four classes and two folders.</summary>
     public static JsonObject Demo() => (JsonObject)JsonNode.Parse("""
         {
-          "name": "Sam's library", "has_password": true, "notes_folder": "/Users/sam/Study Stash/Lecture notes", "lectures": 42,
+          "name": "Sam's library", "has_password": true, "notes_folder": "/Users/sam/Egghead Notes/Lecture notes", "lectures": 42,
           "classes": [
-            {"name": "CS 101", "aliases": ["cs101", "intro to cs"], "description": "Recursion, the call stack and Big-O", "folder": "/Users/sam/Study Stash/Lecture notes/CS 101", "lectures": 18},
-            {"name": "BIO 110", "aliases": ["biology"], "description": "Cells, membranes and osmosis", "folder": "/Users/sam/Study Stash/Lecture notes/BIO 110", "lectures": 14},
-            {"name": "HIST 210", "aliases": [], "description": "", "folder": "/Users/sam/Study Stash/Lecture notes/HIST 210", "lectures": 9},
-            {"name": "MATH 221", "aliases": ["calc"], "description": "", "folder": "/Users/sam/Study Stash/Lecture notes/MATH 221", "lectures": 1}
+            {"name": "CS 101", "aliases": ["cs101", "intro to cs"], "description": "Recursion, the call stack and Big-O", "folder": "/Users/sam/Egghead Notes/Lecture notes/CS 101", "lectures": 18},
+            {"name": "BIO 110", "aliases": ["biology"], "description": "Cells, membranes and osmosis", "folder": "/Users/sam/Egghead Notes/Lecture notes/BIO 110", "lectures": 14},
+            {"name": "HIST 210", "aliases": [], "description": "", "folder": "/Users/sam/Egghead Notes/Lecture notes/HIST 210", "lectures": 9},
+            {"name": "MATH 221", "aliases": ["calc"], "description": "", "folder": "/Users/sam/Egghead Notes/Lecture notes/MATH 221", "lectures": 1}
           ],
           "notes": {"write": true, "sort": true, "min_confidence": 0.6, "writer": "Ollama (gemma4:e4b)"},
           "ollama": {"host": "http://localhost:11434", "answering": true,

@@ -103,7 +103,10 @@
           <Border Name="RecBar" Classes="recbar" IsVisible="{Binding Live}" Margin="0,2,0,26" AutomationProperties.Name="{Binding RecordingSaid}"
                   AutomationProperties.LiveSetting="Polite">
             <Grid ColumnDefinitions="Auto,14,Auto,14,Auto,14,Auto,*,Auto,8,Auto">
-              <Ellipse Width="12" Height="12" Fill="{DynamicResource Record}" Classes.pulse="{Binding Pulses}" VerticalAlignment="Center" />
+              <StackPanel Orientation="Horizontal" Spacing="12">
+                <c:Doodle Art="listening" Size="34" Busy="{Binding Recorder.IsRunning, FallbackValue=False}" VerticalAlignment="Center" />
+                <Ellipse Width="12" Height="12" Fill="{DynamicResource Record}" Classes.pulse="{Binding Pulses}" VerticalAlignment="Center" />
+              </StackPanel>
               <TextBlock Grid.Column="2" Text="{Binding RecordingWord}" FontSize="15" FontWeight="Bold" VerticalAlignment="Center" />
               <c:Waveform Grid.Column="4" Bars="3" Height="16" MinBar="5" Levels="{Binding Recorder.Levels, FallbackValue={x:Null}}" Foreground="{DynamicResource Record}"
                           VerticalAlignment="Center" IsVisible="{Binding Recorder.IsRunning, FallbackValue=False}" />
@@ -220,10 +223,14 @@
               </StackPanel>
             </StackPanel>
             <StackPanel IsVisible="{Binding Saved}" Spacing="14">
-              <c:PageText Name="Pending" IsVisible="{Binding HasPending}" Text="{Binding Pending}" FontSize="14.5" LineHeight="22" Foreground="{DynamicResource InkMuted}" TextWrapping="Wrap" />
+              <Grid ColumnDefinitions="Auto,*" IsVisible="{Binding HasPending}">
+                <c:Doodle Art="writing" Busy="{Binding Writing}" Size="64" IsVisible="{Binding Writing}" Margin="0,0,18,0" VerticalAlignment="Center" />
+                <c:PageText Grid.Column="1" Name="Pending" IsVisible="{Binding HasPending}" Text="{Binding Pending}" FontSize="14.5" LineHeight="22" Foreground="{DynamicResource InkMuted}" TextWrapping="Wrap"
+                            VerticalAlignment="Center" />
+              </Grid>
               <!-- A rewrite the library couldn't do: why, over the notes it left as they were -->
               <c:PageText Name="NotRewritten" IsVisible="{Binding WasNotRewritten}" Text="{Binding NotRewritten}" FontSize="14.5" LineHeight="22" Foreground="{DynamicResource InkMuted}" TextWrapping="Wrap" />
-              <!-- Notes from an AI Study Stash doesn't run: over a lecture with none, that the Claude app (or any free
+              <!-- Notes from an AI Egghead Notes doesn't run: over a lecture with none, that the Claude app (or any free
                    chat) can write them, with Copy for your AI and Paste notes; a long lecture's copy a part at a time;
                    and the box a chat's notes are pasted into (from here, or the notes' ⋯ menu). -->
               <StackPanel Name="FreeAi" Spacing="12" DataContext="{Binding $parent[UserControl].((vm:LibraryModel)DataContext).FreeAi}" x:DataType="vm:FreeAiModel"

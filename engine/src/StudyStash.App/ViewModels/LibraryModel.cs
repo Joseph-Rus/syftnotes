@@ -113,6 +113,9 @@ public sealed partial class NoteModel : ObservableObject
 
     public bool ShowNotes => !ShowTranscript;
     public bool HasPending => !string.IsNullOrEmpty(Pending);
+    /// <summary>Its notes are on their way (written down here, sent, or being written by the library), not just
+    /// missing: the page shows the egghead writing them beside <see cref="Pending"/>.</summary>
+    public bool Writing { get; init; }
     public bool NoTranscript => Lines.Count == 0;
     /// <summary>What the page was last drawn from: a reload that finds the same leaves the page as it is.</summary>
     public string Stamp { get; init; } = "";
@@ -376,7 +379,7 @@ public sealed partial class LibraryModel : ObservableObject
         OnPropertyChanged(nameof(HasLectureFiles));
     }
 
-    /// <summary>Notes from an AI Study Stash doesn't run, for the open note: the offer over a lecture with none, Copy for
+    /// <summary>Notes from an AI Egghead Notes doesn't run, for the open note: the offer over a lecture with none, Copy for
     /// your AI and Paste notes. Null with no note open, or one being recorded.</summary>
     [ObservableProperty] public partial FreeAiModel? FreeAi { get; set; }
 

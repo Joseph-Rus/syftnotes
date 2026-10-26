@@ -72,13 +72,13 @@ public sealed class SetupTests
         var one = SetupModel.For(SkinKind.Mac);
         var laptop = SetupModel.For(SkinKind.Mac, AppRole.Laptop);
         var library = SetupModel.For(SkinKind.Mac, AppRole.Library);
-        Assert.Equal("Set up Study Stash on this Mac", one.HeaderTitle);
-        Assert.Equal("Set up Study Stash on this Mac", laptop.HeaderTitle);
+        Assert.Equal("Set up Egghead Notes on this Mac", one.HeaderTitle);
+        Assert.Equal("Set up Egghead Notes on this Mac", laptop.HeaderTitle);
         Assert.Equal("Set up your library", library.HeaderTitle);
         Assert.Equal(["Setup", "Laptop for class", "Computer at home"], new[] { one.FlowName, laptop.FlowName, library.FlowName });
         Assert.Equal(3, new[] { one.FlowIcon, laptop.FlowIcon, library.FlowIcon }.Distinct().Count());
         Assert.All(new[] { one, laptop, library }, m => Assert.Equal("Welcome", m.StepLabel));
-        Assert.Equal("Set up Study Stash on this PC", SetupModel.For(SkinKind.Win).HeaderTitle);
+        Assert.Equal("Set up Egghead Notes on this PC", SetupModel.For(SkinKind.Win).HeaderTitle);
         Assert.Contains("all on this Mac", one.OneComputerAbout, StringComparison.Ordinal);
         Assert.Contains("No other computer needed", one.OneComputerAbout, StringComparison.Ordinal);
         Assert.Contains("Mac mini", library.LibraryAbout, StringComparison.Ordinal);
@@ -91,7 +91,7 @@ public sealed class SetupTests
         var m = SetupModel.For(SkinKind.Mac);
         Assert.True(m.IsOneComputer);
         Assert.False(m.IsLaptop || m.IsLibrary);
-        Assert.Equal("Welcome to Study Stash", m.IntroTitle);
+        Assert.Equal("Welcome to Egghead Notes", m.IntroTitle);
         Assert.Equal("Where your lectures are kept", m.WelcomeTitle);
         // A laptop and a computer at home wait under Advanced; the library download, which starts on the computer at
         // home, shows them.
@@ -133,7 +133,7 @@ public sealed class SetupTests
         var m = SetupModel.For(SkinKind.Mac, AppRole.Library);
         m.LibraryOk = true;
         m.Again = true;
-        Assert.Equal("Set up Study Stash again", m.WelcomeTitle);
+        Assert.Equal("Set up Egghead Notes again", m.WelcomeTitle);
         Assert.Contains("Settings → Advanced → Connection", m.WelcomeBody, StringComparison.Ordinal);
         Assert.True(m.CanChooseLibrary);
         Assert.False(m.CanChooseOneComputer || m.CanChooseLaptop);
@@ -220,7 +220,7 @@ public sealed class SetupTests
     {
         var m = SetupModel.For(SkinKind.Mac);
         m.Go(SetupStep.StartAtLogin);
-        Assert.Equal("Keep Study Stash running", m.StartAtLoginTitle);
+        Assert.Equal("Keep Egghead Notes running", m.StartAtLoginTitle);
         Assert.Contains("whenever this Mac is on", m.StartAtLoginLede, StringComparison.Ordinal);
         Assert.DoesNotContain("laptop", m.StartAtLoginLede, StringComparison.OrdinalIgnoreCase);
         m.Go(SetupStep.Done);
@@ -286,7 +286,7 @@ public sealed class SetupTests
         Assert.False(m.OnPlainStep);
         m.Go(SetupStep.Done);
         Assert.True(m.IsLast);
-        Assert.Equal("Open Study Stash", m.ContinueLabel);
+        Assert.Equal("Open Egghead Notes", m.ContinueLabel);
         Assert.True(m.OnLibraryDone);
         Assert.False(m.OnLaptopDone);
 
@@ -494,7 +494,7 @@ public sealed class SetupTests
         using var home = new TempHome();
         string notes = home["Lecture notes"];
         Configs.Save(new Config(home.Path, notes) { PoolName = "Sam's library", PoolPassword = "kept-password" });
-        // A library is here but Study Stash was never asked to start at login (setup was closed part-way, or its
+        // A library is here but Egghead Notes was never asked to start at login (setup was closed part-way, or its
         // switch was left off): the switch is off, and finishing writes no login item.
         var never = new CountingLoginItems();
         using (var unasked = Host(home, login: never))

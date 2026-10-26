@@ -6,8 +6,8 @@ using Avalonia.Platform;
 namespace StudyStash.App.Platform;
 
 /// <summary>
-/// The menu bar's and the tray's icon: the monochrome "S." (Assets/mark-&lt;px&gt;.png, drawn by macos/make_icon.swift
-/// with the app icon) in one ink, and while recording a small red dot at its top right, set off from the S by a thin
+/// The menu bar's and the tray's icon: the monochrome egghead, line art (Assets/mark-&lt;px&gt;.png, drawn by macos/make_icon.swift
+/// with the app icon) in one ink, and while recording a small red dot at its top right, set off from the egg by a thin
 /// clear ring the way the system's own badges are.
 /// </summary>
 public static class TrayMark

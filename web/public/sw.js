@@ -1,4 +1,4 @@
-// Study Stash's service worker: caches the app's own files so it opens (and shows what was read before) with no
+// Egghead Notes' service worker: caches the app's own files so it opens (and shows what was read before) with no
 // network, and never touches /api/ — a lecture's notes, its list of classes, an upload: all of that is the app's
 // own cache in resource.ts and localStorage, never this cache. Vite's build copies this file to dist/sw.js
 // unchanged (it's in web/public/), and the library serves it at /app/sw.js with Service-Worker-Allowed: /app/.

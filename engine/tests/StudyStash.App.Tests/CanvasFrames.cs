@@ -73,7 +73,7 @@ public static class CanvasFrames
     public static Control WinSettings(Control content)
     {
         var mark = new AppIcon { Margin = new Thickness(16, 0, 10, 0), VerticalAlignment = VerticalAlignment.Center };
-        var titleText = new TextBlock { Text = "Study Stash settings", FontSize = 12, VerticalAlignment = VerticalAlignment.Center };
+        var titleText = new TextBlock { Text = "Egghead Notes settings", FontSize = 12, VerticalAlignment = VerticalAlignment.Center };
         var titleBar = new Grid { Height = 32, ColumnDefinitions = new ColumnDefinitions("Auto,*,Auto"), Children = { mark, titleText } };
         Grid.SetColumn(titleText, 1);
         var caps = new StackPanel { Orientation = Orientation.Horizontal, Children = { CapBtn("remove"), CapBtn("crop_square"), CapBtn("close") } };
@@ -245,7 +245,7 @@ public static class CanvasFrames
     public static Control WinApp(string selected, Control list, Control? detail = null, double width = 1280, double listWidth = 340)
     {
         var mark = new AppIcon { Margin = new Thickness(16, 0, 12, 0), VerticalAlignment = VerticalAlignment.Center };
-        var appName = new TextBlock { Text = "Study Stash", FontSize = 12, VerticalAlignment = VerticalAlignment.Center };
+        var appName = new TextBlock { Text = "Egghead Notes", FontSize = 12, VerticalAlignment = VerticalAlignment.Center };
         var left = new StackPanel { Orientation = Orientation.Horizontal, Children = { mark, appName } };
 
         var search = new Border { Width = 400, Height = 32, CornerRadius = new CornerRadius(4) };
@@ -386,7 +386,7 @@ public static class CanvasFrames
         {
             var titleBar = new Border { Height = 32, Padding = new Thickness(12, 0) };
             titleBar.Bind(Border.BackgroundProperty, titleBar.GetResourceObservable("Layer"));
-            var title = new TextBlock { Text = "Set up Study Stash", FontSize = 12, VerticalAlignment = VerticalAlignment.Center };
+            var title = new TextBlock { Text = "Set up Egghead Notes", FontSize = 12, VerticalAlignment = VerticalAlignment.Center };
             title.Bind(TextBlock.ForegroundProperty, title.GetResourceObservable("Fg2"));
             titleBar.Child = title;
             frame.Children.Add(titleBar);

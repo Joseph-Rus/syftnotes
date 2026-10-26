@@ -13,7 +13,7 @@ public enum LibraryServiceState
     Starting,
     /// <summary>Our child is up and the library answers.</summary>
     Running,
-    /// <summary>Something else already answers as a Study Stash library on this port: we didn't start anything.</summary>
+    /// <summary>Something else already answers as an Egghead Notes library on this port: we didn't start anything.</summary>
     Elsewhere,
     /// <summary>Another program holds the port.</summary>
     PortTaken,

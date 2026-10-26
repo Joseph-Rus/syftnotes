@@ -28,7 +28,7 @@ public sealed class LibraryHereTests
         using var home = new TempHome();
         using var host = Host(home.Path);
         // Its notes in this test's own folder: with none given a new library keeps them in the real Documents\Study Stash.
-        var here = new LibraryHere { Command = [exe], Folder = home["Study Stash"] };
+        var here = new LibraryHere { Command = [exe], Folder = home["Egghead Notes"] };
         try
         {
             string said = await here.CreateAsync(host, "Ada's library", "at-least-4", "Ada");
@@ -52,7 +52,7 @@ public sealed class LibraryHereTests
         Assert.True(File.Exists(exe), $"build the solution first: no {exe}");
         using var home = new TempHome();
         using var host = Host(home.Path);
-        var here = new LibraryHere { Command = [exe], Folder = home["Study Stash"] };
+        var here = new LibraryHere { Command = [exe], Folder = home["Egghead Notes"] };
         using var squatter = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
         squatter.Bind(new IPEndPoint(IPAddress.Loopback, 8787));
         squatter.Listen();
@@ -74,7 +74,7 @@ public sealed class LibraryHereTests
         Assert.True(File.Exists(exe), $"build the solution first: no {exe}");
         using var home = new TempHome();
         using var host = Host(home.Path);
-        var here = new LibraryHere { Command = [exe], Folder = home["Study Stash"] };
+        var here = new LibraryHere { Command = [exe], Folder = home["Egghead Notes"] };
         try
         {
             await here.CreateAsync(host, "Ada's library", "at-least-4", "Ada");
@@ -185,7 +185,7 @@ public sealed class LibraryHereTests
         Assert.True(File.Exists(exe), $"build the solution first: no {exe}");
         using var home = new TempHome();
         using var host = Host(home.Path);
-        var m = Setup.Make(host, AppRole.Both, here: new LibraryHere { Command = [exe], Folder = home["Study Stash"] });
+        var m = Setup.Make(host, AppRole.Both, here: new LibraryHere { Command = [exe], Folder = home["Egghead Notes"] });
         m.Go(SetupStep.Welcome); // past How it works
         try
         {
@@ -199,7 +199,7 @@ public sealed class LibraryHereTests
             Assert.True(LibraryHere.OnlyHere(cfg));
             Assert.Equal("127.0.0.1", cfg.WebHost);
             Assert.True(cfg.PoolPassword.Length >= 12); // made up: nobody types it until a laptop is added
-            Assert.Equal(Path.GetFullPath(home["Study Stash"]), Path.GetFullPath(cfg.PoolDir));
+            Assert.Equal(Path.GetFullPath(home["Egghead Notes"]), Path.GetFullPath(cfg.PoolDir));
             var cc = Configs.LoadClient(home.Path);
             Assert.Equal($"http://127.0.0.1:{cfg.WebPort}", cc.ServerUrl);
             Assert.Equal(cfg.PoolPassword, cc.PoolKey);
@@ -217,7 +217,7 @@ public sealed class LibraryHereTests
         Assert.True(File.Exists(exe), $"build the solution first: no {exe}");
         using var home = new TempHome();
         using var host = Host(home.Path);
-        var here = new LibraryHere { Command = [exe], Folder = home["Study Stash"] };
+        var here = new LibraryHere { Command = [exe], Folder = home["Egghead Notes"] };
         try
         {
             await here.CreateAsync(host, "Ada's library", null, "Ada", AppRole.Both, localOnly: true);
@@ -254,7 +254,7 @@ public sealed class LibraryHereTests
         Assert.True(File.Exists(exe), $"build the solution first: no {exe}");
         using var home = new TempHome();
         using var host = Host(home.Path);
-        var m = Setup.Make(host, AppRole.Both, here: new LibraryHere { Command = [exe], Folder = home["Study Stash"] });
+        var m = Setup.Make(host, AppRole.Both, here: new LibraryHere { Command = [exe], Folder = home["Egghead Notes"] });
         m.Go(SetupStep.Welcome); // past How it works
         try
         {

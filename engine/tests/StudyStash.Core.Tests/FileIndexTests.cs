@@ -2,7 +2,7 @@ using StudyStash.Core.Ai;
 
 namespace StudyStash.Core.Tests;
 
-/// <summary>Searching files that aren't lectures, and the folders Study Stash may read.</summary>
+/// <summary>Searching files that aren't lectures, and the folders Egghead Notes may read.</summary>
 public class FileIndexTests
 {
     [Fact]

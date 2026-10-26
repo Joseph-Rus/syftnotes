@@ -58,7 +58,7 @@ public sealed class CanvasSettings
     /// <summary>The browser the student picked for a place where two run the extension: that one reads Canvas while
     /// it's running, and the other is left alone.</summary>
     public Dictionary<string, string> BrowserChoice { get; set; } = [];
-    /// <summary>Chrome's extension updated itself (it reloads from a folder Study Stash keeps up to date): Settings
+    /// <summary>Chrome's extension updated itself (it reloads from a folder Egghead Notes keeps up to date): Settings
     /// says so ("The Chrome extension updated itself. Now version 1.3.") until it's dismissed.</summary>
     public ExtensionUpdate? ExtensionUpdate { get; set; }
     /// <summary>What went wrong last, for Settings; empty when all is well.</summary>
@@ -96,7 +96,7 @@ public sealed class CanvasSettings
     /// <summary>The extension the browser runs is older than this library's and can't bring itself up to date: one
     /// from before protocol 2 (1.3) never reloads itself from its folder. A later one reloads itself when its folder is
     /// rewritten, and a copy from a store (the Chrome Web Store's, Firefox's) is updated by that store, often days after
-    /// a new Study Stash has a newer folder: neither is ever told to reload by hand.</summary>
+    /// a new Egghead Notes has a newer folder: neither is ever told to reload by hand.</summary>
     [JsonIgnore] public bool ExtensionOutdated => ExtensionProtocol < 2 && Extension.IsOlder(ExtensionVersion, Extension.Version());
 
     /// <summary>The browser the extension runs in, for a sentence: its name once an extension has said it

@@ -7,7 +7,7 @@ using StudyStash.Core.Ai;
 namespace StudyStash.Library;
 
 /// <summary>
-/// Searching files (everything in the library that isn't a lecture, and the folders Study Stash may read), and
+/// Searching files (everything in the library that isn't a lecture, and the folders Egghead Notes may read), and
 /// choosing those folders in Settings.
 /// </summary>
 public sealed partial class LibraryWeb

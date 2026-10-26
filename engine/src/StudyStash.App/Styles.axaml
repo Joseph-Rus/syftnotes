@@ -1195,7 +1195,7 @@
     <Setter Property="BoxShadow" Value="{DynamicResource RecordRing}" />
     <Setter Property="Padding" Value="16,8,8,8" />
   </Style>
-  <!-- Notes from an AI Study Stash doesn't run, on a note's page (the Claude app, any free chat): the offer over a
+  <!-- Notes from an AI Egghead Notes doesn't run, on a note's page (the Claude app, any free chat): the offer over a
        lecture with no notes, a long lecture's copy in parts, and the box a chat's notes are pasted into. -->
   <Style Selector="Border.free-ai">
     <Setter Property="Background" Value="{DynamicResource Surface}" />

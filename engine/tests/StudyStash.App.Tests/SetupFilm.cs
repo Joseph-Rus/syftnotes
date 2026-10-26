@@ -126,7 +126,7 @@ sealed class SetupFilmRig : IAsyncDisposable
         // A first run's microphone: not asked yet, allowed once the student presses Allow (no system prompt here).
         host = new AppHost(home.Path, microphone: () => speaking = new FilmMic(), log: s => Log("app " + s), loginItems: new CountingLoginItems(),
             models: new ModelSetting(null, Mirror: "https://mirror.example/models"), http: new HttpClient(models), micPermissions: new FilmMicAccess());
-        setup = Services.Setup.Make(host, AppRole.Both, here: new LibraryHere { Command = [BuiltEngine()], Folder = home["Study Stash"], FirstPort = o.Port });
+        setup = Services.Setup.Make(host, AppRole.Both, here: new LibraryHere { Command = [BuiltEngine()], Folder = home["Egghead Notes"], FirstPort = o.Port });
         // Nothing outside the film opens: pages, settings panes and terminals are only written down.
         setup.OnMicSettings = () => Log("(would open the microphone's settings)");
         setup.OnOpenUrl = url => Log($"(would open {url})");
@@ -157,7 +157,7 @@ sealed class SetupFilmRig : IAsyncDisposable
         {
             Services.Setup.Finish(setup, host);
             finished = true;
-            Log("setup finished: Open Study Stash");
+            Log("setup finished: Open Egghead Notes");
         };
         setup.OnEnter = Enter;
         setup.OnCopy = _ => { };
@@ -581,7 +581,7 @@ sealed class SetupFilmRig : IAsyncDisposable
         };
         if (card.Kind == "microphone_check" && action is null)
         {
-            // The student talks: the pretend microphone's levels move until Study Stash hears them (the card folds).
+            // The student talks: the pretend microphone's levels move until Egghead Notes hears them (the card folds).
             Caption("Student talks (a pretend microphone)");
             for (int i = 0; i < 30 && !setup.MicHeard; i++) Frame();
             Hold(0.6);
@@ -734,7 +734,7 @@ sealed class SetupFilmRig : IAsyncDisposable
         return true;
     }
 
-    /// <summary>After Open Study Stash: what the library now writes notes with, and the library's own Check of that AI
+    /// <summary>After Open Egghead Notes: what the library now writes notes with, and the library's own Check of that AI
     /// (a one-word answer through the same command its notes use).</summary>
     async Task CheckLibraryAsync()
     {

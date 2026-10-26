@@ -95,7 +95,7 @@ public sealed class MathView : Control
             }
             if (p.Display is not { } d)
             {
-                ErrorMessage = "Study Stash couldn't typeset this formula.";
+                ErrorMessage = "Egghead Notes couldn't typeset this formula.";
                 return default;
             }
             ascent = d.Ascent;

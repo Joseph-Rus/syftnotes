@@ -62,7 +62,7 @@ public class PlotNotesTests
         Assert.Contains("```plot", prompts[0]);
         Assert.Single(result.Drawn);
         Assert.Empty(result.Problems);
-        Assert.Contains($"**The sigmoid squashes a score**\n\n```plot\n%% Study Stash diagram, from {TimedText.Clock(25)}\ntitle The sigmoid squashes", result.Notes);
+        Assert.Contains($"**The sigmoid squashes a score**\n\n```plot\n%% Egghead Notes diagram, from {TimedText.Clock(25)}\ntitle The sigmoid squashes", result.Notes);
         Assert.True(result.Notes.IndexOf("```plot", StringComparison.Ordinal) < result.Notes.IndexOf("## Questions to review", StringComparison.Ordinal));
         var block = NoteBlocks.Find(result.Notes).Single(b => b.Kind == NoteBlockKind.Plot);
         Assert.Equal(25, DiagramMoment.From(block.Text));

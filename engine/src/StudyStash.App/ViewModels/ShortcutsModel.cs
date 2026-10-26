@@ -47,7 +47,7 @@ public sealed partial class ShortcutsModel : ObservableObject
         Rows.Add(new ShortcutRow(this, KeyAction.Quick, "Search your lectures", "From any app"));
         if (records) Rows.Add(new ShortcutRow(this, KeyAction.Record, "Start or stop recording", "From any app"));
         Rows.Add(new ShortcutRow(this, KeyAction.Ask, "Ask about what you searched", "In the search panel"));
-        Rows.Add(new ShortcutRow(this, KeyAction.Settings, "Open Settings", "In any Study Stash window"));
+        Rows.Add(new ShortcutRow(this, KeyAction.Settings, "Open Settings", "In any Egghead Notes window"));
         Fill();
     }
 

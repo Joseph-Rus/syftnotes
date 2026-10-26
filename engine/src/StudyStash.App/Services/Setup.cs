@@ -66,7 +66,7 @@ public static class Setup
             m.Password = had.PoolPassword;
             m.NotesFolder = had.PoolDir;
         }
-        // The switch shows what the student last chose: on only when Study Stash already starts at login (Finish
+        // The switch shows what the student last chose: on only when Egghead Notes already starts at login (Finish
         // then writes the login item afresh, pointing at this copy of the app). A library already here doesn't turn
         // it on by itself: setup closed part-way and opened again would write a login item nobody asked for.
         if (host.LoginItems.StartsAtLogin(host.Home)) m.StartAtLogin = true;

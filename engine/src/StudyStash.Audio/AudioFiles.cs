@@ -11,7 +11,7 @@ namespace StudyStash.Audio;
 /// </summary>
 public static class AudioFiles
 {
-    public const string CantRead = "Study Stash couldn't read that recording. Voice Memos' .m4a, .mp3 and .wav all work.";
+    public const string CantRead = "Egghead Notes couldn't read that recording. Voice Memos' .m4a, .mp3 and .wav all work.";
 
     /// <summary>Converts <paramref name="input"/> to a 16 kHz mono WAV at <paramref name="output"/>. Throws
     /// InvalidOperationException, with words for the student, when it can't.</summary>

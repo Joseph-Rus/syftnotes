@@ -19,7 +19,7 @@ public static class AttachmentWords
     public const string RewriteWhy = "Your notes were written before some of these came.";
     public const string Rewriting = "Rewriting your notes with your attachments. They show here when they're done.";
     public const string NoWords = "No words to read in it";
-    public const string OlderLibrary = "Your library runs an older Study Stash: update it to attach files.";
+    public const string OlderLibrary = "Your library runs an older Egghead Notes: update it to attach files.";
     public const string Unreachable = "Can't reach your library right now.";
 
     /// <summary>"Slides · 2.4 MB", "The student's own notes · 830 KB · Reading your handwriting…" (said as "Your notes").</summary>
@@ -97,7 +97,7 @@ public sealed partial class AttachmentsModel(IAttachmentLibrary library, string?
     /// <summary>Opens a file with its own app.</summary>
     public Action<string> OpenFile { get; set; } = Machine.Open;
     /// <summary>Where a file opened from the library is copied to first.</summary>
-    public string CacheDir { get; set; } = Path.Combine(Path.GetTempPath(), "Study Stash attachments");
+    public string CacheDir { get; set; } = Path.Combine(Path.GetTempPath(), "Egghead Notes attachments");
     /// <summary>The notes are being written again: the host reloads the lecture when they're done.</summary>
     public Action? Rewriting { get; set; }
 

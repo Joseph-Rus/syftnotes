@@ -1315,7 +1315,7 @@ public sealed partial class Crawl
         foreach (var item in list.OfType<JsonObject>())
         {
             string cls = S(Courses[Num(D(item["course_id"]))]);
-            if (cls.Length == 0) continue; // a course this student takes but Study Stash doesn't sync
+            if (cls.Length == 0) continue; // a course this student takes but Egghead Notes doesn't sync
             string type = S(item["plannable_type"]);
             var plannable = item["plannable"] as JsonObject ?? [];
             long id = (long)(D(item["plannable_id"]) ?? D(plannable["id"]) ?? 0);

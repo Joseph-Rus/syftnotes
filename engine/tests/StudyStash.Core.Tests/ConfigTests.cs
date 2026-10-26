@@ -77,7 +77,7 @@ public class ConfigTests
     {
         using var dir = new TempDir();
         string path = Configs.WriteExample(dir.Path);
-        Assert.StartsWith("# Study Stash library settings.", File.ReadAllText(path));
+        Assert.StartsWith("# Egghead Notes library settings.", File.ReadAllText(path));
         Assert.Equal(Configs.DefaultPoolDir, Configs.Load(dir.Path).PoolDir);
         Assert.Equal(["Example 101"], Configs.Load(dir.Path).ClassNames());
     }

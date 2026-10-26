@@ -2,7 +2,7 @@ using System.Text.RegularExpressions;
 
 namespace StudyStash.Core.Tests;
 
-/// <summary>Study Stash's version lives in one place, engine/Directory.Build.props, and the build reports that one.</summary>
+/// <summary>Egghead Notes' version lives in one place, engine/Directory.Build.props, and the build reports that one.</summary>
 public class VersionTests
 {
     [Fact]

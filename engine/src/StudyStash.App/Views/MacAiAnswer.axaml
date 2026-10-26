@@ -52,18 +52,22 @@
             <DataTemplate x:DataType="vm:AiTurn">
               <StackPanel Spacing="6">
                 <c:PageText Classes="ai-q" Text="{Binding Question}" />
-                <StackPanel Orientation="Horizontal" Spacing="8" IsVisible="{Binding IsThinking}">
-                  <c:Spinner Width="14" Height="14" Foreground="{DynamicResource Fg2}" />
-                  <TextBlock Classes="ai-thinking" Text="{Binding ThinkingWords}" />
+                <!-- The egghead answers: thinking while it's written, his face beside it once it's there -->
+                <StackPanel Orientation="Horizontal" Spacing="10" IsVisible="{Binding IsThinking}">
+                  <c:Doodle Art="thinking" Size="38" Busy="{Binding IsThinking}" VerticalAlignment="Center" />
+                  <TextBlock Classes="ai-thinking" Text="{Binding ThinkingWords}" VerticalAlignment="Center" />
                 </StackPanel>
                 <c:PageText Classes="ai-answer" Text="{Binding Failed}" Foreground="{DynamicResource Warn}"
                            IsVisible="{Binding Failed, Converter={x:Static c:Converters.NotEmpty}}" />
-                <StackPanel Spacing="6" IsVisible="{Binding !IsThinking}">
+                <Grid ColumnDefinitions="Auto,10,*" IsVisible="{Binding !IsThinking}">
+                <c:Doodle Art="head" Size="26" VerticalAlignment="Top" Margin="0,2,0,0" IsVisible="{Binding Answer, Converter={x:Static c:Converters.NotEmpty}}" />
+                <StackPanel Grid.Column="2" Spacing="6">
                   <c:NoteView Compact="True" BodySize="13" BodyLineHeight="18.85" Markdown="{Binding Answer}" IsVisible="{Binding Answer, Converter={x:Static c:Converters.NotEmpty}}" />
                   <v:AiByline HorizontalAlignment="Left" IsVisible="{Binding Byline, Converter={x:Static c:Converters.NotEmpty}}" />
                   <TextBlock Classes="ai-byline" Text="{Binding FellBackNote}" TextWrapping="Wrap" IsVisible="{Binding FellBackNote, Converter={x:Static c:Converters.NotEmpty}}" />
                   <TextBlock Classes="ai-byline" Text="{Binding OlderLibraryNote}" TextWrapping="Wrap" IsVisible="{Binding OlderLibraryNote, Converter={x:Static c:Converters.NotEmpty}}" />
                 </StackPanel>
+                </Grid>
               </StackPanel>
             </DataTemplate>
           </ItemsControl.ItemTemplate>

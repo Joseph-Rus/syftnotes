@@ -255,8 +255,8 @@ public sealed class Flowchart
 /// <see cref="Flowchart"/>.</summary>
 public static partial class Mermaid
 {
-    /// <summary>What every kind Study Stash draws is called, for a reason given about one it doesn't.</summary>
-    public const string Drawn = "Study Stash draws flowcharts, state and sequence diagrams, timelines and mind maps";
+    /// <summary>What every kind Egghead Notes draws is called, for a reason given about one it doesn't.</summary>
+    public const string Drawn = "Egghead Notes draws flowcharts, state and sequence diagrams, timelines and mind maps";
 
     static readonly Dictionary<string, string> OtherKinds = new(StringComparer.OrdinalIgnoreCase)
     {
@@ -514,7 +514,7 @@ public static partial class Mermaid
             {
                 if (OtherKinds.TryGetValue(word, out string? kind))
                     throw new MermaidException($"{Drawn}; this is {kind}.", LineNumber);
-                throw new MermaidException("This diagram doesn't start with flowchart, graph, stateDiagram, sequenceDiagram, timeline or mindmap, so it isn't one Study Stash can draw.", LineNumber);
+                throw new MermaidException("This diagram doesn't start with flowchart, graph, stateDiagram, sequenceDiagram, timeline or mindmap, so it isn't one Egghead Notes can draw.", LineNumber);
             }
             string rest = line[n..].TrimStart();
             int d = 0;
@@ -579,7 +579,7 @@ public static partial class Mermaid
 
         void Subgraph(string rest)
         {
-            if (open.Count >= 2) throw new MermaidException($"Line {LineNumber} puts a group inside a group inside a group; Study Stash draws two levels.", LineNumber);
+            if (open.Count >= 2) throw new MermaidException($"Line {LineNumber} puts a group inside a group inside a group; Egghead Notes draws two levels.", LineNumber);
             string id, groupTitle;
             if (rest.StartsWith('"'))
             {
@@ -644,7 +644,7 @@ public static partial class Mermaid
                         foreach (var b in right)
                         {
                             if (edges.Count >= Flowchart.MaxEdges)
-                                throw new MermaidException($"This diagram has more than {Flowchart.MaxEdges} arrows; Study Stash draws up to {Flowchart.MaxEdges}.", LineNumber);
+                                throw new MermaidException($"This diagram has more than {Flowchart.MaxEdges} arrows; Egghead Notes draws up to {Flowchart.MaxEdges}.", LineNumber);
                             edges.Add(new FlowEdge(a, b, link.Label, link.Line, link.Start, link.End));
                         }
                 left = right;
@@ -881,7 +881,7 @@ public static partial class Mermaid
             if (!nodes.TryGetValue(r.Id, out var node))
             {
                 if (nodes.Count >= Flowchart.MaxNodes)
-                    throw new MermaidException($"This diagram has more than {Flowchart.MaxNodes} boxes; Study Stash draws up to {Flowchart.MaxNodes}.", LineNumber);
+                    throw new MermaidException($"This diagram has more than {Flowchart.MaxNodes} boxes; Egghead Notes draws up to {Flowchart.MaxNodes}.", LineNumber);
                 node = new MutNode(r.Id);
                 nodes[r.Id] = node;
                 order.Add(node);

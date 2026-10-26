@@ -403,7 +403,7 @@ public class LibrarySettingsApiTests
         await using (var alone = await Site(cfg, store))
         {
             string why = await Refused(await alone.Client.SendAsync(Req(HttpMethod.Post, "/api/v2/settings", new { start_at_login = true })), HttpStatusCode.Conflict);
-            Assert.Contains("without the Study Stash app", why);
+            Assert.Contains("without the Egghead Notes app", why);
         }
     }
 

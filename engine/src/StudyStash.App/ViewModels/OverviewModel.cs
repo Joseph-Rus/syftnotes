@@ -362,7 +362,7 @@ public sealed partial class OverviewModel : ObservableObject
     }
     [RelayCommand] void Record() => OnRecord?.Invoke();
 
-    /// <summary>Home's "Buy us a coffee": Study Stash is free, and a tip for the two students who build it goes to
+    /// <summary>Home's "Buy us a coffee": Egghead Notes is free, and a tip for the two students who build it goes to
     /// their Ko-fi page (<see cref="Services.SupportAsk"/>). Only on Home, a quiet line at the foot of the page.</summary>
     public Action? OnSupport { get; set; }
     public bool CanSupport => IsHome && OnSupport is not null;

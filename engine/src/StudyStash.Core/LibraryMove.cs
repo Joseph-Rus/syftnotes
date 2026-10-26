@@ -18,7 +18,7 @@ public sealed record MoveProgress(int Done, int Total, string Stage = LibraryMov
 /// <summary>What bringing a library over did: lectures filed in the new library, ones it already had (left as they
 /// are), and classes it didn't have yet; files (attachments and the library folder's other files) and chats that came
 /// too; files the old library listed but no longer had; lectures that came still waiting for their notes (the new
-/// library writes them); and whether part of it couldn't come because one of the two runs an older Study Stash.</summary>
+/// library writes them); and whether part of it couldn't come because one of the two runs an older Egghead Notes.</summary>
 public sealed record MoveResult(int Filed, int Skipped, int Classes, int Files = 0, int Missed = 0, int Writing = 0, int Chats = 0,
     bool Partial = false);
 
@@ -679,7 +679,7 @@ public static class LibraryMove
     /// got travels, so doing it again after a failure picks up where it stopped. A library from before this version
     /// hands over (or takes) its lectures only: the rest is left for when it's updated (<see cref="MoveResult.Partial"/>).
     /// Throws <see cref="InvalidOperationException"/> with a sentence for the student when either library says no: the
-    /// old one can't be reached, a password is wrong, or it runs a Study Stash too old to hand lectures over. Whatever
+    /// old one can't be reached, a password is wrong, or it runs an Egghead Notes too old to hand lectures over. Whatever
     /// came before that stays.
     /// </summary>
     public static async Task<MoveResult> CopyAsync(HttpClient from, string fromKey, HttpClient to, string toKey,
@@ -986,7 +986,7 @@ public static class LibraryMove
             if (r.StatusCode is HttpStatusCode.NotFound or HttpStatusCode.MethodNotAllowed)
             {
                 if (optional) return null;
-                throw new InvalidOperationException($"{Capital(side.Who)} runs an older Study Stash. Update it, then bring your lectures over.");
+                throw new InvalidOperationException($"{Capital(side.Who)} runs an older Egghead Notes. Update it, then bring your lectures over.");
             }
             if (!r.IsSuccessStatusCode)
                 throw new InvalidOperationException($"{Capital(side.Who)} didn't take it ({(int)r.StatusCode}). Try again in a moment.");

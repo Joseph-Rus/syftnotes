@@ -1,6 +1,6 @@
 // The toolbar popup: when Canvas last synced, or what's wrong (the library refused this extension's key, can't be
 // reached, the browser isn't signed in to Canvas); sync now, or open the library. A copy from a browser's store that
-// isn't connected yet asks for the code from Study Stash, then for the browser's permission to reach Canvas and the
+// isn't connected yet asks for the code from Egghead Notes, then for the browser's permission to reach Canvas and the
 // library.
 const $ = id => document.getElementById(id);
 const s = $('s'), connect = $('connect'), allowRow = $('allow-row'), main = $('main'), code = $('code'), go = $('go');
@@ -30,7 +30,7 @@ async function show() {
   conn = await loadConnection();
   if (!conn) {
     only(connect);
-    s.textContent = 'Connect this extension to your library: Study Stash shows the code when you add the extension to ' + (where || 'your browser') + '.';
+    s.textContent = 'Connect this extension to your library: Egghead Notes shows the code when you add the extension to ' + (where || 'your browser') + '.';
     return;
   }
   if (!(await hasAccess(conn))) {
@@ -77,7 +77,7 @@ $('allow').onclick = () => allowAccess(conn).then(granted => {
 }, () => show());
 $('recode').onclick = () => {
   only(connect);
-  s.textContent = 'Paste the new code from Study Stash.';
+  s.textContent = 'Paste the new code from Egghead Notes.';
   code.focus();
 };
 $('sync').onclick = () => {

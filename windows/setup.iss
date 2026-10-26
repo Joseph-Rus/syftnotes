@@ -1,4 +1,4 @@
-; Study-Stash-Setup.exe, the one Windows download (built by windows/build.ps1 with Inno Setup 6). The app has no
+; Egghead-Notes-Setup.exe, the one Windows download (built by windows/build.ps1 with Inno Setup 6). The app has no
 ; role of its own: setup asks what this computer is for, and Settings can change it later (docs/one-download.md).
 ; The AppId is the one the old Laptop and Library Setup.exe had, so installing over any earlier copy is an in-place
 ; upgrade: same folder, and its study-stash.ini keeps the role= line an old Setup.exe wrote (Apps.RolePreset reads it
@@ -16,10 +16,10 @@
 
 [Setup]
 AppId={{6F2C9A51-3B7E-4D28-9C41-8E5A0B7D2F63}
-AppName=Study Stash
+AppName=Egghead Notes
 AppVersion={#AppVersion}
-AppVerName=Study Stash {#AppVersion}
-AppPublisher=Study Stash
+AppVerName=Egghead Notes {#AppVersion}
+AppPublisher=Egghead Notes
 AppPublisherURL=https://github.com/Joseph-Rus/study-stash
 AppSupportURL=https://github.com/Joseph-Rus/study-stash/issues
 AppCopyright=MIT License.
@@ -29,10 +29,10 @@ DisableProgramGroupPage=yes
 DisableReadyPage=yes
 PrivilegesRequired=lowest
 ArchitecturesAllowed=x64compatible
-OutputBaseFilename=Study-Stash-Setup
+OutputBaseFilename=Egghead-Notes-Setup
 SetupIconFile=..\assets\study-stash.ico
 UninstallDisplayIcon={app}\StudyStash.exe
-UninstallDisplayName=Study Stash
+UninstallDisplayName=Egghead Notes
 Compression=lzma2
 SolidCompression=yes
 WizardStyle=modern
@@ -56,9 +56,14 @@ Source: "{#Source}\win-x64\*"; DestDir: "{app}"; Flags: ignoreversion recursesub
 ; the version an installed copy reports without running .NET (Updates.InstalledVersion); no role: setup asks
 Filename: "{app}\study-stash.ini"; Section: "app"; Key: "version"; String: "{#AppVersion}"
 
+[InstallDelete]
+; The shortcuts an install from before the rename to Egghead Notes made, so an update leaves one of each, not two.
+Type: files; Name: "{userprograms}\Study Stash.lnk"
+Type: files; Name: "{userdesktop}\Study Stash.lnk"
+
 [Icons]
-Name: "{userprograms}\Study Stash"; Filename: "{app}\StudyStash.exe"; Comment: "Open Study Stash"
-Name: "{userdesktop}\Study Stash"; Filename: "{app}\StudyStash.exe"; Tasks: desktopicon
+Name: "{userprograms}\Egghead Notes"; Filename: "{app}\StudyStash.exe"; Comment: "Open Egghead Notes"
+Name: "{userdesktop}\Egghead Notes"; Filename: "{app}\StudyStash.exe"; Tasks: desktopicon
 
 [Registry]
 ; What the app tells Windows about itself the first time it has something to say, so its notifications are Windows'
@@ -67,7 +72,7 @@ Root: HKCU; Subkey: "Software\Classes\AppUserModelId\StudyStash.App"; Flags: don
 Root: HKCU; Subkey: "Software\Classes\studystash"; Flags: dontcreatekey uninsdeletekey
 
 [Run]
-Filename: "{app}\StudyStash.exe"; Description: "Open Study Stash"; Flags: nowait postinstall skipifsilent
+Filename: "{app}\StudyStash.exe"; Description: "Open Egghead Notes"; Flags: nowait postinstall skipifsilent
 ; a silent update (/relaunch=1) reopens the app once the new files are in place
 Filename: "{app}\StudyStash.exe"; Parameters: "--background"; Flags: nowait; Check: Relaunch
 
@@ -113,7 +118,7 @@ begin
         if Stop then
         begin
           Pid := Proc.ProcessId;
-          Log('Stopping Study Stash (' + IntToStr(Pid) + ')');
+          Log('Stopping Egghead Notes (' + IntToStr(Pid) + ')');
           Exec(ExpandConstant('{sys}\taskkill.exe'), '/f /pid ' + IntToStr(Pid), '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
         end;
       end;
@@ -142,7 +147,7 @@ begin
       if (Pos('Wait-Process', Cmd) > 0) and (Pos('StudyStash.exe', Cmd) > 0) then
       begin
         Pid := Proc.ProcessId;
-        Log('Stopping an older Study Stash''s relaunch waiter (' + IntToStr(Pid) + ')');
+        Log('Stopping an older Egghead Notes''s relaunch waiter (' + IntToStr(Pid) + ')');
         Exec(ExpandConstant('{sys}\taskkill.exe'), '/f /pid ' + IntToStr(Pid), '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
       end;
     end;
@@ -174,7 +179,7 @@ begin
       Tries := Tries + 1;
     end;
   except
-    Log('Couldn''t check for a running Study Stash: ' + GetExceptionMessage);
+    Log('Couldn''t check for a running Egghead Notes: ' + GetExceptionMessage);
   end;
 end;
 
@@ -195,11 +200,11 @@ begin
     Exe := ExpandConstant('{app}\StudyStash.exe');
     if FileExists(Exe) then
     begin
-      Log('The update didn''t finish: opening Study Stash again');
+      Log('The update didn''t finish: opening Egghead Notes again');
       Exec(Exe, '--background', '', SW_SHOWNORMAL, ewNoWait, ResultCode);
     end;
   except
-    Log('Couldn''t open Study Stash again: ' + GetExceptionMessage);
+    Log('Couldn''t open Egghead Notes again: ' + GetExceptionMessage);
   end;
 end;
 

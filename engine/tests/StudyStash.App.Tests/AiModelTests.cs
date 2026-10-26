@@ -66,7 +66,7 @@ public class AiWordsTests
         Assert.Equal("With an API key, or Google's Antigravity app. Not on this Mac yet.", AiWords.SetupAbout("gemini", "not_installed", "Mac"));
         Assert.Equal("With your API key. It works.", AiWords.SetupAbout("claude", "ready", hasKey: true));
         Assert.Equal("With your paid Claude plan, through Claude Code. Not on this Mac yet.", AiWords.SetupAbout("claude", "not_installed", "Mac"));
-        Assert.Equal("Free and private (Ollama). Study Stash downloads it for you: a few gigabytes, once.", AiWords.SetupAbout("ollama", "not_installed", "PC"));
+        Assert.Equal("Free and private (Ollama). Egghead Notes downloads it for you: a few gigabytes, once.", AiWords.SetupAbout("ollama", "not_installed", "PC"));
     }
 
     [Fact]
@@ -1524,7 +1524,7 @@ public class AiAccessModelTests
         Connections: [new ToolConnection("tok-1", "Cursor", "token") { Created = 1_726_000_000, LastUsed = new DateTimeOffset(Now.AddHours(-2)).ToUnixTimeSeconds() }])
     {
         PublicUrl = null, HasPassword = true,
-        Web = new WebReach(false, "Study Stash", null, null, null, null, null, null, true),
+        Web = new WebReach(false, "Egghead Notes", null, null, null, null, null, null, true),
     };
 
     static (AiAccessModel Model, FakeAiLibrary Library) Loaded(ToolAccessInfo? info = null)
@@ -1601,7 +1601,7 @@ public class AiAccessModelTests
         model.ConnectApp = id =>
         {
             added = id == "claude-desktop";
-            return new AiAppChange(true, "Added Study Stash to Claude Desktop.", "/c.json", "/c.json.study-stash-backup", "{\"mcpServers\":{}}");
+            return new AiAppChange(true, "Added Egghead Notes to Claude Desktop.", "/c.json", "/c.json.study-stash-backup", "{\"mcpServers\":{}}");
         };
         model.ReopenApp = id =>
         {
@@ -1620,10 +1620,10 @@ public class AiAccessModelTests
         await row.Connect!.ExecuteAsync(null);
 
         Assert.Same(row, Assert.Single(model.Apps));
-        Assert.Equal("Almost done. Reopen Claude so it loads Study Stash.", row.Status);
+        Assert.Equal("Almost done. Reopen Claude so it loads Egghead Notes.", row.Status);
         Assert.True(row.CanReopen);
         Assert.True(row.CanDisconnect);
-        Assert.Equal("Added Study Stash to Claude Desktop.", model.Say);
+        Assert.Equal("Added Egghead Notes to Claude Desktop.", model.Say);
         // What was written is there for whoever wants it, folded away.
         Assert.True(model.HasWritten);
         Assert.False(model.ShowWritten);
@@ -1637,7 +1637,7 @@ public class AiAccessModelTests
         Assert.Equal(["claude-desktop"], reopened);
         Assert.Equal("Claude is opening. This turns to Connected in a moment.", row.Status);
 
-        // The app starts Study Stash: the row says so by itself, with Settings still open, and there's a question to try.
+        // The app starts Egghead Notes: the row says so by itself, with Settings still open, and there's a question to try.
         started = Now.AddMinutes(1);
         loaded.SetResult();
         var deadline = DateTime.UtcNow.AddSeconds(5);
@@ -1715,7 +1715,7 @@ public class AiAccessModelTests
         Assert.True(model.WebOn);
         Assert.True(model.ShowWebReady);
         Assert.Equal("https://mini.tail1234.ts.net/mcp", model.WebUrl);
-        Assert.Equal("Study Stash", model.WebName);
+        Assert.Equal("Egghead Notes", model.WebName);
         Assert.Equal(ReachCheck.Answers, model.WebWords);
         Assert.Null(model.WebNote);
     }
@@ -1727,7 +1727,7 @@ public class AiAccessModelTests
         await model.Load();
         lib.OnSetWeb = on => lib.Access! with
         {
-            Web = new WebReach(false, "Study Stash", null,
+            Web = new WebReach(false, "Egghead Notes", null,
                 "Your tailnet doesn't allow Funnel yet. Open the page below, allow it for this computer, then turn this on again.",
                 "https://login.tailscale.com/f/funnel?node=abc", null, null, null, true),
         };
@@ -1749,7 +1749,7 @@ public class AiAccessModelTests
         await model.Load();
         lib.OnSetWeb = on => lib.Access! with
         {
-            Web = new WebReach(false, "Study Stash", null,
+            Web = new WebReach(false, "Egghead Notes", null,
                 "Tailscale isn't on the library's computer. Install it from tailscale.com/download and sign in.",
                 "https://tailscale.com/download", null, null, null, true),
         };
@@ -1814,7 +1814,7 @@ public class AiAccessModelTests
         lib.OnSetWeb = on => lib.Access = lib.Access! with
         {
             PublicUrl = "https://mini.tail1234.ts.net",
-            Web = new WebReach(true, "Study Stash", "https://mini.tail1234.ts.net/mcp", null, null, false, "The internet can't find mini.tail1234.ts.net yet. Funnel can take a minute to start.", null, true),
+            Web = new WebReach(true, "Egghead Notes", "https://mini.tail1234.ts.net/mcp", null, null, false, "The internet can't find mini.tail1234.ts.net yet. Funnel can take a minute to start.", null, true),
         };
         lib.OnCheckWeb = () =>
         {
@@ -1844,7 +1844,7 @@ public class AiAccessModelTests
         lib.OnSetWeb = on => lib.Access = lib.Access! with
         {
             PublicUrl = "https://mini.tail1234.ts.net",
-            Web = new WebReach(true, "Study Stash", "https://mini.tail1234.ts.net/mcp", null, null, false, "The internet can't find mini.tail1234.ts.net yet. Funnel can take a minute to start.", null, true),
+            Web = new WebReach(true, "Egghead Notes", "https://mini.tail1234.ts.net/mcp", null, null, false, "The internet can't find mini.tail1234.ts.net yet. Funnel can take a minute to start.", null, true),
         };
         lib.OnCheckWeb = () => lib.Access;
         model.Delay = _ => Task.CompletedTask;

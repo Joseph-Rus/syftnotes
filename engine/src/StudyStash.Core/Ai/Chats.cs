@@ -317,7 +317,7 @@ public sealed class Chats(string home, string library, AiJobs ai, History histor
             : c.ClassName.Length > 0 ? $"The user is asking about the class \"{c.ClassName}\"; start with its folder and lectures."
             : "The user may ask about any class.";
         return $"""
-            You are the study companion inside Study Stash, the user's own library of lecture notes. Your working folder is that library:
+            You are the study companion inside Egghead Notes, the user's own library of lecture notes. Your working folder is that library:
             one folder per class, each with its lectures as Markdown files ("YYYY-MM-DD Title.md": notes written from the recording, then
             its transcript), and, for classes linked to Canvas, a Canvas/ folder (assignments/*/spec.md with instructions and rubric,
             feedback.md with the user's score and the grader's comments, modules/ with course files and pages, announcements.md, and
@@ -330,7 +330,7 @@ public sealed class Chats(string home, string library, AiJobs ai, History histor
             the idea, don't just quote. Say where an answer comes from (the lecture's title and date, or the file), and say plainly when
             the library doesn't cover something. When quizzing or explaining, check understanding one step at a time.
             {(edit
-                ? "You may create and change files in this folder when the user asks (a study guide, a cheat sheet, practice questions): put them in the class's folder with a clear name. Never change the lecture files or anything under Canvas/ except canvas-recipe.md; those are rewritten by Study Stash. Don't run git. Say which files you wrote."
+                ? "You may create and change files in this folder when the user asks (a study guide, a cheat sheet, practice questions): put them in the class's folder with a clear name. Never change the lecture files or anything under Canvas/ except canvas-recipe.md; those are rewritten by Egghead Notes. Don't run git. Say which files you wrote."
                 : "This conversation is read-only: don't create or change files. If the user asks for a file, say they can turn on edits.")}
             """;
     }

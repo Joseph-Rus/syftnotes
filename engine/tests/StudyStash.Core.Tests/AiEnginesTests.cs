@@ -14,7 +14,7 @@ public class AiEnginesTests
     public void Engines_come_in_the_designs_order_with_their_own_names()
     {
         Assert.Equal(["ollama", "claude", "codex", "gemini"], Engines.Order);
-        // Each AI by the name the person using Study Stash knows; the tool it's reached through is a separate thing.
+        // Each AI by the name the person using Egghead Notes knows; the tool it's reached through is a separate thing.
         Assert.Equal(["Ollama", "Claude", "ChatGPT", "Gemini"], Engines.Order.Select(Engines.Name));
         Assert.Equal(["Ollama", "Claude Code", "Codex", "Antigravity CLI"], Engines.Order.Select(Engines.Tool));
     }

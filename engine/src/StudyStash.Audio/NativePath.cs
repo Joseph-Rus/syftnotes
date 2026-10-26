@@ -13,7 +13,7 @@ static class NativePath
         if (!OperatingSystem.IsWindows() || path.All(c => c < 128)) return path;
         var buffer = new StringBuilder(520);
         if (GetShortPathName(path, buffer, buffer.Capacity) > 0 && buffer.ToString().All(c => c < 128)) return buffer.ToString();
-        throw new IOException($"Study Stash can't open the model in {path}: the folder's name has letters Windows can't pass on. Move Study Stash's folder to one with a plain name.");
+        throw new IOException($"Egghead Notes can't open the model in {path}: the folder's name has letters Windows can't pass on. Move Egghead Notes' folder to one with a plain name.");
     }
 
     [DllImport("kernel32", CharSet = CharSet.Unicode, EntryPoint = "GetShortPathNameW")]

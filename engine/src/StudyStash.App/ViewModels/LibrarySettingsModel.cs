@@ -58,7 +58,7 @@ public sealed class SettingChoice(string id, string label, Action<string> pick)
 }
 
 /// <summary>Whether the library's settings can be shown: still asking, here, no library yet, can't reach it, or it
-/// runs an older Study Stash without these routes.</summary>
+/// runs an older Egghead Notes without these routes.</summary>
 public enum LibrarySettingsState
 {
     Loading,
@@ -141,7 +141,7 @@ public sealed partial class LibrarySettingsModel : ObservableObject
     {
         LibrarySettingsState.NoLibrary => "There's no library yet. Connect to one in Connection, and its settings show here.",
         LibrarySettingsState.Unreachable => "Can't reach your library right now. Is its computer on, and Tailscale connected?",
-        LibrarySettingsState.Older => "Your library runs an older Study Stash. Update it to change its settings here; until then its own page has them.",
+        LibrarySettingsState.Older => "Your library runs an older Egghead Notes. Update it to change its settings here; until then its own page has them.",
         _ => "",
     };
 
@@ -171,7 +171,7 @@ public sealed partial class LibrarySettingsModel : ObservableObject
 
     /// <summary>A library on this computer is the app's own: the switch updates both, and never mid-lecture. A laptop's
     /// own switch is in General, and says so, so this one is taken for the library's.</summary>
-    public string AutoUpdateSub => IsHere ? "Study Stash installs each new version by itself, never while you're recording"
+    public string AutoUpdateSub => IsHere ? "Egghead Notes installs each new version by itself, never while you're recording"
         : "The library's computer installs each new version by itself. This laptop has its own switch in General.";
     /// <summary>On a laptop, these are the library's updates (General has this laptop's own).</summary>
     public string UpdatesHeading => IsHere ? "Updates" : "Library updates";
@@ -202,7 +202,7 @@ public sealed partial class LibrarySettingsModel : ObservableObject
     }
     public string StartAtLoginTitle => IsHere ? $"Start the library when this {Device} starts" : "Start when the library's computer starts";
     public string StartAtLoginSub => StartsAtLogin is null
-        ? "The library runs without the Study Stash app there, so this is set on that computer."
+        ? "The library runs without the Egghead Notes app there, so this is set on that computer."
         : OnlyThisComputer ? $"So your notes get written whenever this {Device} is on. Off until you turn it on."
         : "So your laptop can always reach it. Off until you turn it on.";
     static string Device => OperatingSystem.IsWindows() ? "PC" : "Mac";
@@ -419,7 +419,7 @@ public sealed partial class LibrarySettingsModel : ObservableObject
             Version = Str(u?["version"]);
             bool newer = Flag(u?["newer"]);
             CanUpdateNow = newer && Flag(u?["can_update"]);
-            UpdateLine = newer ? $"Version {Str(u?["latest"]).TrimStart('v')} is out. The library has {Version}." : IsHere ? $"Study Stash {Version}, the newest." : $"Your library has Study Stash {Version}, the newest.";
+            UpdateLine = newer ? $"Version {Str(u?["latest"]).TrimStart('v')} is out. The library has {Version}." : IsHere ? $"Egghead Notes {Version}, the newest." : $"Your library has Egghead Notes {Version}, the newest.";
             AutoUpdate = Flag(u?["auto"]) && (!IsHere || AppAutoUpdate?.Invoke() != false);
 
             int i = 0;
@@ -605,7 +605,7 @@ public sealed partial class LibrarySettingsModel : ObservableObject
             AddingLaptop = false;
             LaptopPassword = "";
             PasswordChanged?.Invoke(password);
-            LaptopSay = "Laptops can connect now. On your laptop, install Study Stash, and in its setup open Advanced and choose “My laptop for class”. Then enter one of the addresses below and this password.";
+            LaptopSay = "Laptops can connect now. On your laptop, install Egghead Notes, and in its setup open Advanced and choose “My laptop for class”. Then enter one of the addresses below and this password.";
         }
     }
 
@@ -772,7 +772,7 @@ public sealed partial class LibrarySettingsModel : ObservableObject
             var r = await call(HttpMethod.Post, "/course-names", new JsonObject());
             if (r is null)
             {
-                Say = "Your library runs an older Study Stash: update it to use Canvas course names.";
+                Say = "Your library runs an older Egghead Notes: update it to use Canvas course names.";
                 return;
             }
             var renamed = (r["renamed"] as JsonArray ?? []).OfType<JsonObject>().Select(x => (Str(x["from"]), Str(x["to"]))).ToList();

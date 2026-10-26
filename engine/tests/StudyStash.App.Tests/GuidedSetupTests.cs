@@ -100,7 +100,7 @@ public sealed class GuidedSetupTests
             foreach (var m in WhisperModels.All) Models.Hold.Add(m.File);
             Host = new AppHost(Home.Path, mic ?? (() => throw new InvalidOperationException("no microphone in this test")), log: _ => { }, loginItems: Login,
                 models: new ModelSetting(null, Mirror: "https://mirror.example/models"), http: new HttpClient(Models));
-            Setup = Services.Setup.Make(Host, role, here: new LibraryHere { Command = [BuiltEngine()], Folder = Home["Study Stash"] });
+            Setup = Services.Setup.Make(Host, role, here: new LibraryHere { Command = [BuiltEngine()], Folder = Home["Egghead Notes"] });
             Setup.Again = again;
             var services = new GuidedServices
             {
@@ -261,8 +261,8 @@ public sealed class GuidedSetupTests
         rig.Setup.MicAllowed = true;
         rig.Setup.MicHeard = true;
         Assert.Equal(ChecklistState.Done, rig.Item("microphone").State);
-        Assert.Contains(g.Thread.OfType<NoteEntry>(), n => n.Text == "Microphone allowed · Study Stash hears you");
-        Assert.Equal("Study Stash hears you", mic.Outcome);
+        Assert.Contains(g.Thread.OfType<NoteEntry>(), n => n.Text == "Microphone allowed · Egghead Notes hears you");
+        Assert.Equal("Egghead Notes hears you", mic.Outcome);
         Assert.False(rig.Setup.MicCheckOpen);
     }
 
@@ -275,19 +275,19 @@ public sealed class GuidedSetupTests
         string words = GuidedSetupModel.PickLede + GuidedSetupModel.ClaudeLine + GuidedSetupModel.CodexLine + GuidedSetupModel.GeminiLine + g.FreeLine;
         foreach (string tool in new[] { "Claude Code", "Codex", "Antigravity" }) Assert.DoesNotContain(tool, words);
         // The free AI that runs on the computer is named once, as what it is: Ollama, and advanced; so is an API key.
-        // Without a plan the plain way is no AI at all, and Study Stash still records and transcribes.
+        // Without a plan the plain way is no AI at all, and Egghead Notes still records and transcribes.
         Assert.DoesNotContain("Ollama", words.Replace(g.FreeLine, ""));
-        Assert.Equal($"That's fine: Study Stash still records and transcribes. Advanced: a free AI on this {g.Device} (Ollama), or an API key.", g.FreeLine);
+        Assert.Equal($"That's fine: Egghead Notes still records and transcribes. Advanced: a free AI on this {g.Device} (Ollama), or an API key.", g.FreeLine);
         g.Picked = "";
         Assert.False(g.CanContinue);
         // Nothing picked yet, the steps name no AI.
-        Assert.Equal(["Pick your AI", "Get your AI ready", "Sign in", "Set up Study Stash"], g.Steps.Select(s => s.Title));
+        Assert.Equal(["Pick your AI", "Get your AI ready", "Sign in", "Set up Egghead Notes"], g.Steps.Select(s => s.Title));
         g.PickCommand.Execute("claude");
-        Assert.Equal(["Pick your AI", "Get Claude ready", "Sign in to Claude", "Set up Study Stash"], g.Steps.Select(s => s.Title));
+        Assert.Equal(["Pick your AI", "Get Claude ready", "Sign in to Claude", "Set up Egghead Notes"], g.Steps.Select(s => s.Title));
         // Gemini gets ready and signs in the same way, its own mark beside it.
         g.PickCommand.Execute("gemini");
         Assert.False(g.PickedByHand);
-        Assert.Equal(["Pick your AI", "Get Gemini ready", "Sign in to Gemini", "Set up Study Stash"], g.Steps.Select(s => s.Title));
+        Assert.Equal(["Pick your AI", "Get Gemini ready", "Sign in to Gemini", "Set up Egghead Notes"], g.Steps.Select(s => s.Title));
         Assert.Equal("brand:gemini", g.BrandGlyph);
 
         // "I don't have a paid plan" is an answer like the others: nothing to install or sign in to here, and Continue
@@ -295,7 +295,7 @@ public sealed class GuidedSetupTests
         g.PickCommand.Execute("free");
         Assert.True(g.PickedByHand);
         Assert.True(g.CanContinue);
-        Assert.Equal(["Pick your AI", "Set up Study Stash"], g.Steps.Select(s => s.Title));
+        Assert.Equal(["Pick your AI", "Set up Egghead Notes"], g.Steps.Select(s => s.Title));
         await g.ContinueCommand.ExecuteAsync(null);
         Assert.Equal(GuidedScreen.Manual, g.Screen);
         Assert.True(g.PreferOllama);
@@ -388,7 +388,7 @@ public sealed class GuidedSetupTests
 
     /// <summary>
     /// Gemini the guided way: "Get Gemini ready" installs Google's Antigravity CLI with one button, "Sign in to Gemini"
-    /// runs its own sign-in in Study Stash's own home for it (the browser opens on Google's page), and the check after
+    /// runs its own sign-in in Egghead Notes' own home for it (the browser opens on Google's page), and the check after
     /// says in plain words how much of the account's allowance is left; then the chat, on Gemini.
     /// </summary>
     [AvaloniaFact]
@@ -416,7 +416,7 @@ public sealed class GuidedSetupTests
         await Until(() => g.AiReady, "Gemini signed in and its allowance checked");
         Assert.Equal("About 80% of this week's Gemini allowance is left.", g.AllowanceWords);
         Assert.True(g.HasAllowance);
-        // The sign-in ran in Study Stash's own home for agy, never the student's own.
+        // The sign-in ran in Egghead Notes' own home for agy, never the student's own.
         Assert.Equal(Antigravity.Home(), File.ReadAllText(Path.Combine(rig.Bin, "usage-home.txt")).Trim());
 
         await g.ContinueCommand.ExecuteAsync(null);
@@ -479,7 +479,7 @@ public sealed class GuidedSetupTests
         rig.InstallMode = "offline";
         await g.InstallCommand.ExecuteAsync(null);
         Assert.Equal(InstallFailure.Offline, g.InstallFailure);
-        Assert.Equal("Study Stash couldn't reach chatgpt.com. Check your internet connection, then try again.", g.InstallProblem);
+        Assert.Equal("Egghead Notes couldn't reach chatgpt.com. Check your internet connection, then try again.", g.InstallProblem);
         Assert.False(g.CanContinue);
 
         rig.InstallMode = "ok";
@@ -492,7 +492,7 @@ public sealed class GuidedSetupTests
         await g.OpenSignInCommand.ExecuteAsync(null);
         Assert.Equal(ChatProblem.Plan, g.PlanProblem);
         Assert.Equal("This ChatGPT account is on a plan that other apps can't use", g.PlanProblemTitle);
-        Assert.Equal("Study Stash needs ChatGPT Plus or higher. Without one, it still records and transcribes your lectures. Have an API key? Carry on, and add it on the notes step.", g.PlanProblemText);
+        Assert.Equal("Egghead Notes needs ChatGPT Plus or higher. Without one, it still records and transcribes your lectures. Have an API key? Carry on, and add it on the notes step.", g.PlanProblemText);
         Assert.False(g.AiReady);
         g.OpenPlansCommand.Execute("");
         Assert.Equal(["https://chatgpt.com/pricing"], rig.Opened);
@@ -525,14 +525,14 @@ public sealed class GuidedSetupTests
         var g = rig.Guided;
         await Until(() => g.HasChatProblem, "the guard");
         Assert.Equal(ChatProblem.Guard, g.ChatProblemKind);
-        Assert.Equal("Study Stash stopped Claude: it tried to use a tool it isn't allowed here.", g.ChatProblemText);
+        Assert.Equal("Egghead Notes stopped Claude: it tried to use a tool it isn't allowed here.", g.ChatProblemText);
     }
 
     [AvaloniaFact]
     public async Task Not_now_to_start_at_login_leaves_it_off_though_setup_has_its_box_ticked_because_it_already_did()
     {
         await using var rig = new Rig(role: AppRole.Both);
-        rig.Setup.StartAtLogin = true; // what setup does when Study Stash already starts at login
+        rig.Setup.StartAtLogin = true; // what setup does when Egghead Notes already starts at login
         rig.Guided.Skip("start_at_login");
         Assert.False(rig.Setup.StartAtLogin);
         Assert.Equal(ChecklistState.Skipped, rig.Item("start_at_login").State);
@@ -561,8 +561,8 @@ public sealed class GuidedSetupTests
         // ChatGPT asked it, then went on: its first sentence is there already.
         Assert.Null(GuidedSetupModel.QuestionToAdd("What classes are you taking this term? You can name them one at a time and briefly say what each covers.",
             "What classes are you taking this term? You can name them one at a time, and say what each covers."));
-        Assert.Equal("Press Open Study Stash when you're ready.\nYour library: ready",
-            GuidedSetupModel.PlainWords("Press **Open Study Stash** when you're ready.\n## Your library: `ready`"));
+        Assert.Equal("Press Open Egghead Notes when you're ready.\nYour library: ready",
+            GuidedSetupModel.PlainWords("Press **Open Egghead Notes** when you're ready.\n## Your library: `ready`"));
     }
 
     // --- the checklist, on its own ------------------------------------------------------------------------------------

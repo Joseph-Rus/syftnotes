@@ -7,7 +7,8 @@ import { href } from '../router';
 import { renderMath } from '../ui/math';
 import { scrollTables } from '../ui/tables';
 import { Checklist, Paperclip, Sparkle } from '../ui/icons';
-import { Dot, IconButton, Problem, Row, Screen, Section, SkeletonRows } from '../ui/kit';
+import { Doodle } from '../ui/Doodle';
+import { Dot, Empty, IconButton, Problem, Row, Screen, Section, SkeletonRows } from '../ui/kit';
 import { AttachmentRow } from './attachments';
 import { useClassColors } from './classColors';
 
@@ -39,7 +40,8 @@ export function LectureScreen({ api, id }: { api: Api; id: string }) {
   return (
     <Screen
       title={l?.title || notes.data?.title || 'Lecture'}
-      quiet back={{ label: cls || 'Library', to: backTo }}
+      quiet
+      back={{ label: cls || 'Library', to: backTo }}
       onRefresh={refresh}
       actions={
         <>
@@ -53,7 +55,14 @@ export function LectureScreen({ api, id }: { api: Api; id: string }) {
       }
     >
       {lecture.error && !l ? (
-        <Problem message={lecture.error.status === 404 ? "This lecture isn't in your library any more." : "Couldn't load this lecture."} onRetry={refresh} />
+        <Problem
+          message={
+            lecture.error.status === 404
+              ? "This lecture isn't in your library any more."
+              : "Couldn't load this lecture."
+          }
+          onRetry={refresh}
+        />
       ) : !l ? (
         <SkeletonRows count={3} />
       ) : (
@@ -105,8 +114,20 @@ function NoNotes({ lecture }: { lecture: Lecture }) {
           ? // Filed without notes, and the library says why (its AI needs signing in again, say).
             `${lecture.error.trim()}${/[.!?]$/.test(lecture.error.trim()) ? '' : '.'}${below}`
           : lecture.summary
-          ? lecture.summary
-          : `No notes were written for this lecture.${below}`;
+            ? lecture.summary
+            : `No notes were written for this lecture.${below}`;
+  const writing = !lecture.no_notes_why && (lecture.status === 'queued' || lecture.status === 'working');
+  if (writing || lecture.status === 'failed')
+    return (
+      <div class="section">
+        <Empty
+          icon={<Doodle name={writing ? 'writing' : 'cracked'} busy={writing} />}
+          title={writing ? 'Writing your notes' : "Notes didn't happen"}
+        >
+          {words}
+        </Empty>
+      </div>
+    );
   return (
     <div class="section">
       <div class="callout">
@@ -141,7 +162,12 @@ function Transcript({ text, open: startOpen }: { text: string; open: boolean }) 
           )}
         </div>
       ) : (
-        <Row title="Show the transcript" detail={plain ? undefined : `${lines.length} lines`} onClick={() => setOpen(true)} chevron />
+        <Row
+          title="Show the transcript"
+          detail={plain ? undefined : `${lines.length} lines`}
+          onClick={() => setOpen(true)}
+          chevron
+        />
       )}
     </Section>
   );
@@ -150,11 +176,19 @@ function Transcript({ text, open: startOpen }: { text: string; open: boolean }) 
 function Attachments({ id, files, loading }: { id: string; files: Attachment[] | undefined; loading: boolean }) {
   if (loading && !files) return null;
   return (
-    <Section title="Attachments" footer={files && files.length > 0 ? undefined : 'Handwritten notes, slides or photos from this lecture.'}>
+    <Section
+      title="Attachments"
+      footer={files && files.length > 0 ? undefined : 'Handwritten notes, slides or photos from this lecture.'}
+    >
       {(files ?? []).map((a) => (
         <AttachmentRow key={a.id} attachment={a} url={undefined} />
       ))}
-      <Row href={href({ name: 'upload', class: null, lecture: id })} lead={<Paperclip size={20} />} title={files && files.length > 0 ? 'Add more files' : 'Add files'} chevron />
+      <Row
+        href={href({ name: 'upload', class: null, lecture: id })}
+        lead={<Paperclip size={20} />}
+        title={files && files.length > 0 ? 'Add more files' : 'Add files'}
+        chevron
+      />
     </Section>
   );
 }

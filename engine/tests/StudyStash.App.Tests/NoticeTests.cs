@@ -9,7 +9,7 @@ public class NoticeTests
     static readonly DateTime T0 = new(2026, 9, 28, 10, 0, 0, DateTimeKind.Utc);
     static DateTime At(double seconds) => T0.AddSeconds(seconds);
 
-    static Notice Plain(string title = "Recording saved", string text = "Study Stash is writing it down.") => new() { Title = title, Text = text };
+    static Notice Plain(string title = "Recording saved", string text = "Egghead Notes is writing it down.") => new() { Title = title, Text = text };
 
     [Fact]
     public void Without_a_button_it_goes_after_six_seconds_and_with_one_after_ten()

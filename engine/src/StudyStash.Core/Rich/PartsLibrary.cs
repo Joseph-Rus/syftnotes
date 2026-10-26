@@ -207,15 +207,15 @@ public sealed partial class PartsLibrary
     static string Describe(PartsLibrary library)
     {
         var credits = library.Credits();
-        var named = credits.Where(c => (c.Licence.StartsWith("CC BY", StringComparison.Ordinal) || c.Licence is "MIT" or "BSD") && !c.Credit.StartsWith("Study Stash", StringComparison.Ordinal))
+        var named = credits.Where(c => (c.Licence.StartsWith("CC BY", StringComparison.Ordinal) || c.Licence is "MIT" or "BSD") && !c.Credit.StartsWith("Egghead Notes", StringComparison.Ordinal))
             .Select(c => c.Credit).Distinct().ToList();
         int free = credits.Where(c => c.Licence is "CC0 1.0" or "Public domain").Sum(c => c.Parts);
-        int own = credits.Where(c => c.Credit.StartsWith("Study Stash", StringComparison.Ordinal)).Sum(c => c.Parts);
+        int own = credits.Where(c => c.Credit.StartsWith("Egghead Notes", StringComparison.Ordinal)).Sum(c => c.Parts);
         var sb = new System.Text.StringBuilder();
         sb.Append(string.Join("; ", named));
         if (free > 0) sb.Append($"; {free} public-domain and CC0 parts from Bioicons' artists and Wikimedia Commons");
-        if (own > 0) sb.Append($"; {own} of Study Stash's own");
-        sb.Append(". Recoloured and simplified; every part and its licence is listed in docs/parts-credits.md in Study Stash's repository.");
+        if (own > 0) sb.Append($"; {own} of Egghead Notes' own");
+        sb.Append(". Recoloured and simplified; every part and its licence is listed in docs/parts-credits.md in Egghead Notes' repository.");
         return sb.ToString();
     }
 

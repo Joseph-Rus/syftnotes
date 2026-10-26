@@ -1,6 +1,6 @@
-# Builds Study Stash for Windows: a self-contained publish for x64 and arm64 (so it needs no .NET install),
+# Builds Egghead Notes for Windows: a self-contained publish for x64 and arm64 (so it needs no .NET install),
 # pruned to the runtime each processor needs, and, when Inno Setup 6 is installed, the one download,
-# Study-Stash-Setup.exe. The app has no role of its own: setup asks what the computer is for.
+# Egghead-Notes-Setup.exe. The app has no role of its own: setup asks what the computer is for.
 #   powershell -File windows\build.ps1 [-Out dist\windows]
 # Needs the .NET SDK, and Inno Setup 6 for the installers (skipped, with a note, when it's missing:
 # choco install innosetup). What this makes is not signed, so a downloaded Setup.exe gets Windows' SmartScreen

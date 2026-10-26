@@ -3,7 +3,7 @@ using Avalonia.Input;
 namespace StudyStash.App.Platform;
 
 /// <summary>What a shortcut Settings lets the student change does. <see cref="Quick"/> and <see cref="Record"/> work
-/// from any app; <see cref="Ask"/> works in the search panel and <see cref="Settings"/> in any Study Stash window.</summary>
+/// from any app; <see cref="Ask"/> works in the search panel and <see cref="Settings"/> in any Egghead Notes window.</summary>
 public enum KeyAction
 {
     Quick,
@@ -196,7 +196,7 @@ public static class Keybindings
 
     public static string Show(KeyAction action, bool mac) => Of(action, Saved(), mac).Show(mac);
 
-    /// <summary>Works from any app (registered with the system), not just in Study Stash's windows.</summary>
+    /// <summary>Works from any app (registered with the system), not just in Egghead Notes' windows.</summary>
     public static bool IsGlobal(KeyAction action) => action is KeyAction.Quick or KeyAction.Record;
 
     public static string Name(KeyAction action) => action switch

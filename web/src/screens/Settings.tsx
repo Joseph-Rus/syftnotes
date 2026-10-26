@@ -33,7 +33,7 @@ export function SettingsScreen({ api, onRemoved }: { api: Api; onRemoved: () => 
   return (
     <Screen title="Settings" large>
       <Section title="Library">
-        <Row title={me.data?.library.name ?? '…'} subtitle={me.data ? `Study Stash ${me.data.library.version}` : undefined} />
+        <Row title={me.data?.library.name ?? '…'} subtitle={me.data ? `Egghead Notes ${me.data.library.version}` : undefined} />
       </Section>
 
       <Section title="Look">
@@ -70,7 +70,7 @@ export function SettingsScreen({ api, onRemoved }: { api: Api; onRemoved: () => 
 
       <Section
         title="This phone"
-        footer={device ? `Paired ${ago(device.added)}. Add another phone from Study Stash's Settings → Phone on your computer.` : undefined}
+        footer={device ? `Paired ${ago(device.added)}. Add another phone from Egghead Notes' Settings → Phone on your computer.` : undefined}
       >
         <Row title={device?.name ?? 'This phone'} subtitle={device ? 'Reads your library until it’s removed' : undefined} />
         {device ? (

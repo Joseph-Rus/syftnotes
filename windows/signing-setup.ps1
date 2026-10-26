@@ -14,7 +14,7 @@ function Add-Env([string]$Name, [string]$Value) {
 
 if ($SelfSigned) {
   New-Item -ItemType Directory -Force -Path $Work | Out-Null
-  $cert = New-SelfSignedCertificate -Type CodeSigningCert -Subject "CN=Study Stash rehearsal (self-signed, not a real signature)" `
+  $cert = New-SelfSignedCertificate -Type CodeSigningCert -Subject "CN=Egghead Notes rehearsal (self-signed, not a real signature)" `
     -KeyAlgorithm RSA -KeyLength 3072 -HashAlgorithm SHA256 -KeyExportPolicy Exportable -NotAfter (Get-Date).AddDays(2) `
     -CertStoreLocation Cert:\CurrentUser\My
   $password = [Guid]::NewGuid().ToString("N") + "aA1!"

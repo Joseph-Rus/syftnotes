@@ -10,7 +10,7 @@ namespace StudyStash.Core.Ai;
 /// <summary>
 /// One piece of work for an AI: what to ask, the folder it works in, and what it may do there. A job with
 /// <see cref="Tools"/> off and <see cref="Write"/> off just answers (notes, sorting, Ask); with them on, the AI
-/// works like an agent: it reads the library and any folders it's given, uses Study Stash's MCP tools (Canvas),
+/// works like an agent: it reads the library and any folders it's given, uses Egghead Notes' MCP tools (Canvas),
 /// and with <see cref="Write"/> may change files in <see cref="Cwd"/>.
 /// </summary>
 public sealed record AiRequest(string Prompt, string Cwd)
@@ -28,7 +28,7 @@ public sealed record AiRequest(string Prompt, string Cwd)
     /// (<see cref="ClaudeProvider.FastSettings"/>). Only Claude Code has one; every other provider ignores it.</summary>
     public bool Fast { get; init; }
     public bool Tools { get; init; }
-    /// <summary>The command that starts Study Stash's MCP server (the engine itself, told `mcp`).</summary>
+    /// <summary>The command that starts Egghead Notes' MCP server (the engine itself, told `mcp`).</summary>
     public IReadOnlyList<string> McpCommand { get; init; } = [];
     /// <summary>Carries on a conversation this provider started (its own id for it).</summary>
     public string Session { get; init; } = "";
@@ -53,7 +53,7 @@ public sealed record AiResult(bool Ok, string Text, string Session, IReadOnlyLis
 /// <summary>
 /// One AI a person may pick. Each provider is its own command-line agent, signed in with the person's own account
 /// and plan (Claude Code, OpenAI's Codex for ChatGPT, Google's Antigravity for Gemini), or Ollama on this computer.
-/// Study Stash never holds their keys.
+/// Egghead Notes never holds their keys.
 /// </summary>
 public abstract class AiProvider
 {
@@ -154,7 +154,7 @@ public abstract class AiProvider
 
     /// <summary>Where these commands usually live: a background service starts with a short PATH. On Windows also
     /// the PATH as Windows has it now: an engine (or Node.js, which npm's claude.cmd and codex.cmd run on) installed
-    /// while Study Stash was running isn't on the PATH it started with, and "Check again" in setup should find it.
+    /// while Egghead Notes was running isn't on the PATH it started with, and "Check again" in setup should find it.
     /// Codex's own Windows installer puts it in %LOCALAPPDATA%\Programs\OpenAI\Codex\bin, Antigravity's in
     /// %LOCALAPPDATA%\agy\bin. Last of all, the copies the
     /// ChatGPT and Claude desktop apps carry (<see cref="DesktopAppDirs"/>): one installed on its own comes first.</summary>
@@ -389,7 +389,7 @@ public sealed class ClaudeProvider : AiProvider
 
     /// <summary>How long a run waits before it's tried again when Claude Code stopped because another of its processes
     /// was renewing the sign-in (<see cref="Engines.LooksLikeRefreshBusy"/>), up to <see cref="RefreshTries"/> tries in
-    /// all, about the minute Anthropic's docs say it takes. Study Stash starts several at once (notes, diagrams, Ask,
+    /// all, about the minute Anthropic's docs say it takes. Egghead Notes starts several at once (notes, diagrams, Ask,
     /// beside the student's own), and one it stopped halfway can leave the renewal locked for a while: without this the
     /// lecture said "Claude needs you to sign in again" when it didn't. The tests make it short.</summary>
     public TimeSpan RefreshWait { get; init; } = TimeSpan.FromSeconds(30);
@@ -725,8 +725,8 @@ public class CodexProvider : AiProvider
 }
 
 /// <summary>Gemini, through Google's Antigravity CLI (<c>agy -p</c>), which took over from Gemini CLI for
-/// personal Google accounts, in a home of Study Stash's own (<see cref="Antigravity.Home"/>): the student's own agy
-/// settings, MCP servers, plugins and skills don't run in the library's work, and Study Stash never changes theirs. The
+/// personal Google accounts, in a home of Egghead Notes' own (<see cref="Antigravity.Home"/>): the student's own agy
+/// settings, MCP servers, plugins and skills don't run in the library's work, and Egghead Notes never changes theirs. The
 /// sign-in is kept in that home too: the one setup's "Sign in to Gemini" made.</summary>
 public sealed class GeminiProvider : AiProvider
 {
@@ -738,7 +738,7 @@ public sealed class GeminiProvider : AiProvider
         [("", "Antigravity's default model"), ("gemini-3.8-flash-medium", "Gemini 3.8 Flash: fast"), ("gemini-3.1-pro-high", "Gemini 3.1 Pro: strongest")];
 
     /// <summary>
-    /// Agent work runs as Study Stash's library agent (<see cref="Antigravity.LibraryAgent"/>), which declares the
+    /// Agent work runs as Egghead Notes' library agent (<see cref="Antigravity.LibraryAgent"/>), which declares the
     /// library's MCP server itself (<paramref name="mcp"/>), so it never sits in the home's global config, where it would
     /// start in the setup chat's sessions too. In print mode agy can't ask before running a command or opening a file, so
     /// it refuses them and ends with an empty answer; allow the commands that only read (ls, cat, grep…), reading the
@@ -751,14 +751,14 @@ public sealed class GeminiProvider : AiProvider
         AllowReading(Antigravity.SettingsPath(Antigravity.Home()), folders, create: true);
     }
 
-    /// <summary>agy's home of Study Stash's own.</summary>
+    /// <summary>agy's home of Egghead Notes' own.</summary>
     protected override IReadOnlyDictionary<string, string> Env(AiRequest req) => Antigravity.HomeEnv();
 
     public static readonly string[] ReadOnlyCommands = ["ls", "cat", "head", "tail", "grep", "rg", "find", "wc", "pdftotext", "file", "stat"];
 
     /// <summary>Add read-only command rules, and reading each of <paramref name="folders"/> (Antigravity's
     /// <c>read_file(/a/folder)</c>), to Antigravity's settings, keeping everything else in them (made, with
-    /// <paramref name="create"/>, when there are none yet: Study Stash's own home). True when it changed them.</summary>
+    /// <paramref name="create"/>, when there are none yet: Egghead Notes' own home). True when it changed them.</summary>
     public static bool AllowReading(string settingsPath, IEnumerable<string>? folders = null, bool create = false)
     {
         if (!File.Exists(settingsPath) && !create) return false;
@@ -768,7 +768,7 @@ public sealed class GeminiProvider : AiProvider
     }
 
     /// <summary>A plain answer (notes, sorting, the Check: no tools, no files to change, no folders to look at): it runs
-    /// as Study Stash's answer agent, which has no tools to reach for (<see cref="Antigravity.AnswerAgentFile"/>).</summary>
+    /// as Egghead Notes' answer agent, which has no tools to reach for (<see cref="Antigravity.AnswerAgentFile"/>).</summary>
     static bool PlainAnswer(AiRequest req) => !req.Tools && !req.Write && req.ReadDirs.Count == 0;
 
     public override List<string> Command(AiRequest req, bool stream)
@@ -965,7 +965,7 @@ public sealed class OllamaProvider(Func<string> host) : CodexProvider
     }
 }
 
-/// <summary>Every AI Study Stash knows, by id.</summary>
+/// <summary>Every AI Egghead Notes knows, by id.</summary>
 public static class AiProviders
 {
     public static IReadOnlyList<AiProvider> All(Func<string>? ollamaHost = null) =>

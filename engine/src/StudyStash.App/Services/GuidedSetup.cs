@@ -13,7 +13,7 @@ namespace StudyStash.App.Services;
 /// Guided setup's driver: what the setup tools read and show (<see cref="ISetupDriver"/>), over the window's own
 /// <see cref="SetupModel"/> and the app, and what a card's buttons do (<see cref="IGuidedActions"/>), reusing setup by
 /// hand's own steps (<see cref="Setup"/>, <see cref="CanvasConnectModel"/>). Only a press in a card changes the
-/// computer; each press ends with a <c>[Study Stash]</c> note so the AI hears what happened. Every call from the
+/// computer; each press ends with a <c>[Egghead Notes]</c> note so the AI hears what happened. Every call from the
 /// tools runs on the window's thread.
 /// </summary>
 public sealed class GuidedSetup : ISetupDriver, IGuidedActions
@@ -310,7 +310,7 @@ public sealed class GuidedSetup : ISetupDriver, IGuidedActions
                 catch (Exception e) when (e is InvalidOperationException or IOException or UnauthorizedAccessException or System.Security.SecurityException)
                 {
                     host.Log($"[setup] start at login: {e.Message}");
-                    card.Problem = "Study Stash couldn't turn that on. You can try again in Settings → General.";
+                    card.Problem = "Egghead Notes couldn't turn that on. You can try again in Settings → General.";
                     break;
                 }
                 m.StartAtLogin = true;
@@ -437,9 +437,9 @@ public sealed class GuidedSetup : ISetupDriver, IGuidedActions
         {
             case nameof(SetupModel.MicHeard) when m.MicHeard && !micSaid && g.OpenCard is { IsMicrophone: true } mic:
                 micSaid = true;
-                Fold(mic, "Study Stash hears you");
+                Fold(mic, "Egghead Notes hears you");
                 m.MicCheckOpen = false;
-                g.Note("Microphone allowed · Study Stash hears you", "The microphone is allowed and Study Stash hears the student.");
+                g.Note("Microphone allowed · Egghead Notes hears you", "The microphone is allowed and Egghead Notes hears the student.");
                 break;
             case nameof(SetupModel.MicDenied) or nameof(SetupModel.MicTrouble) when m.ShowMicProblem && !deniedSaid && g.OpenCard is { IsMicrophone: true, Open: true }:
                 deniedSaid = true;

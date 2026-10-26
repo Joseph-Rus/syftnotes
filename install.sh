@@ -1,5 +1,5 @@
 #!/bin/sh
-# Study Stash installer (Mac only; on Windows, run install.ps1 instead).
+# Egghead Notes installer (Mac only; on Windows, run install.ps1 instead).
 #     curl -fsSL https://raw.githubusercontent.com/Joseph-Rus/study-stash/main/install.sh | sh
 # The same app for every computer: when it opens, setup asks whether it's just this computer, your laptop or your
 # library. (An old "library" or "laptop" argument is still accepted, and changes nothing.)
@@ -15,17 +15,17 @@
 set -eu
 
 if [ "$(uname -s)" != Darwin ]; then
-  echo "Study Stash runs on a Mac or a Windows PC. On Windows, run install.ps1 instead." >&2
+  echo "Egghead Notes runs on a Mac or a Windows PC. On Windows, run install.ps1 instead." >&2
   exit 1
 fi
 
 # One download for every role: setup asks. A role argument or STUDYSTASH_ROLE from an older line is ignored.
-NAME=Study-Stash.dmg
+NAME=Egghead-Notes.dmg
 SLUG=Joseph-Rus/study-stash
 
 say() { printf '%s\n' "$*"; }
 fail() {
-  say "Study Stash install failed: $*" >&2
+  say "Egghead Notes install failed: $*" >&2
   exit 1
 }
 
@@ -74,7 +74,7 @@ ditto "$WORK/mount/Study Stash.app" "$DEST/Study Stash.app.new" || fail "couldn'
 rm -rf "$DEST/Study Stash.app"
 mv "$DEST/Study Stash.app.new" "$DEST/Study Stash.app"
 
-say "Installed Study Stash in $DEST."
+say "Installed Egghead Notes in $DEST."
 if [ "${STUDYSTASH_NO_OPEN:-}" != 1 ]; then
   open "$DEST/Study Stash.app"
 fi

@@ -6,7 +6,7 @@ using Avalonia.Platform;
 
 namespace StudyStash.App.Controls;
 
-/// <summary>Study Stash's own icon in a view: the cream tile with the navy "S." (Assets/icon.png, drawn by
+/// <summary>Egghead Notes' own icon in a view: the cream tile with the egghead on it (Assets/icon.png, drawn by
 /// macos/make_icon.swift), e.g. at the left of a Windows title bar.</summary>
 public sealed class AppIcon : Image
 {
@@ -20,8 +20,8 @@ public sealed class AppIcon : Image
     }
 }
 
-/// <summary>The monochrome "S." (the menu bar's and the tray's icon) in <see cref="Foreground"/>: for pictures of the
-/// tray or menu bar inside the app, like setup's "Keep Study Stash on the taskbar".</summary>
+/// <summary>The monochrome egghead (the menu bar's and the tray's icon) in <see cref="Foreground"/>: for pictures of the
+/// tray or menu bar inside the app, like setup's "Keep Egghead Notes on the taskbar".</summary>
 public sealed class AppMarkGlyph : Border
 {
     public static readonly StyledProperty<IBrush?> ForegroundProperty = AvaloniaProperty.Register<AppMarkGlyph, IBrush?>(nameof(Foreground));

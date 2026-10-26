@@ -294,7 +294,7 @@ public sealed class FakeAiLibrary : IAiLibrary
         Access = Access with
         {
             PublicUrl = on ? Url : null,
-            Web = new WebReach(on, "Study Stash", on ? Url + "/mcp" : null, null, null, on ? true : null, on ? ReachCheck.Answers : null,
+            Web = new WebReach(on, "Egghead Notes", on ? Url + "/mcp" : null, null, null, on ? true : null, on ? ReachCheck.Answers : null,
                 on ? 1_790_000_000 : null, Access.HasPassword),
         };
         return Task.FromResult<ToolAccessInfo?>(Access);

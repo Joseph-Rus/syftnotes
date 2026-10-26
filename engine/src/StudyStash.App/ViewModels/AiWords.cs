@@ -68,7 +68,7 @@ public static partial class AiWords
         id == "ollama" ? "Runs on your library. Nothing leaves it."
         : Through(id) + (state == "ready" ? "Runs on your library. Signed in." : "Runs on your library.");
 
-    /// <summary>The tool Study Stash reaches an AI through, said once on its row: "Through Claude Code. ".</summary>
+    /// <summary>The tool Egghead Notes reaches an AI through, said once on its row: "Through Claude Code. ".</summary>
     static string Through(string id) => id switch
     {
         "claude" => "Through Claude Code. ",
@@ -121,12 +121,12 @@ public static partial class AiWords
     /// <summary>The library setup step's row subtitle: phrased for the computer you're sitting at, since in setup
     /// the library is this computer.</summary>
     /// <summary>An AI's name where a student chooses one in Settings ("Your AI"): what they'd call it. Claude Code and
-    /// Codex are how Study Stash reaches Claude and ChatGPT, and the free one is Ollama; a student picks the AI, not
+    /// Codex are how Egghead Notes reaches Claude and ChatGPT, and the free one is Ollama; a student picks the AI, not
     /// the tool, and the tool's name is in the row's own line.</summary>
     public static string PlainName(string id, string name) => id switch
     {
         "ollama" => "Ollama (free, advanced)",
-        // By its id too: a library on an older Study Stash still sends the tools' names.
+        // By its id too: a library on an older Egghead Notes still sends the tools' names.
         "claude" => "Claude",
         "codex" => "ChatGPT",
         _ => name,
@@ -163,7 +163,7 @@ public static partial class AiWords
     public static string SetupAbout(string id, string state, string device = "computer", double gb = 0, bool small = false, bool hasKey = false) => id == "ollama"
         ? state switch
         {
-            "not_installed" => $"Free and private (Ollama). Study Stash downloads it for you: {HowBig(gb)}, once.{Simpler(small, device)}",
+            "not_installed" => $"Free and private (Ollama). Egghead Notes downloads it for you: {HowBig(gb)}, once.{Simpler(small, device)}",
             "not_running" => "Free and private (Ollama). It's here, and needs starting.",
             "model_missing" => $"Free and private (Ollama). It's here, and still needs what it writes notes with: {HowBig(gb)}, once.{Simpler(small, device)}",
             _ => $"Free and private (Ollama). It runs on this {device}: nothing you record leaves it.",
@@ -220,7 +220,7 @@ public static partial class AiWords
     public static DateTime? ParseUntil(string iso) =>
         DateTime.TryParse(iso, CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind, out var t) ? t : null;
 
-    public const string OlderLibraryWords = "Your library runs an older Study Stash: update it to choose your AI here.";
+    public const string OlderLibraryWords = "Your library runs an older Egghead Notes: update it to choose your AI here.";
 
     /// <summary>Whether an engine is worth offering to ask or write with: ready, or installed but never checked. A
     /// down/limited/unsignedin/missing-model engine is skipped (not_installed already never reaches the ask menu).</summary>
@@ -281,7 +281,7 @@ public static partial class AiWords
     public const string ReadChat = " · also read the chat above";
 
     /// <summary>Under the first answer from a library too old to keep chats.</summary>
-    public const string NoHistoryOnOlderLibrary = "Your library runs an older Study Stash, so this chat isn't kept and follow-ups start fresh. Update it to keep your chats.";
+    public const string NoHistoryOnOlderLibrary = "Your library runs an older Egghead Notes, so this chat isn't kept and follow-ups start fresh. Update it to keep your chats.";
 
     /// <summary>What a moment in a byline does: "Read the transcript at 01:52".</summary>
     public static string MomentTip(string time) => $"Read the transcript at {time}";
@@ -388,7 +388,7 @@ public static partial class AiWords
     public const string EditOffline = "Your library isn't answering, so nothing was saved. What you typed is still here.";
 
     /// <summary>The library is too old to take an edit.</summary>
-    public const string EditNeedsNewerLibrary = "Your library runs an older Study Stash. Update it to edit notes here.";
+    public const string EditNeedsNewerLibrary = "Your library runs an older Egghead Notes. Update it to edit notes here.";
 
     /// <summary>Why the library wouldn't save an edit, as the editor says it (what was typed stays).</summary>
     public static string EditRefused(int status, string message) => status switch

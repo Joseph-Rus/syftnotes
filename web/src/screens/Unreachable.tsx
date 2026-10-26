@@ -1,4 +1,4 @@
-import { Offline } from '../ui/icons';
+import { Doodle } from '../ui/Doodle';
 import { Button } from '../ui/kit';
 
 /**
@@ -11,12 +11,12 @@ export function Unreachable({ onRetry, outdated = false }: { onRetry: () => void
     <div class="unreachable">
       <div class="empty">
         <div class="empty-icon">
-          <Offline size={48} />
+          <Doodle name={outdated ? 'cracked' : 'sleepy'} />
         </div>
         <h2>{outdated ? "Your library doesn't know phones yet" : "Can't reach your library"}</h2>
         <p>
           {outdated
-            ? 'Update Study Stash on the library computer, then try again.'
+            ? 'Update Egghead Notes on the library computer, then try again.'
             : "Make sure Tailscale is on here and on the library's computer, and that computer is awake."}
         </p>
         <div class="empty-action">

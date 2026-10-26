@@ -11,7 +11,7 @@ public sealed record FileHit(string Root, string Path, string Title, string Snip
 
 /// <summary>
 /// Full-text search over everything in the library that isn't a lecture (the Canvas mirror with its PDFs and
-/// slides, files the AI wrote, your own notes) and the folders Study Stash may read (SQLite FTS5 in files.db,
+/// slides, files the AI wrote, your own notes) and the folders Egghead Notes may read (SQLite FTS5 in files.db,
 /// brought up to date in the background). Markdown, code and notebooks are read as they are; PDFs, Word, PowerPoint
 /// (and RTF on a Mac) by <see cref="DocumentText"/>, handwritten and scanned pages too; photos and scans (png, jpg,
 /// heic) in the library only, so a folder of holiday photos isn't read through. A private folder by file name only.
@@ -36,7 +36,7 @@ public sealed partial class FileIndex
     public int Files { get; private set; }
     public string Last { get; private set; } = "";
 
-    /// <param name="roots">The folders to index: the library first, then the ones Study Stash may read.</param>
+    /// <param name="roots">The folders to index: the library first, then the ones Egghead Notes may read.</param>
     /// <param name="lectures">The lectures' own files (lectures have their own search).</param>
     public FileIndex(string home, Func<IReadOnlyList<(string Name, string Path, bool Private)>> roots, Func<IReadOnlyCollection<string>> lectures)
     {

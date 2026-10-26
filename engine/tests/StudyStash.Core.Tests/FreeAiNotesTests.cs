@@ -7,7 +7,7 @@ namespace StudyStash.Core.Tests;
 
 /// <summary>
 /// Notes from an AI the library doesn't run, end to end through a real library's API: the Claude app (or any app
-/// connected to Study Stash) saving notes with save_notes, and the student pasting what a free chat wrote. Nothing is
+/// connected to Egghead Notes) saving notes with save_notes, and the student pasting what a free chat wrote. Nothing is
 /// ever lost: a lecture's own notes stay unless replacing them is asked for, the ones replaced come back, and what the
 /// student typed during the lecture is in whatever is saved. No real AI here: the notes are what an AI might send.
 /// </summary>
@@ -38,7 +38,7 @@ public class FreeAiNotesTests
         using var store = new Store(cfg.DbPath, cfg.PoolDir);
         Seed(store, notes: "## Summary\nOld notes about cells.", model: "qwen3:8b");
         await using var site = await Site(cfg, store);
-        var app = new RemoteLibrary("http://localhost", "pw", site.Client); // what `Study Stash mcp` reads through
+        var app = new RemoteLibrary("http://localhost", "pw", site.Client); // what `Egghead Notes mcp` reads through
         const string Writer = "Claude (in the Claude app)";
         const string Written = "## Summary\nThe membrane lets water through by osmosis.\n\n## Key points\n- The pump needs energy.";
 
@@ -137,7 +137,7 @@ public class FreeAiNotesTests
 
         // The library itself refuses, whatever the app's server last heard...
         string said = await ClaudeTools.SaveNotesAsync(app, "lec-1", "## Summary\nNotes.", replace: false, "Claude (in the Claude app)");
-        Assert.StartsWith("Nothing was saved: Study Stash's settings don't let AI apps save notes", said);
+        Assert.StartsWith("Nothing was saved: Egghead Notes' settings don't let AI apps save notes", said);
         Assert.Null(store.Get("lec-1")!.SummaryMd);
         // ...and so does the tool, before it asks the library.
         var server = McpServer.Create(new StdioServerTransport("test"), new McpServerOptions { ServerInfo = new Implementation { Name = "test", Version = "1" } });

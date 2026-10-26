@@ -7,7 +7,7 @@ namespace StudyStash.Core.Tests;
 /// <summary>Claude's Canvas tools: due_assignments (grouped and labelled), one assignment's whole story (found by id
 /// or by words of its name), a class's modules/files/announcements, and the deny-list that keeps AI reads off other
 /// people's Canvas data — each exercised through LocalLibrary (in the library itself) and RemoteLibrary (over its
-/// API, the way a laptop's <c>Study Stash mcp</c> reads a library).</summary>
+/// API, the way a laptop's <c>Egghead Notes mcp</c> reads a library).</summary>
 public class CanvasToolsTests
 {
     const string Password = "maple otter";
@@ -69,7 +69,7 @@ public class CanvasToolsTests
         Assert.Contains("Points: 20", local);
         Assert.Contains("Status: Graded · 18/20", local);
         Assert.Contains("Base cases: 5 / 5", local);
-        // On the web, what Study Stash saved is named the way read_file takes it: "<class>/<path in its folder>".
+        // On the web, what Egghead Notes saved is named the way read_file takes it: "<class>/<path in its folder>".
         string web = await ClaudeTools.GetAssignmentAsync(Local(dir, sync), "CS 101", "problem set 4", web: true);
         Assert.Contains("Spec: CS 101/Canvas/", web);
         Assert.DoesNotContain("Spec: Canvas/", web);
@@ -178,7 +178,7 @@ public class CanvasToolsTests
         int labUp = text.IndexOf("Lab 3 is up", StringComparison.Ordinal), welcome = text.IndexOf("Welcome to COMP 101", StringComparison.Ordinal);
         Assert.True(labUp >= 0 && welcome >= 0 && labUp < welcome); // newest first
         Assert.Contains("Lab 3 is up — Dr. Okafor", text);
-        Assert.Contains("(new)", text); // unread on Canvas, never opened in Study Stash
+        Assert.Contains("(new)", text); // unread on Canvas, never opened in Egghead Notes
     }
 
     [Theory]
@@ -212,7 +212,7 @@ public class CanvasToolsTests
         var reading = sync.FetchAsync("/api/v1/courses/4201/users", "json");
         sync.Results(sync.Work(force: false).Jobs.Select(canvas.Answer).ToList());
         var result = await reading;
-        Assert.Equal("Study Stash doesn't read other people's Canvas data.", result["error"]!.GetValue<string>());
+        Assert.Equal("Egghead Notes doesn't read other people's Canvas data.", result["error"]!.GetValue<string>());
         Assert.DoesNotContain("/api/v1/courses/4201/users", canvas.Requested);
     }
 

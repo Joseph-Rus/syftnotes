@@ -1,4 +1,4 @@
-# Signs the Windows app and makes Study-Stash-Setup.exe around it, signed: the exe and dlls the app is made of, then
+# Signs the Windows app and makes Egghead-Notes-Setup.exe around it, signed: the exe and dlls the app is made of, then
 # Setup.exe and the uninstaller it installs (Inno Setup's SignTool, which runs windows\sign.ps1). A step of its own,
 # after windows\build.ps1 -NoInstaller, so that nothing the build runs (npm's packages, the .NET restore) ever sees the
 # signing identity (docs/signing.md).
@@ -46,6 +46,6 @@ if ($LASTEXITCODE -ne 0) {
   if (Test-Path $SignLog) { Write-Host "--- what the sign tool said"; Get-Content $SignLog | Write-Host }
   throw "the signed installer didn't build"
 }
-$Setup = Join-Path $Out "Study-Stash-Setup.exe"
+$Setup = Join-Path $Out "Egghead-Notes-Setup.exe"
 if (-not (Get-AuthenticodeSignature -FilePath $Setup).SignerCertificate) { throw "$Setup isn't signed" }
-Write-Host "Signed Study-Stash-Setup.exe ($Method)."
+Write-Host "Signed Egghead-Notes-Setup.exe ($Method)."

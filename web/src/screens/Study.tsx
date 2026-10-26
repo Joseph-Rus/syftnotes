@@ -2,8 +2,9 @@ import { useEffect, useState } from 'preact/hooks';
 import type { Api } from '../api/client';
 import { ApiError } from '../api/client';
 import { useResource } from '../data/resource';
+import { Doodle } from '../ui/Doodle';
 import { Refresh } from '../ui/icons';
-import { Button, Empty, IconButton, Screen, Segmented, Spinner } from '../ui/kit';
+import { Button, Empty, IconButton, Screen, Segmented } from '../ui/kit';
 
 /** Flashcards and a quiz the library's AI makes from one lecture (as the iPhone app's Study does), kept on the phone. */
 export interface StudyDeck {
@@ -117,11 +118,15 @@ export function StudyScreen({ api, id }: { api: Api; id: string }) {
         </div>
       ) : making || !lecture.data ? (
         <div class="study-making">
-          <Spinner />
+          <Doodle name="writing" size={104} busy />
           <p>Making flashcards and a quiz from your notes…</p>
         </div>
       ) : (
-        <Empty title="Couldn't make them" action={<Button onClick={() => void make()}>Try again</Button>}>
+        <Empty
+          icon={<Doodle name="cracked" />}
+          title="Couldn't make them"
+          action={<Button onClick={() => void make()}>Try again</Button>}
+        >
           {problem ?? ''}
         </Empty>
       )}
@@ -145,6 +150,7 @@ function Cards({ cards }: { cards: StudyDeck['cards'] }) {
   if (!card)
     return (
       <Empty
+        icon={<Doodle name="overeasy" />}
         title={`You went through all ${cards.length}`}
         action={
           <Button

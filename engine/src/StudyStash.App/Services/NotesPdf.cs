@@ -190,7 +190,7 @@ public static class NotesPdf
             using var stream = new SKManagedWStream(output, disposeManagedStream: false);
             using var document = SKDocument.CreatePdf(stream, new SKDocumentPdfMetadata
             {
-                Title = title, Creator = "Study Stash", Producer = "Study Stash", Creation = DateTime.Now, Modified = DateTime.Now,
+                Title = title, Creator = "Egghead Notes", Producer = "Egghead Notes", Creation = DateTime.Now, Modified = DateTime.Now,
             });
             for (int i = 0; i < slices.Count; i++)
             {

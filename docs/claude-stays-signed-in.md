@@ -1,20 +1,20 @@
-# Keeping Claude signed in for Study Stash
+# Keeping Claude signed in for Egghead Notes
 
-Study Stash writes notes and answers Ask by running the student's own Claude Code (`claude -p`), signed in with
+Egghead Notes writes notes and answers Ask by running the student's own Claude Code (`claude -p`), signed in with
 their own Claude plan. When that sign-in stops working, notes and Ask stop until the student signs in again. The
-question was whether `claude setup-token` could keep Claude signed in for Study Stash "no matter what".
+question was whether `claude setup-token` could keep Claude signed in for Egghead Notes "no matter what".
 
 **Short answer.** On the technical side it would work. Anthropic's rules forbid it, though. `setup-token` prints a
 one-year token, and Claude Code runs on it through `CLAUDE_CODE_OAUTH_TOKEN`. But Anthropic's legal page says an app
-like Study Stash "may not collect, store, or intermediate Claude.ai credentials or session tokens". A button that
+like Egghead Notes "may not collect, store, or intermediate Claude.ai credentials or session tokens". A button that
 runs `setup-token` and keeps the token does exactly that. So it isn't built.
 
 What was built instead goes after the failure Joey's library really had, "OAuth session expired and could not be
 refreshed" (see [that section](#oauth-session-expired-and-could-not-be-refreshed)):
 
-- after a quiet spell, Study Stash's Claude runs sign in one at a time, so they don't race each other to renew the
+- after a quiet spell, Egghead Notes' Claude runs sign in one at a time, so they don't race each other to renew the
   sign-in;
-- a run turned away as signed out is tried once more, alone, before Study Stash calls Claude signed out;
+- a run turned away as signed out is tried once more, alone, before Egghead Notes calls Claude signed out;
 - a run that hit another Claude Code renewing the sign-in is tried again a little later.
 
 See [What changed](#what-changed-on-this-branch). The other ways to keep Claude working are listed below.
@@ -22,11 +22,11 @@ See [What changed](#what-changed-on-this-branch). The other ways to keep Claude 
 Checked on 2026-10-24 against Anthropic's docs and Claude Code 2.1.310's own `--help`. Nothing here ran
 `setup-token`, `login` or `logout`, or read a credential.
 
-## What Study Stash does today
+## What Egghead Notes does today
 
 - The student signs in through Claude Code's own `claude auth login`, on Anthropic's own sign-in page. Claude Code
   keeps the sign-in itself: in the Keychain on a Mac, in `.credentials.json` elsewhere
-  ([Credential management](https://code.claude.com/docs/en/authentication#credential-management)). Study Stash
+  ([Credential management](https://code.claude.com/docs/en/authentication#credential-management)). Egghead Notes
   never sees it.
 - When a run fails because Claude needs signing in again (`Engines.LooksSignedOut`):
   - the lecture says so in plain words;
@@ -42,8 +42,8 @@ Checked on 2026-10-24 against Anthropic's docs and Claude Code 2.1.310's own `--
 | What it does | "opens the same browser authorization flow as `/login`, and the token prints to the terminal after you approve access in the browser. It does not save the token anywhere." `--help`: "Set up a long-lived authentication token (requires Claude subscription)", and it has no options. | [Generate a long-lived token](https://code.claude.com/docs/en/authentication#generate-a-long-lived-token), [CLI reference](https://code.claude.com/docs/en/cli-reference) |
 | How long it lasts | "a one-year OAuth token" | same |
 | Which plans | "requires a Pro, Max, Team, or Enterprise plan" | same |
-| What it can do | "It can only make model requests, so it can't establish Remote Control sessions or fetch claude.ai connectors. MCP servers you configure locally still work." That's enough for Study Stash: plain answers turn claude.ai's connectors off anyway, and the Canvas tools are a local MCP server. | same |
-| How it's used | Put it in the `CLAUDE_CODE_OAUTH_TOKEN` environment variable. It ranks 5th of 7: above the saved `/login` (7th), but below `ANTHROPIC_AUTH_TOKEN`, `ANTHROPIC_API_KEY` and `apiKeyHelper`. `--bare` never reads it. Study Stash uses `--restricted`, which the docs don't say ignores it. | [Authentication precedence](https://code.claude.com/docs/en/authentication#authentication-precedence), [env vars](https://code.claude.com/docs/en/env-vars) |
+| What it can do | "It can only make model requests, so it can't establish Remote Control sessions or fetch claude.ai connectors. MCP servers you configure locally still work." That's enough for Egghead Notes: plain answers turn claude.ai's connectors off anyway, and the Canvas tools are a local MCP server. | same |
+| How it's used | Put it in the `CLAUDE_CODE_OAUTH_TOKEN` environment variable. It ranks 5th of 7: above the saved `/login` (7th), but below `ANTHROPIC_AUTH_TOKEN`, `ANTHROPIC_API_KEY` and `apiKeyHelper`. `--bare` never reads it. Egghead Notes uses `--restricted`, which the docs don't say ignores it. | [Authentication precedence](https://code.claude.com/docs/en/authentication#authentication-precedence), [env vars](https://code.claude.com/docs/en/env-vars) |
 | Revoking it | The docs name "revoked" as a state ("you signed out everywhere or an admin removed access"), but don't say where one token is revoked. Users report that claude.ai's settings list each token with a Revoke button, the setup-token one showing only `user:inference`. There's no command to revoke one: [#57400](https://github.com/anthropics/claude-code/issues/57400) asked for one and was closed for inactivity. | [Errors](https://code.claude.com/docs/en/errors#oauth-token-revoked-or-expired), [#103209](https://github.com/anthropics/claude-code/issues/103209) |
 | When it expires or is revoked | In `-p`: `Failed to authenticate: OAuth token revoked. Please log in again or contact your administrator.` or `Failed to authenticate. API Error: 401 OAuth token has expired ...` (error code `authentication_failed`). Claude Code goes on sending the variable's token after a 401 and never falls back to the saved login: you "generate a fresh token … and restart with it". | [Errors](https://code.claude.com/docs/en/errors#oauth-token-revoked-or-expired) |
 | Does it sign the student out of their own Claude Code? | No. It "does not save the token anywhere", so the student's own `/login` stays as it is. The variable only affects the processes that are given it. | [Generate a long-lived token](https://code.claude.com/docs/en/authentication#generate-a-long-lived-token) |
@@ -66,9 +66,9 @@ still happen on Anthropic's own page, but keeping the token is the part this rul
 or an owner-only file doesn't change that. If Anthropic enforces the rule, it's the student's own Claude account that
 pays.
 
-What Study Stash does today fits inside what the same page allows: "Nor does it prevent an end user from signing in
+What Egghead Notes does today fits inside what the same page allows: "Nor does it prevent an end user from signing in
 to the unmodified Claude Code binary with their own Claude subscription". The student signs in with `claude auth
-login`, Claude Code keeps the credential, and Study Stash never handles it.
+login`, Claude Code keeps the credential, and Egghead Notes never handles it.
 
 Two more lines point the same way:
 
@@ -88,7 +88,7 @@ with the person keeping their own token. It's not an app collecting one.
    please contact sales". The question to ask: may a desktop app that runs the student's own unmodified Claude Code,
    on the student's own computer, run `setup-token` for them and keep the token on that computer, giving it only to
    that Claude Code? If they say yes in writing, the design at the end of this page is ready to build.
-2. **The student's own API key (already in Study Stash).** Settings → Your AI takes an Anthropic Console key and
+2. **The student's own API key (already in Egghead Notes).** Settings → Your AI takes an Anthropic Console key and
    keeps it in `ai_keys.json`, owner-only. The same page allows this: "This does not restrict how customers provision
    and manage their own API keys". With a key, notes and Ask go to the API and never depend on the sign-in. It's
    billed per use by the Console, apart from the Pro or Max plan. Agent work with tools still runs through Claude
@@ -98,13 +98,13 @@ with the person keeping their own token. It's not an app collecting one.
      computer. When one holds it, or stopped halfway and left it locked, the others say `Failed to refresh OAuth
      token: another Claude Code process is refreshing it or exited mid-refresh. This is usually transient; retry in a
      minute…` ([Errors](https://code.claude.com/docs/en/errors#could-not-refresh-your-login-because-another-claude-code-process-is-refreshing-it)).
-     Study Stash runs several at once (notes, diagrams, Ask, beside the student's own). It also stops one halfway when
+     Egghead Notes runs several at once (notes, diagrams, Ask, beside the student's own). It also stops one halfway when
      a question is cancelled or a run times out. Until this branch, those words read as signed out. The lecture said
      "Claude needs you to sign in again", and the notes were written once the next job worked, with no sign-in.
      **Fixed on this branch.** (Joey's own log says something else; see
      [the next section](#oauth-session-expired-and-could-not-be-refreshed).)
    - *Several Claude Codes renewing the sign-in at the same moment.* That's what Joey's log points to. **Prevented on
-     this branch** as far as Study Stash's own runs go; see
+     this branch** as far as Egghead Notes' own runs go; see
      [that section](#oauth-session-expired-and-could-not-be-refreshed).
    - *An old Claude Code.* "Before v2.1.211, waking the machine from sleep could cause two sessions to renew with the
      same token, which revoked the saved login"
@@ -186,9 +186,9 @@ them.
   run usually fails too, and only signing in again fixes it. Preventing the race is what matters. Trying again
   rescues only the runs that lost before anything was cleared; #91708 has those too: "the token refresh completes on
   its own in about 40 s".
-- *Study Stash's part.* After a quiet spell, the library's runs start close together: sorting and notes for a new
+- *Egghead Notes' part.* After a quiet spell, the library's runs start close together: sorting and notes for a new
   lecture, then diagrams, or an Ask. Joey's Mac also runs many other Claude Codes (his own sessions, agents, Claude
-  Desktop's own copy), and Study Stash can't line those up.
+  Desktop's own copy), and Egghead Notes can't line those up.
 
 **What's built.** It stays inside the rules: the unmodified `claude`, and no credential read or kept.
 
@@ -234,20 +234,20 @@ them.
 
 ## If Anthropic says yes: the design
 
-- **Settings → Your AI, Claude's row:** "Keep Claude signed in for Study Stash". It runs `claude setup-token` in a
+- **Settings → Your AI, Claude's row:** "Keep Claude signed in for Egghead Notes". It runs `claude setup-token` in a
   pseudo-terminal (a Mac: `forkpty` or `script`; Windows: ConPTY), and `setup-token` opens the browser itself. Study
   Stash reads the token from the output: colour codes stripped, wrapped lines joined, never logged.
 - **Where it's kept:** the Keychain on a Mac. On Windows, an owner-only file beside `ai_keys.json` (`ApiKeys`), or
   DPAPI.
-- **Who gets it:** every `claude` Study Stash starts gets `CLAUDE_CODE_OAUTH_TOKEN` (the `env` that `Spawn` takes).
+- **Who gets it:** every `claude` Egghead Notes starts gets `CLAUDE_CODE_OAUTH_TOKEN` (the `env` that `Spawn` takes).
   The student's own terminal never does.
 - **What could override it:** `ANTHROPIC_AUTH_TOKEN`, `ANTHROPIC_API_KEY` or `apiKeyHelper` in the app's own
   environment outrank the token. Never use `--bare` with it. `claude auth status` then says `authMethod:
   oauth_token`.
-- **When it stops working:** a revoked or expired token gives `authentication_failed` while it's set. Study Stash
-  says "Study Stash's Claude sign-in stopped working" with **Get a new one**, and runs once more without the token,
+- **When it stops working:** a revoked or expired token gives `authentication_failed` while it's set. Egghead Notes
+  says "Egghead Notes' Claude sign-in stopped working" with **Get a new one**, and runs once more without the token,
   so the student's own sign-in still writes the notes. The handling above stays as the fallback.
-- **Stop keeping it:** Study Stash forgets the token, and says where on claude.ai it can be revoked, since there's no
+- **Stop keeping it:** Egghead Notes forgets the token, and says where on claude.ai it can be revoked, since there's no
   command or API for that.
 - **What Joey would try by hand:** the one real sign-in in a browser, on a Pro or Max account; then a lecture's notes
   written with the student's own sign-in signed out.

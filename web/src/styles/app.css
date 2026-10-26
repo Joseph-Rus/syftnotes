@@ -368,6 +368,17 @@ a.detail-eyebrow {
   opacity: 0.8;
   margin-bottom: 2px;
 }
+/* The egghead answers: his face beside each answer. */
+.theirs-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  max-width: 100%;
+}
+.theirs-row > .doodle {
+  flex: none;
+  margin-top: 4px;
+}
 .bubble.theirs {
   align-self: flex-start;
   background: var(--raised);

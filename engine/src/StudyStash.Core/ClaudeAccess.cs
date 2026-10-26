@@ -78,7 +78,7 @@ public sealed class ClaudeAccess
     /// <summary>Shown when a client's published identity (CIMD) couldn't be read or doesn't check out: the document
     /// didn't fetch, wasn't JSON, claimed a different client_id, listed no good redirect_uris, or can only sign in
     /// with a secret or a signature (this library takes public clients: PKCE, nothing else).</summary>
-    public const string CimdInvalidMessage = "Study Stash couldn't confirm which app this is. Go back and try again.";
+    public const string CimdInvalidMessage = "Egghead Notes couldn't confirm which app this is. Go back and try again.";
     static readonly JsonSerializerOptions Json = new() { WriteIndented = true, PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower };
 
     sealed class State
@@ -115,7 +115,7 @@ public sealed class ClaudeAccess
         state = Load();
     }
 
-    /// <summary>Another copy changed claude.json (the Study Stash app, or a second library process): read it again, so a
+    /// <summary>Another copy changed claude.json (the Egghead Notes app, or a second library process): read it again, so a
     /// disconnect takes effect at once. Called under the lock.</summary>
     void Fresh()
     {

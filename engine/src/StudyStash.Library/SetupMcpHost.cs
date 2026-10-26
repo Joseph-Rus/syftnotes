@@ -42,13 +42,13 @@ public sealed class SetupMcpHost : IAsyncDisposable
 
     /// <summary>Opens the door for <paramref name="tools"/>.</summary>
     public static Task<SetupMcpHost> StartAsync(SetupTools tools, CancellationToken ct = default) =>
-        StartAsync(tools.Tools(), "Study Stash setup",
-            "Study Stash's setup tools. get_setup_status is the truth; offer_… tools show the student a card and change nothing themselves.", ct);
+        StartAsync(tools.Tools(), "Egghead Notes setup",
+            "Egghead Notes' setup tools. get_setup_status is the truth; offer_… tools show the student a card and change nothing themselves.", ct);
 
     /// <summary>Opens the door for Settings' helper's <paramref name="tools"/>.</summary>
     public static Task<SetupMcpHost> StartAsync(SettingsTools tools, CancellationToken ct = default) =>
-        StartAsync(tools.Tools(), "Study Stash settings",
-            "Study Stash's settings tools. get_settings says what's set; change_setting changes only what the student asked for.", ct);
+        StartAsync(tools.Tools(), "Egghead Notes settings",
+            "Egghead Notes' settings tools. get_settings says what's set; change_setting changes only what the student asked for.", ct);
 
     static async Task<SetupMcpHost> StartAsync(IEnumerable<ModelContextProtocol.Server.McpServerTool> tools, string title, string instructions, CancellationToken ct)
     {

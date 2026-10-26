@@ -85,7 +85,7 @@ public class ExtensionScriptTests
                 var __legacy = {{{legacy ?? "null"}}};
                 var __reloads = 0;
                 var __granted = {{{(granted ? "true" : "false")}}}, __checked = [];
-                var __badge = '', __title = 'Study Stash';
+                var __badge = '', __title = 'Egghead Notes';
                 function importScripts(name) {
                   if (name === 'connection.js') return; // already run, below
                   if (name === 'config.js' && __legacy) { globalThis.STUDY_STASH = __legacy; return; }
@@ -451,7 +451,7 @@ public class ExtensionScriptTests
         w.Eval("pump(false)");
         Assert.StartsWith(moved + "/api/v2/canvas/work?", w.Fetched.Last().Url);
         Assert.Equal(0, w.Reloads);
-        Assert.Equal(("!", "Study Stash: Can't reach your library at mini.test:8787."), w.Button);
+        Assert.Equal(("!", "Egghead Notes: Can't reach your library at mini.test:8787."), w.Button);
     }
 
     [Fact]
@@ -462,9 +462,9 @@ public class ExtensionScriptTests
         Assert.Empty(w.Asks);
         Assert.Equal("no_config", w.Status);
         Assert.Equal("!", w.Button.Badge);
-        Assert.Contains("isn't connected to Study Stash", w.Button.Title);
+        Assert.Contains("isn't connected to Egghead Notes", w.Button.Title);
         // A job that somehow arrives is refused with a reason, never fetched.
-        Assert.Equal("refused: Study Stash has no Canvas address yet", S(w.Run(Canvas + "/api/v1/courses"), "error"));
+        Assert.Equal("refused: Egghead Notes has no Canvas address yet", S(w.Run(Canvas + "/api/v1/courses"), "error"));
         Assert.DoesNotContain(w.Fetched, f => f.Url.StartsWith(Canvas, StringComparison.Ordinal));
     }
 
@@ -472,7 +472,7 @@ public class ExtensionScriptTests
     public void Without_a_canvas_address_every_job_is_refused_with_a_reason()
     {
         var w = new Worker(config: $$"""{"app":"{{Library}}","key":"k3y","canvas":"","files":["*.inscloudgate.net"],"protocol":3}""");
-        Assert.Equal("refused: Study Stash has no Canvas address yet", S(w.Run("https://cluster1.inscloudgate.net/files/9", "bytes"), "error"));
+        Assert.Equal("refused: Egghead Notes has no Canvas address yet", S(w.Run("https://cluster1.inscloudgate.net/files/9", "bytes"), "error"));
         Assert.False(w.Allowed("https://cluster1.inscloudgate.net/files/9"));
         Assert.Empty(w.Fetched);
     }
@@ -531,19 +531,19 @@ public class ExtensionScriptTests
         var refused = new Worker().Route(Library + "/api/v2/canvas/work", Json("""{"detail":"Wrong key."}""", 401));
         refused.Eval("pump(true)");
         Assert.Equal("library_refused", refused.Status);
-        Assert.Equal(("!", "Study Stash: This extension's key was refused. Open Study Stash and add the extension again."), refused.Button);
+        Assert.Equal(("!", "Egghead Notes: This extension's key was refused. Open Egghead Notes and add the extension again."), refused.Button);
 
         var away = new Worker().Route(Library + "/api/v2/canvas/work", new FakeResponse { Throws = true });
         away.Eval("pump(true)");
         Assert.Equal("library_unreachable", away.Status);
-        Assert.Equal(("!", "Study Stash: Can't reach your library at 127.0.0.1:8787."), away.Button);
+        Assert.Equal(("!", "Egghead Notes: Can't reach your library at 127.0.0.1:8787."), away.Button);
         Assert.Equal(Library, away.Stored("status")!["library"]!.GetValue<string>());
 
         // The library answers again: the button clears.
         WithLibrary(away, [], protocol: 2, rounds: 5);
         away.Eval("pump(false)");
         Assert.Equal("ok", away.Status);
-        Assert.Equal(("", "Study Stash"), away.Button);
+        Assert.Equal(("", "Egghead Notes"), away.Button);
     }
 
     [Fact]
@@ -560,7 +560,7 @@ public class ExtensionScriptTests
         // An older library (p 2, not hot) hands out one job per pump.
         w.Eval("pump(false)");
         Assert.Equal("signed_out", w.Status);
-        Assert.Equal(("!", "Study Stash: Sign in to Canvas in Chrome."), w.Button);
+        Assert.Equal(("!", "Egghead Notes: Sign in to Canvas in Chrome."), w.Button);
 
         w.Route(Canvas + "/api/v1/courses", Json("[]"));
         w.Eval("pump(false)");
@@ -589,7 +589,7 @@ public class ExtensionScriptTests
         Assert.Equal(("https://mini.tail.ts.net", "k3y", "https://school.instructure.com", Extension.Protocol),
             (S(c, "app"), S(c, "key"), S(c, "canvas"), c["protocol"]!.GetValue<int>()));
         Assert.Equal(["*.inscloudgate.net"], c["files"]!.AsArray().Select(f => f!.GetValue<string>()));
-        // The sites it asks Chrome for are the ones Study Stash writes into a folder's manifest for the same connection.
+        // The sites it asks Chrome for are the ones Egghead Notes writes into a folder's manifest for the same connection.
         using var dir = new TempDir();
         Extension.Ensure(dir.Path, "https://mini.tail.ts.net", "k3y", "https://school.instructure.com/");
         var folderHosts = JsonNode.Parse(File.ReadAllText(Path.Combine(dir.Path, "manifest.json")))!["host_permissions"]!.AsArray().Select(h => h!.GetValue<string>());
@@ -598,15 +598,15 @@ public class ExtensionScriptTests
     }
 
     [Theory]
-    [InlineData("", "That isn't a code from Study Stash.")]
-    [InlineData("hello there", "That isn't a code from Study Stash.")]
-    [InlineData("eyJhcHAiOiJodHRwOi8vbWluaS50ZXN0In0", "That isn't a code from Study Stash.")] // {"app":"http://mini.test"}: no key
-    [InlineData("eyJhcHAiOiJodHRwOi8vbWluaS50ZXN0Iiwia2V5IjoiazN5IiwiY2FudmFzIjoiIn0", "Add your school's Canvas address in Study Stash first")] // no Canvas yet
+    [InlineData("", "That isn't a code from Egghead Notes.")]
+    [InlineData("hello there", "That isn't a code from Egghead Notes.")]
+    [InlineData("eyJhcHAiOiJodHRwOi8vbWluaS50ZXN0In0", "That isn't a code from Egghead Notes.")] // {"app":"http://mini.test"}: no key
+    [InlineData("eyJhcHAiOiJodHRwOi8vbWluaS50ZXN0Iiwia2V5IjoiazN5IiwiY2FudmFzIjoiIn0", "Add your school's Canvas address in Egghead Notes first")] // no Canvas yet
     public void A_code_that_isn_t_one_says_so(string code, string words)
     {
         var w = new Worker();
         Assert.StartsWith(words, w.Eval($"(() => {{ try {{ decodeCode({JsonSerializer.Serialize(code)}); return 'decoded'; }} catch (e) {{ return e.message; }} }})()").AsString());
-        Assert.False(Extension.ReadConnectionCode(code) is { Canvas.Length: > 0 }); // nor one Study Stash would hand out
+        Assert.False(Extension.ReadConnectionCode(code) is { Canvas.Length: > 0 }); // nor one Egghead Notes would hand out
     }
 
     [Fact]
@@ -664,10 +664,10 @@ public class ExtensionScriptTests
         string Say(string state) => w.Eval($"statusWords({{state: '{state}', library: 'http://mini.test:8787'}})").AsString();
         Assert.Equal("", Say("ok"));
         Assert.Equal("Can't reach your library at mini.test:8787.", Say("library_unreachable"));
-        Assert.Equal("This extension's key was refused. Open Study Stash and add the extension again.", Say("library_refused"));
+        Assert.Equal("This extension's key was refused. Open Egghead Notes and add the extension again.", Say("library_refused"));
         Assert.Equal("Sign in to Canvas in Chrome.", Say("signed_out"));
         Assert.StartsWith("This extension isn't connected", Say("no_config"));
-        Assert.Contains("paste the code from Study Stash", Say("no_config"));
+        Assert.Contains("paste the code from Egghead Notes", Say("no_config"));
         Assert.StartsWith("Chrome hasn't allowed this extension", Say("no_access"));
     }
 }

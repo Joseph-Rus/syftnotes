@@ -1,6 +1,6 @@
 Cactus Whistle (whistle.cact, from huggingface.co/Cactus-Compute/whistle) and the needle engine that runs it
 (libneedle3, from huggingface.co/Cactus-Compute/needle3; github.com/cactus-compute/needle), by Cactus Compute, Inc.,
-are carried unchanged inside Study Stash under the Apache License, Version 2.0, below. Neither comes with a NOTICE file.
+are carried unchanged inside Egghead Notes under the Apache License, Version 2.0, below. Neither comes with a NOTICE file.
 
 --------------------------------------------------------------------------------
 

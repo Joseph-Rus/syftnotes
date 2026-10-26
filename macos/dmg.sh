@@ -1,8 +1,8 @@
 #!/bin/sh
-# stage_dmg, the one place a Study Stash DMG is made. Sourced (never run) by macos/build-app.sh, which makes the
+# stage_dmg, the one place an Egghead Notes DMG is made. Sourced (never run) by macos/build-app.sh, which makes the
 # first, ad hoc signed DMG, and by macos/sign-release.sh, which makes it again around the Developer ID signed and
 # notarized app. The caller sets OUT (a scratch folder these stage and mount under) and calls
-#   stage_dmg "<path>/Study Stash.app" "Study Stash" "<path>/Study-Stash.dmg"
+#   stage_dmg "<path>/Study Stash.app" "Egghead Notes" "<path>/Egghead-Notes.dmg"
 
 # The DMG: a stage folder with the app plus a link to /Applications. The disk shows the app's icon when it opens
 # (.VolumeIcon.icns, flagged on the volume, which only a mounted read-write copy can take), and the .dmg file itself

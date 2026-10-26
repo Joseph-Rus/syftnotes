@@ -34,7 +34,7 @@ public static class FindOutcome
         Found => "Found your Canvas courses. Pick one for each class.",
         NoAddress => "Add your school's Canvas address first, like school.instructure.com.",
         SignedOut => "Your browser isn't signed in to Canvas. Open Canvas there, sign in, then try again.",
-        NoExtension => "Add the Study Stash extension to your browser first (below).",
+        NoExtension => "Add the Egghead Notes extension to your browser first (below).",
         Away => "Your browser didn't answer. Set up the extension below, keep that browser open and signed in to Canvas, then try again.",
         _ => words.Length > 0 ? $"Couldn't find your courses: {words}" : "Couldn't find your courses.",
     };

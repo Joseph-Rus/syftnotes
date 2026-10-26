@@ -45,7 +45,7 @@
     </Style>
   </UserControl.Styles>
   <Panel>
-    <!-- The pill, upright and quiet: the Study Stash S over a three-bar level meter, nothing else. With the pointer on
+    <!-- The pill, upright and quiet: the Egghead Notes S over a three-bar level meter, nothing else. With the pointer on
          it the S turns into Stop (Resume while paused), one click away, and a card beside it says the class, the time
          and the last lines heard (PillCard, a window of its own beside it). A click anywhere else on it opens the recorder; a drag moves it. Paused, the meter
          rests and the S dims. -->

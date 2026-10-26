@@ -66,7 +66,7 @@ public sealed class MacSound(bool withComputerAudio) : IAudioSource
 /// <summary>
 /// Everything the Mac plays, through a Core Audio process tap (macOS 14.2 and later): a tap on every app's sound, in a
 /// private aggregate device of its own that nothing else sees, read with an IO proc and made 16 kHz mono. The first
-/// time, macOS asks the student whether Study Stash may record what the Mac plays (Info.plist's
+/// time, macOS asks the student whether Egghead Notes may record what the Mac plays (Info.plist's
 /// NSAudioCaptureUsageDescription); until they say yes, the tap hears silence. Nothing is muted: the student still
 /// hears it all.
 /// </summary>
@@ -273,7 +273,7 @@ public sealed unsafe class MacComputerAudio : IDisposable
         CFArrayAppendValue(taps, sub);
 
         IntPtr all = CFDictionaryCreateMutable(IntPtr.Zero, 0, keys, values);
-        CFDictionarySetValue(all, S("name"), S("Study Stash computer audio")); // kAudioAggregateDeviceNameKey
+        CFDictionarySetValue(all, S("name"), S("Egghead Notes computer audio")); // kAudioAggregateDeviceNameKey
         CFDictionarySetValue(all, S("uid"), S($"com.study-stash.computer-audio.{Guid.NewGuid():N}")); // kAudioAggregateDeviceUIDKey
         CFDictionarySetValue(all, S("private"), yes); // kAudioAggregateDeviceIsPrivateKey
         CFDictionarySetValue(all, S("tapautostart"), yes); // kAudioAggregateDeviceTapAutoStartKey

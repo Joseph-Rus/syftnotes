@@ -159,7 +159,7 @@ public class SupportTests
             var card = view.GetVisualDescendants().OfType<Control>().Single(c => c.Name == "SupportAsk");
             Assert.True(card.IsEffectivelyVisible);
             var texts = Texts(card);
-            Assert.Contains("Enjoying Study Stash?", texts);
+            Assert.Contains("Enjoying Egghead Notes?", texts);
             Assert.Contains("It's free, and two students build it with Claude.\nA coffee keeps us going.", texts);
             Assert.Contains("Buy us a coffee", texts);
             Assert.Contains("Maybe later", texts);

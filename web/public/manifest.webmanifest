@@ -1,6 +1,6 @@
 {
-  "name": "Study Stash",
-  "short_name": "Study Stash",
+  "name": "Egghead Notes",
+  "short_name": "Egghead Notes",
   "description": "Your lecture library, on your phone.",
   "start_url": "/app/",
   "scope": "/app/",

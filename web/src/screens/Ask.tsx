@@ -6,7 +6,8 @@ import { persistedStore, useStore } from '../data/store';
 import { useResource } from '../data/resource';
 import { clock, shortDate, parseWhen } from '../format';
 import { href } from '../router';
-import { ArrowUp, Sparkle, Trash } from '../ui/icons';
+import { ArrowUp, Trash } from '../ui/icons';
+import { Doodle } from '../ui/Doodle';
 import { Dot, Empty, IconButton, Screen, Spinner } from '../ui/kit';
 import { useClassColors } from './classColors';
 
@@ -108,12 +109,12 @@ export function AskScreen({ api }: { api: Api }) {
       }
     >
       {noAi ? (
-        <Empty icon={<Sparkle size={40} />} title="Asking isn't set up yet">
-          Choose an AI in Study Stash's Settings → AI engines on your library's computer, then ask here.
+        <Empty icon={<Doodle name="thinking" />} title="Asking isn't set up yet">
+          Choose an AI in Egghead Notes' Settings → AI engines on your library's computer, then ask here.
         </Empty>
       ) : turns.length === 0 ? (
         <div class="ask-start">
-          <Empty icon={<Sparkle size={40} />} title="Ask about your notes">
+          <Empty icon={<Doodle name="thinking" />} title="Ask about your notes">
             Questions are answered from what's in your library, with the lectures each answer used.
           </Empty>
           <div class="suggestions">
@@ -204,28 +205,31 @@ function TurnView({ turn, colorOf }: { turn: Turn; colorOf: (c: string | null) =
         {turn.scope ? <span class="bubble-scope">{turn.scope}</span> : null}
         {turn.question}
       </div>
-      <div class="bubble theirs">
-        {turn.answer ? (
-          <div class="answer selectable">{turn.answer}</div>
-        ) : turn.state === 'asking' ? (
-          <div class="answer thinking">
-            <Spinner size={16} /> Reading your notes…
-          </div>
-        ) : null}
-        {turn.state === 'failed' ? <p class="answer-problem">{turn.problem}</p> : null}
-        {turn.sources.length > 0 ? (
-          <div class="sources">
-            {dedupe(turn.sources).map((s) =>
-              s.id ? (
-                <a class="source" href={href({ name: 'lecture', id: s.id })}>
-                  <Dot color={colorOf(s.class)} size={7} />
-                  <span class="source-title">{s.title}</span>
-                  <span class="source-meta">{sourceMeta(s)}</span>
-                </a>
-              ) : null,
-            )}
-          </div>
-        ) : null}
+      <div class="theirs-row">
+        <Doodle name="head" size={30} />
+        <div class="bubble theirs">
+          {turn.answer ? (
+            <div class="answer selectable">{turn.answer}</div>
+          ) : turn.state === 'asking' ? (
+            <div class="answer thinking">
+              <Doodle name="thinking" size={40} busy /> Reading your notes…
+            </div>
+          ) : null}
+          {turn.state === 'failed' ? <p class="answer-problem">{turn.problem}</p> : null}
+          {turn.sources.length > 0 ? (
+            <div class="sources">
+              {dedupe(turn.sources).map((s) =>
+                s.id ? (
+                  <a class="source" href={href({ name: 'lecture', id: s.id })}>
+                    <Dot color={colorOf(s.class)} size={7} />
+                    <span class="source-title">{s.title}</span>
+                    <span class="source-meta">{sourceMeta(s)}</span>
+                  </a>
+                ) : null,
+              )}
+            </div>
+          ) : null}
+        </div>
       </div>
     </div>
   );

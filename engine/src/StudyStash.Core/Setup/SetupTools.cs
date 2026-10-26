@@ -6,7 +6,7 @@ using StudyStash.Core.Ai;
 
 namespace StudyStash.Core.Setup;
 
-/// <summary>Where a checklist item has got to. Only Study Stash sets these, from what's really so.</summary>
+/// <summary>Where a checklist item has got to. Only Egghead Notes sets these, from what's really so.</summary>
 public enum ChecklistState
 {
     Todo,
@@ -120,7 +120,7 @@ public sealed class SetupTools(ISetupDriver driver)
     static CallToolResult Say(string text) => new() { Content = [new TextContentBlock { Text = text }] };
     static CallToolResult No(string text) => new() { IsError = true, Content = [new TextContentBlock { Text = text }] };
 
-    const string Wait = "Stop here and wait for the student: a [Study Stash] message will say what they did.";
+    const string Wait = "Stop here and wait for the student: a [Egghead Notes] message will say what they did.";
 
     static McpServerToolCreateOptions Named(string name, string title, string description) =>
         new() { Name = name, Title = title, Description = description, ReadOnly = KindOf(name) != "direct", Destructive = false, Idempotent = KindOf(name) != "direct", OpenWorld = false };
@@ -139,7 +139,7 @@ public sealed class SetupTools(ISetupDriver driver)
             }
             catch (Exception e) when (e is not OperationCanceledException)
             {
-                return No($"Study Stash couldn't do that just now ({e.Message.TrimEnd('.')}). Tell the student, and offer to finish by hand.");
+                return No($"Egghead Notes couldn't do that just now ({e.Message.TrimEnd('.')}). Tell the student, and offer to finish by hand.");
             }
         }
     }
@@ -164,7 +164,7 @@ public sealed class SetupTools(ISetupDriver driver)
             ([Description("The choice to start on: one_computer, laptop or library. Leave out for one_computer.")] string? suggested = null) =>
                 OfferComputerAsync(suggested),
             Named("offer_computer_setup", "Offer: how you'll use it",
-                "Shows the card where the student picks how they'll use Study Stash: just this computer (shown first, recommended), or under "
+                "Shows the card where the student picks how they'll use Egghead Notes: just this computer (shown first, recommended), or under "
                 + "Advanced a laptop (library elsewhere) or the library (a computer that stays on); a suggested laptop or library opens "
                 + "Advanced. They press Set up; just this computer also makes the library here.")),
         McpServerTool.Create(() => OfferAsync("library_password"), Named("offer_library_password", "Offer: library password",
@@ -177,7 +177,7 @@ public sealed class SetupTools(ISetupDriver driver)
                 "A laptop: shows the card where the student finds or types the library's address and its password, and connects. The password "
                 + "never reaches you.")),
         McpServerTool.Create(() => OfferAsync("microphone_check"), Named("offer_microphone_check", "Offer: microphone check",
-            "A computer that records: shows the microphone card (the computer asks to allow it; live bars show Study Stash hears the student).")),
+            "A computer that records: shows the microphone card (the computer asks to allow it; live bars show Egghead Notes hears the student).")),
         McpServerTool.Create(
             ([Description("The model's id, from list_transcription_models.")] string model_id) => OfferModelAsync(model_id),
             Named("offer_model_download", "Offer: download a model",
@@ -187,19 +187,19 @@ public sealed class SetupTools(ISetupDriver driver)
             ([Description("The address the student opens Canvas at, like school.instructure.com.")] string school_address) =>
                 OfferCanvasAsync(school_address),
             Named("offer_chrome_helper", "Offer: connect Canvas through the browser",
-                "Checks the school's Canvas address, then shows the card that adds Study Stash's helper to the student's browser (the card names "
-                + "the browser and shows each step). Study Stash says when the browser is connected.")),
+                "Checks the school's Canvas address, then shows the card that adds Egghead Notes' helper to the student's browser (the card names "
+                + "the browser and shows each step). Egghead Notes says when the browser is connected.")),
         McpServerTool.Create(() => OfferCoursesAsync(), Named("offer_course_picker", "Offer: pick your courses",
             "Once the student's browser is connected: shows the ticked list of courses Canvas found; \"Add these classes\" makes them classes.")),
         McpServerTool.Create(() => OfferAsync("ai_app"), Named("offer_ai_app", "Offer: let their AI app read their lectures",
             "When the checklist has ai_app (the ChatGPT or Claude app is on this computer): shows the card that lets that app read the "
             + "student's lectures and notes, so they can ask it about their classes. It only reads. The student presses Connect.")),
         McpServerTool.Create(() => OfferAsync("start_at_login"), Named("offer_start_at_login", "Offer: start at login",
-            "Just this computer or a library: asks whether Study Stash starts when the student logs in (recommended, so notes get written).")),
+            "Just this computer or a library: asks whether Egghead Notes starts when the student logs in (recommended, so notes get written).")),
         McpServerTool.Create(() => OfferAsync("taskbar_tip"), Named("offer_taskbar_tip", "Offer: taskbar tip",
-            "Windows, a computer that records: shows how to keep Study Stash's icon on the taskbar.")),
+            "Windows, a computer that records: shows how to keep Egghead Notes' icon on the taskbar.")),
         McpServerTool.Create(() => OfferAsync("finish"), Named("offer_finish", "Offer: finish",
-            "When get_setup_status says ready_to_finish: shows a short recap and the Open Study Stash button.")),
+            "When get_setup_status says ready_to_finish: shows a short recap and the Open Egghead Notes button.")),
         McpServerTool.Create(
             ([Description("The class's name, like BIO 110 (up to 80 characters).")] string name,
              [Description("What it covers, in the student's words (up to 300 characters). It helps file each lecture.")] string? about = null) =>
@@ -217,7 +217,7 @@ public sealed class SetupTools(ISetupDriver driver)
             ([Description("The checklist item to start at (from get_setup_status). Leave out for the first one not done.")] string? step = null) =>
                 ManualAsync(step ?? ""),
             Named("open_manual_setup", "Set up by hand",
-                "Hands over to Study Stash's own setup pages, for a student who'd rather do it by hand. The chat stays; they can come back.")),
+                "Hands over to Egghead Notes' own setup pages, for a student who'd rather do it by hand. The chat stays; they can come back.")),
     ];
 
     // --- reading ------------------------------------------------------------------------------------------------------
@@ -301,7 +301,7 @@ public sealed class SetupTools(ISetupDriver driver)
 
     /// <summary>What stops any card now: another mid-action, or a step that isn't this computer's.</summary>
     static string? Unready(SetupStatus s, string card) => s.Busy is { } busy
-        ? $"Not now: the card on screen is busy ({busy}). Wait for the [Study Stash] message about it."
+        ? $"Not now: the card on screen is busy ({busy}). Wait for the [Egghead Notes] message about it."
         : card switch
         {
             "library_password" when s.Role != "library" => "That card is only for a library. Check get_setup_status: " + RoleWords(s),
@@ -318,7 +318,7 @@ public sealed class SetupTools(ISetupDriver driver)
             _ => null,
         };
 
-    const string FirstRole = "First ask how they'll use Study Stash (offer_computer_setup).";
+    const string FirstRole = "First ask how they'll use Egghead Notes (offer_computer_setup).";
 
     static string RoleWords(SetupStatus s) => s.Role.Length == 0 ? FirstRole : $"this computer is set up as {(s.Role == "one" ? "just this " + s.Device : "a " + s.Role)}.";
 
@@ -379,7 +379,7 @@ public sealed class SetupTools(ISetupDriver driver)
     async Task<CallToolResult> OfferCoursesAsync()
     {
         var c = await driver.CoursesAsync();
-        if (c.Found.Count == 0) return No(c.Why.Length > 0 ? c.Why : "The student's browser isn't connected yet: offer_chrome_helper first, then wait for Study Stash to say it's connected.");
+        if (c.Found.Count == 0) return No(c.Why.Length > 0 ? c.Why : "The student's browser isn't connected yet: offer_chrome_helper first, then wait for Egghead Notes to say it's connected.");
         return await OfferAsync("course_picker");
     }
 
@@ -419,6 +419,6 @@ public sealed class SetupTools(ISetupDriver driver)
         step = step.Trim();
         if (step.Length > 40) return No("Give a checklist item's id, or leave it out.");
         await driver.OpenManualAsync(step);
-        return Say("Setup by hand is showing. The student can come back to this chat; Study Stash will tell you what they did.");
+        return Say("Setup by hand is showing. The student can come back to this chat; Egghead Notes will tell you what they did.");
     }
 }

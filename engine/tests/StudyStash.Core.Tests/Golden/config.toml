@@ -1,4 +1,4 @@
-# Study Stash library settings. Edit freely, or change them on the library's Settings page.
+# Egghead Notes library settings. Edit freely, or change them on the library's Settings page.
 pool_name = "Fall \"26\" \u2014 Caf\u00e9 \\ notes"
 pool_dir = "/srv/Lecture notes"
 web_host = "0.0.0.0"

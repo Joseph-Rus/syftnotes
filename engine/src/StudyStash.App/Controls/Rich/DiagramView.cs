@@ -280,7 +280,7 @@ public sealed class DiagramView : Decorator
         Cursor = null;
         Focusable = false;
         AutomationProperties.SetHelpText(this, null);
-        Child = new DiagramCard("Study Stash couldn't lay this flowchart out.", Source ?? chart.ToSource());
+        Child = new DiagramCard("Egghead Notes couldn't lay this flowchart out.", Source ?? chart.ToSource());
     }
 }
 

@@ -127,7 +127,7 @@ public sealed partial class DriveLink
 
     /// <param name="drive">The folder.</param>
     /// <param name="library">This computer's library.</param>
-    /// <param name="me">This laptop: its install's id, its name ("Joey's MacBook Air") and Study Stash's version.</param>
+    /// <param name="me">This laptop: its install's id, its name ("Joey's MacBook Air") and Egghead Notes' version.</param>
     /// <param name="active">Whether this computer is still its own library (just this computer).</param>
     public DriveLink(IDrive drive, LibraryCalls library, Func<(string Id, string Name, string Version)> me, Func<bool>? active = null,
         DriveNames? names = null, Action<string>? log = null, Func<DateTimeOffset>? clock = null)

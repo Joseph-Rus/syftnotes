@@ -1,4 +1,4 @@
-# Study Stash's website
+# Egghead Notes' website
 
 The public site: a home page with one download per platform, the phone app guide, the privacy policy, the terms and
 a support page. It's plain HTML and CSS with one small script that nothing depends on, and it loads nothing from any
@@ -44,7 +44,7 @@ folder such as `<user>.github.io/study-stash/` alike.
 **The check** serves `site/` the way a static host does and fails when a page doesn't load or is missing `lang`, a
 viewport, a `<title>`, a description or an `<h1>`; when an image has no `alt`; when any link, image, script or
 stylesheet on the site doesn't resolve, or a `#fragment` names no id on its page; when a page loads anything from
-another site; or when a download link isn't `Study-Stash.dmg` or `Study-Stash-Setup.exe` from
+another site; or when a download link isn't `Egghead-Notes.dmg` or `Egghead-Notes-Setup.exe` from
 `releases/latest/download/` (and the home page must offer both). It doesn't fetch outside links, so it passes
 before a release with those assets exists.
 
@@ -94,7 +94,7 @@ policy on a domain the publisher controls.
 
 In Google Cloud console, **Google Auth Platform → Branding**:
 
-- **App name** Study Stash, the **logo** (the repository's `assets/icon.png`, resized to 120 × 120), a **support email**.
+- **App name** Egghead Notes, the **logo** (the repository's `assets/icon.png`, resized to 120 × 120), a **support email**.
 - **Application home page**, **privacy policy link** and **terms of service link**: the three addresses above.
 - **Authorised domains**: the domain. It must be verified as yours in
   [Google Search Console](https://search.google.com/search-console): add it as a **Domain** property, and Search
@@ -108,7 +108,7 @@ In Google Cloud console, **Google Auth Platform → Branding**:
 What reviewers check on the site, and where it is:
 
 - The homepage says what the app does and links to the privacy policy (the footer, and the privacy section).
-- The homepage isn't just a sign-in page, and the app's name matches the consent screen: **Study Stash**.
+- The homepage isn't just a sign-in page, and the app's name matches the consent screen: **Egghead Notes**.
 - The privacy policy says what Google data is used and why, where it's stored, that it's not shared, how to revoke
   it, and includes the **Limited Use** statement in the exact words Google asks for (`privacy/#google`).
 

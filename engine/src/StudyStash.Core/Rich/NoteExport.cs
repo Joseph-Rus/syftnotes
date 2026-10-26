@@ -77,7 +77,7 @@ public static class NoteExport
         if (date is { } d) md.Append("date: ").Append(d.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)).Append('\n');
         md.Append("duration: ").Append(PyJson.Dumps(duration)).Append('\n');
         if (topics.Count > 0) md.Append("topics: ").Append(PyJson.Dumps(topics)).Append('\n');
-        md.Append("source: Study Stash\n---\n\n");
+        md.Append("source: Egghead Notes\n---\n\n");
         md.Append("# ").Append(title).Append("\n\n");
         if (meta.Length > 0) md.Append('*').Append(meta).Append("*\n\n");
         md.Append(body.TrimEnd('\n')).Append('\n');
@@ -137,7 +137,7 @@ public static class NoteExport
             }
             else if (block.Kind == NoteBlockKind.Plot && block.Closed && TryPlot(block.Text) is { } plot)
             {
-                // Its canonical source (what Study Stash reads back), then its picture at its sliders' starting values,
+                // Its canonical source (what Egghead Notes reads back), then its picture at its sliders' starting values,
                 // which any Markdown reader shows.
                 output.Add(indent + "```plot");
                 foreach (string line in plot.ToSource().Split('\n')) output.Add(indent + line);

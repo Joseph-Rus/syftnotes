@@ -3,7 +3,7 @@ using System.Text.Json.Nodes;
 namespace StudyStash.Core;
 
 /// <summary>
-/// What Study Stash remembers about the lectures in someone's Granola: the ones it has brought over, and the ones they
+/// What Egghead Notes remembers about the lectures in someone's Granola: the ones it has brought over, and the ones they
 /// said to leave where they are, so neither is offered again. One small JSON file beside the app's settings.
 /// </summary>
 public sealed class GranolaLedger
@@ -68,7 +68,7 @@ public sealed class GranolaLedger
 
 /// <summary>
 /// Bringing lectures over from Granola, through Granola's own connection for apps (its MCP server, signed in to as
-/// the student): which of the lectures there Study Stash doesn't have, and one of them as the library takes it. A
+/// the student): which of the lectures there Egghead Notes doesn't have, and one of them as the library takes it. A
 /// free Granola plan lists the last 30 days and gives each lecture's notes (its summary, and what was typed) but
 /// never its transcript; a paid one gives the transcript too, and then the library writes its own notes from that.
 /// </summary>
@@ -87,14 +87,14 @@ public static class GranolaTransfer
 
     public static bool IsFromGranola(string lectureId) => lectureId.StartsWith(IdPrefix, StringComparison.Ordinal);
 
-    /// <summary>A lecture in Granola that Study Stash could bring over.</summary>
+    /// <summary>A lecture in Granola that Egghead Notes could bring over.</summary>
     public sealed record Waiting(string GranolaId, string Title, string Date);
 
     /// <summary>A lecture this old is over, whether or not Granola's notes for it can be seen.</summary>
     public static readonly TimeSpan SurelyOver = TimeSpan.FromHours(3);
 
     /// <summary>
-    /// The lectures in Granola (the last 30 days: all a free plan lists) that Study Stash hasn't brought over and
+    /// The lectures in Granola (the last 30 days: all a free plan lists) that Egghead Notes hasn't brought over and
     /// wasn't told to leave, newest first. One the library has already (brought over from another computer) is
     /// remembered as brought over and not offered. A library that can't be asked right now counts as not having it.
     /// A lecture seen for the first time is only offered once Granola has written its notes (it writes them when the
@@ -147,7 +147,7 @@ public static class GranolaTransfer
         if (m.Transcript.Length == 0) m.Transcript = await granola.GetTranscriptAsync(session, granolaId, ct);
         if (Py.Strip(m.NotesMarkdown).Length == 0 && Py.Strip(m.PrivateNotes).Length == 0 && Py.Strip(m.Transcript).Length == 0)
         {
-            // The names of what Granola did send (never its words): if its notes are there under a name Study Stash
+            // The names of what Granola did send (never its words): if its notes are there under a name Egghead Notes
             // doesn't know, this is how that's found.
             log?.Invoke($"[granola] {granolaId} came with no notes; Granola sent: {string.Join(", ", m.Raw.Select(kv => kv.Key))}");
             return null;
@@ -165,7 +165,7 @@ public static class GranolaTransfer
 
 /// <summary>
 /// The student's Granola, as the app keeps up with it: signed in to once (in the browser, on Granola's own page; Study
-/// Stash never sees the password), then looked at every few minutes for lectures Study Stash doesn't have. A new one
+/// Stash never sees the password), then looked at every few minutes for lectures Egghead Notes doesn't have. A new one
 /// is announced once (<see cref="Found"/>, the app's notification with Transfer), and every waiting one is listed for
 /// Settings. Transfer sends it to the library the way a recording goes (/api/ingest), where its notes are written.
 /// </summary>
@@ -187,7 +187,7 @@ public sealed class GranolaImport(string tokensPath, string clientPath, GranolaL
     /// <summary>Who is signed in, as Granola names them; empty when Granola didn't say.</summary>
     public string Account => ledger.Account;
 
-    /// <summary>The lectures in Granola that Study Stash could bring over, newest first, as of the last look.</summary>
+    /// <summary>The lectures in Granola that Egghead Notes could bring over, newest first, as of the last look.</summary>
     public IReadOnlyList<GranolaTransfer.Waiting> Waiting { get; private set; } = [];
 
     /// <summary>Why the last look or transfer didn't work, in words for the student; null when it did.</summary>
@@ -219,7 +219,7 @@ public sealed class GranolaImport(string tokensPath, string clientPath, GranolaL
         Changed?.Invoke();
     }
 
-    /// <summary>Forgets the sign-in on this computer. What was brought over stays in Study Stash.</summary>
+    /// <summary>Forgets the sign-in on this computer. What was brought over stays in Egghead Notes.</summary>
     public void SignOut()
     {
         oauth.Logout();
@@ -285,7 +285,7 @@ public sealed class GranolaImport(string tokensPath, string clientPath, GranolaL
             var cc = config();
             if (cc.ServerUrl.Length == 0)
             {
-                Problem = "Study Stash isn't connected to a library yet, so there's nowhere to bring it.";
+                Problem = "Egghead Notes isn't connected to a library yet, so there's nowhere to bring it.";
                 return false;
             }
             var m = await GranolaTransfer.FetchAsync(Granola(), granolaId, ct, say);
@@ -324,14 +324,14 @@ public sealed class GranolaImport(string tokensPath, string clientPath, GranolaL
     }
 
     /// <summary>What went wrong, for the student. Null only for a cancel: anything else Granola or the library does
-    /// (an answer in a shape Study Stash doesn't know included) is said, and tried again at the next look.</summary>
+    /// (an answer in a shape Egghead Notes doesn't know included) is said, and tried again at the next look.</summary>
     static string? Words(Exception e) => e switch
     {
         OperationCanceledException and not TaskCanceledException => null,
         OAuthException => "Granola wants you to sign in again. Disconnect, then Connect.",
-        LibraryRefusedException => "Your library didn't take it. Check Study Stash is connected to your library.",
+        LibraryRefusedException => "Your library didn't take it. Check Egghead Notes is connected to your library.",
         HttpRequestException or TaskCanceledException or IOException or TimeoutException => "Couldn't reach Granola or your library. It will try again.",
-        _ => "Granola didn't answer the way Study Stash expected. It will try again.",
+        _ => "Granola didn't answer the way Egghead Notes expected. It will try again.",
     };
 
     /// <summary>Looks at Granola now and every <see cref="Every"/> until stopped.</summary>

@@ -49,11 +49,11 @@ public static class RecordingWords
     public const string DiskFull = "Your disk is full: recording paused. Free some space, then press Resume.";
     public const string NearlyFull = "Your disk is nearly full: free some space to record.";
     public const string MicStopped = "The microphone stopped. Plug it back in, then press Resume.";
-    public const string CantHearMac = "Study Stash can't hear the microphone. Allow it in System Settings → Privacy & Security → Microphone.";
-    public const string CantHearWindows = "Windows isn't letting Study Stash use the microphone. Turn on Settings → Privacy & security → Microphone → Let desktop apps access your microphone.";
+    public const string CantHearMac = "Egghead Notes can't hear the microphone. Allow it in System Settings → Privacy & Security → Microphone.";
+    public const string CantHearWindows = "Windows isn't letting Egghead Notes use the microphone. Turn on Settings → Privacy & security → Microphone → Let desktop apps access your microphone.";
     public const string CouldntRead = "The recording couldn't be read";
 
-    /// <summary>A microphone that gives only silence: the system isn't letting Study Stash hear it.</summary>
+    /// <summary>A microphone that gives only silence: the system isn't letting Egghead Notes hear it.</summary>
     public static string CantHear => OperatingSystem.IsWindows() ? CantHearWindows : CantHearMac;
 
     public static string CouldntSave(string why) => $"Recording paused: the recording couldn't be saved ({why.TrimEnd('.')}).";

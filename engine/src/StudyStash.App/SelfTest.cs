@@ -227,7 +227,7 @@ public static partial class SelfTest
 
     // --- setup -------------------------------------------------------------------------------------------------------
 
-    /// <summary>Setup's first page says how Study Stash works: seen, then on to the computer's choices.</summary>
+    /// <summary>Setup's first page says how Egghead Notes works: seen, then on to the computer's choices.</summary>
     static async Task PastIntroAsync(SetupModel m)
     {
         if (!m.OnIntro) return;
@@ -316,7 +316,7 @@ public static partial class SelfTest
             m.NextCommand.Execute(null);
         }
 
-        // Done: how to record, then Open Study Stash. The role stays Laptop; no login item is touched.
+        // Done: how to record, then Open Egghead Notes. The role stays Laptop; no login item is touched.
         if (m.OnDone)
         {
             await Wait(1);

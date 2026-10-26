@@ -1,4 +1,4 @@
-# Study Stash: Attachments
+# Egghead Notes: Attachments
 
 A student can hand the library their own files for a lecture or a whole class: a photo of handwritten notes, a
 PDF of slides, a scanned handout. The library keeps the file, reads the words in it (handwriting and scans too),

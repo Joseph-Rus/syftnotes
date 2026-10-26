@@ -117,7 +117,7 @@ public class VoiceMemoImportTests
         lib.Memos.Add(Memo("silent", cls: null));
         var import = new VoiceMemoImport(store, () => lib, (from, to) =>
         {
-            if (File.ReadAllText(from).EndsWith("bad", StringComparison.Ordinal)) throw new InvalidOperationException("Study Stash couldn't read that recording.");
+            if (File.ReadAllText(from).EndsWith("bad", StringComparison.Ordinal)) throw new InvalidOperationException("Egghead Notes couldn't read that recording.");
             Wav(to, 0.2);
         }, () => "Sam", () => "Mac");
 
@@ -125,7 +125,7 @@ public class VoiceMemoImportTests
 
         Assert.Empty(store.All());
         Assert.Empty(Directory.GetFiles(store.Dir, "*.wav"));
-        Assert.Equal([("bad", (string?)null, "Study Stash couldn't read that recording."), ("silent", null, "The recording has no sound in it.")], lib.Finished);
+        Assert.Equal([("bad", (string?)null, "Egghead Notes couldn't read that recording."), ("silent", null, "The recording has no sound in it.")], lib.Finished);
     }
 
     [Fact]

@@ -57,7 +57,7 @@ public sealed partial class LibraryWeb
 
     void MapCanvas(WebApplication app)
     {
-        // The extension's folder is ready before anyone asks for it, and an updated Study Stash brings it up to date:
+        // The extension's folder is ready before anyone asks for it, and an updated Egghead Notes brings it up to date:
         // Chrome's copy reloads itself from it.
         EnsureHere();
         // A sync's jobs that were out with Chrome when the library stopped: their answers found nobody to take them,
@@ -622,7 +622,7 @@ public sealed partial class LibraryWeb
         string stores = $"from the {Link(Extension.ChromeStorePublishedAt, "Chrome Web Store")}, or in Firefox from "
             + $"{Link(Extension.FirefoxAddOn, "Mozilla's add-ons site")}";
         string folder = Extension.Folder(cfg.Home);
-        string where = Extension.Ready(folder) ? $"<code>{Ui.Esc(folder)}</code>" : $"<code>{Ui.Esc(folder)}</code> (not ready: restart Study Stash)";
+        string where = Extension.Ready(folder) ? $"<code>{Ui.Esc(folder)}</code>" : $"<code>{Ui.Esc(folder)}</code> (not ready: restart Egghead Notes)";
         return $"<div class=\"group-head\" id=\"canvas\">Canvas</div>{say}<form method=\"post\" action=\"/settings/canvas\"><div class=\"group\">"
             + $"<div class=\"row\"><label class=\"grow\" for=\"canvas_url\">Your school's Canvas</label><input id=\"canvas_url\" name=\"canvas_url\" type=\"text\" value=\"{Ui.Esc(s.Url)}\" placeholder=\"school.instructure.com\" style=\"width:16rem\"></div>"
             + rows
@@ -635,10 +635,10 @@ public sealed partial class LibraryWeb
             + scouts
             + "<details class=\"help\"><summary>Set up the extension on this computer</summary>"
             + "<div class=\"group-head\">Chrome, Edge, Brave, Arc, Vivaldi or Firefox</div><div class=\"group\">"
-            + $"<div class=\"row\"><span class=\"grow\">1. Add Study Stash for Canvas {stores}</span></div>"
+            + $"<div class=\"row\"><span class=\"grow\">1. Add Egghead Notes for Canvas {stores}</span></div>"
             + (code.Length == 0
                 ? "<div class=\"row\"><span class=\"grow\">2. Save your school's Canvas address above: the code to connect it shows here</span></div>"
-                : "<div class=\"row\"><span class=\"grow\">2. Click its Study Stash button and paste this code</span></div>"
+                : "<div class=\"row\"><span class=\"grow\">2. Click its Egghead Notes button and paste this code</span></div>"
                     + $"<div class=\"row\"><code style=\"word-break:break-all;user-select:all\">{Ui.Esc(code)}</code></div>"
                     + "<div class=\"row\"><span class=\"grow\">3. Click Connect, then Allow</span></div>")
             + "</div>"
@@ -647,7 +647,7 @@ public sealed partial class LibraryWeb
             + "<div class=\"row\"><span class=\"grow\">1. In that browser, open chrome://extensions and turn on Developer mode</span></div>"
             + "<div class=\"row\"><span class=\"grow\">2. Click Load unpacked and pick that folder, or drag the folder onto the Extensions page</span></div>"
             + "</div>"
-            + "<p class=\"group-foot\">On a laptop that reaches this library from elsewhere, set it up from the Study Stash app's Settings instead.</p></details>";
+            + "<p class=\"group-foot\">On a laptop that reaches this library from elsewhere, set it up from the Egghead Notes app's Settings instead.</p></details>";
     }
 
     async Task<IResult> SaveCanvas(HttpContext ctx) => await WithMemberAsync(ctx, async _ =>

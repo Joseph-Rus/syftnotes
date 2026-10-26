@@ -6,7 +6,7 @@ namespace StudyStash.Core.Tests;
 /// was wherever that line ends up.</summary>
 public class NoteEditTests
 {
-    const string Chain = "```mermaid\n%% Study Stash diagram, from 0:25\nflowchart LR\n  A --> B\n```";
+    const string Chain = "```mermaid\n%% Egghead Notes diagram, from 0:25\nflowchart LR\n  A --> B\n```";
     const string Plot = "```plot\nf(x) = x^2\n```";
     const string Drawing = "    ```svg\n    <svg viewBox=\"0 0 10 10\"></svg>\n    ```";
 

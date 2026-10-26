@@ -1,4 +1,4 @@
-// Study Stash · Canvas: where this copy reaches its Study Stash library, and what to tell the student when it can't.
+// Egghead Notes · Canvas: where this copy reaches its Egghead Notes library, and what to tell the student when it can't.
 // Shared by the background script and the toolbar popup. The same files run in Chrome and the browsers built on it
 // (Edge, Brave, Arc, Opera, Vivaldi) and in Firefox and the browsers built on it (Zen, LibreWolf, Waterfox); only the
 // manifest differs (Extension.cs writes each one).
@@ -9,7 +9,7 @@ const GECKO = (() => {
 })();
 
 // Which browser this copy runs in, as its maker names it ("Chrome", "Edge", "Brave", "Firefox", "Zen"): told to the
-// library, so Study Stash can say "Is Firefox open?", and used in this extension's own words. '' until whichBrowser()
+// library, so Egghead Notes can say "Is Firefox open?", and used in this extension's own words. '' until whichBrowser()
 // has been asked, and for a browser that doesn't say.
 let browserIs = '';
 async function whichBrowser() {
@@ -35,7 +35,7 @@ async function whichBrowser() {
 }
 
 // {app, key, canvas, files, protocol}, read afresh every time so a new key, library or Canvas address needs no reload:
-// config.json in this folder (Study Stash rewrites it when something changes), else the connection a copy from a
+// config.json in this folder (Egghead Notes rewrites it when something changes), else the connection a copy from a
 // browser's store saved from a pasted code (marked stored: it may reach only what the browser was asked to allow), else
 // the config.js of a folder from before 1.4 (STUDY_STASH). Null when there's none of them.
 async function loadConnection() {
@@ -64,20 +64,20 @@ function libraryHost(app) {
 // browser is named once whichBrowser() has found it.
 function statusWords(status) {
   switch (status && status.state) {
-    case 'no_config': return "This extension isn't connected to Study Stash yet. Click it and paste the code from Study Stash.";
+    case 'no_config': return "This extension isn't connected to Egghead Notes yet. Click it and paste the code from Egghead Notes.";
     case 'no_access': return (browserIs || 'This browser') + ' hasn\'t allowed this extension to reach Canvas and your library. Click it and choose Allow.';
-    case 'library_refused': return "This extension's key was refused. Open Study Stash and add the extension again.";
+    case 'library_refused': return "This extension's key was refused. Open Egghead Notes and add the extension again.";
     case 'library_unreachable': return "Can't reach your library at " + libraryHost(status.library) + '.';
     case 'signed_out': return 'Sign in to Canvas in ' + (browserIs || 'this browser') + '.';
     default: return '';
   }
 }
 
-// A copy from a browser's store (the Chrome Web Store, Firefox's add-ons) has no folder for Study Stash to write: the
-// student pastes a code from Study Stash instead. The code is config.json's text in base64url (Extension.ConnectionCode). Throws, in the student's words, when
+// A copy from a browser's store (the Chrome Web Store, Firefox's add-ons) has no folder for Egghead Notes to write: the
+// student pastes a code from Egghead Notes instead. The code is config.json's text in base64url (Extension.ConnectionCode). Throws, in the student's words, when
 // the text isn't one.
 function decodeCode(code) {
-  const wrong = new Error("That isn't a code from Study Stash. Copy it again and paste the whole thing.");
+  const wrong = new Error("That isn't a code from Egghead Notes. Copy it again and paste the whole thing.");
   let b64 = String(code || '').replace(/\s+/g, '').replace(/^["']|["']$/g, '').replace(/-/g, '+').replace(/_/g, '/').replace(/=+$/, '');
   if (!b64 || /[^A-Za-z0-9+\/]/.test(b64) || b64.length % 4 === 1) throw wrong;
   while (b64.length % 4) b64 += '=';
@@ -85,7 +85,7 @@ function decodeCode(code) {
   try { c = JSON.parse(atob(b64)); } catch (e) { throw wrong; }
   const web = /^https?:\/\/[^\/?#\s]+/i;
   if (!c || typeof c !== 'object' || !web.test(c.app || '') || !c.key) throw wrong;
-  if (!web.test(c.canvas || '')) throw new Error("Add your school's Canvas address in Study Stash first, then copy the code again.");
+  if (!web.test(c.canvas || '')) throw new Error("Add your school's Canvas address in Egghead Notes first, then copy the code again.");
   return {
     app: c.app.replace(/\/+$/, ''), key: String(c.key), canvas: c.canvas.replace(/\/+$/, ''),
     files: Array.isArray(c.files) ? c.files.filter(h => typeof h === 'string') : [], protocol: c.protocol || 0,
@@ -93,7 +93,7 @@ function decodeCode(code) {
 }
 
 // "https://school.instructure.com/*" from "https://school.instructure.com/courses": the match pattern the browser
-// grants, without a default port, the way Study Stash writes a folder's host permissions. Firefox's patterns take no
+// grants, without a default port, the way Egghead Notes writes a folder's host permissions. Firefox's patterns take no
 // port at all: it grants "http://mini.local/*" (that host on every port), and one written with a port never matches
 // what it granted.
 function originPattern(url) {

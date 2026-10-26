@@ -70,7 +70,7 @@ public static partial class Notes
     }
 
     /// <summary>Whether two versions of some notes say the same thing, whatever level their headings are at and
-    /// whatever follows the end of a line: what tells an edit from a note file written by an older Study Stash.</summary>
+    /// whatever follows the end of a line: what tells an edit from a note file written by an older Egghead Notes.</summary>
     public static bool SameWords(string a, string b)
     {
         static string Plain(string notes) => string.Join("\n", Py.SplitLines(Py.Strip(notes)).Select(l => l.TrimEnd().TrimStart('#').TrimStart()));
@@ -95,7 +95,7 @@ public sealed partial class Store
     /// edit that says what it started from isn't saved over them unseen (<see cref="NotesEdited.Changed"/>): the
     /// student sees them and chooses. Without (an AI app's save, a paste, a version put back), they're kept as the
     /// version the new notes replace.</para>
-    /// <para><paramref name="writer"/>: notes someone else wrote (an AI app through Study Stash's connection, a chat the
+    /// <para><paramref name="writer"/>: notes someone else wrote (an AI app through Egghead Notes' connection, a chat the
     /// student pasted them from), named as their writer the way the library names its own AI ("Claude (in the Claude
     /// app)"), and the lecture's notes done, any old error about them gone. Null keeps whoever wrote the notes as their
     /// writer; "" names none (the student's own).</para>

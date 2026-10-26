@@ -71,9 +71,9 @@ distinguished_name = dn
 x509_extensions = ext
 prompt = no
 [dn]
-CN = Study Stash rehearsal (self-signed, not a real signature)
+CN = Egghead Notes rehearsal (self-signed, not a real signature)
 OU = REHEARSAL
-O = Study Stash rehearsal
+O = Egghead Notes rehearsal
 [ext]
 basicConstraints = critical,CA:false
 keyUsage = critical,digitalSignature

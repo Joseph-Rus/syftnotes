@@ -109,7 +109,7 @@ public static class HostInfo
         }
     }
 
-    /// <summary>"free", "ours" (a Study Stash library already answers there), or "busy" (something else has it).</summary>
+    /// <summary>"free", "ours" (an Egghead Notes library already answers there), or "busy" (something else has it).</summary>
     public static async Task<string> PortStatusAsync(int port, HttpClient? http = null)
     {
         if (PortFree(port)) return "free";

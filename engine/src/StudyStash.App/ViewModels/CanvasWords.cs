@@ -358,7 +358,7 @@ public static class CanvasWords
             "signed_out" => new StateCopy($"Sign in to Canvas in {browser}", "Syncing waits until you do."),
             "syncing" => new StateCopy($"Syncing… {s.Syncing?.Left ?? 0} left", $"{JoinAnd(s.Syncing?.Classes ?? [])}."),
             "updated" => new StateCopy($"The extension in {browser} updated itself", $"Now version {s.Extension?.Updated?.To}. Nothing to do."),
-            "error" => new StateCopy("Canvas didn’t answer", $"{s.School} didn’t respond at {C(s.Error?.At)}. Study Stash will try again at {C(s.NextSync)}."),
+            "error" => new StateCopy("Canvas didn’t answer", $"{s.School} didn’t respond at {C(s.Error?.At)}. Egghead Notes will try again at {C(s.NextSync)}."),
             _ => new StateCopy("Connected", $"Last sync {C(s.LastSync)}. Next at {C(s.NextSync)}."),
         };
     }

@@ -334,7 +334,7 @@ public sealed class DiagramExploreTests : IDisposable
                 new(900, 910, "Then reassess in thirty to sixty minutes."),
             ],
         };
-        string source = "%% Study Stash diagram, from 6:30\n" + RichDemo.PainReassess;
+        string source = "%% Egghead Notes diagram, from 6:30\n" + RichDemo.PainReassess;
         var note = new NoteView { Markdown = "```mermaid\n" + source + "\n```" };
         DiagramHost.SetHost(note, page);
         var window = Show(note);

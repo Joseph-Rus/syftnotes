@@ -1,6 +1,6 @@
 #!/bin/sh
-# Checks that a built (or downloaded) Study Stash is signed the way a release is, and says what it found.
-#   sh macos/verify-signing.sh "<path>/Study Stash.app" [<path>/Study-Stash.dmg] [notarized|signed|rehearsal]
+# Checks that a built (or downloaded) Egghead Notes is signed the way a release is, and says what it found.
+#   sh macos/verify-signing.sh "<path>/Study Stash.app" [<path>/Egghead-Notes.dmg] [notarized|signed|rehearsal]
 # notarized (the default)  signed with a Developer ID, hardened runtime and timestamp, with library validation on, and
 #                          accepted by Gatekeeper as notarized, with the ticket stapled (the DMG too, if given)
 # signed                   the same without notarization: what CI checks when it has a certificate but no notary key
@@ -10,7 +10,7 @@
 # APPLE_TEAM_ID, when set, is the Team ID the signature must carry.
 set -eu
 
-APP=${1:?"usage: sh macos/verify-signing.sh \"<path>/Study Stash.app\" [<path>/Study-Stash.dmg] [notarized|signed|rehearsal]"}
+APP=${1:?"usage: sh macos/verify-signing.sh \"<path>/Study Stash.app\" [<path>/Egghead-Notes.dmg] [notarized|signed|rehearsal]"}
 DMG=""
 MODE=notarized
 shift
@@ -54,7 +54,7 @@ printf '%s\n' "$info" | grep -q '^Timestamp=' || fail "no secure timestamp"
 echo "  $(codesign -d -r- "$APP" 2>&1 | grep '^designated' | cut -c1-200)"
 
 if [ "$MODE" = rehearsal ]; then
-  printf '%s\n' "$info" | grep -q '^Authority=Study Stash rehearsal' || fail "not signed by the rehearsal's identity"
+  printf '%s\n' "$info" | grep -q '^Authority=Egghead Notes rehearsal' || fail "not signed by the rehearsal's identity"
   [ -z "$DMG" ] || codesign --verify --verbose=2 "$DMG"
   echo "verify-signing.sh: the rehearsal's signature is whole (Gatekeeper not asked: this identity is a throwaway)."
   exit 0

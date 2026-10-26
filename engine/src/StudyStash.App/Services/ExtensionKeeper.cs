@@ -7,7 +7,7 @@ namespace StudyStash.App.Services;
 /// <summary>
 /// Keeps the Chrome extension's folder on this computer ready by itself, so the student never has to make it: once
 /// the app is paired with a library that has a Canvas address, the folder points at that library (as this computer
-/// reaches it) and that Canvas, and it's written again when either changes or Study Stash updates. Also says what
+/// reaches it) and that Canvas, and it's written again when either changes or Egghead Notes updates. Also says what
 /// the library last heard from Chrome, so a screen can show "Add to Chrome" and then "Connected". Nothing here
 /// touches the UI thread.
 /// </summary>
@@ -18,7 +18,7 @@ public sealed class ExtensionKeeper(string home, Func<CanvasClient?> client, Act
     string keptFor = "";
 
     /// <summary>The folder Chrome loads the extension from on this computer ("Load unpacked"). The one an older
-    /// Study Stash wrote inside the home is kept up to date alongside it, for a Chrome that loaded that one.</summary>
+    /// Egghead Notes wrote inside the home is kept up to date alongside it, for a Chrome that loaded that one.</summary>
     public string LocalFolder { get; init; } = Extension.Folder(home);
 
     /// <summary>The folder is there, complete, and points at the paired library and its Canvas.</summary>

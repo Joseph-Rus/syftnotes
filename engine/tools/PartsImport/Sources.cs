@@ -8,7 +8,7 @@ sealed record Origin(string Source, string Author, string Licence, string Licenc
 
 /// <summary>
 /// Where parts come from, each pinned: Bioicons at one commit (the licence and author read from each file's own path,
-/// and only the allowed licences), Wokwi's elements at one package version (MIT), and Study Stash's own parts in
+/// and only the allowed licences), Wokwi's elements at one package version (MIT), and Egghead Notes' own parts in
 /// <c>house/</c>. Downloads are kept in the cache, so a rebuild doesn't fetch again.
 /// </summary>
 static class Sources
@@ -119,8 +119,8 @@ static class Sources
                 if (rest.IndexOf('#') is var hash and > 0) { file = rest[..hash]; group = rest[(hash + 1)..]; }
                 string text = await File.ReadAllTextAsync(Path.Combine(Tool.Dir, "house", file));
                 if (group.Length > 0) text = Harvest.Group(text, group);
-                return (text, new Origin("Study Stash", "Study Stash", "MIT", "https://opensource.org/licenses/MIT", "https://github.com/Joseph-Rus/study-stash",
-                    "Study Stash's own parts, MIT"));
+                return (text, new Origin("Egghead Notes", "Egghead Notes", "MIT", "https://opensource.org/licenses/MIT", "https://github.com/Joseph-Rus/study-stash",
+                    "Egghead Notes' own parts, MIT"));
             }
         }
         throw new Refused($"unknown source '{kind}'");
@@ -158,7 +158,7 @@ static class Sources
     public static JsonSerializerOptions Json { get; } = new() { PropertyNameCaseInsensitive = true, ReadCommentHandling = JsonCommentHandling.Skip, AllowTrailingCommas = true };
 }
 
-/// <summary>A part cut out of one of Study Stash's own illustrations: the group with that id, alone, with what it
+/// <summary>A part cut out of one of Egghead Notes' own illustrations: the group with that id, alone, with what it
 /// uses.</summary>
 static class Harvest
 {

@@ -5,7 +5,7 @@ using StudyStash.Core;
 namespace StudyStash.App;
 
 /// <summary>
-/// Study Stash. With no command it's the app (in the menu bar or the tray); given one (serve, mcp, doctor, ...) it's
+/// Egghead Notes. With no command it's the app (in the menu bar or the tray); given one (serve, mcp, doctor, ...) it's
 /// the engine, so the library's service and Claude's MCP server run from the same program.
 /// </summary>
 static class Program
@@ -33,7 +33,7 @@ static class Program
         }
         int at = Array.IndexOf(args, "--home");
         if (at >= 0 && at + 1 < args.Length) Home = Path.GetFullPath(Py.ExpandUser(args[at + 1]));
-        // Gemini's agy (setup's sign-in, its check) runs in the same home of Study Stash's own as the library's notes.
+        // Gemini's agy (setup's sign-in, its check) runs in the same home of Egghead Notes' own as the library's notes.
         StudyStash.Core.Ai.Antigravity.Home = () => StudyStash.Core.Ai.Antigravity.For(Home);
         Background = args.Contains("--background");
         // STUDYSTASH_SELFTEST: before anything touches --home (even making its logs folder, which would fail the
@@ -57,13 +57,13 @@ static class Program
                 : args.Contains("--record") ? "record"
                 : show >= 0 && show + 1 < args.Length ? args[show + 1]
                 : Background ? null : "show";
-            Log(word is null ? "[app] Study Stash is already running for this folder; this copy, started at login, goes"
-                : Desktop.HandOff(Home, word) ? $"[app] Study Stash is already running for this folder: handed it \"{word}\""
-                : "[app] Study Stash is already running for this folder but didn't answer in 5 seconds; this copy goes");
+            Log(word is null ? "[app] Egghead Notes is already running for this folder; this copy, started at login, goes"
+                : Desktop.HandOff(Home, word) ? $"[app] Egghead Notes is already running for this folder: handed it \"{word}\""
+                : "[app] Egghead Notes is already running for this folder but didn't answer in 5 seconds; this copy goes");
             return 0;
         }
         Skin.Current = Skin.FromEnvironment();
-        Log($"[app] Study Stash {Engine.Version} starting ({Home})");
+        Log($"[app] Egghead Notes {Engine.Version} starting ({Home})");
         int code = BuildAvaloniaApp().StartWithClassicDesktopLifetime(args);
         Log($"[app] quit ({code})");
         return code;

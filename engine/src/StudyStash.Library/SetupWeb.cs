@@ -162,7 +162,7 @@ public static class SetupWeb
                 + $"<p class=\"addr\">{Ui.Esc(info.Urls[0])}</p><p>Password: <span class=\"addr\">{Ui.Esc(info.Password)}</span></p>"
                 + $"<div class=\"toolbar\"><a class=\"btn primary\" href=\"http://127.0.0.1:{cfg.WebPort}/\">Open your library</a></div>"
                 + "<h3 style=\"margin:1.2rem 0 .3rem\">Connect your laptop</h3>"
-                + $"<p>Install Study Stash on the laptop you record lectures on (<a href=\"{dmg}\">Mac</a> or "
+                + $"<p>Install Egghead Notes on the laptop you record lectures on (<a href=\"{dmg}\">Mac</a> or "
                 + $"<a href=\"{exe}\">Windows</a>), open it, and enter the address and password above.</p>";
         }
         else
@@ -193,7 +193,7 @@ public static class SetupWeb
 
     static bool Same(string a, string b) => CryptographicOperations.FixedTimeEquals(Encoding.UTF8.GetBytes(a), Encoding.UTF8.GetBytes(b));
 
-    /// <summary>The setup page's routes. Only this computer's Study Stash Library app can use them.</summary>
+    /// <summary>The setup page's routes. Only this computer's Egghead Notes Library app can use them.</summary>
     public static WebApplication Build(WebApplicationBuilder builder, LibrarySetup s, int port = LibrarySetup.SetupPort,
         IEnumerable<string>? extraHosts = null, Func<string>? nonce = null)
     {
@@ -217,7 +217,7 @@ public static class SetupWeb
         bool Authed(HttpContext ctx) => Same(ctx.Request.Cookies[AppPage.Cookie] ?? "", token);
 
         IResult? Refused(HttpContext ctx) => Authed(ctx) && ctx.Request.Headers["x-study-stash"] == "1" ? null
-            : Http.Detail(403, "Open the setup from the Study Stash Library app.");
+            : Http.Detail(403, "Open the setup from the Egghead Notes Library app.");
 
         async Task<IResult> Act(HttpContext ctx, Func<JsonObject, Task<string>> step, bool reload = true)
         {
@@ -243,7 +243,7 @@ public static class SetupWeb
                 });
                 return Http.SeeOther("/");
             }
-            if (!Authed(ctx)) return Results.Content("<p>Open the setup from the Study Stash Library app.</p>", "text/html; charset=utf-8", Encoding.UTF8, 403);
+            if (!Authed(ctx)) return Results.Content("<p>Open the setup from the Egghead Notes Library app.</p>", "text/html; charset=utf-8", Encoding.UTF8, 403);
             string n = nonce();
             string page = Ui.Head("Set up your library", n).Replace("</style>", PageText.AppCss + PageText.SetupCss + "</style>")
                 + $"<body><div class=\"solo\">{await RenderAsync(s)}</div>"

@@ -102,10 +102,10 @@ public static unsafe class MacStatusItem
         // A library-only computer doesn't record: no Record in its menu.
         if (record is not null) MenuItem("Record", 0);
         MenuItem("Search notes and lectures", 1);
-        MenuItem("Open Study Stash", 2);
+        MenuItem("Open Egghead Notes", 2);
         MenuItem("Settings…", 3);
         SendVoidId(menu, sel_registerName("addItem:"), Send(objc_getClass("NSMenuItem"), sel_registerName("separatorItem")));
-        MenuItem("Quit Study Stash", 4);
+        MenuItem("Quit Egghead Notes", 4);
     }
 
     /// <summary>The name the menu bar files the icon's place under: where the student ⌘-drags it (or
@@ -184,7 +184,7 @@ public static unsafe class MacStatusItem
         SendVoidLong(item, sel_registerName("setTag:"), tag);
     }
 
-    /// <summary>The icon at 18×18 pt: the "S." as a template image (the menu bar tints it), or — while recording, when
+    /// <summary>The icon at 18×18 pt: the egghead as a template image (the menu bar tints it), or — while recording, when
     /// its red dot must stay red — an ordinary one drawn in the menu bar's own ink (see <see cref="DarkMenuBar"/>).</summary>
     public static void SetIcon(byte[] png, bool template = true)
     {

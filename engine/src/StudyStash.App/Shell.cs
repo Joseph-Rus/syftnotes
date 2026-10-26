@@ -115,7 +115,7 @@ public static partial class Shell
             if (title == AppHost.RecordingPaused) SayRecordingPaused(why);
             else Toast(title, why, null, null);
         });
-        // Granola has a lecture Study Stash doesn't: said once, with Transfer.
+        // Granola has a lecture Egghead Notes doesn't: said once, with Transfer.
         host.Granola.Found += found => Dispatcher.UIThread.Post(() => SayGranolaHas(found));
         if (host.PretendMic) Program.Log("[app] recording from a pretend microphone (STUDYSTASH_MIC_FILE)");
         Wire();
@@ -236,7 +236,7 @@ public static partial class Shell
         try
         {
             // The exception is in the log already; the student gets what happened, not the stack's words.
-            Toast("Something went wrong", "Study Stash carried on. If something looks wrong, quit it and open it again.", null, null);
+            Toast("Something went wrong", "Egghead Notes carried on. If something looks wrong, quit it and open it again.", null, null);
         }
         catch (Exception again)
         {
@@ -305,7 +305,7 @@ public static partial class Shell
         return null;
     }
 
-    /// <summary>Quit Study Stash, with an exit code (the self-test's pass or fail). Only the first call counts.</summary>
+    /// <summary>Quit Egghead Notes, with an exit code (the self-test's pass or fail). Only the first call counts.</summary>
     public static void Quit(int code = 0)
     {
         if (quitting) return;
@@ -381,7 +381,7 @@ public static partial class Shell
 
     // --- the tray ---------------------------------------------------------------------------------------------------
 
-    /// <summary>The icon, as PNG bytes: the "S." mark — black on a Mac (a template image the menu bar tints, or, while
+    /// <summary>The icon, as PNG bytes: the egghead mark — black on a Mac (a template image the menu bar tints, or, while
     /// recording, in the menu bar's own ink so its red dot stays red), black or white on Windows by theme — with a red
     /// dot while recording.</summary>
     static byte[] TrayImageBytes(bool recording)
@@ -415,7 +415,7 @@ public static partial class Shell
             DispatcherTimer.RunOnce(CheckMenuBarIcon, TimeSpan.FromSeconds(2));
             return;
         }
-        tray = new TrayIcon { Icon = TrayImage(false), ToolTipText = "Study Stash", IsVisible = true };
+        tray = new TrayIcon { Icon = TrayImage(false), ToolTipText = "Egghead Notes", IsVisible = true };
         tray.Clicked += (_, _) => TogglePanel();
         trayRole = host.Settings.Role;
         tray.Menu = TrayMenu(host.Settings.Role);
@@ -440,10 +440,10 @@ public static partial class Shell
         }
         if (role != AppRole.Library) Item("Record", ToggleRecording);
         Item("Search notes and lectures", ToggleQuick);
-        Item("Open Study Stash", ShowLibrary);
+        Item("Open Egghead Notes", ShowLibrary);
         Item("Settings…", SettingsFromAnywhere);
         menu.Add(new NativeMenuItemSeparator());
-        Item("Quit Study Stash", () => Quit());
+        Item("Quit Egghead Notes", () => Quit());
         return menu;
     }
 
@@ -845,7 +845,7 @@ public static partial class Shell
         if (panelWindow is not null && DateTime.UtcNow - panelWindow.LastDeactivateHide < Floating.ToggleDebounce) return;
         if (panelWindow is null)
         {
-            panelWindow = new Floating { Content = PanelView(), CloseOnDeactivate = true, KeepClear = true, Title = "Study Stash" };
+            panelWindow = new Floating { Content = PanelView(), CloseOnDeactivate = true, KeepClear = true, Title = "Egghead Notes" };
             AppMenu.AddSettingsKey(panelWindow, SettingsFromAnywhere);
         }
         Refresh();
@@ -909,7 +909,7 @@ public static partial class Shell
             pillCard?.Hide();
             return;
         }
-        pillCard ??= new Floating { Content = new PillCard { DataContext = recorder }, OverFullScreen = true, ShowActivated = false, ClickThrough = true, Title = "Study Stash recorder card" };
+        pillCard ??= new Floating { Content = new PillCard { DataContext = recorder }, OverFullScreen = true, ShowActivated = false, ClickThrough = true, Title = "Egghead Notes recorder card" };
         var (area, scale) = pillCard.WorkArea(pill.Center);
         var size = pillCard.Measured(scale);
         int room = (int)(Floating.ShadowRoom * scale), gap = (int)(10 * scale), width = size.Width - 2 * room;
@@ -921,7 +921,7 @@ public static partial class Shell
     static Floating MakeRecorderWindow()
     {
         var view = Skin.Current == SkinKind.Mac ? (Control)new MacRecorder { DataContext = recorder } : new WinRecorder { DataContext = recorder };
-        var w = new Floating { Content = view, KeepClear = true, SteadySize = true, OverFullScreen = true, ClicksOnPanelOnly = true, Title = "Study Stash recorder" };
+        var w = new Floating { Content = view, KeepClear = true, SteadySize = true, OverFullScreen = true, ClicksOnPanelOnly = true, Title = "Egghead Notes recorder" };
         // Gone from the screen: its card goes with it.
         w.PropertyChanged += (_, e) =>
         {
@@ -1023,7 +1023,7 @@ public static partial class Shell
         if (quickWindow is null)
         {
             view = Skin.Current == SkinKind.Mac ? new MacQuick { DataContext = quick } : new WinQuick { DataContext = quick };
-            quickWindow = new Floating { Content = view, CloseOnDeactivate = true, KeepClear = true, Title = "Study Stash search" };
+            quickWindow = new Floating { Content = view, CloseOnDeactivate = true, KeepClear = true, Title = "Egghead Notes search" };
             AppMenu.AddSettingsKey(quickWindow, SettingsFromAnywhere);
         }
         quick.Answering = false;
@@ -1046,7 +1046,7 @@ public static partial class Shell
         if (mainWindow is not null) return mainWindow;
         var w = new Window
         {
-            Title = "Study Stash", Width = 1280, Height = 800, MinWidth = 600, MinHeight = 560, WindowStartupLocation = WindowStartupLocation.CenterScreen,
+            Title = "Egghead Notes", Width = 1280, Height = 800, MinWidth = 600, MinHeight = 560, WindowStartupLocation = WindowStartupLocation.CenterScreen,
             ExtendClientAreaToDecorationsHint = true, ExtendClientAreaTitleBarHeightHint = Skin.Current == SkinKind.Mac ? WindowHeader.MacHeight : 32,
         };
         Look.Apply(w);
@@ -1184,7 +1184,7 @@ public static partial class Shell
     }
 
     /// <summary>Brings a window the student asked for to the front. On Windows, activating a minimized window leaves it
-    /// in the taskbar: Open Study Stash, opening the app again and a click on a lecture seemed to do nothing. So it
+    /// in the taskbar: Open Egghead Notes, opening the app again and a click on a lecture seemed to do nothing. So it
     /// comes back up first, as large as it was.</summary>
     static void Raise(Window w)
     {
@@ -1232,7 +1232,7 @@ public static partial class Shell
         var view = byHand ? manualView : guidedView;
         var w = new Window
         {
-            Title = byHand ? setup.HeaderTitle : "Set up Study Stash", CanResize = false, CanMaximize = false, Content = view,
+            Title = byHand ? setup.HeaderTitle : "Set up Egghead Notes", CanResize = false, CanMaximize = false, Content = view,
             ExtendClientAreaToDecorationsHint = true, ExtendClientAreaTitleBarHeightHint = Skin.Current == SkinKind.Mac ? WindowHeader.MacHeight : 32,
         };
         Look.Apply(w);
@@ -1270,7 +1270,7 @@ public static partial class Shell
             model.GuidedLabel = guided.AiReady ? $"Set up with {guided.Brand} instead" : "Set up with an AI instead";
             if (w.Content == want) return;
             w.Content = want;
-            w.Title = want == manualView ? model.HeaderTitle : "Set up Study Stash";
+            w.Title = want == manualView ? model.HeaderTitle : "Set up Egghead Notes";
             FitTo(w, want);
         };
         // The AI engines step saves its choice before moving on; if it can't, it says why and stays.
@@ -1536,7 +1536,7 @@ public static partial class Shell
         if (section is not null) model.Section = section;
         var w = new Window
         {
-            Title = "Study Stash settings", CanResize = false, CanMaximize = false,
+            Title = "Egghead Notes settings", CanResize = false, CanMaximize = false,
             Content = new SettingsView { DataContext = model, DrawChrome = false },
             ExtendClientAreaToDecorationsHint = true, ExtendClientAreaTitleBarHeightHint = Skin.Current == SkinKind.Mac ? WindowHeader.MacHeight : 32,
         };
@@ -1631,7 +1631,7 @@ public static partial class Shell
         }
         else if (tray is not null)
         {
-            tray.ToolTipText = $"Study Stash · recording {elapsed}";
+            tray.ToolTipText = $"Egghead Notes · recording {elapsed}";
         }
     }
 
@@ -1753,7 +1753,7 @@ public static partial class Shell
             else if (tray is not null)
             {
                 tray.Icon = TrayImage(recording);
-                if (!recording) tray.ToolTipText = "Study Stash";
+                if (!recording) tray.ToolTipText = "Egghead Notes";
             }
         }
         if (OperatingSystem.IsWindows()) UpdateTaskbar(problem);

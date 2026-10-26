@@ -12,7 +12,7 @@ public enum SupportAnswer
 }
 
 /// <summary>
-/// Where a tip for Study Stash goes, the words that ask for one, and when the library window asks: once the library
+/// Where a tip for Egghead Notes goes, the words that ask for one, and when the library window asks: once the library
 /// holds a few lectures, never while recording or during setup, and at most twice ("Maybe later" asks once more a
 /// month on, then never again). "Buy us a coffee", in the ask or on Home, ends it for good.
 /// </summary>
@@ -25,10 +25,10 @@ public static class SupportAsk
     public const string Button = "Buy us a coffee";
 
     /// <summary>What Home's button is for, under the pointer.</summary>
-    public const string HomeTip = "Study Stash is free. A tip on Ko-fi goes to the two students who build it.";
+    public const string HomeTip = "Egghead Notes is free. A tip on Ko-fi goes to the two students who build it.";
 
     /// <summary>The ask's title, and its two sentences, a line each.</summary>
-    public const string Title = "Enjoying Study Stash?";
+    public const string Title = "Enjoying Egghead Notes?";
     public const string Text = "It's free, and two students build it with Claude.\nA coffee keeps us going.";
     public const string LaterButton = "Maybe later";
     public const string NeverButton = "Don't ask again";

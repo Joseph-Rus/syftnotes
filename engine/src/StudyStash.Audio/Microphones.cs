@@ -33,12 +33,12 @@ public static class Microphones
         return Task.FromResult(Access());
     }
 
-    /// <summary>Where the person turns the microphone on for Study Stash.</summary>
+    /// <summary>Where the person turns the microphone on for Egghead Notes.</summary>
     public static string SettingsUrl => OperatingSystem.IsWindows() ? WindowsPermissions.MicrophoneSettings
         : OperatingSystem.IsMacOS() ? MacPermissions.MicrophoneSettingsUrl : "";
 }
 
-/// <summary>Asking the system about the microphone: whether Study Stash may use it, and having it ask the student.
+/// <summary>Asking the system about the microphone: whether Egghead Notes may use it, and having it ask the student.
 /// The app goes through this so a test can stand in for the system's answers.</summary>
 public interface IMicPermissions
 {

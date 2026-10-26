@@ -5,7 +5,8 @@ import { dueWhen, lectureMeta } from '../format';
 import { useResource } from '../data/resource';
 import { href } from '../router';
 import { classColor } from '../theme/themes';
-import { ChevronRight, Folder, Mic, Paperclip, PlusCircle } from '../ui/icons';
+import { ChevronRight, Mic, Paperclip, PlusCircle } from '../ui/icons';
+import { Doodle } from '../ui/Doodle';
 import { Dot, Empty, IconButton, Problem, Row, Screen, Section, SkeletonRows } from '../ui/kit';
 import { useClassColors } from './classColors';
 
@@ -41,8 +42,22 @@ export function Home({ api, offline }: { api: Api; offline: boolean }) {
         </IconButton>
       }
     >
+      {writing > 0 && !offline ? (
+        <div class="busy-strip" role="status">
+          <Doodle name="writing" size={44} busy />
+          <span>
+            Writing notes for {writing} lecture{writing === 1 ? '' : 's'}…
+          </span>
+        </div>
+      ) : null}
       <DueSoon list={due.data} colorOf={colorOf} />
-      <RecentLectures lectures={recent.data} loading={recent.loading} error={recent.error} onRetry={recent.refresh} colorOf={colorOf} />
+      <RecentLectures
+        lectures={recent.data}
+        loading={recent.loading}
+        error={recent.error}
+        onRetry={recent.refresh}
+        colorOf={colorOf}
+      />
       <Classes overview={library.data} loading={library.loading} error={library.error} onRetry={library.refresh} />
       {adding ? <AddSheet onClose={() => setAdding(false)} /> : null}
     </Screen>
@@ -172,8 +187,8 @@ function Classes({
   if (!overview) return null;
   if (overview.classes.length === 0 && overview.unsorted === 0)
     return (
-      <Empty icon={<Folder size={40} />} title="Nothing here yet">
-        Record a lecture with Study Stash on your computer, or import a voice memo with +.
+      <Empty icon={<Doodle name="hello" size={128} />} title="Nothing here yet">
+        Record a lecture with Egghead Notes on your computer, or import a voice memo with +.
       </Empty>
     );
   return (
@@ -190,7 +205,13 @@ function Classes({
         />
       ))}
       {overview.unsorted > 0 ? (
-        <Row href={href({ name: 'class', class: 'Unsorted' })} lead={<Dot color="var(--fg3)" size={12} />} title="Unsorted" detail={`${overview.unsorted}`} chevron />
+        <Row
+          href={href({ name: 'class', class: 'Unsorted' })}
+          lead={<Dot color="var(--fg3)" size={12} />}
+          title="Unsorted"
+          detail={`${overview.unsorted}`}
+          chevron
+        />
       ) : null}
     </Section>
   );

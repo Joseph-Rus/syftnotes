@@ -26,7 +26,7 @@ public class ExtensionFolderMoveTests
         var fake = new FakeLibrary().Json(HttpMethod.Get, "/api/v2/canvas/extension", Library);
         var keeper = new ExtensionKeeper(home.Path, () => new CanvasClient("https://mini.tail.ts.net", "test-key", fake.Client()))
         {
-            LocalFolder = Path.Combine(visible.Path, "Study Stash", "Chrome extension"),
+            LocalFolder = Path.Combine(visible.Path, "Egghead Notes", "Chrome extension"),
         };
 
         Assert.True(await keeper.KeepAsync(TestContext.Current.CancellationToken));
@@ -42,7 +42,7 @@ public class ExtensionFolderMoveTests
         var context = CanvasFixtures.Context();
         var model = new CanvasConnectModel(context, new CanvasWatch(context));
         Assert.Equal("Pick the Chrome extension folder, or drag it onto the page", model.PickCaption);
-        model.ExtensionFolder = Path.Combine("home", "Study Stash", "Chrome extension");
+        model.ExtensionFolder = Path.Combine("home", "Egghead Notes", "Chrome extension");
         Assert.Equal("Chrome extension", model.FolderName);
         model.ExtensionFolder = Path.Combine("home", ".study-stash", "chrome-extension");
         Assert.Equal("Pick the chrome-extension folder, or drag it onto the page", model.PickCaption);

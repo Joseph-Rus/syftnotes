@@ -3,7 +3,7 @@ using System.Text.Json.Serialization;
 
 namespace StudyStash.Core.Canvas;
 
-/// <summary>Which announcements the student has opened in Study Stash (Canvas's own read state is separate: an
+/// <summary>Which announcements the student has opened in Egghead Notes (Canvas's own read state is separate: an
 /// announcement can be read on Canvas but never opened here, or the other way round). Kept in
 /// <c>home/canvas_seen.json</c>, class → announcement ids.</summary>
 public static class CanvasSeen
@@ -30,7 +30,7 @@ public static class CanvasSeen
         SharedFile.Write(PathIn(home), JsonSerializer.Serialize(all, Options));
     }
 
-    /// <summary>The announcement ids opened in Study Stash for this class.</summary>
+    /// <summary>The announcement ids opened in Egghead Notes for this class.</summary>
     public static HashSet<long> For(string home, string cls) => Load(home).GetValueOrDefault(cls, []).ToHashSet();
 
     /// <summary>A class was renamed: its opened announcements move to the new name.</summary>
@@ -45,7 +45,7 @@ public static class CanvasSeen
         }
     }
 
-    /// <summary>Mark these announcements opened in Study Stash.</summary>
+    /// <summary>Mark these announcements opened in Egghead Notes.</summary>
     public static void Mark(string home, string cls, IEnumerable<long> ids)
     {
         lock (Gate)

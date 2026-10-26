@@ -119,7 +119,7 @@ public class DoctorTests
             Tailscale = () => ts ?? new TailscaleInfo(true, true, "Running", "sams-laptop.example.ts.net"), Latest = () => Task.FromResult<Release?>(null),
             ServiceStatus = _ => throw new InvalidOperationException("a laptop has no background service to check"), Unicode = false,
         };
-        const string connect = "open Study Stash and connect it to your library";
+        const string connect = "open Egghead Notes and connect it to your library";
 
         // Not connected to a library yet: that's the one thing to do.
         Assert.Equal([new Check("Config", Doctor.Fail, $"no {cc.ConfigPath}", connect)], await Doctor.ClientChecksAsync(cc, Host()));
@@ -154,12 +154,12 @@ public class DoctorTests
         Assert.Equal(new Check("Recordings", Doctor.Warn, "2 lectures waiting to reach Fall",
             "last try: Can't reach your library. Lectures wait here until it's back."), await Recordings());
         store.Update("rec-2", l => l.Error = "");
-        Assert.Equal("they go on their own while Study Stash is open and the library answers", (await Recordings()).Fix);
+        Assert.Equal("they go on their own while Egghead Notes is open and the library answers", (await Recordings()).Fix);
 
         // Sent, but Whisper couldn't write one down.
         store.Update("rec-2", l => l.State = LectureState.Filed);
         store.Update("rec-3", l => (l.State, l.Error) = (LectureState.Failed, "its recording is missing"));
-        Assert.Equal(new Check("Recordings", Doctor.Warn, "1 lecture couldn't be written down: its recording is missing", "open Study Stash to see which"), await Recordings());
+        Assert.Equal(new Check("Recordings", Doctor.Warn, "1 lecture couldn't be written down: its recording is missing", "open Egghead Notes to see which"), await Recordings());
         store.Delete("rec-3");
         Assert.Equal(new Check("Recordings", Doctor.Ok, "2 lectures filed in Fall"), await Recordings());
 

@@ -1,5 +1,5 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1800 2100">
-  <!-- Study Stash's own rack parts, front view, drawn to scale in millimetres: a 19-inch (482.6 mm) rack and the
+  <!-- Egghead Notes' own rack parts, front view, drawn to scale in millimetres: a 19-inch (482.6 mm) rack and the
        equipment that mounts in it (1U = 44.45 mm). Each part is a group with its id; the importer cuts them out. -->
   <defs>
     <linearGradient id="g-panel" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#F3F5F7"/><stop offset=".55" stop-color="#D7DCE1"/><stop offset="1" stop-color="#AEB6BE"/></linearGradient>

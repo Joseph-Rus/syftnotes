@@ -6,7 +6,7 @@ namespace StudyStash.App.Services;
 
 /// <summary>
 /// Setup's microphone step: opens a microphone (through whatever <see cref="Open"/> is given — never the real one in
-/// a test) and counts its loudness in 50 ms blocks, so the step's waveform can show the student Study Stash hearing
+/// a test) and counts its loudness in 50 ms blocks, so the step's waveform can show the student Egghead Notes hearing
 /// them. Opening happens off the caller's thread (a sound driver can take its time), and a microphone that won't
 /// open leaves its <see cref="Trouble"/> for the step to show and is tried again a few seconds later (one plugged in
 /// meanwhile just works). Pure and thread-safe: nothing here touches a view model, so a caller (Setup, Shell) copies
@@ -30,7 +30,7 @@ public sealed class MicCheck(Func<DateTime>? clock = null) : IDisposable
     MicTrouble? trouble;
     DateTime troubleAt;
 
-    /// <summary>A level has passed the "Study Stash hears you" mark since the microphone opened.</summary>
+    /// <summary>A level has passed the "Egghead Notes hears you" mark since the microphone opened.</summary>
     public bool Heard => heard;
 
     /// <summary>Why the microphone didn't open last time, in the student's words; null once it's open (or not tried).</summary>

@@ -69,7 +69,7 @@ public static partial class DiagramDesign
     public static readonly TimeSpan Timeout = TimeSpan.FromMinutes(8);
 
     /// <summary>What marks a diagram this pass added: the first line inside its block.</summary>
-    const string Mark = "Study Stash diagram";
+    const string Mark = "Egghead Notes diagram";
 
     /// <summary>How many diagrams a lecture may get: none under <see cref="MinTranscriptChars"/>, one for a short
     /// lecture (under about ten minutes), two under about twenty, three under about forty, four for a long one.</summary>
@@ -650,7 +650,7 @@ public static partial class DiagramDesign
     {
         var sb = new StringBuilder();
         sb.Append($"You designed {(wrong.Count == 1 ? "this diagram" : "these diagrams")} for a university student's study notes on a lecture. ")
-            .Append("Study Stash laid each one out at the width of the notes (about 620 px) and found the problems listed under it. ")
+            .Append("Egghead Notes laid each one out at the width of the notes (about 620 px) and found the problems listed under it. ")
             .Append("Redesign each one so every problem is fixed, keeping what was good about it and keeping it true to the lecture: every label must still be something the lecture said (the notes below are written from it). ")
             .Append("Keep the same kind of diagram unless another kind fixes the problem better.\n\n");
         sb.Append("<lecture>\n").Append(Summarize.Header(m)).Append("\n</lecture>\n\n<notes>\n").Append(notes).Append("\n</notes>\n");

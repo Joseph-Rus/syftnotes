@@ -7,7 +7,7 @@ namespace StudyStash.App.Controls.Rich;
 
 /// <summary>
 /// A diagram the app couldn't draw, said calmly in the notes' code box: an info icon beside "Couldn't draw this
-/// diagram." and one line saying why (the reader's own words, like "Study Stash draws flowcharts; this is a sequence
+/// diagram." and one line saying why (the reader's own words, like "Egghead Notes draws flowcharts; this is a sequence
 /// diagram."), then the diagram's source, so nothing the notes say is lost.
 /// </summary>
 public sealed class DiagramCard : Border

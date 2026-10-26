@@ -7,7 +7,7 @@ using StudyStash.App.Platform;
 
 namespace StudyStash.App.Tests;
 
-/// <summary>The "S." in the menu bar and the tray (and the app icon files it comes with): one ink, a red dot only while
+/// <summary>The egghead in the menu bar and the tray (and the app icon files it comes with): one ink, a red dot only while
 /// recording, and every icon file the installers and the library's pages need.</summary>
 public class TrayMarkTests
 {
@@ -63,8 +63,8 @@ public class TrayMarkTests
 
         Assert.True(Reddish(px[(int)centre.X, (int)centre.Y]), $"no red dot at {centre}: {px[(int)centre.X, (int)centre.Y]}");
         Assert.True((int)centre.X > 18 && (int)centre.Y < 18, "the dot sits at the top right");
-        // Just outside the dot, in the ring: nothing drawn (the mark is cut back there).
-        int ringX = (int)Math.Round(centre.X - r * 1.3), ringY = (int)Math.Round(centre.Y + r * 1.3);
+        // Just outside the dot, in the ring (TrayMark cuts the mark back to 1.55 × the dot's radius): nothing drawn.
+        int ringX = (int)Math.Round(centre.X - r * 1.0), ringY = (int)Math.Round(centre.Y + r * 1.0);
         Assert.True(px[ringX, ringY].A < 40, $"the ring isn't clear: {px[ringX, ringY]}");
         Assert.Contains(All(px), c => c.A == 255 && c.R > 240 && c.G > 240 && c.B > 240); // the mark, white
         Assert.DoesNotContain(All(Pixels(TrayMark.Png(32, Brushes.Black, recording: false))), Reddish);
@@ -114,6 +114,6 @@ public class TrayMarkTests
         Assert.Equal("Record", Items(Services.AppRole.Both)[0]);
         Assert.Equal("Record", Items(Services.AppRole.Laptop)[0]);
         Assert.DoesNotContain("Record", Items(Services.AppRole.Library));
-        Assert.Equal("Quit Study Stash", Items(Services.AppRole.Both)[^1]);
+        Assert.Equal("Quit Egghead Notes", Items(Services.AppRole.Both)[^1]);
     }
 }

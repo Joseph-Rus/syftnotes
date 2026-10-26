@@ -27,7 +27,7 @@ Tailscale way exactly as before: Add a phone, the 6-digit code and its QR code, 
 the page** when Tailscale is missing. Folding it away again puts a code on show away.
 
 ```
-phone (iPhone app)                     Google Drive, appDataFolder                laptop (Study Stash, just this computer)
+phone (iPhone app)                     Google Drive, appDataFolder                laptop (Egghead Notes, just this computer)
   phone-<id>.json  (its box) ───────▶  read by id, every 1 s while open  ───────▶  DriveLink: PhoneCalls checks it,
   answer-<req>.json ({} first)                                                    LibraryCalls replays it on
   upload-<req>     (a file it sends)                                               http://127.0.0.1:<port>/api/v2
@@ -70,9 +70,9 @@ reading by id every 0.5 s):
 
 ## Google
 
-- Project `study-stash-app` (number 1073354844610). Drive API is on. Consent screen "Study Stash", External, in
+- Project `study-stash-app` (number 1073354844610). Drive API is on. Consent screen "Egghead Notes", External, in
   Testing (one test user, an account of our own). In Testing, Google lets a refresh token live 7 days: the laptop then
-  says "Google signed Study Stash out of your account…" with **Connect again**.
+  says "Google signed Egghead Notes out of your account…" with **Connect again**.
 - Scopes, both sides: `openid email https://www.googleapis.com/auth/drive.appdata`. Nothing else. A student who
   unticks Google Drive on Google's page is told to connect again and leave it ticked.
 - Everything lives in Drive's hidden **appDataFolder** (`parents: ["appDataFolder"]`, `spaces=appDataFolder`). It's
@@ -84,7 +84,7 @@ reading by id every 0.5 s):
   from the environment variable `GOOGLE_DESKTOP_CLIENT_SECRET` or the git-ignored file
   `engine/google-desktop-client-secret.txt` (as assembly metadata), and the same variable at run time overrides it. CI
   passes the repository secret `GOOGLE_DESKTOP_CLIENT_SECRET` to the Mac and Windows installer builds
-  (`.github/workflows/ci.yml`). A build without it shows Connect with Google greyed out with "This copy of Study Stash
+  (`.github/workflows/ci.yml`). A build without it shows Connect with Google greyed out with "This copy of Egghead Notes
   can't connect to Google: it was built without Google sign-in. The download from studystash.app can.", and every
   test that doesn't need real Google passes. (A Desktop client's secret is not a real secret to Google — it ships
   inside every copy of the app — but it stays out of the repo.)
@@ -99,7 +99,7 @@ reading by id every 0.5 s):
   `[drive] POST /lectures/{}/title from Joey's iPhone: 200`.
 - What Google says no to, in the student's words (`GoogleException.Words`): Cancel or an account turned away ("Google
   didn't connect. If you pressed Cancel…"), a school account (`admin_policy_enforced`/`org_internal`: "Your school's
-  Google account doesn't allow Study Stash. Try a personal Gmail on both."), no answer in five minutes (Google shows
+  Google account doesn't allow Egghead Notes. Try a personal Gmail on both."), no answer in five minutes (Google shows
   its own error page for a blocked account and never sends the browser back), offline.
 
 ## The folder
@@ -327,14 +327,14 @@ on white, in light and dark (checked by decoding it with macOS's CoreImage detec
 ## Sign-in screens, in words
 
 Plain, second person, no jargon, the desktop's words. "Google Drive" is fine to say; "OAuth", "token", "appDataFolder"
-are not. Laptop: "Connect your phone through your Google account" / "Your notes go into a private Study Stash folder
-in your Google Drive that only Study Stash can see." Once connected: "Connected as sam@example.com", "1. On your
-iPhone, open Study Stash and tap Continue with Google, or scan this code with the camera.", "2. Use the same Google
+are not. Laptop: "Connect your phone through your Google account" / "Your notes go into a private Egghead Notes folder
+in your Google Drive that only Egghead Notes can see." Once connected: "Connected as sam@example.com", "1. On your
+iPhone, open Egghead Notes and tap Continue with Google, or scan this code with the camera.", "2. Use the same Google
 account: sam@example.com.", "Your phone keeps a copy of your notes, so it can read them while this Mac is off.
 Recordings, files and questions from your phone reach this Mac when it's on." Disconnect asks first: "Your phone
-stops getting your notes, and Study Stash empties its folder in your Google Drive." Each phone: "Open now" or "Last
+stops getting your notes, and Egghead Notes empties its folder in your Google Drive." Each phone: "Open now" or "Last
 open 3 hours ago". Phone: "Continue with Google. Use the same Google account as on your laptop." If Google refuses (a
-school account that blocks outside apps), say so: "Your school's Google account doesn't allow Study Stash. Try a
+school account that blocks outside apps), say so: "Your school's Google account doesn't allow Egghead Notes. Try a
 personal Gmail on both."
 
 ## Testing
@@ -431,7 +431,7 @@ short:
   PKCE S256, `login_hint` when the QR code named an account (else `prompt=select_account`), no secret, no Google SDK.
   The client is the build setting `GOOGLE_IOS_CLIENT_ID` (Info.plist `GoogleClientID`) and its reversed form
   `GOOGLE_IOS_URL_SCHEME` (a URL type); both are placeholders (`…-replace-me`) until the iOS client exists, and while
-  they are, Continue with Google says "Continue with Google isn't set up in this copy of Study Stash yet." The account
+  they are, Continue with Google says "Continue with Google isn't set up in this copy of Egghead Notes yet." The account
   (email from the id_token, the refresh token) is one Keychain item, after-first-unlock, this device only; the widgets
   don't need it. A reply without the `drive.appdata` scope (the Drive box unticked on Google's page) is refused in
   words; `admin_policy_enforced` / `org_internal` get the school words. Sign out (Settings) deletes the phone's box,

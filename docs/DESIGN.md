@@ -1,4 +1,4 @@
-# Study Stash: design
+# Egghead Notes: design
 
 One C# program (`engine/src/StudyStash.App`, .NET 10 and Avalonia) plays both parts of a student's
 lecture library, and installs itself in one of two roles:
@@ -13,7 +13,7 @@ laptop                                          library (a Mac mini, say — any
   record → Whisper (local, no audio leaves it)    /api/ingest → a queue (SQLite)
   the class you picked, or none             ──▶   pipeline: study notes (an AI engine) → sort → Markdown
                                                   then, after filing: diagrams (DiagramJobs) into the notes
-  Study Stash app / quick panel                   web page, Claude/MCP, Canvas mirror — over Tailscale
+  Egghead Notes app / quick panel                   web page, Claude/MCP, Canvas mirror — over Tailscale
 ```
 
 ## The projects
@@ -122,8 +122,8 @@ place, `Shell.Notify`, as a `Notice`.
 
 - **On a Mac they're the system's own.** `MacNotifications` hands each one to Notification Center
   (`UNUserNotificationCenter`, spoken to from C#), and macOS shows it its way: its look, its corner, how long it
-  stays, the list of earlier ones, Do Not Disturb and Focus. Study Stash adds only the words and, where a notice has
-  one, its button; a click on the notification does what the button does. Nothing of Study Stash's is drawn on one
+  stays, the list of earlier ones, Do Not Disturb and Focus. Egghead Notes adds only the words and, where a notice has
+  one, its button; a click on the notification does what the button does. Nothing of Egghead Notes' is drawn on one
   (no picture, no sound). The icon macOS puts beside it is the app's own, which is macOS's doing and can't be left
   off.
 - **macOS asks once** whether to allow them, the first time something is said. Until that's answered a notice waits
@@ -139,10 +139,10 @@ place, `Shell.Notify`, as a `Notice`.
   against Windows' own metadata. An app that isn't a Store package gets notifications by saying who it is in the
   registry, which the app does for this account the first time it has something to say (its name and icon under
   `HKCU\Software\Classes\AppUserModelId\StudyStash.App`); Windows shows that name and icon along the top, as it
-  does for any app, and nothing else of Study Stash's (no picture in it, no sound). A click on one, or on its button,
+  does for any app, and nothing else of Egghead Notes' (no picture in it, no sound). A click on one, or on its button,
   opens a `studystash:` link (`NoticeLinks`): Windows starts a second copy with `--open LINK`, which hands the running
   app a word and goes, the way `--show` does. Only that one exact link shape means anything. Windows asks nobody's
-  leave first; notifications turned off for Study Stash (or altogether) in Windows' settings is treated as on a Mac,
+  leave first; notifications turned off for Egghead Notes (or altogether) in Windows' settings is treated as on a Mac,
   and one Windows won't take is shown as the app's own card and noted in the log.
   Setup.exe's uninstaller takes the registry keys out. A build run from its folder, or a second profile, keeps the
   app's own cards: the link has to open the installed program.
@@ -282,7 +282,7 @@ frames. On paper (`NoteView.PageHeight`, the PDF) that's all it is: the still pi
   to, or a cycle's first box), each box once after every box with a forward arrow to it, a branch to
   its end before the next, a group finished before the walk leaves it; arrows back round a loop are
   the last step's way out.
-- **Moments** (`Core/Rich/DiagramMoment.cs`): a designed diagram's `%% Study Stash diagram, from
+- **Moments** (`Core/Rich/DiagramMoment.cs`): a designed diagram's `%% Egghead Notes diagram, from
   12:34` mark, and where a box's words were said, found by matching their stems against the timed
   transcript (rare words count for more).
 - The page a diagram is on answers for it through `IDiagramHost` (`DiagramHost.Host`, found by

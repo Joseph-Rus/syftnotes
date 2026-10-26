@@ -210,7 +210,7 @@ public sealed partial class SettingsModel : ObservableObject, IDisposable
     [ObservableProperty] public partial string KeepAudio { get; set; } = "30";
     [ObservableProperty] public partial bool Shortcuts { get; set; }
     [ObservableProperty] public partial bool CountThisCopy { get; set; } = true;
-    public string CountThisCopySub => "Once a day, send one anonymous count (a random code for this copy, the version and Mac or Windows) so we know how many people use Study Stash.";
+    public string CountThisCopySub => "Once a day, send one anonymous count (a random code for this copy, the version and Mac or Windows) so we know how many people use Egghead Notes.";
     /// <summary>Which shortcut (if either) another app already has, once the toggle's had a moment to try them.</summary>
     [ObservableProperty] public partial string? ShortcutsSay { get; set; }
     public bool CanRecordComputerAudio => host.CanRecordComputerAudio;
@@ -224,7 +224,7 @@ public sealed partial class SettingsModel : ObservableObject, IDisposable
     public CanvasSettingsModel Canvas { get; }
     /// <summary>The calendar feeds and sources connected on this computer, and which of their calendars are shown.</summary>
     public CalendarSettingsModel Calendars { get; }
-    /// <summary>Settings → Granola: sign in, and the lectures there that Study Stash could bring over.</summary>
+    /// <summary>Settings → Granola: sign in, and the lectures there that Egghead Notes could bring over.</summary>
     public ViewModels.GranolaSettingsModel Granola { get; }
     /// <summary>The library's own settings (Library, Classes, Notes and sorting, Folders).</summary>
     public LibrarySettingsModel Lib { get; }
@@ -277,7 +277,7 @@ public sealed partial class SettingsModel : ObservableObject, IDisposable
     [ObservableProperty] public partial bool CanUpdateHere { get; set; }
     [ObservableProperty] public partial bool UpdateHereBusy { get; set; }
     [ObservableProperty] public partial bool AutoUpdateHere { get; set; }
-    public string AutoUpdateHereSub => "Study Stash on this laptop installs each new version by itself, never while you're recording. Your library has its own switch under Advanced → Library.";
+    public string AutoUpdateHereSub => "Egghead Notes on this laptop installs each new version by itself, never while you're recording. Your library has its own switch under Advanced → Library.";
     Func<AppUpdates?> updater = () => AppUpdates.Current;
 
     /// <summary>For a test: Check now and Update now go through <paramref name="updates"/>, not the running app's.</summary>
@@ -348,7 +348,7 @@ public sealed partial class SettingsModel : ObservableObject, IDisposable
         NavItem Nav(string id, string glyph, string label) => new() { Id = id, Glyph = glyph, Label = label };
         NavGroups =
         [
-            new("Study Stash",
+            new("Egghead Notes",
             [
                 Nav("General", "tune", "General"),
                 Nav("Appearance", "palette", "Appearance"),
@@ -450,7 +450,7 @@ public sealed partial class SettingsModel : ObservableObject, IDisposable
         CountThisCopy = host.Settings.CountThisCopy;
         StartAtLogin = host.LoginItems.StartsAtLogin(host.Home);
         AutoUpdateHere = cc.AutoUpdate;
-        UpdateHereLine = $"Study Stash {Version} on this laptop";
+        UpdateHereLine = $"Egghead Notes {Version} on this laptop";
         // A newer version the app already knows of: Update now is there straight away, no Check now first.
         if (AppUpdates.Current?.Found is { } found)
             (UpdateHereLine, CanUpdateHere) = NoticeWords.UpdateChecked(new UpdateCheck(AppUpdates.Available, found), Version);
@@ -528,7 +528,7 @@ public sealed partial class SettingsModel : ObservableObject, IDisposable
         {
             LibraryState.Connected when runsHere && !host.OlderLibrary =>
                 $"{cc.PoolName} runs on this {(OperatingSystem.IsMacOS() ? "Mac" : "PC")}, on port {host.LocalLibrary!.Cfg.WebPort}.",
-            LibraryState.Connected when host.OlderLibrary => $"Connected to {cc.PoolName}. It runs an older Study Stash: update it to browse, search and ask from here.",
+            LibraryState.Connected when host.OlderLibrary => $"Connected to {cc.PoolName}. It runs an older Egghead Notes: update it to browse, search and ask from here.",
             LibraryState.Connected => $"Connected to {cc.PoolName} at {cc.ServerUrl}.",
             LibraryState.Starting => "Starting your library…",
             LibraryState.Unreachable => $"Can't reach {cc.ServerUrl} right now. Lectures wait here until it's back.",

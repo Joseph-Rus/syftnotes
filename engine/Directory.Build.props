@@ -9,9 +9,9 @@
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
   </PropertyGroup>
   <PropertyGroup>
-    <!-- The one place Study Stash's version lives: CI publishes v<version> when it changes on main. The laptop and
+    <!-- The one place Egghead Notes' version lives: CI publishes v<version> when it changes on main. The laptop and
          setup check it. -->
-    <StudyStashVersion>0.18.5</StudyStashVersion>
+    <StudyStashVersion>0.19.0</StudyStashVersion>
     <Version>$(StudyStashVersion)</Version>
     <InformationalVersion>$(StudyStashVersion)</InformationalVersion>
     <IncludeSourceRevisionInInformationalVersion>false</IncludeSourceRevisionInInformationalVersion>
