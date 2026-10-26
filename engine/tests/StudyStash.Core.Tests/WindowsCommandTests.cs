@@ -237,7 +237,9 @@ public class WindowsCommandTests
 
         foreach (var (program, expected) in new[] { (shim, Tricky), (wrapper, Tricky.Select(t => t.Replace('\n', ' ')).ToArray()) })
         {
-            var result = await new EchoCli([program, .. Tricky]).CompleteAsync(new AiRequest(prompt, dir.Path) { Timeout = TimeSpan.FromMinutes(1) });
+            // Five minutes, not one: on a CI runner busy with the rest of the tests, cmd.exe and Node starting can
+            // take past a minute, and this checks what arrives, not how fast.
+            var result = await new EchoCli([program, .. Tricky]).CompleteAsync(new AiRequest(prompt, dir.Path) { Timeout = TimeSpan.FromMinutes(5) });
             Assert.True(result.Ok, result.Text);
             var got = JsonNode.Parse(result.Text)!;
             Assert.Equal(expected, got["args"]!.AsArray().Select(a => (string)a!).ToArray());
