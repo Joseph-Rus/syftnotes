@@ -29,7 +29,7 @@ public static class Converters
     /// <summary>There or not, but keeping its room either way (its opacity): two things that take turns in one place
     /// without the place changing size.</summary>
     public static readonly IValueConverter Shown = new FuncValueConverter<bool, double>(on => on ? 1 : 0);
-    /// <summary>Half there while true (the pill's S and meter while paused).</summary>
+    /// <summary>Half there while true (the pill's egghead and meter while paused).</summary>
     public static readonly IValueConverter Dim = new FuncValueConverter<bool, double>(on => on ? 0.5 : 1);
 
     /// <summary>A row that only shows when it has something to say: an engine's subtitle, a menu's footer.</summary>

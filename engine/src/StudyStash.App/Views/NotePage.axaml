@@ -102,16 +102,23 @@
           <!-- While it records: the bar. Pause keeps the file open; Stop ends the recording and starts the write-up. -->
           <Border Name="RecBar" Classes="recbar" IsVisible="{Binding Live}" Margin="0,2,0,26" AutomationProperties.Name="{Binding RecordingSaid}"
                   AutomationProperties.LiveSetting="Polite">
-            <Grid ColumnDefinitions="Auto,14,Auto,14,Auto,14,Auto,*,Auto,8,Auto">
+            <Grid ColumnDefinitions="Auto,10,Auto,10,Auto,12,Auto,*,Auto,8,Auto">
               <StackPanel Orientation="Horizontal" Spacing="12">
-                <c:Doodle Art="listening" Size="34" Busy="{Binding Recorder.IsRunning, FallbackValue=False}" VerticalAlignment="Center" />
-                <Ellipse Width="12" Height="12" Fill="{DynamicResource Record}" Classes.pulse="{Binding Pulses}" VerticalAlignment="Center" />
+                <!-- The egghead listening, in his light drawing on a white tile (the app icon's) on a dark page too: the
+                     dark drawing's grey egg and pale lines read as a skull at this size, and his dark headphones
+                     vanish into a dark page without the tile. -->
+                <ThemeVariantScope RequestedThemeVariant="Light" VerticalAlignment="Center">
+                  <Border Width="38" Height="38" CornerRadius="19" Background="#FFFFFF" BoxShadow="{DynamicResource LineRing}">
+                    <c:Doodle Art="listening" Size="30" Busy="{Binding Recorder.IsRunning, FallbackValue=False}" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                  </Border>
+                </ThemeVariantScope>
+                <Ellipse Width="10" Height="10" Fill="{DynamicResource Record}" Classes.pulse="{Binding Pulses}" VerticalAlignment="Center" />
               </StackPanel>
-              <TextBlock Grid.Column="2" Text="{Binding RecordingWord}" FontSize="15" FontWeight="Bold" VerticalAlignment="Center" />
-              <c:Waveform Grid.Column="4" Bars="3" Height="16" MinBar="5" Levels="{Binding Recorder.Levels, FallbackValue={x:Null}}" Foreground="{DynamicResource Record}"
-                          VerticalAlignment="Center" IsVisible="{Binding Recorder.IsRunning, FallbackValue=False}" />
-              <TextBlock Grid.Column="6" Text="{Binding Recorder.Elapsed, FallbackValue=''}" FontSize="15" FontWeight="Medium" Foreground="{DynamicResource InkMuted}"
+              <TextBlock Grid.Column="2" Text="{Binding RecordingWord}" FontSize="15" FontWeight="SemiBold" VerticalAlignment="Center" />
+              <TextBlock Grid.Column="4" Classes="num" Text="{Binding Recorder.Elapsed, FallbackValue=''}" FontSize="15" FontWeight="Medium" Foreground="{DynamicResource InkMuted}"
                          VerticalAlignment="Center" />
+              <c:Waveform Grid.Column="6" Bars="3" Height="14" MinBar="4" Levels="{Binding Recorder.Levels, FallbackValue={x:Null}}" Foreground="{DynamicResource Record}"
+                          VerticalAlignment="Center" IsVisible="{Binding Recorder.IsRunning, FallbackValue=False}" />
               <Button Name="Pause" Grid.Column="8" Classes="btn sm" Command="{Binding Recorder.PauseCommand, FallbackValue={x:Null}}" AutomationProperties.Name="{Binding PauseWord}">
                 <StackPanel Orientation="Horizontal" Spacing="6">
                   <c:Icon Glyph="{Binding Recorder.PauseGlyph, FallbackValue=pause}" Size="14" VerticalAlignment="Center" />

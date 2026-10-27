@@ -1188,12 +1188,12 @@
     <Setter Property="Foreground" Value="{DynamicResource InkSubtle}" />
     <Setter Property="TextWrapping" Value="Wrap" />
   </Style>
-  <!-- The bar across the top of a note's page while it records: ringed in red, the one place besides the dot. -->
+  <!-- The bar across the top of a note's page while it records: a quiet card, its red only in the dot and the meter. -->
   <Style Selector="Border.recbar">
     <Setter Property="Background" Value="{DynamicResource Surface}" />
     <Setter Property="CornerRadius" Value="{DynamicResource RadiusPanel}" />
-    <Setter Property="BoxShadow" Value="{DynamicResource RecordRing}" />
-    <Setter Property="Padding" Value="16,8,8,8" />
+    <Setter Property="BoxShadow" Value="{DynamicResource LineRing}" />
+    <Setter Property="Padding" Value="12,8,8,8" />
   </Style>
   <!-- Notes from an AI Egghead Notes doesn't run, on a note's page (the Claude app, any free chat): the offer over a
        lecture with no notes, a long lecture's copy in parts, and the box a chat's notes are pasted into. -->
