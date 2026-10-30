@@ -103,7 +103,7 @@ function Groups({ list, colorOf }: { list: DueList; colorOf: (c: string | null) 
   if (todo.length === 0 && done.length === 0)
     return (
       <Empty icon={<Doodle name="sleepy" />} title="Nothing due">
-        Link your classes to Canvas in Egghead Notes on your computer, and what's due shows up here.
+        Link your classes to Canvas in Syft Notes on your computer, and what's due shows up here.
       </Empty>
     );
   return (

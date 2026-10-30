@@ -1,4 +1,4 @@
-// The Egghead Notes look on a phone: the app's twenty colour themes (ColourThemes.cs) and the Mac's Liquid Glass tokens
+// The Syft Notes look on a phone: the app's twenty colour themes (ColourThemes.cs) and the Mac's Liquid Glass tokens
 // worked out from them the way Skin.cs does, as CSS oklch() colours.
 
 /** A colour theme: the accent's hue, chroma and lightness, and the faint hue the neutral surfaces lean to. */

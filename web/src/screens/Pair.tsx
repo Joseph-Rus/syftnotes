@@ -48,7 +48,7 @@ export function Pair({ api, library, onPaired }: { api: Api; library: Me['librar
         <Doodle name="hello" size={120} />
         <h1>{library ? `Add this phone to ${library.name}` : 'Add this phone'}</h1>
         <p class="lede">
-          In Egghead Notes on your computer, open Settings → Phone → <strong>Add a phone</strong>, then type the 6-digit
+          In Syft Notes on your computer, open Settings → Phone → <strong>Add a phone</strong>, then type the 6-digit
           code it shows.
         </p>
         <input

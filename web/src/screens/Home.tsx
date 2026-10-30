@@ -188,7 +188,7 @@ function Classes({
   if (overview.classes.length === 0 && overview.unsorted === 0)
     return (
       <Empty icon={<Doodle name="hello" size={128} />} title="Nothing here yet">
-        Record a lecture with Egghead Notes on your computer, or import a voice memo with +.
+        Record a lecture with Syft Notes on your computer, or import a voice memo with +.
       </Empty>
     );
   return (

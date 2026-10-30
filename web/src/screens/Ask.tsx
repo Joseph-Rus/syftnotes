@@ -110,7 +110,7 @@ export function AskScreen({ api }: { api: Api }) {
     >
       {noAi ? (
         <Empty icon={<Doodle name="thinking" />} title="Asking isn't set up yet">
-          Choose an AI in Egghead Notes' Settings → AI engines on your library's computer, then ask here.
+          Choose an AI in Syft Notes' Settings → AI engines on your library's computer, then ask here.
         </Empty>
       ) : turns.length === 0 ? (
         <div class="ask-start">

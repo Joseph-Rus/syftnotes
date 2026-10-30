@@ -1,4 +1,4 @@
-// Egghead Notes · Canvas: a read-only fetcher for your Egghead Notes library.
+// Syft Notes · Canvas: a read-only fetcher for your Syft Notes library.
 // The library decides what to read (assignments, submissions, modules, pages, files, or whatever a course's
 // scout asks for); this extension only fetches those Canvas URLs with the session you're already
 // signed into and hands the answers back. It never writes to Canvas, and it refuses any URL outside Canvas
@@ -75,7 +75,7 @@ async function viaPublicUrl(url) {
 }
 
 async function run(job) {
-  if (!conn || !conn.canvas) return {id: job.id, error: 'refused: Egghead Notes has no Canvas address yet'};
+  if (!conn || !conn.canvas) return {id: job.id, error: 'refused: Syft Notes has no Canvas address yet'};
   if (!allowed(job.url)) return {id: job.id, error: 'refused: not a Canvas URL'};
   try {
     const headers = job.kind === 'json' ? {Accept: 'application/json'} : {};
@@ -111,7 +111,7 @@ async function run(job) {
   }
 }
 
-// Egghead Notes rewrites this folder when it updates, and when the Canvas or library address changes: when the
+// Syft Notes rewrites this folder when it updates, and when the Canvas or library address changes: when the
 // manifest there isn't the one running (another version, or other hosts it may reach), reload to pick up the new
 // files and permissions. Checked before asking for work, so a reload never drops work already taken. Reloading for
 // the same folder again (Chrome came back still running something else) waits a minute, so a folder Chrome reads
@@ -150,7 +150,7 @@ async function setStatus(state) {
   try {
     await chrome.storage.local.set({status: told});
     await chrome.action.setBadgeText({text: state === 'ok' ? '' : '!'});
-    await chrome.action.setTitle({title: state === 'ok' ? 'Egghead Notes' : 'Egghead Notes: ' + statusWords(told)});
+    await chrome.action.setTitle({title: state === 'ok' ? 'Syft Notes' : 'Syft Notes: ' + statusWords(told)});
   } catch (e) { /* no toolbar button to update */ }
 }
 

@@ -1,8 +1,8 @@
 {
-  "name": "study-stash-phone",
+  "name": "syft-notes-phone",
   "private": true,
   "version": "0.9.0",
-  "description": "Egghead Notes on a phone: the library's own web app, served at /app/.",
+  "description": "Syft Notes on a phone: the library's own web app, served at /app/.",
   "type": "module",
   "scripts": {
     "dev": "vite",
