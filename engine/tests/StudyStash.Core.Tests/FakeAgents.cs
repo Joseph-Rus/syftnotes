@@ -81,6 +81,9 @@ public static class FakeAgents
         }
     }
 
+    /// <summary>How many times the fake's sign-in was started (<c>logins</c>, a line each).</summary>
+    public static int Logins(string bin) => File.Exists(Path.Combine(bin, "logins")) ? File.ReadAllLines(Path.Combine(bin, "logins")).Length : 0;
+
     public static int Turns(string bin) => File.Exists(Path.Combine(bin, "turns")) ? int.Parse(File.ReadAllText(Path.Combine(bin, "turns")).Trim(), System.Globalization.CultureInfo.InvariantCulture) : 0;
 
     static string ShCli(string id, string version) => $$"""
@@ -120,6 +123,7 @@ public static class FakeAgents
           exit 0
         fi
         if { [ "{{id}}" = claude ] && [ "$1" = auth ] && [ "$2" = login ]; } || { [ "{{id}}" = codex ] && [ "$1" = login ]; }; then
+          echo x >> "$D/logins"
           echo "Opening your browser to sign in: https://example.com/fake-sign-in?code=abc"
           [ -f "$D/login-fails" ] && { echo "Raw mode is not supported on the current process.stdin" >&2; exit 1; }
           sleep "$(cat "$D/login-delay" 2>/dev/null || echo 1)"
@@ -213,6 +217,7 @@ public static class FakeAgents
           exit 0
         }
         if (($ID -eq 'claude' -and $argv[0] -eq 'auth' -and $argv[1] -eq 'login') -or ($ID -eq 'codex' -and $argv[0] -eq 'login')) {
+          Add-Content "$D\logins" 'x'
           'Opening your browser to sign in: https://example.com/fake-sign-in?code=abc'
           if (Test-Path "$D\login-fails") { [Console]::Error.WriteLine('Raw mode is not supported'); exit 1 }
           $delay = 1; if (Test-Path "$D\login-delay") { $delay = [int](Get-Content "$D\login-delay") }

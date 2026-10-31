@@ -36,7 +36,7 @@ public sealed partial class LibraryWeb
     }
 
     async Task<AiOverview> AiOverviewAsync() =>
-        (await Engines.StatusAsync(AiSettings.Load(cfg.Home), cfg, Jobs.Checks)) with { Pulling = Jobs.Pulling };
+        Jobs.SignIns.Annotate((await Engines.StatusAsync(AiSettings.Load(cfg.Home), cfg, Jobs.Checks)) with { Pulling = Jobs.Pulling });
 
     static IResult AiJson<T>(T value) => Http.Json(JsonSerializer.SerializeToNode(value, AiRemote.Options));
 
@@ -243,10 +243,17 @@ public sealed partial class LibraryWeb
             if (id == "ollama") return Http.Detail(400, "Ollama doesn't need to sign in: it's private, on this computer.");
             if (!IsLocal(ctx))
                 return Http.Detail(409, $"Sign in on your library's computer: open {(OperatingSystem.IsWindows() ? "PowerShell" : "Terminal")} there and run {Engines.SignInWords(id)}");
+            var body = await Http.JsonBodyAsync(ctx.Request);
+            bool Asked(string key) => body?[key] is JsonValue v && v.TryGetValue(out bool b) && b;
             string said;
             try
             {
-                said = Jobs.Checks.OpenSignIn(cfg.Home, AiSettings.Load(cfg.Home).Terminal, id);
+                // The last resort, once the hidden sign-in couldn't start or stopped at once: a terminal, as it always was.
+                if (Asked("terminal")) said = Jobs.Checks.OpenSignIn(cfg.Home, AiSettings.Load(cfg.Home).Terminal, id);
+                // Otherwise the AI's own sign-in, hidden: it opens the student's browser itself, and the engine's row says
+                // "waiting" until its status command says signed in (then it's ready by itself).
+                else if (Jobs.SignIns.Can(id)) said = Asked("again") ? Jobs.SignIns.Again(id) : Jobs.SignIns.Start(id);
+                else throw new InvalidOperationException($"{Engines.Tool(id)} isn't installed on this computer.");
             }
             catch (Exception e) when (e is InvalidOperationException or System.ComponentModel.Win32Exception or IOException)
             {

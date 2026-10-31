@@ -575,6 +575,49 @@ public class AiShots
                 });
     }
 
+    /// <summary>Claude's own sign-in going from Syft Notes, in the student's browser: the Your AI row and the problems card
+    /// while it waits (a quiet line and a small "Open the page again" link, no button), after it gave up (Try again), and
+    /// when its maker doesn't offer it in the country.</summary>
+    [AvaloniaFact]
+    public void Ai_signing_in_in_the_browser()
+    {
+        foreach (var skin in new[] { SkinKind.Mac, SkinKind.Win })
+            foreach (var t in Themes)
+                foreach (var (name, phase) in new[] { ("waiting", SignInPhase.Waiting), ("gave-up", SignInPhase.GaveUp), ("country", SignInPhase.Region), ("stuck", SignInPhase.Stuck) })
+                {
+                    string prefix = skin == SkinKind.Mac ? "mac" : "win";
+                    Shot.Take($"{prefix}-13-ai-engines-sign-in-{name}", skin, t, () => PaneSheet(skin, 720, 1340, skin == SkinKind.Mac
+                        ? new MacAiEngines { DataContext = AiDemo.EnginesSigningIn(phase) } : new WinAiEngines { DataContext = AiDemo.EnginesSigningIn(phase) }),
+                        size: new Size(850, 1470));
+                    Shot.Take($"{prefix}-18-ai-problem-sign-in-{name}", skin, t, () => PaneSheet(skin, 720, null,
+                        skin == SkinKind.Mac ? new MacAiProblem { DataContext = AiDemo.ProblemSigningIn(phase).Problems.Single() }
+                            : new WinAiProblem { DataContext = AiDemo.ProblemSigningIn(phase).Problems.Single() }),
+                        size: new Size(850, 300));
+                }
+    }
+
+    /// <summary>A pane (or one card) on a sheet of the skin's own surface, without the settings window round it: for pictures
+    /// of a part of Settings that sits too far down for the window's height.</summary>
+    static Control PaneSheet(SkinKind skin, double width, double? height, Control child)
+    {
+        var sheet = new Border { Width = width, Padding = new Thickness(skin == SkinKind.Mac ? 8 : 24), Child = child };
+        if (height is { } h) sheet.Height = h;
+        if (skin == SkinKind.Mac)
+        {
+            Res(sheet, Border.BackgroundProperty, sheet, "Win");
+            sheet.CornerRadius = new CornerRadius(26);
+            Res(sheet, Border.BoxShadowProperty, sheet, "GShadow");
+        }
+        else
+        {
+            Res(sheet, Border.BackgroundProperty, sheet, "Mica");
+            sheet.CornerRadius = new CornerRadius(8);
+            sheet.BorderThickness = new Thickness(1);
+            Res(sheet, Border.BorderBrushProperty, sheet, "FlyStroke");
+        }
+        return sheet;
+    }
+
     [AvaloniaFact]
     public void Mac_ai_problems()
     {

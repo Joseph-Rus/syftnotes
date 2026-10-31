@@ -18,6 +18,29 @@ public sealed class AiJobs(string home, Func<string>? ollamaHost = null)
     /// <summary>How the library checks whether each engine is ready, without ever contacting an account.</summary>
     public EngineChecks Checks { get; init; } = EngineChecks.Machine with { HasKey = id => ApiKeys.Has(home, id) };
 
+    /// <summary>How often a sign-in that's waiting for the student is looked at, and how long it's looked at before it
+    /// gives up: a test sets them small.</summary>
+    public TimeSpan SignInEvery { get; init; } = TimeSpan.FromSeconds(3);
+    public TimeSpan SignInPatience { get; init; } = TimeSpan.FromMinutes(10);
+
+    AiSignIns? signIns;
+
+    /// <summary>The AIs' own sign-ins, started hidden from every Sign in button (<see cref="AiSignIns"/>): once one says it's
+    /// signed in, the AI is marked ready (<see cref="MarkSignedIn"/>).</summary>
+    public AiSignIns SignIns => signIns ??= new AiSignIns(Checks, MarkSignedIn) { Every = SignInEvery, Patience = SignInPatience };
+
+    /// <summary>An AI's own status command said the student signed in: it's ready now, with no check to press, and the
+    /// notes it couldn't write while it was signed out are written (<see cref="SignedInAgain"/>). A usage limit is left
+    /// alone: signing in doesn't end one.</summary>
+    public void MarkSignedIn(string id)
+    {
+        var s = Settings;
+        bool back = Engines.LooksLikeAuth(s.Tests.GetValueOrDefault(id, ""));
+        s.Tests[id] = "works";
+        s.Save(home);
+        if (back) SignedInAgain?.Invoke(id);
+    }
+
     /// <summary>How long <see cref="AskAsync"/> waits for the picked engine before falling back to Ollama: for the
     /// whole answer, or, when it's shown as it's written, for the engine to start writing it.</summary>
     public TimeSpan AskTimeout { get; init; } = TimeSpan.FromSeconds(90);
