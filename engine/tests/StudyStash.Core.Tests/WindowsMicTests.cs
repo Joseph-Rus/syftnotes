@@ -155,10 +155,12 @@ public class WindowsMicTests
     [Fact]
     public void Opening_that_fails_throws_its_own_exception_and_one_that_works_is_returned()
     {
-        var e = Assert.Throws<MicrophoneException>(() => Opening.Within<string>(TimeSpan.FromSeconds(5),
+        // Both come back at once; the limit only bounds a hang, roomy enough for a busy test machine's thread pool to start
+        // the opening (it timed out at 5 s on a CI runner).
+        var e = Assert.Throws<MicrophoneException>(() => Opening.Within<string>(TimeSpan.FromSeconds(60),
             () => throw new MicrophoneException(MicTrouble.NoDevice(windows: true)), _ => { }, () => new TimeoutException()));
         Assert.Equal(MicTroubleKind.NoDevice, e.Trouble.Kind);
-        Assert.Equal("ok", Opening.Within(TimeSpan.FromSeconds(5), () => "ok", _ => { }, () => new TimeoutException()));
+        Assert.Equal("ok", Opening.Within(TimeSpan.FromSeconds(60), () => "ok", _ => { }, () => new TimeoutException()));
     }
 
     // --- the real Windows path -----------------------------------------------------------------------------------
