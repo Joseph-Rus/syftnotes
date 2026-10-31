@@ -181,11 +181,11 @@ public static class Cli
             // Notes, sorting and Ask use the AI picked in Settings (ai.json): Ollama unless another is chosen. A lecture is
             // filed as soon as its notes are written; their diagrams follow, one lecture at a time, never holding up notes,
             // and the diagram pass says in the log what it drew, or why nothing.
-            var ai = new AiJobs(home, () => cfg.OllamaHost) { Log = Console.WriteLine };
+            var ai = new AiJobs(home, () => cfg.OllamaHost) { Log = Console.WriteLine, GeminiBack = Antigravity.Back };
             Pipeline? writer = null; // the pipeline, below: the diagrams wait while it writes notes
             var diagrams = new DiagramJobs(cfg, store, ai) { NotesBusy = () => writer?.Writing == true };
             var pipeline = writer = new Pipeline(cfg, store, ai.SortAsync, ai.SummarizeAsync, notesModel: () => ai.Describe("notes", cfg), notesFast: ai.NotesInFastMode,
-                filed: id => diagrams.AfterFiled(id, ai.TakeDiagramsFollow(id)));
+                filed: id => diagrams.AfterFiled(id, ai.TakeDiagramsFollow(id)), limitUntil: ai.LimitUntil);
             // An AI that needed signing in again answers once more: the lectures it couldn't write notes for meanwhile
             // get them now, without the student asking for each.
             ai.SignedInAgain += id =>
@@ -195,6 +195,30 @@ public static class Cli
                 Console.WriteLine($"[pipeline] {Engines.Name(id)} is signed in again: writing the notes of {n} lecture(s) it couldn't before");
                 pipeline.Wake();
             };
+            // An AI over its usage limit (Gemini's free allowance used up for the week): the lectures it couldn't write
+            // notes for are written once the limit's over, at that time (a timer set for it, not a look every so often),
+            // or as soon as it answers again. A restart sets the timers again from what's recorded.
+            var limitTimers = new System.Collections.Concurrent.ConcurrentDictionary<string, Timer>();
+            void WriteLimited(string id, string why)
+            {
+                int n = store.RequeueLimited(Engines.Name(id));
+                if (n == 0) return;
+                Console.WriteLine($"[pipeline] {Engines.Name(id)} {why}: writing the notes of {n} lecture(s) it couldn't before");
+                pipeline.Wake();
+            }
+            void WhenLimitEnds(string id, DateTime until)
+            {
+                // A minute after the limit's end, so it's really over by then; one already past runs at once.
+                var due = until.ToUniversalTime() - DateTime.UtcNow + TimeSpan.FromMinutes(1);
+                if (due < TimeSpan.Zero) due = TimeSpan.Zero;
+                if (due > TimeSpan.FromDays(40)) due = TimeSpan.FromDays(40);
+                var timer = new Timer(_ => WriteLimited(id, "is past its usage limit"), null, due, Timeout.InfiniteTimeSpan);
+                if (limitTimers.TryGetValue(id, out var before)) before.Dispose();
+                limitTimers[id] = timer;
+            }
+            ai.Limited += WhenLimitEnds;
+            ai.LimitOver += id => WriteLimited(id, "answers again");
+            foreach (var (id, until) in ai.LimitsNow()) WhenLimitEnds(id, until);
             var working = pipeline.Start(stop.Token);
             var designing = diagrams.Start(stop.Token);
             Task updating = Task.CompletedTask;

@@ -159,7 +159,9 @@ public static class Engines
     // out says "api key" too, but with its /login.
     static readonly Regex KeyRefused = new(@"api key", RegexOptions.IgnoreCase | RegexOptions.Compiled);
     static readonly Regex LoginLike = new(@"log ?in", RegexOptions.IgnoreCase | RegexOptions.Compiled);
-    static readonly Regex LimitLike = new(@"usage limit|rate limit|quota|limit reached|too many requests|\b429\b|resets? (at|in)",
+    // Google's own words for an allowance that's used up ("RESOURCE_EXHAUSTED", "You have exhausted your capacity"):
+    // matched as a limit too, though no real used-up Gemini account has been seen here yet.
+    static readonly Regex LimitLike = new(@"usage limit|rate limit|quota|limit reached|too many requests|\b429\b|resets? (at|in)|resource.?exhausted|exhausted your|allowance (is |was |has been )?used up",
         RegexOptions.IgnoreCase | RegexOptions.Compiled);
     static readonly Regex InDuration = new(@"in (\d+)\s*(hour|minute)s?", RegexOptions.IgnoreCase | RegexOptions.Compiled);
     static readonly Regex AtTime = new(@"at (\d{1,2})(?::(\d{2}))?\s*([ap]m)?", RegexOptions.IgnoreCase | RegexOptions.Compiled);
@@ -191,6 +193,41 @@ public static class Engines
     /// writes those notes by itself (<see cref="AiJobs.SignedInAgain"/>, <see cref="Store.RequeueSignedIn"/>).</summary>
     public static string NotesNeedSignIn(string name) =>
         $"{NotesBecause}{name}{SignInAgain} Sign in from Settings → Your AI, and they're written then.";
+
+    const string WaitBecause = "Your notes aren't written yet because ";
+    const string WaitThen = " They're written by themselves once it's back.";
+
+    /// <summary>Why a lecture has no notes yet when the AI that writes them hit its usage limit (Gemini's free allowance
+    /// used up for the week, say): kept as the lecture's reason, so every page says it, and the library writes those
+    /// notes by itself once the limit is over (<see cref="Store.RequeueLimited"/>). <paramref name="until"/>, when
+    /// it's known, is said in the student's time.</summary>
+    public static string NotesWaitForLimit(string name, DateTime? until) =>
+        $"{WaitBecause}{name}{(name == "Gemini" ? "'s allowance is used up" : " hit its usage limit")}"
+        + (until is { } t ? $" until {UntilWords(t)}." : " for now.") + WaitThen;
+
+    /// <summary>"Tue 3 Nov, 9:00 am", in this computer's time.</summary>
+    public static string UntilWords(DateTime t) =>
+        (t.Kind == DateTimeKind.Utc ? t.ToLocalTime() : t).ToString("ddd d MMM, h:mm tt", CultureInfo.InvariantCulture).Replace("AM", "am").Replace("PM", "pm");
+
+    /// <summary>The AI a lecture's reason says hit its limit (<see cref="NotesWaitForLimit"/>), or null.</summary>
+    public static string? WaitsForLimit(string why)
+    {
+        if (!why.StartsWith(WaitBecause, StringComparison.Ordinal)) return null;
+        string rest = why[WaitBecause.Length..];
+        int end = rest.IndexOf("'s allowance", StringComparison.Ordinal) is var a and > 0 ? a : rest.IndexOf(" hit its usage limit", StringComparison.Ordinal);
+        return end > 0 ? rest[..end] : null;
+    }
+
+    /// <summary>When the limit in a lecture's reason ends, as it says it ("Tue 3 Nov, 9:00 am"), or "" for "for now".</summary>
+    public static string LimitUntil(string why)
+    {
+        int at = why.IndexOf(" until ", StringComparison.Ordinal);
+        int end = at < 0 ? -1 : why.IndexOf(WaitThen, at, StringComparison.Ordinal);
+        return at > 0 && end > at ? why[(at + 7)..end].TrimEnd('.') : "";
+    }
+
+    /// <summary>The start every <see cref="NotesWaitForLimit"/> reason for <paramref name="name"/> has.</summary>
+    public static string WaitPrefix(string name) => WaitBecause + name;
 
     /// <summary>The same for notes that were to be written again: the ones there stay as they were.</summary>
     public static string RewriteNeedsSignIn(string name) =>
