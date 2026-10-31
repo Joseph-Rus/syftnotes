@@ -58,8 +58,9 @@ folder such as `<user>.github.io/study-stash/` alike. Only the link-preview tags
 **The check** serves `site/` the way a static host does and fails when a page doesn't load or is missing `lang`, a
 viewport, a `<title>`, a description or an `<h1>`; when an image has no `alt`; when any link, image, script or
 stylesheet on the site doesn't resolve, or a `#fragment` names no id on its page; when a page loads anything from
-another site; or when a download link isn't `Syft-Notes.dmg` or `Syft-Notes-Setup.exe` from
-`releases/latest/download/` (and the home page must offer both). It doesn't fetch outside links, so it passes
+another site; or when a download link isn't `Syft-Notes.dmg`, `Syft-Notes-Setup.exe`,
+`Syft-Notes-linux-x64.tar.gz` or `Syft-Notes-linux-arm64.tar.gz` from `releases/latest/download/` (and the home
+page must offer them all). It doesn't fetch outside links, so it passes
 before a release with those assets exists.
 
 ## Publishing

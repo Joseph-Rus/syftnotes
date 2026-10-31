@@ -206,7 +206,7 @@ public class LinuxTests
         Assert.True(Microphones.CanRecordComputerAudio);
         Assert.Equal(MicAccess.Allowed, Microphones.Access());
         Assert.Equal("", Microphones.SettingsUrl);
-        Assert.Contains("Sound settings", RecordingWords.CantHear);
+        Assert.Contains("Sound settings", RecordingWords.CantHearLinux);
     }
 
     [Fact]

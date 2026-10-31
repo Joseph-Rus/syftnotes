@@ -3,7 +3,7 @@
 <h1 align="center">Syft Notes</h1>
 
 <p align="center">
-  <b>Syft Notes is a free, open-source AI lecture recorder and note-taker for students on Mac and Windows: it records your lectures, transcribes them on your own computer and writes study notes, with the diagrams already drawn.</b><br>
+  <b>Syft Notes is a free, open-source AI lecture recorder and note-taker for students on Mac, Windows and Linux: it records your lectures, transcribes them on your own computer and writes study notes, with the diagrams already drawn.</b><br>
   Works with Claude, ChatGPT, Gemini or a free AI on your computer. No paid plan needed, and your recordings stay on your own computers.
 </p>
 
@@ -12,12 +12,14 @@
   &nbsp;·&nbsp;
   <a href="https://github.com/Joseph-Rus/study-stash/releases/latest/download/Syft-Notes-Setup.exe"><b>Download for Windows</b></a>
   &nbsp;·&nbsp;
+  <a href="#install"><b>Linux</b></a>
+  &nbsp;·&nbsp;
   <a href="https://syftnotes.com">Website</a>
 </p>
 
 <p align="center">
   <a href="https://github.com/Joseph-Rus/study-stash/releases/latest"><img src="https://img.shields.io/github/v/release/Joseph-Rus/study-stash?label=release" alt="Latest release"></a>
-  <img src="https://img.shields.io/badge/macOS%2015%2B%20%C2%B7%20Windows%2010%2F11-555" alt="macOS 15 or later, Windows 10 or 11">
+  <img src="https://img.shields.io/badge/macOS%2015%2B%20%C2%B7%20Windows%2010%2F11%20%C2%B7%20Linux-555" alt="macOS 15 or later, Windows 10 or 11, Linux">
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue" alt="MIT licence"></a>
 </p>
 
@@ -36,7 +38,7 @@ choose, including a free one that runs on your machine.
 
 ## What it does
 
-- **Records lectures** from the menu bar (Mac) or the tray (Windows), with one click or one shortcut.
+- **Records lectures** from the menu bar (Mac) or the tray (Windows and Linux), with one click or one shortcut.
 - **Transcribes them on your computer** with Whisper or NVIDIA Parakeet, live as the lecturer speaks.
 - **Writes AI study notes** (summary, key points, definitions, review questions) with Claude, ChatGPT, Gemini or a free local AI.
 - **Draws the diagrams**: flowcharts, labelled drawings, typeset formulas, and graphs worked out from the lecturer's formula.
@@ -225,24 +227,32 @@ your laptop                                  your library (this laptop, or a com
 
 One download for every computer, on the [latest release](https://github.com/Joseph-Rus/study-stash/releases/latest):
 
-| Mac | Windows |
-|---|---|
-| [Syft-Notes.dmg](https://github.com/Joseph-Rus/study-stash/releases/latest/download/Syft-Notes.dmg) | [Syft-Notes-Setup.exe](https://github.com/Joseph-Rus/study-stash/releases/latest/download/Syft-Notes-Setup.exe) |
+| Mac | Windows | Linux |
+|---|---|---|
+| [Syft-Notes.dmg](https://github.com/Joseph-Rus/study-stash/releases/latest/download/Syft-Notes.dmg) | [Syft-Notes-Setup.exe](https://github.com/Joseph-Rus/study-stash/releases/latest/download/Syft-Notes-Setup.exe) | [x64](https://github.com/Joseph-Rus/study-stash/releases/latest/download/Syft-Notes-linux-x64.tar.gz) · [ARM64](https://github.com/Joseph-Rus/study-stash/releases/latest/download/Syft-Notes-linux-arm64.tar.gz) |
 
-It's the same app either way; what a computer is for is chosen when you first open it, not when
+It's the same app every way; what a computer is for is chosen when you first open it, not when
 you download it. The Mac app needs macOS 15 (Sequoia) or later, on Apple silicon or Intel; the
-Windows one, Windows 10 or 11.
+Windows one, Windows 10 or 11; the Linux one, a desktop with PipeWire or PulseAudio (Ubuntu 22.04 or
+later, Fedora, Debian 12, Mint, and the like), on x64 or ARM64.
 
 - **Mac:** open the DMG and drag **Syft Notes** into Applications. It's signed with a Developer ID
   and notarized by Apple, so it opens like any app from the internet (macOS asks once whether to
   open it). Allow the microphone when it asks.
 - **Windows:** run the Setup.exe. It installs for your account only, no admin rights needed. If
   Windows says "Windows protected your PC", click **More info**, then **Run anyway**.
+- **Linux:** unpack the tarball and run its `install.sh` (`tar -xzf Syft-Notes-linux-x64.tar.gz &&
+  sh syft-notes/install.sh`). It installs for your account only, no root needed: the app in
+  `~/.local/share/syft-notes`, **Syft Notes** in your applications menu, and `syft-notes` on your
+  PATH. It looks like the Windows app and lives in your desktop's tray (on GNOME, the AppIndicator
+  extension shows it; Ubuntu has it already). The shortcuts work on X11; Wayland doesn't let an app
+  have keys of its own, so there you record and search from the tray, or give the keys to Syft Notes
+  in your desktop's keyboard settings.
 
 Or install from a terminal:
 
 ```bash
-# Mac (Terminal)
+# Mac or Linux (Terminal)
 curl -fsSL https://raw.githubusercontent.com/Joseph-Rus/study-stash/main/install.sh | sh
 ```
 ```powershell
@@ -316,7 +326,7 @@ nothing is left behind. Nothing to reinstall or redownload.
 
 ## Record and transcribe lectures
 
-Click **Record** in the menu bar (Mac) or tray (Windows), press ⌥⇧R (Ctrl+Alt+R on Windows), or
+Click **Record** in the menu bar (Mac) or tray (Windows and Linux), press ⌥⇧R (Ctrl+Alt+R on Windows and Linux), or
 click an event in **Up next**. Syft Notes transcribes as you go, so the recorder shows what's said
 and you can ask about it mid-lecture; or, to save battery, it only records during the lecture and
 transcribes it after class (Settings → Recording). The audio never leaves your computer.
@@ -338,8 +348,8 @@ aren't using has its own **Remove**, to free the space.
 shows what's said a second or two after it's said: a quick model hears the newest sound every
 second, and the chosen model's more accurate lines take its place as they come (about half a minute
 behind). The quick model comes with the app: Cactus Whistle on Apple silicon and Windows on ARM,
-where its engine is fastest; a small Whisper (tiny, 44 MB) on Intel Macs and other PCs, where
-Whistle's engine is slow. Every pass is timed, and each lecture's first is a short test: where this
+where its engine is fastest; a small Whisper (tiny, 44 MB) on Intel Macs, other PCs and Linux, where
+Whistle's engine is slow or has no build. Every pass is timed, and each lecture's first is a short test: where this
 computer can't keep up cheaply during a lecture (a pass taking more than 0.3× the sound it hears),
 the live words switch themselves off for that lecture and the recorder shows the chosen model's
 lines only; the next lecture tries again. Whistle reads English, German, French, Spanish, Italian,
@@ -706,9 +716,9 @@ Your settings, the lecture database and the recordings are under `~/.study-stash
 the `STUDYSTASH_HOME` environment variable). If you connect Granola, its sign-in is kept there too, in
 `granola-tokens.json`. The notes themselves are plain Markdown files in a folder per class, by
 default in **Documents/Study Stash** on the library's computer (**Settings → Library → Notes folder**
-shows where), which you can open, back up or sync however you like. On a Mac the browser extension's
-folder (for Opera, or a browser that can't add it from a store) is `~/Study Stash/Chrome extension`,
-because a browser's Load unpacked window doesn't show folders whose names start with a dot.
+shows where), which you can open, back up or sync however you like. On a Mac and on Linux the browser
+extension's folder (for Opera, or a browser that can't add it from a store) is `~/Study Stash/Chrome
+extension`, because a browser's Load unpacked window doesn't show folders whose names start with a dot.
 
 ## Updates
 
@@ -717,20 +727,22 @@ every 6 hours, and install it when nothing is recording or being transcribed and
 in a lecture's notes. To update right away, use **Update now** in **Settings → General → Updates**,
 or from the menu bar on a Mac. A laptop whose library is another computer has that library's own
 **Update now** and **Update automatically** under **Settings → Library**. On a Mac an update swaps in
-the new **Study Stash.app**; on Windows it runs the new Setup.exe quietly. Every download is checked
-against the release's `SHA256SUMS.txt` first.
+the new **Study Stash.app**; on Windows it runs the new Setup.exe quietly; on Linux it unpacks the new
+tarball beside the app and swaps it in. Every download is checked against the release's
+`SHA256SUMS.txt` first.
 
 ## Uninstall
 
 **Mac:** if you turned on **Open when you log in** (Settings → General), turn it off first, so no
 login item is left behind; then quit Syft Notes and drag it from Applications to the Trash.
-**Windows:** Settings → Apps → **Syft Notes** → Uninstall. Your lectures and settings stay where
+**Windows:** Settings → Apps → **Syft Notes** → Uninstall.
+**Linux:** run `sh ~/.local/share/syft-notes/uninstall.sh`. Your lectures and settings stay where
 they are; only the app goes. To remove them too, delete the folders under
 [Where your data lives](#where-your-data-lives).
 
 ## Build from source
 
-Syft Notes is C# on .NET 10: the Mac and Windows app is [Avalonia](https://avaloniaui.net), speech
+Syft Notes is C# on .NET 10: the Mac, Windows and Linux app is [Avalonia](https://avaloniaui.net), speech
 runs on Whisper.net and sherpa-onnx, the library and its MCP server are in the same program, the
 phone web app in `web/` is Preact and TypeScript, and the iPhone and iPad app in `ios/` is SwiftUI
 ([ios/README.md](ios/README.md)).
@@ -746,14 +758,16 @@ dotnet run --project engine/src/StudyStash.App -- --home /some/temp/dir
 ```
 
 `macos/build-app.sh` builds "Study Stash.app" and `Syft-Notes.dmg` (with Xcode's command line tools), and
-`windows/build.ps1` `Syft-Notes-Setup.exe`; both build the phone app into it first. `engine/README.md` has more on the projects and tests.
+`windows/build.ps1` `Syft-Notes-Setup.exe`, and `linux/build.sh` `Syft-Notes-linux-x64.tar.gz` and
+`Syft-Notes-linux-arm64.tar.gz`; each builds the phone app into it first. `engine/README.md` has more on the projects and tests.
 
 Releases come from CI (`.github/workflows/ci.yml`), at two speeds. A change that reaches `main` is
-tested once: the engine's tests on macOS, Linux and Windows (side by side), and both apps built and
-self-tested for real. No installer is kept, installed or published for it. A release is a push to `main` with a new
+tested once: the engine's tests on macOS, Linux and Windows (side by side), and the Mac, Windows and
+Linux apps built and self-tested for real. No installer is kept, installed or published for it. A release is a push to `main` with a new
 `StudyStashVersion` in `engine/Directory.Build.props` (no tag yet): CI also builds the installers,
 proves them (the Mac app natively on an Intel Mac; Setup.exe installed, updated in place and
-uninstalled), and publishes `Syft-Notes.dmg`, `Syft-Notes-Setup.exe` (and copies under the old
+uninstalled; each Linux tarball installed, self-tested from there and uninstalled), and publishes
+`Syft-Notes.dmg`, `Syft-Notes-Setup.exe`, the two Linux tarballs (and copies under the old
 installers' names, so older copies still update) and `SHA256SUMS.txt`. A version already released is
 never published again. Code that already passed isn't tested twice: a push that only changes the
 version (or the docs) on top of a commit that passed, or a merge of a branch whose run passed on the

@@ -188,7 +188,7 @@ public static partial class Machine
 
     /// <summary>What Syft Notes calls this computer in a sentence ("on this Mac", "restart your PC", "this
     /// computer" on Linux).</summary>
-    public static string Device => OperatingSystem.IsMacOS() ? "Mac" : DeviceFor(windows: true);
+    public static string Device => DeviceFor(OperatingSystem.IsWindows());
 
     /// <summary>The word for a computer said to be Windows or not (<paramref name="windows"/>): "PC" or "Mac", and
     /// "computer" for either on Linux, which shares the Mac's commands (bash, curl) and the Windows look.</summary>

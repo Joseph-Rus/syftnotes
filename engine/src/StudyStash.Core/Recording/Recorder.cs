@@ -55,7 +55,7 @@ public static class RecordingWords
     public const string CouldntRead = "The recording couldn't be read";
 
     /// <summary>A microphone that gives only silence: the system isn't letting Syft Notes hear it.</summary>
-    public static string CantHear => OperatingSystem.IsWindows() ? CantHearWindows : OperatingSystem.IsLinux() ? CantHearLinux : CantHearMac;
+    public static string CantHear => Machine.Linux ? CantHearLinux : OperatingSystem.IsWindows() ? CantHearWindows : CantHearMac;
 
     public static string CouldntSave(string why) => $"Recording paused: the recording couldn't be saved ({why.TrimEnd('.')}).";
 }

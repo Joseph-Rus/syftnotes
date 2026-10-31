@@ -154,7 +154,7 @@ public class LibrarySettingsModelTests
             using var _m = model;
             Assert.Equal(can, model.Lib.CanChangeLaptops);
             if (role == AppRole.Laptop) Assert.Contains("from this laptop", model.Engines.Lede, StringComparison.Ordinal);
-            else Assert.Contains($"It runs on this {(OperatingSystem.IsWindows() ? "PC" : "Mac")}", model.Engines.Lede, StringComparison.Ordinal);
+            else Assert.Contains($"It runs on this {Core.Machine.Device}", model.Engines.Lede, StringComparison.Ordinal);
         }
     }
 

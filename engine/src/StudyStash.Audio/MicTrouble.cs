@@ -40,7 +40,7 @@ public sealed record MicTrouble(MicTroubleKind Kind, string Title, string Detail
         : new(MicTroubleKind.Denied, "Syft Notes can't use the microphone",
             "Allow it in System Settings → Privacy & Security → Microphone.", "Open System Settings", MacPrivacyUrl);
 
-    public static MicTrouble Denied() => OperatingSystem.IsLinux() ? Linux.Denied() : Denied(OperatingSystem.IsWindows());
+    public static MicTrouble Denied() => Machine.Linux ? Linux.Denied() : Denied(OperatingSystem.IsWindows());
 
     /// <summary>No microphone plugged in or picked.</summary>
     public static MicTrouble NoDevice(bool windows) => windows
@@ -49,7 +49,7 @@ public sealed record MicTrouble(MicTroubleKind Kind, string Title, string Detail
         : new(MicTroubleKind.NoDevice, "No microphone found", "Plug one in, or pick one in System Settings → Sound → Input.",
             "Open Sound settings", MacSoundUrl);
 
-    public static MicTrouble NoDevice() => OperatingSystem.IsLinux() ? Linux.NoDevice() : NoDevice(OperatingSystem.IsWindows());
+    public static MicTrouble NoDevice() => Machine.Linux ? Linux.NoDevice() : NoDevice(OperatingSystem.IsWindows());
 
     /// <summary>Another app took the microphone for itself alone (a call app, or a recorder in exclusive mode).</summary>
     public static MicTrouble InUse() => new(MicTroubleKind.InUse, "Another app is using the microphone",
@@ -80,7 +80,7 @@ public sealed record MicTrouble(MicTroubleKind Kind, string Title, string Detail
         $"Press Record to try again. If it keeps happening, restart your {(windows ? "PC" : "Mac")}.", "", "");
 
     /// <summary><see cref="Other(bool)"/> in this computer's words.</summary>
-    public static MicTrouble Other() => OperatingSystem.IsLinux() ? Linux.Other() : Other(OperatingSystem.IsWindows());
+    public static MicTrouble Other() => Machine.Linux ? Linux.Other() : Other(OperatingSystem.IsWindows());
 
     /// <summary>The words for the sound server refusing to open the microphone with PulseAudio's error
     /// <paramref name="code"/> (PipeWire answers with the same numbers).</summary>
