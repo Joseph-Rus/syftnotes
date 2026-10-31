@@ -188,8 +188,10 @@ export function AskScreen({ api }: { api: Api }) {
                 }
               }}
             />
+            {/* While an answer is on its way the thread's hopping bits say so: one loader at a time, so Ask stays
+                still here (only greyed). */}
             <button type="submit" class="send" disabled={!question.trim() || busy} aria-label="Ask">
-              {busy ? <SyftLoader variant="hoppingBits" size={13} /> : <ArrowUp size={20} />}
+              <ArrowUp size={20} />
             </button>
           </div>
         </form>
