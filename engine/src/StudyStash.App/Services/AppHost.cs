@@ -84,6 +84,9 @@ public sealed class AppSettings
     public SetupChatSaved? SetupChat { get; set; }
     /// <summary>The version of Syft Notes that last ran here: a newer one starting (it updated itself) says so, once.</summary>
     public string LastVersion { get; set; } = "";
+    /// <summary>Which name and icon this computer was last asked to show for the app (<see cref="BrandRefresh.Current"/>):
+    /// empty until the first start after the rename, which asks the system to read them again, once.</summary>
+    public string Brand { get; set; } = "";
     /// <summary>The version this copy quit to install ("0.10.1"), until the next start: one that comes up older than
     /// that (Windows' Setup.exe didn't finish) says the update didn't take.</summary>
     public string UpdatingTo { get; set; } = "";

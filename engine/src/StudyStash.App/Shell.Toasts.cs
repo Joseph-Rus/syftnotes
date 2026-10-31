@@ -183,6 +183,7 @@ public static partial class Shell
     /// Every start remembers its version.</summary>
     static void SayIfUpdated()
     {
+        RefreshBrandOnce();
         string last = host.Settings.LastVersion, tried = host.Settings.UpdatingTo;
         if (last == Engine.Version && tried.Length == 0) return;
         host.Save(s =>
@@ -203,6 +204,19 @@ public static partial class Shell
                 Title = said.Title, Text = said.Text, ActionLabel = said.Action, Act = () => Dialogs.OpenUrl(Updates.ReleasePage(Engine.Version)),
                 Stay = NoticeTimes.Advice,
             });
+    }
+
+    /// <summary>The first start after the app took its present name and icon: the system is asked, once, to read them
+    /// again (<see cref="BrandRefresh"/>), and on Windows the notifications' name and icon are written afresh now
+    /// rather than at the first notification. Off the UI thread: the Mac's commands take a moment.</summary>
+    static void RefreshBrandOnce()
+    {
+        if (host.Settings.Brand == BrandRefresh.Current || !Desktop.SameFolder(host.Home, Configs.DefaultHome)) return;
+        if (OperatingSystem.IsWindows() && File.Exists(Path.Combine(AppContext.BaseDirectory, "study-stash.ini"))) _ = WindowsNotifications();
+        _ = Task.Run(() =>
+        {
+            if (BrandRefresh.Run(Program.Log)) Dispatcher.UIThread.Post(() => host.Save(s => s.Brand = BrandRefresh.Current));
+        });
     }
 
     /// <summary>What the app's own updates say (<see cref="AppUpdates.Tell"/>, from the updater's thread): a new
