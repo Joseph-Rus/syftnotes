@@ -257,7 +257,9 @@ public sealed class LiveCaptioner(Func<Lecture?> recording, Func<double, RecentS
     public bool Step()
     {
         var l = recording();
-        if (l is null || l.AfterClass || l.State != LectureState.Recording)
+        // Written down after class shows no live words (to save battery), except a lecture only waiting for its model:
+        // its live words are the first sign Syft Notes hears the class.
+        if (l is null || l.AfterClass && !l.WaitsForModel || l.State != LectureState.Recording)
         {
             if (l is null) Reset(null);
             return false;
@@ -391,7 +393,7 @@ public sealed class LiveCaptioner(Func<Lecture?> recording, Func<double, RecentS
             var took = DateTime.UtcNow - started;
             var left = (took * 4 > Every ? took * 4 : Every) - took;
             // Nothing recording: look less often.
-            if (recording() is not { State: LectureState.Recording, AfterClass: false }) left = TimeSpan.FromSeconds(2);
+            if (recording() is not ({ State: LectureState.Recording, AfterClass: false } or { State: LectureState.Recording, WaitsForModel: true })) left = TimeSpan.FromSeconds(2);
             if (left > TimeSpan.Zero) WaitHandle.WaitAny([stop.WaitHandle, woken], left);
         }
     }

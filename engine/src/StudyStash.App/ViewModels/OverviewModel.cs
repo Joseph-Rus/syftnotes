@@ -373,6 +373,11 @@ public sealed partial class OverviewModel : ObservableObject
     public bool HasAsking => Asking is not null;
     partial void OnAskingChanged(SupportAskModel? value) => OnPropertyChanged(nameof(HasAsking));
 
+    /// <summary>Home's "Ready when class starts", after a first run (<see cref="WelcomeCardModel"/>); null otherwise.</summary>
+    [ObservableProperty] public partial WelcomeCardModel? Welcome { get; set; }
+    public bool HasWelcome => Welcome is not null;
+    partial void OnWelcomeChanged(WelcomeCardModel? value) => OnPropertyChanged(nameof(HasWelcome));
+
     /// <summary>Ask about every note (Home) or this folder's (its page), floating at the foot of the page as under a note.</summary>
     [ObservableProperty] public partial AiAskModel? Ask { get; set; }
     public bool HasAsk => Ask is not null;

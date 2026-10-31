@@ -448,16 +448,15 @@ public sealed class GuidedSetupTests
         Assert.Equal((GuidedScreen.Manual, step, (string?)null), (g.Screen, rig.Setup.Step, ready));
         Assert.Equal("Set up by hand", g.ByHandLabel);
 
-        // This time through: one button installs it, its own page signs in, and Continue is back on the step.
+        // This time through: one button installs it and moves on to signing in by itself, its own page signs in, and
+        // once its plan is checked it's back on the step by itself: no Continue to press anywhere.
         await g.GetReadyForNotesAsync("claude");
         await g.InstallCommand.ExecuteAsync(null);
         Assert.True(g.Installed);
-        await g.ContinueCommand.ExecuteAsync(null);
         Assert.Equal(GuidedScreen.SignIn, g.Screen);
         File.WriteAllText(Path.Combine(rig.Bin, "signed-in"), "");
         await g.OpenSignInCommand.ExecuteAsync(null);
-        await Until(() => g.AiReady, "Claude signed in and its plan checked");
-        await g.ContinueCommand.ExecuteAsync(null);
+        await Until(() => g.Screen == GuidedScreen.Manual, "Claude signed in, its plan checked, and back on the step");
         Assert.Equal((GuidedScreen.Manual, step, "claude"), (g.Screen, rig.Setup.Step, ready));
         Assert.False(g.ForNotes);
         Assert.Empty(rig.Terminals); // nothing was opened to paste a command into

@@ -59,12 +59,15 @@ public static class NoticeWords
     /// be reached. <paramref name="notes"/>: whether notes will be written for it (<see cref="Summarize.WillHaveNotes"/>).
     /// One too short for them says so, and one that could go either way isn't promised any; nor is any while the
     /// library writes none (<paramref name="off"/>).</summary>
+    /// <summary>After the first Stop's "Recording saved", as the Mac asks for notifications.</summary>
+    public const string AllowToHear = "To hear when it's ready, allow Syft Notes' notifications when your Mac asks.";
+
     public static string Saved(LibraryState library, bool mac, bool? notes = true, bool off = false) => library switch
     {
         LibraryState.Unreachable => $"Syft Notes is writing it down. It waits on this {(mac ? "Mac" : "PC")} and goes to your library when it's back.",
         LibraryState.WrongPassword => "Syft Notes is writing it down. Type your library's new password in Settings to send it.",
         LibraryState.NotSetUp => "Syft Notes is writing it down. Connect to your library in Settings to file it.",
-        _ when off => "Syft Notes is writing it down, and the library files it. Notes are off, so it has just its transcript.",
+        _ when off => "Syft Notes is writing it down, and the library files it with its transcript. Its page offers to write the notes.",
         _ => notes switch
         {
             true => "Syft Notes is writing it down; the library files it and writes your notes.",

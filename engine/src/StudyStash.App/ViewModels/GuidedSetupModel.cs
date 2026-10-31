@@ -242,13 +242,20 @@ public sealed partial class GuidedSetupModel : ObservableObject, IDisposable
 
     public string StepLabel => Screen switch
     {
-        GuidedScreen.Install => $"Step 1 of 3 · {Brand}",
-        GuidedScreen.SignIn => $"Step 2 of 3 · {Brand}",
+        // From a lecture's page there are just the two: get it ready, sign in.
+        GuidedScreen.Install => ForNotes ? $"Step 1 of 2 · {Brand}" : $"Step 1 of 3 · {Brand}",
+        GuidedScreen.SignIn => ForNotes ? $"Step 2 of 2 · {Brand}" : $"Step 2 of 3 · {Brand}",
         _ => "Step 3 of 3",
     };
 
+    /// <summary>The small window's title, getting an AI ready from a lecture's page.</summary>
+    public string ReadyTitle => $"Get {Brand} ready";
+
     public string InstallTitle => $"Get {Brand} ready";
-    public string InstallLede => $"Syft Notes talks to {Brand} through {Cli.Name}, {Cli.Maker}'s own helper for apps. Syft Notes will download it and set it up in your account. You won't need an administrator password.";
+    public string InstallLede => ForNotes
+        // From a lecture's page: no tool names, just what happens.
+        ? $"Syft Notes downloads {Cli.Maker}'s own helper for {Brand} and sets it up in your account. You won't need an administrator password."
+        : $"Syft Notes talks to {Brand} through {Cli.Name}, {Cli.Maker}'s own helper for apps. Syft Notes will download it and set it up in your account. You won't need an administrator password.";
     public string InstallButton => "Download and set up";
     public string InstallSource => $"Installs with {Cli.Maker}'s own installer from {Cli.Site}";
     public string InstallLine => (Windows ? Cli.WindowsInstaller : Cli.MacInstaller).Line;
@@ -269,7 +276,10 @@ public sealed partial class GuidedSetupModel : ObservableObject, IDisposable
     public string Privacy => Cli.Id == "gemini"
         ? $"Syft Notes never sees your password. The sign-in is Google's own, and stays on this {Device}."
         : $"Syft Notes never sees your password. The sign-in is {Brand}'s own, and stays on this {Device}.";
-    public string PlanNote => Cli.Id == "gemini" ? "Your chat with Gemini uses a little of your Google account's Gemini allowance." : $"Your chat with {Brand} uses your {Brand} plan.";
+    public string PlanNote => ForNotes
+        ? Cli.Id == "gemini" ? "Each lecture's notes use a little of your Google account's free Gemini allowance. Google's free plan may use what's sent to improve its products."
+            : $"Each lecture's notes use your {Brand} plan."
+        : Cli.Id == "gemini" ? "Your chat with Gemini uses a little of your Google account's Gemini allowance." : $"Your chat with {Brand} uses your {Brand} plan.";
     public string ReadyWords => $"{Brand} is ready.";
     public bool HasAllowance => AllowanceWords.Length > 0 && ShowReady;
     /// <summary>Its maker doesn't offer it in this country (at its sign-in, its check, or a turn).</summary>
@@ -348,7 +358,7 @@ public sealed partial class GuidedSetupModel : ObservableObject, IDisposable
         Notify(nameof(Cli), nameof(Other), nameof(Brand), nameof(BrandGlyph), nameof(Found), nameof(PickedClaude), nameof(PickedCodex), nameof(PickedGemini), nameof(PickedFree),
             nameof(PickedByHand), nameof(CanContinue), nameof(StepLabel),
             nameof(InstallTitle), nameof(InstallLede), nameof(InstallButton), nameof(InstallSource), nameof(InstallLine), nameof(UseOtherLabel), nameof(SignInTitle),
-            nameof(SignInLede), nameof(Privacy), nameof(PlanNote), nameof(ReadyWords), nameof(PlanTooSmallTitle), nameof(PlanTooSmallText), nameof(SidebarTitle),
+            nameof(SignInLede), nameof(Privacy), nameof(PlanNote), nameof(ReadyWords), nameof(PlanTooSmallTitle), nameof(PlanTooSmallText), nameof(SidebarTitle), nameof(ReadyTitle),
             nameof(FieldHint), nameof(Thinking));
     }
 
@@ -529,7 +539,7 @@ public sealed partial class GuidedSetupModel : ObservableObject, IDisposable
         StopWork();
         forNotes = id;
         Picked = id;
-        Notify(nameof(ForNotes), nameof(ByHandLabel));
+        Notify(nameof(ForNotes), nameof(ByHandLabel), nameof(StepLabel), nameof(PlanNote), nameof(ReadyTitle), nameof(InstallLede));
         var found = await Task.Run(() => services.Find(AgentCli.Get(id)));
         SetFound(id, found);
         if (!found.Works)
@@ -652,8 +662,9 @@ public sealed partial class GuidedSetupModel : ObservableObject, IDisposable
         InstallProblem = null;
         InstallFailure = InstallFailure.None;
         InstallOutput = "";
-        Phase = $"Downloading {Cli.Name}…";
-        install.Phase += p => services.Post(() => Phase = p);
+        string helper = ForNotes ? $"{Cli.Maker}'s helper" : Cli.Name;
+        Phase = $"Downloading {helper}…";
+        install.Phase += p => services.Post(() => Phase = p.Replace(Cli.Name, helper));
         install.Printed += _ => services.Post(() => InstallOutput = install.Output);
         var outcome = await install.RunAsync(cts.Token);
         Installing = false;
@@ -663,6 +674,8 @@ public sealed partial class GuidedSetupModel : ObservableObject, IDisposable
             Installed = true;
             InstalledWords = outcome.Words;
             SetFound(Cli.Id, outcome.Found);
+            // From a lecture's page there's nothing to choose here: on to signing in, with no Continue to press.
+            if (ForNotes) await ToSignInOrChatAsync();
             return;
         }
         if (outcome.Failure == InstallFailure.Cancelled) return;
@@ -809,6 +822,9 @@ public sealed partial class GuidedSetupModel : ObservableObject, IDisposable
         {
             keepUserConfig = check.KeptConfig;
             AiReady = true;
+            // Got ready from a lecture's page (or setup's notes step): signed in and checked, it goes straight back
+            // there to write the notes, with no Continue to press.
+            if (ForNotes && Screen == GuidedScreen.SignIn) BackToNotes();
             return;
         }
         switch (check.Problem)

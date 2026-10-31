@@ -48,6 +48,9 @@ public sealed class Lecture
     /// <summary>Written down after class, not as it records (Settings → Recording, when it started): nothing is
     /// written down while it records or is paused, so the computer only records; all of it is once it stops.</summary>
     public bool AfterClass { get; set; }
+    /// <summary>Recorded before the model that writes it down had arrived (a first lecture, right after setup): it's
+    /// written down after class, once the model is here, and live words still show while it records.</summary>
+    public bool WaitsForModel { get; set; }
     public List<Spoken> Segments { get; set; } = [];
     public string Language { get; set; } = "";
     /// <summary>The voices in it have been told apart (or it was sent without: it was too short, or that failed).</summary>
