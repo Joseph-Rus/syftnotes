@@ -1799,7 +1799,7 @@
             <Panel Margin="0,16,0,0">
               <!-- Looking for the student's AI -->
               <StackPanel Orientation="Horizontal" Spacing="8" IsVisible="{Binding IsLooking}" VerticalAlignment="Top">
-                <c:Spinner Width="14" Height="14" Foreground="{DynamicResource Fg2}" />
+                <c:SyftLoader Kind="HoppingBits" Size="20" />
                 <TextBlock Classes="say" Text="Looking for your AI…" Margin="0" />
               </StackPanel>
 
@@ -1814,7 +1814,7 @@
 
               <!-- Before anything's asked: a few things to try -->
               <StackPanel Spacing="10" IsVisible="{Binding ShowWelcome}" VerticalAlignment="Top">
-                <c:Doodle Art="thinking" Size="84" HorizontalAlignment="Left" />
+                <c:SyftMark Size="84" HorizontalAlignment="Left" />
                 <TextBlock Classes="say" Text="Try asking:" Margin="0" />
                 <ItemsControl ItemsSource="{Binding Suggestions}">
                   <ItemsControl.ItemsPanel><ItemsPanelTemplate><WrapPanel /></ItemsPanelTemplate></ItemsControl.ItemsPanel>
@@ -1840,9 +1840,9 @@
                       </Border>
                     </DataTemplate>
                     <DataTemplate DataType="vm:AiEntry">
-                      <!-- The egghead's replies: his face beside each -->
+                      <!-- The replies: the pixel s beside each -->
                       <Grid ColumnDefinitions="Auto,10,*" HorizontalAlignment="Left">
-                      <c:Doodle Art="head" Size="28" VerticalAlignment="Top" />
+                      <c:SyftMark Size="28" Bits="False" VerticalAlignment="Top" />
                       <StackPanel Grid.Column="2" Spacing="6" HorizontalAlignment="Left" MaxWidth="520">
                         <TextBlock Text="{Binding Byline}" FontSize="11" FontWeight="SemiBold" Foreground="{DynamicResource Fg2}" />
                         <c:PageText Text="{Binding Text}" FontSize="13" LineHeight="19" TextWrapping="Wrap" Foreground="{DynamicResource Fg}"
@@ -1867,7 +1867,7 @@
                 </ItemsControl>
               </ScrollViewer>
               <StackPanel Orientation="Horizontal" Spacing="8" IsVisible="{Binding Busy}" VerticalAlignment="Bottom" HorizontalAlignment="Left" Margin="0,0,0,-4">
-                <c:Doodle Art="thinking" Size="34" Busy="{Binding Busy}" />
+                <c:SyftLoader Kind="HoppingBits" Size="22" IsActive="{Binding Busy}" />
               </StackPanel>
             </Panel>
           </DockPanel>

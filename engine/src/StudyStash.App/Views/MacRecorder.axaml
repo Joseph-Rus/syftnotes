@@ -1,4 +1,4 @@
-<!-- The floating recorder (Mac): small, an upright pill of the egghead and a level meter (Stop and a card on hover); open,
+<!-- The floating recorder (Mac): small, an upright pill of the pixel s and a level meter (Stop and a card on hover); open,
      360 × 520, the transcript fading upward and a chat below whose answers link to moments in the recording. -->
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
@@ -45,26 +45,18 @@
     </Style>
   </UserControl.Styles>
   <Panel>
-    <!-- The pill, upright and quiet: the egghead over a three-bar level meter, nothing else. With the pointer on
-         it the egghead turns into Stop (Resume while paused), one click away, and a card beside it says the class, the time
+    <!-- The pill, upright and quiet: the pixel s over a three-bar level meter, nothing else. With the pointer on
+         it the s turns into Stop (Resume while paused), one click away, and a card beside it says the class, the time
          and the last lines heard (PillCard, a window of its own beside it). A click anywhere else on it opens the recorder; a drag moves it. Paused, the meter
-         rests and the egghead dims. -->
+         rests and the s dims. -->
     <Border Name="Pill" IsVisible="{Binding !Expanded}" Classes.recording="{Binding IsRunning}" Classes.paused="{Binding IsPaused}"
             Width="36" Height="62" CornerRadius="18" Background="{DynamicResource Surface}" BoxShadow="{DynamicResource ShadowFloat}"
             HorizontalAlignment="Left" VerticalAlignment="Top" AutomationProperties.Name="{Binding PillSaid}">
       <StackPanel Spacing="6" HorizontalAlignment="Center" VerticalAlignment="Center">
         <Panel Width="24" Height="24" HorizontalAlignment="Center">
           <Viewbox Name="PillMark" Width="18" Height="18" IsVisible="{Binding ShowMark}" Opacity="{Binding IsPaused, Converter={x:Static c:Converters.Dim}}">
-            <!-- The menu bar's egghead (macos/make_icon.swift's mark, from assets/egghead/mark.json): the egg, his
-                 two lenses and the bridge, his eyes, one 1.5 pt line each. -->
-            <Canvas Width="18" Height="18">
-              <Path Data="M2.6,6.81 L2.73,6.05 L2.89,5.35 L3.08,4.63 L3.28,4.05 L3.52,3.5 L3.87,2.99 L4.31,2.57 L4.79,2.25 L5.32,1.95 L5.86,1.69 L6.41,1.47 L7.05,1.26 L7.83,1 L8.59,0.9 L9.36,0.93 L10.06,1.06 L10.68,1.36 L11.42,1.84 L11.91,2.2 L12.34,2.63 L12.7,3.09 L13.01,3.58 L13.29,4.09 L13.54,4.64 L13.75,5.19 L13.97,5.77 L14.2,6.48 L14.41,7.16 L14.56,7.74 L14.71,8.51 L14.81,9.29 L14.84,10.25 L14.84,11.07 L14.74,11.83 L14.63,12.45 L14.46,13.03 L14.22,13.58 L13.91,14.07 L13.51,14.6 L13.09,15.11 L12.62,15.62 L12.2,16.03 L11.69,16.29 L10.89,16.56 L10.26,16.75 L9.4,16.91 L8.67,17.04 L7.77,17.08 L7.06,16.85 L6.42,16.61 L5.74,16.35 L5.2,16.08 L4.7,15.78 L4.22,15.43 L3.82,14.99 L3.5,14.48 L3.28,13.93 L3.1,13.31 L2.97,12.66 L2.88,12.01 L2.8,11.23 L2.75,10.48 L2.7,9.69 L2.64,8.76 L2.59,7.92 L2.59,6.94Z"
-                    Stroke="{DynamicResource Fg}" StrokeThickness="1.5" StrokeJoin="Round" />
-              <Path Data="M2.08,4.41 Q2.08,3.21 3.28,3.21 L6.19,3.21 Q7.39,3.21 7.39,4.41 L7.39,9.03 Q7.39,10.23 6.19,10.23 L3.28,10.23 Q2.08,10.23 2.08,9.03Z M9.03,4.45 Q9.03,3.25 10.23,3.25 L12.89,3.25 Q14.09,3.25 14.09,4.45 L14.09,8.32 Q14.09,9.52 12.89,9.52 L10.23,9.52 Q9.03,9.52 9.03,8.32Z M7.39,6.55 L9.03,6.55"
-                    Stroke="{DynamicResource Fg}" StrokeThickness="1.5" StrokeJoin="Round" StrokeLineCap="Round" />
-              <Ellipse Canvas.Left="3.85" Canvas.Top="5.94" Width="2.25" Height="2.25" Fill="{DynamicResource Fg}" />
-              <Ellipse Canvas.Left="10.77" Canvas.Top="5.69" Width="2.25" Height="2.25" Fill="{DynamicResource Fg}" />
-            </Canvas>
+            <!-- The menu bar's mark: the pixel s in one colour, the window's ink. -->
+            <c:SyftMark Look="Ink" Size="18" Foreground="{DynamicResource Fg}" />
           </Viewbox>
           <Button AutomationProperties.Name="Stop" Classes="stop" Command="{Binding StopCommand}" IsVisible="{Binding ShowStop}">
             <Border Width="8" Height="8" CornerRadius="2" Background="{DynamicResource OnRecord}" />

@@ -114,7 +114,7 @@ public sealed partial class NoteModel : ObservableObject
     public bool ShowNotes => !ShowTranscript;
     public bool HasPending => !string.IsNullOrEmpty(Pending);
     /// <summary>Its notes are on their way (written down here, sent, or being written by the library), not just
-    /// missing: the page shows the egghead writing them beside <see cref="Pending"/>.</summary>
+    /// missing: the page shows the Path Trace loader beside <see cref="Pending"/>.</summary>
     public bool Writing { get; init; }
     public bool NoTranscript => Lines.Count == 0;
     /// <summary>What the page was last drawn from: a reload that finds the same leaves the page as it is.</summary>

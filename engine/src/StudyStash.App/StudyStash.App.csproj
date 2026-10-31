@@ -33,8 +33,6 @@
 
   <ItemGroup>
     <AvaloniaResource Include="Assets\**" />
-    <!-- The egghead's doodles (Controls/Doodle.cs), from assets/egghead at the repo's root (tools/egghead/make_art.py) -->
-    <AvaloniaResource Include="..\..\..\assets\egghead\*.svg" Link="Assets\Egghead\%(Filename)%(Extension)" />
   </ItemGroup>
 
   <ItemGroup>

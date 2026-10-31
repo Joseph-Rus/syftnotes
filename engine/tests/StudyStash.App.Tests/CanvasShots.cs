@@ -30,7 +30,7 @@ public class CanvasShots
     {
         foreach (var icon in root.GetLogicalDescendants().OfType<Icon>())
         {
-            if (icon.Glyph.Length == 0) continue; // e.g. the syncing card, which draws a Spinner instead
+            if (icon.Glyph.Length == 0) continue; // e.g. the syncing card, which draws a loader instead
             Assert.True(IconPaths.All.ContainsKey(icon.Glyph), $"Icon glyph '{icon.Glyph}' isn't in IconPaths.All");
         }
     }

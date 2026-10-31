@@ -98,7 +98,7 @@
             </Button>
           </Grid>
           <Grid ColumnDefinitions="Auto,10,Auto,12,*">
-            <c:Doodle Art="listening" Size="30" Busy="{Binding IsRecording}" VerticalAlignment="Center" />
+            <c:SyftLoader Kind="PathTrace" Size="30" IsActive="{Binding IsRecording}" VerticalAlignment="Center" AutomationProperties.AccessibilityView="Raw" />
             <TextBlock Grid.Column="2" Classes="num" Text="{Binding Elapsed}" FontFamily="{DynamicResource DisplayFont}" FontSize="24" FontWeight="Light"
                        c:Typography.Extra="-0.24" VerticalAlignment="Center" />
             <c:Waveform Grid.Column="4" Height="20" Bars="20" Levels="{Binding Levels}" Foreground="{DynamicResource Fg2}" VerticalAlignment="Center" />
@@ -182,8 +182,9 @@
           <Button Name="OpenApp" Classes="row" Padding="8,3" Height="26" HorizontalContentAlignment="Stretch" VerticalContentAlignment="Center"
                   Command="{Binding OpenAppCommand}">
             <StackPanel Orientation="Horizontal" Spacing="7">
-              <c:Doodle Art="head" Size="18" VerticalAlignment="Center" />
+              <c:SyftMark Size="18" Bits="False" VerticalAlignment="Center" />
               <TextBlock Text="Open Syft Notes" FontSize="13" VerticalAlignment="Center" />
+
             </StackPanel>
           </Button>
           <Button Name="Settings" AutomationProperties.Name="Settings" Grid.Column="2" Classes="row" Width="26" Height="26" Padding="0" HorizontalContentAlignment="Center"

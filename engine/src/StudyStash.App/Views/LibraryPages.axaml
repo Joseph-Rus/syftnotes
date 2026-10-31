@@ -87,7 +87,7 @@
                    HorizontalAlignment="Center" VerticalAlignment="Center" />
         <!-- The library can't be read: why, in a sentence -->
         <StackPanel IsVisible="{Binding ShowEmpty}" HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="16">
-          <c:Doodle Art="cracked" Size="110" HorizontalAlignment="Center" />
+          <c:SyftMark Look="OddOneOut" Size="110" HorizontalAlignment="Center" />
           <c:PageText Name="Empty" Classes="empty" IsVisible="{Binding ShowEmpty}" Text="{Binding Empty}" HorizontalAlignment="Center" TextAlignment="Center" />
         </StackPanel>
         <!-- Narrow: back to the list -->

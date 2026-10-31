@@ -52,15 +52,15 @@
             <DataTemplate x:DataType="vm:AiTurn">
               <StackPanel Spacing="6">
                 <c:PageText Classes="ai-q" Text="{Binding Question}" />
-                <!-- The egghead answers: thinking while it's written, his face beside it once it's there -->
+                <!-- The answer: the hopping bits while it's written, the pixel s beside it once it's there -->
                 <StackPanel Orientation="Horizontal" Spacing="10" IsVisible="{Binding IsThinking}">
-                  <c:Doodle Art="thinking" Size="38" Busy="{Binding IsThinking}" VerticalAlignment="Center" />
+                  <c:SyftLoader Kind="HoppingBits" Size="22" IsActive="{Binding IsThinking}" VerticalAlignment="Center" />
                   <TextBlock Classes="ai-thinking" Text="{Binding ThinkingWords}" VerticalAlignment="Center" />
                 </StackPanel>
                 <c:PageText Classes="ai-answer" Text="{Binding Failed}" Foreground="{DynamicResource Warn}"
                            IsVisible="{Binding Failed, Converter={x:Static c:Converters.NotEmpty}}" />
                 <Grid ColumnDefinitions="Auto,10,*" IsVisible="{Binding !IsThinking}">
-                <c:Doodle Art="head" Size="26" VerticalAlignment="Top" Margin="0,2,0,0" IsVisible="{Binding Answer, Converter={x:Static c:Converters.NotEmpty}}" />
+                <c:SyftMark Size="26" Bits="False" VerticalAlignment="Top" Margin="0,2,0,0" IsVisible="{Binding Answer, Converter={x:Static c:Converters.NotEmpty}}" />
                 <StackPanel Grid.Column="2" Spacing="6">
                   <c:NoteView Compact="True" BodySize="13" BodyLineHeight="18.85" Markdown="{Binding Answer}" IsVisible="{Binding Answer, Converter={x:Static c:Converters.NotEmpty}}" />
                   <v:AiByline HorizontalAlignment="Left" IsVisible="{Binding Byline, Converter={x:Static c:Converters.NotEmpty}}" />

@@ -63,6 +63,9 @@ public static partial class Shell
     static AppProblem? currentProblem;
     static LibraryState lastLibraryState = LibraryState.NotSetUp;
     static bool hotkeysOn;
+    /// <summary>The library window opened as the app starts plays the splash over itself while the library is first read.</summary>
+    static bool splashAtLaunch;
+    static SyftSplash? librarySplash;
     static HotkeyResult hotkeys;
 
     public static AppHost Host => host;
@@ -136,7 +139,12 @@ public static partial class Shell
         Refresh();
         SayIfUpdated();
         if (!host.Settings.SetupDone) ShowSetup();
-        else if (!Program.Background) ShowLibrary();
+        else if (!Program.Background)
+        {
+            // Not for the self-test, which looks at the window straight away.
+            splashAtLaunch = SelfTest.Dir is null;
+            ShowLibrary();
+        }
         if (SelfTest.Dir is not null) SelfTest.Run();
     }
 
@@ -1061,6 +1069,7 @@ public static partial class Shell
             WinChrome.Apply(w);
         }
         if (!PutWhereLeft(w)) OpenCentred(w, new Size(1280, 800));
+        if (splashAtLaunch) Splash(w);
         AppMenu.Attach(w, ShowLibrary, SettingsFromAnywhere);
         AddLibraryKeys(w);
         // The menu bar, read back once, so the log shows the app menu really has Settings… ⌘, and Quit ⌘Q.
@@ -1180,7 +1189,36 @@ public static partial class Shell
         // The library in front: the small pill goes now, not only once macOS says the app is active (it may not, when
         // another app was in front), and comes back when the library is left.
         if (recorderWindow?.IsVisible == true && !recorder.Expanded) recorderWindow.Hide();
-        _ = LoadLibraryAsync();
+        _ = LoadLibraryAsync().ContinueWith(_ => Dispatcher.UIThread.Post(() =>
+        {
+            if (librarySplash is { } splash) splash.IsReady = true;
+        }), TaskScheduler.Default);
+    }
+
+    /// <summary>
+    /// The splash over the library window opened at launch: Sort In in a dark window, Sieve Drop in a light one
+    /// (Controls/Syft/SyftSplash.cs), played once while the library is read the first time, then faded out and gone; at
+    /// least 1.2 s, at most 4, whether the library has answered or not. The page goes on loading underneath. A drag on it
+    /// moves the window; on Windows the title bar, with its buttons, stays above it, and a Mac's traffic lights are the
+    /// system's, over everything. Opened later (from the menu bar, with the library long read) it has no splash.
+    /// </summary>
+    static void Splash(Window w)
+    {
+        splashAtLaunch = false;
+        if (w.Content is not Control view) return;
+        var splash = new SyftSplash();
+        WindowHeader.SetMovesWindow(splash, true);
+        if (Skin.Current == SkinKind.Win) splash.Margin = new Thickness(0, 32, 0, 0);
+        var layers = new Panel();
+        w.Content = layers;
+        layers.Children.Add(view);
+        layers.Children.Add(splash);
+        librarySplash = splash;
+        splash.Finished += () =>
+        {
+            layers.Children.Remove(splash);
+            librarySplash = null;
+        };
     }
 
     /// <summary>Brings a window the student asked for to the front. On Windows, activating a minimized window leaves it

@@ -158,6 +158,13 @@ public static class Skin
         d["RadiusMenu"] = new CornerRadius(10);
         d["RadiusPanel"] = new CornerRadius(12);
         d["RadiusPane"] = new CornerRadius(14);
+        // Syft Notes' brand colours (Controls/Syft/Syft.cs), the same light and dark: the colour as SyftLilac, a brush
+        // of it as SyftLilacBrush. The mark, the loaders and the splash draw in them.
+        foreach (var (key, colour) in Controls.Syft.Tokens)
+        {
+            d[key] = colour;
+            d[key + "Brush"] = new SolidColorBrush(colour);
+        }
         d.ThemeDictionaries[ThemeVariant.Light] = light;
         d.ThemeDictionaries[ThemeVariant.Dark] = dark;
         FluentPopups.Add(d, light, dark);

@@ -104,14 +104,9 @@
                   AutomationProperties.LiveSetting="Polite">
             <Grid ColumnDefinitions="Auto,10,Auto,10,Auto,12,Auto,*,Auto,8,Auto">
               <StackPanel Orientation="Horizontal" Spacing="12">
-                <!-- The egghead listening, in his light drawing on a white tile (the app icon's) on a dark page too: the
-                     dark drawing's grey egg and pale lines read as a skull at this size, and his dark headphones
-                     vanish into a dark page without the tile. -->
-                <ThemeVariantScope RequestedThemeVariant="Light" VerticalAlignment="Center">
-                  <Border Width="38" Height="38" CornerRadius="19" Background="#FFFFFF" BoxShadow="{DynamicResource LineRing}">
-                    <c:Doodle Art="listening" Size="30" Busy="{Binding Recorder.IsRunning, FallbackValue=False}" HorizontalAlignment="Center" VerticalAlignment="Center" />
-                  </Border>
-                </ThemeVariantScope>
+                <!-- Listening: the Path Trace loader on its own dark tile, its trail running while it records and the
+                     whole s lit while it's paused. -->
+                <c:SyftLoader Kind="PathTrace" Size="38" IsActive="{Binding Recorder.IsRunning, FallbackValue=False}" VerticalAlignment="Center" AutomationProperties.AccessibilityView="Raw" />
                 <Ellipse Width="10" Height="10" Fill="{DynamicResource Record}" Classes.pulse="{Binding Pulses}" VerticalAlignment="Center" />
               </StackPanel>
               <TextBlock Grid.Column="2" Text="{Binding RecordingWord}" FontSize="15" FontWeight="SemiBold" VerticalAlignment="Center" />
@@ -231,7 +226,7 @@
             </StackPanel>
             <StackPanel IsVisible="{Binding Saved}" Spacing="14">
               <Grid ColumnDefinitions="Auto,*" IsVisible="{Binding HasPending}">
-                <c:Doodle Art="writing" Busy="{Binding Writing}" Size="64" IsVisible="{Binding Writing}" Margin="0,0,18,0" VerticalAlignment="Center" />
+                <c:SyftLoader Kind="PathTrace" Size="56" IsActive="{Binding Writing}" IsVisible="{Binding Writing}" Margin="0,0,18,0" VerticalAlignment="Center" />
                 <c:PageText Grid.Column="1" Name="Pending" IsVisible="{Binding HasPending}" Text="{Binding Pending}" FontSize="14.5" LineHeight="22" Foreground="{DynamicResource InkMuted}" TextWrapping="Wrap"
                             VerticalAlignment="Center" />
               </Grid>

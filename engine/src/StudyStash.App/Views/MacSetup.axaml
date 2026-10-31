@@ -81,8 +81,8 @@
                        of help | the radio. -->
                   <!-- The first page: what happens to a lecture, before any choice. -->
                   <StackPanel IsVisible="{Binding OnIntro}">
-                    <!-- The egghead says hello, first thing -->
-                    <c:Doodle Art="hello" Size="120" HorizontalAlignment="Left" Margin="0,0,0,14" />
+                    <!-- The pixel s says hello, first thing: Pop Back, played once, and the wordmark -->
+                    <c:SyftSplash Kind="PopBack" Inline="True" Size="150" HorizontalAlignment="Left" Margin="-11,-14,0,10" />
                     <TextBlock Classes="page-title step-title" Text="{Binding IntroTitle}" />
                     <TextBlock Classes="page-lede step-lede" Text="{Binding IntroBody}" />
                     <ItemsControl ItemsSource="{Binding IntroPoints}" Margin="0,20,0,0" MaxWidth="500" HorizontalAlignment="Stretch">
@@ -156,7 +156,7 @@
                     <!-- Just this computer: Continue makes the library here; while it does, and if it can't, say so. -->
                     <Grid ColumnDefinitions="Auto,8,*" Margin="0,14,0,0" MinHeight="20" MaxWidth="480" HorizontalAlignment="Left" IsVisible="{Binding ShowWelcomeStatus}">
                       <Panel VerticalAlignment="Top" Margin="0,2,0,0">
-                        <c:Spinner IsVisible="{Binding Connecting}" Width="14" Height="14" Foreground="{DynamicResource InkMuted}" />
+                        <c:SyftLoader Kind="HoppingBits" Size="20" IsVisible="{Binding Connecting}" />
                         <c:Icon Classes="warn" Size="16" IsVisible="{Binding HasWelcomeProblem}" />
                       </Panel>
                       <TextBlock Grid.Column="2" Classes="hint" IsVisible="{Binding Connecting}" Text="Getting your library ready…" />
@@ -191,7 +191,7 @@
                     </Grid>
                     <Grid ColumnDefinitions="Auto,8,*" Margin="0,16,0,0" MinHeight="20" MaxWidth="480" HorizontalAlignment="Left">
                       <Panel VerticalAlignment="Top" Margin="0,2,0,0">
-                        <c:Spinner IsVisible="{Binding Connecting}" Width="14" Height="14" Foreground="{DynamicResource InkMuted}" />
+                        <c:SyftLoader Kind="HoppingBits" Size="20" IsVisible="{Binding Connecting}" />
                         <c:Icon Classes="ok" Size="16" IsVisible="{Binding LibraryOk}" />
                         <c:Icon Classes="warn" Size="16">
                           <c:Icon.IsVisible>
@@ -224,8 +224,8 @@
                     </Grid>
                     <Grid ColumnDefinitions="Auto,8,*" Margin="0,16,0,0" MinHeight="20" MaxWidth="480" HorizontalAlignment="Left">
                       <Panel VerticalAlignment="Top" Margin="0,2,0,0">
-                        <c:Spinner IsVisible="{Binding Connecting}" Width="14" Height="14" Foreground="{DynamicResource InkMuted}" />
-                        <c:Spinner IsVisible="{Binding Finding}" Width="14" Height="14" Foreground="{DynamicResource InkMuted}" />
+                        <c:SyftLoader Kind="HoppingBits" Size="20" IsVisible="{Binding Connecting}" />
+                        <c:SyftLoader Kind="HoppingBits" Size="20" IsVisible="{Binding Finding}" />
                         <c:Icon Classes="ok" Size="16" IsVisible="{Binding LibraryOk}" />
                         <c:Icon Classes="warn" Size="16">
                           <c:Icon.IsVisible>

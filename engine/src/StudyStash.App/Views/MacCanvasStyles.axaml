@@ -526,7 +526,7 @@
     <Setter Property="VerticalAlignment" Value="Center" />
     <Setter Property="HorizontalAlignment" Value="Right" />
   </Style>
-  <Style Selector="StackPanel.cv-action > TextBlock, StackPanel.cv-action > c|Icon, StackPanel.cv-action > c|Spinner">
+  <Style Selector="StackPanel.cv-action > TextBlock, StackPanel.cv-action > c|Icon, StackPanel.cv-action > c|SyftLoader">
     <Setter Property="VerticalAlignment" Value="Center" />
   </Style>
   <!-- The open step's help, pictures and lists: under its title, in the title's column. -->

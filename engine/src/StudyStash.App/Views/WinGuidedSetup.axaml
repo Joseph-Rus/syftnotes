@@ -206,7 +206,7 @@
                         <TextBlock Classes="hint" Text="{Binding InstallSource}" VerticalAlignment="Center" MaxWidth="250" />
                       </StackPanel>
                       <StackPanel Spacing="10" Margin="0,26,0,0" MaxWidth="480" HorizontalAlignment="Stretch" IsVisible="{Binding Installing}">
-                        <ProgressBar Classes="work" IsIndeterminate="True" />
+                        <c:SyftLoader Kind="PixelProgress" Size="9" HorizontalAlignment="Left" />
                         <TextBlock Classes="hint" Text="{Binding Phase}" />
                       </StackPanel>
                       <StackPanel Orientation="Horizontal" Spacing="8" Margin="0,26,0,0" IsVisible="{Binding ShowInstalled}">
@@ -355,9 +355,9 @@
                       </ItemsControl.ItemsPanel>
                       <ItemsControl.DataTemplates>
                         <DataTemplate DataType="vm:AiEntry">
-                          <!-- The egghead says it: his face beside each of the AI's messages -->
+                          <!-- Syft says it: the pixel s beside each of the AI's messages -->
                           <Grid ColumnDefinitions="Auto,12,*" HorizontalAlignment="Left">
-                          <c:Doodle Art="head" Size="34" VerticalAlignment="Top" Margin="0,2,0,0" />
+                          <c:SyftMark Size="34" Bits="False" VerticalAlignment="Top" Margin="0,2,0,0" />
                           <StackPanel Grid.Column="2" Spacing="4" HorizontalAlignment="Left" MaxWidth="540">
                             <TextBlock Classes="ai-byline" Text="{Binding Byline}" />
                             <TextBlock Classes="ai-answer" Text="{Binding Text}" />
@@ -443,7 +443,7 @@
                                     </Button>
                                   </StackPanel>
                                   <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Right" Margin="0,6,0,0">
-                                    <c:Spinner IsVisible="{Binding Busy}" Width="14" Height="14" Foreground="{DynamicResource InkMuted}" VerticalAlignment="Center" />
+                                    <c:SyftLoader Kind="HoppingBits" Size="20" IsVisible="{Binding Busy}" VerticalAlignment="Center" />
                                     <Button Classes="btn sm ink" Command="{Binding PressCommand}" CommandParameter="setup" IsEnabled="{Binding !Busy}" Content="Set up" />
                                   </StackPanel>
                                 </StackPanel>
@@ -454,7 +454,7 @@
                                   <Border Classes="field"><TextBox Classes="bare" Text="{Binding Setup.Password}" PasswordChar="•" PlaceholderText="A password for your library (4 or more letters)" /></Border>
                                   <TextBlock Classes="hint" Text="{Binding PasswordNote}" />
                                   <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Right" Margin="0,4,0,0">
-                                    <c:Spinner IsVisible="{Binding Busy}" Width="14" Height="14" Foreground="{DynamicResource InkMuted}" VerticalAlignment="Center" />
+                                    <c:SyftLoader Kind="HoppingBits" Size="20" IsVisible="{Binding Busy}" VerticalAlignment="Center" />
                                     <Button Classes="btn sm ink" Command="{Binding PressCommand}" CommandParameter="create" IsEnabled="{Binding !Busy}" Content="Create library" />
                                   </StackPanel>
                                 </StackPanel>
@@ -465,7 +465,7 @@
                                   <Border Classes="field"><TextBox Classes="bare" Text="{Binding Setup.ConnectPassword}" PasswordChar="•" PlaceholderText="Its password" /></Border>
                                   <TextBlock Classes="hint" Text="{Binding Setup.LibraryResult}" IsVisible="{Binding Setup.HasLibraryResult}" />
                                   <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Right" Margin="0,4,0,0">
-                                    <c:Spinner IsVisible="{Binding Busy}" Width="14" Height="14" Foreground="{DynamicResource InkMuted}" VerticalAlignment="Center" />
+                                    <c:SyftLoader Kind="HoppingBits" Size="20" IsVisible="{Binding Busy}" VerticalAlignment="Center" />
                                     <Button Classes="btn sm" Command="{Binding PressCommand}" CommandParameter="find" IsEnabled="{Binding !Busy}" Content="Find it" />
                                     <Button Classes="btn sm ink" Command="{Binding PressCommand}" CommandParameter="connect" IsEnabled="{Binding !Busy}" Content="Connect" />
                                   </StackPanel>
@@ -571,7 +571,7 @@
                                             <Grid ColumnDefinitions="16,*"><TextBlock Classes="cv-caption-num" Text="3" /><TextBlock Grid.Column="1" Classes="cv-caption" Text="{Binding StoreStep3}" TextWrapping="Wrap" /></Grid>
                                           </StackPanel>
                                           <StackPanel Orientation="Horizontal" Spacing="8" IsVisible="{Binding WaitingForBrowser}">
-                                            <c:Spinner Width="14" Height="14" Thickness="2" Foreground="{DynamicResource InkMuted}" VerticalAlignment="Center" />
+                                            <c:SyftLoader Kind="HoppingBits" Size="20" VerticalAlignment="Center" />
                                             <TextBlock Classes="hint" Text="{Binding WaitingLabel}" VerticalAlignment="Center" />
                                           </StackPanel>
                                           <Button Name="OtherWay" Classes="text-link small" Command="{Binding OtherWayCommand}" IsVisible="{Binding ShowOtherWay}" Content="{Binding OtherWayLabel}" />
@@ -610,7 +610,7 @@
                                     </ItemsControl.ItemTemplate>
                                   </ItemsControl>
                                   <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Right">
-                                    <c:Spinner IsVisible="{Binding Busy}" Width="14" Height="14" Foreground="{DynamicResource InkMuted}" VerticalAlignment="Center" />
+                                    <c:SyftLoader Kind="HoppingBits" Size="20" IsVisible="{Binding Busy}" VerticalAlignment="Center" />
                                     <Button Classes="btn sm ink" Command="{Binding PressCommand}" CommandParameter="add" IsEnabled="{Binding !Busy}" Content="Add these classes" />
                                   </StackPanel>
                                 </StackPanel>
@@ -682,7 +682,7 @@
                       </ItemsControl.DataTemplates>
                     </ItemsControl>
                     <StackPanel Orientation="Horizontal" Spacing="12" IsVisible="{Binding Busy}">
-                      <c:Doodle Art="thinking" Size="44" Busy="{Binding Busy}" VerticalAlignment="Center" />
+                      <c:SyftLoader Kind="HoppingBits" Size="24" IsActive="{Binding Busy}" VerticalAlignment="Center" />
                       <TextBlock Classes="ai-thinking" Text="{Binding Thinking}" VerticalAlignment="Center" />
                     </StackPanel>
                   </StackPanel>
