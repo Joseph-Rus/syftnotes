@@ -33,6 +33,8 @@ OutputBaseFilename=Syft-Notes-Setup
 SetupIconFile=..\assets\study-stash.ico
 UninstallDisplayIcon={app}\StudyStash.exe
 UninstallDisplayName=Syft Notes
+; Explorer, the Start menu and the taskbar drop the icons they kept for the old name (Setup tells Windows at the end)
+ChangesAssociations=yes
 Compression=lzma2
 SolidCompression=yes
 WizardStyle=modern
