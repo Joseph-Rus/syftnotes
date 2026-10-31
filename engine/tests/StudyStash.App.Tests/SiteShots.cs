@@ -59,6 +59,8 @@ public class SiteShots
                 Due(t);
                 Ask(t);
                 AiApps(t);
+                Setup(t);
+                FirstNotes(t);
             }
         }
         finally
@@ -68,6 +70,24 @@ public class SiteShots
     }
 
     // --- the pictures ------------------------------------------------------------------------------------------------
+
+    /// <summary>The first run's one window: the pixel s, Get started, and Open Syft Notes when you log in.</summary>
+    static void Setup(ThemeVariant t)
+    {
+        var welcome = new MacWelcome { DataContext = FirstRunShots.Welcome(SkinKind.Mac), DrawChrome = true };
+        var window = Stage(welcome, t, null);
+        Save("setup", t, window, Bounds(window, welcome));
+    }
+
+    /// <summary>The first lecture's page asking who writes its notes: Continue with Google, Claude or ChatGPT.</summary>
+    static void FirstNotes(ThemeVariant t)
+    {
+        var window = Stage(new MacLibrary { DataContext = FirstRunShots.FirstLecture(_ => { }) }, t, WindowSize);
+        var pane = Pane(window);
+        var column = Column(window);
+        var card = Bounds(window, window.GetVisualDescendants().OfType<Border>().First(b => b.Name == "GetNotes"));
+        Save("first-notes", t, window, new Rect(column.X, pane.Y + 36, column.Width, card.Bottom - pane.Y - 36 + 28));
+    }
 
     /// <summary>Home, the whole window: the design's own sample (Monday 12 October).</summary>
     static void Home(ThemeVariant t)

@@ -16,8 +16,8 @@ import tempfile
 from PIL import Image, ImageDraw
 
 SITE = pathlib.Path(__file__).resolve().parent.parent / "site" / "assets" / "img"
-WINDOWS = {"home": 36}  # pictures of the whole window, and the radius of its corners in pixels
-NAMES = ["home", "record", "notes", "formulas", "graph", "heart", "cycle", "due", "ask", "ai-apps"]
+WINDOWS = {"home": 36, "setup": 36}  # pictures of the whole window, and the radius of its corners in pixels
+NAMES = ["home", "record", "notes", "formulas", "graph", "heart", "cycle", "due", "ask", "ai-apps", "setup", "first-notes"]
 
 
 def rounded(im, radius):

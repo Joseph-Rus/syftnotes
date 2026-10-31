@@ -20,7 +20,7 @@ public sealed class FirstRunShots
     static readonly SkinKind[] Looks = [SkinKind.Mac, SkinKind.Win];
     static string Look(SkinKind skin) => skin == SkinKind.Mac ? "mac" : "win";
 
-    static SetupModel Welcome(SkinKind skin, Action<SetupModel>? state = null)
+    internal static SetupModel Welcome(SkinKind skin, Action<SetupModel>? state = null)
     {
         var m = SetupModel.For(skin);
         m.OneButton = true;
@@ -76,7 +76,7 @@ public sealed class FirstRunShots
     }
 
     /// <summary>A first lecture's page with no AI writing notes yet, the card in <paramref name="state"/>.</summary>
-    static LibraryModel FirstLecture(Action<FreeAiModel> state)
+    internal static LibraryModel FirstLecture(Action<FreeAiModel> state)
     {
         var m = EmptyLibrary(Demo.Page.Note);
         m.Notes = null;
