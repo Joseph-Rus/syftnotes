@@ -13,7 +13,7 @@ namespace StudyStash.Core.Ai;
 public static class ToolAccess
 {
     /// <summary>What every tool says while Settings → AI apps has reading switched off.</summary>
-    public const string Off = "Reading is switched off for AI apps in Egghead Notes. The student can turn it on in Egghead Notes → Settings → AI apps.";
+    public const string Off = "Reading is switched off for AI apps in Syft Notes. The student can turn it on in Syft Notes → Settings → AI apps.";
 
     /// <summary>Each scope as its toggle is named in Settings → AI apps, and what it lets tools read.</summary>
     static readonly Dictionary<string, (string Toggle, string What)> Toggles = new()
@@ -28,10 +28,10 @@ public static class ToolAccess
 
     /// <summary>What a tool says when the toggle its scope needs is off, naming that toggle.</summary>
     public static string Refused(string scope) => scope == "save"
-        ? $"Egghead Notes' settings don't let AI apps save notes right now (Settings → AI apps → {SaveToggle}). Nothing was saved: the student can switch it on, or copy these notes into Egghead Notes with Paste notes."
+        ? $"Syft Notes' settings don't let AI apps save notes right now (Settings → AI apps → {SaveToggle}). Nothing was saved: the student can switch it on, or copy these notes into Syft Notes with Paste notes."
         : Toggles.TryGetValue(scope, out var t)
-        ? $"Egghead Notes' settings don't let AI tools read {t.What} right now (Settings → AI apps → {t.Toggle})."
-        : "Egghead Notes' settings don't let AI tools read that right now (Settings → AI apps).";
+        ? $"Syft Notes' settings don't let AI tools read {t.What} right now (Settings → AI apps → {t.Toggle})."
+        : "Syft Notes' settings don't let AI tools read that right now (Settings → AI apps).";
 
     /// <summary>The scope a tool needs, or null only for list_classes (just the class names and counts). Every other
     /// tool is named here on purpose: a test fails when a new tool isn't. save_notes is the one that writes: "save".</summary>

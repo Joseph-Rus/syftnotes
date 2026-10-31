@@ -115,7 +115,7 @@ public static class RichDemo
           Nurse->>Patient: I'll bring your analgesic and check back in 30 minutes
         """;
 
-    /// <summary>A diagram Egghead Notes doesn't draw (a class diagram), for the calm card that shows its source.</summary>
+    /// <summary>A diagram Syft Notes doesn't draw (a class diagram), for the calm card that shows its source.</summary>
     public const string ClassChart = """
         classDiagram
           Nurse <|-- ChargeNurse

@@ -41,7 +41,7 @@ public sealed class CalendarSettings
     /// read fine isn't here.</summary>
     public Dictionary<string, string> Problems { get; set; } = [];
 
-    /// <summary>Whether Egghead Notes shows this calendar's events: the student's choice, else its source's suggestion.</summary>
+    /// <summary>Whether Syft Notes shows this calendar's events: the student's choice, else its source's suggestion.</summary>
     public bool IsEnabled(CalendarInfo c) => Enabled.TryGetValue(c.Id, out bool on) ? on : c.Enabled;
 
     /// <summary>The calendars shown, by source.</summary>

@@ -311,7 +311,7 @@ public sealed class Rewrites(Config cfg, Store store, AiJobs ai, Action<string>?
         }
     }
 
-    // --- notes from an AI the library doesn't run: an AI app through Egghead Notes' connection, or a free chat ----------
+    // --- notes from an AI the library doesn't run: an AI app through Syft Notes' connection, or a free chat ----------
 
     /// <summary>
     /// Notes an AI app wrote (save_notes) or the student pasted from a chat, saved as the lecture's notes the way an edit
@@ -432,7 +432,7 @@ public sealed class Rewrites(Config cfg, Store store, AiJobs ai, Action<string>?
     }
 
     /// <summary>
-    /// How Egghead Notes writes this lecture's notes, for an AI it doesn't run: its own notes prompt
+    /// How Syft Notes writes this lecture's notes, for an AI it doesn't run: its own notes prompt
     /// (<see cref="Summarize.Brief"/>, with the lines the student typed), drawing what the rich notes switches allow. For
     /// a free chat (<paramref name="chat"/>), flowcharts at most (SVG is beyond most of them), and the whole request to
     /// copy, transcript and all, in as many parts as it takes (<see cref="ChatNotes.Request"/>). Refuses (409) a lecture

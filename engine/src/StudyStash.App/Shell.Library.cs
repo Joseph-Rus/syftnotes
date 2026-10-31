@@ -160,7 +160,7 @@ public static partial class Shell
             ClearPane();
             library.Overview = null;
             SelectInSidebar(null, home: true);
-            library.Empty = host.OlderLibrary ? "Your library runs an older Egghead Notes. It files your lectures, but update it to browse, search and ask here."
+            library.Empty = host.OlderLibrary ? "Your library runs an older Syft Notes. It files your lectures, but update it to browse, search and ask here."
                 : host.Library switch
             {
                 LibraryState.NotSetUp => "Connect to your library in Settings to see your notes here.",
@@ -312,7 +312,7 @@ public static partial class Shell
     }
 
     /// <summary>
-    /// Notes from an AI Egghead Notes doesn't run, for a lecture's page (<see cref="FreeAiModel"/>): over one with no notes
+    /// Notes from an AI Syft Notes doesn't run, for a lecture's page (<see cref="FreeAiModel"/>): over one with no notes
     /// (<paramref name="offer"/>: none written, nothing writing them, a transcript to write them from), that the Claude
     /// app or any free chat can write them; Copy for your AI and Paste notes, there and in the notes' ⋯ menu. The same
     /// lecture read again keeps its model, so what's pasted and not saved stays.
@@ -672,7 +672,7 @@ public static partial class Shell
             {
                 try
                 {
-                    Toast("Egghead Notes", await lib.TerminalAsync(cls), null, null);
+                    Toast("Syft Notes", await lib.TerminalAsync(cls), null, null);
                 }
                 catch (Exception e) when (e is HttpRequestException or TaskCanceledException or LibraryRefusedException)
                 {
@@ -803,7 +803,7 @@ public static partial class Shell
         try
         {
             var r = await lib.CaptureAsync(text);
-            Toast("Kept", r is null ? "Your library runs an older Egghead Notes." : "It's filed under its class in a minute.", null, null);
+            Toast("Kept", r is null ? "Your library runs an older Syft Notes." : "It's filed under its class in a minute.", null, null);
         }
         catch (Exception e) when (e is HttpRequestException or TaskCanceledException or LibraryRefusedException)
         {

@@ -99,7 +99,7 @@ public class StateShots
                 m.Status = "Library password changed · Model ready";
                 break;
             case ProblemKind.MicDenied:
-                m.Hint = "Egghead Notes can't use the microphone";
+                m.Hint = "Syft Notes can't use the microphone";
                 m.CanRecord = false;
                 break;
             case ProblemKind.DiskFull:

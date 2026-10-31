@@ -11,7 +11,7 @@ public sealed class BrowserOption
 }
 
 /// <summary>
-/// "Which browser do you use for Canvas?": asked when the Egghead Notes extension checks in from two browsers in one
+/// "Which browser do you use for Canvas?": asked when the Syft Notes extension checks in from two browsers in one
 /// place (Chrome and Edge on the same computer, say), and again whenever the student asks to change it in Settings. Until it's answered the one that was reading Canvas carries on
 /// and the other is left alone; the answer makes it that browser from then on, in the library's own settings.
 /// The model holds on to nothing that outlives it: what picking does and how the window closes are handed in, and it
@@ -26,7 +26,7 @@ public sealed partial class BrowserChoiceModel : ObservableObject
     public BrowserChoiceModel(IReadOnlyList<string> browsers, Func<string, Task<string?>> choose)
     {
         this.choose = choose;
-        Lede = $"The Egghead Notes extension is in {(browsers.Count == 2 ? "both " : "")}{Join(browsers)}. Egghead Notes reads Canvas through one of them, and opens Canvas there. You can change this later in Settings.";
+        Lede = $"The Syft Notes extension is in {(browsers.Count == 2 ? "both " : "")}{Join(browsers)}. Syft Notes reads Canvas through one of them, and opens Canvas there. You can change this later in Settings.";
         Options = [.. browsers.Select(name => new BrowserOption { Name = name, Pick = new AsyncRelayCommand(() => PickAsync(name)) })];
     }
 

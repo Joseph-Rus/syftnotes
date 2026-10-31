@@ -284,9 +284,9 @@ public class DiagramInteractionTests
     [Fact]
     public void A_designed_diagram_says_the_moment_it_comes_from()
     {
-        Assert.Equal(12 * 60 + 34, DiagramMoment.From("%% Egghead Notes diagram, from 12:34\nflowchart LR\n  A --> B"));
-        Assert.Equal(3723, DiagramMoment.From("<!-- Egghead Notes diagram, from 1:02:03 -->\n<svg></svg>"));
-        Assert.Null(DiagramMoment.From("%% Egghead Notes diagram\nflowchart LR\n  A --> B"));
+        Assert.Equal(12 * 60 + 34, DiagramMoment.From("%% Syft Notes diagram, from 12:34\nflowchart LR\n  A --> B"));
+        Assert.Equal(3723, DiagramMoment.From("<!-- Syft Notes diagram, from 1:02:03 -->\n<svg></svg>"));
+        Assert.Null(DiagramMoment.From("%% Syft Notes diagram\nflowchart LR\n  A --> B"));
         Assert.Null(DiagramMoment.From("flowchart LR\n  A --> B"));
     }
 

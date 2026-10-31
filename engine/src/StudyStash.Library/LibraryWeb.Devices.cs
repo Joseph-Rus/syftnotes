@@ -123,9 +123,9 @@ public sealed partial class LibraryWeb
             };
             var (device, token, why) = Phones.Pair(typed, Str(body, "name") ?? PhoneName(ctx.Request.Headers.UserAgent));
             if (why == Devices.Refusal.TooManyTries)
-                return PairError(429, "Too many wrong codes. Wait ten minutes, then make a new code in Egghead Notes' Settings.");
+                return PairError(429, "Too many wrong codes. Wait ten minutes, then make a new code in Syft Notes' Settings.");
             if (device is null)
-                return PairError(401, "That code isn't right, or it's more than ten minutes old. Make a new one in Egghead Notes' Settings.");
+                return PairError(401, "That code isn't right, or it's more than ten minutes old. Make a new one in Syft Notes' Settings.");
             ctx.Response.Cookies.Append(Devices.Cookie, token!, new CookieOptions
             {
                 HttpOnly = true, Secure = SecureCookie(ctx.Request), SameSite = SameSiteMode.Strict, Path = "/", MaxAge = TimeSpan.FromDays(400), IsEssential = true,

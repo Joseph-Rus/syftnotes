@@ -3,7 +3,7 @@ using System.Text.RegularExpressions;
 
 namespace StudyStash.Core.Tests;
 
-/// <summary>The background services, under Egghead Notes' own names and files (a fixed golden fixture, once the
+/// <summary>The background services, under Syft Notes' own names and files (a fixed golden fixture, once the
 /// Python engine's own output).</summary>
 public class AutostartTests
 {
@@ -20,8 +20,8 @@ public class AutostartTests
         string home = s["user_home"].S(), log = s["log"].S();
         Assert.Equal(s["plist"].S(), Autostart.RenderPlist("com.study-stash.server", args, log, [], home));
         Assert.Equal(s["plist_odd"].S(), Autostart.RenderPlist("com.study-stash.client", odd, log, [], home));
-        Assert.Equal(s["systemd"].S(), Autostart.RenderSystemd("Egghead Notes library", args));
-        Assert.Equal(s["systemd_odd"].S(), Autostart.RenderSystemd("Egghead Notes library", odd));
+        Assert.Equal(s["systemd"].S(), Autostart.RenderSystemd("Syft Notes library", args));
+        Assert.Equal(s["systemd_odd"].S(), Autostart.RenderSystemd("Syft Notes library", odd));
     }
 
     [Fact]

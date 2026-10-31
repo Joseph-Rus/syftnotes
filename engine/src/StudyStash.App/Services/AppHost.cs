@@ -35,7 +35,7 @@ public sealed class AppSettings
     public bool SetupDone { get; set; }
     /// <summary>The Whisper model's id; empty picks the one for this computer.</summary>
     public string Model { get; set; } = "";
-    /// <summary>The lighter model Egghead Notes once suggested for this computer (an install on a heavier one hears it
+    /// <summary>The lighter model Syft Notes once suggested for this computer (an install on a heavier one hears it
     /// once, never again); empty until then.</summary>
     public string ModelSuggested { get; set; } = "";
     /// <summary>"" finds each lecture's language; "en" and so on fixes it.</summary>
@@ -82,7 +82,7 @@ public sealed class AppSettings
     public string SetupAi { get; set; } = "";
     /// <summary>Guided setup's chat, so a window closed part-way picks it up again: the AI's CLI and its session.</summary>
     public SetupChatSaved? SetupChat { get; set; }
-    /// <summary>The version of Egghead Notes that last ran here: a newer one starting (it updated itself) says so, once.</summary>
+    /// <summary>The version of Syft Notes that last ran here: a newer one starting (it updated itself) says so, once.</summary>
     public string LastVersion { get; set; } = "";
     /// <summary>The version this copy quit to install ("0.10.1"), until the next start: one that comes up older than
     /// that (Windows' Setup.exe didn't finish) says the update didn't take.</summary>
@@ -98,7 +98,7 @@ public sealed class AppSettings
     /// <summary>The notes' diagrams have shown, once, how to explore one ("Click a box to follow its arrows").</summary>
     public bool DiagramHintSeen { get; set; }
     /// <summary>The browser the student added the Canvas extension to on this computer ("Chrome", "Firefox"…): the
-    /// one Egghead Notes opens Canvas in, and offers first next time. "" until they've added it.</summary>
+    /// one Syft Notes opens Canvas in, and offers first next time. "" until they've added it.</summary>
     public string CanvasBrowser { get; set; } = "";
 
     public static string PathIn(string home) => System.IO.Path.Combine(home, "app.json");
@@ -370,7 +370,7 @@ public sealed partial class AppHost : IDisposable, IProblemSource
     /// <summary>A pretend microphone stands in for the real one.</summary>
     public bool PretendMic => pretendMic is not null;
 
-    /// <summary>Whether Egghead Notes may use the microphone (a pretend one always may).</summary>
+    /// <summary>Whether Syft Notes may use the microphone (a pretend one always may).</summary>
     public MicAccess MicAccess() => mics.Access();
 
     /// <summary>Have the system ask the student (a Mac asks once, with its own prompt) and wait for the answer.
@@ -380,7 +380,7 @@ public sealed partial class AppHost : IDisposable, IProblemSource
     /// <summary>The microphone to record from (and, if asked, what the computer plays too).</summary>
     public IAudioSource OpenMic() => pretendMic is { } pretend ? pretend() : Microphones.Open(Settings.ComputerAudio);
 
-    /// <summary>Where the student turns the microphone on for Egghead Notes.</summary>
+    /// <summary>Where the student turns the microphone on for Syft Notes.</summary>
     public string MicSettingsUrl => Microphones.SettingsUrl;
 
     /// <summary>This computer can record what it plays, too (Windows; macOS 14.2 or later).</summary>
@@ -389,7 +389,7 @@ public sealed partial class AppHost : IDisposable, IProblemSource
     /// <summary>Voice memos from the phone, brought in as lectures for Whisper (<see cref="Start"/> runs it).</summary>
     public VoiceMemoImport Memos { get; }
 
-    /// <summary>The student's Granola, once they've signed in to it in Settings: looked at for lectures Egghead Notes
+    /// <summary>The student's Granola, once they've signed in to it in Settings: looked at for lectures Syft Notes
     /// doesn't have (<see cref="Start"/> runs it), which Transfer brings over.</summary>
     public GranolaImport Granola { get; }
 
@@ -564,7 +564,7 @@ public sealed partial class AppHost : IDisposable, IProblemSource
                 s.Model = fallback.Id;
             });
             _ = DownloadModelAsync(fallback);
-            throw new InvalidOperationException($"Its library won't load on this computer. Egghead Notes switched to {fallback.Name}, which downloads now.");
+            throw new InvalidOperationException($"Its library won't load on this computer. Syft Notes switched to {fallback.Name}, which downloads now.");
         }
     }
 
@@ -918,7 +918,7 @@ public sealed partial class AppHost : IDisposable, IProblemSource
         catch (Exception e) when (e is IOException or UnauthorizedAccessException)
         {
             log($"[app] couldn't save the settings: {e.Message}");
-            Problem?.Invoke("Your settings couldn't be saved", "The change lasts until Egghead Notes quits. Check this computer has free space.");
+            Problem?.Invoke("Your settings couldn't be saved", "The change lasts until Syft Notes quits. Check this computer has free space.");
         }
         Changed?.Invoke();
     }

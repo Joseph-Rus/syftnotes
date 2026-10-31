@@ -114,6 +114,6 @@ public class TrayMarkTests
         Assert.Equal("Record", Items(Services.AppRole.Both)[0]);
         Assert.Equal("Record", Items(Services.AppRole.Laptop)[0]);
         Assert.DoesNotContain("Record", Items(Services.AppRole.Library));
-        Assert.Equal("Quit Egghead Notes", Items(Services.AppRole.Both)[^1]);
+        Assert.Equal("Quit Syft Notes", Items(Services.AppRole.Both)[^1]);
     }
 }

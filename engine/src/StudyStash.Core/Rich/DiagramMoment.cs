@@ -7,13 +7,13 @@ namespace StudyStash.Core.Rich;
 public sealed record SaidAt(Spoken Line, double Score);
 
 /// <summary>
-/// Where in the lecture a diagram comes from: the moment the diagram pass marked it with ("%% Egghead Notes diagram, from
+/// Where in the lecture a diagram comes from: the moment the diagram pass marked it with ("%% Syft Notes diagram, from
 /// 12:34"), and the moments a box's words were said, found by matching its words against the transcript's lines (the
 /// same lenient matching the diagram pass checks a diagram's words with: each word by its stem, common words left out).
 /// </summary>
 public static partial class DiagramMoment
 {
-    [GeneratedRegex(@"Egghead Notes diagram, from ((?:\d+:)?\d{1,2}:\d{2})\b")]
+    [GeneratedRegex(@"Syft Notes diagram, from ((?:\d+:)?\d{1,2}:\d{2})\b")]
     private static partial Regex Mark();
 
     [GeneratedRegex(@"[^\p{L}\p{N}]+")]

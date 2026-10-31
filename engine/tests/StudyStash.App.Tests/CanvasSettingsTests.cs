@@ -183,7 +183,7 @@ public class CanvasSettingsTests
         var model = new CanvasSettingsModel(CanvasFixtures.Context(new FakeLibrary())); // nothing routed: every call 404s
         await model.LoadAsync(TestContext.Current.CancellationToken);
 
-        Assert.Equal("Your library runs an older Egghead Notes: update it to use Canvas.", model.Say);
+        Assert.Equal("Your library runs an older Syft Notes: update it to use Canvas.", model.Say);
         Assert.Empty(model.Courses);
     }
 

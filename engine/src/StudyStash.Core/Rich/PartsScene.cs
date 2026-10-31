@@ -10,7 +10,7 @@ namespace StudyStash.Core.Rich;
 /// <summary>
 /// An illustration composed from ready-made parts (<see cref="PartsLibrary"/>) rather than drawn shape by shape: the
 /// composer's small JSON plan (which parts, where and how big, a few simple shapes where no part exists, and which part
-/// or region each label points at), read strictly (<see cref="Read"/>), and the SVG Egghead Notes draws from it
+/// or region each label points at), read strictly (<see cref="Read"/>), and the SVG Syft Notes draws from it
 /// (<see cref="Draw"/>) in the house style: each labelled part a group with its id, title and desc, the callouts in
 /// columns with leader lines, exactly as an AI-drawn illustration is structured, so everything that shows, searches,
 /// exports and prints an illustration takes it as it is.
@@ -43,7 +43,7 @@ public static partial class PartsScene
     /// shape), with an optional short fact under the name.</summary>
     public sealed record Label(string Part, string To, string Fact)
     {
-        /// <summary>Where on its target the leader ends, when the composer says (in its units); else Egghead Notes picks.</summary>
+        /// <summary>Where on its target the leader ends, when the composer says (in its units); else Syft Notes picks.</summary>
         public (double X, double Y)? At { get; init; }
     }
 
@@ -104,7 +104,7 @@ public static partial class PartsScene
                 if (shapes.Count == MaxShapes) { dropped.Add($"more than {MaxShapes} shapes"); break; }
                 string name = Str(s["as"]).ToLowerInvariant(), kind = Str(s["kind"]), material = Str(s["material"]);
                 if (!Plain().IsMatch(name) || !names.Add(name)) { dropped.Add($"a shape named '{Clip(name, 40)}' (names are plain and used once)"); continue; }
-                if (kind is not ("ellipse" or "rect" or "blob" or "band" or "arrow")) { dropped.Add($"'{name}' is a {Clip(kind, 20)}, not a shape Egghead Notes draws"); continue; }
+                if (kind is not ("ellipse" or "rect" or "blob" or "band" or "arrow")) { dropped.Add($"'{name}' is a {Clip(kind, 20)}, not a shape Syft Notes draws"); continue; }
                 if (Material(material) is null) material = kind == "arrow" ? "ink" : "light-metal";
                 var points = new List<Point>();
                 if (s["points"] is JsonArray pts)

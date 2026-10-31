@@ -31,7 +31,7 @@ public sealed class IllustrationViewTests : IDisposable
 
     /// <summary>A small drone as the illustrator draws one, its parts named.</summary>
     public const string Drone = """
-        <!-- Egghead Notes diagram, from 00:20 -->
+        <!-- Syft Notes diagram, from 00:20 -->
         <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 300">
           <title>A small drone</title>
           <g id="art">

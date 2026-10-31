@@ -4,7 +4,7 @@ using StudyStash.App.Controls;
 
 namespace StudyStash.App.Views;
 
-/// <summary>What every Egghead Notes window shares.</summary>
+/// <summary>What every Syft Notes window shares.</summary>
 public static class Look
 {
     /// <summary>Grayscale antialiasing: text as macOS draws it now (and as the design does), not the older, heavier

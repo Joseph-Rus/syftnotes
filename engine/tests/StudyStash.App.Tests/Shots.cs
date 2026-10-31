@@ -654,7 +654,7 @@ public class SurfaceShots
         m.ModelLeft = "About 4 minutes left";
         m.Addresses.Add(new SetupAddress("At home", "http://mac-mini.local:8787"));
         m.Addresses.Add(new SetupAddress("With Tailscale", "http://mac-mini.example.ts.net:8787"));
-        m.NotesFolder = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), "Documents", "Egghead Notes");
+        m.NotesFolder = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), "Documents", "Syft Notes");
         if (step > SetupStep.Library || role == AppRole.Both && step > SetupStep.Welcome)
         {
             m.LibraryOk = true;
@@ -763,7 +763,7 @@ public class SurfaceShots
             model.Lib.LaptopPassword = "correct-horse";
         }
         if (section == "One-computer-on")
-            model.Lib.LaptopSay = "Laptops can connect now. On your laptop, install Egghead Notes, and in its setup open Advanced and choose “My laptop for class”. Then enter one of the addresses below and this password.";
+            model.Lib.LaptopSay = "Laptops can connect now. On your laptop, install Syft Notes, and in its setup open Advanced and choose “My laptop for class”. Then enter one of the addresses below and this password.";
         return (model, host, home);
     }
 
@@ -830,7 +830,7 @@ public class SurfaceShots
         var paused = NoticeWords.Paused(RecordingWords.MicStopped, windows: Skin.Current == SkinKind.Win);
         plain.Children.Add(Card(NoticeWords.PausedTitle, paused.Text, paused.Action));
         plain.Children.Add(Card("Your library didn't answer, and this title is far too long to fit on one line",
-            "Egghead Notes keeps the recording here and sends it when the library is back. It tries again every few minutes, so there's nothing to do."));
+            "Syft Notes keeps the recording here and sends it when the library is back. It tries again every few minutes, so there's nothing to do."));
         var updates = new StackPanel { Spacing = 10, VerticalAlignment = VerticalAlignment.Top };
         var ready = NoticeWords.UpdateReady("0.10.1");
         updates.Children.Add(Card(ready.Title, ready.Text, ready.Action));

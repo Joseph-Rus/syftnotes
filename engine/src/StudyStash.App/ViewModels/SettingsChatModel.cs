@@ -40,7 +40,7 @@ public enum AssistantState
 
 /// <summary>
 /// Settings' helper ("Ask your AI"): the student says what they want ("make it dark", "record my Zoom lectures too"),
-/// and their own Claude Code or Codex, run as guided setup's chat is (locked to Egghead Notes' own tools), finds it in
+/// and their own Claude Code or Codex, run as guided setup's chat is (locked to Syft Notes' own tools), finds it in
 /// Settings, shows it, and changes what's theirs to change, each change showing in the window as it's made. One
 /// conversation a window; New chat starts another.
 /// </summary>
@@ -58,7 +58,7 @@ public sealed partial class SettingsChatModel(SettingsChatServices services) : O
     /// <summary>A few things to ask, before anything's been asked.</summary>
     public IReadOnlyList<string> Suggestions { get; } =
     [
-        "Make Egghead Notes dark",
+        "Make Syft Notes dark",
         "Record my Zoom lectures too",
         "Keep recordings for a week",
         "Where do I change my library's password?",
@@ -81,7 +81,7 @@ public sealed partial class SettingsChatModel(SettingsChatServices services) : O
     public string Brand => Cli?.Brand ?? "your AI";
     public string Title => Cli is { } c ? $"Ask {c.Brand}" : "Ask your AI";
     public string Lede => Cli is { } c
-        ? $"Tell {c.Brand} what you'd like, and it finds it in Settings, shows you, and changes it for you. It can only reach Egghead Notes' settings, and never your passwords."
+        ? $"Tell {c.Brand} what you'd like, and it finds it in Settings, shows you, and changes it for you. It can only reach Syft Notes' settings, and never your passwords."
         : "Your AI can find things in Settings and change them for you.";
     public string Placeholder => $"Ask {Brand} to change something…";
     public bool IsLooking => State == AssistantState.Looking;
@@ -236,8 +236,8 @@ public sealed partial class SettingsChatModel(SettingsChatServices services) : O
             ChatProblem.Offline => $"{Brand} couldn't be reached. Check your internet connection.",
             ChatProblem.Limit => $"{Brand} is at its usage limit until {GuidedSetupModel.UntilWords(Engines.UntilFrom(said, services.Now()))}. You can still change anything here yourself.",
             ChatProblem.NoAnswer => $"{Brand} didn't answer. Try again.",
-            ChatProblem.Guard => $"Egghead Notes stopped {Brand}: it tried to use a tool it isn't allowed here.",
-            ChatProblem.Tools => $"Egghead Notes couldn't connect {Brand} to Settings.",
+            ChatProblem.Guard => $"Syft Notes stopped {Brand}: it tried to use a tool it isn't allowed here.",
+            ChatProblem.Tools => $"Syft Notes couldn't connect {Brand} to Settings.",
             _ => $"{Brand} stopped: {Py.Head(said, 160).TrimEnd('.')}.",
         };
     }

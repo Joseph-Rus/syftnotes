@@ -125,7 +125,7 @@ public sealed class IcsRulesZone : IcsZone
 /// Finds the zone a TZID names. Google and iCloud write IANA names ("America/New_York"), Outlook writes Windows names
 /// ("Eastern Standard Time") or its own ("Customized Time Zone"), some old exports a prefixed path
 /// ("/mozilla.org/20050126_1/America/New_York"). The computer's zone database is asked first (under either kind of
-/// name, through a small table of the common ones, since Egghead Notes runs without the ICU data that converts them);
+/// name, through a small table of the common ones, since Syft Notes runs without the ICU data that converts them);
 /// then the feed's own VTIMEZONE; then nothing, and the time reads as floating.
 /// </summary>
 public static class IcsZones

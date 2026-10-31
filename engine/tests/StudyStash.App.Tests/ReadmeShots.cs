@@ -92,7 +92,7 @@ public class ReadmeShots
             "## The chambers",
             "- The two atria receive blood; the two ventricles pump it out.\n- A valve between each atrium and its ventricle keeps blood moving one way.",
             $"**{plan.Title}**",
-            "```svg\n<!-- Egghead Notes diagram, from 14:20 -->\n" + drawn.Svg + "\n```",
+            "```svg\n<!-- Syft Notes diagram, from 14:20 -->\n" + drawn.Svg + "\n```",
             $"*{caption} Parts: {string.Join("; ", drawn.Credits)}.* (from 14:20)",
             "## Questions to review",
             "1. Why is the left ventricle's wall thicker than the right's?");

@@ -31,7 +31,7 @@ static class NoInternetFetch
         StudyStash.Core.Ai.SetupChat.CodexConfig = () => Path.Combine(Path.GetTempPath(), "studystash-core-tests-no-codex", "config.toml");
         // Claude Code's version, as a current one says it: no test asks the real one.
         StudyStash.Core.Ai.ClaudeProvider.VersionOf = _ => new Version(2, 1, 260);
-        // Antigravity's home of Egghead Notes' own: a folder of the tests' own, never ~/.study-stash/gemini.
+        // Antigravity's home of Syft Notes' own: a folder of the tests' own, never ~/.study-stash/gemini.
         StudyStash.Core.Ai.Antigravity.Home = () => Path.Combine(Path.GetTempPath(), "studystash-core-tests-agy-home");
     }
 #pragma warning restore CA2255
@@ -244,7 +244,7 @@ public class ConnectorTests
         Assert.Equal($"[\"{Ts}\"]", resource["authorization_servers"]!.ToJsonString());
         Assert.Equal("[\"library:read\"]", resource["scopes_supported"]!.ToJsonString());
         Assert.Equal("[\"header\"]", resource["bearer_methods_supported"]!.ToJsonString());
-        Assert.Equal("Egghead Notes", resource["resource_name"]!.GetValue<string>());
+        Assert.Equal("Syft Notes", resource["resource_name"]!.GetValue<string>());
         Assert.EndsWith("/docs/claude-connector.md", resource["resource_documentation"]!.GetValue<string>());
 
         // Every address in the 401 is the https one too; a token that doesn't work says so.
@@ -495,7 +495,7 @@ public class ConnectorTests
         // Tools off: Claude is told up front, before it tries a call and gets refused.
         door.Access.ToolsOn = false;
         html = await (await c.GetAsync("/authorize?" + Query(fields))).Content.ReadAsStringAsync();
-        Assert.Contains("Reading is switched off for AI apps in Egghead Notes (Settings → AI apps), so Claude Code won't see anything until you turn it on.", html);
+        Assert.Contains("Reading is switched off for AI apps in Syft Notes (Settings → AI apps), so Claude Code won't see anything until you turn it on.", html);
     }
 
     [Fact]
@@ -554,7 +554,7 @@ public class ConnectorTests
         door.Cfg.PoolPassword = "";
         var noPassword = await c.GetAsync("/authorize?" + Query(fields));
         Assert.Equal(HttpStatusCode.Forbidden, noPassword.StatusCode);
-        Assert.Contains("Your library has no password yet. Set one in Egghead Notes → Settings → Library, then connect again.", await noPassword.Content.ReadAsStringAsync());
+        Assert.Contains("Your library has no password yet. Set one in Syft Notes → Settings → Library, then connect again.", await noPassword.Content.ReadAsStringAsync());
     }
 
     [Fact]
@@ -1042,7 +1042,7 @@ public class ConnectorTests
         {
             var r = await mcp.CallToolAsync(t.Name, new Dictionary<string, object?>());
             Assert.True(r.IsError);
-            Assert.Equal("Reading is switched off for AI apps in Egghead Notes. The student can turn it on in Egghead Notes → Settings → AI apps.", Text(r));
+            Assert.Equal("Reading is switched off for AI apps in Syft Notes. The student can turn it on in Syft Notes → Settings → AI apps.", Text(r));
         }
 
         door.Access.ToolsOn = true; // no reconnect needed
@@ -1067,7 +1067,7 @@ public class ConnectorTests
         {
             var r = await mcp.CallToolAsync(name, new Dictionary<string, object?>());
             Assert.True(r.IsError, name);
-            Assert.Equal("Egghead Notes' settings don't let AI tools read Canvas right now (Settings → AI apps → Canvas assignments and files).", Text(r));
+            Assert.Equal("Syft Notes' settings don't let AI tools read Canvas right now (Settings → AI apps → Canvas assignments and files).", Text(r));
         }
         Assert.True((await mcp.CallToolAsync("list_classes", new Dictionary<string, object?>())).IsError is null or false);
     }
@@ -1176,7 +1176,7 @@ public class ConnectorTests
         Assert.Equal(first, await source.ReadFileAsync("CS 101/Canvas/files/Week 1/recursion.md", 0));
 
         Assert.Contains("private folder", await source.ReadFileAsync(taxes, 0));
-        const string NotHere = "That isn't a file Egghead Notes shares with AI tools.";
+        const string NotHere = "That isn't a file Syft Notes shares with AI tools.";
         Assert.StartsWith(NotHere, await source.ReadFileAsync(linked, 0)); // a link out of the folder
         Assert.StartsWith(NotHere, await source.ReadFileAsync(away, 0));
         Assert.StartsWith(NotHere, await source.ReadFileAsync(Path.Combine(week, "..", "..", "..", "..", "..", "outside", "diary.md"), 0));
@@ -1186,7 +1186,7 @@ public class ConnectorTests
         Assert.StartsWith(NotHere, await source.ReadFileAsync(Path.Combine(home, "claude.json"), 0));
     }
 
-    // --- end to end: Claude adds Egghead Notes as a custom connector, over a real server behind Funnel -------------------
+    // --- end to end: Claude adds Syft Notes as a custom connector, over a real server behind Funnel -------------------
 
     /// <summary>Tailscale Funnel, as far as the test needs it: a request to https://mini.tail1234.ts.net goes on to the
     /// library's Claude port on this computer over plain http, keeping the name it was sent to and saying who asked and

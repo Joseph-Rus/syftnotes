@@ -149,7 +149,7 @@ public class PhoneDriveTests
         }
         using (var stop = new CancellationTokenSource())
         {
-            // Egghead Notes quits and starts again: laptop.json says what it answered.
+            // Syft Notes quits and starts again: laptop.json says what it answered.
             var again = Link(drive, rig);
             var running = again.RunAsync(stop.Token);
             await again.FirstCopy.Task.WaitAsync(TimeSpan.FromSeconds(20), Test);
@@ -443,7 +443,7 @@ public class PhoneDriveTests
         // A school account turned away, and Google Drive unticked: each in words, and nothing kept.
         await phoneDrive.DisconnectAsync();
         var school = await Assert.ThrowsAsync<GoogleException>(() => phoneDrive.ConnectAsync(Browser("error=admin_policy_enforced")));
-        Assert.Equal("Your school's Google account doesn't allow Egghead Notes. Try a personal Gmail on both.", school.Message);
+        Assert.Equal("Your school's Google account doesn't allow Syft Notes. Try a personal Gmail on both.", school.Message);
         google.Scope = "openid email";
         var noDrive = await Assert.ThrowsAsync<GoogleException>(() => phoneDrive.ConnectAsync(Browser("code=another")));
         Assert.Equal(GoogleTrouble.NoDrive, noDrive.Trouble);

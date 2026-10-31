@@ -20,7 +20,7 @@ public sealed partial class CopyPart(int number, string text) : ObservableObject
 }
 
 /// <summary>
-/// Notes from an AI Egghead Notes doesn't run, on a lecture's page: over a lecture with no notes, the line that says a
+/// Notes from an AI Syft Notes doesn't run, on a lecture's page: over a lecture with no notes, the line that says a
 /// student with no paid AI can ask the Claude app for them; "Copy for your AI" (what to ask any free chat for the notes,
 /// and the transcript, in parts when the lecture is long for one message); and "Paste notes", a box for what the chat
 /// wrote, saved as the lecture's notes (tidied of what chats put round them, the student's typed lines kept, any notes
@@ -104,7 +104,7 @@ public sealed partial class FreeAiModel : ObservableObject
             var brief = await library.NotesBriefAsync(LectureId);
             if (brief is null || brief.Parts.Count == 0)
             {
-                Say = "Your library runs an older Egghead Notes. Update it to copy a lecture for another AI.";
+                Say = "Your library runs an older Syft Notes. Update it to copy a lecture for another AI.";
                 return;
             }
             Parts.Clear();
@@ -162,7 +162,7 @@ public sealed partial class FreeAiModel : ObservableObject
 
     public bool CanSavePaste => !Busy && PasteText.Trim().Length > 0;
 
-    public const string PasteHint = "Copy the chat's whole answer and paste it here. Egghead Notes tidies away what chats add around notes.";
+    public const string PasteHint = "Copy the chat's whole answer and paste it here. Syft Notes tidies away what chats add around notes.";
     public string ReplacesWords => HasNotes ? $"These replace this {Noun}'s notes. You can put those back from the ⋯ menu by the notes." : "";
     public bool HasReplacesWords => HasNotes;
 
@@ -194,7 +194,7 @@ public sealed partial class FreeAiModel : ObservableObject
             var info = await library.SaveNotesAsync(LectureId, PasteText, replace: HasNotes || overChanged, basedOn: overChanged ? null : BasedOn?.Invoke());
             if (info is null)
             {
-                PasteProblem = "Your library runs an older Egghead Notes. Update it to save notes from another AI.";
+                PasteProblem = "Your library runs an older Syft Notes. Update it to save notes from another AI.";
                 return;
             }
             Pasting = false;

@@ -37,7 +37,7 @@ public static class ClaudeWeb
         var source = new LocalLibrary(reader, canvas, cfg.Home, files);
         builder.Services.AddMcpServer(o =>
         {
-            o.ServerInfo = new ModelContextProtocol.Protocol.Implementation { Name = ClaudeTools.ServerName, Title = "Egghead Notes", Version = Engine.Version };
+            o.ServerInfo = new ModelContextProtocol.Protocol.Implementation { Name = ClaudeTools.ServerName, Title = "Syft Notes", Version = Engine.Version };
             o.ServerInstructions = ClaudeTools.WebInstructions;
         })
             // No sessions: every request stands alone, so a library restart (or an update) loses Claude nothing.
@@ -103,7 +103,7 @@ public static class ClaudeWeb
                 await ctx.Response.WriteAsJsonAsync(new JsonObject
                 {
                     ["jsonrpc"] = "2.0",
-                    ["error"] = new JsonObject { ["code"] = -32600, ["message"] = "Egghead Notes doesn't take requests from pages on " + origin + "." },
+                    ["error"] = new JsonObject { ["code"] = -32600, ["message"] = "Syft Notes doesn't take requests from pages on " + origin + "." },
                 });
                 return;
             }
@@ -117,7 +117,7 @@ public static class ClaudeWeb
                 ctx.Response.StatusCode = StatusCodes.Status401Unauthorized;
                 ctx.Response.Headers.WWWAuthenticate = $"Bearer resource_metadata=\"{metadata}\", scope=\"{Scope}\""
                     + (bearer.Length > 0 ? ", error=\"invalid_token\", error_description=\"The token is unknown, expired, revoked or for another address\"" : "");
-                await ctx.Response.WriteAsJsonAsync(new { error = "invalid_token", error_description = "Sign in to Egghead Notes again." });
+                await ctx.Response.WriteAsJsonAsync(new { error = "invalid_token", error_description = "Sign in to Syft Notes again." });
                 return;
             }
             // This door never hands out a session, so a session id can only be one a client kept from somewhere
@@ -140,7 +140,7 @@ public static class ClaudeWeb
             ["authorization_servers"] = new JsonArray(Base(ctx, access)),
             ["bearer_methods_supported"] = new JsonArray("header"),
             ["scopes_supported"] = new JsonArray(Scope),
-            ["resource_name"] = "Egghead Notes",
+            ["resource_name"] = "Syft Notes",
             ["resource_documentation"] = Docs,
         });
         app.MapGet("/.well-known/oauth-protected-resource", Resource);
@@ -217,7 +217,7 @@ public static class ClaudeWeb
             if (clientId.Length == 0 && AssertedClient(form.Get("client_assertion")) is { Length: > 0 } asserted) clientId = asserted;
             string grantType = form.Get("grant_type");
             if (grantType is "authorization_code" or "refresh_token" && (grantType == "authorization_code" || clientId.Length > 0) && !access.KnownClient(clientId))
-                return Http.Json(new JsonObject { ["error"] = "invalid_client", ["error_description"] = "Egghead Notes doesn't know this app. Register again." }, 401);
+                return Http.Json(new JsonObject { ["error"] = "invalid_client", ["error_description"] = "Syft Notes doesn't know this app. Register again." }, 401);
             string? resource = null;
             if (form.Get("resource") is { Length: > 0 } asked && ((resource = Canonical(asked)) is null || !Ours(ctx, cfg, access, resource)))
                 return Http.Json(new JsonObject { ["error"] = "invalid_target", ["error_description"] = "That isn't one of this library's addresses." }, 400);
@@ -246,7 +246,7 @@ public static class ClaudeWeb
 
         app.MapMcp(McpPath);
         app.MapGet("/", () => Results.Text(
-            "Egghead Notes: the MCP server for your lecture library.\nAdd " + McpPath + " on this address to Claude or ChatGPT as a connector.\n",
+            "Syft Notes: the MCP server for your lecture library.\nAdd " + McpPath + " on this address to Claude or ChatGPT as a connector.\n",
             "text/plain; charset=utf-8"));
         app.MapGet("/healthz", () => Http.Json(new JsonObject { ["ok"] = true, ["app"] = "study-stash-claude", ["version"] = Engine.Version }));
         Icons.Map(app);
@@ -395,7 +395,7 @@ public static class ClaudeWeb
         if (bound is null || !Ours(ctx, cfg, access, bound))
             return Results.Redirect(Back("error=invalid_target&error_description=" + Uri.EscapeDataString("resource isn't this library's MCP address")));
         if (cfg.PoolPassword.Length == 0)
-            return Problem("Your library has no password yet. Set one in Egghead Notes → Settings → Library, then connect again.", 403);
+            return Problem("Your library has no password yet. Set one in Syft Notes → Settings → Library, then connect again.", 403);
         var fields = new[] { ("client_id", clientId), ("redirect_uri", redirect), ("state", state), ("code_challenge", challenge),
             ("code_challenge_method", method), ("resource", resource), ("response_type", "code"), ("scope", scope) };
         string csp = $"default-src 'none'; style-src 'unsafe-inline'; img-src 'self'; form-action 'self' {redirectUri.GetLeftPart(UriPartial.Authority)}; frame-ancestors 'none'; base-uri 'none'";
@@ -443,7 +443,7 @@ public static class ClaudeWeb
         if (reading.Notes) items.Add("Study notes");
         if (reading.Canvas) items.Add("Canvas assignments and files");
         string list = items.Count > 0 ? $"<ul class=\"reading\">{string.Concat(items.Select(i => $"<li>{Ui.Esc(i)}</li>"))}</ul>" : "";
-        string toolsOff = access.ToolsOn ? "" : $"<p class=\"note\">Reading is switched off for AI apps in Egghead Notes (Settings → AI apps), so {Ui.Esc(name)} won't see anything until you turn it on.</p>";
+        string toolsOff = access.ToolsOn ? "" : $"<p class=\"note\">Reading is switched off for AI apps in Syft Notes (Settings → AI apps), so {Ui.Esc(name)} won't see anything until you turn it on.</p>";
         string body = $"""
             <main><form method="post" action="/authorize">
             <img src="/icon.png" alt="" width="56" height="56">
@@ -467,10 +467,10 @@ public static class ClaudeWeb
     }
 
     static IResult Problem(string text, int status) =>
-        Http.Html(Shell("Egghead Notes", $"<main><form><img src=\"/icon.png\" alt=\"\" width=\"56\" height=\"56\"><h1>Can't sign in</h1><p role=\"alert\">{Ui.Esc(text)}</p></form></main>"),
+        Http.Html(Shell("Syft Notes", $"<main><form><img src=\"/icon.png\" alt=\"\" width=\"56\" height=\"56\"><h1>Can't sign in</h1><p role=\"alert\">{Ui.Esc(text)}</p></form></main>"),
             "default-src 'none'; style-src 'unsafe-inline'; img-src 'self'; frame-ancestors 'none'; base-uri 'none'", status);
 
-    /// <summary>A page in the Egghead Notes look (the Lagoon accent), light or dark with the system, self-contained (no
+    /// <summary>A page in the Syft Notes look (the Lagoon accent), light or dark with the system, self-contained (no
     /// scripts, so the CSP can hold to <c>default-src 'none'</c>).</summary>
     static string Shell(string title, string body) => $$$"""
         <!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">

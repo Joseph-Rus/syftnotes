@@ -229,7 +229,7 @@ public static class Doctor
     public static async Task<List<Check>> ClientChecksAsync(ClientConfig cc, DoctorHost? host = null)
     {
         host ??= new DoctorHost();
-        const string connect = "open Egghead Notes and connect it to your library";
+        const string connect = "open Syft Notes and connect it to your library";
         if (!File.Exists(cc.ConfigPath)) return [new Check("Config", Fail, $"no {cc.ConfigPath}", connect)];
         if (cc.ServerUrl.Length == 0) return [new Check("Config", Fail, $"{cc.ConfigPath} names no library", connect)];
         var output = new List<Check> { new("Config", Ok, cc.ConfigPath) };
@@ -267,11 +267,11 @@ public static class Doctor
         if (waiting.Count > 0)
             return new Check("Recordings", Warn, $"{Count(waiting.Count)} waiting to reach {library}",
                 waiting.FirstOrDefault(l => l.Error.Length > 0) is { } stuck ? $"last try: {stuck.Error}"
-                    : "they go on their own while Egghead Notes is open and the library answers");
+                    : "they go on their own while Syft Notes is open and the library answers");
         var failed = lectures.Where(l => l.State == LectureState.Failed).ToList();
         if (failed.Count > 0)
             return new Check("Recordings", Warn, $"{Count(failed.Count)} couldn't be written down: {failed[0].Error}",
-                "open Egghead Notes to see which");
+                "open Syft Notes to see which");
         int filed = lectures.Count(l => l.State == LectureState.Filed);
         return new Check("Recordings", Ok, lectures.Count == 0 ? "nothing recorded yet" : $"{Count(filed)} filed in {library}");
     }
@@ -325,7 +325,7 @@ public static class Doctor
         {
             print($"Nothing is set up in {home} yet.\n"
                 + "  The computer that keeps the library:  studystash setup --page\n"
-                + "  Your laptop:                          open the Egghead Notes app");
+                + "  Your laptop:                          open the Syft Notes app");
             return 1;
         }
         bool failed = false;

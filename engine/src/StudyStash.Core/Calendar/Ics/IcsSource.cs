@@ -91,7 +91,7 @@ public sealed class IcsSource(CalendarSourceSettings settings, HttpClient http, 
             if (r.StatusCode is HttpStatusCode.NotFound or HttpStatusCode.Gone)
                 throw new CalendarFeedException("That calendar isn't there any more. Check its address.");
             if (!r.IsSuccessStatusCode)
-                throw new CalendarFeedException($"The calendar's server didn't answer ({(int)r.StatusCode}). Egghead Notes tries again soon.");
+                throw new CalendarFeedException($"The calendar's server didn't answer ({(int)r.StatusCode}). Syft Notes tries again soon.");
             if (r.Content.Headers.ContentLength is > MaxBytes) throw new CalendarFeedException("That calendar is too big to read.");
             await using var stream = await r.Content.ReadAsStreamAsync(cts.Token);
             using var buffer = new MemoryStream();

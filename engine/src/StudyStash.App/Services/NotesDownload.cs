@@ -101,7 +101,7 @@ public static class NotesDownload
         catch (Exception e) when (e is not OutOfMemoryException)
         {
             Program.Log($"[export] couldn't make a PDF of {lectureId}: {e.GetType().Name}: {e.Message}");
-            Shell.Toast("Couldn't make the PDF", "Egghead Notes couldn't lay these notes out on paper.", null, null);
+            Shell.Toast("Couldn't make the PDF", "Syft Notes couldn't lay these notes out on paper.", null, null);
             return;
         }
         await using var stream = await open();

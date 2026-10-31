@@ -8,7 +8,7 @@ function ago(iso) {
 fetch(STUDY_STASH.app + '/api/v2/canvas/status', {headers: {'X-Study-Stash-Key': STUDY_STASH.key}})
   .then(r => r.json())
   .then(j => { s.textContent = j.busy ? j.busy : (j.error ? j.error : 'Canvas synced ' + ago(j.synced) + '.'); })
-  .catch(() => { s.textContent = "Your Egghead Notes library isn't answering."; });
+  .catch(() => { s.textContent = "Your Syft Notes library isn't answering."; });
 document.getElementById('sync').onclick = () => {
   chrome.runtime.sendMessage({sync: true});
   s.textContent = 'Syncing… you can close this.';

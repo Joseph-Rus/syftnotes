@@ -9,11 +9,11 @@ namespace StudyStash.Core.Ai;
 /// Google's Antigravity CLI (<c>agy</c>), which Gemini runs through: Google moved personal Google accounts (free, AI Pro,
 /// Ultra) from Gemini CLI to it on 18 June 2026, and Gemini CLI now serves only API keys and company licences.
 /// <para>
-/// Egghead Notes runs it with a home of its own (<see cref="Home"/>: agy keeps everything under <c>~/.gemini</c>, and reads
+/// Syft Notes runs it with a home of its own (<see cref="Home"/>: agy keeps everything under <c>~/.gemini</c>, and reads
 /// its home from HOME, or USERPROFILE on Windows), so nothing of the student's own agy (their MCP servers, plugins,
-/// skills, hooks, rules, settings) ever runs inside Egghead Notes' work, and Egghead Notes never writes theirs. The sign-in
-/// is kept in that home too (agy 1.4.5 keeps it there, <c>antigravity-cli/antigravity-oauth-token</c>, which Egghead Notes
-/// never reads): a student signs in to Gemini for Egghead Notes once, in setup, and its notes and its setup chat use that.
+/// skills, hooks, rules, settings) ever runs inside Syft Notes' work, and Syft Notes never writes theirs. The sign-in
+/// is kept in that home too (agy 1.4.5 keeps it there, <c>antigravity-cli/antigravity-oauth-token</c>, which Syft Notes
+/// never reads): a student signs in to Gemini for Syft Notes once, in setup, and its notes and its setup chat use that.
 /// </para>
 /// <para>
 /// The setup chat runs in that home as an agent of its own (<see cref="SetupAgent"/>): Antigravity's default prompt and
@@ -26,7 +26,7 @@ namespace StudyStash.Core.Ai;
 public static class Antigravity
 {
     public const string Binary = "agy";
-    /// <summary>The setup guide's agent, in Egghead Notes' home for agy.</summary>
+    /// <summary>The setup guide's agent, in Syft Notes' home for agy.</summary>
     public const string SetupAgent = "study-stash-setup";
     /// <summary>The one tool agy calls any MCP server's tools through, naming the server and the tool.</summary>
     public const string McpTool = "call_mcp_tool";
@@ -35,7 +35,7 @@ public static class Antigravity
     public static readonly string[] Harmless = ["manage_task"];
     public static readonly string[] ResourceTools = ["list_resources", "read_resource"];
 
-    /// <summary>Egghead Notes' own home for agy, where its sign-in, its notes and its setup chat are: the library's home's
+    /// <summary>Syft Notes' own home for agy, where its sign-in, its notes and its setup chat are: the library's home's
     /// <c>gemini</c> folder (<see cref="For"/>). The app and the library set it from their own home; a test gives its own
     /// with <see cref="Use"/>, which no other test running beside it sees.</summary>
     public static Func<string> Home
@@ -64,7 +64,7 @@ public static class Antigravity
         public void Dispose() => undo();
     }
 
-    /// <summary>The agy home for an Egghead Notes home: its <c>gemini</c> folder, or STUDYSTASH_AGY_HOME when that's set
+    /// <summary>The agy home for a Syft Notes home: its <c>gemini</c> folder, or STUDYSTASH_AGY_HOME when that's set
     /// (an app and its library pointed at one signed-in home, as the off-screen films are).</summary>
     public static string For(string studyStashHome) =>
         Environment.GetEnvironmentVariable("STUDYSTASH_AGY_HOME") is { Length: > 0 } set ? set : Path.Combine(studyStashHome, "gemini");
@@ -83,7 +83,7 @@ public static class Antigravity
     public static string AgentPath(string home, string name) => Path.Combine(home, ".gemini", "config", "agents", name, "agent.md");
 
     /// <summary>
-    /// The sign-in in a terminal window (when the hidden one can't open the browser), in Egghead Notes' own home for
+    /// The sign-in in a terminal window (when the hidden one can't open the browser), in Syft Notes' own home for
     /// agy as well: <c>/usr/bin/env HOME=… agy -p=/usage</c> on a Mac, PowerShell setting the home first on Windows.
     /// It opens the browser, waits a minute (a code can be pasted there too), then says how much is left.
     /// </summary>
@@ -120,7 +120,7 @@ public static class Antigravity
     /// listed), none of the home's skills, rules, plugins, subagents or MCP servers taken in, commands off, and the setup
     /// tools as its one MCP server (none for a turn with no tools). agy doesn't fill in <c>${VAR}</c> in a header
     /// (tried: it sends the words as they are), so the token is written in: in a file only this account can read, in
-    /// Egghead Notes' own folder, for the turn alone (<see cref="ForgetSetup"/>). Its body (after the H1) is the brief.
+    /// Syft Notes' own folder, for the turn alone (<see cref="ForgetSetup"/>). Its body (after the H1) is the brief.
     /// </summary>
     public static string SetupAgentFile(string brief, string mcpUrl = "", string token = "")
     {
@@ -134,7 +134,7 @@ public static class Antigravity
         return $"""
             ---
             name: {SetupAgent}
-            description: Egghead Notes' setup guide. It only uses the study_stash_setup tools.
+            description: Syft Notes' setup guide. It only uses the study_stash_setup tools.
             mainAgent: true
             subagent: false
             hidden: true
@@ -145,7 +145,7 @@ public static class Antigravity
             tools: []
             {servers}
             ---
-            # Egghead Notes setup guide
+            # Syft Notes setup guide
 
             {brief.Replace("\r\n", "\n").Trim()}
 
@@ -164,7 +164,7 @@ public static class Antigravity
     public static string AnswerAgentFile() => """
         ---
         name: study-stash-answer
-        description: Egghead Notes' notes and answers, from what the message gives it. It has no tools.
+        description: Syft Notes' notes and answers, from what the message gives it. It has no tools.
         mainAgent: true
         subagent: false
         hidden: true
@@ -175,7 +175,7 @@ public static class Antigravity
         tools: []
         mcpServers: []
         ---
-        # Egghead Notes
+        # Syft Notes
 
         Answer from what the message gives you. You have no tools: don't try to use any.
 
@@ -186,7 +186,7 @@ public static class Antigravity
     /// global MCP config, whose servers start in every session there, the setup chat's included.</summary>
     public const string LibraryAgent = "study-stash-library";
 
-    /// <summary>The library agent's file: <paramref name="mcp"/> is the command that starts Egghead Notes' MCP server
+    /// <summary>The library agent's file: <paramref name="mcp"/> is the command that starts Syft Notes' MCP server
     /// (none: no server).</summary>
     public static string LibraryAgentFile(IReadOnlyList<string> mcp)
     {
@@ -200,15 +200,15 @@ public static class Antigravity
         return $"""
             ---
             name: {LibraryAgent}
-            description: Works with the student's Egghead Notes library, its lectures and its Canvas material.
+            description: Works with the student's Syft Notes library, its lectures and its Canvas material.
             mainAgent: true
             subagent: false
             hidden: true
             {servers}
             ---
-            # Egghead Notes
+            # Syft Notes
 
-            You were opened from Egghead Notes, the student's lecture library. The {ClaudeTools.ServerName} MCP tools (search_notes, get_lecture, due_assignments, canvas_*) read the library and Canvas.
+            You were opened from Syft Notes, the student's lecture library. The {ClaudeTools.ServerName} MCP tools (search_notes, get_lecture, due_assignments, canvas_*) read the library and Canvas.
 
             """.Replace("\r\n", "\n");
     }
@@ -224,7 +224,7 @@ public static class Antigravity
         ForgetGlobal(ClaudeTools.ServerName);
     }
 
-    /// <summary>Takes <paramref name="server"/> out of the home's global MCP config (Egghead Notes' own home: an earlier
+    /// <summary>Takes <paramref name="server"/> out of the home's global MCP config (Syft Notes' own home: an earlier
     /// build put the library's server there with <c>agy mcp add</c>), keeping everything else. True when it did.</summary>
     public static bool ForgetGlobal(string server)
     {
@@ -244,7 +244,7 @@ public static class Antigravity
         return true;
     }
 
-    /// <summary>The answer agent's file in Egghead Notes' home for agy, written when it isn't there as it should be.</summary>
+    /// <summary>The answer agent's file in Syft Notes' home for agy, written when it isn't there as it should be.</summary>
     public static void PrepareAnswer()
     {
         string path = AgentPath(Home(), AnswerAgent);
@@ -266,7 +266,7 @@ public static class Antigravity
     }
 
     /// <summary>
-    /// Writes the setup agent afresh for a turn, in Egghead Notes' home for agy, with <paramref name="brief"/> and the
+    /// Writes the setup agent afresh for a turn, in Syft Notes' home for agy, with <paramref name="brief"/> and the
     /// setup tools' address and token (none: no tools at all); the folder the run works in is made empty. agy keeps the
     /// conversation itself, so a turn carries it on.
     /// </summary>
@@ -292,7 +292,7 @@ public static class Antigravity
 
     /// <summary>Adds <paramref name="rules"/> to agy's <c>permissions.allow</c> in <paramref name="settingsPath"/> (made
     /// when there's none yet), keeping everything else in it. True when it changed it; false too when it isn't JSON
-    /// (not Egghead Notes' to repair).</summary>
+    /// (not Syft Notes' to repair).</summary>
     public static bool Allow(string settingsPath, IEnumerable<string> rules)
     {
         JsonObject root;

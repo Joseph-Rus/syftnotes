@@ -4,7 +4,7 @@ using System.Xml.Linq;
 namespace StudyStash.Core;
 
 /// <summary>
-/// Where the Egghead Notes app lives on this computer, and which role it was installed as (D3): a Mac bundle
+/// Where the Syft Notes app lives on this computer, and which role it was installed as (D3): a Mac bundle
 /// (Study Stash.app) or a Windows install folder. What the updater (Updates.cs) needs to find and replace it.
 /// </summary>
 public static class Apps

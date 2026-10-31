@@ -47,8 +47,8 @@
         <Grid ColumnDefinitions="Auto,8,*,Auto,2,Auto">
           <Ellipse Width="6" Height="6" Classes="status" Classes.warn="{Binding !StatusGood}" VerticalAlignment="Center" IsVisible="{Binding ShowStatus}" />
           <TextBlock Grid.Column="2" Text="{Binding Status}" ToolTip.Tip="{Binding Status}" c:Tips.WhenCut="True" IsVisible="{Binding ShowStatus}" FontSize="12" Foreground="{DynamicResource Fg2}" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
-          <!-- "Open", not "Open Egghead Notes": the words beside it ("Library running on this PC · Model ready") are shown whole -->
-          <Button Name="OpenApp" AutomationProperties.Name="Open Egghead Notes" Grid.Column="3" Theme="{StaticResource Surface}" Height="32" CornerRadius="4" Padding="8,0"
+          <!-- "Open", not "Open Syft Notes": the words beside it ("Library running on this PC · Model ready") are shown whole -->
+          <Button Name="OpenApp" AutomationProperties.Name="Open Syft Notes" Grid.Column="3" Theme="{StaticResource Surface}" Height="32" CornerRadius="4" Padding="8,0"
                   Command="{Binding OpenAppCommand}">
             <StackPanel Orientation="Horizontal" Spacing="6">
               <c:Doodle Art="head" Size="18" VerticalAlignment="Center" />

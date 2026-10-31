@@ -95,7 +95,7 @@ public sealed class MathView : Control
             }
             if (p.Display is not { } d)
             {
-                ErrorMessage = "Egghead Notes couldn't typeset this formula.";
+                ErrorMessage = "Syft Notes couldn't typeset this formula.";
                 return default;
             }
             ascent = d.Ascent;

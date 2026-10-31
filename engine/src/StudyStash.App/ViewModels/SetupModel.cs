@@ -10,7 +10,7 @@ namespace StudyStash.App.ViewModels;
 /// <summary>Setup's pages, in the order they come in any flow (each flow uses some of them).</summary>
 public enum SetupStep
 {
-    /// <summary>The first page: what Egghead Notes does, in four steps, before any choice.</summary>
+    /// <summary>The first page: what Syft Notes does, in four steps, before any choice.</summary>
     Intro,
     /// <summary>What this computer is for, and what setting it up involves.</summary>
     Welcome,
@@ -28,7 +28,7 @@ public enum SetupStep
     /// <summary>Optional: bring in Canvas (design 07).</summary>
     Canvas,
     Classes,
-    /// <summary>The library: start Egghead Notes at login, so the laptop can always reach it (off unless ticked).</summary>
+    /// <summary>The library: start Syft Notes at login, so the laptop can always reach it (off unless ticked).</summary>
     StartAtLogin,
     /// <summary>Windows, on a computer that records: pin the tray icon out of the overflow.</summary>
     Taskbar,
@@ -78,7 +78,7 @@ public sealed partial class StepItem : ObservableObject
 /// <summary>One step of "how it works" on setup's first page, or of what to do next on its last.</summary>
 public sealed record IntroPoint(string Glyph, string Title, string About);
 
-/// <summary>One thing Egghead Notes can be for, ticked or not, on setup's "What's it for?" page.</summary>
+/// <summary>One thing Syft Notes can be for, ticked or not, on setup's "What's it for?" page.</summary>
 public sealed partial class UseChoice : ObservableObject
 {
     public string Kind { get; init; } = "";
@@ -166,7 +166,7 @@ public sealed partial class SetupModel : ObservableObject
     public bool IsLaptop => Role == AppRole.Laptop;
     /// <summary>The library lives on this computer (made here in setup): just this computer, or a library.</summary>
     public bool LibraryIsHere => Role != AppRole.Laptop;
-    public string HeaderTitle => IsLibrary ? "Set up your library" : $"Set up Egghead Notes on this {DeviceWord}";
+    public string HeaderTitle => IsLibrary ? "Set up your library" : $"Set up Syft Notes on this {DeviceWord}";
     public string FlowName => Role switch { AppRole.Library => "Computer at home", AppRole.Laptop => "Laptop for class", _ => "Setup" };
     public string FlowIcon => Role switch { AppRole.Library => "dns", AppRole.Laptop => "laptop_mac", _ => "desktop_windows" };
     /// <summary>Setup run again from Settings, on a computer that's already set up: it walks the same steps with
@@ -181,7 +181,7 @@ public sealed partial class SetupModel : ObservableObject
     {
         if (Steps.Count > 0) SetRole(Role);
     }
-    public string WelcomeTitle => Again ? "Set up Egghead Notes again" : "Where your lectures are kept";
+    public string WelcomeTitle => Again ? "Set up Syft Notes again" : "Where your lectures are kept";
     public string WelcomeBody => Again
         ? "Go through the steps again; what's already set up stays as it is. To change what this computer is for, use Settings → Advanced → Connection."
         : $"Most people keep everything on this {DeviceWord}: it records your lectures, writes the notes and keeps them here. Your phone can join any time.";
@@ -192,11 +192,11 @@ public sealed partial class SetupModel : ObservableObject
     [ObservableProperty] public partial bool OtherComputersOpen { get; set; }
 
     /// <summary>The first page: what happens to a lecture, from Record to notes on every device.</summary>
-    public string IntroTitle => Again ? "Set up Egghead Notes again" : "Welcome to Egghead Notes";
+    public string IntroTitle => Again ? "Set up Syft Notes again" : "Welcome to Syft Notes";
     public string IntroBody => "Your lectures, written up for you. Here's how it works, then a few steps to set it up: about three minutes.";
     public IntroPoint[] IntroPoints { get; } =
     [
-        new("mic", "Record when class starts", "Press Record, or its shortcut, and Egghead Notes writes down what's said, on this computer. Type your own notes as it records, if you like."),
+        new("mic", "Record when class starts", "Press Record, or its shortcut, and Syft Notes writes down what's said, on this computer. Type your own notes as it records, if you like."),
         new("auto_awesome", "Notes are written for you", "After class your AI turns the transcript into study notes: a summary, the key points, definitions, formulas and diagrams, and questions to review."),
         new("folder_open", "Everything filed, and searchable", "Each lecture goes in its class on its own. Search every word that was said, or ask a question across all your notes."),
         new("smartphone", "With you everywhere", "Your calendar and Canvas say what's next and what's due, and your iPhone or iPad has it all, Pencil notes too."),
@@ -206,7 +206,7 @@ public sealed partial class SetupModel : ObservableObject
     /// <summary>The last page's next steps, for a computer that records.</summary>
     public IntroPoint[] NextSteps => [
         new("mic", "Record your first class", "Type your own notes as it records if you like: the notes are written around yours, and yours stay word for word."),
-        new("smartphone", "Get it on your phone", "Install Egghead Notes on your iPhone or iPad, then open Settings → Phone → Add a phone here and scan the code."),
+        new("smartphone", "Get it on your phone", "Install Syft Notes on your iPhone or iPad, then open Settings → Phone → Add a phone here and scan the code."),
         new("forum", "Ask anything", "Search finds every lecture, word for word; Ask answers from your own notes, and says which lecture it used."),
     ];
     /// <summary>The welcome's choices: any of them the first time; only the one this computer already is when run again.</summary>
@@ -234,7 +234,7 @@ public sealed partial class SetupModel : ObservableObject
     [ObservableProperty] public partial bool MicHeard { get; set; }
     /// <summary>Guided setup's microphone card is showing: the microphone opens for it as it does on the step.</summary>
     public bool MicCheckOpen { get; set; }
-    public string MicLine => MicHeard ? "Egghead Notes hears you." : "Say something. The bars move when Egghead Notes hears you.";
+    public string MicLine => MicHeard ? "Syft Notes hears you." : "Say something. The bars move when Syft Notes hears you.";
     /// <summary>Why the mic check couldn't open the microphone (none plugged in, refused, another app has it); null
     /// while it's fine.</summary>
     [ObservableProperty] public partial Audio.MicTrouble? MicTrouble { get; set; }
@@ -245,7 +245,7 @@ public sealed partial class SetupModel : ObservableObject
     public bool HasMicProblemTitle => MicTrouble is not null;
     public string MicProblemTitle => MicTrouble?.Title ?? "";
     public string MicProblemText => MicTrouble?.Detail ?? (skin == SkinKind.Mac
-        ? "macOS is keeping the microphone from Egghead Notes. Turn it on in System Settings → Privacy & Security → Microphone."
+        ? "macOS is keeping the microphone from Syft Notes. Turn it on in System Settings → Privacy & Security → Microphone."
         : "Windows is keeping the microphone from desktop apps. Turn on Settings → Privacy & security → Microphone → Let desktop apps access your microphone.");
     public bool HasMicProblemButton => MicTrouble is null || MicTrouble.HasAction;
     public string MicProblemButton => MicTrouble is { HasAction: true } t ? t.ActionLabel
@@ -280,7 +280,7 @@ public sealed partial class SetupModel : ObservableObject
     [ObservableProperty] public partial bool Connecting { get; set; }
     /// <summary>Looking for a library on this computer or your Tailscale network ("Find it").</summary>
     [ObservableProperty] public partial bool Finding { get; set; }
-    /// <summary>Start Egghead Notes when the student logs in: off unless they tick it (or it already started at login).</summary>
+    /// <summary>Start Syft Notes when the student logs in: off unless they tick it (or it already started at login).</summary>
     [ObservableProperty] public partial bool StartAtLogin { get; set; }
     /// <summary>This computer already has a library (setup run again): the password step keeps what it has.</summary>
     [ObservableProperty] public partial bool ExistingLibrary { get; set; }
@@ -316,10 +316,10 @@ public sealed partial class SetupModel : ObservableObject
     public string ShowPasswordText => ShowPassword ? "Hide" : "Show";
     // The step's words: the switch goes by the name Settings → General gives it, "Open when you log in", in the sidebar,
     // on the page and on the switch itself.
-    public string StartAtLoginTitle => IsLibrary ? "Keep your library running" : "Keep Egghead Notes running";
+    public string StartAtLoginTitle => IsLibrary ? "Keep your library running" : "Keep Syft Notes running";
     public string StartAtLoginLede => IsLibrary
-        ? "Open Egghead Notes when you log in to this computer, so your laptop can always reach it."
-        : $"Open Egghead Notes when you log in, so your library is ready and your notes get written whenever this {DeviceWord} is on.";
+        ? "Open Syft Notes when you log in to this computer, so your laptop can always reach it."
+        : $"Open Syft Notes when you log in, so your library is ready and your notes get written whenever this {DeviceWord} is on.";
     public string StartAtLoginHint => IsLibrary ? "Recommended for a library." : "Recommended.";
     /// <summary>Just this computer's last page: growing into a laptop and a library later.</summary>
     public string AddLaptopLater => "Want to record on a laptop too? Add it any time in Settings → Advanced → Library.";
@@ -412,7 +412,7 @@ public sealed partial class SetupModel : ObservableObject
         : OnAi && IsLibrary ? $"Library setup · step {Index} of {Count}"
         : $"Step {Index} of {Count}";
     public string ContinueLabel =>
-        IsLast ? "Open Egghead Notes"
+        IsLast ? "Open Syft Notes"
         : OnIntro ? "Get started"
         : OnPassword && !LibraryOk ? (ExistingLibrary ? "Start library" : "Create library")
         : OnLibrary && !LibraryOk ? "Connect"
@@ -452,8 +452,8 @@ public sealed partial class SetupModel : ObservableObject
     public double ModelBarWidth => Math.Clamp(ModelProgress, 0, 1) * 416;
     public double ModelBarWidthWin => Math.Clamp(ModelProgress, 0, 1) * 440;
     public string ModelBody => ChosenModel is { Model.Bundled: true } bundled
-        ? $"Egghead Notes turns speech into text on this {DeviceWord}, so your recordings never leave it. {bundled.Name} comes with the app: there's nothing to download."
-        : $"Egghead Notes turns speech into text on this {DeviceWord}, so your recordings never leave it. The model is about {ModelSize} and only downloads once.";
+        ? $"Syft Notes turns speech into text on this {DeviceWord}, so your recordings never leave it. {bundled.Name} comes with the app: there's nothing to download."
+        : $"Syft Notes turns speech into text on this {DeviceWord}, so your recordings never leave it. The model is about {ModelSize} and only downloads once.";
 
     /// <summary>Setup in <paramref name="skin"/>'s look, starting on <paramref name="role"/>'s choice (just this
     /// computer unless said).</summary>
@@ -468,7 +468,7 @@ public sealed partial class SetupModel : ObservableObject
     /// the laptop download, or a build that doesn't say, on "Just this Mac" (the one most students want).</summary>
     public static AppRole Suggested(AppRole? installer) => installer == AppRole.Library ? AppRole.Library : AppRole.Both;
 
-    /// <summary>The steps of each flow, in order. Windows adds the taskbar where Egghead Notes records.</summary>
+    /// <summary>The steps of each flow, in order. Windows adds the taskbar where Syft Notes records.</summary>
     public static IReadOnlyList<SetupStep> StepsFor(AppRole role, SkinKind skin) => StepsFor(role, skin, forSchool: true);
 
     public static IReadOnlyList<SetupStep> StepsFor(AppRole role, SkinKind skin, bool forSchool, bool intro = true)

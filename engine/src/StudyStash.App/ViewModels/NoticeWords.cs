@@ -25,13 +25,13 @@ public static class NoticeWords
         return (title, filedTitle.Length > 0 ? filedTitle : "Its notes are written.", "Open note");
     }
 
-    /// <summary>Granola has lectures Egghead Notes doesn't: one is named and offered there and then (Transfer); several
+    /// <summary>Granola has lectures Syft Notes doesn't: one is named and offered there and then (Transfer); several
     /// are counted, and the button shows them in Settings → Granola, where each can be brought over or left.</summary>
     public static (string Title, string Text, string Action) GranolaHas(IReadOnlyList<string> titles)
     {
         if (titles.Count == 1)
-            return ("Granola has a lecture Egghead Notes doesn't", $"{Named(titles[0])}. Bring it over, and Egghead Notes files it and writes its notes.", "Transfer");
-        return ($"Granola has {titles.Count} lectures Egghead Notes doesn't", $"{Named(titles[0])} and {(titles.Count == 2 ? "one more" : $"{titles.Count - 1} more")}.", "Show them");
+            return ("Granola has a lecture Syft Notes doesn't", $"{Named(titles[0])}. Bring it over, and Syft Notes files it and writes its notes.", "Transfer");
+        return ($"Granola has {titles.Count} lectures Syft Notes doesn't", $"{Named(titles[0])} and {(titles.Count == 2 ? "one more" : $"{titles.Count - 1} more")}.", "Show them");
     }
 
     /// <summary>A lecture brought over from Granola, or why it wasn't.</summary>
@@ -42,7 +42,7 @@ public static class NoticeWords
     static string Named(string title) => title.Trim().Length > 0 ? title.Trim() : "A lecture with no title";
 
     /// <summary>What to do about the lecture that paused by itself (<paramref name="why"/> is the recorder's reason):
-    /// Resume once the microphone or the disk is sorted, or the privacy settings when the system won't let Egghead Notes
+    /// Resume once the microphone or the disk is sorted, or the privacy settings when the system won't let Syft Notes
     /// hear (<paramref name="opensSettings"/>).</summary>
     public static (string Text, string Action, bool OpensSettings) Paused(string why, bool windows)
     {
@@ -61,15 +61,15 @@ public static class NoticeWords
     /// library writes none (<paramref name="off"/>).</summary>
     public static string Saved(LibraryState library, bool mac, bool? notes = true, bool off = false) => library switch
     {
-        LibraryState.Unreachable => $"Egghead Notes is writing it down. It waits on this {(mac ? "Mac" : "PC")} and goes to your library when it's back.",
-        LibraryState.WrongPassword => "Egghead Notes is writing it down. Type your library's new password in Settings to send it.",
-        LibraryState.NotSetUp => "Egghead Notes is writing it down. Connect to your library in Settings to file it.",
-        _ when off => "Egghead Notes is writing it down, and the library files it. Notes are off, so it has just its transcript.",
+        LibraryState.Unreachable => $"Syft Notes is writing it down. It waits on this {(mac ? "Mac" : "PC")} and goes to your library when it's back.",
+        LibraryState.WrongPassword => "Syft Notes is writing it down. Type your library's new password in Settings to send it.",
+        LibraryState.NotSetUp => "Syft Notes is writing it down. Connect to your library in Settings to file it.",
+        _ when off => "Syft Notes is writing it down, and the library files it. Notes are off, so it has just its transcript.",
         _ => notes switch
         {
-            true => "Egghead Notes is writing it down; the library files it and writes your notes.",
+            true => "Syft Notes is writing it down; the library files it and writes your notes.",
             false => $"{Summarize.TooShortWords()} The library files it with its transcript.",
-            null => "Egghead Notes is writing it down, and the library files it.",
+            null => "Syft Notes is writing it down, and the library files it.",
         },
     };
 
@@ -95,35 +95,35 @@ public static class NoticeWords
     public static (string Title, string Text) LighterModel(ModelAdvice advice) =>
         ("A lighter model would keep up better", $"{advice.Why} Switch in Settings → Recording.");
 
-    /// <summary>Egghead Notes updates itself while nothing's recording and starts again: the first start of a newer
+    /// <summary>Syft Notes updates itself while nothing's recording and starts again: the first start of a newer
     /// version than <paramref name="lastRun"/> says so, once (the S. went from the menu bar for a moment), with the
     /// release's notes as the button. Nothing on the very first start, or starting an older or the same version.</summary>
     public static (string Title, string Text, string Action)? Updated(string lastRun, string running)
     {
         if (lastRun.Length == 0 || Updates.Compare(Updates.ParseVersion(running), Updates.ParseVersion(lastRun)) <= 0) return null;
-        return ($"Egghead Notes updated to {Plain(running)}", "Everything is just as you left it.", "What's new");
+        return ($"Syft Notes updated to {Plain(running)}", "Everything is just as you left it.", "What's new");
     }
 
     /// <summary>A new version is out and updates aren't automatic on this computer: the button installs it.</summary>
     public static (string Title, string Text, string Action) UpdateReady(string version) =>
-        ($"Egghead Notes {Plain(version)} is out", "Installing takes about a minute, then Egghead Notes opens again by itself.", "Update");
+        ($"Syft Notes {Plain(version)} is out", "Installing takes about a minute, then Syft Notes opens again by itself.", "Update");
 
     /// <summary>A new version is out but this copy can't replace itself: <paramref name="why"/> says what to do, and
     /// the button gets the download.</summary>
     public static (string Title, string Text, string Action) UpdateBlocked(string version, string why) =>
-        ($"Egghead Notes {Plain(version)} is out", why, "Download");
+        ($"Syft Notes {Plain(version)} is out", why, "Download");
 
     /// <summary>Update was pressed: it's on its way.</summary>
     public static (string Title, string Text) Updating(string version) =>
-        ($"Updating to {Plain(version)}", "Egghead Notes closes and opens again by itself in a minute or so.");
+        ($"Updating to {Plain(version)}", "Syft Notes closes and opens again by itself in a minute or so.");
 
     /// <summary>Update was pressed during a lecture: nothing's cut short.</summary>
     public static (string Title, string Text) UpdateWaits(string version) =>
-        ("The update waits for your lecture", $"Egghead Notes {Plain(version)} installs once you stop recording.");
+        ("The update waits for your lecture", $"Syft Notes {Plain(version)} installs once you stop recording.");
 
     /// <summary>The update didn't install: what's running now, that it tries again, and the button gets it by hand.</summary>
     public static (string Title, string Text, string Action) UpdateFailed(string version, string running) =>
-        ("Egghead Notes couldn't update", $"You're still on {Plain(running)}. It tries again later, or you can download {Plain(version)} now.", "Download");
+        ("Syft Notes couldn't update", $"You're still on {Plain(running)}. It tries again later, or you can download {Plain(version)} now.", "Download");
 
     /// <summary>This start comes after quitting to install <paramref name="tried"/>, but runs an older version (Windows'
     /// Setup.exe didn't finish): the update didn't take. Null when nothing was being installed, or it took.</summary>
@@ -133,13 +133,13 @@ public static class NoticeWords
     /// <summary>Settings' line after Update now: what's happening (see <see cref="AppUpdates.NowAsync"/>).</summary>
     public static string UpdateNowLine(string result) => result switch
     {
-        AppUpdates.Relaunching or AppUpdates.HandedOff => "Updating: Egghead Notes opens again on the new version in a minute or so.",
+        AppUpdates.Relaunching or AppUpdates.HandedOff => "Updating: Syft Notes opens again on the new version in a minute or so.",
         AppUpdates.Waiting => "The update installs once you stop recording.",
         AppUpdates.Failed => "It couldn't update just now, and tries again later.",
         AppUpdates.CheckFailed => "GitHub couldn't be reached. Try again in a while.",
         AppUpdates.CantHere => "This copy can't update itself: the notification says what to do.",
         AppUpdates.Off => "This copy doesn't update itself.",
-        _ => "Egghead Notes is up to date.",
+        _ => "Syft Notes is up to date.",
     };
 
     /// <summary>A laptop's own Updates row (Settings → General) after Check now: what it found, and whether Update now
@@ -148,7 +148,7 @@ public static class NoticeWords
     {
         AppUpdates.Available => ($"Version {Newer(found)} is out. This laptop has {Plain(running)}.", true),
         AppUpdates.CantHere => ($"Version {Newer(found)} is out. {found.Why}", false),
-        AppUpdates.UpToDate => ($"Egghead Notes {Plain(running)} on this laptop, the newest.", false),
+        AppUpdates.UpToDate => ($"Syft Notes {Plain(running)} on this laptop, the newest.", false),
         _ => (UpdateNowLine(found.Result), false),
     };
 

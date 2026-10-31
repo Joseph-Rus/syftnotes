@@ -40,7 +40,7 @@ public sealed class Config(string home, string poolDir)
     public string SummaryModel { get; set; } = ""; // blank = the sorting model
     public int SummaryMaxContext { get; set; } = 32768;
     public List<ClassDef> Classes { get; set; } = [];
-    /// <summary>What Egghead Notes is for, as setup asked ("student", "work", "research", "creative", "personal"; any
+    /// <summary>What Syft Notes is for, as setup asked ("student", "work", "research", "creative", "personal"; any
     /// of them). Empty until asked, and read as school, as every library was before it was asked.</summary>
     public List<string> Uses { get; set; } = [];
 
@@ -73,7 +73,7 @@ public sealed class ClientConfig(string home)
 }
 
 /// <summary>
-/// Reading and writing config.toml and client.toml. A file an older version wrote still loads: the keys Egghead Notes
+/// Reading and writing config.toml and client.toml. A file an older version wrote still loads: the keys Syft Notes
 /// no longer uses are ignored, and the next save leaves them out.
 /// </summary>
 public static class Configs
@@ -153,7 +153,7 @@ public static class Configs
     {
         var lines = new List<string>
         {
-            "# Egghead Notes library settings. Edit freely, or change them on the library's Settings page.",
+            "# Syft Notes library settings. Edit freely, or change them on the library's Settings page.",
             $"pool_name = {Toml(cfg.PoolName)}",
             $"pool_dir = {Toml(cfg.PoolDir)}",
             $"web_host = {Toml(cfg.WebHost)}",
@@ -209,12 +209,12 @@ public static class Configs
     {
         string[] lines =
         [
-            "# Egghead Notes laptop settings. Change them in the Egghead Notes app.",
+            "# Syft Notes laptop settings. Change them in the Syft Notes app.",
             $"server_url = {Toml(cc.ServerUrl)}",
             $"pool_key = {Toml(cc.PoolKey)}",
             $"pool_name = {Toml(cc.PoolName)}",
             $"display_name = {Toml(cc.DisplayName)}",
-            "# Install new releases of Egghead Notes automatically.",
+            "# Install new releases of Syft Notes automatically.",
             $"auto_update = {Toml(cc.AutoUpdate)}",
         ];
         return string.Join("\n", lines) + "\n";

@@ -10,7 +10,7 @@ using StudyStash.Core.Ai;
 
 namespace StudyStash.App.Tests;
 
-/// <summary>A lecture's page offers notes from an AI Egghead Notes doesn't run (the Claude app, any free chat), and the
+/// <summary>A lecture's page offers notes from an AI Syft Notes doesn't run (the Claude app, any free chat), and the
 /// notes' ⋯ menu copies the lecture for a chat, pastes a chat's notes in, and puts earlier notes back.</summary>
 public class FreeAiNotesViewTests
 {

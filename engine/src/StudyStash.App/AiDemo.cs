@@ -34,7 +34,7 @@ public static class AiDemo
         ])
     {
         PublicUrl = "https://sams-mini.tailnet.ts.net", HasPassword = true,
-        Web = new WebReach(true, "Egghead Notes", "https://sams-mini.tailnet.ts.net/mcp", null, null, true, Core.ReachCheck.Answers, 1_726_600_000, true),
+        Web = new WebReach(true, "Syft Notes", "https://sams-mini.tailnet.ts.net/mcp", null, null, true, Core.ReachCheck.Answers, 1_726_600_000, true),
     };
 
     /// <summary>Answers one fixed <see cref="AiOverview"/> and nothing else: enough to draw the panes, never a real

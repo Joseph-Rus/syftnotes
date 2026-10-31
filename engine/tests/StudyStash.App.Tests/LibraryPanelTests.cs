@@ -107,7 +107,7 @@ public class LibraryPanelTests
             Assert.Contains("Canvas synced 10 min ago", shown);
             Assert.Contains("1 laptop connected", shown);
             Assert.Single(shown, t => t == "Library running on this Mac"); // said once, not again in the status line
-            // Search, Open Egghead Notes and the gear stay.
+            // Search, Open Syft Notes and the gear stay.
             foreach (var name in new[] { "Search", "OpenApp", "Settings" })
                 Assert.Contains(view.GetVisualDescendants().OfType<Button>(), b => b.Name == name && b.IsEffectivelyVisible);
             // The library's lines: markers in one column, words starting at one edge.

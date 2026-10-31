@@ -29,7 +29,7 @@ public static class Terminal
 
     /// <summary>What the AI is told when it opens.</summary>
     public static string Briefing(string library, string folder, string? className) =>
-        $"You were opened from Egghead Notes, the user's lecture library ({library}: one folder per class, lectures as Markdown, "
+        $"You were opened from Syft Notes, the user's lecture library ({library}: one folder per class, lectures as Markdown, "
         + "and a Canvas/ folder with assignment specs, feedback, module files and announcements). "
         + (className is not null ? $"This is the class \"{className}\" ({folder}). Look at its lectures, Canvas/assignments and Canvas/canvas-recipe.md before starting, and follow any AI-use policy in its syllabus. " : "")
         + "The study-stash MCP tools (search_notes, get_lecture, due_assignments, canvas_*) read the library and Canvas.";
@@ -52,7 +52,7 @@ public static class Terminal
 
     /// <summary>
     /// What <see cref="Open"/> runs: the command, its arguments, and what its environment needs. Gemini's agy runs in
-    /// Egghead Notes' own home for it (signed in there, the library's tools there), never the student's own ~/.gemini,
+    /// Syft Notes' own home for it (signed in there, the library's tools there), never the student's own ~/.gemini,
     /// where it would be signed out, without the library, and would make that folder.
     /// </summary>
     internal static (string Bin, List<string> Args, Dictionary<string, string> Env) Command(string folder, string library, string? className, string provider,

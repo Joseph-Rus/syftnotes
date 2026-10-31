@@ -79,7 +79,7 @@ public sealed partial class LibraryWeb
     {
         string nonce = options.Nonce();
         string body = "<div class=\"login\"><form><div class=\"appicon\" aria-hidden=\"true\">" + Ui.Esc(Py.Head(cfg.PoolName.Length > 0 ? cfg.PoolName : "L", 1).ToUpperInvariant())
-            + "</div><h1>The phone app isn't here yet</h1><p class=\"muted\">This copy of Egghead Notes was built without it. Update Egghead Notes "
+            + "</div><h1>The phone app isn't here yet</h1><p class=\"muted\">This copy of Syft Notes was built without it. Update Syft Notes "
             + "on the library's computer, then scan the code in Settings again.</p><a class=\"btn primary\" href=\"/\">Open the library</a></form></div>";
         return Respond(Ui.BarePage($"Phone app · {cfg.PoolName}", body, nonce), nonce, 404);
     }

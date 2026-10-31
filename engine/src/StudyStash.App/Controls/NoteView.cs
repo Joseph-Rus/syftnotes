@@ -655,7 +655,7 @@ public sealed partial class NoteView : StackPanel
         var drawing = SafeSvg.Clean(source, new SafeSvgOptions { FontFamily = SvgView.Font });
         if (drawing.Problem is { } problem) return new DiagramCard(problem, source);
         using (var hold = SvgPictures.Hold(drawing.Svg!))
-            if (hold is null) return new DiagramCard("Egghead Notes couldn't draw this SVG.", source);
+            if (hold is null) return new DiagramCard("Syft Notes couldn't draw this SVG.", source);
         var view = new SvgView(opensLarger: !Print, fitWhole: Print) { Source = source, Margin = new Thickness(0, 6) };
         if (Compact) view.MaxHeight = CompactDiagramMaxHeight;
         if (Print) view.MaxHeight = PageHeight;

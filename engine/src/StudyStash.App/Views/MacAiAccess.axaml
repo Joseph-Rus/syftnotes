@@ -25,11 +25,11 @@
         <TextBlock Classes="ai-sub" MaxWidth="540" HorizontalAlignment="Left" Foreground="{DynamicResource Warn}" IsVisible="{Binding Offline}"
                    Text="Can't reach your library right now, so what's below may be out of date." />
         <TextBlock Classes="ai-sub" MaxWidth="540" HorizontalAlignment="Left" IsVisible="{Binding OlderLibrary}"
-                   Text="Your library runs an older Egghead Notes. Update it to change these." />
+                   Text="Your library runs an older Syft Notes. Update it to change these." />
       </StackPanel>
 
       <!-- The AI apps on this computer come first: connecting one is what a student opens this page to do. Each
-           starts Egghead Notes itself (stdio), so no Tailscale, no address and no password in the app's settings. A row
+           starts Syft Notes itself (stdio), so no Tailscale, no address and no password in the app's settings. A row
            says the one thing to do next (Connect, Reopen, start a chat); apps that aren't here are one quiet line,
            or, when none is, where to get one. What Connect wrote is folded away behind "Show what changed". -->
       <StackPanel Spacing="8">
@@ -227,7 +227,7 @@
               <StackPanel Classes="ai-row-text" Grid.Column="2" VerticalAlignment="Center">
                 <TextBlock Classes="ai-row-title" Text="Let Claude and ChatGPT reach your library from the internet" TextWrapping="Wrap" />
                 <TextBlock Classes="ai-row-sub" TextWrapping="Wrap"
-                           Text="claude.ai, the Claude phone app and chatgpt.com need an address on the internet to reach your library. Egghead Notes makes one with Tailscale (free), and only your library password lets anyone in. The apps above don't need this." />
+                           Text="claude.ai, the Claude phone app and chatgpt.com need an address on the internet to reach your library. Syft Notes makes one with Tailscale (free), and only your library password lets anyone in. The apps above don't need this." />
               </StackPanel>
               <Panel Grid.Column="3" VerticalAlignment="Center" Margin="12,0,0,0">
                 <c:Spinner IsVisible="{Binding WebBusy}" Width="16" Height="16" Foreground="{DynamicResource Fg2}" />

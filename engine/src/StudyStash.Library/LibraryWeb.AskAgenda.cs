@@ -34,7 +34,7 @@ public sealed partial class LibraryWeb
             $"- {prefix}{When(row)}: {Py.AsString(row?["class"])}: {Py.AsString(row?["name"])}{(row?["missing"]?.GetValue<bool>() == true ? " (missing)" : "")}";
         try
         {
-            if (Canvas.Settings.Url.Length == 0) sb.Append("Canvas isn't linked to Egghead Notes, so due dates aren't known.\n");
+            if (Canvas.Settings.Url.Length == 0) sb.Append("Canvas isn't linked to Syft Notes, so due dates aren't known.\n");
             else
             {
                 var groups = DueList()["groups"] as JsonArray ?? [];

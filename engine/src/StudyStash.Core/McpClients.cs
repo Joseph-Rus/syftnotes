@@ -3,7 +3,7 @@ namespace StudyStash.Core;
 /// <summary>
 /// The AI apps on this computer that Settings connects to the library (Claude Desktop, Claude Code, ChatGPT with
 /// Codex, Gemini CLI).
-/// Each starts Egghead Notes' own MCP server over stdio (<c>mcp --client ID</c>), which reads the library on this
+/// Each starts Syft Notes' own MCP server over stdio (<c>mcp --client ID</c>), which reads the library on this
 /// computer with the password the app already keeps, so nothing secret goes into the AI app's settings and no
 /// network address is involved. The server leaves a note when an app starts it: that's how Settings tells
 /// "connected" from "added, but the app hasn't loaded it yet".
@@ -20,7 +20,7 @@ public static class McpClients
     /// <summary>Touched by the MCP server each time this app starts it.</summary>
     public static string StartedFile(string home, string id) => Path.Combine(Dir(home), id + ".started");
 
-    /// <summary>Touched by Settings when it adds Egghead Notes to this app, removed when it takes it out.</summary>
+    /// <summary>Touched by Settings when it adds Syft Notes to this app, removed when it takes it out.</summary>
     public static string AddedFile(string home, string id) => Path.Combine(Dir(home), id + ".added");
 
     public static DateTime? When(string path) => File.Exists(path) ? File.GetLastWriteTimeUtc(path) : null;
@@ -47,7 +47,7 @@ public static class McpClients
     }
 
     /// <summary>
-    /// Who wrote notes an AI app saved through Egghead Notes (save_notes), as the notes' writer is named ("Written by
+    /// Who wrote notes an AI app saved through Syft Notes (save_notes), as the notes' writer is named ("Written by
     /// Claude"): by the app Settings connected (<paramref name="id"/>, the server's <c>--client</c>), or else by the
     /// name the app gave itself when it connected; "your AI" when neither says.
     /// </summary>

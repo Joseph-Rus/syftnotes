@@ -379,7 +379,7 @@ public sealed partial class LibraryModel : ObservableObject
         OnPropertyChanged(nameof(HasLectureFiles));
     }
 
-    /// <summary>Notes from an AI Egghead Notes doesn't run, for the open note: the offer over a lecture with none, Copy for
+    /// <summary>Notes from an AI Syft Notes doesn't run, for the open note: the offer over a lecture with none, Copy for
     /// your AI and Paste notes. Null with no note open, or one being recorded.</summary>
     [ObservableProperty] public partial FreeAiModel? FreeAi { get; set; }
 

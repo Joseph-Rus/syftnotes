@@ -11,7 +11,7 @@ namespace StudyStash.Core.Ai;
 /// loses can make the sign-in itself stop working ("Failed to authenticate: OAuth session expired and could not be
 /// refreshed"), though nobody signed out: anthropics/claude-code #91708, #80585, #41507 (see
 /// docs/claude-stays-signed-in.md). So the first run leads alone, and the others start once it has got past sign-in
-/// (Claude has begun to answer) or has finished. Egghead Notes never reads or touches the sign-in itself: it only
+/// (Claude has begun to answer) or has finished. Syft Notes never reads or touches the sign-in itself: it only
 /// decides when to start the unmodified <c>claude</c>.
 /// </summary>
 public sealed class SignInGate

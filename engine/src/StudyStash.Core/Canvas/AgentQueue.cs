@@ -11,7 +11,7 @@ public sealed class AgentQueue
     public static readonly TimeSpan HotFor = TimeSpan.FromMinutes(2);
 
     /// <summary>What a read gets back when the browser with the extension didn't answer in time.</summary>
-    public const string NoAnswer = "Your browser didn't answer. Is it open, with the Egghead Notes extension on?";
+    public const string NoAnswer = "Your browser didn't answer. Is it open, with the Syft Notes extension on?";
 
     readonly Lock gate = new();
     readonly List<CanvasJob> jobs = [];

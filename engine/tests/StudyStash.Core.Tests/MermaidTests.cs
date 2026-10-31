@@ -409,7 +409,7 @@ public class MermaidTests
     public void Other_diagram_types_say_what_they_are(string source, string kind)
     {
         var e = Assert.Throws<MermaidException>(() => P(source));
-        Assert.Equal("Egghead Notes draws flowcharts, state and sequence diagrams, timelines and mind maps; this is " + kind, e.Message);
+        Assert.Equal("Syft Notes draws flowcharts, state and sequence diagrams, timelines and mind maps; this is " + kind, e.Message);
         Assert.Equal(1, e.Line);
     }
 

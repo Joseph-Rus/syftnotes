@@ -8,7 +8,7 @@ using StudyStash.Core.Ai;
 namespace StudyStash.Library;
 
 /// <summary>
-/// The engine's commands (`studystash ...`, or the Egghead Notes app given a command): the library, the laptop, and
+/// The engine's commands (`studystash ...`, or the Syft Notes app given a command): the library, the laptop, and
 /// both. The app runs its library and its MCP server through these, so the bundle has one program.
 /// </summary>
 public static class Cli
@@ -136,13 +136,13 @@ public static class Cli
 
         // The zip to upload to the Chrome Web Store (docs/chrome-web-store.md), or with --firefox the one Mozilla signs
         // (docs/firefox-add-on.md): the extension without a connection, which a student's copy gets by pasting a code
-        // from Egghead Notes.
+        // from Syft Notes.
         static int ExtensionZip(string? output, bool firefox)
         {
             if (output is null) return Print("usage: studystash extension-zip [--firefox] OUT.zip", 2);
             string path = Path.GetFullPath(Py.ExpandUser(output));
             var names = firefox ? StudyStash.Core.Canvas.Extension.PackForFirefox(path) : StudyStash.Core.Canvas.Extension.PackForStore(path);
-            return Print($"Packed Egghead Notes for Canvas {StudyStash.Core.Canvas.Extension.Version()} for {(firefox ? "Firefox" : "the Chrome Web Store")}: {path}\n  {string.Join(", ", names)}");
+            return Print($"Packed Syft Notes for Canvas {StudyStash.Core.Canvas.Extension.Version()} for {(firefox ? "Firefox" : "the Chrome Web Store")}: {path}\n  {string.Join(", ", names)}");
         }
 
         static int Print(string text, int code = 0)
@@ -258,7 +258,7 @@ public static class Cli
         async Task<int> Mcp()
         {
             var (url, key) = McpTarget(home);
-            if (url is null) return Print("Egghead Notes isn't set up on this computer yet: open the Egghead Notes app first.", 1);
+            if (url is null) return Print("Syft Notes isn't set up on this computer yet: open the Syft Notes app first.", 1);
             // Which AI app started this (Settings writes `--client ID` into each app's setup): Settings shows it connected.
             McpClients.Started(home, Option(McpClients.Option));
             var ai = new AiRemote(url, key);

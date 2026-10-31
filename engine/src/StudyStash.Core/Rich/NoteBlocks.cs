@@ -25,7 +25,7 @@ public static partial class NoteBlocks
     [GeneratedRegex(@"^(flowchart|graph|sequenceDiagram|stateDiagram(-v2)?)\b", RegexOptions.IgnoreCase)]
     private static partial Regex FlowchartStart();
 
-    /// <summary>Every kind of Mermaid diagram Egghead Notes draws, as its first word; timeline and mindmap only count
+    /// <summary>Every kind of Mermaid diagram Syft Notes draws, as its first word; timeline and mindmap only count
     /// where a diagram is expected (a repair's reply), not on a bare fence, where they'd be ordinary words.</summary>
     [GeneratedRegex(@"^(flowchart|graph|sequenceDiagram|stateDiagram(-v2)?|timeline|mindmap)\b", RegexOptions.IgnoreCase)]
     private static partial Regex DiagramStart();
@@ -60,7 +60,7 @@ public static partial class NoteBlocks
     public static bool StartsAsFlowchart(string text) =>
         !DiagramStart().IsMatch(text.TrimStart()) || text.TrimStart().StartsWith("flowchart", StringComparison.OrdinalIgnoreCase) || text.TrimStart().StartsWith("graph", StringComparison.OrdinalIgnoreCase);
 
-    /// <summary>Whether a text starts like a diagram of its own: any kind of Mermaid diagram Egghead Notes draws, or an SVG.</summary>
+    /// <summary>Whether a text starts like a diagram of its own: any kind of Mermaid diagram Syft Notes draws, or an SVG.</summary>
     public static bool StartsAsDiagram(string text) => DiagramStart().IsMatch(text.TrimStart()) || IsSvg(text);
 
     /// <summary>A fence line: its character (` or ~), how many, and the info after them; null when it isn't one.</summary>

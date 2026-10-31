@@ -157,7 +157,7 @@ public static class Autostart
         }
         else
         {
-            Py.WriteText(path, RenderSystemd("Egghead Notes library", args, env));
+            Py.WriteText(path, RenderSystemd("Syft Notes library", args, env));
             run("systemctl", ["--user", "daemon-reload"], Quick);
             run("systemctl", ["--user", "enable", Path.GetFileName(path)], Quick);
             run("systemctl", ["--user", "restart", Path.GetFileName(path)], Quick);

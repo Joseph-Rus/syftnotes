@@ -498,7 +498,7 @@
     <Setter Property="LetterSpacing" Value="-0.16" />
     <Setter Property="TextWrapping" Value="Wrap" />
   </Style>
-  <!-- What the AI says, who said it, and what Egghead Notes did ("Checked your setup"). -->
+  <!-- What the AI says, who said it, and what Syft Notes did ("Checked your setup"). -->
   <Style Selector="TextBlock.ai-byline">
     <Setter Property="FontSize" Value="12" />
     <Setter Property="FontWeight" Value="Bold" />

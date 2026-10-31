@@ -15,7 +15,7 @@ public class MicTroubleTests
     {
         var t = MicTrouble.From(MicTrouble.InvalidDevice, access);
         Assert.Equal(MicTroubleKind.Denied, t.Kind);
-        Assert.Equal("Egghead Notes can't use the microphone", t.Title);
+        Assert.Equal("Syft Notes can't use the microphone", t.Title);
         Assert.Equal("Allow it in System Settings → Privacy & Security → Microphone.", t.Detail);
         Assert.Equal("Open System Settings", t.ActionLabel);
         Assert.Equal(MacPrivacy, t.ActionUrl);
@@ -27,7 +27,7 @@ public class MicTroubleTests
         var t = MicTrouble.From(MicTrouble.InvalidDevice, MicAccess.Allowed);
         Assert.Equal(MicTroubleKind.NotHandedOver, t.Kind);
         Assert.Equal("macOS didn't hand over the microphone", t.Title);
-        Assert.Equal("In System Settings → Privacy & Security → Microphone, turn Egghead Notes off and on again, then press Record.", t.Detail);
+        Assert.Equal("In System Settings → Privacy & Security → Microphone, turn Syft Notes off and on again, then press Record.", t.Detail);
         Assert.Equal("Open System Settings", t.ActionLabel);
         Assert.Equal(MacPrivacy, t.ActionUrl);
     }
@@ -65,7 +65,7 @@ public class MicTroubleTests
     public void Windows_keeps_its_own_words()
     {
         var t = MicTrouble.Denied(windows: true);
-        Assert.Equal("Egghead Notes can't use the microphone", t.Title);
+        Assert.Equal("Syft Notes can't use the microphone", t.Title);
         Assert.Equal(RecordingWords.CantHearWindows, t.Detail);
         Assert.Equal("Open Settings", t.ActionLabel);
         Assert.Equal("ms-settings:privacy-microphone", t.ActionUrl);

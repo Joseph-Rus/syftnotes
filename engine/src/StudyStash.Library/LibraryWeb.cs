@@ -505,7 +505,7 @@ public sealed partial class LibraryWeb
         string lede = c.Total > 0
             ? $"{c.Total} lecture{Plural(c.Total, "", "s")} across {nClasses} class{Plural(nClasses, "", "es")}." : "";
         string empty = c.Processing > 0 ? ""
-            : "<div class=\"empty\"><strong>No lectures yet</strong>Lectures you record with Egghead Notes show up here "
+            : "<div class=\"empty\"><strong>No lectures yet</strong>Lectures you record with Syft Notes show up here "
               + "once your laptop sends them. To connect it, see <a href=\"/settings\">Settings</a>.</div>";
         // Phones have no sidebar: the classes are a list here instead, like folders in Notes.
         string folders = string.Concat(c.Classes.Select(x =>
@@ -867,9 +867,9 @@ public sealed partial class LibraryWeb
         string invite = $"<div class=\"group-head\">Connect your laptop</div>{tsNote}<div class=\"group\">"
             + $"<div class=\"row\"><span class=\"grow\">Address</span><span class=\"value\">{Ui.Esc(url)}</span></div>"
             + $"<div class=\"row\"><span class=\"grow\">Password</span><span class=\"value\">{Ui.Esc(cfg.PoolPassword.Length > 0 ? cfg.PoolPassword : "none")}</span></div>"
-            + "<div class=\"row\"><span class=\"grow\">Egghead Notes for the laptop</span><span class=\"value\">"
+            + "<div class=\"row\"><span class=\"grow\">Syft Notes for the laptop</span><span class=\"value\">"
             + $"<a href=\"{dl}/{Updates.MacAsset}\">Mac</a> · <a href=\"{dl}/{Updates.WindowsAsset}\">Windows</a>"
-            + "</span></div></div><p class=\"group-foot\">On the computer you record lectures on, install Egghead Notes, "
+            + "</span></div></div><p class=\"group-foot\">On the computer you record lectures on, install Syft Notes, "
             + "open it, and enter this address and password.</p>";
 
         var rel = await options.Latest(3600);
@@ -1013,7 +1013,7 @@ public sealed partial class LibraryWeb
     }
 }
 
-/// <summary>The Egghead Notes icon: the browser tab, the Windows app's taskbar button, and an iPhone's home screen.</summary>
+/// <summary>The Syft Notes icon: the browser tab, the Windows app's taskbar button, and an iPhone's home screen.</summary>
 public static class Icons
 {
     static readonly (string Path, string Resource, string Type)[] Files =

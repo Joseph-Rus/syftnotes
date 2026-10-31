@@ -77,7 +77,7 @@ public sealed class AgentInstall
     /// <summary>The CLI as it is on this computer now: found, and whether its <c>--version</c> answers.</summary>
     public AgentFound Find() => Find(cli, which);
 
-    /// <summary>Its <c>--version</c> runs with the CLI's own environment too: agy in Egghead Notes' own home for it,
+    /// <summary>Its <c>--version</c> runs with the CLI's own environment too: agy in Syft Notes' own home for it,
     /// never the student's own ~/.gemini.</summary>
     public static AgentFound Find(AgentCliInfo cli, Func<string, string?>? which = null)
     {
@@ -91,7 +91,7 @@ public sealed class AgentInstall
     public async Task<InstallOutcome> RunAsync(CancellationToken ct = default)
     {
         if (Elevated())
-            return Fail(InstallFailure.Elevated, $"Egghead Notes is running as an administrator, so {cli.Name} would install for the wrong account. Close Egghead Notes, open it normally, then try again.");
+            return Fail(InstallFailure.Elevated, $"Syft Notes is running as an administrator, so {cli.Name} would install for the wrong account. Close Syft Notes, open it normally, then try again.");
         // Tests and the self-test never run a maker's real installer, whatever they ask for.
         if (official && Desktop.SystemChangesOff)
             return Fail(InstallFailure.Other, "Installing is off here.");
@@ -167,7 +167,7 @@ public sealed class AgentInstall
     /// <summary>Setup's words for each way an install fails.</summary>
     public string Words(InstallFailure kind, string last) => kind switch
     {
-        InstallFailure.Offline => $"Egghead Notes couldn't reach {cli.Site}. Check your internet connection, then try again.",
+        InstallFailure.Offline => $"Syft Notes couldn't reach {cli.Site}. Check your internet connection, then try again.",
         InstallFailure.Region => $"{cli.Name} isn't offered in your country yet.",
         InstallFailure.Memory => $"Your {Device} ran out of memory while installing. Close some apps, then try again.",
         InstallFailure.WontStart => $"{cli.Name} installed but won't start.",
