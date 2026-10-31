@@ -103,9 +103,6 @@ public sealed partial class SettingsModel : ObservableObject, IDisposable
     /// <summary>The first group's heading: "This laptop" on a laptop, this Mac or PC where the library runs.</summary>
     public string ComputerNavTitle { get; }
 
-    /// <summary>Whether this window draws the Mac's round swatches or Windows' squared ones.</summary>
-    public bool ShowMacSwatch => Skin.Current == SkinKind.Mac;
-
     // Appearance
     public IReadOnlyList<ThemeSwatch> Themes { get; } = [.. ColourThemes.All.Select(t => new ThemeSwatch(t))];
     [ObservableProperty] public partial string ColourTheme { get; set; } = "";

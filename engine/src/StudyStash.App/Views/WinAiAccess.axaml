@@ -10,13 +10,14 @@
              x:DataType="vm:AiAccessModel">
   <UserControl.Styles>
     <StyleInclude Source="avares://StudyStash/Views/WinAiStyles.axaml" />
+    <StyleInclude Source="avares://StudyStash/Views/SettingsPaneStyles.axaml" />
   </UserControl.Styles>
 
   <ScrollViewer VerticalScrollBarVisibility="Auto">
-    <StackPanel Margin="36,28,36,28" Spacing="4" MaxWidth="680">
+    <StackPanel Margin="40,30,40,40" Spacing="4" MaxWidth="680">
 
       <TextBlock Classes="ai-title" Text="AI apps" />
-      <TextBlock Classes="ai-sub" MaxWidth="560" Margin="0,4,0,0" HorizontalAlignment="Left"
+      <TextBlock Classes="ai-sub lede" MaxWidth="560" Margin="0,4,0,0" HorizontalAlignment="Left"
                  Text="ChatGPT, Claude and other AI apps can read your lectures and notes to answer your questions, and save notes you ask them to write. They can't delete anything." />
       <TextBlock Classes="ai-sub" MaxWidth="560" Margin="0,4,0,0" HorizontalAlignment="Left" Foreground="{DynamicResource Warn}" IsVisible="{Binding Offline}"
                  Text="Can't reach your library right now, so what's below may be out of date." />
@@ -33,7 +34,7 @@
           </StackPanel>
           <StackPanel Grid.Column="3" Orientation="Horizontal" Spacing="12" VerticalAlignment="Center">
             <TextBlock Text="{Binding On, Converter={x:Static c:Converters.OnOff}}" FontSize="14" />
-            <ToggleButton AutomationProperties.Name="Let AI tools read your library" Theme="{StaticResource AiToggle}" IsChecked="{Binding On}" />
+            <ToggleButton AutomationProperties.Name="Let AI tools read your library" Classes="switch" IsChecked="{Binding On}" />
           </StackPanel>
         </Grid>
       </Border>
@@ -211,7 +212,7 @@
             </StackPanel>
             <Panel Grid.Column="3" VerticalAlignment="Center" Margin="12,0,0,0">
               <c:SyftLoader Kind="HoppingBits" Size="22" IsVisible="{Binding WebBusy}" />
-              <ToggleButton AutomationProperties.Name="Let Claude and ChatGPT reach your library from the internet" IsVisible="{Binding !WebBusy}" Theme="{StaticResource AiToggle}"
+              <ToggleButton AutomationProperties.Name="Let Claude and ChatGPT reach your library from the internet" IsVisible="{Binding !WebBusy}" Classes="switch"
                             IsChecked="{Binding WebOn}" IsEnabled="{Binding WebToggleEnabled}" />
             </Panel>
           </Grid>

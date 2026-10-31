@@ -769,7 +769,7 @@ public class SurfaceShots
 
     static void SettingsShots(SkinKind skin, Size size)
     {
-        foreach (string section in new[] { "General", "Appearance", "Recording", "Recording-heavier", "Recording-remove", "Recording-after", "Library", "Classes", "Rename", "Notes", "Folders", "Unreachable", "One-computer", "One-computer-adding", "One-computer-on" })
+        foreach (string section in new[] { "General", "Appearance", "Recording", "Recording-heavier", "Recording-remove", "Recording-after", "Library", "Classes", "Rename", "Notes", "Folders", "Unreachable", "One-computer", "One-computer-adding", "One-computer-on", "Calendars" })
         {
             var (model, host, home) = MakeSettings(section, skin);
             bool tall = section == "Recording-after";
