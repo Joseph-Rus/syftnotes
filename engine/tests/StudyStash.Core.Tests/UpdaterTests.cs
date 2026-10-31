@@ -35,15 +35,15 @@ public class UpdaterTests
     [Fact]
     public void Every_Mac_and_PC_installs_from_its_one_download()
     {
-        Assert.Equal("Egghead-Notes.dmg", Updates.Installer("Darwin"));
-        Assert.Equal("Egghead-Notes-Setup.exe", Updates.Installer("Windows"));
+        Assert.Equal("Syft-Notes.dmg", Updates.Installer("Darwin"));
+        Assert.Equal("Syft-Notes-Setup.exe", Updates.Installer("Windows"));
         Assert.Null(Updates.Installer("Linux"));
         Assert.Null(Updates.Installer(""));
         // The two downloads, then the names older copies still fetch, each once: the one download as it was named
-        // before Egghead Notes, and the four role names.
-        Assert.Equal(["Egghead-Notes.dmg", "Egghead-Notes-Setup.exe", "Study-Stash.dmg", "Study-Stash-Setup.exe", "Study-Stash-Laptop.dmg",
+        // before Syft Notes (Egghead Notes', then Study Stash's), and the four role names.
+        Assert.Equal(["Syft-Notes.dmg", "Syft-Notes-Setup.exe", "Egghead-Notes.dmg", "Egghead-Notes-Setup.exe", "Study-Stash.dmg", "Study-Stash-Setup.exe", "Study-Stash-Laptop.dmg",
             "Study-Stash-Library.dmg", "Study-Stash-Laptop-Setup.exe", "Study-Stash-Library-Setup.exe"], Updates.Installers);
-        Assert.Equal(8, Updates.Installers.Distinct().Count());
+        Assert.Equal(10, Updates.Installers.Distinct().Count());
     }
 
     [Fact]
@@ -51,8 +51,10 @@ public class UpdaterTests
     {
         var github = new FakeOllama((path, _) => path == "/repos/Joseph-Rus/study-stash/releases/latest" ? System.Text.Json.Nodes.JsonNode.Parse("""
             {"tag_name": "v0.5.0", "html_url": "https://github.com/Joseph-Rus/study-stash/releases/tag/v0.5.0",
-             "assets": [{"name": "Egghead-Notes.dmg", "browser_download_url": "https://dl/study-stash.dmg"},
-                        {"name": "Egghead-Notes-Setup.exe", "browser_download_url": "https://dl/setup.exe"},
+             "assets": [{"name": "Syft-Notes.dmg", "browser_download_url": "https://dl/study-stash.dmg"},
+                        {"name": "Syft-Notes-Setup.exe", "browser_download_url": "https://dl/setup.exe"},
+                        {"name": "Egghead-Notes.dmg", "browser_download_url": "https://dl/egg.dmg"},
+                        {"name": "Egghead-Notes-Setup.exe", "browser_download_url": "https://dl/egg.exe"},
                         {"name": "Study-Stash.dmg", "browser_download_url": "https://dl/old.dmg"},
                         {"name": "Study-Stash-Setup.exe", "browser_download_url": "https://dl/old.exe"},
                         {"name": "Study-Stash-Laptop.dmg", "browser_download_url": "https://dl/laptop.dmg"},
@@ -134,7 +136,7 @@ public class UpdaterTests
         File.WriteAllText(Path.Combine(contents, "Info.plist"), Plist("0.4.4", "laptop"));
         var host = UpdateHost.ThisComputer(Path.Combine(contents, "MacOS", "arm64"), "Darwin");
         Assert.Equal("", host.AppDir);
-        Assert.Equal("Move Egghead Notes into Applications, then open it again, so it can update itself.", Updates.WhyNotUpdatable(host));
+        Assert.Equal("Move Syft Notes into Applications, then open it again, so it can update itself.", Updates.WhyNotUpdatable(host));
     }
 
     [Fact]
@@ -150,7 +152,7 @@ public class UpdaterTests
         try
         {
             var host = UpdateHost.ThisComputer(Path.Combine(contents, "MacOS", "arm64"), "Darwin");
-            Assert.Equal("Egghead Notes' folder isn't writable, so it can't update itself here.", Updates.WhyNotUpdatable(host));
+            Assert.Equal("Syft Notes' folder isn't writable, so it can't update itself here.", Updates.WhyNotUpdatable(host));
         }
         finally
         {
@@ -161,7 +163,7 @@ public class UpdaterTests
     [Fact]
     public void Linux_never_updates_itself()
     {
-        Assert.Equal("Egghead Notes updates itself on a Mac or a Windows PC.", Updates.WhyNotUpdatable(new UpdateHost { System = "Linux" }));
+        Assert.Equal("Syft Notes updates itself on a Mac or a Windows PC.", Updates.WhyNotUpdatable(new UpdateHost { System = "Linux" }));
     }
 
     [Fact]
@@ -349,7 +351,7 @@ public class UpdaterTests
         Assert.Equal(Updates.PutOff, said[^1]);
         Assert.True(await Updates.ApplyAsync(rel, home, host, said.Add));
         var args = Assert.Single(spawned);
-        string setupPath = Path.Combine(dir["temp"], "Egghead Notes update", Updates.WindowsAsset);
+        string setupPath = Path.Combine(dir["temp"], "Syft Notes update", Updates.WindowsAsset);
         Assert.Equal(setup, await File.ReadAllBytesAsync(setupPath));
         Assert.Equal([setupPath, "/VERYSILENT", "/SUPPRESSMSGBOXES", "/NORESTART", "/CLOSEAPPLICATIONS", "/relaunch=1", $"/LOG={Path.Combine(home, "logs", "update.log")}"],
             args);

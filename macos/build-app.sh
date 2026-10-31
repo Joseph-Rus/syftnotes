@@ -1,6 +1,6 @@
 #!/bin/sh
 # Builds "Study Stash.app": one universal bundle (D1: macos/launcher.c hosts .NET in-process, so the same running
-# executable works on Apple silicon and Intel), then the one download, Egghead-Notes.dmg. The app has no role of its own:
+# executable works on Apple silicon and Intel), then the one download, Syft-Notes.dmg. The app has no role of its own:
 # setup asks what the computer is for, and Settings can change it later (docs/one-download.md).
 #   sh macos/build-app.sh [out-dir]      default: dist/mac
 # Needs the .NET 10 SDK and the Xcode command line tools (clang, lipo, codesign, hdiutil, PlistBuddy, iconutil,
@@ -81,7 +81,7 @@ sed -e "s/__VERSION__/$VERSION/g" -e "s/__MINOS__/$MINOS/g" \
 printf 'APPL????' > "$APP/Contents/PkgInfo"
 # The name Finder and the Dock show (the bundle's own file name stays Study Stash.app: see Info.plist).
 mkdir -p "$APP/Contents/Resources/en.lproj"
-printf '"CFBundleDisplayName" = "Egghead Notes";\n"CFBundleName" = "Egghead Notes";\n' > "$APP/Contents/Resources/en.lproj/InfoPlist.strings"
+printf '"CFBundleDisplayName" = "Syft Notes";\n"CFBundleName" = "Syft Notes";\n' > "$APP/Contents/Resources/en.lproj/InfoPlist.strings"
 
 # Sign inside-out (D1): every file in each per-arch tree first, ad hoc with the hardened runtime, then the launcher,
 # then the bundle itself with its entitlements. `codesign --deep` alone can skip a Mach-O with no executable bit, so
@@ -101,13 +101,13 @@ codesign --force --options runtime --sign - "$MACOS/StudyStash"
 codesign --force --options runtime --entitlements "$HERE/StudyStash.entitlements" --sign - "$APP"
 codesign --verify --deep --strict --verbose=2 "$APP"
 
-echo "Built Egghead Notes $VERSION (universal, min $MINOS):"
+echo "Built Syft Notes $VERSION (universal, min $MINOS):"
 du -sh "$APP"
 
 # The DMG (macos/dmg.sh): a stage folder with the app plus a link to /Applications, with the app's icon on the disk.
 # shellcheck source=macos/dmg.sh
 . "$HERE/dmg.sh"
-stage_dmg "$APP" "Egghead Notes" "$OUT/Egghead-Notes.dmg"
+stage_dmg "$APP" "Syft Notes" "$OUT/Syft-Notes.dmg"
 
 echo "DMG:"
-du -sh "$OUT/Egghead-Notes.dmg"
+du -sh "$OUT/Syft-Notes.dmg"
