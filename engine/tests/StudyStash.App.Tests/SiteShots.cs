@@ -205,7 +205,7 @@ public class SiteShots
     /// <summary>Settings → AI apps: Claude Desktop and ChatGPT connected, Claude Code with its Connect button.</summary>
     static void AiApps(ThemeVariant t)
     {
-        // As a student sees it once it's set up: Claude and ChatGPT connected, Claude Code one Connect away. Each
+        // As a student sees it once it's set up: Claude, ChatGPT and Gemini connected, Claude Code one Connect away. Each
         // button as it is in the app, where every row's Connect and Disconnect do something.
         var access = AiShots.AccessModel();
         access.Apps.Clear();
@@ -214,6 +214,7 @@ public class SiteShots
         {
             ("claude-desktop", "Claude Desktop", true, now.AddMinutes(-20)),
             ("codex", "ChatGPT", true, now.AddMinutes(-6)),
+            ("gemini", "Gemini CLI", true, now.AddMinutes(-3)),
             ("claude-code", "Claude Code", false, null),
         })
         {
