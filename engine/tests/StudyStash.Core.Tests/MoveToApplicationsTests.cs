@@ -98,11 +98,13 @@ public class MoveToApplicationsTests
             if (exe == "ditto") CopyDir(args[0], args[1]);
             return new ProcResult(0, "");
         }
-        bool went = MoveToApplications.Offer(baseDir, home, home, () => true, Run, a => spawned = a, 4242, _ => { }, applicationsWritable: false);
+        bool went = MoveToApplications.Offer(baseDir, home, home, () => true, Run, a => spawned = a, 4242, _ => { }, applicationsWritable: false, otherCopyRunning: () => false);
         Assert.True(went);
         string dest = Path.Combine(home, "Applications", "Study Stash.app");
         Assert.True(File.Exists(Path.Combine(dest, "Contents", "Info.plist")));
         Assert.Equal(["sh", "4242", dest, ""], spawned!.Skip(3).ToArray());
+        Assert.Contains("/usr/bin/caffeinate -w", spawned![2]);
+        Assert.DoesNotContain("sleep", spawned[2]);
     }
 
     static void CopyDir(string from, string to)
@@ -110,5 +112,29 @@ public class MoveToApplicationsTests
         Directory.CreateDirectory(to);
         foreach (string f in Directory.GetFiles(from)) File.Copy(f, Path.Combine(to, Path.GetFileName(f)));
         foreach (string d in Directory.GetDirectories(from)) CopyDir(d, Path.Combine(to, Path.GetFileName(d)));
+    }
+
+    [Fact]
+    public void Nothing_is_offered_while_another_copy_runs()
+    {
+        using var t = new TempDir();
+        string home = Path.Combine(t.Path, "home");
+        Directory.CreateDirectory(home);
+        string baseDir = Make(home, "Downloads");
+        int asked = 0;
+        bool went = MoveToApplications.Offer(baseDir, home, home, () => { asked++; return true; }, (_, _, _) => null,
+            _ => throw new InvalidOperationException("nothing starts"), 1, _ => { }, applicationsWritable: false, otherCopyRunning: () => true);
+        Assert.False(went);
+        Assert.Equal(0, asked);
+        Assert.False(File.Exists(Path.Combine(home, MoveToApplications.DeclinedFile)));
+    }
+
+    [Fact]
+    public void Another_copy_is_any_process_but_this_one_in_the_list()
+    {
+        ProcResult? Pgrep(string pids) => new ProcResult(0, pids);
+        Assert.False(MoveToApplications.OtherCopyRunning((_, _, _) => Pgrep("4242\n"), 4242));
+        Assert.True(MoveToApplications.OtherCopyRunning((_, _, _) => Pgrep("4242\n999\n"), 4242));
+        Assert.False(MoveToApplications.OtherCopyRunning((_, _, _) => new ProcResult(1, ""), 4242));
     }
 }

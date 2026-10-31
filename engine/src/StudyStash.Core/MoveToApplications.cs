@@ -38,13 +38,17 @@ public static class MoveToApplications
     /// <paramref name="ask"/> shows the one sheet (true for Move). <paramref name="spawn"/> starts the little
     /// waiter that, once this process is gone, ejects the disk image and opens the new copy.</summary>
     public static bool Offer(string baseDir, string home, string userHome, Func<bool> ask, Runner run,
-        Action<IReadOnlyList<string>> spawn, int pid, Action<string> log, bool? applicationsWritable = null)
+        Action<IReadOnlyList<string>> spawn, int pid, Action<string> log, bool? applicationsWritable = null,
+        Func<bool>? otherCopyRunning = null)
     {
         string declined = Path.Combine(home, DeclinedFile);
         if (File.Exists(declined)) return false;
         bool writable = applicationsWritable ?? Machine.Writable("/Applications");
         if (Plan(baseDir, userHome, writable) is not { } plan) return false;
         if (Path.GetFullPath(plan.Source) == Path.GetFullPath(plan.Dest)) return false;
+        // Another copy of the app running (an older one in Applications): swapping the bundle under it and opening the
+        // new one would only hand off to that old copy, so nothing is offered until it's quit.
+        if ((otherCopyRunning ?? (() => OtherCopyRunning(run, pid)))()) return false;
         if (!ask())
         {
             try { File.WriteAllText(declined, ""); } catch (Exception e) when (e is IOException or UnauthorizedAccessException) { }
@@ -76,17 +80,23 @@ public static class MoveToApplications
         return true;
     }
 
+    /// <summary>Any other process running a program from a Study Stash.app bundle (the app, or the library it runs).</summary>
+    internal static bool OtherCopyRunning(Runner run, int pid) =>
+        run("/usr/bin/pgrep", ["-f", "Study Stash.app/Contents/MacOS/"], TimeSpan.FromSeconds(10)) is { ExitCode: 0 } p
+        && p.Stdout.Split('\n', StringSplitOptions.RemoveEmptyEntries)
+            .Any(l => int.TryParse(l.Trim(), out int other) && other != pid);
+
     /// <summary>`hdiutil info` lists only disk images, so a volume it names is one this download made, never a
     /// USB stick or another disk.</summary>
     static bool IsDiskImage(string volume, Runner run) =>
         run("/usr/bin/hdiutil", ["info"], TimeSpan.FromSeconds(20)) is { ExitCode: 0 } p
         && p.Stdout.Split('\n').Any(l => l.TrimEnd().EndsWith(volume, StringComparison.Ordinal));
 
-    /// <summary>Waits for <paramref name="pid"/> to quit, ejects <paramref name="volume"/> (when not empty), opens the app.</summary>
+    /// <summary>Waits for <paramref name="pid"/> to quit (caffeinate -w blocks until it exits: no polling), ejects <paramref name="volume"/> (when not empty), opens the app.</summary>
     internal static IReadOnlyList<string> WaiterCommand(int pid, string dest, string? volume) =>
     [
         "/bin/sh", "-c",
-        "while kill -0 \"$1\" 2>/dev/null; do sleep 0.2; done; [ -z \"$3\" ] || /usr/bin/hdiutil detach \"$3\" -quiet; /usr/bin/open \"$2\"",
+        "/usr/bin/caffeinate -w \"$1\"; [ -z \"$3\" ] || /usr/bin/hdiutil detach \"$3\" -quiet; /usr/bin/open \"$2\"",
         "sh", pid.ToString(System.Globalization.CultureInfo.InvariantCulture), dest, volume ?? "",
     ];
 }
