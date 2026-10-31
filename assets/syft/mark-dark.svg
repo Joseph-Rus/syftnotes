@@ -1,0 +1,75 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="-0.5 -0.5 47.6 74.72" width="190.4" height="298.88">
+  <!-- Syft Notes' mark, dark: the empty grid, the s with its mustard row, three bits falling out (for ink) (tools/syft/make_art.swift writes this file; don't edit it) -->
+  <!-- the empty grid -->
+  <rect x="0" y="0" width="6.6" height="6.6" rx="1.8" fill="#24212D"/>
+  <rect x="8" y="0" width="6.6" height="6.6" rx="1.8" fill="#24212D"/>
+  <rect x="16" y="0" width="6.6" height="6.6" rx="1.8" fill="#24212D"/>
+  <rect x="24" y="0" width="6.6" height="6.6" rx="1.8" fill="#24212D"/>
+  <rect x="32" y="0" width="6.6" height="6.6" rx="1.8" fill="#24212D"/>
+  <rect x="40" y="0" width="6.6" height="6.6" rx="1.8" fill="#24212D"/>
+  <rect x="0" y="8" width="6.6" height="6.6" rx="1.8" fill="#24212D"/>
+  <rect x="8" y="8" width="6.6" height="6.6" rx="1.8" fill="#24212D"/>
+  <rect x="16" y="8" width="6.6" height="6.6" rx="1.8" fill="#24212D"/>
+  <rect x="24" y="8" width="6.6" height="6.6" rx="1.8" fill="#24212D"/>
+  <rect x="32" y="8" width="6.6" height="6.6" rx="1.8" fill="#24212D"/>
+  <rect x="40" y="8" width="6.6" height="6.6" rx="1.8" fill="#24212D"/>
+  <rect x="0" y="16" width="6.6" height="6.6" rx="1.8" fill="#24212D"/>
+  <rect x="8" y="16" width="6.6" height="6.6" rx="1.8" fill="#24212D"/>
+  <rect x="16" y="16" width="6.6" height="6.6" rx="1.8" fill="#24212D"/>
+  <rect x="24" y="16" width="6.6" height="6.6" rx="1.8" fill="#24212D"/>
+  <rect x="32" y="16" width="6.6" height="6.6" rx="1.8" fill="#24212D"/>
+  <rect x="40" y="16" width="6.6" height="6.6" rx="1.8" fill="#24212D"/>
+  <rect x="0" y="24" width="6.6" height="6.6" rx="1.8" fill="#24212D"/>
+  <rect x="8" y="24" width="6.6" height="6.6" rx="1.8" fill="#24212D"/>
+  <rect x="16" y="24" width="6.6" height="6.6" rx="1.8" fill="#24212D"/>
+  <rect x="24" y="24" width="6.6" height="6.6" rx="1.8" fill="#24212D"/>
+  <rect x="32" y="24" width="6.6" height="6.6" rx="1.8" fill="#24212D"/>
+  <rect x="40" y="24" width="6.6" height="6.6" rx="1.8" fill="#24212D"/>
+  <rect x="0" y="32" width="6.6" height="6.6" rx="1.8" fill="#24212D"/>
+  <rect x="8" y="32" width="6.6" height="6.6" rx="1.8" fill="#24212D"/>
+  <rect x="16" y="32" width="6.6" height="6.6" rx="1.8" fill="#24212D"/>
+  <rect x="24" y="32" width="6.6" height="6.6" rx="1.8" fill="#24212D"/>
+  <rect x="32" y="32" width="6.6" height="6.6" rx="1.8" fill="#24212D"/>
+  <rect x="40" y="32" width="6.6" height="6.6" rx="1.8" fill="#24212D"/>
+  <rect x="0" y="40" width="6.6" height="6.6" rx="1.8" fill="#24212D"/>
+  <rect x="8" y="40" width="6.6" height="6.6" rx="1.8" fill="#24212D"/>
+  <rect x="16" y="40" width="6.6" height="6.6" rx="1.8" fill="#24212D"/>
+  <rect x="24" y="40" width="6.6" height="6.6" rx="1.8" fill="#24212D"/>
+  <rect x="32" y="40" width="6.6" height="6.6" rx="1.8" fill="#24212D"/>
+  <rect x="40" y="40" width="6.6" height="6.6" rx="1.8" fill="#24212D"/>
+  <rect x="0" y="48" width="6.6" height="6.6" rx="1.8" fill="#24212D"/>
+  <rect x="8" y="48" width="6.6" height="6.6" rx="1.8" fill="#24212D"/>
+  <rect x="16" y="48" width="6.6" height="6.6" rx="1.8" fill="#24212D"/>
+  <rect x="24" y="48" width="6.6" height="6.6" rx="1.8" fill="#24212D"/>
+  <rect x="32" y="48" width="6.6" height="6.6" rx="1.8" fill="#24212D"/>
+  <rect x="40" y="48" width="6.6" height="6.6" rx="1.8" fill="#24212D"/>
+  <!-- the s, p0 → p23 -->
+  <rect x="40" y="8" width="6.6" height="6.6" rx="1.8" fill="#CDBDFF"/>
+  <rect x="40" y="0" width="6.6" height="6.6" rx="1.8" fill="#CDBDFF"/>
+  <rect x="32" y="0" width="6.6" height="6.6" rx="1.8" fill="#CDBDFF"/>
+  <rect x="24" y="0" width="6.6" height="6.6" rx="1.8" fill="#CDBDFF"/>
+  <rect x="16" y="0" width="6.6" height="6.6" rx="1.8" fill="#CDBDFF"/>
+  <rect x="8" y="0" width="6.6" height="6.6" rx="1.8" fill="#CDBDFF"/>
+  <rect x="0" y="8" width="6.6" height="6.6" rx="1.8" fill="#CDBDFF"/>
+  <rect x="8" y="8" width="6.6" height="6.6" rx="1.8" fill="#CDBDFF"/>
+  <rect x="0" y="16" width="6.6" height="6.6" rx="1.8" fill="#A3DAF2"/>
+  <rect x="8" y="16" width="6.6" height="6.6" rx="1.8" fill="#A3DAF2"/>
+  <rect x="8" y="24" width="6.6" height="6.6" rx="1.8" fill="#A3DAF2"/>
+  <rect x="16" y="24" width="6.6" height="6.6" rx="1.8" fill="#A3DAF2"/>
+  <rect x="24" y="24" width="6.6" height="6.6" rx="1.8" fill="#A3DAF2"/>
+  <rect x="32" y="24" width="6.6" height="6.6" rx="1.8" fill="#A3DAF2"/>
+  <rect x="32" y="32" width="6.6" height="6.6" rx="1.8" fill="#FF6E4E"/>
+  <rect x="40" y="32" width="6.6" height="6.6" rx="1.8" fill="#FF6E4E"/>
+  <rect x="32" y="40" width="6.6" height="6.6" rx="1.8" fill="#FF6E4E"/>
+  <rect x="40" y="40" width="6.6" height="6.6" rx="1.8" fill="#FF6E4E"/>
+  <rect x="32" y="48" width="6.6" height="6.6" rx="1.8" fill="#FFC943"/>
+  <rect x="24" y="48" width="6.6" height="6.6" rx="1.8" fill="#FFC943"/>
+  <rect x="16" y="48" width="6.6" height="6.6" rx="1.8" fill="#FFC943"/>
+  <rect x="8" y="48" width="6.6" height="6.6" rx="1.8" fill="#FFC943"/>
+  <rect x="0" y="48" width="6.6" height="6.6" rx="1.8" fill="#FFC943"/>
+  <rect x="0" y="40" width="6.6" height="6.6" rx="1.8" fill="#FF6E4E"/>
+  <!-- the loose bits -->
+  <rect x="8" y="60.8" width="6.6" height="6.6" rx="1.8" fill="#FF6E4E" transform="rotate(20 11.3 64.1)"/>
+  <rect x="22.48" y="67.2" width="5.8" height="5.8" rx="1.58" fill="#A3DAF2" transform="rotate(-17 25.38 70.1)"/>
+  <rect x="33.92" y="60.56" width="5" height="5" rx="1.36" fill="#CDBDFF" transform="rotate(35 36.42 63.06)"/>
+</svg>

@@ -1,0 +1,35 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="-0.5 -21.8 47.6 76.9" width="190.4" height="307.61">
+  <!-- Syft Notes' mark, light: the sorted s, six bits tumbling in above (for white or paper) (tools/syft/make_art.swift writes this file; don't edit it) -->
+  <!-- the s, p0 → p23 -->
+  <rect x="40" y="8" width="6.6" height="6.6" rx="1.8" fill="#CDBDFF"/>
+  <rect x="40" y="0" width="6.6" height="6.6" rx="1.8" fill="#CDBDFF"/>
+  <rect x="32" y="0" width="6.6" height="6.6" rx="1.8" fill="#CDBDFF"/>
+  <rect x="24" y="0" width="6.6" height="6.6" rx="1.8" fill="#CDBDFF"/>
+  <rect x="16" y="0" width="6.6" height="6.6" rx="1.8" fill="#CDBDFF"/>
+  <rect x="8" y="0" width="6.6" height="6.6" rx="1.8" fill="#CDBDFF"/>
+  <rect x="0" y="8" width="6.6" height="6.6" rx="1.8" fill="#CDBDFF"/>
+  <rect x="8" y="8" width="6.6" height="6.6" rx="1.8" fill="#CDBDFF"/>
+  <rect x="0" y="16" width="6.6" height="6.6" rx="1.8" fill="#A3DAF2"/>
+  <rect x="8" y="16" width="6.6" height="6.6" rx="1.8" fill="#A3DAF2"/>
+  <rect x="8" y="24" width="6.6" height="6.6" rx="1.8" fill="#A3DAF2"/>
+  <rect x="16" y="24" width="6.6" height="6.6" rx="1.8" fill="#A3DAF2"/>
+  <rect x="24" y="24" width="6.6" height="6.6" rx="1.8" fill="#A3DAF2"/>
+  <rect x="32" y="24" width="6.6" height="6.6" rx="1.8" fill="#A3DAF2"/>
+  <rect x="32" y="32" width="6.6" height="6.6" rx="1.8" fill="#FF6E4E"/>
+  <rect x="40" y="32" width="6.6" height="6.6" rx="1.8" fill="#FF6E4E"/>
+  <rect x="32" y="40" width="6.6" height="6.6" rx="1.8" fill="#FF6E4E"/>
+  <rect x="40" y="40" width="6.6" height="6.6" rx="1.8" fill="#FF6E4E"/>
+  <rect x="32" y="48" width="6.6" height="6.6" rx="1.8" fill="#16131D"/>
+  <rect x="24" y="48" width="6.6" height="6.6" rx="1.8" fill="#16131D"/>
+  <rect x="16" y="48" width="6.6" height="6.6" rx="1.8" fill="#16131D"/>
+  <rect x="8" y="48" width="6.6" height="6.6" rx="1.8" fill="#16131D"/>
+  <rect x="0" y="48" width="6.6" height="6.6" rx="1.8" fill="#16131D"/>
+  <rect x="0" y="40" width="6.6" height="6.6" rx="1.8" fill="#FF6E4E"/>
+  <!-- the loose bits -->
+  <rect x="2.08" y="-12.08" width="6.6" height="6.6" rx="1.8" fill="#FF6E4E" transform="rotate(-21 5.38 -8.78)"/>
+  <rect x="8.16" y="-13.76" width="6.6" height="6.6" rx="1.8" fill="#CDBDFF" transform="rotate(13 11.46 -10.46)"/>
+  <rect x="12.16" y="-20.56" width="6.6" height="6.6" rx="1.8" fill="#A3DAF2" transform="rotate(15 15.46 -17.26)"/>
+  <rect x="21.12" y="-16.56" width="6.6" height="6.6" rx="1.8" fill="#FFC943" transform="rotate(-7 24.42 -13.26)"/>
+  <rect x="30.08" y="-18.32" width="6.6" height="6.6" rx="1.8" fill="#CDBDFF" transform="rotate(25 33.38 -15.02)"/>
+  <rect x="38.08" y="-14.4" width="6.6" height="6.6" rx="1.8" fill="#16131D" transform="rotate(-31 41.38 -11.1)"/>
+</svg>

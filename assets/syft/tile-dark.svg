@@ -1,0 +1,76 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="400" height="400">
+  <!-- Syft Notes' dark tile (the app icon) (tools/syft/make_art.swift writes this file; don't edit it) -->
+  <rect width="100" height="100" rx="22.2" fill="#16131D"/>
+  <!-- the empty grid -->
+  <rect x="26.7" y="14" width="6.6" height="6.6" rx="1.8" fill="#24212D"/>
+  <rect x="34.7" y="14" width="6.6" height="6.6" rx="1.8" fill="#24212D"/>
+  <rect x="42.7" y="14" width="6.6" height="6.6" rx="1.8" fill="#24212D"/>
+  <rect x="50.7" y="14" width="6.6" height="6.6" rx="1.8" fill="#24212D"/>
+  <rect x="58.7" y="14" width="6.6" height="6.6" rx="1.8" fill="#24212D"/>
+  <rect x="66.7" y="14" width="6.6" height="6.6" rx="1.8" fill="#24212D"/>
+  <rect x="26.7" y="22" width="6.6" height="6.6" rx="1.8" fill="#24212D"/>
+  <rect x="34.7" y="22" width="6.6" height="6.6" rx="1.8" fill="#24212D"/>
+  <rect x="42.7" y="22" width="6.6" height="6.6" rx="1.8" fill="#24212D"/>
+  <rect x="50.7" y="22" width="6.6" height="6.6" rx="1.8" fill="#24212D"/>
+  <rect x="58.7" y="22" width="6.6" height="6.6" rx="1.8" fill="#24212D"/>
+  <rect x="66.7" y="22" width="6.6" height="6.6" rx="1.8" fill="#24212D"/>
+  <rect x="26.7" y="30" width="6.6" height="6.6" rx="1.8" fill="#24212D"/>
+  <rect x="34.7" y="30" width="6.6" height="6.6" rx="1.8" fill="#24212D"/>
+  <rect x="42.7" y="30" width="6.6" height="6.6" rx="1.8" fill="#24212D"/>
+  <rect x="50.7" y="30" width="6.6" height="6.6" rx="1.8" fill="#24212D"/>
+  <rect x="58.7" y="30" width="6.6" height="6.6" rx="1.8" fill="#24212D"/>
+  <rect x="66.7" y="30" width="6.6" height="6.6" rx="1.8" fill="#24212D"/>
+  <rect x="26.7" y="38" width="6.6" height="6.6" rx="1.8" fill="#24212D"/>
+  <rect x="34.7" y="38" width="6.6" height="6.6" rx="1.8" fill="#24212D"/>
+  <rect x="42.7" y="38" width="6.6" height="6.6" rx="1.8" fill="#24212D"/>
+  <rect x="50.7" y="38" width="6.6" height="6.6" rx="1.8" fill="#24212D"/>
+  <rect x="58.7" y="38" width="6.6" height="6.6" rx="1.8" fill="#24212D"/>
+  <rect x="66.7" y="38" width="6.6" height="6.6" rx="1.8" fill="#24212D"/>
+  <rect x="26.7" y="46" width="6.6" height="6.6" rx="1.8" fill="#24212D"/>
+  <rect x="34.7" y="46" width="6.6" height="6.6" rx="1.8" fill="#24212D"/>
+  <rect x="42.7" y="46" width="6.6" height="6.6" rx="1.8" fill="#24212D"/>
+  <rect x="50.7" y="46" width="6.6" height="6.6" rx="1.8" fill="#24212D"/>
+  <rect x="58.7" y="46" width="6.6" height="6.6" rx="1.8" fill="#24212D"/>
+  <rect x="66.7" y="46" width="6.6" height="6.6" rx="1.8" fill="#24212D"/>
+  <rect x="26.7" y="54" width="6.6" height="6.6" rx="1.8" fill="#24212D"/>
+  <rect x="34.7" y="54" width="6.6" height="6.6" rx="1.8" fill="#24212D"/>
+  <rect x="42.7" y="54" width="6.6" height="6.6" rx="1.8" fill="#24212D"/>
+  <rect x="50.7" y="54" width="6.6" height="6.6" rx="1.8" fill="#24212D"/>
+  <rect x="58.7" y="54" width="6.6" height="6.6" rx="1.8" fill="#24212D"/>
+  <rect x="66.7" y="54" width="6.6" height="6.6" rx="1.8" fill="#24212D"/>
+  <rect x="26.7" y="62" width="6.6" height="6.6" rx="1.8" fill="#24212D"/>
+  <rect x="34.7" y="62" width="6.6" height="6.6" rx="1.8" fill="#24212D"/>
+  <rect x="42.7" y="62" width="6.6" height="6.6" rx="1.8" fill="#24212D"/>
+  <rect x="50.7" y="62" width="6.6" height="6.6" rx="1.8" fill="#24212D"/>
+  <rect x="58.7" y="62" width="6.6" height="6.6" rx="1.8" fill="#24212D"/>
+  <rect x="66.7" y="62" width="6.6" height="6.6" rx="1.8" fill="#24212D"/>
+  <!-- the s, p0 → p23 -->
+  <rect x="66.7" y="22" width="6.6" height="6.6" rx="1.8" fill="#CDBDFF"/>
+  <rect x="66.7" y="14" width="6.6" height="6.6" rx="1.8" fill="#CDBDFF"/>
+  <rect x="58.7" y="14" width="6.6" height="6.6" rx="1.8" fill="#CDBDFF"/>
+  <rect x="50.7" y="14" width="6.6" height="6.6" rx="1.8" fill="#CDBDFF"/>
+  <rect x="42.7" y="14" width="6.6" height="6.6" rx="1.8" fill="#CDBDFF"/>
+  <rect x="34.7" y="14" width="6.6" height="6.6" rx="1.8" fill="#CDBDFF"/>
+  <rect x="26.7" y="22" width="6.6" height="6.6" rx="1.8" fill="#CDBDFF"/>
+  <rect x="34.7" y="22" width="6.6" height="6.6" rx="1.8" fill="#CDBDFF"/>
+  <rect x="26.7" y="30" width="6.6" height="6.6" rx="1.8" fill="#A3DAF2"/>
+  <rect x="34.7" y="30" width="6.6" height="6.6" rx="1.8" fill="#A3DAF2"/>
+  <rect x="34.7" y="38" width="6.6" height="6.6" rx="1.8" fill="#A3DAF2"/>
+  <rect x="42.7" y="38" width="6.6" height="6.6" rx="1.8" fill="#A3DAF2"/>
+  <rect x="50.7" y="38" width="6.6" height="6.6" rx="1.8" fill="#A3DAF2"/>
+  <rect x="58.7" y="38" width="6.6" height="6.6" rx="1.8" fill="#A3DAF2"/>
+  <rect x="58.7" y="46" width="6.6" height="6.6" rx="1.8" fill="#FF6E4E"/>
+  <rect x="66.7" y="46" width="6.6" height="6.6" rx="1.8" fill="#FF6E4E"/>
+  <rect x="58.7" y="54" width="6.6" height="6.6" rx="1.8" fill="#FF6E4E"/>
+  <rect x="66.7" y="54" width="6.6" height="6.6" rx="1.8" fill="#FF6E4E"/>
+  <rect x="58.7" y="62" width="6.6" height="6.6" rx="1.8" fill="#FFC943"/>
+  <rect x="50.7" y="62" width="6.6" height="6.6" rx="1.8" fill="#FFC943"/>
+  <rect x="42.7" y="62" width="6.6" height="6.6" rx="1.8" fill="#FFC943"/>
+  <rect x="34.7" y="62" width="6.6" height="6.6" rx="1.8" fill="#FFC943"/>
+  <rect x="26.7" y="62" width="6.6" height="6.6" rx="1.8" fill="#FFC943"/>
+  <rect x="26.7" y="54" width="6.6" height="6.6" rx="1.8" fill="#FF6E4E"/>
+  <!-- the loose bits -->
+  <rect x="34.7" y="74.8" width="6.6" height="6.6" rx="1.8" fill="#FF6E4E" transform="rotate(20 38 78.1)"/>
+  <rect x="49.18" y="81.2" width="5.8" height="5.8" rx="1.58" fill="#A3DAF2" transform="rotate(-17 52.08 84.1)"/>
+  <rect x="60.62" y="74.56" width="5" height="5" rx="1.36" fill="#CDBDFF" transform="rotate(35 63.12 77.06)"/>
+</svg>
