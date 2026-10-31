@@ -198,7 +198,7 @@ Mozilla's site ([firefox-add-on.md](firefox-add-on.md)), each connected by a pas
 student whose Chrome won't install from the store, load the folder described here. Wherever this page
 says Chrome, any browser of its family does the same. The engine carries it as embedded resources (`extension/<file>` in `StudyStash.Core`), and
 `Extension.Ensure(dir, library, key, canvasUrl)` writes it out as a folder for Chrome's "Load unpacked": the scripts
-(`background.js`, `connection.js`, the popup, the icons that `macos/make_icon.swift out.chrome` draws), a manifest,
+(`background.js`, `connection.js`, the popup, the icons that `tools/syft/make_art.swift` draws), a manifest,
 and `config.json` + `config.js`. The library keeps its own folder (`Extension.Folder(home)`) ready by itself: on start, and whenever the Canvas address changes.
 
 **Where the folder is.** `Extension.Folder(home)` is `<home>/chrome-extension` on Windows and Linux. On a Mac the home

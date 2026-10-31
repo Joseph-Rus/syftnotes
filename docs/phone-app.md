@@ -123,9 +123,8 @@ tab bar.
 ## The PWA itself
 
 - **`web/public/manifest.webmanifest`**: name Syft Notes, `start_url`/`scope` `/app/`, `display: standalone`, and
-  icons at 192 and 512 (plus maskable versions with a teal safe-zone background), made from `assets/icon.png` with
-  `sips` (`sips -z 192 192 assets/icon.png --out web/public/icon-192.png`, and similarly for 512 and the padded
-  maskable pair). `apple-touch-icon.png` is the repo's own 180×180 (`assets/apple-touch-icon.png`), copied as-is.
+  icons at 192 and 512 (plus maskable versions: the s inside the safe zone on full-bleed ink), and `apple-touch-icon.png` at 180×180, all
+  drawn by `xcrun swift tools/syft/make_art.swift` from the pixel s's geometry.
 - **`index.html`** links the manifest and icons and carries iOS's own meta tags (`apple-mobile-web-app-capable`,
   `-title`, `-status-bar-style`), since iOS reads those instead of the manifest for how the app runs from the Home
   Screen.

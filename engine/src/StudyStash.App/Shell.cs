@@ -389,7 +389,7 @@ public static partial class Shell
 
     // --- the tray ---------------------------------------------------------------------------------------------------
 
-    /// <summary>The icon, as PNG bytes: the egghead mark — black on a Mac (a template image the menu bar tints, or, while
+    /// <summary>The icon, as PNG bytes: the pixel s — black on a Mac (a template image the menu bar tints, or, while
     /// recording, in the menu bar's own ink so its red dot stays red), black or white on Windows by theme — with a red
     /// dot while recording.</summary>
     static byte[] TrayImageBytes(bool recording)

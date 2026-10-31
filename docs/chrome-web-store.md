@@ -165,8 +165,8 @@ needs the extension's ID ([above](#the-extensions-id)), so the folder keeps its 
   and uses your own sign-in, that it does nothing until you paste a code from Syft Notes, and that nothing goes
   anywhere except your library.
 - **Category**: Education. **Language**: English.
-- **Icon**: 128 × 128 (`extension/icon-128.png`: the app icon tile at 96 px inside Chrome's 16-px margin; redraw every
-  size with `swift macos/make_icon.swift out.chrome` and copy them into `extension/`).
+- **Icon**: 128 × 128 (`extension/icon-128.png`: the app icon tile at 96 px inside Chrome's 16-px margin; every size is
+  drawn by `xcrun swift tools/syft/make_art.swift`, which writes them straight into `extension/`).
 - **Screenshots**: at least one, 1280 × 800 (or 640 × 400). For example: the popup connected ("Canvas synced just
   now") over a Canvas course page, and the popup asking for the code. Use the design's made-up classes (CS 101,
   BIO 110), never a real school or real names.
