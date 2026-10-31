@@ -19,6 +19,7 @@ public class MoveToApplicationsTests
     [Fact]
     public void Offered_from_a_disk_image_from_translocation_and_from_Downloads_or_Desktop()
     {
+        if (!OperatingSystem.IsMacOS()) return; // the move is a Mac's, and its disk-image and Applications paths are a Mac's
         using var t = new TempDir();
         string home = Path.Combine(t.Path, "home");
         string vols = Path.Combine(t.Path, "Volumes");
