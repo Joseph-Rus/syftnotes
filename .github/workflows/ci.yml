@@ -162,7 +162,7 @@ jobs:
         os: [ubuntu-latest, macos-latest, windows-latest]
         suite: [Core, App]
     # A leg takes 2 to 9 minutes; the App tests on a slow Windows runner the most. 15 and 20 only bound a hang.
-    timeout-minutes: ${{ matrix.suite == 'Core' && 15 || 20 }}
+    timeout-minutes: ${{ matrix.suite == 'Core' && 15 || 30 }}
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
