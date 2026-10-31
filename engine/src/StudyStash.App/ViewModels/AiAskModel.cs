@@ -212,28 +212,39 @@ public sealed partial class AiAskModel : ObservableObject
     public string ScopeName => ScopeChoices.FirstOrDefault(c => c.Id == Scope)?.Name ?? Scope;
     public string Placeholder => Live is not null ? AiWords.AskLive : AiWords.AskPlaceholder(Scope, noun, folder);
     public AiTurn? Latest => Turns.Count > 0 ? Turns[^1] : null;
-    /// <summary>The latest answer shows above the ask bar until the student closes it; the next question opens it again.</summary>
+    /// <summary>The latest answer shows until the student closes it; the next question opens it again.</summary>
     public bool HasLatest => Latest is not null && !AnswerClosed;
     [ObservableProperty] public partial bool AnswerClosed { get; set; }
 
+    /// <summary>The conversation's panel is open beside the page: an answer to show, or a new chat started in the panel
+    /// and waiting for its first question (New chat keeps the panel where it is, empty).</summary>
+    public bool PanelOpen => !AnswerClosed && (Latest is not null || waiting);
+    /// <summary>New chat was pressed with the panel open: it stays open for the first question.</summary>
+    bool waiting;
+
     partial void OnAnswerClosedChanged(bool value) => ThreadShown();
 
-    /// <summary>The answer card's close button: the notes get their room back, and an answer still being written stops.
-    /// The conversation is kept: the next question carries it on, and it's in the Chats list.</summary>
+    /// <summary>The panel's close button (and Esc in it): the notes get their room back, the bar goes back to the foot of
+    /// the page, and an answer still being written stops. The conversation is kept: the next question carries it on,
+    /// and it's in the Chats list.</summary>
     [RelayCommand]
     void CloseAnswer()
     {
         Stop();
+        waiting = false;
         AnswerClosed = true;
+        ThreadShown();
     }
 
     /// <summary>New chat: the next question starts a conversation of its own, the AI remembering nothing before it. The
-    /// one before stays in the Chats list. An answer still being written stops. The card closes until then.</summary>
+    /// one before stays in the Chats list. An answer still being written stops. An open panel stays open, empty, with the
+    /// caret in the bar for the first question.</summary>
     [RelayCommand(CanExecute = nameof(CanStartOver))]
     void NewChat() => StartOver(show: true);
 
     void StartOver(bool show)
     {
+        waiting = PanelOpen;
         Stop();
         Turns.Clear();
         ChatId = null;
@@ -266,6 +277,7 @@ public sealed partial class AiAskModel : ObservableObject
     void CloseChat()
     {
         Stop();
+        waiting = false;
         AnswerClosed = true;
     }
 
@@ -277,6 +289,7 @@ public sealed partial class AiAskModel : ObservableObject
     void ThreadShown()
     {
         OnPropertyChanged(nameof(HasLatest));
+        OnPropertyChanged(nameof(PanelOpen));
         OnPropertyChanged(nameof(CanShowChat));
         OnPropertyChanged(nameof(CanStartOver));
         CloseChatCommand.NotifyCanExecuteChanged();

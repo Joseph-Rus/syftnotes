@@ -9,6 +9,12 @@ public partial class Overview : UserControl
     public Overview()
     {
         InitializeComponent();
+        // Opening the conversation slides the page's column over to the left, and the page lays itself out narrow there.
+        Split.Anchor = Column;
+        Split.PropertyChanged += (_, e) =>
+        {
+            if (e.Property == AskSplit.BesideProperty && DataContext is OverviewModel m) m.Beside = Split.Beside;
+        };
         AttachFiles.AcceptDrops(Page, () => (DataContext as OverviewModel)?.Files);
         Fades.Under(Fade, "Surface", 0.55);
         // Another page opens at its top, not wherever the last one was scrolled to; the same one read again (Canvas
@@ -17,6 +23,7 @@ public partial class Overview : UserControl
         DataContextChanged += (_, _) =>
         {
             if (DataContext is not OverviewModel m) return;
+            m.Beside = Split.Beside;
             string key = m.IsHome ? m.OnlyUnsorted ? "\u0001unsorted" : "" : m.IsDuePage ? "\u0001due" : m.ClassName;
             if (key != showing) Page.Offset = default;
             showing = key;
