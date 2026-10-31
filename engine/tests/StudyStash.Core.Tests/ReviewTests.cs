@@ -228,4 +228,27 @@ public class ReviewTests
         Assert.Equal([(150d, false), (315d, true), (400d, false)], flags.Select(f => (f.At!.Value, f.Not)));
         Assert.Equal(404, (await Assert.ThrowsAsync<LibraryRefusedException>(() => lib.Study.ExamFlagsAsync("nope"))).Status);
     }
+
+    [Fact]
+    public async Task Only_a_lecture_in_one_of_the_classes_has_exam_flags()
+    {
+        await using var lib = await StudyLibrary.StartAsync(l =>
+        {
+            // A folder of the student's own (a club's meetings), and a recording not sorted into any folder: what's
+            // said in them isn't about an exam, however it's worded.
+            l.Cfg.Classes.Add(new ClassDef("Robotics Club", group: "Clubs"));
+            l.Store.Save(new Meeting("club") { Title = "Build night", Date = "2026-10-09", Transcript = StudyLibrary.BloodTranscript },
+                new Classification("Robotics Club", 1, "folder"), "## Summary\nWe built the arm.", "Claude");
+            l.Store.Save(new Meeting("loose") { Title = "Voice memo", Date = "2026-10-09", Transcript = StudyLibrary.BloodTranscript },
+                new Classification(Configs.Unsorted, 1, "folder"), "## Summary\nA memo.", "Claude");
+        });
+
+        Assert.Equal(3, (await lib.Study.ExamFlagsAsync("v1"))!.Count);
+        Assert.Empty((await lib.Study.ExamFlagsAsync("club"))!);
+        Assert.Empty((await lib.Study.ExamFlagsAsync("loose"))!);
+        Assert.True(lib.Cfg.IsClass("BIO 110"));
+        Assert.False(lib.Cfg.IsClass("Robotics Club"));
+        Assert.False(lib.Cfg.IsClass(Configs.Unsorted));
+        Assert.False(lib.Cfg.IsClass(""));
+    }
 }

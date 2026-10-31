@@ -298,7 +298,8 @@ public static partial class Shell
             note.Transcript.Add(new HeardLine { Time = timed ? TimedText.Clock(line.Start) : "", Text = line.Text, Start = timed ? line.Start : null });
             if (timed) note.Spoken.Add(line);
         }
-        note.FlagExam();
+        // What the lecturer said is on the exam: only a lecture in one of the student's classes has an exam to flag.
+        if (noun == Nouns.Lecture) note.FlagExam();
         FlushTyped();
         library.NarrowDetail = false;
         library.Assignment = null;

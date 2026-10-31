@@ -46,7 +46,7 @@ public sealed partial class LibraryWeb
         {
             string id = (string)ctx.Request.RouteValues["id"]!;
             bool more = (await Http.JsonBodyAsync(ctx.Request))?["more"] is JsonValue mv && mv.TryGetValue(out bool m) && m;
-            if (StudyMaterial.Read(store, id) is not { } lecture) return Http.Detail(404, "no such lecture");
+            if (StudyMaterial.Read(store, id, cfg.IsClass) is not { } lecture) return Http.Detail(404, "no such lecture");
             if (!lecture.HasWords) return Http.Detail(409, "This lecture has no notes or transcript to make cards from yet.");
             var had = ReviewCards.OfLecture(id);
             if (had.Count > 0 && !more) return StudyJson(new { added = new List<ReviewCard>(), cards = had });
@@ -107,7 +107,7 @@ public sealed partial class LibraryWeb
 
         // What the lecturer said is on the exam, for the phone and Claude.
         app.MapGet("/api/v2/lectures/{id}/exam-flags", (HttpContext ctx, string id) => Api(ctx, () =>
-            StudyMaterial.Read(store, id) is { } l ? StudyJson(l.Flags) : Http.Detail(404, "no such lecture")));
+            StudyMaterial.Read(store, id, cfg.IsClass) is { } l ? StudyJson(l.Flags) : Http.Detail(404, "no such lecture")));
     }
 
     ExamPrep? examPreps;
@@ -167,7 +167,7 @@ public sealed partial class LibraryWeb
             var since = ExamDates().Where(e => e.Class == cls && ExamPrep.IsExam(e.Title) && e.When is { } w && w < (when ?? now).AddHours(-12)
                     && ExamPrep.Same(e.Title) != ExamPrep.Same(title))
                 .Select(e => e.When).Max();
-            var lectures = ExamPrep.Covered(store, cls, since, when, now).Select(r => StudyMaterial.Read(store, r.Id)).OfType<StudyLecture>()
+            var lectures = ExamPrep.Covered(store, cls, since, when, now).Select(r => StudyMaterial.Read(store, r.Id, cfg.IsClass)).OfType<StudyLecture>()
                 .Where(l => l.HasWords).ToList();
             if (lectures.Count == 0) return Http.Detail(409, $"{cls} has no lectures with notes to prep from yet.");
             string key = $"{cls}\u0001{ExamPrep.Same(title)}";
@@ -228,7 +228,7 @@ public sealed partial class LibraryWeb
         // Makes it: the library's AI writes the script, this computer's voices read it, in the background.
         app.MapPost("/api/v2/listen/{id}", (HttpContext ctx, string id) => Api(ctx, () =>
         {
-            if (StudyMaterial.Read(store, id) is not { } lecture) return Http.Detail(404, "no such lecture");
+            if (StudyMaterial.Read(store, id, cfg.IsClass) is not { } lecture) return Http.Detail(404, "no such lecture");
             if (!lecture.HasWords) return Http.Detail(409, "This lecture has no notes or transcript to make a listen from yet.");
             if (Listening.Speech.Ready() is (false, var why)) return Http.Detail(409, why);
             return StudyJson(Listening.Start(lecture, (p, s) => Jobs.PlanAsync("ask", p, s), Now(), Console.WriteLine));

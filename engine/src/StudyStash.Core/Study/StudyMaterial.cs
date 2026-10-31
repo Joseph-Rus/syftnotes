@@ -42,13 +42,15 @@ public sealed record StudyLecture(string Id, string Title, string Class, string 
 /// <summary>Reading a lecture for the study tools, and asking an AI for flashcards from it.</summary>
 public static partial class StudyMaterial
 {
-    /// <summary>A lecture from the library, with its exam flags found; null when there's no such lecture.</summary>
-    public static StudyLecture? Read(Store store, string id)
+    /// <summary>A lecture from the library, with its exam flags found (only in one of the student's classes:
+    /// <paramref name="isClass"/>; a meeting or an unsorted recording has none); null when there's no such lecture.</summary>
+    public static StudyLecture? Read(Store store, string id, Func<string, bool> isClass)
     {
         if (store.Get(id) is not { } row) return null;
         var m = store.Meeting(row);
         string notes = !string.IsNullOrEmpty(row.SummaryMd) ? row.SummaryMd : m.NotesMarkdown;
-        return new StudyLecture(row.Id, row.Title ?? m.Title, row.ClassName ?? "", row.Date ?? m.Date, notes ?? "", m.Transcript ?? "", ExamHints.Find(m.Transcript ?? ""));
+        return new StudyLecture(row.Id, row.Title ?? m.Title, row.ClassName ?? "", row.Date ?? m.Date, notes ?? "", m.Transcript ?? "",
+            isClass(row.ClassName ?? "") ? ExamHints.Find(m.Transcript ?? "") : []);
     }
 
     /// <summary>A JSON answer from the library's AI: (prompt, schema) → the JSON text.</summary>

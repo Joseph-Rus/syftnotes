@@ -26,7 +26,9 @@ library's home, and one with the same name as a built-in is used in its place.
 what's on the exam, found by what was said, with no AI: "on the midterm", "make sure you know", "write
 this down", "I'll ask you this", "fair game", and "will be on it" just after an exam was named. The
 same said the other way ("won't be on the exam", "you don't need to memorise") is marked `not`. A
-lecture's page lists them over its notes; Review's cards, exam prep and Listen are all told them.
+lecture's page lists them over its notes; Review's cards, exam prep and Listen are all told them. Only a lecture in
+one of the student's classes has them (`Config.IsClass`): a meeting in a folder of their own (Clubs, Work) or an
+unsorted recording has none.
 
 `GET /api/v2/lectures/{id}/exam-flags` gives them as `[{at, said, not, moment}]`.
 
