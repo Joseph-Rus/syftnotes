@@ -82,7 +82,26 @@ public static class FakeAgents
     }
 
     /// <summary>How many times the fake's sign-in was started (<c>logins</c>, a line each).</summary>
-    public static int Logins(string bin) => File.Exists(Path.Combine(bin, "logins")) ? File.ReadAllLines(Path.Combine(bin, "logins")).Length : 0;
+    public static int Logins(string bin)
+    {
+        string path = Path.Combine(bin, "logins");
+        // On Windows the fake's Add-Content may hold the file this moment: it's read sharing every way, and looked at
+        // again until it's free (a few seconds at most).
+        var until = DateTime.UtcNow.AddSeconds(5);
+        while (true)
+        {
+            try
+            {
+                if (!File.Exists(path)) return 0;
+                using var reader = new StreamReader(new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete));
+                return reader.ReadToEnd().Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).Length;
+            }
+            catch (IOException) when (DateTime.UtcNow < until)
+            {
+                Thread.Yield();
+            }
+        }
+    }
 
     public static int Turns(string bin) => File.Exists(Path.Combine(bin, "turns")) ? int.Parse(File.ReadAllText(Path.Combine(bin, "turns")).Trim(), System.Globalization.CultureInfo.InvariantCulture) : 0;
 
