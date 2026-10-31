@@ -250,7 +250,7 @@ struct DueTab: View {
     var body: some View {
         NavigationStack(path: app.stack(.due)) {
             if let api = app.api {
-                DuePage(api: api) { app.stack(.due).wrappedValue.append($0) }.routes()
+                DuePage(api: api) { app.stack(.due).wrappedValue.append($0) }.laptopNotice().routes()
             }
         }
     }

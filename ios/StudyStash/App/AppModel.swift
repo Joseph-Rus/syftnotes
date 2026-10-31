@@ -56,7 +56,9 @@ final class AppModel {
         case ready
     }
 
-    private(set) var phase: Phase
+    private(set) var phase: Phase {
+        didSet { if phase == .unpaired { laptop = .unknown; laptopBack = false } }
+    }
     private(set) var api: APIClient?
     private(set) var libraryName: String
     /// The library couldn't be reached last time it was asked: screens show what was saved before.
@@ -373,6 +375,13 @@ final class AppModel {
 
     /// Connected over Google Drive: the account, the laptop and when it was last there (nil when not signed in).
     var drive: DriveStatus?
+    /// Whether the laptop is there to answer (over Google Drive only): the banner on the main screens and Ask's first
+    /// screen say when it's asleep or off, before the student tries anything.
+    private(set) var laptop = LaptopPresence.unknown
+    /// "Your laptop is back" is showing: the few seconds after an away laptop was heard from again.
+    private(set) var laptopBack = false
+    @ObservationIgnored private var presenceTicker: Task<Void, Never>?
+    @ObservationIgnored private var backHiding: Task<Void, Never>?
     /// Why the phone was signed out of Google, said on the first screen.
     var googleProblem: String?
     /// The account signed in with (its tokens are the link's).
@@ -468,6 +477,9 @@ final class AppModel {
 
     func tryDemo() {
         paired(base: DemoLibrary.base, library: Me.Library(name: "Demo library", version: "demo"))
+        #if DEBUG
+        demoLaptop()
+        #endif
     }
 
     /// Connect your computer, from the sample classes (Home's banner, Settings): the demo ends, on setup's first
@@ -489,6 +501,7 @@ final class AppModel {
         if !keepGoogle {
             DriveLibrary.link = nil
             drive = nil
+            laptop = .unknown
         }
         defaults.removeObject(forKey: Self.baseKey)
         defaults.removeObject(forKey: Self.nameKey)
@@ -570,6 +583,7 @@ extension AppModel {
     private func driveChanged(_ status: DriveStatus, wrote: String?) {
         guard DriveLibrary.link != nil else { return }
         drive = status
+        updatePresence()
         if let problem = status.problem {
             // Google stopped letting this phone in: back to the first screen, saying why.
             googleProblem = problem
@@ -594,7 +608,10 @@ extension AppModel {
         guard let link = DriveLibrary.link else { return }
         if on {
             Task { await link.foreground(true) }
+            watchPresence()
         } else {
+            presenceTicker?.cancel()
+            presenceTicker = nil
             let id = UIApplication.shared.beginBackgroundTask(withName: "Syft Notes' box")
             Task {
                 await link.foreground(false)
@@ -603,6 +620,58 @@ extension AppModel {
         }
     }
 
+    /// How long the laptop has been quiet keeps growing while nothing changes, so while the app is in front it's looked at
+    /// again every 15 s (a laptop closed with the app open shows up here within a few minutes).
+    private func watchPresence() {
+        presenceTicker?.cancel()
+        presenceTicker = Task { [weak self] in
+            while !Task.isCancelled {
+                try? await Task.sleep(for: .seconds(15))
+                self?.updatePresence()
+            }
+        }
+    }
+
+    /// Say what the last read of the laptop's file says. Nothing is said until it has been read since the app came to
+    /// the front (the earlier verdict stays up meanwhile), and an away laptop heard from again says so for a moment.
+    func updatePresence(now: Date = .now) {
+        #if DEBUG
+        if DebugLaunch.flag("-laptop-away") || DebugLaunch.flag("-laptop-back") { return }
+        #endif
+        guard isDrive, let d = drive else { return }
+        setPresence(LaptopPresence.evaluate(hasLaptop: d.laptop != nil, seen: d.seen, checked: d.checked, now: now))
+    }
+
+    private func setPresence(_ new: LaptopPresence) {
+        guard new != .unknown, new != laptop else { return }
+        let wasAway = laptop.isAway
+        withAnimation(.smooth) {
+            laptop = new
+            laptopBack = wasAway && new == .here
+        }
+        backHiding?.cancel()
+        guard laptopBack else { return }
+        backHiding = Task { [weak self] in
+            try? await Task.sleep(for: .seconds(4))
+            guard !Task.isCancelled else { return }
+            withAnimation(.smooth) { self?.laptopBack = false }
+        }
+    }
+
+    #if DEBUG
+    /// `-demo -laptop-away`: the sample classes with the laptop asleep, two hours since it was last there, to picture the
+    /// banner. `-laptop-back` starts the same and has it come back a few seconds in.
+    func demoLaptop() {
+        guard DebugLaunch.flag("-laptop-away") || DebugLaunch.flag("-laptop-back") else { return }
+        laptop = .away(since: .now.addingTimeInterval(-2 * 3600))
+        guard DebugLaunch.flag("-laptop-back") else { return }
+        Task { [weak self] in
+            try? await Task.sleep(for: .seconds(Double(DebugLaunch.value("-laptop-back") ?? "") ?? 4))
+            self?.setPresence(.here)
+        }
+    }
+    #endif
+
     /// Sign out of Google on this phone: its files in the folder go, Google's access is taken back, and the phone
     /// forgets the laptop. Recordings not yet sent stay on the phone.
     func signOutOfGoogle() async {
@@ -610,6 +679,8 @@ extension AppModel {
         let account = googleAccount
         DriveLibrary.link = nil
         drive = nil
+        laptop = .unknown
+        laptopBack = false
         googleAccount = nil
         await link?.signOut()
         // A debug build's test account (`-drive-token-file`) is never revoked: only one this phone signed in with.

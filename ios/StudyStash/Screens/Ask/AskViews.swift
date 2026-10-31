@@ -137,6 +137,8 @@ private struct AskThread: View {
         ScrollViewReader { proxy in
             ScrollView {
                 VStack(alignment: .leading, spacing: 0) {
+                    // With a chat already on the page the first screen's words aren't there to say it.
+                    if !conversation.turns.isEmpty || app.laptopBack { LaptopBanner().padding(.top, 8) }
                     if noAI {
                         EmptyState(title: "Asking isn't set up yet",
                                    detail: "On your computer, open Settings, then Your AI, and choose one.", mark: .oddOneOut)
@@ -274,15 +276,27 @@ private struct AskThread: View {
     private var start: some View {
         VStack(spacing: 16) {
             SyftMark(height: 96)
-            Text(emptyLine).textStyle(.title).foregroundStyle(.ink)
+            Text(laptopAway ? "Your laptop isn't answering right now." : emptyLine).textStyle(.title).foregroundStyle(.ink)
                 .multilineTextAlignment(.center)
                 .fixedSize(horizontal: false, vertical: true)
+            if case .away(let since) = app.laptop {
+                // Questions aren't kept for later: each is answered on the laptop while it's asked, or not at all.
+                Text("\(LaptopPresence.lastHere(since)) Ask needs it to be on and awake, so ask again when it's back.")
+                    .textStyle(.lede).foregroundStyle(.inkMuted)
+                    .multilineTextAlignment(.center)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .accessibilityIdentifier("ask.laptopAway")
+            }
         }
         .padding(.horizontal, 24)
         .frame(maxWidth: .infinity)
         .containerRelativeFrame(.vertical) { height, _ in height * 0.78 }
         .accessibilityElement(children: .combine)
     }
+
+    /// The laptop is asleep or off (over Google Drive). The bar still sends: the page may be a few minutes behind a laptop
+    /// that has just woken, and a question that gets no answer says so in the words it always has.
+    private var laptopAway: Bool { app.laptop.isAway }
 
     private var emptyLine: String {
         switch base {
@@ -346,7 +360,7 @@ private struct AskThread: View {
                     .padding(.horizontal, 2)
                 }
             }
-            AskBar(placeholder: "Ask anything", text: $question, busy: conversation.busy, onStop: { conversation.stop() },
+            AskBar(placeholder: laptopAway ? "Ask when your laptop is back" : "Ask anything", text: $question, busy: conversation.busy, onStop: { conversation.stop() },
                    focusOnAppear: DebugLaunch.value("-ask-typing") != nil && isTab, onFocus: onFocus) {
                 scopeMenu
             } onSend: {

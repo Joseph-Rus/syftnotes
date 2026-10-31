@@ -397,7 +397,9 @@ one) and `-quiet` (no notification prompt):
   again), `-ask-chats` (Chats open; `-ask-undo` with it, one deleted with Undo), `-ask-open <chat id>` (a kept chat
   open: the demo's `demo-chat-chem`, `demo-chat-ibp`…), `-ask-typing "<text>"` (typed in the bar, the keyboard up),
   `-ask-engine claude|codex|gemini|ollama` (which AI the demo says answers), `-ask-chips` (the alternative with three
-  short questions over the bar);
+  short questions over the bar); `-laptop-away` (with `-demo`: the laptop asleep or off, last here two hours ago, so the
+  banner on Home, Due and Search and Ask's first screen show) and `-laptop-back [seconds]` (the same, then "Your laptop
+  is back" after that long, 4 by default);
   `-unpaired` (setup, no `-demo`), with `-pair-code` its second step, or
   `-pair-page others|laptop|connect|finding|connecting|camera-off|address|cant-reach|code|typing|wrong|uses|done` any
   page of it (`others` is Other ways, `laptop` is "Now connect your laptop" after Continue with Google);

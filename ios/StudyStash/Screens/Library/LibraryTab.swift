@@ -11,7 +11,7 @@ struct LibraryTab: View {
     var body: some View {
         NavigationStack(path: app.stack(.home)) {
             if let api = app.api {
-                LibraryHome(api: api, path: app.stack(.home)).routes()
+                LibraryHome(api: api, path: app.stack(.home)).laptopNotice().routes()
             }
         }
     }

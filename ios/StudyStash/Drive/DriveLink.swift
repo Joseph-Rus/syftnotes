@@ -14,6 +14,9 @@ struct DriveStatus: Sendable, Equatable {
     var waiting: Int
     /// Google stopped letting the phone in (the sign-in ended, the Drive box was unticked): its words.
     var problem: String?
+    /// The laptop's file was read since the app last came to the front: only then does `seen` say anything about now
+    /// (before it, it's the copy from the last time).
+    var checked = false
 }
 
 /// The phone's side of the phone over Google Drive (docs/phone-google.md). The laptop keeps a copy of its library's
@@ -79,6 +82,8 @@ actor DriveLink {
     private var results: [String: Finished] = [:]
     private var resultOrder: [String] = []
     private var problem: GoogleProblem?
+    /// laptop.json was read (found or not) since the app last came to the front.
+    private var checked = false
     private var preparing: Set<String> = []
     private var boxBusy = false
     private var boxWaiters: [CheckedContinuation<Void, Never>] = []
@@ -122,7 +127,7 @@ actor DriveLink {
 
     var status: DriveStatus {
         DriveStatus(email: account, laptop: laptop?.name, version: laptop?.version, seen: laptop?.seen,
-                    waiting: state.requests.filter { $0.write }.count, problem: problem?.words)
+                    waiting: state.requests.filter { $0.write }.count, problem: problem?.words, checked: checked)
     }
 
     var phoneID: String { state.phoneID }
@@ -271,7 +276,16 @@ actor DriveLink {
     }
 
     private func refreshNow() async throws {
-        guard let raw = try await laptopFile() else {
+        let raw = try await laptopFile()
+        // Read (or found not to be there): `seen` now means something. Told once what was read has been taken in.
+        let firstRead = !checked
+        defer {
+            if firstRead {
+                checked = true
+                tell()
+            }
+        }
+        guard let raw else {
             // No laptop in the folder: never connected, or it disconnected (and took its copy away).
             if laptop != nil {
                 laptop = nil
@@ -726,6 +740,12 @@ actor DriveLink {
         loop?.cancel()
         loop = nil
         openUntil = on ? .now.addingTimeInterval(timing.openFor) : .now
+        // The copy of the laptop's file is as old as the last time the app was open: until it's read again (the loop's
+        // first thing, straight away) nothing is said about whether the laptop's there.
+        if on, checked {
+            checked = false
+            tell()
+        }
         try? await pushBox()
         guard on else { return }
         loop = Task { await self.run() }

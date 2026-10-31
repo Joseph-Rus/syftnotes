@@ -287,6 +287,8 @@ extension View {
 ///   `-pane notes|transcript|files` picks a lecture's tab.
 /// - `-show <screen>` opens a sheet: `record`, `ask`, `ask:lecture:<id>`, `ask:class:<name>`, `add-files`,
 ///   `import-audio`, `goodnotes`, `handwriting`, `notebook`, `study:<id>`, `quiz:<id>`, `uses`, `widgets`.
+/// - `-laptop-away` (with `-demo`) shows the laptop asleep or off, two hours since it was last there (the banner, Ask's
+///   first screen); `-laptop-back [seconds]` starts the same and has it come back after that long (4 s).
 /// - `-record` records (in the simulator, made-up lines stand in for what's heard), `-ask "<question>"` asks it on
 ///   the Ask tab, `-quiet` never asks to send notifications.
 /// A screen's own file can read a flag of its own with `DebugLaunch.flag("-x")` or `DebugLaunch.value("-x")`.

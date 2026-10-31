@@ -206,7 +206,7 @@ struct SettingsTab: View {
     /// The laptop's there if it said so in the last 3 minutes (it does every minute while it runs).
     private var laptopReach: Reach {
         guard let seen = app.drive?.seen else { return .checking }
-        return Date.now.timeIntervalSince(seen) < 180 ? .connected : .unreachable
+        return Date.now.timeIntervalSince(seen) < LaptopPresence.staleAfter ? .connected : .unreachable
     }
 
     /// "Syft Notes 0.17.3", or when it's away, "Your laptop was last here 3 hours ago."

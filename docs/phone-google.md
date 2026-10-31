@@ -479,7 +479,14 @@ short:
   given up on after one look, not another 25 s.
 - While the app is in front: the copy every 10 s, the box every 60 s (`open_until` 90 s ahead), writes no screen waits
   for looked at every 3 s. To the back: `open_until` now. The system's app refresh (`app.studystash.ios.refresh`, the
-  same task as the reminders) reads the copy, sends what's waiting and looks at it. Once a day the phone deletes
+  same task as the reminders) reads the copy, sends what's waiting and looks at it.
+- Before the student tries anything, the phone says when the laptop is away. `DriveStatus.checked` turns true once
+  laptop.json has been read since the app came to the front (the copy kept on the phone is from the last time, so its
+  `seen` always looks old); only then does `LaptopPresence` call the laptop away, when `seen` is over 3 minutes old (it's
+  written every 45 s) or the file isn't in the folder. A banner ("Your laptop is asleep or off. Last here 2 hours ago…")
+  shows on Home, Due, Search and Ask, Ask's first screen and bar say it too, and when `seen` is fresh again the banner
+  turns to "Your laptop is back." for 4 s. A question is never queued for later (it's given up after 25 s), so the bar
+  still sends but its placeholder says to ask when the laptop is back. `-demo -laptop-away` / `-laptop-back` show it. Once a day the phone deletes
   `upload-` files older than a day that no request of its own points at.
 - Setup: Welcome is Continue with Google (ink), "Use the same Google account as on your laptop.", Scan the code on
   your laptop, and Other ways (Connect over Tailscale; Try it with sample classes). The scanner (and the Camera app,
