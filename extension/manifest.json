@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "Syft Notes for Canvas",
   "short_name": "Syft Notes",
-  "version": "1.6",
+  "version": "1.7",
   "description": "Copies your Canvas courses (assignments, submissions, modules, files) into your Syft Notes library. Read-only, your own sign-in.",
   "minimum_chrome_version": "120",
   "permissions": ["alarms", "storage"],
