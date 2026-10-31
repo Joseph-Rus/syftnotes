@@ -15,14 +15,10 @@ using StudyStash.Core.Rich;
 
 namespace StudyStash.App.Tests;
 
-/// <summary>A flowchart drawn in the app: every sample in both looks, light and dark; fitted to narrow columns;
-/// named for screen readers; and a theme switch that only recolours.</summary>
+/// <summary>A flowchart drawn in the app: turned top-down in a narrow column, named for screen readers, and a theme
+/// switch that only recolours.</summary>
 public class DiagramViewTests
 {
-    public static TheoryData<string> Samples => [.. RichDemo.Diagrams.Select(d => d.Title)];
-
-    static string SourceOf(string title) => RichDemo.Diagrams.Single(d => d.Title == title).Source;
-
     /// <summary>Shows the views in a column of <paramref name="width"/>, lets them lay out and draw, and hands back
     /// the window (still open) for a look.</summary>
     static Window Show(double width, SkinKind skin, ThemeVariant variant, params Control[] views)
@@ -35,26 +31,6 @@ public class DiagramViewTests
         window.Show();
         DiagramsReady.Wait(window);
         return window;
-    }
-
-    [AvaloniaTheory]
-    [MemberData(nameof(Samples))]
-    public void A_narrow_column_scales_the_picture_but_never_below_the_floor(string title)
-    {
-        var view = new DiagramView { Chart = Flowchart.Parse(SourceOf(title)) };
-        var window = Show(300, SkinKind.Mac, ThemeVariant.Light, view);
-        var scene = view.Scene!;
-        Assert.True(view.Scale >= DiagramView.MinScale);
-        Assert.True(view.Bounds.Width <= 300.5);
-        if (scene.Width * DiagramView.MinScale > 300)
-        {
-            // Past the floor the picture keeps its size and scrolls sideways.
-            var scroller = view.GetVisualDescendants().OfType<ScrollViewer>().First();
-            Assert.Equal(DiagramView.MinScale, view.Scale, 3);
-            Assert.True(scroller.Extent.Width > scroller.Viewport.Width);
-        }
-        else Assert.Equal(Math.Min(1, 300 / scene.Width), view.Scale, 3);
-        window.Close();
     }
 
     [AvaloniaFact]

@@ -9,13 +9,14 @@
              x:DataType="vm:AiEnginesModel">
   <UserControl.Styles>
     <StyleInclude Source="avares://StudyStash/Views/WinAiStyles.axaml" />
+    <StyleInclude Source="avares://StudyStash/Views/SettingsPaneStyles.axaml" />
   </UserControl.Styles>
 
   <ScrollViewer VerticalScrollBarVisibility="Auto">
-    <StackPanel Margin="36,28,36,20" Spacing="4" MaxWidth="680">
+    <StackPanel Margin="40,30,40,40" Spacing="4" MaxWidth="680">
 
       <TextBlock Classes="ai-title" Text="Your AI" />
-      <TextBlock Classes="ai-sub" MaxWidth="560" Margin="0,4,0,0"
+      <TextBlock Classes="ai-sub lede" MaxWidth="560" Margin="0,4,0,0"
                  Text="{Binding Lede}" />
 
       <TextBlock Text="{Binding OlderLibraryWords}" Classes="ai-sub" Margin="0,8,0,0" IsVisible="{Binding OlderLibrary}" />
@@ -76,7 +77,7 @@
             </StackPanel>
             <StackPanel Grid.Column="3" Orientation="Horizontal" Spacing="12" VerticalAlignment="Center">
               <TextBlock Text="{Binding RichOn, Converter={x:Static c:Converters.OnOff}}" FontSize="14" />
-              <ToggleButton AutomationProperties.Name="Rich notes" Theme="{StaticResource AiToggle}" IsChecked="{Binding RichOn}" />
+              <ToggleButton AutomationProperties.Name="Rich notes" Classes="switch" IsChecked="{Binding RichOn}" />
             </StackPanel>
           </Grid>
         </Border>
@@ -90,7 +91,7 @@
             </StackPanel>
             <StackPanel Grid.Column="3" Orientation="Horizontal" Spacing="12" VerticalAlignment="Center">
               <TextBlock Text="{Binding RichDiagrams, Converter={x:Static c:Converters.OnOff}}" FontSize="14" />
-              <ToggleButton AutomationProperties.Name="Diagrams" Theme="{StaticResource AiToggle}" IsChecked="{Binding RichDiagrams}" />
+              <ToggleButton AutomationProperties.Name="Diagrams" Classes="switch" IsChecked="{Binding RichDiagrams}" />
             </StackPanel>
           </Grid>
         </Border>
@@ -103,7 +104,7 @@
             </StackPanel>
             <StackPanel Grid.Column="3" Orientation="Horizontal" Spacing="12" VerticalAlignment="Center">
               <TextBlock Text="{Binding RichPlots, Converter={x:Static c:Converters.OnOff}}" FontSize="14" />
-              <ToggleButton AutomationProperties.Name="Formula plots" Theme="{StaticResource AiToggle}" IsChecked="{Binding RichPlots}" />
+              <ToggleButton AutomationProperties.Name="Formula plots" Classes="switch" IsChecked="{Binding RichPlots}" />
             </StackPanel>
           </Grid>
         </Border>
@@ -116,7 +117,7 @@
             </StackPanel>
             <StackPanel Grid.Column="3" Orientation="Horizontal" Spacing="12" VerticalAlignment="Center">
               <TextBlock Text="{Binding RichDrawings, Converter={x:Static c:Converters.OnOff}}" FontSize="14" />
-              <ToggleButton AutomationProperties.Name="Drawings" Theme="{StaticResource AiToggle}" IsChecked="{Binding RichDrawings}" />
+              <ToggleButton AutomationProperties.Name="Drawings" Classes="switch" IsChecked="{Binding RichDrawings}" />
             </StackPanel>
           </Grid>
         </Border>
@@ -195,16 +196,21 @@
             <Border Classes="ai-card" Margin="{Binding First, Converter={x:Static c:Converters.FirstCardMargin}}">
               <Grid Classes="ai-row" ColumnDefinitions="Auto,16,*,Auto">
                 <c:Icon Glyph="{Binding Icon}" Size="20" />
-                <StackPanel Classes="ai-row-text" Grid.Column="2" VerticalAlignment="Center">
+                <StackPanel Classes="ai-row-text" Grid.Column="2" VerticalAlignment="Center" Margin="0,0,12,0">
                   <TextBlock Classes="ai-row-title" Text="{Binding Name}" />
-                  <TextBlock Classes="ai-row-sub" Text="{Binding About}" />
+                  <TextBlock Classes="ai-row-sub" Text="{Binding About}" TextWrapping="Wrap" />
+                  <!-- What else to try (Open the page again, Sign in in Terminal instead): a link under the row's words, so the
+                       words keep their room beside the state and its button. -->
+                  <Button Classes="ai-textbtn" Name="SignInLink" Command="{Binding LinkCommand}" IsVisible="{Binding HasLink}" HorizontalAlignment="Left" Margin="0,6,0,2">
+                    <Border Classes="ai-pill-plain"><TextBlock Text="{Binding LinkWords}" /></Border>
+                  </Button>
                 </StackPanel>
                 <StackPanel Grid.Column="3" Orientation="Horizontal" Spacing="10" VerticalAlignment="Center">
                   <StackPanel Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
                     <Ellipse Classes="ai-dot" Classes.good="{Binding Good}" Classes.warn="{Binding Warn}" />
                     <TextBlock Classes="ai-state" Classes.warn="{Binding Warn}" Text="{Binding StateWords}" />
                   </StackPanel>
-                  <Button Classes="ai-pillbtn" Command="{Binding ActCommand}" IsVisible="{Binding !NeedsOptions}">
+                      <Button Classes="ai-pillbtn" Command="{Binding ActCommand}" IsVisible="{Binding ShowPill}">
                     <Border Classes="ai-pill" Classes.primary="{Binding IsPrimary}">
                       <TextBlock Text="{Binding ActionWords}" />
                     </Border>
@@ -286,7 +292,7 @@
           </StackPanel>
           <StackPanel Grid.Column="3" Orientation="Horizontal" Spacing="12" VerticalAlignment="Center">
             <TextBlock Text="{Binding Fallback, Converter={x:Static c:Converters.OnOff}}" FontSize="14" />
-            <ToggleButton AutomationProperties.Name="Use Ollama instead" Theme="{StaticResource AiToggle}" IsChecked="{Binding Fallback}" />
+            <ToggleButton AutomationProperties.Name="Use Ollama instead" Classes="switch" IsChecked="{Binding Fallback}" />
           </StackPanel>
         </Grid>
       </Border>

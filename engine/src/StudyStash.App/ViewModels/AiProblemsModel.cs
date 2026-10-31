@@ -52,9 +52,36 @@ public sealed class AiProblem
 /// this last one has no server source yet: nothing asks for approval today, but the shape is here for when
 /// something does). Reads and drives one library's AI (<see cref="IAiLibrary"/>); the view is just this list.
 /// </summary>
-public sealed class AiProblemsModel(IAiLibrary library)
+public sealed class AiProblemsModel
 {
+    readonly IAiLibrary library;
+    readonly SignInWatch watch;
+    string shown = "";
+
+    public AiProblemsModel(IAiLibrary library)
+    {
+        this.library = library;
+        watch = new SignInWatch(library, SignInMovedAsync);
+    }
+
+    /// <summary>How often a sign-in that's going is looked at; a test sets it small.</summary>
+    public TimeSpan SignInEvery
+    {
+        get => watch.Every;
+        set => watch.Every = value;
+    }
+
     public ObservableCollection<AiProblem> Problems { get; } = [];
+
+    /// <summary>A sign-in going from a card: its card turns into "Finish signing in…", and goes by itself once the AI
+    /// says it's signed in (nothing to press).</summary>
+    Task SignInMovedAsync(AiOverview now)
+    {
+        if (SignInWatch.Signature(now) == shown) return Task.CompletedTask;
+        shown = SignInWatch.Signature(now);
+        Apply(now.Problems);
+        return Task.CompletedTask;
+    }
 
     public async Task Load()
     {
@@ -67,7 +94,10 @@ public sealed class AiProblemsModel(IAiLibrary library)
         {
             return;
         }
-        if (overview is not null) Apply(overview.Problems);
+        if (overview is null) return;
+        shown = SignInWatch.Signature(overview);
+        Apply(overview.Problems);
+        watch.Begin(overview);
     }
 
     void Apply(List<AiProblemInfo> infos)
@@ -81,23 +111,52 @@ public sealed class AiProblemsModel(IAiLibrary library)
     AiProblem Build(AiProblemInfo p)
     {
         string fallbackName = Engines.Name(p.FallbackTo.Length > 0 ? p.FallbackTo : "ollama");
+        // A sign-in going from this card says where it is, in the card's own words.
+        string signIn = p.Kind == "not_signed_in" ? p.SignIn : "";
         var problem = new AiProblem
         {
             Id = p.Id,
             Kind = p.Kind,
             Caption = AiWords.ProblemCaption(p.Kind),
-            Title = AiWords.ProblemTitle(p.Kind, p.EngineName, fallbackName),
+            Title = signIn.Length > 0 ? AiWords.SignInTitle(p.EngineName, signIn) : AiWords.ProblemTitle(p.Kind, p.EngineName, fallbackName),
             // A sign-in with no stand-in says so, rather than naming Ollama, which isn't used.
-            Message = AiWords.ProblemMessage(p.Kind, p.EngineName, p.Kind == "not_signed_in" && p.FallbackTo.Length == 0 ? "" : fallbackName,
-                p.Until, p.SizeGb, ""),
+            Message = signIn.Length > 0 ? AiWords.SignInAbout(p.EngineName, signIn)
+                : AiWords.ProblemMessage(p.Kind, p.EngineName, p.Kind == "not_signed_in" && p.FallbackTo.Length == 0 ? "" : fallbackName,
+                    p.Until, p.SizeGb, ""),
             Icon = AiWords.ProblemIcon(p.Kind),
             ColorKey = AiWords.ProblemColorKey(p.Kind),
             Severity = AiWords.ProblemSeverity(p.Kind),
-            PrimaryWords = p.Kind == "not_signed_in" && signingIn.Contains(p.Engine) ? "Check" : AiWords.ProblemAction(p.Kind),
+            PrimaryWords = signIn.Length > 0 ? AiWords.SignInButton(signIn)
+                : p.Kind == "not_signed_in" && signingIn.Contains(p.Engine) ? "Check" : AiWords.ProblemAction(p.Kind),
+            SecondaryWords = AiWords.SignInLink(signIn),
         };
         problem.PrimaryCommand = new AsyncRelayCommand(() => Act(p));
+        if (signIn.Length > 0) problem.SecondaryCommand = new AsyncRelayCommand(() => ActOnLink(p, signIn));
         problem.CloseCommand = new AsyncRelayCommand(() => CloseServerAsync(p.Id));
         return problem;
+    }
+
+    /// <summary>The small link on a sign-in that's going: the page again, or (only once the hidden sign-in couldn't start
+    /// or stopped at once) the terminal.</summary>
+    async Task ActOnLink(AiProblemInfo p, string signIn)
+    {
+        try
+        {
+            var said = signIn == SignInPhase.Stuck ? await library.SignInInTerminalAsync(p.Engine) : await library.SignInAgainAsync(p.Engine);
+            if (said?.Overview is not null) Take(said.Overview);
+        }
+        catch
+        {
+            // The card stays: its link can be pressed again.
+        }
+    }
+
+    /// <summary>The overview an action answered: its cards, and the watch for a sign-in it started.</summary>
+    void Take(AiOverview overview)
+    {
+        shown = SignInWatch.Signature(overview);
+        Apply(overview.Problems);
+        watch.Begin(overview);
     }
 
     async Task Act(AiProblemInfo p)
@@ -114,7 +173,7 @@ public sealed class AiProblemsModel(IAiLibrary library)
                 "usage_limit" => await Dismissed(p.Id),
                 _ => null,
             };
-            if (said?.Overview is not null) Apply(said.Overview.Problems);
+            if (said?.Overview is not null) Take(said.Overview);
         }
         catch (LibraryRefusedException)
         {
@@ -130,10 +189,14 @@ public sealed class AiProblemsModel(IAiLibrary library)
     /// <summary>AIs whose Sign in was pressed on their card: the card's button is Check until it's pressed.</summary>
     readonly HashSet<string> signingIn = [];
 
-    Task<AiSaid?> SignInAsync(string engine)
+    async Task<AiSaid?> SignInAsync(string engine)
     {
         signingIn.Add(engine);
-        return library.SignInAsync(engine);
+        var said = await library.SignInAsync(engine);
+        // A library that signs in hidden says so on the card; one that doesn't leaves the student to press Check.
+        if (said?.Overview?.Problems.FirstOrDefault(x => x.Engine == engine && x.Kind == "not_signed_in") is { SignIn.Length: > 0 }
+            || said?.Overview?.Engines.FirstOrDefault(x => x.Id == engine) is { SignIn.Length: > 0 }) signingIn.Remove(engine);
+        return said;
     }
 
     async Task<AiSaid?> Dismissed(string id)

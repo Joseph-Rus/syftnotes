@@ -262,6 +262,34 @@ public static class AiDemo
         return m;
     }
 
+    /// <summary>Claude signed out with its own sign-in going from Syft Notes, at <paramref name="phase"/>
+    /// (<see cref="SignInPhase"/>): the overview its row and its card read.</summary>
+    static AiOverview SigningIn(string phase)
+    {
+        var o = Overview();
+        return o with
+        {
+            Engines = [.. o.Engines.Select(e => e.Id == "claude" ? e with { State = "not_signed_in", SignIn = phase } : e)],
+            Problems = [new AiProblemInfo("not_signed_in:claude", "not_signed_in", "claude", "Claude") { SignIn = phase }],
+        };
+    }
+
+    /// <summary>The Your AI rows with Claude's sign-in at <paramref name="phase"/> (waiting for the browser, gave up, ...).</summary>
+    public static AiEnginesModel EnginesSigningIn(string phase)
+    {
+        var m = new AiEnginesModel(new Library(SigningIn(phase))) { SignInEvery = TimeSpan.FromHours(1) };
+        m.Load().GetAwaiter().GetResult();
+        return m;
+    }
+
+    /// <summary>Settings' card for Claude, its sign-in at <paramref name="phase"/>.</summary>
+    public static AiProblemsModel ProblemSigningIn(string phase)
+    {
+        var m = new AiProblemsModel(new Library(SigningIn(phase))) { SignInEvery = TimeSpan.FromHours(1) };
+        m.Load().GetAwaiter().GetResult();
+        return m;
+    }
+
     /// <summary>The design's six problems, in its own order (row-major into the sheet's two columns).</summary>
     public static AiProblemsModel Problems()
     {

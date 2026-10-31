@@ -49,6 +49,15 @@ public sealed partial class AiEngineRow : ObservableObject
     public bool IsPrimary { get; init; }
     /// <summary>The row's button opens the Options menu (models, Check it works) instead of acting straight away.</summary>
     public bool NeedsOptions { get; init; }
+    /// <summary>Where the AI's own sign-in is while one is going from this row (<see cref="SignInPhase"/>); "" otherwise.</summary>
+    public string SignIn { get; init; } = "";
+    /// <summary>The row's pill: not while it has no words (a sign-in that waits for the browser has no button to press).</summary>
+    public bool ShowPill => !NeedsOptions && ActionWords.Length > 0;
+    /// <summary>A small link beside a sign-in that's going: "Open the page again", or, only once the hidden sign-in couldn't
+    /// start or stopped at once, "Sign in in Terminal instead".</summary>
+    public string LinkWords { get; init; } = "";
+    public bool HasLink => LinkWords.Length > 0;
+    public IAsyncRelayCommand LinkCommand { get; internal set; } = null!;
     public string Model { get; init; } = "";
     public List<ModelOption> Models { get; init; } = [];
     public List<AiModelChoice> ModelChoices { get; internal set; } = [];
@@ -109,7 +118,34 @@ public sealed partial class AiEnginesModel : ObservableObject
     readonly IAiLibrary library;
     bool loading;
 
-    public AiEnginesModel(IAiLibrary library) => this.library = library;
+    public AiEnginesModel(IAiLibrary library)
+    {
+        this.library = library;
+        watch = new SignInWatch(library, SignInMovedAsync);
+    }
+
+    /// <summary>Keeps asking the library while a sign-in is going, so its row turns ready by itself (also when the
+    /// student left this page and came back to a sign-in still waiting: <see cref="Apply"/> starts it again).</summary>
+    readonly SignInWatch watch;
+    string shown = "";
+
+    /// <summary>How often a sign-in that's going is looked at; a test sets it small.</summary>
+    public TimeSpan SignInEvery
+    {
+        get => watch.Every;
+        set => watch.Every = value;
+    }
+
+    Task SignInMovedAsync(AiOverview now)
+    {
+        if (SignInWatch.Signature(now) == shown) return Task.CompletedTask;
+        var waiting = Engines.Where(r => r.SignIn == SignInPhase.Waiting).ToList();
+        Apply(now);
+        foreach (var r in waiting)
+            if (now.Engines.FirstOrDefault(e => e.Id == r.Id) is { State: not "not_signed_in" })
+                Say = $"{r.Name} is signed in.";
+        return Task.CompletedTask;
+    }
 
     /// <summary>AIs whose Sign in was pressed: their row's button is Check until it's pressed, since nothing else here
     /// learns the student has signed in (the library still remembers the AI turning them away). Check that finds it
@@ -358,6 +394,8 @@ public sealed partial class AiEnginesModel : ObservableObject
                     Keys.Add(k);
                 }
             OnPropertyChanged(nameof(HasKeys));
+            shown = SignInWatch.Signature(overview);
+            watch.Begin(overview);
         }
         finally
         {
@@ -399,18 +437,26 @@ public sealed partial class AiEnginesModel : ObservableObject
 
     AiEngineRow BuildRow(EngineInfo e)
     {
+        // A sign-in going from here (the AI's own, hidden, in the student's browser): the row says where it is, and turns
+        // ready by itself when it's done.
+        string signIn = e.State == "not_signed_in" ? e.SignIn : "";
+        string name = AiWords.PlainName(e.Id, e.Name);
         var row = new AiEngineRow
         {
             Id = e.Id,
-            Name = AiWords.PlainName(e.Id, e.Name),
+            Name = name,
             Icon = AiWords.EngineIcon(e.Id),
-            About = e.Installed || e.Id == "ollama" ? AiWords.EngineAbout(e.Id, e.State) : "Install it on your library's computer.",
+            About = signIn.Length > 0 ? AiWords.SignInAbout(name, signIn)
+                : e.Installed || e.Id == "ollama" ? AiWords.EngineAbout(e.Id, e.State) : "Install it on your library's computer.",
             State = e.State,
-            StateWords = AiWords.EngineStateWords(e.State),
+            StateWords = signIn == SignInPhase.Waiting ? "Signing in" : AiWords.EngineStateWords(e.State),
             Good = AiWords.StateIsGood(e.State),
-            Warn = AiWords.StateIsWarn(e.State),
-            Muted = AiWords.StateIsMuted(e.State),
-            ActionWords = !e.Installed && e.Id != "ollama" ? "Get it"
+            Warn = AiWords.StateIsWarn(e.State) && signIn != SignInPhase.Waiting,
+            Muted = AiWords.StateIsMuted(e.State) || signIn == SignInPhase.Waiting,
+            SignIn = signIn,
+            LinkWords = AiWords.SignInLink(signIn),
+            ActionWords = signIn.Length > 0 ? AiWords.SignInButton(signIn)
+                : !e.Installed && e.Id != "ollama" ? "Get it"
                 : e.State == "not_signed_in" && signingIn.Contains(e.Id) ? "Check" : AiWords.RowActionWords(e.State),
             IsPrimary = AiWords.RowActionPrimary(e.State),
             NeedsOptions = AiWords.NeedsOptions(e.State),
@@ -420,6 +466,7 @@ public sealed partial class AiEnginesModel : ObservableObject
         };
         row.ActCommand = new AsyncRelayCommand(() => RunRowActionAsync(row));
         row.CheckCommand = new AsyncRelayCommand(() => CheckAsync(row.Id));
+        row.LinkCommand = new AsyncRelayCommand(() => SignInLinkAsync(row));
         row.ModelChoices = [.. e.Models.Select(m => new AiModelChoice(m.Id, m.Label, m.Id == e.Model, new AsyncRelayCommand(() => PickModelAsync(row.Id, m.Id))))];
         row.AddCommand = new RelayCommand(() =>
         {
@@ -461,12 +508,46 @@ public sealed partial class AiEnginesModel : ObservableObject
         }
     }
 
-    /// <summary>Sign in: the library opens a terminal to do it in (or says where to, from a laptop); the row's button
-    /// becomes Check for when it's done.</summary>
-    Task<AiSaid?> SignInAsync(string id)
+    /// <summary>Sign in: the library starts the AI's own sign-in, hidden, and it opens the student's browser; the row says
+    /// it's waiting and turns ready by itself. (A library from before that opens a terminal to do it in, or says where to,
+    /// from a laptop: the row's button becomes Check for when that's done.)</summary>
+    async Task<AiSaid?> SignInAsync(string id)
     {
         signingIn.Add(id);
-        return library.SignInAsync(id);
+        var said = await library.SignInAsync(id);
+        return HiddenOrOld(id, said);
+    }
+
+    /// <summary>A library that signs in hidden says where each sign-in is on the AI's row; one that doesn't leaves the
+    /// student to press Check.</summary>
+    AiSaid? HiddenOrOld(string id, AiSaid? said)
+    {
+        if (said?.Overview?.Engines.FirstOrDefault(e => e.Id == id) is { SignIn.Length: > 0 }) signingIn.Remove(id);
+        return said;
+    }
+
+    /// <summary>The small link on a row whose sign-in is going: the page again (the sign-in run once more, so the browser
+    /// opens at a page that finishes by itself), or the terminal once the hidden sign-in couldn't start.</summary>
+    async Task SignInLinkAsync(AiEngineRow row)
+    {
+        Busy = true;
+        try
+        {
+            var said = row.SignIn == SignInPhase.Stuck ? await library.SignInInTerminalAsync(row.Id) : await library.SignInAgainAsync(row.Id);
+            await AfterAction(said);
+        }
+        catch (LibraryRefusedException ex)
+        {
+            Say = ex.Message;
+        }
+        catch
+        {
+            Offline = true;
+        }
+        finally
+        {
+            Busy = false;
+        }
     }
 
     async Task CheckAsync(string id)

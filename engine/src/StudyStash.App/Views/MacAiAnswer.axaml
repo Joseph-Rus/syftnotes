@@ -1,28 +1,45 @@
-<!-- The conversation from the ask bar under a lecture's notes (design 16's answer card), just above the bar: a solid
-     card with every question asked here and its answer, oldest first, New chat to start afresh and a close button, in
-     room the page makes for it, so it never lies over the notes. It scrolls inside a height of its own (AnswerHeight),
-     the newest at the bottom. -->
+<!-- The conversation from a page's Ask bar, as a panel down the right of the page area (AskSplit puts it there, the bar
+     docked at its foot): a header with Chats (this place's kept conversations), New chat and Close (as a sheet over a
+     narrow window, a way back to the page instead), then every question asked here and its answer, oldest first, the
+     newest at the bottom. An answer has the panel's whole width, in reading type; the question it answers sits over it
+     on the right, in the student's own words. -->
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="using:StudyStash.App.ViewModels"
              xmlns:c="using:StudyStash.App.Controls"
              xmlns:v="using:StudyStash.App.Views"
              x:Class="StudyStash.App.Views.MacAiAnswer"
-             x:DataType="vm:AiAskModel"
-             ClipToBounds="False">
+             x:DataType="vm:AiAskModel">
   <UserControl.Styles>
     <StyleInclude Source="avares://StudyStash/Views/MacAiStyles.axaml" />
+    <!-- As a sheet over the page: back to it on the left, instead of Close on the right -->
+    <Style Selector="Button#BackToPage">
+      <Setter Property="IsVisible" Value="False" />
+    </Style>
+    <Style Selector="v|AskSplit:sheet Button#BackToPage">
+      <Setter Property="IsVisible" Value="True" />
+    </Style>
+    <Style Selector="v|AskSplit:sheet Button#Close">
+      <Setter Property="IsVisible" Value="False" />
+    </Style>
   </UserControl.Styles>
 
-  <Border Name="Card" Classes="ai-answer-card" Width="560" IsVisible="{Binding HasLatest}">
+  <Border Name="Card" Classes="ai-panel">
     <DockPanel>
-      <Grid DockPanel.Dock="Top" ColumnDefinitions="Auto,*,Auto,2,Auto" Margin="10,6,6,0">
+      <Grid Name="Head" DockPanel.Dock="Top" ColumnDefinitions="Auto,Auto,*,Auto,2,Auto" Height="48" Margin="12,0,10,0">
+        <Button Name="BackToPage" Classes="ai-head" VerticalAlignment="Center" Margin="0,0,4,0" Command="{Binding CloseAnswerCommand}"
+                AutomationProperties.Name="{Binding $parent[v:AskSplit].BackWords, StringFormat='Back to {0}', FallbackValue='Back'}">
+          <StackPanel Orientation="Horizontal" Spacing="6">
+            <c:Icon Glyph="arrow_back" Size="16" Foreground="{DynamicResource Fg}" VerticalAlignment="Center" />
+            <TextBlock Classes="ai-head" Text="{Binding $parent[v:AskSplit].BackWords, FallbackValue='Back'}" VerticalAlignment="Center" />
+          </StackPanel>
+        </Button>
         <!-- This place's kept conversations: one picked opens here, to carry on -->
-        <Button Name="ChatsButton" Classes="ai-newchat" VerticalAlignment="Center" AutomationProperties.Name="Chats">
-          <StackPanel Orientation="Horizontal" Spacing="4">
-            <c:Icon Glyph="forum" Size="14" Foreground="{DynamicResource Fg2}" VerticalAlignment="Center" />
-            <TextBlock Classes="ai-asked" Text="Chats" VerticalAlignment="Center" />
-            <c:Icon Glyph="expand_more" Size="13" Foreground="{DynamicResource Fg2}" VerticalAlignment="Center" />
+        <Button Name="ChatsButton" Grid.Column="1" Classes="ai-head" VerticalAlignment="Center" AutomationProperties.Name="Chats">
+          <StackPanel Orientation="Horizontal" Spacing="6">
+            <c:Icon Glyph="forum" Size="16" Foreground="{DynamicResource Fg2}" VerticalAlignment="Center" />
+            <TextBlock Classes="ai-head" Text="Chats" VerticalAlignment="Center" />
+            <c:Icon Glyph="expand_more" Size="14" Foreground="{DynamicResource Fg2}" VerticalAlignment="Center" />
           </StackPanel>
           <Button.Flyout>
             <Flyout Placement="BottomEdgeAlignedLeft" ShowMode="Standard" FlyoutPresenterClasses="bare">
@@ -30,48 +47,60 @@
             </Flyout>
           </Button.Flyout>
         </Button>
-        <Button Name="NewChat" Grid.Column="2" Classes="ai-newchat" VerticalAlignment="Center" Command="{Binding NewChatCommand}"
-                AutomationProperties.Name="New chat">
-          <StackPanel Orientation="Horizontal" Spacing="4">
-            <c:Icon Glyph="add" Size="14" Foreground="{DynamicResource Fg2}" VerticalAlignment="Center" />
-            <TextBlock Classes="ai-asked" Text="New chat" VerticalAlignment="Center" />
+        <Button Name="NewChat" Grid.Column="3" Classes="ai-head" VerticalAlignment="Center" Command="{Binding NewChatCommand}"
+                AutomationProperties.Name="New chat" ToolTip.Tip="Start a new chat">
+          <StackPanel Orientation="Horizontal" Spacing="6">
+            <c:Icon Glyph="add" Size="16" Foreground="{DynamicResource Fg2}" VerticalAlignment="Center" />
+            <TextBlock Classes="ai-head" Text="New chat" VerticalAlignment="Center" />
           </StackPanel>
         </Button>
-        <Button Grid.Column="4" Classes="ai-close" VerticalAlignment="Center" ToolTip.Tip="Close" AutomationProperties.Name="Close the answer"
+        <Button Name="Close" Grid.Column="5" Classes="ai-close" VerticalAlignment="Center" ToolTip.Tip="Close (Esc)" AutomationProperties.Name="Close the chat"
                 Command="{Binding CloseAnswerCommand}">
-          <c:Icon Glyph="close" Size="14" Foreground="{DynamicResource Fg2}" />
+          <c:Icon Glyph="close" Size="16" Foreground="{DynamicResource Fg2}" />
         </Button>
       </Grid>
-      <ScrollViewer Name="Thread" Classes="ai-answer-scroll" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" c:FollowEnd.IsOn="True">
-        <!-- Every question and its answer select as one, a drag running on from a question into its answer -->
-        <ItemsControl ItemsSource="{Binding Turns}" Margin="16,2,16,12" c:TextSelection.Area="True">
-          <ItemsControl.ItemsPanel>
-            <ItemsPanelTemplate><StackPanel Spacing="16" /></ItemsPanelTemplate>
-          </ItemsControl.ItemsPanel>
-          <ItemsControl.ItemTemplate>
-            <DataTemplate x:DataType="vm:AiTurn">
-              <StackPanel Spacing="6">
-                <c:PageText Classes="ai-q" Text="{Binding Question}" />
-                <!-- The answer: the hopping bits while it's written, the pixel s beside it once it's there -->
-                <StackPanel Orientation="Horizontal" Spacing="10" IsVisible="{Binding IsThinking}">
-                  <c:SyftLoader Kind="HoppingBits" Size="22" IsActive="{Binding IsThinking}" VerticalAlignment="Center" />
-                  <TextBlock Classes="ai-thinking" Text="{Binding ThinkingWords}" VerticalAlignment="Center" />
+      <ScrollViewer Name="Thread" Classes="ai-panel-scroll" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" c:FollowEnd.IsOn="True">
+        <StackPanel Margin="20,4,20,8">
+          <!-- A new chat, before its first question -->
+          <StackPanel Name="Fresh" Spacing="6" Margin="0,20,0,0" IsVisible="{Binding !CanStartOver}">
+            <TextBlock Classes="ai-fresh-title" Text="New chat" />
+            <TextBlock Classes="ai-fresh" Text="{Binding Placeholder}" />
+          </StackPanel>
+          <!-- Every question and its answer select as one, a drag running on from a question into its answer -->
+          <ItemsControl ItemsSource="{Binding Turns}" c:TextSelection.Area="True">
+            <ItemsControl.ItemsPanel>
+              <ItemsPanelTemplate><StackPanel Spacing="28" /></ItemsPanelTemplate>
+            </ItemsControl.ItemsPanel>
+            <ItemsControl.ItemTemplate>
+              <DataTemplate x:DataType="vm:AiTurn">
+                <StackPanel Spacing="14">
+                  <!-- The question: the student's own words, on the right -->
+                  <Border Classes="ai-asked-q">
+                    <c:PageText Classes="ai-q" Text="{Binding Question}" />
+                  </Border>
+                  <!-- The answer: the hopping bits while it's written -->
+                  <StackPanel Orientation="Horizontal" Spacing="10" IsVisible="{Binding IsThinking}">
+                    <c:SyftLoader Kind="HoppingBits" Size="22" IsActive="{Binding IsThinking}" VerticalAlignment="Center" />
+                    <TextBlock Classes="ai-thinking" Text="{Binding ThinkingWords}" VerticalAlignment="Center" />
+                  </StackPanel>
+                  <c:PageText Classes="ai-failed" Text="{Binding Failed}" IsVisible="{Binding Failed, Converter={x:Static c:Converters.NotEmpty}}" />
+                  <!-- Then its words across the panel, and under them who answered and from where, the pixel s beside
+                       them. Anything more about an answer goes here, under its byline. -->
+                  <StackPanel Name="AnswerArea" Spacing="10" IsVisible="{Binding !IsThinking}">
+                    <c:NoteView Compact="True" BodySize="15" BodyLineHeight="24" Markdown="{Binding Answer}" IsVisible="{Binding Answer, Converter={x:Static c:Converters.NotEmpty}}" />
+                    <Grid ColumnDefinitions="Auto,8,*" IsVisible="{Binding Byline, Converter={x:Static c:Converters.NotEmpty}}">
+                      <c:SyftMark Size="16" Bits="False" VerticalAlignment="Top" Margin="0,1,0,0" />
+                      <v:AiByline Grid.Column="2" HorizontalAlignment="Left" VerticalAlignment="Center" />
+                    </Grid>
+                    <v:MacAiQuotes />
+                    <TextBlock Classes="ai-byline" Text="{Binding FellBackNote}" TextWrapping="Wrap" IsVisible="{Binding FellBackNote, Converter={x:Static c:Converters.NotEmpty}}" />
+                    <TextBlock Classes="ai-byline" Text="{Binding OlderLibraryNote}" TextWrapping="Wrap" IsVisible="{Binding OlderLibraryNote, Converter={x:Static c:Converters.NotEmpty}}" />
+                  </StackPanel>
                 </StackPanel>
-                <c:PageText Classes="ai-answer" Text="{Binding Failed}" Foreground="{DynamicResource Warn}"
-                           IsVisible="{Binding Failed, Converter={x:Static c:Converters.NotEmpty}}" />
-                <Grid ColumnDefinitions="Auto,10,*" IsVisible="{Binding !IsThinking}">
-                <c:SyftMark Size="26" Bits="False" VerticalAlignment="Top" Margin="0,2,0,0" IsVisible="{Binding Answer, Converter={x:Static c:Converters.NotEmpty}}" />
-                <StackPanel Grid.Column="2" Spacing="6">
-                  <c:NoteView Compact="True" BodySize="13" BodyLineHeight="18.85" Markdown="{Binding Answer}" IsVisible="{Binding Answer, Converter={x:Static c:Converters.NotEmpty}}" />
-                  <v:AiByline HorizontalAlignment="Left" IsVisible="{Binding Byline, Converter={x:Static c:Converters.NotEmpty}}" />
-                  <TextBlock Classes="ai-byline" Text="{Binding FellBackNote}" TextWrapping="Wrap" IsVisible="{Binding FellBackNote, Converter={x:Static c:Converters.NotEmpty}}" />
-                  <TextBlock Classes="ai-byline" Text="{Binding OlderLibraryNote}" TextWrapping="Wrap" IsVisible="{Binding OlderLibraryNote, Converter={x:Static c:Converters.NotEmpty}}" />
-                </StackPanel>
-                </Grid>
-              </StackPanel>
-            </DataTemplate>
-          </ItemsControl.ItemTemplate>
-        </ItemsControl>
+              </DataTemplate>
+            </ItemsControl.ItemTemplate>
+          </ItemsControl>
+        </StackPanel>
       </ScrollViewer>
     </DockPanel>
   </Border>

@@ -5,6 +5,8 @@ using Avalonia.Automation.Peers;
 using Avalonia.Controls;
 using Avalonia.Controls.Documents;
 using Avalonia.Input;
+using Avalonia.Media;
+using Avalonia.Media.Immutable;
 using StudyStash.App.Controls.Rich;
 
 namespace StudyStash.App.Controls;
@@ -43,6 +45,11 @@ public class NoteText : SelectableTextBlock
         // and dark, where some of those colours on it don't (a light theme's link nearly vanishes).
         this.Bind(SelectionBrushProperty, this.GetResourceObservable("Hl"));
         this.Bind(SelectionForegroundBrushProperty, this.GetResourceObservable("Fg"));
+        // The pen is lighter on a dark page: drawn again when the theme changes.
+        ActualThemeVariantChanged += (_, _) =>
+        {
+            if (Quoted.Count > 0) InvalidateVisual();
+        };
     }
 
     protected override Type StyleKeyOverride => typeof(SelectableTextBlock);
@@ -99,6 +106,48 @@ public class NoteText : SelectableTextBlock
 
     /// <summary>The selection that last drew some of this piece as selected (null: none has).</summary>
     internal TextSelection? LitBy;
+
+    /// <summary>Words of this piece an answer quoted (<see cref="NoteView.Highlights"/>): each the characters from
+    /// <c>Start</c>, <c>Length</c> of them, of quote number <c>Quote</c>. Drawn under the words like a highlighter pen.</summary>
+    internal IReadOnlyList<(int Start, int Length, int Quote)> Quoted { get; private set; } = [];
+
+    /// <summary>The quotes drawn stronger (the one the pointer is on in its chip, the one that just flashed).</summary>
+    HashSet<int> strong = [];
+
+    /// <summary>What this piece highlights now: its quoted words, and which quotes are the strong ones.</summary>
+    internal void Highlight(IReadOnlyList<(int Start, int Length, int Quote)> quoted, HashSet<int> strong)
+    {
+        if (quoted.Count == 0 && Quoted.Count == 0) return;
+        if (quoted.SequenceEqual(Quoted) && strong.SetEquals(this.strong)) return;
+        (Quoted, this.strong) = (quoted, strong);
+        InvalidateVisual();
+    }
+
+    // The pen: the mustard of the app's highlighter, flat, light on a light page and lighter still on a dark one so the
+    // words keep their ink. The one the pointer is on is stronger.
+    static readonly Color Pen = Color.Parse("#FFC943");
+
+    protected override void RenderTextLayout(DrawingContext context, Point origin)
+    {
+        if (Quoted.Count > 0)
+        {
+            bool dark = ActualThemeVariant == Avalonia.Styling.ThemeVariant.Dark;
+            var metrics = new Typeface(FontFamily, FontStyle, FontWeight).GlyphTypeface.Metrics;
+            double height = metrics.DesignEmHeight > 0 ? (metrics.Descent - metrics.Ascent) * FontSize / metrics.DesignEmHeight : FontSize * 1.3;
+            foreach (var (start, length, quote) in Quoted)
+            {
+                byte alpha = (byte)(strong.Contains(quote) ? (dark ? 140 : 190) : (dark ? 70 : 105));
+                var brush = new ImmutableSolidColorBrush(Color.FromArgb(alpha, Pen.R, Pen.G, Pen.B));
+                foreach (var r in TextLayout.HitTestTextRange(start, length))
+                {
+                    var box = new Rect(r.X - 2, r.Y + (r.Height - height) / 2, r.Width + 4, height).Translate(origin);
+                    context.DrawRectangle(brush, null, new RoundedRect(box, 3));
+                }
+            }
+        }
+        base.RenderTextLayout(context, origin);
+    }
+
 
     protected override void OnPropertyChanged(AvaloniaPropertyChangedEventArgs change)
     {

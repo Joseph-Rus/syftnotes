@@ -35,112 +35,79 @@ public class AiShots
     }
 
     // ---------------------------------------------------------------------------------------------------------
-    // Mac settings window (design's Mac Settings frame): 900×780 r26, an inset glass sidebar with 7 sections.
+    // The settings window (SettingsView's look, the library window's): its sections straight on the canvas, the open
+    // one the white chip, and the pane on the white sheet beside them; Mac 900×780, Windows 900×860.
     // ---------------------------------------------------------------------------------------------------------
 
-    static readonly (string Icon, string Title)[] MacSections =
+    static readonly (string Icon, string Title)[] Sections =
     [
         ("tune", "General"), ("mic", "Recording"), ("dns", "Library"), ("auto_awesome", "Your AI"),
         ("hub", "AI apps"), ("school", "Canvas"), ("keyboard", "Shortcuts"),
     ];
 
-    /// <summary>The Mac settings window, its sidebar selected on <paramref name="selected"/>, the pane on the right.</summary>
-    public static Control SettingsFrame(SkinKind skin, string selected, Control pane) =>
-        skin == SkinKind.Mac ? MacSettingsFrame(selected, pane) : WinSettingsFrame(selected, pane);
-
-    static Border MacSettingsFrame(string selected, Control pane)
+    /// <summary>The settings window, its sidebar on <paramref name="selected"/>, the pane on the page beside it.</summary>
+    public static Control SettingsFrame(SkinKind skin, string selected, Control pane)
     {
-        var lights = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8, Height = 44, Margin = new Thickness(10, 0, 0, 0), VerticalAlignment = VerticalAlignment.Center };
-        lights.Children.Add(new Ellipse { Width = 12, Height = 12, Fill = new SolidColorBrush(Color.Parse("#FF5F57")) });
-        lights.Children.Add(new Ellipse { Width = 12, Height = 12, Fill = new SolidColorBrush(Color.Parse("#FEBC2E")) });
-        lights.Children.Add(new Ellipse { Width = 12, Height = 12, Fill = new SolidColorBrush(Color.Parse("#28C840")) });
+        bool mac = skin == SkinKind.Mac;
+        var header = new Grid { Height = mac ? 52 : 32 };
+        if (mac)
+        {
+            var lights = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8, Margin = new Thickness(20, 0, 0, 0), VerticalAlignment = VerticalAlignment.Center };
+            foreach (string c in new[] { "#FF5F57", "#FEBC2E", "#28C840" }) lights.Children.Add(new Ellipse { Width = 12, Height = 12, Fill = new SolidColorBrush(Color.Parse(c)) });
+            header.Children.Add(lights);
+            var title = new TextBlock { Text = "Settings", FontSize = 13, FontWeight = FontWeight.SemiBold, HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center };
+            Res(title, TextBlock.ForegroundProperty, title, "InkMuted");
+            header.Children.Add(title);
+        }
+        else
+        {
+            var row = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 10, Margin = new Thickness(16, 0, 0, 0), VerticalAlignment = VerticalAlignment.Center };
+            row.Children.Add(new AppIcon { VerticalAlignment = VerticalAlignment.Center });
+            row.Children.Add(new TextBlock { Text = "Syft Notes settings", FontSize = 12, VerticalAlignment = VerticalAlignment.Center });
+            header.Children.Add(row);
+        }
 
-        var rows = new StackPanel { Spacing = 2 };
-        rows.Children.Add(lights);
-        foreach (var (icon, title) in MacSections)
+        var rows = new StackPanel { Spacing = 2, Margin = new Thickness(6, 2, 10, 8) };
+        foreach (var (icon, title) in Sections)
         {
             bool on = title == selected;
-            var row = new Border { Height = 34, CornerRadius = new CornerRadius(10), Padding = new Thickness(10, 0) };
+            var row = new Border { Height = 32, CornerRadius = new CornerRadius(8), Padding = new Thickness(10, 0), BorderThickness = new Thickness(1) };
             if (on)
             {
-                Res(row, Border.BackgroundProperty, row, "Fill2");
-                Res(row, Border.BoxShadowProperty, row, "EdgeSoft");
+                Res(row, Border.BackgroundProperty, row, "Surface");
+                Res(row, Border.BorderBrushProperty, row, "Line");
             }
-            var grid = new Grid { ColumnDefinitions = new ColumnDefinitions("16,10,*") };
-            grid.Children.Add(Glyph(icon, 16, on ? "AccentText" : "Fg2"));
-            var label = new TextBlock { Text = title, FontSize = 13, FontWeight = on ? FontWeight.SemiBold : FontWeight.Normal, VerticalAlignment = VerticalAlignment.Center };
-            if (!on) Res(label, TextBlock.ForegroundProperty, label, "Fg2");
+            var grid = new Grid { ColumnDefinitions = new ColumnDefinitions("17,10,*") };
+            grid.Children.Add(Glyph(icon, 17, on ? "Ink" : "InkMuted"));
+            var label = new TextBlock { Text = title, FontSize = 14, FontWeight = on ? FontWeight.Bold : FontWeight.Medium, VerticalAlignment = VerticalAlignment.Center };
+            Res(label, TextBlock.ForegroundProperty, label, on ? "Ink" : "InkMuted");
             Grid.SetColumn(label, 2);
             grid.Children.Add(label);
             row.Child = grid;
             rows.Children.Add(row);
         }
 
-        var sidebarInner = new Border { CornerRadius = new CornerRadius(18), Padding = new Thickness(10, 0, 10, 14), Child = rows };
-        Res(sidebarInner, Border.BackgroundProperty, sidebarInner, "Glass");
-        Res(sidebarInner, Border.BoxShadowProperty, sidebarInner, "SideGlassShadow");
-        var sidebar = new Border { Width = 220, Padding = new Thickness(8, 8, 0, 8), Child = sidebarInner };
+        var sheet = new Border { CornerRadius = new CornerRadius(14) };
+        Res(sheet, Border.BackgroundProperty, sheet, "Surface");
+        Res(sheet, Border.BoxShadowProperty, sheet, "LineRing");
+        var clip = new Border { CornerRadius = new CornerRadius(14), ClipToBounds = true, Child = pane };
+        var body = new Grid { ColumnDefinitions = new ColumnDefinitions("228,*"), Margin = new Thickness(8, 0, 8, 8) };
+        body.Children.Add(rows);
+        Grid.SetColumn(sheet, 1);
+        body.Children.Add(sheet);
+        Grid.SetColumn(clip, 1);
+        body.Children.Add(clip);
 
-        var grid2 = new Grid { ColumnDefinitions = new ColumnDefinitions("220,*"), Width = 900, Height = 780 };
-        grid2.Children.Add(sidebar);
-        Grid.SetColumn(pane, 1);
-        grid2.Children.Add(pane);
-
-        var window = new Border { Width = 900, Height = 780, CornerRadius = new CornerRadius(26), ClipToBounds = true, Child = grid2 };
-        Res(window, Border.BackgroundProperty, window, "Win");
-        Res(window, Border.BoxShadowProperty, window, "WindowShadow");
-        return window;
-    }
-
-    static readonly (string Icon, string Title)[] WinSections = MacSections;
-
-    static Border WinSettingsFrame(string selected, Control pane)
-    {
-        var titleBar = new Grid { ColumnDefinitions = new ColumnDefinitions("Auto,Auto,*"), Height = 32, Margin = new Thickness(16, 0, 0, 0) };
-        var badge = new AppIcon { VerticalAlignment = VerticalAlignment.Center };
-        titleBar.Children.Add(badge);
-        var titleText = new TextBlock { Text = "Syft Notes settings", FontSize = 12, Margin = new Thickness(10, 0, 0, 0), VerticalAlignment = VerticalAlignment.Center };
-        Grid.SetColumn(titleText, 1);
-        titleBar.Children.Add(titleText);
-
-        var nav = new StackPanel { Width = 240, Spacing = 4, Margin = new Thickness(4, 4, 4, 8) };
-        foreach (var (icon, title) in WinSections)
-        {
-            bool on = title == selected;
-            var row = new Grid { ColumnDefinitions = new ColumnDefinitions("16,14,*"), Height = 40, Margin = new Thickness(4, 0) };
-            var cell = new Border { CornerRadius = new CornerRadius(4), Padding = new Thickness(12, 0), Child = row };
-            if (on) Res(cell, Border.BackgroundProperty, cell, "Subtle");
-            if (on)
-            {
-                var bar = new Border { Width = 3, Height = 16, CornerRadius = new CornerRadius(2), HorizontalAlignment = HorizontalAlignment.Left, VerticalAlignment = VerticalAlignment.Center };
-                Res(bar, Border.BackgroundProperty, bar, "Accent");
-                row.Children.Add(bar);
-            }
-            row.Children.Add(Glyph(icon, 16));
-            var label = new TextBlock { Text = title, FontSize = 14, FontWeight = on ? FontWeight.SemiBold : FontWeight.Normal, VerticalAlignment = VerticalAlignment.Center };
-            Grid.SetColumn(label, 2);
-            row.Children.Add(label);
-            nav.Children.Add(cell);
-        }
-
-        var layer = new Border { BorderThickness = new Thickness(1, 1, 0, 0), CornerRadius = new CornerRadius(8, 0, 0, 0), Child = pane };
-        Res(layer, Border.BackgroundProperty, layer, "Layer");
-        Res(layer, Border.BorderBrushProperty, layer, "LayerStroke");
-
-        var body = new Grid { ColumnDefinitions = new ColumnDefinitions("240,*") };
-        body.Children.Add(nav);
-        Grid.SetColumn(layer, 1);
-        body.Children.Add(layer);
-
-        var stack = new DockPanel { LastChildFill = true };
-        DockPanel.SetDock(titleBar, Dock.Top);
-        stack.Children.Add(titleBar);
+        var stack = new DockPanel();
+        DockPanel.SetDock(header, Dock.Top);
+        stack.Children.Add(header);
         stack.Children.Add(body);
 
-        var window = new Border { Width = 900, Height = 860, CornerRadius = new CornerRadius(8), BorderThickness = new Thickness(1), ClipToBounds = true, Child = stack };
-        Res(window, Border.BackgroundProperty, window, "Mica");
-        Res(window, Border.BorderBrushProperty, window, "FlyStroke");
-        Res(window, Border.BoxShadowProperty, window, "ShadowLg");
+        var window = new Border { Width = 900, Height = mac ? 780 : 860, CornerRadius = new CornerRadius(mac ? 18 : 8), ClipToBounds = true, Child = stack };
+        window.Classes.Add("in-settings");
+        window.Resources.MergedDictionaries.Add(Skin.NoAccent());
+        Res(window, Border.BackgroundProperty, window, "Canvas");
+        Res(window, Border.BoxShadowProperty, window, mac ? "WindowShadow" : "ShadowLg");
         return window;
     }
 
@@ -405,9 +372,8 @@ public class AiShots
     }
 
     // ---------------------------------------------------------------------------------------------------------
-    // An answer being written (design 16's answer card and compact chat, mid-answer): the words so far, the formula
-    // it's in the middle of held back, and Stop where Send was. The design has no picture of this moment; it's the
-    // same card and chat as the picker's, a few words at a time.
+    // An answer being written (the conversation's panel beside the page, and the compact chat, mid-answer): the words
+    // so far, the formula it's in the middle of held back, and Stop where Send was.
     // ---------------------------------------------------------------------------------------------------------
 
     const string WritingSoFar = "The base case is the call that stops the recursion: it returns without calling itself again, so each paused call "
@@ -421,15 +387,27 @@ public class AiShots
         return m;
     }
 
+    /// <summary>A page beside its conversation's panel, the bar docked at the panel's foot, an answer being written.</summary>
     static Control WritingPage(SkinKind skin)
     {
-        var page = (Border)AskPage(skin, Writing("What's a base case?", "Ollama"));
-        var panel = (Panel)page.Child!;
-        panel.Children.RemoveAt(2); // no "Answer with" menu open: the answer card in its place, above the bar
-        var model = (AiAskModel)((Control)panel.Children[^1]).DataContext!;
-        panel.Children.Insert(2, skin == SkinKind.Mac
-            ? new MacAiAnswer { DataContext = model, HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Bottom, Margin = new Thickness(0, 0, 0, 84) }
-            : new WinAiAnswer { DataContext = model, HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Bottom, Margin = new Thickness(0, 0, 0, 84) });
+        var model = Writing("What's a base case?", "Ollama");
+        bool mac = skin == SkinKind.Mac;
+        var text = new TextBlock
+        {
+            Text = AskSample, FontSize = mac ? 16 : 15, LineHeight = mac ? 25.6 : 24, TextWrapping = TextWrapping.Wrap, Margin = new Thickness(40, 40, 40, 0),
+            VerticalAlignment = VerticalAlignment.Top,
+        };
+        if (mac) Res(text, TextBlock.FontFamilyProperty, text, "SerifFont");
+        Res(text, TextBlock.ForegroundProperty, text, "Fg");
+        var split = new AskSplit
+        {
+            Page = text,
+            Chat = mac ? new MacAiAnswer { DataContext = model } : new WinAiAnswer { DataContext = model },
+            Bar = mac ? new MacAiAskBar { DataContext = model } : new WinAiAskBar { DataContext = model },
+            IsOpen = true,
+        };
+        var page = new Border { Width = 920, Height = 520, ClipToBounds = true, Child = split, CornerRadius = new CornerRadius(mac ? 18 : 8) };
+        Res(page, Border.BackgroundProperty, page, "Surface");
         return page;
     }
 
@@ -573,6 +551,40 @@ public class AiShots
                         new ToastView { Title = filed.Title, Text = filed.Text, ActionLabel = filed.Action, VerticalAlignment = Avalonia.Layout.VerticalAlignment.Top },
                         ProblemsSheet(skin, AiDemo.SignedOut().Problems, 900));
                 });
+    }
+
+    /// <summary>Claude's own sign-in going from Syft Notes, in the student's browser: the Your AI row and the problems card
+    /// while it waits (a quiet line and a small "Open the page again" link, no button), after it gave up (Try again), and
+    /// when its maker doesn't offer it in the country.</summary>
+    [AvaloniaFact]
+    public void Ai_signing_in_in_the_browser()
+    {
+        foreach (var skin in new[] { SkinKind.Mac, SkinKind.Win })
+            foreach (var t in Themes)
+                foreach (var (name, phase) in new[] { ("waiting", SignInPhase.Waiting), ("gave-up", SignInPhase.GaveUp), ("country", SignInPhase.Region), ("stuck", SignInPhase.Stuck) })
+                {
+                    string prefix = skin == SkinKind.Mac ? "mac" : "win";
+                    Shot.Take($"{prefix}-13-ai-engines-sign-in-{name}", skin, t, () => PaneSheet(skin, 720, 1340, skin == SkinKind.Mac
+                        ? new MacAiEngines { DataContext = AiDemo.EnginesSigningIn(phase) } : new WinAiEngines { DataContext = AiDemo.EnginesSigningIn(phase) }),
+                        size: new Size(850, 1470));
+                    Shot.Take($"{prefix}-18-ai-problem-sign-in-{name}", skin, t, () => PaneSheet(skin, 720, null,
+                        skin == SkinKind.Mac ? new MacAiProblem { DataContext = AiDemo.ProblemSigningIn(phase).Problems.Single() }
+                            : new WinAiProblem { DataContext = AiDemo.ProblemSigningIn(phase).Problems.Single() }),
+                        size: new Size(850, 300));
+                }
+    }
+
+    /// <summary>A pane (or one card) on Settings' white page, without the settings window round it: for pictures of a
+    /// part of Settings that sits too far down for the window's height.</summary>
+    static Control PaneSheet(SkinKind skin, double width, double? height, Control child)
+    {
+        var sheet = new Border { Width = width, Padding = new Thickness(8), Child = child, CornerRadius = new CornerRadius(14) };
+        if (height is { } h) sheet.Height = h;
+        sheet.Classes.Add("in-settings");
+        sheet.Resources.MergedDictionaries.Add(Skin.NoAccent());
+        Res(sheet, Border.BackgroundProperty, sheet, "Surface");
+        Res(sheet, Border.BoxShadowProperty, sheet, "LineRing");
+        return sheet;
     }
 
     [AvaloniaFact]

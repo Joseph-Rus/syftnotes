@@ -28,6 +28,9 @@ public sealed record EngineInfo(string Id, string Name, string State)
     public bool HasKey { get; init; }
     /// <summary>The key's last four characters ("…a1b2"), to tell which one it is.</summary>
     public string KeyHint { get; init; } = "";
+    /// <summary>Where the AI's own sign-in is while the student signs in from Syft Notes (<see cref="SignInPhase"/>:
+    /// waiting | gave_up | region | stuck); "" when none is going, and from a library that signs in in a terminal.</summary>
+    public string SignIn { get; init; } = "";
 }
 
 /// <summary>kind: engine_offline | not_signed_in | model_missing | usage_limit (the app adds fell_back,
@@ -38,6 +41,8 @@ public sealed record AiProblemInfo(string Id, string Kind, string Engine, string
     public string Model { get; init; } = "";
     public double SizeGb { get; init; }
     public string FallbackTo { get; init; } = "";
+    /// <summary>For "not signed in": where that AI's sign-in is (<see cref="EngineInfo.SignIn"/>).</summary>
+    public string SignIn { get; init; } = "";
 }
 
 /// <summary>Something the library is downloading for the free AI on its computer: how far along, or why it stopped.
@@ -113,6 +118,9 @@ public sealed record AskChat(string Id, string Title, string Updated)
 public sealed record AskChatMessage(string Role, string Text)
 {
     public List<AskSource> Sources { get; init; } = [];
+    /// <summary>The words of the lecture's notes the answer was built on (<see cref="AskQuotes"/>); empty for an answer
+    /// that gave none, or from a library too old to.</summary>
+    public List<string> Quotes { get; init; } = [];
     public string Engine { get; init; } = "";
     public string EngineName { get; init; } = "";
     public bool Failed { get; init; }
@@ -131,6 +139,9 @@ public sealed record AskTurn(string Question, string Answer)
 
 public sealed record AskReply(string Answer, List<AskSource> Sources, string Engine, string EngineName)
 {
+    /// <summary>For a question about one lecture: the words of its notes the answer was built on, to highlight there
+    /// (<see cref="AskQuotes"/>). Empty when it gave none; an older library has none.</summary>
+    public List<string> Quotes { get; init; } = [];
     public string Asked { get; init; } = "";
     public string AskedName { get; init; } = "";
     public bool FellBack { get; init; }
@@ -237,7 +248,15 @@ public interface IAiLibrary
     /// app installed, started, its model downloaded), in the background: <see cref="AiOverview.Pulling"/> says how far
     /// along. Null from a library too old to.</summary>
     Task<AiSaid?> SetUpAsync(string engine);
+    /// <summary>Starts the AI's own sign-in on the library's computer, hidden: it opens the student's browser itself, and the
+    /// engine's <see cref="EngineInfo.SignIn"/> says where it is until it turns ready by itself.</summary>
     Task<AiSaid?> SignInAsync(string engine);
+    /// <summary>"Open the page again": the sign-in run once more, so the browser opens at a page that finishes by itself.
+    /// Null from a library too old to.</summary>
+    Task<AiSaid?> SignInAgainAsync(string engine) => Task.FromResult<AiSaid?>(null);
+    /// <summary>The last resort, once the hidden sign-in couldn't start or stopped at once: the same sign-in in a terminal
+    /// window on the library's computer. Null from a library too old to tell it from <see cref="SignInAsync"/>.</summary>
+    Task<AiSaid?> SignInInTerminalAsync(string engine) => Task.FromResult<AiSaid?>(null);
     Task<AiSaid?> CheckAsync(string engine, string model = "");
     Task<AiOverview?> ModelAsync(string engine, string model);
     Task<AiOverview?> DismissAsync(string problemId);
@@ -396,6 +415,12 @@ public sealed class AiRemote(string serverUrl, Func<string> key, HttpClient? htt
     public async Task<AiSaid?> SetUpAsync(string engine) => As<AiSaid>(await SendAsync(HttpMethod.Post, $"/engines/{Seg(engine)}/set-up"));
 
     public async Task<AiSaid?> SignInAsync(string engine) => As<AiSaid>(await SendAsync(HttpMethod.Post, $"/engines/{Seg(engine)}/sign-in"));
+
+    public async Task<AiSaid?> SignInAgainAsync(string engine) =>
+        As<AiSaid>(await SendAsync(HttpMethod.Post, $"/engines/{Seg(engine)}/sign-in", new JsonObject { ["again"] = true }));
+
+    public async Task<AiSaid?> SignInInTerminalAsync(string engine) =>
+        As<AiSaid>(await SendAsync(HttpMethod.Post, $"/engines/{Seg(engine)}/sign-in", new JsonObject { ["terminal"] = true }));
 
     public async Task<AiSaid?> CheckAsync(string engine, string model = "") => As<AiSaid>(await SendAsync(HttpMethod.Post,
         $"/engines/{Seg(engine)}/check", model.Length > 0 ? new JsonObject { ["model"] = model } : null));

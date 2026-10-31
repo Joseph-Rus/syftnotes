@@ -469,6 +469,37 @@ public sealed class GuidedSetupTests
     }
 
     [AvaloniaFact]
+    public async Task The_terminal_is_offered_for_signing_in_only_once_the_hidden_sign_in_stopped_at_once()
+    {
+        // The sign-in runs hidden and opens the browser itself: while it waits there's no terminal on offer.
+        await using var rig = await new Rig(cli: "codex", installed: true).OpenAsync();
+        File.WriteAllText(Path.Combine(rig.Bin, "login-delay"), "120");
+        var g = rig.Guided;
+        g.PickCommand.Execute("codex");
+        await g.ContinueCommand.ExecuteAsync(null);
+        Assert.Equal(GuidedScreen.SignIn, g.Screen);
+        _ = g.OpenSignInCommand.ExecuteAsync(null);
+        await Until(() => g.WaitingSignIn, "waiting for the browser");
+        Assert.False(g.OfferTerminal);
+        Assert.Empty(rig.Terminals);
+    }
+
+    [AvaloniaFact]
+    public async Task A_sign_in_that_stops_at_once_offers_the_terminal_as_a_small_link_and_opens_nothing_by_itself()
+    {
+        await using var rig = await new Rig(cli: "codex", installed: true).OpenAsync();
+        File.WriteAllText(Path.Combine(rig.Bin, "login-fails"), "");
+        var g = rig.Guided;
+        g.PickCommand.Execute("codex");
+        await g.ContinueCommand.ExecuteAsync(null);
+        _ = g.OpenSignInCommand.ExecuteAsync(null);
+        await Until(() => g.OfferTerminal, "the terminal offered, the hidden sign-in having stopped at once");
+        Assert.Empty(rig.Terminals);
+        g.SignInInTerminalCommand.Execute(null);
+        Assert.Single(rig.Terminals);
+    }
+
+    [AvaloniaFact]
     public async Task An_install_offline_or_a_plan_without_the_cli_says_so_with_a_way_on()
     {
         await using var rig = await new Rig(cli: "codex").OpenAsync();

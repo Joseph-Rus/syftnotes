@@ -460,7 +460,7 @@ public class AiSetupModelTests
         var codex = mac.Engines.Single(r => r.Id == "codex");
         Assert.Equal(["codex login"], codex.Help.Select(h => h.Command));
         Assert.Contains("Sign in with ChatGPT", codex.Help[0].Title, StringComparison.Ordinal);
-        Assert.Equal("Sign in in Terminal", codex.OpenLabel);
+        Assert.Equal("Sign in", codex.OpenLabel);
 
         var win = new AiSetupModel(new FakeAiLibrary { Overview = With(("claude", "not_installed"), ("codex", "not_installed")) }) { Windows = true };
         await win.Load();

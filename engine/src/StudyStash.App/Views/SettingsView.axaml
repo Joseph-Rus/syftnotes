@@ -1,18 +1,21 @@
-<!-- Settings, in the design's settings language: Mac a glass sidebar over grouped rows (mac-13-ai-engines,
-     mac-06-canvas-settings); Windows a nav with an accent indicator over card rows on a Layer page (win-13-*,
-     win-06-*). The code-behind adds "mac" or "win" to the root, and every look-specific value below is a style
-     scoped by it (.mac X / .win X), so the classes read the same either way:
-       group   a card of rows: Mac one Border (radius 16, Group), Windows each row its own Card (see "choice")
+<!-- Settings, in the library window's look (as setup is, SetupStyles), the same in both looks: the sections straight on
+     the window's canvas as the library's sidebar is, the open one its white chip; the page one white sheet with a
+     hairline round it, a big bold title and a grey sentence under it, a heading per part in the library's weight, and
+     the settings themselves on white panels with hairlines between their rows. Its buttons are Styles.axaml's own
+     (btn sm, btn sm ink for a part's one main action, text-link), its switches, ticks, radios and choices ink and
+     greys: no accent in Settings, so a colour theme no longer tints Settings' own controls (Skin.NoAccent, set in the
+     code-behind). The code-behind adds "mac" or "win" to the root for the little that still differs, the window's own
+     frame. The classes:
+       group   a white panel of rows, a hairline round it
        row     one line in a group: title + sub on the left, a control on the right
        row-title / row-sub   its two lines of text
-       section a header above a group ("Colour theme"), with room for a trailing link
-       pill    a small button (Options, Add, Sign in…); "primary" tints it as the default action
-       choice  a selectable card (a model, an AI, a colour) with an "on" state
-       select  a dropdown-styled button (unfold_more/expand_more); not used here yet — for wave 2
-       switch  an accent-track, white-knob toggle (ToggleButton, not the Fluent ToggleSwitch)
-       link    small accent-coloured text, for a section header's trailing action
-     Appearance is new: 10 colour-theme swatches, applied live and saved. Other sections keep their content; wave 2
-     gives Canvas and AI their own screens. -->
+       section a part's heading over a group ("Colour theme")
+       btn sm  a button (Options, Add, Sign in…); "ink" for the part's one main action
+       choice  a selectable panel (a model, when it's written down), ringed in ink when chosen
+       select  a menu's button: the choice and a chevron in a hairline
+       switch  grey off, ink on
+     The panes it hosts (Your AI, AI apps, Canvas) are drawn in it too: SettingsPaneStyles restyles their own classes
+     under ".in-settings", the class this view carries. -->
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:s="using:StudyStash.App.Services"
@@ -23,197 +26,166 @@
              xmlns:vm="using:StudyStash.App.ViewModels"
              x:Class="StudyStash.App.Views.SettingsView"
              x:DataType="s:SettingsModel"
+             Classes="in-settings"
              ClipToBounds="False">
   <UserControl.Styles>
-    <!-- The window's own frame, drawn only for a screenshot: a real window is already rounded, edged and shadowed
-         by the system (macOS; Windows 11), so drawing both would double up. -->
+    <StyleInclude Source="avares://StudyStash/Views/SettingsPaneStyles.axaml" />
+
+    <!-- ===== The window ===== -->
+
+    <!-- The window's canvas, with its own frame drawn only for a screenshot: a real window is already rounded, edged and
+         shadowed by the system (macOS; Windows 11), so drawing both would double up. -->
     <Style Selector="Border#Chrome">
+      <Setter Property="Background" Value="{DynamicResource Canvas}" />
       <Setter Property="ClipToBounds" Value="True" />
     </Style>
-    <Style Selector=".mac Border#Chrome">
-      <Setter Property="Background" Value="{DynamicResource Win}" />
-    </Style>
     <Style Selector=".mac Border#Chrome.chrome">
-      <Setter Property="CornerRadius" Value="26" />
+      <Setter Property="CornerRadius" Value="18" />
       <Setter Property="BoxShadow" Value="{DynamicResource WindowShadow}" />
     </Style>
-    <Style Selector=".win Border#Chrome">
-      <Setter Property="Background" Value="{DynamicResource Mica}" />
-    </Style>
     <Style Selector=".win Border#Chrome.chrome">
-      <Setter Property="BorderBrush" Value="{DynamicResource FlyStroke}" />
-      <Setter Property="BorderThickness" Value="1" />
       <Setter Property="CornerRadius" Value="8" />
       <Setter Property="BoxShadow" Value="{DynamicResource ShadowLg}" />
     </Style>
 
-    <!-- The sidebar: Mac an inset floating glass panel below the title bar; Windows plain, flush on the Mica. -->
-    <Style Selector="c|Glass.side">
-      <Setter Property="ClipToBounds" Value="False" />
+    <!-- The page: one white sheet, a hairline round it, no shadow (the library's pane); what's on it cut to its corners. -->
+    <Style Selector="Border.sheet">
+      <Setter Property="Background" Value="{DynamicResource Surface}" />
+      <Setter Property="CornerRadius" Value="{DynamicResource RadiusPane}" />
+      <Setter Property="BoxShadow" Value="{DynamicResource LineRing}" />
     </Style>
-    <Style Selector=".mac c|Glass.side">
-      <Setter Property="CornerRadius" Value="18" />
-      <Setter Property="BoxShadow" Value="{DynamicResource SideGlassShadow}" />
-      <Setter Property="Margin" Value="8,0,0,8" />
-      <Setter Property="Padding" Value="10,10,10,14" />
+    <Style Selector="Border.sheet-clip">
+      <Setter Property="CornerRadius" Value="{DynamicResource RadiusPane}" />
+      <Setter Property="ClipToBounds" Value="True" />
     </Style>
-    <Style Selector=".win c|Glass.side">
-      <Setter Property="Background" Value="Transparent" />
-      <Setter Property="BoxShadow" Value="0 0 0 0 Transparent" />
-      <Setter Property="CornerRadius" Value="0" />
-      <Setter Property="Margin" Value="0" />
-      <Setter Property="Padding" Value="4,8" />
+    <Style Selector="StackPanel.pagebody">
+      <Setter Property="Margin" Value="40,30,40,40" />
     </Style>
 
-    <!-- One nav row: Mac highlights the row itself and tints its icon; Windows only shades it and adds the pill. -->
-    <Style Selector="Button.nav">
+    <!-- ===== The sections, on the canvas: the library's sidebar ===== -->
+
+    <!-- Search, over them: a white field with a hairline round it, ringed in ink while the caret's in it (the ring drawn
+         inside, so the words don't move). While it has words, the sidebar is what matches (a setting and the section
+         it's in), then a row that asks the helper instead. -->
+    <Style Selector="Border.search">
+      <Setter Property="Height" Value="34" />
+      <Setter Property="CornerRadius" Value="{DynamicResource RadiusControl}" />
+      <Setter Property="Background" Value="{DynamicResource Surface}" />
+      <Setter Property="BoxShadow" Value="{DynamicResource LineRing}" />
+      <Setter Property="BorderBrush" Value="{DynamicResource Ink}" />
+      <Setter Property="BorderThickness" Value="0" />
+      <Setter Property="Padding" Value="10,0,6,0" />
+      <Setter Property="Margin" Value="0,0,0,10" />
+    </Style>
+    <Style Selector="Border.search:focus-within">
+      <Setter Property="BorderThickness" Value="1.5" />
+      <Setter Property="Padding" Value="8.5,0,4.5,0" />
+      <Setter Property="BoxShadow" Value="none" />
+    </Style>
+    <Style Selector="Button.hit">
       <Setter Property="Theme" Value="{StaticResource Surface}" />
       <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+      <Setter Property="CornerRadius" Value="{DynamicResource RadiusControl}" />
+      <Setter Property="Padding" Value="10,7" />
+    </Style>
+    <Style Selector="TextBlock.hit-title">
+      <Setter Property="FontSize" Value="14" />
+      <Setter Property="FontWeight" Value="Medium" />
+      <Setter Property="Foreground" Value="{DynamicResource Ink}" />
+      <Setter Property="TextWrapping" Value="Wrap" />
+    </Style>
+    <Style Selector="TextBlock.hit-where">
+      <Setter Property="FontSize" Value="12" />
+      <Setter Property="Foreground" Value="{DynamicResource InkSubtle}" />
+      <Setter Property="TextTrimming" Value="CharacterEllipsis" />
+    </Style>
+
+    <!-- A section: a row of the library's sidebar, the open one the white chip with bold words. (Its hairline is a
+         border inside it: a ring outside one would be cut off by the list.) -->
+    <Style Selector="Button.nav">
+      <Setter Property="Theme" Value="{StaticResource Surface}" />
+      <Setter Property="Height" Value="32" />
+      <Setter Property="Padding" Value="10,0" />
+      <Setter Property="CornerRadius" Value="{DynamicResource RadiusControl}" />
+      <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+      <Setter Property="BorderThickness" Value="1" />
+      <Setter Property="BorderBrush" Value="Transparent" />
+      <Setter Property="Foreground" Value="{DynamicResource InkMuted}" />
+      <Setter Property="FontSize" Value="14" />
+      <Setter Property="FontWeight" Value="Medium" />
+    </Style>
+    <Style Selector="Button.nav:pointerover">
+      <Setter Property="Foreground" Value="{DynamicResource Ink}" />
+    </Style>
+    <Style Selector="Button.nav.on">
+      <Setter Property="Background" Value="{DynamicResource Surface}" />
+      <Setter Property="BorderBrush" Value="{DynamicResource Line}" />
+      <Setter Property="Foreground" Value="{DynamicResource Ink}" />
+      <Setter Property="FontWeight" Value="Bold" />
     </Style>
     <Style Selector="c|Icon.navicon">
-      <Setter Property="Foreground" Value="{DynamicResource Fg2}" />
+      <Setter Property="Foreground" Value="{DynamicResource InkMuted}" />
+      <Setter Property="VerticalAlignment" Value="Center" />
     </Style>
-    <Style Selector="Border.indicator">
-      <Setter Property="IsVisible" Value="False" />
+    <Style Selector="Button.nav:pointerover c|Icon.navicon, Button.nav.on c|Icon.navicon">
+      <Setter Property="Foreground" Value="{DynamicResource Ink}" />
     </Style>
-    <Style Selector=".mac Button.nav">
-      <Setter Property="Height" Value="32" />
-      <Setter Property="CornerRadius" Value="10" />
-      <Setter Property="Padding" Value="10,0" />
-      <Setter Property="FontSize" Value="13" />
-    </Style>
-    <Style Selector=".mac Button.nav.on">
-      <Setter Property="Background" Value="{DynamicResource Fill2}" />
-    </Style>
-    <Style Selector=".mac Button.nav.on /template/ Border#PART_Bg">
-      <Setter Property="BoxShadow" Value="{DynamicResource EdgeSoft}" />
-    </Style>
-    <Style Selector=".mac Button.nav.on TextBlock.navlabel">
-      <Setter Property="FontWeight" Value="SemiBold" />
-    </Style>
-    <Style Selector=".mac Button.nav.on c|Icon.navicon">
-      <Setter Property="Foreground" Value="{DynamicResource AccentText}" />
-    </Style>
-    <Style Selector=".win Button.nav">
-      <Setter Property="Height" Value="40" />
-      <Setter Property="CornerRadius" Value="4" />
-      <Setter Property="Padding" Value="12,0" />
-      <Setter Property="FontSize" Value="14" />
-    </Style>
-    <Style Selector=".win c|Icon.navicon">
-      <Setter Property="Foreground" Value="{DynamicResource Fg}" />
-    </Style>
-    <Style Selector=".win Button.nav.on">
-      <Setter Property="Background" Value="{DynamicResource Subtle}" />
-    </Style>
-    <Style Selector=".win Button.nav.on Border.indicator">
-      <Setter Property="IsVisible" Value="True" />
-    </Style>
-
-    <!-- The sidebar's two groups: this computer's settings, then the library's own. -->
+    <!-- The sidebar's groups ("Your library"): its group labels, a little room over each. -->
     <Style Selector="TextBlock.navgroup">
-      <Setter Property="FontWeight" Value="SemiBold" />
+      <Setter Property="FontSize" Value="13" />
+      <Setter Property="FontWeight" Value="Bold" />
+      <Setter Property="Foreground" Value="{DynamicResource InkSubtle}" />
+      <Setter Property="Margin" Value="10,10,0,4" />
     </Style>
-    <Style Selector=".mac TextBlock.navgroup">
-      <Setter Property="FontSize" Value="11" />
-      <Setter Property="Foreground" Value="{DynamicResource Fg3}" />
-      <Setter Property="Margin" Value="10,4,0,4" />
-    </Style>
-    <Style Selector=".win TextBlock.navgroup">
-      <Setter Property="FontSize" Value="12" />
-      <Setter Property="Foreground" Value="{DynamicResource Fg2}" />
-      <Setter Property="Margin" Value="12,6,0,4" />
-    </Style>
-    <Style Selector=".mac TextBlock.navgroup.second">
+    <Style Selector="TextBlock.navgroup.second">
       <Setter Property="Margin" Value="10,16,0,4" />
     </Style>
-    <Style Selector=".win TextBlock.navgroup.second">
-      <Setter Property="Margin" Value="12,18,0,4" />
-    </Style>
 
-    <!-- The content page: Mac sits right on the window's Win colour; Windows is an inset Layer with its own corner. -->
-    <Style Selector=".win Border.page">
-      <Setter Property="Background" Value="{DynamicResource Layer}" />
-      <Setter Property="BorderBrush" Value="{DynamicResource LayerStroke}" />
-      <Setter Property="BorderThickness" Value="1,1,0,0" />
-      <Setter Property="CornerRadius" Value="8,0,0,0" />
-    </Style>
-    <Style Selector=".mac StackPanel.pagebody">
-      <Setter Property="Margin" Value="40,12,40,32" />
-      <Setter Property="Spacing" Value="24" />
-    </Style>
-    <Style Selector=".win StackPanel.pagebody">
-      <Setter Property="Margin" Value="36,28,36,28" />
-      <Setter Property="Spacing" Value="16" />
-    </Style>
+    <!-- ===== The page's words ===== -->
 
+    <!-- The title: setup's (the library's page title, a little smaller for the narrower page). -->
     <Style Selector="TextBlock.h">
-      <Setter Property="FontFamily" Value="{DynamicResource DisplayFont}" />
-    </Style>
-    <Style Selector=".mac TextBlock.h">
-      <Setter Property="FontSize" Value="26" />
-      <Setter Property="FontWeight" Value="Bold" />
-      <Setter Property="Margin" Value="0,0,0,6" />
-      <Setter Property="c:Typography.Extra" Value="-0.39" />
-    </Style>
-    <Style Selector=".win TextBlock.h">
-      <Setter Property="FontSize" Value="28" />
-      <Setter Property="FontWeight" Value="SemiBold" />
-      <Setter Property="Margin" Value="0,4,0,4" />
-    </Style>
-    <Style Selector="TextBlock.body">
-      <Setter Property="Foreground" Value="{DynamicResource Fg2}" />
+      <Setter Property="FontSize" Value="30" />
+      <Setter Property="FontWeight" Value="ExtraBold" />
+      <Setter Property="LineHeight" Value="36" />
+      <Setter Property="LetterSpacing" Value="-0.6" />
       <Setter Property="TextWrapping" Value="Wrap" />
-      <Setter Property="HorizontalAlignment" Value="Left" />
     </Style>
-    <Style Selector=".mac TextBlock.body">
-      <Setter Property="FontSize" Value="13" />
-      <Setter Property="LineHeight" Value="19.5" />
-      <Setter Property="MaxWidth" Value="540" />
-    </Style>
-    <Style Selector=".win TextBlock.body">
+    <!-- Grey words on the page, and (lede) the sentence under the title, the library's. -->
+    <Style Selector="TextBlock.body">
       <Setter Property="FontSize" Value="14" />
       <Setter Property="LineHeight" Value="21" />
+      <Setter Property="Foreground" Value="{DynamicResource InkMuted}" />
+      <Setter Property="TextWrapping" Value="Wrap" />
+      <Setter Property="HorizontalAlignment" Value="Left" />
       <Setter Property="MaxWidth" Value="560" />
     </Style>
+    <Style Selector="TextBlock.body.lede">
+      <Setter Property="FontSize" Value="16" />
+      <Setter Property="LineHeight" Value="24" />
+      <Setter Property="Margin" Value="0,2,0,0" />
+    </Style>
+    <!-- A quieter line under a part: what it does, what just happened. -->
     <Style Selector="TextBlock.say">
-      <Setter Property="FontSize" Value="12" />
-      <Setter Property="Foreground" Value="{DynamicResource Fg2}" />
+      <Setter Property="FontSize" Value="13" />
+      <Setter Property="LineHeight" Value="19" />
+      <Setter Property="Foreground" Value="{DynamicResource InkMuted}" />
       <Setter Property="TextWrapping" Value="Wrap" />
-      <Setter Property="Margin" Value="0,8,0,0" />
-      <Setter Property="MaxWidth" Value="480" />
+      <Setter Property="Margin" Value="0,4,0,0" />
+      <Setter Property="MaxWidth" Value="560" />
       <Setter Property="HorizontalAlignment" Value="Left" />
     </Style>
-    <Style Selector="TextBlock.link">
-      <Setter Property="Foreground" Value="{DynamicResource AccentText}" />
-    </Style>
-    <Style Selector=".mac TextBlock.link">
-      <Setter Property="FontSize" Value="12" />
-    </Style>
-    <Style Selector=".win TextBlock.link">
-      <Setter Property="FontSize" Value="14" />
-    </Style>
 
-    <!-- A section's header: the label, and room on the right for a trailing link. -->
+    <!-- A part's heading: the library's h2 ("Up next"), room over it to start a new part. -->
     <Style Selector="Grid.section">
       <Setter Property="HorizontalAlignment" Value="Stretch" />
     </Style>
     <Style Selector="TextBlock.section">
-      <Setter Property="FontWeight" Value="SemiBold" />
-    </Style>
-    <Style Selector=".mac TextBlock.section">
-      <Setter Property="FontSize" Value="13" />
-      <Setter Property="Margin" Value="4,0" />
-    </Style>
-    <Style Selector=".win TextBlock.section">
-      <Setter Property="FontSize" Value="14" />
-    </Style>
-    <!-- A header that starts a new part of a page: a little more room above it than between its own rows. -->
-    <Style Selector=".mac TextBlock.section.gap">
-      <Setter Property="Margin" Value="4,10,4,0" />
-    </Style>
-    <Style Selector=".win TextBlock.section.gap">
-      <Setter Property="Margin" Value="0,10,0,0" />
+      <Setter Property="FontSize" Value="17" />
+      <Setter Property="FontWeight" Value="ExtraBold" />
+      <Setter Property="LineHeight" Value="24" />
+      <Setter Property="LetterSpacing" Value="-0.17" />
+      <Setter Property="Margin" Value="0,16,0,0" />
     </Style>
     <!-- A list's rows in one group: a hairline above every row but the first. -->
     <Style Selector="Border.itemsep">
@@ -223,60 +195,38 @@
       <Setter Property="IsVisible" Value="True" />
     </Style>
 
-    <!-- A group of rows: Mac one rounded card; Windows nothing itself (its rows are each their own card, "choice"). -->
+    <!-- ===== Groups and rows ===== -->
+
+    <!-- A group of rows: a white panel, its hairline a border inside it (a ring outside would be cut off where a group
+         clips its rows' hover to its corners). -->
     <Style Selector="Border.group">
-      <Setter Property="Margin" Value="0,8,0,0" />
-    </Style>
-    <Style Selector=".mac Border.group">
-      <Setter Property="CornerRadius" Value="16" />
-      <Setter Property="Background" Value="{DynamicResource Group}" />
-    </Style>
-    <Style Selector=".win Border.group">
-      <Setter Property="CornerRadius" Value="4" />
-      <Setter Property="Background" Value="{DynamicResource Card}" />
-      <Setter Property="BorderBrush" Value="{DynamicResource CardStroke}" />
+      <Setter Property="Margin" Value="0,4,0,0" />
+      <Setter Property="CornerRadius" Value="{DynamicResource RadiusPanel}" />
+      <Setter Property="Background" Value="{DynamicResource Surface}" />
+      <Setter Property="BorderBrush" Value="{DynamicResource Line}" />
       <Setter Property="BorderThickness" Value="1" />
     </Style>
-
-    <!-- One row inside a group: title + sub on the left, a control on the right. -->
     <Style Selector="Border.row">
       <Setter Property="HorizontalAlignment" Value="Stretch" />
-    </Style>
-    <Style Selector=".mac Border.row">
-      <Setter Property="MinHeight" Value="56" />
-      <Setter Property="Padding" Value="16,8" />
-    </Style>
-    <Style Selector=".win Border.row">
-      <Setter Property="MinHeight" Value="64" />
+      <Setter Property="MinHeight" Value="58" />
       <Setter Property="Padding" Value="16,10" />
     </Style>
     <Style Selector="TextBlock.row-title">
+      <Setter Property="FontSize" Value="14" />
+      <Setter Property="FontWeight" Value="SemiBold" />
+      <Setter Property="LineHeight" Value="20" />
       <Setter Property="VerticalAlignment" Value="Center" />
     </Style>
-    <Style Selector=".mac TextBlock.row-title">
-      <Setter Property="FontSize" Value="13" />
-    </Style>
-    <Style Selector=".win TextBlock.row-title">
-      <Setter Property="FontSize" Value="14" />
-    </Style>
     <Style Selector="TextBlock.row-sub">
-      <Setter Property="Foreground" Value="{DynamicResource Fg2}" />
+      <Setter Property="FontSize" Value="13" />
+      <Setter Property="LineHeight" Value="18" />
+      <Setter Property="Foreground" Value="{DynamicResource InkMuted}" />
     </Style>
-    <Style Selector=".mac TextBlock.row-sub">
-      <Setter Property="FontSize" Value="11" />
-    </Style>
-    <Style Selector=".win TextBlock.row-sub">
-      <Setter Property="FontSize" Value="12" />
-    </Style>
-
     <!-- A hairline between two rows of a group, from the rows' text edge to the right. -->
     <Style Selector="Border.rowsep">
       <Setter Property="Height" Value="1" />
-      <Setter Property="Background" Value="{DynamicResource Sep}" />
+      <Setter Property="Background" Value="{DynamicResource Line}" />
       <Setter Property="Margin" Value="16,0,0,0" />
-    </Style>
-    <Style Selector=".mac Border.rowsep">
-      <Setter Property="Height" Value="0.5" />
     </Style>
     <!-- A row's action column: whatever sits there (a switch, a select, a button) lines up at the right edge and on
          the row's centre line. -->
@@ -288,275 +238,176 @@
       <Setter Property="TextTrimming" Value="CharacterEllipsis" />
     </Style>
 
-    <!-- A small button (Options, Add, Save…), "primary" for the section's default action. -->
-    <Style Selector="Button.pill">
-      <Setter Property="Theme" Value="{StaticResource Surface}" />
-      <Setter Property="HorizontalContentAlignment" Value="Center" />
+    <!-- ===== Controls ===== -->
+
+    <!-- Buttons are Styles.axaml's pills (btn sm, btn sm ink); here they sit at their own width, words centred. -->
+    <Style Selector="Button.btn">
       <Setter Property="HorizontalAlignment" Value="Left" />
+      <Setter Property="HorizontalContentAlignment" Value="Center" />
     </Style>
-    <!-- Its hairline is a border inside it: a button cuts off whatever it draws outside its own box, so a ring
-         round it showed only on its round ends (and at a fraction of a pixel, along its top). -->
-    <Style Selector=".mac Button.pill">
-      <Setter Property="Height" Value="30" />
-      <Setter Property="CornerRadius" Value="15" />
-      <Setter Property="Padding" Value="14,0" />
-      <Setter Property="Background" Value="{DynamicResource Raised}" />
-      <Setter Property="BorderBrush" Value="{DynamicResource Line}" />
-      <Setter Property="BorderThickness" Value="1" />
+    <Style Selector="Button.btn c|Icon">
+      <Setter Property="VerticalAlignment" Value="Center" />
     </Style>
-    <Style Selector=".mac Button.pill.primary">
-      <Setter Property="Background" Value="{DynamicResource Tint}" />
-      <Setter Property="Foreground" Value="{DynamicResource OnAccent}" />
-      <Setter Property="BorderThickness" Value="0" />
-    </Style>
-    <Style Selector=".win Button.pill">
-      <Setter Property="Height" Value="32" />
-      <Setter Property="CornerRadius" Value="4" />
-      <Setter Property="Padding" Value="12,0" />
-      <Setter Property="Background" Value="{DynamicResource Ctrl}" />
-      <Setter Property="BorderBrush" Value="{DynamicResource CtrlBorder}" />
-      <Setter Property="BorderThickness" Value="1" />
-    </Style>
-    <Style Selector=".win Button.pill.primary">
-      <Setter Property="Background" Value="{DynamicResource Accent}" />
-      <Setter Property="Foreground" Value="{DynamicResource OnAccent}" />
-      <Setter Property="BorderThickness" Value="0" />
-    </Style>
-    <Style Selector=".win Button.pill.primary TextBlock">
-      <Setter Property="FontWeight" Value="SemiBold" />
+    <Style Selector="Button.text-link.small">
+      <Setter Property="FontSize" Value="13" />
     </Style>
 
-    <!-- A dropdown-styled button: not used on this page yet, kept here for wave 2's Canvas/AI screens. -->
+    <!-- A menu's button: the choice in ink and a chevron, in a hairline, the control's corners (the library's picker). -->
     <Style Selector="Button.select">
       <Setter Property="Theme" Value="{StaticResource Surface}" />
       <Setter Property="HorizontalContentAlignment" Value="Stretch" />
-    </Style>
-    <Style Selector=".mac Button.select">
-      <Setter Property="Height" Value="28" />
-      <Setter Property="CornerRadius" Value="14" />
+      <Setter Property="Height" Value="34" />
+      <Setter Property="CornerRadius" Value="{DynamicResource RadiusControl}" />
       <Setter Property="Padding" Value="12,0,8,0" />
-      <Setter Property="Background" Value="{DynamicResource Raised}" />
+      <Setter Property="Background" Value="{DynamicResource Surface}" />
       <Setter Property="BorderBrush" Value="{DynamicResource Line}" />
       <Setter Property="BorderThickness" Value="1" />
+      <Setter Property="Foreground" Value="{DynamicResource Ink}" />
     </Style>
-    <Style Selector=".win Button.select">
-      <Setter Property="Height" Value="32" />
-      <Setter Property="CornerRadius" Value="4" />
-      <Setter Property="Padding" Value="11,0,10,0" />
-      <Setter Property="Background" Value="{DynamicResource Ctrl}" />
-      <Setter Property="BorderBrush" Value="{DynamicResource CtrlBorder}" />
-      <Setter Property="BorderThickness" Value="1" />
+    <Style Selector="Button.select:pointerover">
+      <Setter Property="BorderBrush" Value="{DynamicResource InkSubtle}" />
+    </Style>
+    <Style Selector="Button.select TextBlock">
+      <Setter Property="FontSize" Value="14" />
+      <Setter Property="FontWeight" Value="Medium" />
     </Style>
 
-    <!-- "Recommended" beside the model for this computer: setup's badge. -->
+    <!-- "Recommended" beside the model for this computer: setup's tag, grey words on the sunken grey. -->
     <Style Selector="Border.badge">
-      <Setter Property="CornerRadius" Value="6" />
-      <Setter Property="Padding" Value="6,1" />
-      <Setter Property="Background" Value="{DynamicResource AccentTint}" />
+      <Setter Property="CornerRadius" Value="{DynamicResource RadiusControl}" />
+      <Setter Property="Padding" Value="7,2" />
+      <Setter Property="Background" Value="{DynamicResource SurfaceSunken}" />
       <Setter Property="VerticalAlignment" Value="Center" />
     </Style>
-    <Style Selector=".win Border.badge">
-      <Setter Property="CornerRadius" Value="4" />
-      <Setter Property="Background" Value="{DynamicResource Subtle2}" />
-    </Style>
     <Style Selector="Border.badge TextBlock">
-      <Setter Property="FontSize" Value="11" />
+      <Setter Property="FontSize" Value="12" />
       <Setter Property="FontWeight" Value="SemiBold" />
-      <Setter Property="Foreground" Value="{DynamicResource AccentText}" />
+      <Setter Property="Foreground" Value="{DynamicResource InkMuted}" />
     </Style>
 
-    <!-- A selectable card (a model, an AI, a colour theme): Mac a tinted card, Windows a stroked one; both take an
-         accent border when chosen. -->
+    <!-- A selectable panel (a model, when it's written down): setup's choice, white with a hairline, ringed in ink when
+         chosen (the ring drawn inside it, the padding giving way so nothing in it moves). -->
     <Style Selector="Border.choice">
-      <Setter Property="BorderThickness" Value="1.5" />
-      <Setter Property="BorderBrush" Value="Transparent" />
+      <Setter Property="CornerRadius" Value="{DynamicResource RadiusPanel}" />
+      <Setter Property="Background" Value="{DynamicResource Surface}" />
+      <Setter Property="BorderBrush" Value="{DynamicResource Line}" />
+      <Setter Property="BorderThickness" Value="1" />
+      <Setter Property="Padding" Value="15,11" />
     </Style>
-    <Style Selector="Border.choice.on">
-      <Setter Property="BorderBrush" Value="{DynamicResource Accent}" />
+    <Style Selector="Button.card:pointerover Border.choice, Button.card:pressed Border.choice">
+      <Setter Property="BorderBrush" Value="{DynamicResource InkSubtle}" />
     </Style>
-    <Style Selector=".mac Border.choice">
-      <Setter Property="CornerRadius" Value="16" />
-      <Setter Property="Background" Value="{DynamicResource Group}" />
-      <Setter Property="Padding" Value="14,12" />
-      <Setter Property="BoxShadow" Value="{DynamicResource EdgeSoft}" />
-    </Style>
-    <Style Selector=".win Border.choice">
-      <Setter Property="CornerRadius" Value="4" />
-      <Setter Property="Background" Value="{DynamicResource Card}" />
-      <Setter Property="BorderBrush" Value="{DynamicResource CardStroke}" />
-      <Setter Property="Padding" Value="14,12" />
-    </Style>
-    <!-- Declared after .win Border.choice, so the chosen card's accent isn't painted over by the plain stroke. -->
-    <Style Selector=".win Border.choice.on">
+    <Style Selector="Border.choice.on, Button.card:pointerover Border.choice.on">
+      <Setter Property="BorderBrush" Value="{DynamicResource Ink}" />
       <Setter Property="BorderThickness" Value="2" />
-      <Setter Property="BorderBrush" Value="{DynamicResource Accent}" />
+      <Setter Property="Padding" Value="14,10" />
+    </Style>
+    <Style Selector="TextBlock.choice-title">
+      <Setter Property="FontSize" Value="14" />
+      <Setter Property="FontWeight" Value="Bold" />
+      <Setter Property="LineHeight" Value="20" />
+      <Setter Property="VerticalAlignment" Value="Center" />
+    </Style>
+    <Style Selector="TextBlock.choice-about">
+      <Setter Property="FontSize" Value="13" />
+      <Setter Property="LineHeight" Value="18" />
+      <Setter Property="Foreground" Value="{DynamicResource InkMuted}" />
+      <Setter Property="TextWrapping" Value="Wrap" />
     </Style>
     <!-- A card's focus ring follows its corners, 4 px out. -->
-    <Style Selector=".mac Border.cardring">
-      <Setter Property="CornerRadius" Value="20" />
-    </Style>
-    <Style Selector=".win Border.cardring">
-      <Setter Property="CornerRadius" Value="8" />
-    </Style>
-    <!-- A card that isn't chosen, hovered or pressed: its own outline shows faintly (no box round it). -->
-    <Style Selector="Button.card:pointerover Border.choice:not(.on), Button.card:pressed Border.choice:not(.on)">
-      <Setter Property="BorderBrush" Value="{DynamicResource Fg3}" />
+    <Style Selector="Border.cardring">
+      <Setter Property="CornerRadius" Value="16" />
     </Style>
 
-    <!-- Settings → Appearance's mode: Mac a three-way segmented pill (System Settings' own Appearance control) — one
-         rounded track holding three equal buttons, the chosen one raised. -->
+    <!-- Appearance's mode: the three in one sunken track, the chosen one the white chip with a hairline. -->
     <Style Selector="Border.seg">
       <Setter Property="Padding" Value="3" />
-    </Style>
-    <Style Selector=".mac Border.seg">
-      <Setter Property="CornerRadius" Value="10" />
-      <Setter Property="Background" Value="{DynamicResource Group}" />
+      <Setter Property="CornerRadius" Value="11" />
+      <Setter Property="Background" Value="{DynamicResource SurfaceSunken}" />
     </Style>
     <Style Selector="Button.seg-item">
       <Setter Property="Theme" Value="{StaticResource Surface}" />
       <Setter Property="HorizontalContentAlignment" Value="Center" />
       <Setter Property="Background" Value="Transparent" />
-    </Style>
-    <Style Selector=".mac Button.seg-item">
-      <Setter Property="Height" Value="28" />
-      <Setter Property="Padding" Value="14,0" />
-      <Setter Property="CornerRadius" Value="7" />
-      <Setter Property="FontSize" Value="12" />
-      <Setter Property="FontWeight" Value="Medium" />
-      <Setter Property="Foreground" Value="{DynamicResource Fg2}" />
-    </Style>
-    <Style Selector=".mac Button.seg-item.on">
-      <Setter Property="Foreground" Value="{DynamicResource Fg}" />
-      <Setter Property="Background" Value="{DynamicResource Raised}" />
-      <Setter Property="BorderBrush" Value="{DynamicResource Line}" />
-      <Setter Property="BorderThickness" Value="1" />
-    </Style>
-
-    <!-- An accent-track, white-knob toggle: a plain ToggleButton, not the Fluent ToggleSwitch (which doesn't follow
-         the colour theme). -->
-    <Style Selector="ToggleButton.switch">
-      <Setter Property="Width" Value="38" />
-      <Setter Property="Height" Value="22" />
-      <Setter Property="Padding" Value="0" />
-      <Setter Property="Background" Value="Transparent" />
-      <Setter Property="BorderThickness" Value="0" />
-      <Setter Property="Template">
-        <ControlTemplate>
-          <Panel>
-            <Border Name="Track" CornerRadius="11" Background="{DynamicResource Fill2}" />
-            <Border Name="Knob" Width="18" Height="18" CornerRadius="9" Background="{DynamicResource Mini}"
-                    HorizontalAlignment="Left" Margin="2,0,0,0" BoxShadow="0 1 3 0 #40000000" />
-          </Panel>
-        </ControlTemplate>
-      </Setter>
-    </Style>
-    <Style Selector="ToggleButton.switch:checked /template/ Border#Track">
-      <Setter Property="Background" Value="{DynamicResource Accent}" />
-    </Style>
-    <Style Selector="ToggleButton.switch:checked /template/ Border#Knob">
-      <Setter Property="HorizontalAlignment" Value="Right" />
-      <Setter Property="Margin" Value="0,0,2,0" />
-    </Style>
-
-    <!-- A text field, as the other sections already draw them. -->
-    <Style Selector="Border.field">
       <Setter Property="Height" Value="30" />
+      <Setter Property="Padding" Value="16,0" />
       <Setter Property="CornerRadius" Value="{DynamicResource RadiusControl}" />
       <Setter Property="BorderThickness" Value="1" />
-      <Setter Property="Padding" Value="9,0" />
+      <Setter Property="BorderBrush" Value="Transparent" />
+      <Setter Property="FontSize" Value="14" />
+      <Setter Property="FontWeight" Value="Medium" />
+      <Setter Property="Foreground" Value="{DynamicResource InkMuted}" />
     </Style>
-    <Style Selector=".mac Border.field">
-      <Setter Property="Background" Value="{DynamicResource Raised}" />
-      <Setter Property="BorderBrush" Value="{DynamicResource Sep}" />
+    <Style Selector="Button.seg-item:pointerover">
+      <Setter Property="Foreground" Value="{DynamicResource Ink}" />
     </Style>
-    <Style Selector=".win Border.field">
-      <Setter Property="Background" Value="{DynamicResource Ctrl}" />
-      <Setter Property="BorderBrush" Value="{DynamicResource CtrlBorder}" />
-    </Style>
-    <Style Selector="Border.field.bad">
-      <Setter Property="BorderBrush" Value="{DynamicResource Accent}" />
+    <Style Selector="Button.seg-item.on">
+      <Setter Property="Foreground" Value="{DynamicResource Ink}" />
+      <Setter Property="FontWeight" Value="Bold" />
+      <Setter Property="Background" Value="{DynamicResource Surface}" />
+      <Setter Property="BorderBrush" Value="{DynamicResource Line}" />
     </Style>
 
-    <!-- The colour theme swatches: Mac a filled ring (a gap of Win, an Accent rim when chosen); Windows a squared
-         swatch with a Fg border and a check when chosen. Hovered or pressed, the rim shows faintly; focused from the
-         keyboard, a focus ring goes round the swatch. Never a box round the whole cell. -->
+    <!-- A text field: white, a hairline round it, the control's corners; ringed in ink while the caret's in it (the
+         ring drawn inside, so the words don't move). -->
+    <Style Selector="Border.field">
+      <Setter Property="Height" Value="34" />
+      <Setter Property="CornerRadius" Value="{DynamicResource RadiusControl}" />
+      <Setter Property="Background" Value="{DynamicResource Surface}" />
+      <Setter Property="BorderBrush" Value="{DynamicResource Line}" />
+      <Setter Property="BorderThickness" Value="1" />
+      <Setter Property="Padding" Value="10,0" />
+    </Style>
+    <Style Selector="Border.field:focus-within">
+      <Setter Property="BorderBrush" Value="{DynamicResource Ink}" />
+      <Setter Property="BorderThickness" Value="1.5" />
+      <Setter Property="Padding" Value="9.5,0" />
+    </Style>
+    <Style Selector="Border.field TextBox.bare">
+      <Setter Property="FontSize" Value="14" />
+    </Style>
+    <Style Selector="Border.field.bad">
+      <Setter Property="BorderBrush" Value="{DynamicResource Warn}" />
+    </Style>
+
+    <!-- How far along: a grey track, filled in ink. -->
+    <Style Selector="Border.track">
+      <Setter Property="Height" Value="6" />
+      <Setter Property="CornerRadius" Value="3" />
+      <Setter Property="Background" Value="{DynamicResource Line}" />
+      <Setter Property="Width" Value="480" />
+      <Setter Property="HorizontalAlignment" Value="Left" />
+    </Style>
+    <Style Selector="Border.track > Border">
+      <Setter Property="CornerRadius" Value="3" />
+      <Setter Property="Background" Value="{DynamicResource Ink}" />
+      <Setter Property="HorizontalAlignment" Value="Left" />
+    </Style>
+
+    <!-- The colour themes: each a round swatch, a gap of the page's white, and an ink rim round the chosen one. Hovered
+         or pressed, the rim shows in grey; focused from the keyboard, a focus ring goes round the swatch. Never a box
+         round the whole cell. -->
     <Style Selector="Border.swatchring">
       <Setter Property="Background" Value="Transparent" />
     </Style>
     <Style Selector="Button.swatch:pointerover Border.swatchring, Button.swatch:pressed Border.swatchring">
-      <Setter Property="Background" Value="{DynamicResource Fg3}" />
+      <Setter Property="Background" Value="{DynamicResource InkSubtle}" />
     </Style>
-    <Style Selector=".mac Border.swatchring.on">
-      <Setter Property="Background" Value="{DynamicResource Accent}" />
-    </Style>
-    <Style Selector="Border.swatchborder">
-      <Setter Property="BorderBrush" Value="Transparent" />
-    </Style>
-    <Style Selector="Button.swatch:pointerover Border.swatchborder, Button.swatch:pressed Border.swatchborder">
-      <Setter Property="BorderBrush" Value="{DynamicResource Fg3}" />
-    </Style>
-    <Style Selector=".win Border.swatchborder.on">
-      <Setter Property="BorderBrush" Value="{DynamicResource Fg}" />
+    <Style Selector="Border.swatchring.on, Button.swatch:pointerover Border.swatchring.on">
+      <Setter Property="Background" Value="{DynamicResource Ink}" />
     </Style>
     <Style Selector="TextBlock.swatchname">
-      <Setter Property="FontSize" Value="11" />
-      <Setter Property="Foreground" Value="{DynamicResource Fg2}" />
+      <Setter Property="FontSize" Value="12" />
+      <Setter Property="FontWeight" Value="Medium" />
+      <Setter Property="Foreground" Value="{DynamicResource InkMuted}" />
       <Setter Property="HorizontalAlignment" Value="Center" />
     </Style>
-    <Style Selector=".win TextBlock.swatchname">
-      <Setter Property="FontSize" Value="12" />
-    </Style>
-    <Style Selector=".mac Button.select TextBlock">
-      <Setter Property="FontSize" Value="13" />
-    </Style>
-    <Style Selector=".win Button.select TextBlock">
-      <Setter Property="FontSize" Value="14" />
-    </Style>
 
-    <!-- An engine's problems sit above the AI engines pane, lined up with its own padding. -->
-    <Style Selector=".mac UserControl.problems">
-      <Setter Property="Margin" Value="40,32,40,-16" />
+    <!-- An engine's problems sit above the Your AI pane, lined up with its own margins. -->
+    <Style Selector="UserControl.problems">
+      <Setter Property="Margin" Value="40,30,40,-14" />
       <Setter Property="MaxWidth" Value="640" />
       <Setter Property="HorizontalAlignment" Value="Left" />
-    </Style>
-    <Style Selector=".win UserControl.problems">
-      <Setter Property="Margin" Value="36,24,36,-8" />
-      <Setter Property="MaxWidth" Value="680" />
-      <Setter Property="HorizontalAlignment" Value="Left" />
-    </Style>
-    <!-- Search, above the sidebar: a field with a magnifier and a clear button; while it has words, the sidebar is
-         what matches (a setting and the section it's in), then a row that asks the helper instead. -->
-    <Style Selector="Border.search">
-      <Setter Property="Height" Value="30" />
-      <Setter Property="CornerRadius" Value="{DynamicResource RadiusControl}" />
-      <Setter Property="BorderThickness" Value="1" />
-      <Setter Property="Padding" Value="8,0" />
-      <Setter Property="Margin" Value="0,0,0,8" />
-    </Style>
-    <Style Selector=".mac Border.search">
-      <Setter Property="Background" Value="{DynamicResource Fill}" />
-      <Setter Property="BorderBrush" Value="Transparent" />
-    </Style>
-    <Style Selector=".win Border.search">
-      <Setter Property="Background" Value="{DynamicResource Ctrl}" />
-      <Setter Property="BorderBrush" Value="{DynamicResource CtrlBorder}" />
-      <Setter Property="Margin" Value="8,0,8,8" />
-    </Style>
-    <Style Selector="Button.hit">
-      <Setter Property="Theme" Value="{StaticResource Surface}" />
-      <Setter Property="HorizontalContentAlignment" Value="Stretch" />
-      <Setter Property="CornerRadius" Value="{DynamicResource RadiusControl}" />
-      <Setter Property="Padding" Value="10,6" />
-    </Style>
-    <Style Selector="TextBlock.hit-title">
-      <Setter Property="FontSize" Value="13" />
-      <Setter Property="Foreground" Value="{DynamicResource Fg}" />
-      <Setter Property="TextWrapping" Value="Wrap" />
-    </Style>
-    <Style Selector="TextBlock.hit-where">
-      <Setter Property="FontSize" Value="11" />
-      <Setter Property="Foreground" Value="{DynamicResource Fg2}" />
-      <Setter Property="TextTrimming" Value="CharacterEllipsis" />
     </Style>
 
     <!-- A setting search or the helper went to: it flashes once on its page. -->
@@ -567,46 +418,38 @@
       <Setter Property="Background" Value="{DynamicResource Hl}" />
     </Style>
 
-    <!-- Ask your AI: the student's words in a tinted bubble on the right, the AI's plain on the left with what it did
-         under them as small chips. -->
+    <!-- Ask your AI: the student's words on the sunken grey at the right (setup's chat), the AI's plain on the left with
+         what it did under them as small chips; the field is the library's Ask bar without its float. -->
     <Style Selector="Border.bubble">
-      <Setter Property="CornerRadius" Value="14" />
-      <Setter Property="Padding" Value="12,8" />
+      <Setter Property="CornerRadius" Value="{DynamicResource RadiusPanel}" />
+      <Setter Property="Padding" Value="14,9" />
       <Setter Property="HorizontalAlignment" Value="Right" />
       <Setter Property="MaxWidth" Value="420" />
-    </Style>
-    <Style Selector=".mac Border.bubble">
-      <Setter Property="Background" Value="{DynamicResource Fill2}" />
-    </Style>
-    <Style Selector=".win Border.bubble">
-      <Setter Property="Background" Value="{DynamicResource Subtle}" />
+      <Setter Property="Background" Value="{DynamicResource SurfaceSunken}" />
     </Style>
     <Style Selector="Border.chip">
-      <Setter Property="CornerRadius" Value="8" />
+      <Setter Property="CornerRadius" Value="{DynamicResource RadiusControl}" />
       <Setter Property="Padding" Value="7,3" />
       <Setter Property="BorderThickness" Value="1" />
-      <Setter Property="BorderBrush" Value="{DynamicResource Sep}" />
+      <Setter Property="BorderBrush" Value="{DynamicResource Line}" />
     </Style>
     <!-- Not "ask": that name is the Ask bar's (Styles.axaml), whose fixed height and floating shadow it would take. -->
     <Style Selector="Border.settings-ask">
-      <Setter Property="MinHeight" Value="40" />
-      <Setter Property="CornerRadius" Value="12" />
+      <Setter Property="MinHeight" Value="48" />
+      <Setter Property="CornerRadius" Value="{DynamicResource RadiusPanel}" />
+      <Setter Property="Padding" Value="16,6,7,6" />
+      <Setter Property="Background" Value="{DynamicResource Surface}" />
+      <Setter Property="BorderBrush" Value="{DynamicResource Line}" />
       <Setter Property="BorderThickness" Value="1" />
-      <Setter Property="Padding" Value="12,4,6,4" />
     </Style>
-    <Style Selector=".mac Border.settings-ask">
-      <Setter Property="Background" Value="{DynamicResource Raised}" />
-      <Setter Property="BorderBrush" Value="{DynamicResource Sep}" />
+    <Style Selector="Border.settings-ask:focus-within">
+      <Setter Property="BorderBrush" Value="{DynamicResource Ink}" />
     </Style>
-    <Style Selector=".win Border.settings-ask">
-      <Setter Property="Background" Value="{DynamicResource Ctrl}" />
-      <Setter Property="BorderBrush" Value="{DynamicResource CtrlBorder}" />
+    <Style Selector="Border.settings-ask TextBox.bare">
+      <Setter Property="FontSize" Value="15" />
     </Style>
-    <Style Selector=".mac DockPanel.assistant">
-      <Setter Property="Margin" Value="40,12,40,24" />
-    </Style>
-    <Style Selector=".win DockPanel.assistant">
-      <Setter Property="Margin" Value="36,28,36,24" />
+    <Style Selector="DockPanel.assistant">
+      <Setter Property="Margin" Value="40,30,40,24" />
     </Style>
   </UserControl.Styles>
 
@@ -622,22 +465,19 @@
     </ControlTheme>
     <DataTemplate x:Key="NavRow" x:DataType="s:NavItem">
       <Button AutomationProperties.Name="{Binding Label}" Classes="nav" Classes.on="{Binding On}" Command="{Binding $parent[UserControl].((s:SettingsModel)DataContext).GoCommand}" CommandParameter="{Binding Id}">
-        <Panel>
-          <Border Classes="indicator" Width="3" Height="16" CornerRadius="2" Background="{DynamicResource Accent}" HorizontalAlignment="Left" Margin="-12,0,0,0" />
-          <StackPanel Orientation="Horizontal" Spacing="10">
-            <c:Icon Classes="navicon" Glyph="{Binding Glyph}" Size="16" />
-            <TextBlock Classes="navlabel" Text="{Binding Label}" VerticalAlignment="Center" />
-          </StackPanel>
-        </Panel>
+        <StackPanel Orientation="Horizontal" Spacing="10">
+          <c:Icon Classes="navicon" Glyph="{Binding Glyph}" Size="17" />
+          <TextBlock Classes="navlabel" Text="{Binding Label}" VerticalAlignment="Center" />
+        </StackPanel>
       </Button>
     </DataTemplate>
     <!-- A select's item: the menu's own item, bound to its choice (a MenuItem inside an item template would sit in the
          real item's header, and picking it did nothing). -->
     <ControlTheme x:Key="PickItem" TargetType="MenuItem" BasedOn="{StaticResource {x:Type MenuItem}}" x:DataType="vm:SettingChoice">
       <Setter Property="CornerRadius" Value="{DynamicResource RadiusControl}" />
-      <Setter Property="FontSize" Value="13" />
-      <Setter Property="Foreground" Value="{DynamicResource Fg}" />
-      <Setter Property="Padding" Value="10,5" />
+      <Setter Property="FontSize" Value="14" />
+      <Setter Property="Foreground" Value="{DynamicResource Ink}" />
+      <Setter Property="Padding" Value="10,6" />
       <Setter Property="Header" Value="{Binding Label}" />
       <Setter Property="Command" Value="{Binding Pick}" />
     </ControlTheme>
@@ -648,13 +488,14 @@
       <!-- The title bar: drag the window by it; the system's window buttons sit in it. -->
       <c:WindowHeader Name="Header" DockPanel.Dock="Top" CanResize="False" />
 
-      <Grid Name="Cols" ColumnDefinitions="220,*">
-        <c:Glass Name="Side" Classes="side">
-          <StackPanel Spacing="2">
+      <Grid Name="Cols" ColumnDefinitions="228,*" Margin="8,0,8,8">
+        <!-- The sections: straight on the canvas, as the library's sidebar is -->
+        <ScrollViewer Name="Side" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+          <StackPanel Spacing="2" Margin="6,2,10,8">
             <Border Classes="search">
               <Grid ColumnDefinitions="Auto,6,*,Auto" VerticalAlignment="Center">
-                <c:Icon Glyph="search" Size="15" Foreground="{DynamicResource Fg2}" VerticalAlignment="Center" />
-                <TextBox Name="Search" Grid.Column="2" Classes="bare" Text="{Binding SearchText}" PlaceholderText="Search settings" FontSize="13"
+                <c:Icon Glyph="search" Size="16" Foreground="{DynamicResource InkSubtle}" VerticalAlignment="Center" />
+                <TextBox Name="Search" Grid.Column="2" Classes="bare" Text="{Binding SearchText}" PlaceholderText="Search settings" FontSize="14"
                          VerticalAlignment="Center" AutomationProperties.Name="Search settings">
                   <TextBox.KeyBindings>
                     <KeyBinding Gesture="Enter" Command="{Binding OpenFirstHitCommand}" />
@@ -663,7 +504,7 @@
                 </TextBox>
                 <Button Grid.Column="3" Theme="{StaticResource Surface}" Padding="2" Command="{Binding ClearSearchCommand}" IsVisible="{Binding Searching}"
                         ToolTip.Tip="Clear" AutomationProperties.Name="Clear the search" VerticalAlignment="Center">
-                  <c:Icon Glyph="close" Size="14" Foreground="{DynamicResource Fg2}" />
+                  <c:Icon Glyph="close" Size="14" Foreground="{DynamicResource InkMuted}" />
                 </Button>
               </Grid>
             </Border>
@@ -676,7 +517,7 @@
                   <DataTemplate x:DataType="s:SettingsHit">
                     <Button Classes="hit" AutomationProperties.Name="{Binding Title}" Command="{Binding $parent[UserControl].((s:SettingsModel)DataContext).OpenHitCommand}" CommandParameter="{Binding}">
                       <Grid ColumnDefinitions="Auto,10,*">
-                        <c:Icon Glyph="{Binding Glyph}" Size="16" Foreground="{DynamicResource Fg2}" VerticalAlignment="Top" Margin="0,1,0,0" />
+                        <c:Icon Glyph="{Binding Glyph}" Size="17" Foreground="{DynamicResource InkMuted}" VerticalAlignment="Top" Margin="0,1,0,0" />
                         <StackPanel Grid.Column="2" Spacing="1">
                           <TextBlock Classes="hit-title" Text="{Binding Title}" />
                           <TextBlock Classes="hit-where" Text="{Binding Where}" />
@@ -689,8 +530,8 @@
               <TextBlock Classes="hit-where" Text="Nothing in Settings matches." Margin="10,4,0,4" IsVisible="{Binding NoHits}" />
               <Button Name="AskSearch" Classes="hit" Command="{Binding AskAboutSearchCommand}" AutomationProperties.Name="Ask your AI instead" Margin="0,6,0,0">
                 <Grid ColumnDefinitions="Auto,10,*">
-                  <c:Icon Glyph="forum" Size="16" Foreground="{DynamicResource AccentText}" VerticalAlignment="Top" Margin="0,1,0,0" />
-                  <TextBlock Grid.Column="2" Classes="hit-title" Text="{Binding AskLine}" Foreground="{DynamicResource AccentText}" />
+                  <c:Icon Glyph="forum" Size="17" Foreground="{DynamicResource Ink}" VerticalAlignment="Top" Margin="0,1,0,0" />
+                  <TextBlock Grid.Column="2" Classes="hit-title" Text="{Binding AskLine}" FontWeight="Bold" />
                 </Grid>
               </Button>
             </StackPanel>
@@ -711,16 +552,17 @@
             </ItemsControl>
             </StackPanel>
           </StackPanel>
-        </c:Glass>
+        </ScrollViewer>
 
-        <Border Grid.Column="1" Classes="page">
+        <Border Grid.Column="1" Classes="sheet" />
+        <Border Grid.Column="1" Classes="sheet-clip">
           <Panel>
           <ScrollViewer VerticalScrollBarVisibility="Auto" IsVisible="{Binding OnPlainPage}">
             <StackPanel Classes="pagebody">
               <!-- General -->
               <StackPanel IsVisible="{Binding OnGeneral}" Spacing="8">
                 <TextBlock Classes="h" Text="General" />
-                <TextBlock Classes="body" Text="How Syft Notes starts and updates, its shortcuts, and setup." />
+                <TextBlock Classes="body lede" Text="How Syft Notes starts and updates, its shortcuts, and setup." />
                 <TextBlock Classes="section" Text="Startup" />
                 <Border Classes="group">
                   <Border Classes="row">
@@ -743,11 +585,11 @@
                         <Grid ColumnDefinitions="*,Auto">
                           <c:PageText Classes="row-title" Text="{Binding UpdateHereLine}" TextWrapping="Wrap" VerticalAlignment="Center" />
                           <StackPanel Grid.Column="1" Classes="act" Orientation="Horizontal" Spacing="8" Margin="12,0,0,0">
-                            <Button Classes="pill" Command="{Binding CheckUpdateHereCommand}" IsEnabled="{Binding !UpdateHereBusy}">
-                              <TextBlock Text="Check now" FontSize="13" />
+                            <Button Classes="btn sm" Command="{Binding CheckUpdateHereCommand}" IsEnabled="{Binding !UpdateHereBusy}">
+                              <TextBlock Text="Check now" />
                             </Button>
-                            <Button Classes="pill primary" Command="{Binding UpdateHereNowCommand}" IsVisible="{Binding CanUpdateHere}" IsEnabled="{Binding !UpdateHereBusy}">
-                              <TextBlock Text="Update now" FontSize="13" FontWeight="Medium" />
+                            <Button Classes="btn sm ink" Command="{Binding UpdateHereNowCommand}" IsVisible="{Binding CanUpdateHere}" IsEnabled="{Binding !UpdateHereBusy}">
+                              <TextBlock Text="Update now" />
                             </Button>
                           </StackPanel>
                         </Grid>
@@ -773,8 +615,8 @@
                           <Border Classes="row">
                             <Grid ColumnDefinitions="*,Auto">
                               <c:PageText Classes="row-title" Text="{Binding Lib.UpdateLine}" TextWrapping="Wrap" />
-                              <Button Grid.Column="1" Classes="pill primary act" Command="{Binding Lib.UpdateNowCommand}" IsVisible="{Binding Lib.CanUpdateNow}" Margin="12,0,0,0">
-                                <TextBlock Text="Update now" FontSize="13" FontWeight="Medium" />
+                              <Button Grid.Column="1" Classes="btn sm ink act" Command="{Binding Lib.UpdateNowCommand}" IsVisible="{Binding Lib.CanUpdateNow}" Margin="12,0,0,0">
+                                <TextBlock Text="Update now" />
                               </Button>
                             </Grid>
                           </Border>
@@ -806,7 +648,7 @@
                 <StackPanel Spacing="8">
                   <TextBlock Classes="section gap" Text="Shortcuts" />
                                   <CheckBox IsChecked="{Binding Shortcuts}" Margin="0,4,0,4">
-                    <TextBlock Text="Search and Record work from any app" FontSize="13" />
+                    <TextBlock Text="Search and Record work from any app" FontSize="14" />
                   </CheckBox>
                   <v:ShortcutsEditor DataContext="{Binding Keys}" />
                   <c:PageText Classes="say" Text="{Binding ShortcutsSay}" IsVisible="{Binding ShortcutsSay, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" TextWrapping="Wrap" />
@@ -822,7 +664,7 @@
                           <ItemsControl.ItemTemplate>
                             <DataTemplate x:DataType="vm:UseChoice">
                               <CheckBox IsChecked="{Binding Ticked}" Margin="0,0,18,4" ToolTip.Tip="{Binding About}">
-                                <TextBlock Text="{Binding Title}" FontSize="13" />
+                                <TextBlock Text="{Binding Title}" FontSize="14" />
                               </CheckBox>
                             </DataTemplate>
                           </ItemsControl.ItemTemplate>
@@ -841,10 +683,8 @@
                         <TextBlock Classes="row-sub" Text="The first-run steps, with what's set up already kept" />
                       </StackPanel>
                       <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="12" VerticalAlignment="Center">
-                        <Button Name="SetUpByHand" Theme="{StaticResource Surface}" Padding="0" Command="{Binding RunSetupByHandCommand}" VerticalAlignment="Center">
-                          <TextBlock Text="Set up by hand" FontSize="12" Foreground="{DynamicResource AccentText}" />
-                        </Button>
-                        <Button Classes="pill" Command="{Binding RunSetupAgainCommand}" VerticalAlignment="Center"><TextBlock Text="Run setup" /></Button>
+                        <Button Name="SetUpByHand" Classes="text-link small" Command="{Binding RunSetupByHandCommand}" VerticalAlignment="Center" Content="Set up by hand" />
+                        <Button Classes="btn sm" Command="{Binding RunSetupAgainCommand}" VerticalAlignment="Center"><TextBlock Text="Run setup" /></Button>
                       </StackPanel>
                     </Grid>
                   </Border>
@@ -859,8 +699,8 @@
                           <TextBlock Classes="row-sub" Text="The speech models and illustration parts Syft Notes uses, and their licences" />
                         </StackPanel>
                         <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
-                          <Button Classes="pill" Command="{Binding ToggleCreditsCommand}"><TextBlock Text="{Binding CreditsButton}" /></Button>
-                          <Button Classes="pill" Command="{Binding QuitCommand}"><TextBlock Text="Quit Syft Notes" /></Button>
+                          <Button Classes="btn sm" Command="{Binding ToggleCreditsCommand}"><TextBlock Text="{Binding CreditsButton}" /></Button>
+                          <Button Classes="btn sm" Command="{Binding QuitCommand}"><TextBlock Text="Quit Syft Notes" /></Button>
                         </StackPanel>
                       </Grid>
                     </Border>
@@ -892,10 +732,10 @@
 
               <StackPanel IsVisible="{Binding OnAppearance}" Spacing="8">
                 <TextBlock Classes="h" Text="Appearance" />
-                <TextBlock Classes="body" Text="Pick how Syft Notes looks." />
+                <TextBlock Classes="body lede" Text="Pick how Syft Notes looks." />
                 <TextBlock Classes="section" Text="Mode" />
-                <!-- Mac: a three-way segmented pill, System Settings' own way of choosing an appearance. -->
-                <Border Classes="seg" IsVisible="{Binding IsMac}" HorizontalAlignment="Left">
+                <!-- The three in one sunken track, the chosen one the white chip. -->
+                <Border Classes="seg" HorizontalAlignment="Left" Margin="0,4,0,0">
                   <StackPanel Orientation="Horizontal" Spacing="2">
                     <Button Classes="seg-item" Classes.on="{Binding AppearanceIsSystem}"
                             Command="{Binding PickAppearanceCommand}" CommandParameter="{x:Static s:AppAppearance.System}">
@@ -911,35 +751,9 @@
                     </Button>
                   </StackPanel>
                 </Border>
-                <!-- Windows: a vertical list of radio rows, each the full row wide; a row's hover stays inside the
-                     group's rounded corners. -->
-                <Border Classes="group" IsVisible="{Binding IsWin}" ClipToBounds="True">
-                  <ItemsControl ItemsSource="{Binding AppearanceOptions}">
-                    <ItemsControl.ItemTemplate>
-                      <DataTemplate x:DataType="s:AppearanceOption">
-                        <StackPanel>
-                          <Border Classes="rowsep itemsep" />
-                          <Button Theme="{StaticResource Surface}" HorizontalContentAlignment="Stretch"
-                                  Command="{Binding $parent[UserControl].((s:SettingsModel)DataContext).PickAppearanceCommand}" CommandParameter="{Binding Mode}">
-                            <Border Classes="row">
-                              <Grid ColumnDefinitions="*,Auto">
-                                <TextBlock Classes="row-title" Text="{Binding Label}" />
-                                <Panel Grid.Column="1" Classes="act" Width="16" Height="16">
-                                  <Ellipse Width="16" Height="16" Stroke="{DynamicResource Fg3}" StrokeThickness="1.3" IsVisible="{Binding !Chosen}" />
-                                  <Ellipse Width="16" Height="16" Stroke="{DynamicResource Accent}" StrokeThickness="1.3" IsVisible="{Binding Chosen}" />
-                                  <Ellipse Width="8" Height="8" Fill="{DynamicResource Accent}" IsVisible="{Binding Chosen}" HorizontalAlignment="Center" VerticalAlignment="Center" />
-                                </Panel>
-                              </Grid>
-                            </Border>
-                          </Button>
-                        </StackPanel>
-                      </DataTemplate>
-                    </ItemsControl.ItemTemplate>
-                  </ItemsControl>
-                </Border>
                 <TextBlock Classes="say" Text="Light and dark set the whole app at once: the dropdown, quick panel, recorder, library and setup." />
                 <TextBlock Classes="section gap" Text="Colour theme" />
-                <Border Classes="group" Padding="16">
+                <Border Classes="group" Padding="16,18,16,8">
                   <!-- Unclipped, so a swatch's focus ring shows whole. -->
                   <ItemsControl ItemsSource="{Binding Themes}" ClipToBounds="False">
                     <ItemsControl.ItemsPanel><ItemsPanelTemplate><UniformGrid Columns="5" /></ItemsPanelTemplate></ItemsControl.ItemsPanel>
@@ -948,21 +762,13 @@
                         <Button AutomationProperties.Name="{Binding Name}" Classes="quiet swatch" Theme="{StaticResource Surface}" Padding="0" Margin="0,0,0,10"
                                 Command="{Binding $parent[UserControl].((s:SettingsModel)DataContext).PickThemeCommand}" CommandParameter="{Binding Name}">
                           <StackPanel Spacing="6" HorizontalAlignment="Center">
-                            <Panel IsVisible="{Binding $parent[UserControl].((s:SettingsModel)DataContext).ShowMacSwatch}" Width="52" Height="52" HorizontalAlignment="Center">
+                            <Panel Width="52" Height="52" HorizontalAlignment="Center">
                               <Border Classes="swatchring" Classes.on="{Binding Chosen}" Width="52" Height="52" CornerRadius="26">
-                                <Border Width="48" Height="48" CornerRadius="24" Background="{DynamicResource Win}" HorizontalAlignment="Center" VerticalAlignment="Center">
+                                <Border Width="48" Height="48" CornerRadius="24" Background="{DynamicResource Surface}" HorizontalAlignment="Center" VerticalAlignment="Center">
                                   <Ellipse Width="44" Height="44" Fill="{Binding Swatch}" />
                                 </Border>
                               </Border>
                               <Border Classes="focusring" Margin="-4" CornerRadius="30" />
-                            </Panel>
-                            <Panel IsVisible="{Binding !$parent[UserControl].((s:SettingsModel)DataContext).ShowMacSwatch}" Width="40" Height="40" HorizontalAlignment="Center">
-                              <Border Width="40" Height="40" CornerRadius="4" Background="{Binding Swatch}" />
-                              <Border Classes="swatchborder" Classes.on="{Binding Chosen}" Width="40" Height="40" CornerRadius="4" BorderThickness="2" />
-                              <Border Width="18" Height="18" CornerRadius="9" Background="{DynamicResource Mini}" IsVisible="{Binding Chosen}">
-                                <c:Icon Glyph="check" Size="12" Foreground="{DynamicResource Fg}" />
-                              </Border>
-                              <Border Classes="focusring" Margin="-4" CornerRadius="8" />
                             </Panel>
                             <TextBlock Classes="swatchname" Text="{Binding Name}" />
                           </StackPanel>
@@ -977,15 +783,15 @@
               <!-- Connection: which library this computer uses (and, where it runs one, that library's process) -->
               <StackPanel IsVisible="{Binding OnConnection}" Spacing="8">
                 <TextBlock Classes="h" Text="Connection" />
-                <c:PageText Classes="body" Text="{Binding LibraryLine}" />
+                <c:PageText Classes="body lede" Text="{Binding LibraryLine}" />
                 <!-- The library runs here: what it's doing, and its page. Nothing to connect to: using another computer's
                      library instead is This computer's choice, below. -->
                 <StackPanel Spacing="8" IsVisible="{Binding LibraryHere}">
                   <c:PageText Classes="say" Text="{Binding LibraryServiceLine}" IsVisible="{Binding LibraryServiceLine, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
                   <StackPanel Orientation="Horizontal" Spacing="10" Margin="0,4,0,0">
-                    <Button Classes="pill" Command="{Binding OpenLibraryPageCommand}"><TextBlock Text="Open the library's page" FontSize="13" /></Button>
-                    <Button Classes="pill" Command="{Binding StartLibraryCommand}" IsVisible="{Binding CanStartLibrary}"><TextBlock Text="Start" FontSize="13" /></Button>
-                    <Button Classes="pill" Command="{Binding StopLibraryCommand}" IsVisible="{Binding CanStopLibrary}"><TextBlock Text="Stop" FontSize="13" /></Button>
+                    <Button Classes="btn sm" Command="{Binding OpenLibraryPageCommand}"><TextBlock Text="Open the library's page" /></Button>
+                    <Button Classes="btn sm" Command="{Binding StartLibraryCommand}" IsVisible="{Binding CanStartLibrary}"><TextBlock Text="Start" /></Button>
+                    <Button Classes="btn sm" Command="{Binding StopLibraryCommand}" IsVisible="{Binding CanStopLibrary}"><TextBlock Text="Stop" /></Button>
                   </StackPanel>
                   <TextBlock Classes="say" Text="It runs while Syft Notes is open. Turn on Start at login in General to keep it running; its own settings, and adding a laptop, are under Your library." />
                 </StackPanel>
@@ -993,17 +799,17 @@
                 <StackPanel Spacing="8" IsVisible="{Binding !LibraryHere}">
                   <TextBlock Classes="section" Text="Connect to a library" />
                   <Grid ColumnDefinitions="*,10,160" MaxWidth="480" HorizontalAlignment="Left">
-                    <Border Classes="field"><TextBox Classes="bare" Text="{Binding Address}" PlaceholderText="http://mac-mini:8787" FontSize="13" /></Border>
-                    <Border Grid.Column="2" Classes="field"><TextBox Classes="bare" Text="{Binding Password}" PasswordChar="•" PlaceholderText="Password" FontSize="13" /></Border>
+                    <Border Classes="field"><TextBox Classes="bare" Text="{Binding Address}" PlaceholderText="http://mac-mini:8787" /></Border>
+                    <Border Grid.Column="2" Classes="field"><TextBox Classes="bare" Text="{Binding Password}" PasswordChar="•" PlaceholderText="Password" /></Border>
                   </Grid>
                   <StackPanel Orientation="Horizontal" Spacing="10" Margin="0,10,0,0">
-                    <Button Classes="pill primary" Command="{Binding ConnectCommand}"><TextBlock Text="Connect" FontSize="13" FontWeight="Medium" /></Button>
-                    <Button Classes="pill" Command="{Binding OpenLibraryPageCommand}"><TextBlock Text="Open the library's page" FontSize="13" /></Button>
+                    <Button Classes="btn sm ink" Command="{Binding ConnectCommand}"><TextBlock Text="Connect" /></Button>
+                    <Button Classes="btn sm" Command="{Binding OpenLibraryPageCommand}"><TextBlock Text="Open the library's page" /></Button>
                   </StackPanel>
                 </StackPanel>
                 <c:PageText Classes="say" Text="{Binding LibrarySay}" IsVisible="{Binding LibrarySay, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
                 <TextBlock Classes="section gap" Text="Your name in the library" />
-                <Border Classes="field" Width="240" HorizontalAlignment="Left"><TextBox Classes="bare" Text="{Binding DisplayName}" FontSize="13" /></Border>
+                <Border Classes="field" Width="240" HorizontalAlignment="Left"><TextBox Classes="bare" Text="{Binding DisplayName}" /></Border>
                 <!-- This computer's role, switched any time after setup (docs/one-download.md) -->
                 <TextBlock Classes="section gap" Text="This computer" />
                 <TextBlock Classes="body" Text="{Binding RoleWords}" />
@@ -1017,8 +823,8 @@
                         <TextBlock Classes="row-sub" Text="{Binding PendingBringLine}" TextWrapping="Wrap" />
                       </StackPanel>
                       <StackPanel Grid.Column="4" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
-                        <Button Classes="pill" Command="{Binding LeaveThemThereCommand}" IsEnabled="{Binding !Switching}"><TextBlock Text="Leave them there" FontSize="13" /></Button>
-                        <Button Classes="pill primary" Command="{Binding BringAgainCommand}" IsEnabled="{Binding !Switching}"><TextBlock Text="{Binding PendingBringAction}" FontSize="13" FontWeight="Medium" /></Button>
+                        <Button Classes="btn sm" Command="{Binding LeaveThemThereCommand}" IsEnabled="{Binding !Switching}"><TextBlock Text="Leave them there" /></Button>
+                        <Button Classes="btn sm ink" Command="{Binding BringAgainCommand}" IsEnabled="{Binding !Switching}"><TextBlock Text="{Binding PendingBringAction}" /></Button>
                       </StackPanel>
                     </Grid>
                   </Border>
@@ -1032,8 +838,8 @@
                           <TextBlock Classes="row-title" Text="Use just this computer" />
                           <TextBlock Classes="row-sub" Text="{Binding JustThisComputerLine}" TextWrapping="Wrap" />
                         </StackPanel>
-                        <Button Grid.Column="1" Classes="pill act" Margin="12,0,0,0" IsVisible="{Binding !ConfirmingBecomeLibrary}" Command="{Binding AskBecomeLibraryCommand}">
-                          <TextBlock Text="Use just this computer…" FontSize="13" />
+                        <Button Grid.Column="1" Classes="btn sm act" Margin="12,0,0,0" IsVisible="{Binding !ConfirmingBecomeLibrary}" Command="{Binding AskBecomeLibraryCommand}">
+                          <TextBlock Text="Use just this computer…" />
                         </Button>
                       </Grid>
                     </Border>
@@ -1041,8 +847,8 @@
                   <StackPanel Spacing="8" IsVisible="{Binding ConfirmingBecomeLibrary}">
                     <TextBlock Classes="say" MaxWidth="560" Text="{Binding BecomeLibraryQuestion}" />
                     <StackPanel Orientation="Horizontal" Spacing="8">
-                      <Button Classes="pill" Command="{Binding CancelBecomeLibraryCommand}" IsEnabled="{Binding !Switching}"><TextBlock Text="Cancel" FontSize="13" /></Button>
-                      <Button Classes="pill primary" Command="{Binding ConfirmBecomeLibraryCommand}" IsEnabled="{Binding !Switching}"><TextBlock Text="Use just this computer" FontSize="13" FontWeight="Medium" /></Button>
+                      <Button Classes="btn sm" Command="{Binding CancelBecomeLibraryCommand}" IsEnabled="{Binding !Switching}"><TextBlock Text="Cancel" /></Button>
+                      <Button Classes="btn sm ink" Command="{Binding ConfirmBecomeLibraryCommand}" IsEnabled="{Binding !Switching}"><TextBlock Text="Use just this computer" /></Button>
                     </StackPanel>
                   </StackPanel>
                 </StackPanel>
@@ -1058,26 +864,25 @@
                     </Border>
                   </Border>
                   <Grid ColumnDefinitions="*,10,160" MaxWidth="480" HorizontalAlignment="Left" Margin="0,4,0,0" IsVisible="{Binding !ConfirmingBecomeLaptop}">
-                    <Border Classes="field"><TextBox Classes="bare" Text="{Binding BecomeLaptopAddress}" PlaceholderText="http://mac-mini:8787" FontSize="13" /></Border>
-                    <Border Grid.Column="2" Classes="field"><TextBox Classes="bare" Text="{Binding BecomeLaptopPassword}" PasswordChar="•" PlaceholderText="Its password" FontSize="13" /></Border>
+                    <Border Classes="field"><TextBox Classes="bare" Text="{Binding BecomeLaptopAddress}" PlaceholderText="http://mac-mini:8787" /></Border>
+                    <Border Grid.Column="2" Classes="field"><TextBox Classes="bare" Text="{Binding BecomeLaptopPassword}" PasswordChar="•" PlaceholderText="Its password" /></Border>
                   </Grid>
-                  <Button Classes="pill" HorizontalAlignment="Left" IsVisible="{Binding !ConfirmingBecomeLaptop}" Command="{Binding AskBecomeLaptopCommand}">
-                    <TextBlock Text="Become a laptop" FontSize="13" />
+                  <Button Classes="btn sm" HorizontalAlignment="Left" IsVisible="{Binding !ConfirmingBecomeLaptop}" Command="{Binding AskBecomeLaptopCommand}">
+                    <TextBlock Text="Become a laptop" />
                   </Button>
                   <StackPanel Spacing="8" IsVisible="{Binding ConfirmingBecomeLaptop}">
                     <TextBlock Classes="say" MaxWidth="560"
                                Text="Everything in this library goes to that address first, so nothing is left behind; if that library can't take it all, nothing changes here. Then this computer stops being the library: its lectures, notes and settings stay right where they are, ready for it to be the library again any time." />
                     <StackPanel Orientation="Horizontal" Spacing="8">
-                      <Button Classes="pill" Command="{Binding CancelBecomeLaptopCommand}" IsEnabled="{Binding !Switching}"><TextBlock Text="Cancel" FontSize="13" /></Button>
-                      <Button Classes="pill primary" Command="{Binding ConfirmBecomeLaptopCommand}" IsEnabled="{Binding !Switching}"><TextBlock Text="Switch" FontSize="13" FontWeight="Medium" /></Button>
+                      <Button Classes="btn sm" Command="{Binding CancelBecomeLaptopCommand}" IsEnabled="{Binding !Switching}"><TextBlock Text="Cancel" /></Button>
+                      <Button Classes="btn sm ink" Command="{Binding ConfirmBecomeLaptopCommand}" IsEnabled="{Binding !Switching}"><TextBlock Text="Switch" /></Button>
                     </StackPanel>
                   </StackPanel>
                 </StackPanel>
                 <!-- How far bringing (or handing on) a library has got, then what came -->
                 <TextBlock Classes="say" Text="{Binding BringLine}" IsVisible="{Binding BringLine, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
-                <Border IsVisible="{Binding ShowBringBar}" Height="4" CornerRadius="2" Background="{DynamicResource Fill2}" Width="480"
-                        HorizontalAlignment="Left" Margin="0,4,0,0">
-                  <Border Width="{Binding BringBarWidth}" CornerRadius="2" Background="{DynamicResource Accent}" HorizontalAlignment="Left" />
+                <Border Classes="track" IsVisible="{Binding ShowBringBar}" Margin="0,4,0,0">
+                  <Border Width="{Binding BringBarWidth}" />
                 </Border>
                 <c:PageText Classes="say" MaxWidth="560" Text="{Binding SwitchSay}" IsVisible="{Binding SwitchSay, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
               </StackPanel>
@@ -1085,7 +890,7 @@
               <!-- Recording -->
               <StackPanel IsVisible="{Binding OnRecording}" Spacing="8">
                 <TextBlock Classes="h" Text="Recording" />
-                <TextBlock Classes="body" Text="Each lecture is written down on this computer by the model you pick. The recording never leaves it; the library gets the transcript." />
+                <TextBlock Classes="body lede" Text="Each lecture is written down on this computer by the model you pick. The recording never leaves it; the library gets the transcript." />
                 <TextBlock Classes="section" Text="Transcription model" />
                 <!-- Unclipped, so a card's focus ring shows whole. -->
                 <ItemsControl ItemsSource="{Binding Models}" MaxWidth="480" HorizontalAlignment="Left" ClipToBounds="False">
@@ -1099,17 +904,17 @@
                             <Grid ColumnDefinitions="*,Auto">
                               <StackPanel Spacing="2">
                                 <StackPanel Orientation="Horizontal" Spacing="8">
-                                  <TextBlock Text="{Binding Name}" FontSize="13" FontWeight="SemiBold" VerticalAlignment="Center" />
+                                  <TextBlock Classes="choice-title" Text="{Binding Name}" />
                                   <Border Classes="badge" IsVisible="{Binding Recommended}"><TextBlock Text="Recommended" /></Border>
                                 </StackPanel>
-                                <TextBlock Text="{Binding About}" FontSize="12" Foreground="{DynamicResource Fg2}" TextWrapping="Wrap" />
+                                <TextBlock Classes="choice-about" Text="{Binding About}" />
                               </StackPanel>
                               <StackPanel Grid.Column="1" Spacing="6" Margin="10,0,0,0" VerticalAlignment="Center" HorizontalAlignment="Right">
-                                <c:Icon IsVisible="{Binding Here}" Glyph="check_circle" Filled="True" Size="18" Foreground="{DynamicResource Accent}" HorizontalAlignment="Right" />
+                                <c:Icon IsVisible="{Binding Here}" Glyph="check_circle" Filled="True" Size="18" Foreground="{DynamicResource Ink}" HorizontalAlignment="Right" />
                                 <!-- Downloaded and not in use: its own Remove (asks first, under the list) -->
-                                <Button Classes="pill" IsVisible="{Binding CanRemove}" AutomationProperties.Name="{Binding RemoveSaid}" ToolTip.Tip="{Binding RemoveSaid}"
+                                <Button Classes="btn sm" IsVisible="{Binding CanRemove}" AutomationProperties.Name="{Binding RemoveSaid}" ToolTip.Tip="{Binding RemoveSaid}"
                                         Command="{Binding $parent[UserControl].((s:SettingsModel)DataContext).AskRemoveModelCommand}" CommandParameter="{Binding}">
-                                  <TextBlock Text="Remove" FontSize="12" />
+                                  <TextBlock Text="Remove" />
                                 </Button>
                               </StackPanel>
                             </Grid>
@@ -1120,17 +925,16 @@
                   </ItemsControl.ItemTemplate>
                 </ItemsControl>
                 <TextBlock Classes="say" Text="{Binding ModelAdviceLine}" Margin="0,0,0,0" />
-                <Border IsVisible="{Binding ModelDownloading}" Height="4" CornerRadius="2" Background="{DynamicResource Fill2}" Width="480"
-                        HorizontalAlignment="Left" Margin="0,8,0,0">
-                  <Border Width="{Binding ModelBarWidth}" CornerRadius="2" Background="{DynamicResource Accent}" HorizontalAlignment="Left" />
+                <Border Classes="track" IsVisible="{Binding ModelDownloading}" Margin="0,8,0,0">
+                  <Border Width="{Binding ModelBarWidth}" />
                 </Border>
                 <c:PageText Classes="say" Text="{Binding ModelLine}" />
                 <!-- A model no longer in use (after a switch) stays until the student presses its Remove in the list. -->
                 <StackPanel Spacing="8" Margin="0,8,0,0" IsVisible="{Binding ConfirmingRemove}">
-                  <TextBlock Text="{Binding RemoveQuestion}" FontSize="12" Foreground="{DynamicResource Fg2}" TextWrapping="Wrap" MaxWidth="480" HorizontalAlignment="Left" />
+                  <TextBlock Classes="say" Text="{Binding RemoveQuestion}" Margin="0" MaxWidth="480" />
                   <StackPanel Orientation="Horizontal" Spacing="8">
-                    <Button Classes="pill" Command="{Binding KeepSpareCommand}"><TextBlock Text="Keep" FontSize="13" /></Button>
-                    <Button Classes="pill primary" Command="{Binding RemoveSpareCommand}"><TextBlock Text="Remove" FontSize="13" FontWeight="Medium" /></Button>
+                    <Button Classes="btn sm" Command="{Binding KeepSpareCommand}"><TextBlock Text="Keep" /></Button>
+                    <Button Classes="btn sm ink" Command="{Binding RemoveSpareCommand}"><TextBlock Text="Remove" /></Button>
                   </StackPanel>
                 </StackPanel>
                 <!-- When a lecture is written down: one choice, the model's cards' look. -->
@@ -1142,9 +946,8 @@
                       <Border Classes="focusring cardring" Margin="-4" />
                       <Border Classes="choice" Classes.on="{Binding LiveTranscript}">
                         <StackPanel Spacing="2">
-                          <TextBlock Text="As you record" FontSize="13" FontWeight="SemiBold" />
-                          <TextBlock Text="The recorder shows the transcript as the lecture goes, and you can ask about what's been said so far."
-                                     FontSize="12" Foreground="{DynamicResource Fg2}" TextWrapping="Wrap" />
+                          <TextBlock Classes="choice-title" Text="As you record" />
+                          <TextBlock Classes="choice-about" Text="The recorder shows the transcript as the lecture goes, and you can ask about what's been said so far." />
                         </StackPanel>
                       </Border>
                     </Panel>
@@ -1155,9 +958,8 @@
                       <Border Classes="focusring cardring" Margin="-4" />
                       <Border Classes="choice" Classes.on="{Binding AfterClass}">
                         <StackPanel Spacing="2">
-                          <TextBlock Text="After class" FontSize="13" FontWeight="SemiBold" />
-                          <TextBlock Text="Only records during the lecture, which saves battery. It's written down once you stop, so the transcript, and asking about it, come then."
-                                     FontSize="12" Foreground="{DynamicResource Fg2}" TextWrapping="Wrap" />
+                          <TextBlock Classes="choice-title" Text="After class" />
+                          <TextBlock Classes="choice-about" Text="Only records during the lecture, which saves battery. It's written down once you stop, so the transcript, and asking about it, come then." />
                         </StackPanel>
                       </Border>
                     </Panel>
@@ -1166,18 +968,18 @@
                 <TextBlock Classes="say" Text="{Binding LiveTranscriptLine}" TextWrapping="Wrap" MaxWidth="480" HorizontalAlignment="Left"
                            IsVisible="{Binding LiveTranscriptLine, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
                 <TextBlock Classes="section" Text="Language" />
-                <Border Classes="field" Width="240" HorizontalAlignment="Left"><TextBox Classes="bare" Text="{Binding Language}" PlaceholderText="Found for each lecture (or en, es, fr…)" FontSize="13" /></Border>
+                <Border Classes="field" Width="240" HorizontalAlignment="Left"><TextBox Classes="bare" Text="{Binding Language}" PlaceholderText="Found for each lecture (or en, es, fr…)" /></Border>
                 <CheckBox IsVisible="{Binding CanRecordComputerAudio}" IsChecked="{Binding ComputerAudio}" Margin="0,16,0,0">
-                  <TextBlock Text="Also record what this computer plays (a lecture on Zoom or Teams)" FontSize="13" />
+                  <TextBlock Text="Also record what this computer plays (a lecture on Zoom or Teams)" FontSize="14" />
                 </CheckBox>
                 <CheckBox IsChecked="{Binding Speakers}" Margin="0,16,0,0">
-                  <TextBlock Text="Tell speakers apart in the transcript" FontSize="13" />
+                  <TextBlock Text="Tell speakers apart in the transcript" FontSize="14" />
                 </CheckBox>
                 <TextBlock Classes="say" Text="{Binding SpeakersLine}" TextWrapping="Wrap" MaxWidth="480" HorizontalAlignment="Left" />
                 <TextBlock Classes="section" Text="Keep recordings" />
                 <StackPanel Orientation="Horizontal" Spacing="8">
-                  <Border Classes="field" Width="64"><TextBox Classes="bare" Text="{Binding KeepAudio}" FontSize="13" /></Border>
-                  <TextBlock Text="days after they're filed (0 keeps them). The notes and transcript stay." FontSize="12" Foreground="{DynamicResource Fg2}" VerticalAlignment="Center" />
+                  <Border Classes="field" Width="64"><TextBox Classes="bare" Text="{Binding KeepAudio}" /></Border>
+                  <TextBlock Classes="say" Text="days after they're filed (0 keeps them). The notes and transcript stay." Margin="0" VerticalAlignment="Center" />
                 </StackPanel>
               </StackPanel>
 
@@ -1185,7 +987,7 @@
                    row is one grid: its words on the left, its control in the right column on the row's centre line. -->
               <StackPanel IsVisible="{Binding OnLibraryPage}" Spacing="8">
                 <TextBlock Classes="h" Text="{Binding LibraryPageTitle}" />
-                <TextBlock Classes="body" Text="{Binding LibraryPageLine}" />
+                <TextBlock Classes="body lede" Text="{Binding LibraryPageLine}" />
                 <TextBlock Classes="say" Text="Asking your library…" IsVisible="{Binding Lib.IsLoading}" />
                 <Border Classes="group" IsVisible="{Binding Lib.ShowProblem}">
                   <Border Classes="row">
@@ -1193,9 +995,9 @@
                       <c:Icon Glyph="info" Size="18" Foreground="{DynamicResource Fg2}" VerticalAlignment="Center" />
                       <c:PageText Grid.Column="2" Classes="row-title" Text="{Binding Lib.Problem}" TextWrapping="Wrap" />
                       <StackPanel Grid.Column="4" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
-                        <Button Classes="pill" Command="{Binding Lib.LoadCommand}" IsVisible="{Binding Lib.CanRetry}"><TextBlock Text="Try again" FontSize="13" /></Button>
-                        <Button Classes="pill" Command="{Binding Lib.OpenLibraryPageCommand}" IsVisible="{Binding Lib.CanOpenPage}"><TextBlock Text="Open its page" FontSize="13" /></Button>
-                        <Button Classes="pill" Command="{Binding GoCommand}" CommandParameter="Connection" IsVisible="{Binding Lib.IsNoLibrary}"><TextBlock Text="Connection" FontSize="13" /></Button>
+                        <Button Classes="btn sm" Command="{Binding Lib.LoadCommand}" IsVisible="{Binding Lib.CanRetry}"><TextBlock Text="Try again" /></Button>
+                        <Button Classes="btn sm" Command="{Binding Lib.OpenLibraryPageCommand}" IsVisible="{Binding Lib.CanOpenPage}"><TextBlock Text="Open its page" /></Button>
+                        <Button Classes="btn sm" Command="{Binding GoCommand}" CommandParameter="Connection" IsVisible="{Binding Lib.IsNoLibrary}"><TextBlock Text="Connection" /></Button>
                       </StackPanel>
                     </Grid>
                   </Border>
@@ -1215,7 +1017,7 @@
                               <TextBlock Classes="row-sub" Text="{Binding Lib.NameSub}" />
                             </StackPanel>
                             <Border Grid.Column="1" Classes="field act" Width="220">
-                              <TextBox Name="LibraryName" Classes="bare" Text="{Binding Lib.Name}" FontSize="13" VerticalAlignment="Center" />
+                              <TextBox Name="LibraryName" Classes="bare" Text="{Binding Lib.Name}" VerticalAlignment="Center" />
                             </Border>
                           </Grid>
                         </Border>
@@ -1226,13 +1028,13 @@
                               <TextBlock Classes="row-title" Text="Password" />
                               <TextBlock Classes="row-sub" Text="{Binding Lib.PasswordLine}" />
                             </StackPanel>
-                            <Button Grid.Column="1" Classes="pill act" Command="{Binding Lib.ChangePasswordCommand}" IsVisible="{Binding !Lib.ChangingPassword}"><TextBlock Text="Change…" FontSize="13" /></Button>
+                            <Button Grid.Column="1" Classes="btn sm act" Command="{Binding Lib.ChangePasswordCommand}" IsVisible="{Binding !Lib.ChangingPassword}"><TextBlock Text="Change…" /></Button>
                             <StackPanel Grid.Column="1" Classes="act" Orientation="Horizontal" Spacing="8" IsVisible="{Binding Lib.ChangingPassword}">
                               <Border Classes="field" Width="180">
-                                <TextBox Name="NewPassword" Classes="bare" Text="{Binding Lib.NewPassword}" PasswordChar="•" PlaceholderText="New password" FontSize="13" VerticalAlignment="Center" />
+                                <TextBox Name="NewPassword" Classes="bare" Text="{Binding Lib.NewPassword}" PasswordChar="•" PlaceholderText="New password" VerticalAlignment="Center" />
                               </Border>
-                              <Button Classes="pill" Command="{Binding Lib.ChangePasswordCommand}"><TextBlock Text="Cancel" FontSize="13" /></Button>
-                              <Button Classes="pill primary" Command="{Binding Lib.SavePasswordCommand}"><TextBlock Text="Save" FontSize="13" FontWeight="Medium" /></Button>
+                              <Button Classes="btn sm" Command="{Binding Lib.ChangePasswordCommand}"><TextBlock Text="Cancel" /></Button>
+                              <Button Classes="btn sm ink" Command="{Binding Lib.SavePasswordCommand}"><TextBlock Text="Save" /></Button>
                             </StackPanel>
                           </Grid>
                         </Border>
@@ -1250,24 +1052,24 @@
                               <TextBlock Classes="row-title" Text="{Binding Lib.LaptopsTitle}" />
                               <TextBlock Classes="row-sub" Text="{Binding Lib.LaptopsSub}" TextWrapping="Wrap" />
                             </StackPanel>
-                            <Button Grid.Column="1" Classes="pill act" Command="{Binding Lib.AddLaptopCommand}" Margin="12,0,0,0" IsEnabled="{Binding !Lib.ChangingLaptops}">
+                            <Button Grid.Column="1" Classes="btn sm act" Command="{Binding Lib.AddLaptopCommand}" Margin="12,0,0,0" IsEnabled="{Binding !Lib.ChangingLaptops}">
                               <Button.IsVisible>
                                 <MultiBinding Converter="{x:Static BoolConverters.And}">
                                   <Binding Path="Lib.OnlyThisComputer" />
                                   <Binding Path="!Lib.AddingLaptop" />
                                 </MultiBinding>
                               </Button.IsVisible>
-                              <TextBlock Text="Add a laptop…" FontSize="13" />
+                              <TextBlock Text="Add a laptop…" />
                             </Button>
                             <StackPanel Grid.Column="1" Classes="act" Orientation="Horizontal" Spacing="8" Margin="12,0,0,0" IsVisible="{Binding Lib.AddingLaptop}">
                               <Border Classes="field" Width="180">
-                                <TextBox Name="LaptopPassword" Classes="bare" Text="{Binding Lib.LaptopPassword}" PasswordChar="•" PlaceholderText="A password for your laptop" FontSize="13" VerticalAlignment="Center" />
+                                <TextBox Name="LaptopPassword" Classes="bare" Text="{Binding Lib.LaptopPassword}" PasswordChar="•" PlaceholderText="A password for your laptop" VerticalAlignment="Center" />
                               </Border>
-                              <Button Classes="pill" Command="{Binding Lib.AddLaptopCommand}"><TextBlock Text="Cancel" FontSize="13" /></Button>
-                              <Button Classes="pill primary" Command="{Binding Lib.TurnOnLaptopsCommand}" IsEnabled="{Binding !Lib.ChangingLaptops}"><TextBlock Text="Turn on" FontSize="13" FontWeight="Medium" /></Button>
+                              <Button Classes="btn sm" Command="{Binding Lib.AddLaptopCommand}"><TextBlock Text="Cancel" /></Button>
+                              <Button Classes="btn sm ink" Command="{Binding Lib.TurnOnLaptopsCommand}" IsEnabled="{Binding !Lib.ChangingLaptops}"><TextBlock Text="Turn on" /></Button>
                             </StackPanel>
-                            <Button Grid.Column="1" Classes="pill act" Command="{Binding Lib.TurnOffLaptopsCommand}" IsVisible="{Binding Lib.LaptopsCanConnect}" IsEnabled="{Binding !Lib.ChangingLaptops}" Margin="12,0,0,0">
-                              <TextBlock Text="Turn off" FontSize="13" />
+                            <Button Grid.Column="1" Classes="btn sm act" Command="{Binding Lib.TurnOffLaptopsCommand}" IsVisible="{Binding Lib.LaptopsCanConnect}" IsEnabled="{Binding !Lib.ChangingLaptops}" Margin="12,0,0,0">
+                              <TextBlock Text="Turn off" />
                             </Button>
                           </Grid>
                         </Border>
@@ -1285,8 +1087,8 @@
                             <Border Classes="row">
                               <Grid ColumnDefinitions="*,Auto">
                                 <c:PageText Classes="row-title" Text="{Binding}" VerticalAlignment="Center" />
-                                <Button Grid.Column="1" Classes="pill act" Command="{Binding $parent[UserControl].((s:SettingsModel)DataContext).Lib.CopyAddressCommand}" CommandParameter="{Binding}">
-                                  <TextBlock Text="Copy" FontSize="13" />
+                                <Button Grid.Column="1" Classes="btn sm act" Command="{Binding $parent[UserControl].((s:SettingsModel)DataContext).Lib.CopyAddressCommand}" CommandParameter="{Binding}">
+                                  <TextBlock Text="Copy" />
                                 </Button>
                               </Grid>
                             </Border>
@@ -1317,8 +1119,8 @@
                               <TextBlock Classes="row-title" Text="Notes folder" />
                               <c:PageText Classes="row-sub" Text="{Binding Lib.NotesFolder}" TextTrimming="PrefixCharacterEllipsis" />
                             </StackPanel>
-                            <Button Grid.Column="1" Classes="pill act" Command="{Binding Lib.ShowNotesFolderCommand}" IsVisible="{Binding Lib.IsHere}" Margin="12,0,0,0">
-                              <TextBlock Text="{Binding Lib.RevealLabel}" FontSize="13" />
+                            <Button Grid.Column="1" Classes="btn sm act" Command="{Binding Lib.ShowNotesFolderCommand}" IsVisible="{Binding Lib.IsHere}" Margin="12,0,0,0">
+                              <TextBlock Text="{Binding Lib.RevealLabel}" />
                             </Button>
                           </Grid>
                         </Border>
@@ -1331,8 +1133,8 @@
                         <Border Classes="row">
                           <Grid ColumnDefinitions="*,Auto">
                             <c:PageText Classes="row-title" Text="{Binding Lib.UpdateLine}" TextWrapping="Wrap" />
-                            <Button Grid.Column="1" Classes="pill primary act" Command="{Binding Lib.UpdateNowCommand}" IsVisible="{Binding Lib.CanUpdateNow}" Margin="12,0,0,0">
-                              <TextBlock Text="Update now" FontSize="13" FontWeight="Medium" />
+                            <Button Grid.Column="1" Classes="btn sm ink act" Command="{Binding Lib.UpdateNowCommand}" IsVisible="{Binding Lib.CanUpdateNow}" Margin="12,0,0,0">
+                              <TextBlock Text="Update now" />
                             </Button>
                           </Grid>
                         </Border>
@@ -1362,10 +1164,10 @@
                               <TextBlock Classes="row-title" Text="Use Canvas course names" />
                               <TextBlock Classes="row-sub" Text="{Binding Lib.CourseNamesSub}" TextWrapping="Wrap" />
                             </StackPanel>
-                            <Button Grid.Column="1" Classes="pill act" Command="{Binding Lib.AskUseCourseNamesCommand}" IsEnabled="{Binding Lib.CanUseCourseNames}" IsVisible="{Binding !Lib.ConfirmingCourseNames}"><TextBlock Text="Preview…" FontSize="13" /></Button>
+                            <Button Grid.Column="1" Classes="btn sm act" Command="{Binding Lib.AskUseCourseNamesCommand}" IsEnabled="{Binding Lib.CanUseCourseNames}" IsVisible="{Binding !Lib.ConfirmingCourseNames}"><TextBlock Text="Preview…" /></Button>
                             <StackPanel Grid.Column="1" Classes="act" Orientation="Horizontal" Spacing="8" IsVisible="{Binding Lib.ConfirmingCourseNames}">
-                              <Button Classes="pill" Command="{Binding Lib.CancelUseCourseNamesCommand}"><TextBlock Text="Cancel" FontSize="13" /></Button>
-                              <Button Classes="pill primary" Command="{Binding Lib.UseCourseNamesCommand}" IsEnabled="{Binding Lib.CanUseCourseNames}"><TextBlock Text="{Binding Lib.RenameLabel}" FontSize="13" FontWeight="Medium" /></Button>
+                              <Button Classes="btn sm" Command="{Binding Lib.CancelUseCourseNamesCommand}"><TextBlock Text="Cancel" /></Button>
+                              <Button Classes="btn sm ink" Command="{Binding Lib.UseCourseNamesCommand}" IsEnabled="{Binding Lib.CanUseCourseNames}"><TextBlock Text="{Binding Lib.RenameLabel}" /></Button>
                             </StackPanel>
                           </Grid>
                         </Border>
@@ -1396,14 +1198,14 @@
                           <Border Classes="group" Margin="0" Padding="16,12">
                             <Grid ColumnDefinitions="Auto,12,3*,8,2*,8,Auto" RowDefinitions="Auto,6,Auto,6,Auto">
                               <c:Swatch Small="True" Fill="{Binding Dot}" VerticalAlignment="Center"/>
-                              <Border Grid.Column="2" Classes="field"><TextBox Classes="bare" Text="{Binding Name}" FontSize="13" FontWeight="Medium" VerticalAlignment="Center" LostFocus="OnClassLostFocus" /></Border>
-                              <Border Grid.Column="4" Classes="field"><TextBox Classes="bare" Text="{Binding Aliases}" PlaceholderText="Other names, like cs101" FontSize="13" VerticalAlignment="Center" LostFocus="OnClassLostFocus" /></Border>
+                              <Border Grid.Column="2" Classes="field"><TextBox Classes="bare" Text="{Binding Name}" FontWeight="Medium" VerticalAlignment="Center" LostFocus="OnClassLostFocus" /></Border>
+                              <Border Grid.Column="4" Classes="field"><TextBox Classes="bare" Text="{Binding Aliases}" PlaceholderText="Other names, like cs101" VerticalAlignment="Center" LostFocus="OnClassLostFocus" /></Border>
                               <Button Grid.Column="6" Theme="{StaticResource Surface}" Width="30" Height="30" CornerRadius="{DynamicResource RadiusControl}" HorizontalContentAlignment="Center"
                                       Command="{Binding $parent[UserControl].((s:SettingsModel)DataContext).Lib.RemoveClassCommand}" CommandParameter="{Binding}" ToolTip.Tip="Remove the class (its lectures stay)">
                                 <c:Icon Glyph="close" Size="15" Foreground="{DynamicResource Fg3}" />
                               </Button>
                               <Border Grid.Row="2" Grid.Column="2" Grid.ColumnSpan="3" Classes="field">
-                                <TextBox Classes="bare" Text="{Binding Description}" PlaceholderText="What it covers (it helps the AI sort)" FontSize="13" VerticalAlignment="Center" LostFocus="OnClassLostFocus" />
+                                <TextBox Classes="bare" Text="{Binding Description}" PlaceholderText="What it covers (it helps the AI sort)" VerticalAlignment="Center" LostFocus="OnClassLostFocus" />
                               </Border>
                               <TextBlock Grid.Row="4" Grid.Column="2" Grid.ColumnSpan="3" Classes="row-sub" Text="{Binding Meta}" TextTrimming="PrefixCharacterEllipsis" />
                             </Grid>
@@ -1414,9 +1216,9 @@
                     <Border Classes="group" Margin="0" Padding="16,12">
                       <Grid ColumnDefinitions="Auto,12,3*,8,2*,8,Auto">
                         <Ellipse Width="8" Height="8" Fill="{DynamicResource Fill2}" VerticalAlignment="Center" />
-                        <Border Grid.Column="2" Classes="field"><TextBox Name="NewLibraryClass" Classes="bare" Text="{Binding Lib.NewClass}" PlaceholderText="A new class" FontSize="13" VerticalAlignment="Center" /></Border>
+                        <Border Grid.Column="2" Classes="field"><TextBox Name="NewLibraryClass" Classes="bare" Text="{Binding Lib.NewClass}" PlaceholderText="A new class" VerticalAlignment="Center" /></Border>
                         <TextBlock Grid.Column="4" Classes="row-sub" Text="Its other names and what it covers come next." VerticalAlignment="Center" TextWrapping="Wrap" />
-                        <Button Grid.Column="6" Classes="pill" Command="{Binding Lib.AddClassCommand}" VerticalAlignment="Center"><TextBlock Text="Add" FontSize="13" /></Button>
+                        <Button Grid.Column="6" Classes="btn sm" Command="{Binding Lib.AddClassCommand}" VerticalAlignment="Center"><TextBlock Text="Add" /></Button>
                       </Grid>
                     </Border>
                     <TextBlock Classes="say" Text="Renaming or removing a class keeps its lectures where they are." />
@@ -1556,10 +1358,10 @@
                             <TextBlock Classes="row-title" Text="{Binding Lib.RewriteTitle}" />
                             <TextBlock Classes="row-sub" Text="{Binding Lib.RewriteSub}" />
                           </StackPanel>
-                          <Button Grid.Column="1" Classes="pill act" Command="{Binding Lib.AskRewriteAllCommand}" IsVisible="{Binding !Lib.ConfirmingRewrite}"><TextBlock Text="Rewrite all…" FontSize="13" /></Button>
+                          <Button Grid.Column="1" Classes="btn sm act" Command="{Binding Lib.AskRewriteAllCommand}" IsVisible="{Binding !Lib.ConfirmingRewrite}"><TextBlock Text="Rewrite all…" /></Button>
                           <StackPanel Grid.Column="1" Classes="act" Orientation="Horizontal" Spacing="8" IsVisible="{Binding Lib.ConfirmingRewrite}">
-                            <Button Classes="pill" Command="{Binding Lib.CancelRewriteAllCommand}"><TextBlock Text="Cancel" FontSize="13" /></Button>
-                            <Button Classes="pill primary" Command="{Binding Lib.RewriteAllCommand}"><TextBlock Text="Rewrite them all" FontSize="13" FontWeight="Medium" /></Button>
+                            <Button Classes="btn sm" Command="{Binding Lib.CancelRewriteAllCommand}"><TextBlock Text="Cancel" /></Button>
+                            <Button Classes="btn sm ink" Command="{Binding Lib.RewriteAllCommand}"><TextBlock Text="Rewrite them all" /></Button>
                           </StackPanel>
                         </Grid>
                       </Border>
@@ -1606,8 +1408,8 @@
                       <Border Classes="row">
                         <Grid ColumnDefinitions="Auto,12,*,12,Auto">
                           <c:Icon Glyph="add" Size="18" Foreground="{DynamicResource Fg3}" VerticalAlignment="Center" />
-                          <Border Grid.Column="2" Classes="field"><TextBox Name="NewFolder" Classes="bare" Text="{Binding Lib.NewFolder}" PlaceholderText="A folder on the library's computer, like ~/Documents/School" FontSize="13" VerticalAlignment="Center" /></Border>
-                          <Button Grid.Column="4" Classes="pill" Command="{Binding Lib.AddFolderCommand}" VerticalAlignment="Center"><TextBlock Text="Add" FontSize="13" /></Button>
+                          <Border Grid.Column="2" Classes="field"><TextBox Name="NewFolder" Classes="bare" Text="{Binding Lib.NewFolder}" PlaceholderText="A folder on the library's computer, like ~/Documents/School" VerticalAlignment="Center" /></Border>
+                          <Button Grid.Column="4" Classes="btn sm" Command="{Binding Lib.AddFolderCommand}" VerticalAlignment="Center"><TextBlock Text="Add" /></Button>
                         </Grid>
                       </Border>
                     </Border>
@@ -1637,7 +1439,7 @@
               <Panel IsVisible="{Binding OnGranola}">
                 <StackPanel Name="GranolaPage" DataContext="{Binding Granola}" x:DataType="vm:GranolaSettingsModel" Spacing="8">
                   <TextBlock Classes="h" Text="Granola" />
-                  <TextBlock Classes="body" Text="{x:Static vm:GranolaSettingsModel.About}" TextWrapping="Wrap" />
+                  <TextBlock Classes="body lede" Text="{x:Static vm:GranolaSettingsModel.About}" TextWrapping="Wrap" />
                   <Border Classes="group">
                     <StackPanel>
                       <!-- Not signed in: Connect, or Cancel while the browser is open on Granola's page -->
@@ -1648,10 +1450,10 @@
                             <TextBlock Classes="row-sub" Text="{x:Static vm:GranolaSettingsModel.SignInNote}" TextWrapping="Wrap" IsVisible="{Binding !Connecting}" />
                             <TextBlock Classes="row-sub" Text="Waiting for you to sign in in your browser…" TextWrapping="Wrap" IsVisible="{Binding Connecting}" />
                           </StackPanel>
-                          <Button Name="GranolaConnect" Grid.Column="2" Classes="pill primary" Command="{Binding ConnectCommand}" IsVisible="{Binding CanConnect}" VerticalAlignment="Center">
-                            <TextBlock Text="Connect" FontWeight="Medium" />
+                          <Button Name="GranolaConnect" Grid.Column="2" Classes="btn sm ink" Command="{Binding ConnectCommand}" IsVisible="{Binding CanConnect}" VerticalAlignment="Center">
+                            <TextBlock Text="Connect" />
                           </Button>
-                          <Button Name="GranolaCancel" Grid.Column="2" Classes="pill" Command="{Binding CancelConnectCommand}" IsVisible="{Binding Connecting}" VerticalAlignment="Center">
+                          <Button Name="GranolaCancel" Grid.Column="2" Classes="btn sm" Command="{Binding CancelConnectCommand}" IsVisible="{Binding Connecting}" VerticalAlignment="Center">
                             <TextBlock Text="Cancel" />
                           </Button>
                         </Grid>
@@ -1663,7 +1465,7 @@
                             <c:PageText Classes="row-title" Text="{Binding ConnectedLine}" TextTrimming="CharacterEllipsis" />
                             <TextBlock Classes="row-sub" Text="Syft Notes looks for new lectures every few minutes." TextWrapping="Wrap" />
                           </StackPanel>
-                          <Button Name="GranolaDisconnect" Grid.Column="2" Classes="pill" Command="{Binding DisconnectCommand}" VerticalAlignment="Center">
+                          <Button Name="GranolaDisconnect" Grid.Column="2" Classes="btn sm" Command="{Binding DisconnectCommand}" VerticalAlignment="Center">
                             <TextBlock Text="Disconnect" />
                           </Button>
                         </Grid>
@@ -1680,18 +1482,18 @@
                       </Border>
                     </StackPanel>
                   </Border>
-                  <c:PageText Name="GranolaProblem" Classes="row-sub" Text="{Binding Problem}" IsVisible="{Binding HasProblem}" Foreground="{DynamicResource Warn}" TextWrapping="Wrap" Margin="4,0" />
+                  <c:PageText Name="GranolaProblem" Classes="row-sub" Text="{Binding Problem}" IsVisible="{Binding HasProblem}" Foreground="{DynamicResource Warn}" TextWrapping="Wrap" />
 
                   <!-- What's waiting in Granola -->
                   <StackPanel Spacing="8" IsVisible="{Binding SignedIn}">
                     <Grid ColumnDefinitions="*,Auto" Margin="0,8,0,0">
                       <TextBlock Classes="section" Text="In Granola, not in Syft Notes" Margin="0" VerticalAlignment="Center" />
                       <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8">
-                        <Button Name="GranolaLook" Classes="pill" Command="{Binding LookNowCommand}" IsEnabled="{Binding !Looking}">
-                          <TextBlock Text="Look now" FontSize="13" />
+                        <Button Name="GranolaLook" Classes="btn sm" Command="{Binding LookNowCommand}" IsEnabled="{Binding !Looking}">
+                          <TextBlock Text="Look now" />
                         </Button>
-                        <Button Name="GranolaTransferAll" Classes="pill primary" Command="{Binding TransferAllCommand}" IsVisible="{Binding HasSeveral}">
-                          <TextBlock Text="Transfer all" FontSize="13" FontWeight="Medium" />
+                        <Button Name="GranolaTransferAll" Classes="btn sm ink" Command="{Binding TransferAllCommand}" IsVisible="{Binding HasSeveral}">
+                          <TextBlock Text="Transfer all" />
                         </Button>
                       </StackPanel>
                     </Grid>
@@ -1711,14 +1513,12 @@
                                   <TextBlock Classes="row-sub" Text="{Binding When}" />
                                 </StackPanel>
                                 <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="12" VerticalAlignment="Center">
-                                  <Button Theme="{StaticResource Surface}" Padding="0" VerticalAlignment="Center" IsEnabled="{Binding !Busy}"
+                                  <Button Classes="text-link small" VerticalAlignment="Center" IsEnabled="{Binding !Busy}"
                                           Command="{Binding $parent[ItemsControl].((vm:GranolaSettingsModel)DataContext).LeaveCommand}" CommandParameter="{Binding}"
-                                          ToolTip.Tip="Leave it in Granola and don't offer it again">
-                                    <TextBlock Text="Leave it" FontSize="12" Foreground="{DynamicResource AccentText}" />
-                                  </Button>
-                                  <Button Classes="pill primary" IsEnabled="{Binding !Busy}"
+                                          ToolTip.Tip="Leave it in Granola and don't offer it again" Content="Leave it" />
+                                  <Button Classes="btn sm ink" IsEnabled="{Binding !Busy}"
                                           Command="{Binding $parent[ItemsControl].((vm:GranolaSettingsModel)DataContext).TransferCommand}" CommandParameter="{Binding}">
-                                    <TextBlock Text="Transfer" FontSize="13" FontWeight="Medium" />
+                                    <TextBlock Text="Transfer" />
                                   </Button>
                                 </StackPanel>
                               </Grid>
@@ -1728,7 +1528,7 @@
                       </ItemsControl.ItemTemplate>
                     </ItemsControl>
                   </StackPanel>
-                  <TextBlock Classes="row-sub" Text="{x:Static vm:GranolaSettingsModel.PlanNote}" TextWrapping="Wrap" Margin="4,6,4,0" />
+                  <TextBlock Classes="say" Text="{x:Static vm:GranolaSettingsModel.PlanNote}" />
                 </StackPanel>
               </Panel>
 
@@ -1764,32 +1564,32 @@
             <StackPanel DockPanel.Dock="Top" Spacing="8">
               <Grid ColumnDefinitions="*,Auto">
                 <TextBlock Classes="h" Text="{Binding Title}" HorizontalAlignment="Left" />
-                <Button Grid.Column="1" Classes="pill" Command="{Binding NewChatCommand}" IsVisible="{Binding Thread.Count, Converter={x:Static c:Converters.Some}}"
-                        VerticalAlignment="Center"><TextBlock Text="New chat" FontSize="13" /></Button>
+                <Button Grid.Column="1" Classes="btn sm" Command="{Binding NewChatCommand}" IsVisible="{Binding Thread.Count, Converter={x:Static c:Converters.Some}}"
+                        VerticalAlignment="Center"><TextBlock Text="New chat" /></Button>
               </Grid>
-              <TextBlock Classes="body" Text="{Binding Lede}" TextWrapping="Wrap" />
+              <TextBlock Classes="body lede" Text="{Binding Lede}" />
             </StackPanel>
 
             <!-- The field, at the bottom while the AI is ready -->
             <StackPanel DockPanel.Dock="Bottom" Spacing="8" IsVisible="{Binding IsReady}" Margin="0,12,0,0">
               <StackPanel Spacing="6" IsVisible="{Binding HasProblem}">
                 <c:PageText Classes="say" Text="{Binding Problem}" Foreground="{DynamicResource Warn}" Margin="0" />
-                <Button Classes="pill" Command="{Binding SetUpCommand}" IsVisible="{Binding ProblemNeedsSetup}" HorizontalAlignment="Left"><TextBlock Text="Run setup" FontSize="13" /></Button>
+                <Button Classes="btn sm" Command="{Binding SetUpCommand}" IsVisible="{Binding ProblemNeedsSetup}" HorizontalAlignment="Left"><TextBlock Text="Run setup" /></Button>
               </StackPanel>
               <Border Classes="settings-ask">
                 <Grid ColumnDefinitions="*,6,Auto">
-                  <TextBox Name="AskBox" c:OneLinePaste.IsOn="True" Classes="bare" Text="{Binding Draft}" PlaceholderText="{Binding Placeholder}" FontSize="13" VerticalAlignment="Center"
+                  <TextBox Name="AskBox" c:OneLinePaste.IsOn="True" Classes="bare" Text="{Binding Draft}" PlaceholderText="{Binding Placeholder}" VerticalAlignment="Center"
                            TextWrapping="Wrap" MaxHeight="96" AutomationProperties.Name="Ask your AI">
                     <TextBox.KeyBindings>
                       <KeyBinding Gesture="Enter" Command="{Binding SendCommand}" />
                     </TextBox.KeyBindings>
                   </TextBox>
                   <Panel Grid.Column="2" VerticalAlignment="Bottom">
-                    <Button Classes="pill primary" Command="{Binding SendCommand}" IsVisible="{Binding !Busy}" ToolTip.Tip="Send" AutomationProperties.Name="Send">
-                      <c:Icon Glyph="arrow_upward" Size="16" Foreground="{DynamicResource OnAccent}" />
+                    <Button Classes="ask-send" Command="{Binding SendCommand}" IsVisible="{Binding !Busy}" ToolTip.Tip="Send" AutomationProperties.Name="Send">
+                      <c:Icon Glyph="arrow_upward" Size="17" Foreground="{DynamicResource Surface}" />
                     </Button>
-                    <Button Classes="pill" Command="{Binding StopCommand}" IsVisible="{Binding Busy}" ToolTip.Tip="Stop" AutomationProperties.Name="Stop the answer">
-                      <c:Icon Glyph="stop" Filled="True" Size="16" Foreground="{DynamicResource Fg}" />
+                    <Button Classes="ask-send" Command="{Binding StopCommand}" IsVisible="{Binding Busy}" ToolTip.Tip="Stop" AutomationProperties.Name="Stop the answer">
+                      <c:Icon Glyph="stop" Filled="True" Size="16" Foreground="{DynamicResource Surface}" />
                     </Button>
                   </Panel>
                 </Grid>
@@ -1807,8 +1607,8 @@
               <StackPanel Spacing="10" IsVisible="{Binding IsNoAi}" VerticalAlignment="Top">
                 <TextBlock Classes="body" Text="{Binding NoAiText}" TextWrapping="Wrap" />
                 <StackPanel Orientation="Horizontal" Spacing="8">
-                  <Button Classes="pill primary" Command="{Binding SetUpCommand}"><TextBlock Text="Set it up" FontSize="13" FontWeight="Medium" /></Button>
-                  <Button Classes="pill" Command="{Binding LookAgainCommand}"><TextBlock Text="Look again" FontSize="13" /></Button>
+                  <Button Classes="btn sm ink" Command="{Binding SetUpCommand}"><TextBlock Text="Set it up" /></Button>
+                  <Button Classes="btn sm" Command="{Binding LookAgainCommand}"><TextBlock Text="Look again" /></Button>
                 </StackPanel>
               </StackPanel>
 
@@ -1820,8 +1620,8 @@
                   <ItemsControl.ItemsPanel><ItemsPanelTemplate><WrapPanel /></ItemsPanelTemplate></ItemsControl.ItemsPanel>
                   <ItemsControl.ItemTemplate>
                     <DataTemplate x:DataType="x:String">
-                      <Button Classes="pill" Margin="0,0,8,8" Command="{Binding $parent[DockPanel].((vm:SettingsChatModel)DataContext).SuggestCommand}" CommandParameter="{Binding}">
-                        <TextBlock Text="{Binding}" FontSize="13" />
+                      <Button Classes="btn sm" Margin="0,0,8,8" Command="{Binding $parent[DockPanel].((vm:SettingsChatModel)DataContext).SuggestCommand}" CommandParameter="{Binding}">
+                        <TextBlock Text="{Binding}" />
                       </Button>
                     </DataTemplate>
                   </ItemsControl.ItemTemplate>
@@ -1836,7 +1636,7 @@
                   <ItemsControl.DataTemplates>
                     <DataTemplate DataType="vm:StudentEntry">
                       <Border Classes="bubble">
-                        <c:PageText Text="{Binding Text}" FontSize="13" TextWrapping="Wrap" Foreground="{DynamicResource Fg}" />
+                        <c:PageText Text="{Binding Text}" FontSize="15" LineHeight="21" TextWrapping="Wrap" Foreground="{DynamicResource Ink}" />
                       </Border>
                     </DataTemplate>
                     <DataTemplate DataType="vm:AiEntry">
@@ -1844,8 +1644,8 @@
                       <Grid ColumnDefinitions="Auto,10,*" HorizontalAlignment="Left">
                       <c:SyftMark Size="28" Bits="False" VerticalAlignment="Top" />
                       <StackPanel Grid.Column="2" Spacing="6" HorizontalAlignment="Left" MaxWidth="520">
-                        <TextBlock Text="{Binding Byline}" FontSize="11" FontWeight="SemiBold" Foreground="{DynamicResource Fg2}" />
-                        <c:PageText Text="{Binding Text}" FontSize="13" LineHeight="19" TextWrapping="Wrap" Foreground="{DynamicResource Fg}"
+                        <TextBlock Text="{Binding Byline}" FontSize="12" FontWeight="Bold" Foreground="{DynamicResource InkSubtle}" />
+                        <c:PageText Text="{Binding Text}" FontSize="15" LineHeight="22" TextWrapping="Wrap" Foreground="{DynamicResource Ink}"
                                     IsVisible="{Binding Text, Converter={x:Static c:Converters.NotEmpty}}" />
                         <ItemsControl ItemsSource="{Binding Chips}" IsVisible="{Binding HasChips}">
                           <ItemsControl.ItemsPanel><ItemsPanelTemplate><WrapPanel /></ItemsPanelTemplate></ItemsControl.ItemsPanel>
@@ -1853,8 +1653,8 @@
                             <DataTemplate x:DataType="x:String">
                               <Border Classes="chip" Margin="0,0,6,6">
                                 <StackPanel Orientation="Horizontal" Spacing="4">
-                                  <c:Icon Glyph="check" Size="12" Foreground="{DynamicResource AccentText}" />
-                                  <TextBlock Text="{Binding}" FontSize="11" Foreground="{DynamicResource Fg2}" />
+                                  <c:Icon Glyph="check" Size="12" Foreground="{DynamicResource Ink}" />
+                                  <TextBlock Text="{Binding}" FontSize="12" FontWeight="Medium" Foreground="{DynamicResource InkMuted}" />
                                 </StackPanel>
                               </Border>
                             </DataTemplate>

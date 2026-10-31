@@ -37,7 +37,7 @@ public class SmallWindowTests
             window.Show();
             window.UpdateLayout();
 
-            var page = view.Part<Panel>("AskRoom").GetVisualParent<Grid>()!;
+            var page = view.GetVisualDescendants().OfType<AskSplit>().Single(s => s.IsEffectivelyVisible);
             var bounds = In(page, view);
             var bar = view.GetVisualDescendants().OfType<WinAiAskBar>().Single();
             var barAt = In(bar, view);

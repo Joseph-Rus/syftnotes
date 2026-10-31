@@ -8,6 +8,7 @@
              x:DataType="vm:CanvasStatusModel">
   <UserControl.Styles>
     <StyleInclude Source="avares://StudyStash/Views/MacCanvasStyles.axaml" />
+    <StyleInclude Source="avares://StudyStash/Views/SettingsPaneStyles.axaml" />
   </UserControl.Styles>
   <Border Classes="cv-card" IsVisible="{Binding IsVisible}">
     <!-- A Grid, not a horizontal StackPanel: the message column needs a real width bound to wrap its text against

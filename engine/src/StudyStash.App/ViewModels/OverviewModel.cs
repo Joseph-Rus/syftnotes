@@ -381,7 +381,7 @@ public sealed partial class OverviewModel : ObservableObject
     /// <summary>Ask about every note (Home) or this folder's (its page), floating at the foot of the page as under a note.</summary>
     [ObservableProperty] public partial AiAskModel? Ask { get; set; }
     public bool HasAsk => Ask is not null;
-    public bool HasAnswer => Ask?.HasLatest == true;
+    public bool HasAnswer => Ask?.PanelOpen == true;
     partial void OnAskChanged(AiAskModel? oldValue, AiAskModel? newValue)
     {
         if (oldValue is not null) oldValue.PropertyChanged -= AskChanged;
@@ -391,7 +391,7 @@ public sealed partial class OverviewModel : ObservableObject
     }
     void AskChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
     {
-        if (e.PropertyName == nameof(AiAskModel.HasLatest)) OnPropertyChanged(nameof(HasAnswer));
+        if (e.PropertyName == nameof(AiAskModel.PanelOpen)) OnPropertyChanged(nameof(HasAnswer));
     }
 
     /// <summary>Folders on the computer that go with the class (a project's repo, say), linked rather than copied in.</summary>
@@ -441,13 +441,20 @@ public sealed partial class OverviewModel : ObservableObject
     /// <summary>The window is narrow: the page's margins draw in, the buttons go under the title, and a folder's rail
     /// goes under its notes.</summary>
     [ObservableProperty] public partial bool Narrow { get; set; }
+    /// <summary>The conversation's panel is open beside the page, which has the left of the pane: it lays itself out as
+    /// in a narrow window.</summary>
+    [ObservableProperty] public partial bool Beside { get; set; }
+    /// <summary>Narrow, or beside the conversation: the narrow layout.</summary>
+    public bool Tight => Narrow || Beside;
     /// <summary>The page's buttons (Record, Attach) sit beside the title (wide) or under it (narrow), never over it.</summary>
-    public int ActionsColumn => Narrow ? 0 : 1;
-    public int ActionsRow => Narrow ? 1 : 0;
-    public int RailColumn => Narrow ? 0 : 1;
-    public int RailRow => Narrow ? 1 : 0;
+    public int ActionsColumn => Tight ? 0 : 1;
+    public int ActionsRow => Tight ? 1 : 0;
+    public int RailColumn => Tight ? 0 : 1;
+    public int RailRow => Tight ? 1 : 0;
+    partial void OnBesideChanged(bool value) => OnNarrowChanged(Narrow);
     partial void OnNarrowChanged(bool value)
     {
+        OnPropertyChanged(nameof(Tight));
         OnPropertyChanged(nameof(ActionsColumn));
         OnPropertyChanged(nameof(ActionsRow));
         OnPropertyChanged(nameof(RailColumn));
