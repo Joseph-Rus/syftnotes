@@ -136,6 +136,7 @@ end;
 function OpenProcess(Access: Cardinal; Inherit: Boolean; Pid: Cardinal): THandle; external 'OpenProcess@kernel32.dll stdcall';
 function WaitForSingleObject(Handle: THandle; Milliseconds: Cardinal): Cardinal; external 'WaitForSingleObject@kernel32.dll stdcall';
 function CloseHandle(Handle: THandle): Boolean; external 'CloseHandle@kernel32.dll stdcall';
+function GetTickCount: Cardinal; external 'GetTickCount@kernel32.dll stdcall';
 
 function WaitForAppCopies(TimeoutMs: Cardinal): Boolean;
 var

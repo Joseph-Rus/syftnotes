@@ -832,7 +832,7 @@ public static partial class SelfTest
         if (waiting is not null)
         {
             // ~8 s of audio, which the mic file plays at 4x speed
-            if (!await Until(() => (host.Recorder.Current?.Seconds ?? 0) >= 8, 30)) Say("FAILED the waiting lecture didn't reach 8 s of audio in 30 s");
+            if (!await Until(() => (host.Recorder.Elapsed >= 8, 30)) Say("FAILED the waiting lecture didn't reach 8 s of audio in 30 s");
             Shell.Windows.StopRecording();
             await Settle();
             var wl = host.Lectures.Get(waiting.Id);
