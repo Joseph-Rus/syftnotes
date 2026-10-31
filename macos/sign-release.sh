@@ -100,13 +100,13 @@ fi
 # The DMG again, now around the signed (and stapled) app, signed itself, then notarized and stapled the same way.
 # shellcheck source=macos/dmg.sh
 . "$HERE/dmg.sh"
-stage_dmg "$APP" "Egghead Notes" "$OUT/Egghead-Notes.dmg"
+stage_dmg "$APP" "Syft Notes" "$OUT/Syft-Notes.dmg"
 codesign --force --timestamp ${STUDYSTASH_SIGN_KEYCHAIN:+--keychain "$STUDYSTASH_SIGN_KEYCHAIN"} \
-  --sign "$STUDYSTASH_SIGN_IDENTITY" "$OUT/Egghead-Notes.dmg"
-codesign --verify --verbose=2 "$OUT/Egghead-Notes.dmg"
+  --sign "$STUDYSTASH_SIGN_IDENTITY" "$OUT/Syft-Notes.dmg"
+codesign --verify --verbose=2 "$OUT/Syft-Notes.dmg"
 if [ "$notarize" = true ]; then
-  sh "$HERE/notarize.sh" submit "$OUT/Egghead-Notes.dmg"
-  sh "$HERE/notarize.sh" staple "$OUT/Egghead-Notes.dmg"
+  sh "$HERE/notarize.sh" submit "$OUT/Syft-Notes.dmg"
+  sh "$HERE/notarize.sh" staple "$OUT/Syft-Notes.dmg"
 fi
 
-echo "Signed Study Stash.app and Egghead-Notes.dmg$([ "$notarize" = true ] && echo ", notarized and stapled" || echo " (not notarized)")."
+echo "Signed Study Stash.app and Syft-Notes.dmg$([ "$notarize" = true ] && echo ", notarized and stapled" || echo " (not notarized)")."

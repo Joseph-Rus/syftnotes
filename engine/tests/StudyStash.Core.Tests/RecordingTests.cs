@@ -37,7 +37,7 @@ public sealed class FakeMic(int rate = 48000, int channels = 2) : IAudioSource
     /// <summary>Unplugged, or not back after a nap: it's still on, but nothing comes from it any more.</summary>
     public void Mute() => muted = true;
 
-    /// <summary>Exact silence, as macOS sends when Egghead Notes isn't allowed to hear the microphone.</summary>
+    /// <summary>Exact silence, as macOS sends when Syft Notes isn't allowed to hear the microphone.</summary>
     public void Zeros(double seconds) => Play(seconds, amplitude: 0);
 
     /// <summary>Seconds of a tone (0 amplitude: silence), in buffers of 10 ms, as a sound card sends them.</summary>
@@ -482,7 +482,7 @@ public class RecordingTests
     [Fact]
     public void Only_zeros_at_the_start_says_the_microphone_isnt_allowed()
     {
-        Assert.Equal("Egghead Notes can't hear the microphone. Allow it in System Settings → Privacy & Security → Microphone.", RecordingWords.CantHearMac);
+        Assert.Equal("Syft Notes can't hear the microphone. Allow it in System Settings → Privacy & Security → Microphone.", RecordingWords.CantHearMac);
         using var dir = new TempDir();
         using var w = new Watched(new LectureStore(dir.Path));
         var rec = w.Recorder;

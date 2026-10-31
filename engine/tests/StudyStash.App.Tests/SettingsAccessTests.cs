@@ -12,7 +12,7 @@ using StudyStash.App.Views;
 namespace StudyStash.App.Tests;
 
 /// <summary>
-/// Settings can be reached from everywhere: a gear in the dropdown (beside Open Egghead Notes) and in the library
+/// Settings can be reached from everywhere: a gear in the dropdown (beside Open Syft Notes) and in the library
 /// window's toolbar, the Mac's app menu (Settings… ⌘,), ⌘, / Ctrl+, in any window; and when a full menu bar hides
 /// the S., the app says so and can move it into view.
 /// </summary>
@@ -47,12 +47,12 @@ public class SettingsAccessTests
             gear.Command!.Execute(null);
             Assert.Equal(1, opened);
 
-            // On one row with Open Egghead Notes, the same height and centred on it; its right edge is the search
+            // On one row with Open Syft Notes, the same height and centred on it; its right edge is the search
             // field's (Mac) or the footer's inset (Windows).
             var g = gear.TranslatePoint(default, view)!.Value;
             var o = open.TranslatePoint(default, view)!.Value;
             Assert.Equal(o.Y + open.Bounds.Height / 2, g.Y + gear.Bounds.Height / 2, 1);
-            Assert.True(g.X > o.X + open.Bounds.Width - 1, "the gear sits right of Open Egghead Notes");
+            Assert.True(g.X > o.X + open.Bounds.Width - 1, "the gear sits right of Open Syft Notes");
             if (skin == SkinKind.Mac)
             {
                 var search = view.GetVisualDescendants().OfType<Button>().Single(b => b.Name == "Search");
@@ -102,7 +102,7 @@ public class SettingsAccessTests
         int about = 0, settings = 0;
         var menu = AppMenu.Build(() => about++, () => settings++);
         var items = menu.Items.OfType<NativeMenuItem>().Where(i => i is not NativeMenuItemSeparator).ToList();
-        Assert.Equal(["About Egghead Notes", "Settings…"], items.Select(i => i.Header));
+        Assert.Equal(["About Syft Notes", "Settings…"], items.Select(i => i.Header));
         var s = items.Single(i => i.Header == "Settings…");
         Assert.Equal(Key.OemComma, s.Gesture!.Key);
         Assert.Equal(OperatingSystem.IsMacOS() ? KeyModifiers.Meta : KeyModifiers.Control, s.Gesture.KeyModifiers);
@@ -117,11 +117,11 @@ public class SettingsAccessTests
     [Fact]
     public void The_app_menu_already_showing_is_filled_in_place()
     {
-        // Avalonia's default ("About Avalonia") is already in the menu bar: the same menu gets Egghead Notes' items.
+        // Avalonia's default ("About Avalonia") is already in the menu bar: the same menu gets Syft Notes' items.
         var shown = new NativeMenu();
         shown.Add(new NativeMenuItem("About Avalonia"));
         AppMenu.Fill(shown, () => { }, () => { });
-        Assert.Equal(["About Egghead Notes", "Settings…"], shown.Items.OfType<NativeMenuItem>().Where(i => i is not NativeMenuItemSeparator).Select(i => i.Header));
+        Assert.Equal(["About Syft Notes", "Settings…"], shown.Items.OfType<NativeMenuItem>().Where(i => i is not NativeMenuItemSeparator).Select(i => i.Header));
     }
 
     [AvaloniaFact]
@@ -138,7 +138,7 @@ public class SettingsAccessTests
             var bar = NativeMenu.GetMenu(w)!;
             var window = Assert.Single(bar.Items.OfType<NativeMenuItem>());
             Assert.Equal("Window", window.Header);
-            Assert.Equal(["Minimize", "Zoom", "Close", "Egghead Notes library", "Settings…"], window.Menu!.Items.OfType<NativeMenuItem>().Where(i => i is not NativeMenuItemSeparator).Select(i => i.Header));
+            Assert.Equal(["Minimize", "Zoom", "Close", "Syft Notes library", "Settings…"], window.Menu!.Items.OfType<NativeMenuItem>().Where(i => i is not NativeMenuItemSeparator).Select(i => i.Header));
             Assert.Equal(new KeyGesture(Key.M, KeyModifiers.Meta), window.Menu.Items.OfType<NativeMenuItem>().First().Gesture);
             // A Mac's menu bar keeps a closed window's menus for as long as the app runs: closed, the window's are
             // emptied, so their items (and each one's hold on the system's own) are let go.
@@ -158,7 +158,7 @@ public class SettingsAccessTests
     public void Where_the_S_lives_is_said_plainly_and_a_hidden_one_can_be_shown()
     {
         var (title, text) = IconWords.WhereItIs(mac: true, hidden: false);
-        Assert.Equal("Egghead Notes is in your menu bar", title);
+        Assert.Equal("Syft Notes is in your menu bar", title);
         Assert.Contains("the S. at the top right", text, StringComparison.Ordinal);
         (title, text) = IconWords.WhereItIs(mac: true, hidden: true);
         Assert.Equal("Your menu bar is full", title);

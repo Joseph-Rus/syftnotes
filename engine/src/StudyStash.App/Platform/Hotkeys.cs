@@ -177,7 +177,7 @@ public static class Hotkeys
                 IntPtr name = Marshal.StringToHGlobalUni("StudyStashHotkeys");
                 var cls = new WndClass { Size = (uint)sizeof(WndClass), Proc = &Proc, Instance = GetModuleHandleW(null), ClassName = name };
                 RegisterClassExW(&cls);
-                window = CreateWindowExW(0, "StudyStashHotkeys", "Egghead Notes", 0, 0, 0, 0, 0, MessageOnly, IntPtr.Zero, cls.Instance, IntPtr.Zero);
+                window = CreateWindowExW(0, "StudyStashHotkeys", "Syft Notes", 0, 0, 0, 0, 0, MessageOnly, IntPtr.Zero, cls.Instance, IntPtr.Zero);
                 if (window == IntPtr.Zero) return new HotkeyResult(false, false);
             }
             var (qVk, qMods) = quickKeys.Win();

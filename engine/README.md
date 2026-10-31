@@ -1,6 +1,6 @@
 # The engine
 
-Egghead Notes' engine and app, on C# and .NET 10. `src/StudyStash.Core` is the engine itself:
+Syft Notes' engine and app, on C# and .NET 10. `src/StudyStash.Core` is the engine itself:
 config, the lecture database and note files, the AI providers, Canvas, recording and
 transcription, autostart, and updates. `src/StudyStash.Library` has the web pages — the library's,
 its setup page, and the laptop-facing ingest API — on ASP.NET Core. `src/StudyStash.Engine` is the
@@ -66,7 +66,7 @@ dotnet test engine/StudyStash.slnx
 - `STUDYSTASH_LIVE_SERVICE=1 dotnet test engine/StudyStash.slnx` (Mac or Windows only) — installs
   the library as the real background service on a spare port, checks it answers, restarts, and
   removes itself. Refuses to run if a library service is already installed, since its label is the
-  real one. **Never run this on a computer with a real Egghead Notes install** — it could disturb it.
+  real one. **Never run this on a computer with a real Syft Notes install** — it could disturb it.
 
 ## Updates
 

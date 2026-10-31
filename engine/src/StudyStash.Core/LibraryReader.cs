@@ -8,7 +8,7 @@ using StudyStash.Core.Rich;
 namespace StudyStash.Core;
 
 /// <summary>
-/// The library as the Egghead Notes app and Claude read it: its classes, lectures, notes, transcripts, search, and
+/// The library as the Syft Notes app and Claude read it: its classes, lectures, notes, transcripts, search, and
 /// answers from your notes. Every answer is plain JSON, the same over /api/v2 and from the MCP tools.
 /// </summary>
 public sealed partial class LibraryReader(Config cfg, Store store)

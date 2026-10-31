@@ -60,8 +60,8 @@ public static class SettingsIndex
 
     public static readonly IReadOnlyList<SettingEntry> All =
     [
-        Page("General", "How Egghead Notes starts, setup, and its version.", "startup about version quit"),
-        new() { Section = "General", Title = "Open when you log in", Detail = "Egghead Notes starts in the menu bar or tray when you log in.",
+        Page("General", "How Syft Notes starts, setup, and its version.", "startup about version quit"),
+        new() { Section = "General", Title = "Open when you log in", Detail = "Syft Notes starts in the menu bar or tray when you log in.",
             Words = "start startup login boot launch automatically background", Key = "start_at_login", Short = "Open at login", Takes = OnOff },
         new() { Section = "General", Title = "Update automatically", Detail = "This laptop installs each new version by itself.",
             Words = "updates upgrade new version auto", Key = "auto_update", Short = "Updates", Takes = OnOff, Only = "laptop" },
@@ -69,11 +69,11 @@ public static class SettingsIndex
             Words = "count anonymous users usage ping daily privacy analytics tracking statistics" },
         new() { Section = "General", Title = "Run setup again", Detail = "The first-run steps, with what's set up already kept.",
             Words = "setup wizard onboarding guided start over" },
-        new() { Section = "General", Title = "Quit Egghead Notes", Words = "exit close stop app" },
-        new() { Section = "General", Title = "Credits", Detail = "The speech models and illustration parts Egghead Notes uses, and their licences.",
+        new() { Section = "General", Title = "Quit Syft Notes", Words = "exit close stop app" },
+        new() { Section = "General", Title = "Credits", Detail = "The speech models and illustration parts Syft Notes uses, and their licences.",
             Words = "licenses licences credits about open source" },
 
-        Page("Appearance", "Pick how Egghead Notes looks.", "look theme"),
+        Page("Appearance", "Pick how Syft Notes looks.", "look theme"),
         new() { Section = "Appearance", Title = "Mode", Detail = "Match system, light or dark.",
             Words = "dark light mode night theme appearance black white", Key = "appearance", Takes = "system, light or dark" },
         new() { Section = "Appearance", Title = "Colour theme", Detail = "The accent for buttons, the selection and highlights.",
@@ -102,12 +102,12 @@ public static class SettingsIndex
         new() { Section = "Recording", Title = "Keep recordings", Detail = "Days the audio stays after a lecture is filed (0 keeps it).",
             Words = "audio delete storage space disk days recordings", Key = "keep_recordings_days", Short = "Keep recordings", Takes = "a number of days, 0 to keep them", Only = "records" },
 
-        Page("Calendars", "Egghead Notes reads your calendars to show what's coming up, and names a lecture you record during a class after it.",
+        Page("Calendars", "Syft Notes reads your calendars to show what's coming up, and names a lecture you record during a class after it.",
             "calendar schedule timetable events", "records"),
         new() { Section = "Calendars", Title = "Add a calendar feed", Detail = "Paste a calendar's address (ics).",
             Words = "ics ical google outlook icloud schedule timetable feed", Only = "records" },
 
-        Page("Granola", "Bring lectures you recorded in Granola over to Egghead Notes, which files them and writes their notes.",
+        Page("Granola", "Bring lectures you recorded in Granola over to Syft Notes, which files them and writes their notes.",
             "granola import transfer bring move lectures other app recorder", "records"),
 
         Page("Connection", "Which library this computer uses, and what this computer is for.", "library server network"),
@@ -129,7 +129,7 @@ public static class SettingsIndex
         new() { Section = "Library", Title = "Update automatically", Detail = "The library installs each new version by itself.",
             Words = "updates upgrade new version auto library", Key = "library_auto_update", Short = "Library updates", Takes = OnOff, Only = "laptop" },
         // The library is this computer: its updates are the app's, in General.
-        new() { Section = "General", Title = "Update automatically", Detail = "Egghead Notes installs each new version by itself.",
+        new() { Section = "General", Title = "Update automatically", Detail = "Syft Notes installs each new version by itself.",
             Words = "updates upgrade new version auto library", Key = "library_auto_update", Short = "Updates", Takes = OnOff, Only = "library" },
 
         Page("Classes", "The classes your library files lectures into.", "course courses subject subjects add rename remove aliases"),
@@ -170,17 +170,17 @@ public static class SettingsIndex
         new() { Section = "Access", Title = "Let Claude and ChatGPT reach your library from the internet", Detail = "For claude.ai, chatgpt.com and their phone apps.",
             Words = "web phone claude.ai chatgpt.com tailscale funnel remote internet" },
 
-        Page("Canvas", "Bring your Canvas courses in as classes. Egghead Notes only reads from Canvas.", "lms instructure school courses assignments"),
+        Page("Canvas", "Bring your Canvas courses in as classes. Syft Notes only reads from Canvas.", "lms instructure school courses assignments"),
         new() { Section = "Canvas", Title = "School", Detail = "Your school's Canvas address.", Words = "canvas school instructure address" },
         new() { Section = "Canvas", Title = "Courses to bring in", Detail = "Which Canvas courses become classes and sync.", Words = "courses sync classes" },
-        new() { Section = "Canvas", Title = "Change browser", Detail = "The browser Egghead Notes' helper is in.", Words = "browser chrome edge extension helper" },
+        new() { Section = "Canvas", Title = "Change browser", Detail = "The browser Syft Notes' helper is in.", Words = "browser chrome edge extension helper" },
 
         Page("Folders", "Folders on the library's computer that search, and the AI when you chat, may read.",
             "files documents search private reads slides pdfs"),
 
         Page("Phone", "Read your notes and lectures, search and ask, and add files from your phone.",
             "iphone android mobile qr code home screen app google drive gmail"),
-        new() { Section = "Phone", Title = "Add a phone", Detail = "Scan the code in the Egghead Notes app on your iPhone or iPad.", Words = "iphone android mobile qr code" },
+        new() { Section = "Phone", Title = "Add a phone", Detail = "Scan the code in the Syft Notes app on your iPhone or iPad.", Words = "iphone android mobile qr code" },
     ];
 
     /// <summary>The entry change_setting knows by <paramref name="key"/>, or null.</summary>

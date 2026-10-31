@@ -31,7 +31,7 @@ public static class EngineSetupWords
     };
 
     /// <summary>What to run to sign in. Not Gemini: typed by hand, <c>agy</c> signs in to the student's own home, not
-    /// Egghead Notes' own one for it that its notes use, so its row has a Sign in button instead.</summary>
+    /// Syft Notes' own one for it that its notes use, so its row has a Sign in button instead.</summary>
     public static string SignInCommand(string id) => id switch
     {
         "claude" => "claude",
@@ -65,7 +65,7 @@ public static class EngineSetupWords
                 new HowToStep($"Install it: paste this into {where}", InstallCommand(id, windows), $"Or with npm: {NpmCommand(id)}"),
                 SignIn(),
             ],
-            // Gemini signed out has no command to paste: its row's Sign in button signs in to Egghead Notes' own home for
+            // Gemini signed out has no command to paste: its row's Sign in button signs in to Syft Notes' own home for
             // agy (setup's sign-in screen, or a terminal the library opens with that home).
             ("claude" or "codex", "not_signed_in") => [SignIn()],
             _ => [],

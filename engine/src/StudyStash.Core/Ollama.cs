@@ -251,7 +251,7 @@ public static class Ollama
     /// <summary>The model for a computer with little memory (under 14 GB): it fits, and its notes are simpler.</summary>
     public const string SmallModel = "qwen3:1.7b";
 
-    /// <summary>How big one of the recommended models is to download, in GB; 0 for a model Egghead Notes doesn't know
+    /// <summary>How big one of the recommended models is to download, in GB; 0 for a model Syft Notes doesn't know
     /// the size of.</summary>
     public static double DownloadGb(string model) => model switch
     {

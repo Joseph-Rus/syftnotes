@@ -1,5 +1,5 @@
 The live words' small Whisper (live-whisper-tiny-q8_0.bin: OpenAI's Whisper tiny, multilingual, as whisper.cpp's
-ggml file ggml-tiny-q8_0.bin from huggingface.co/ggerganov/whisper.cpp, MIT) is carried unchanged inside Egghead Notes'
+ggml file ggml-tiny-q8_0.bin from huggingface.co/ggerganov/whisper.cpp, MIT) is carried unchanged inside Syft Notes'
 x64 builds under the MIT License, below.
 
 --------------------------------------------------------------------------------

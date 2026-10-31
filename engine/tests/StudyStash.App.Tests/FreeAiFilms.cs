@@ -18,7 +18,7 @@ using Path = Avalonia.Controls.Shapes.Path;
 namespace StudyStash.App.Tests;
 
 /// <summary>
-/// Pictures and films of notes from an AI Egghead Notes doesn't run, drawn off screen into STUDYSTASH_SHOTS (the way the
+/// Pictures and films of notes from an AI Syft Notes doesn't run, drawn off screen into STUDYSTASH_SHOTS (the way the
 /// Semester films were made: a pointer drawn over the window, each frame saved). The films show what real runs made:
 /// STUDYSTASH_FREE_AI_RUN names the folder a lane's real runs left (run1: the notes real Claude Code saved through the
 /// connection; run2: what it wrote as a plain chat, given "Copy for your AI"'s text, and those notes as the library
@@ -262,15 +262,15 @@ public class FreeAiFilms
             "  get_transcript(rec-20261012-093012-a41c07)",
             "  get_lecture(rec-20261012-093012-a41c07)",
             "  save_notes(rec-20261012-093012-a41c07, markdown: 4,033 characters)",
-            "  → Saved. The notes are on the lecture's page in Egghead Notes now, written by Claude.",
+            "  → Saved. The notes are on the lecture's page in Syft Notes now, written by Claude.",
         ];
         for (int i = 1; i <= calls.Length; i++)
         {
-            f.Caption(["Claude, through Egghead Notes' connection:", .. calls[..i]]);
+            f.Caption(["Claude, through Syft Notes' connection:", .. calls[..i]]);
             f.Hold(0.7);
         }
         f.Hold(1.0);
-        f.Caption("Back in Egghead Notes, the lecture's page is read again:");
+        f.Caption("Back in Syft Notes, the lecture's page is read again:");
         f.Hold(1.0);
         Written(page, notes, "Claude Code", "2026-10-21T16:56:00-07:00");
         DiagramsReady.Wait(f.Window);

@@ -3,7 +3,7 @@ using StudyStash.Core;
 
 namespace StudyStash.App.Tests;
 
-/// <summary>The browsers Egghead Notes reads Canvas through: which one this computer opens links with, which one the
+/// <summary>The browsers Syft Notes reads Canvas through: which one this computer opens links with, which one the
 /// extension is added to, which one Canvas opens in afterwards, and opening one. Nothing here asks the real computer
 /// or starts a real browser.</summary>
 public class BrowsersTests
@@ -90,7 +90,7 @@ public class BrowsersTests
         Assert.Equal([Browsers.Chrome, Browsers.Edge], Browsers.Offer(Browsers.Firefox, here, firefoxAddOn: ""));
         // Once the add-on is somewhere, it is: first, since it's the default.
         Assert.Equal([Browsers.Firefox, Browsers.Chrome, Browsers.Edge], Browsers.Offer(Browsers.Firefox, here, published));
-        // It is somewhere: Mozilla publishes it, and this Egghead Notes says where, so a student's own Firefox is used.
+        // It is somewhere: Mozilla publishes it, and this Syft Notes says where, so a student's own Firefox is used.
         Assert.Equal(published, StudyStash.Core.Canvas.Extension.FirefoxPublishedAt);
         Assert.Equal(Browsers.Firefox, Browsers.ToUse(Browsers.Firefox, here));
         // The one the student added it to before comes ahead of the default.
@@ -105,11 +105,11 @@ public class BrowsersTests
     public void A_default_browser_the_extension_cant_go_in_gets_advice_and_one_it_can_go_in_gets_none()
     {
         var safari = Browsers.Advise(Browsers.Safari, [Browsers.Chrome, Browsers.Safari], "")!;
-        Assert.Equal("Your usual browser, Safari, can’t run the Egghead Notes extension. Egghead Notes will use Chrome instead.", safari.Say(Browsers.Chrome));
+        Assert.Equal("Your usual browser, Safari, can’t run the Syft Notes extension. Syft Notes will use Chrome instead.", safari.Say(Browsers.Chrome));
 
         // Firefox, while its add-on has nowhere to be fetched from; once it has, Firefox is simply used.
         var firefox = Browsers.Advise(Browsers.Firefox, [Browsers.Edge, Browsers.Firefox], "")!;
-        Assert.Equal("Your usual browser, Firefox, can’t run the Egghead Notes extension yet. Egghead Notes will use Edge instead.", firefox.Say(Browsers.Edge));
+        Assert.Equal("Your usual browser, Firefox, can’t run the Syft Notes extension yet. Syft Notes will use Edge instead.", firefox.Say(Browsers.Edge));
         Assert.Null(Browsers.Advise(Browsers.Firefox, [Browsers.Edge, Browsers.Firefox], "https://addons.mozilla.org/firefox/addon/study-stash-for-canvas/"));
 
         Assert.Null(Browsers.Advise(Browsers.Edge, [Browsers.Chrome, Browsers.Edge], ""));
@@ -118,7 +118,7 @@ public class BrowsersTests
         // A Mac with only Safari.
         var only = Browsers.Advise(Browsers.Safari, [Browsers.Safari], "")!;
         Assert.True(only.NoneHere);
-        Assert.Equal("Your usual browser, Safari, can’t run the Egghead Notes extension. It runs in Chrome, Edge, Brave, Arc, Opera, Vivaldi and Firefox, "
+        Assert.Equal("Your usual browser, Safari, can’t run the Syft Notes extension. It runs in Chrome, Edge, Brave, Arc, Opera, Vivaldi and Firefox, "
             + "and none of them is on this computer. Get Chrome, then press Add to Chrome.", only.Say(Browsers.Chrome));
         Assert.StartsWith("It runs in Chrome", Browsers.Advise(null, [], "")!.Say(Browsers.Chrome));
     }
@@ -136,7 +136,7 @@ public class BrowsersTests
         // The extension is in a browser that isn't on this computer (the library's own, say): the one to use here.
         Assert.Equal(Browsers.Edge, Browsers.ForCanvas("Brave", picked: "", usual: Browsers.Edge, here, firefoxAddOn: ""));
 
-        // An extension from before 1.6 doesn't say where it is: Egghead Notes only ever added those to Chrome.
+        // An extension from before 1.6 doesn't say where it is: Syft Notes only ever added those to Chrome.
         Assert.Equal("Chrome", Browsers.HeardFrom(new CanvasApi.ExtensionInfo { Version = "1.5", LastSeen = CanvasFixtures.Now }));
         Assert.Equal("Firefox", Browsers.HeardFrom(new CanvasApi.ExtensionInfo { Version = "1.6", Browser = "Firefox" }));
         Assert.Equal("", Browsers.HeardFrom(new CanvasApi.ExtensionInfo()));

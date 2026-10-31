@@ -12,7 +12,7 @@ using StudyStash.Core;
 
 namespace StudyStash.App.Tests;
 
-/// <summary>Settings → Granola: connecting, the lectures in Granola that Egghead Notes doesn't have, bringing one over
+/// <summary>Settings → Granola: connecting, the lectures in Granola that Syft Notes doesn't have, bringing one over
 /// or leaving it, and the words of the notification that offers one.</summary>
 public class GranolaSettingsTests
 {
@@ -114,10 +114,10 @@ public class GranolaSettingsTests
     public void The_notification_names_one_lecture_and_counts_several()
     {
         var one = NoticeWords.GranolaHas(["Cell membranes and transport"]);
-        Assert.Equal(("Granola has a lecture Egghead Notes doesn't", "Transfer"), (one.Title, one.Action));
+        Assert.Equal(("Granola has a lecture Syft Notes doesn't", "Transfer"), (one.Title, one.Action));
         Assert.StartsWith("Cell membranes and transport. Bring it over", one.Text);
         var three = NoticeWords.GranolaHas(["Osmosis", "Membranes", "Enzymes"]);
-        Assert.Equal(("Granola has 3 lectures Egghead Notes doesn't", "Osmosis and 2 more.", "Show them"), three);
+        Assert.Equal(("Granola has 3 lectures Syft Notes doesn't", "Osmosis and 2 more.", "Show them"), three);
         Assert.Equal("Osmosis and one more.", NoticeWords.GranolaHas(["Osmosis", "Membranes"]).Text);
         Assert.Equal("A lecture with no title is with your library, which is writing its notes.", NoticeWords.GranolaBrought(" ", null).Text);
     }

@@ -102,7 +102,7 @@ public class ToastShots
     static List<Control> Three() =>
     [
         new ToastView { Title = "Filed in CS 101", Text = "Recursion and the call stack", ActionLabel = "Open note" },
-        new ToastView { Title = "Recording saved", Text = "Egghead Notes is writing it down; the library files it and writes your notes." },
+        new ToastView { Title = "Recording saved", Text = "Syft Notes is writing it down; the library files it and writes your notes." },
         ToastView.For(CanvasShots.ToastGallery()[2]),
     ];
 

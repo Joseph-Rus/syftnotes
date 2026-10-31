@@ -237,7 +237,7 @@
               </Grid>
               <!-- A rewrite the library couldn't do: why, over the notes it left as they were -->
               <c:PageText Name="NotRewritten" IsVisible="{Binding WasNotRewritten}" Text="{Binding NotRewritten}" FontSize="14.5" LineHeight="22" Foreground="{DynamicResource InkMuted}" TextWrapping="Wrap" />
-              <!-- Notes from an AI Egghead Notes doesn't run: over a lecture with none, that the Claude app (or any free
+              <!-- Notes from an AI Syft Notes doesn't run: over a lecture with none, that the Claude app (or any free
                    chat) can write them, with Copy for your AI and Paste notes; a long lecture's copy a part at a time;
                    and the box a chat's notes are pasted into (from here, or the notes' ⋯ menu). -->
               <StackPanel Name="FreeAi" Spacing="12" DataContext="{Binding $parent[UserControl].((vm:LibraryModel)DataContext).FreeAi}" x:DataType="vm:FreeAiModel"

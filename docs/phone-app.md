@@ -1,4 +1,4 @@
-# Egghead Notes: the phone app's web side
+# Syft Notes: the phone app's web side
 
 This is the web app the library serves at `/app/` — see [`docs/phone.md`](phone.md) for the library side (pairing,
 the `device` cookie, Tailscale Serve on 8443, `/api/v2/lectures/{id}/rendered`) and how the two fit together. This
@@ -122,7 +122,7 @@ tab bar.
 
 ## The PWA itself
 
-- **`web/public/manifest.webmanifest`**: name Egghead Notes, `start_url`/`scope` `/app/`, `display: standalone`, and
+- **`web/public/manifest.webmanifest`**: name Syft Notes, `start_url`/`scope` `/app/`, `display: standalone`, and
   icons at 192 and 512 (plus maskable versions with a teal safe-zone background), made from `assets/icon.png` with
   `sips` (`sips -z 192 192 assets/icon.png --out web/public/icon-192.png`, and similarly for 512 and the padded
   maskable pair). `apple-touch-icon.png` is the repo's own 180×180 (`assets/apple-touch-icon.png`), copied as-is.

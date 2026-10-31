@@ -69,7 +69,7 @@
     <StackPanel>
       <!-- Windows: the app's name along the top, with the × -->
       <Grid Name="WinHeader" ColumnDefinitions="*,Auto" Margin="0,0,0,10" IsVisible="False">
-        <TextBlock Text="Egghead Notes" FontSize="12" Foreground="{DynamicResource Fg2}" VerticalAlignment="Center" />
+        <TextBlock Text="Syft Notes" FontSize="12" Foreground="{DynamicResource Fg2}" VerticalAlignment="Center" />
         <Button Name="WinClose" Grid.Column="1" Theme="{StaticResource Surface}" Width="24" Height="24" CornerRadius="4" Margin="0,-4,-6,-4"
                 HorizontalContentAlignment="Center" ToolTip.Tip="Dismiss">
           <c:Icon Glyph="close" Size="14" Foreground="{DynamicResource Fg2}" />

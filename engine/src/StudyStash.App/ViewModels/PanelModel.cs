@@ -101,7 +101,7 @@ public sealed partial class PanelModel : ObservableObject
     /// <summary>Record and the class switcher: a computer that records, while it isn't.</summary>
     public bool ShowRecord => IsIdle && !LibraryOnly;
     public bool ShowRecent => HasRecent && !LibraryOnly;
-    /// <summary>The status line above Open Egghead Notes: the library's own lines say it on a library-only computer.</summary>
+    /// <summary>The status line above Open Syft Notes: the library's own lines say it on a library-only computer.</summary>
     public bool ShowStatus => !LibraryOnly;
     public bool HasCanvasLine => Library?.Canvas is not null;
     public bool HasLaptopsLine => Library?.Laptops is not null;

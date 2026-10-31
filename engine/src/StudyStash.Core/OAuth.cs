@@ -131,7 +131,7 @@ public sealed class GranolaOAuth(string mcpUrl, int callbackPort, string prompt,
         var m = await MetadataAsync(ct);
         var body = new JsonObject
         {
-            ["client_name"] = "Egghead Notes",
+            ["client_name"] = "Syft Notes",
             ["redirect_uris"] = new JsonArray(RedirectUri, $"http://127.0.0.1:{callbackPort}/callback"),
             ["grant_types"] = new JsonArray("authorization_code", "refresh_token"),
             ["response_types"] = new JsonArray("code"),
@@ -207,7 +207,7 @@ public sealed class GranolaOAuth(string mcpUrl, int callbackPort, string prompt,
         var m = await MetadataAsync(ct);
         // The spec: no advertised S256 means no PKCE, and then a client must not go on.
         if ((m["code_challenge_methods_supported"] as JsonArray)?.Any(x => Py.AsString(x) == "S256") != true)
-            throw new OAuthException("Granola's sign-in server doesn't offer PKCE (S256), so Egghead Notes won't sign in there");
+            throw new OAuthException("Granola's sign-in server doesn't offer PKCE (S256), so Syft Notes won't sign in there");
         var query = new List<(string, string)>
         {
             ("response_type", "code"), ("client_id", await ClientIdAsync(ct)), ("redirect_uri", RedirectUri), ("scope", Scope),

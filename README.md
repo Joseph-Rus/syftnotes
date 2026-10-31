@@ -1,16 +1,16 @@
-<p align="center"><img src="docs/images/icon.png" width="96" alt="Egghead Notes app icon"></p>
+<p align="center"><img src="docs/images/icon.png" width="96" alt="Syft Notes app icon"></p>
 
-<h1 align="center">Egghead Notes</h1>
+<h1 align="center">Syft Notes</h1>
 
 <p align="center">
-  <b>Egghead Notes is a free, open-source AI lecture recorder and note-taker for students on Mac and Windows: it records your lectures, transcribes them on your own computer and writes study notes, with the diagrams already drawn.</b><br>
+  <b>Syft Notes is a free, open-source AI lecture recorder and note-taker for students on Mac and Windows: it records your lectures, transcribes them on your own computer and writes study notes, with the diagrams already drawn.</b><br>
   Works with Claude, ChatGPT, Gemini or a free AI on your computer. No paid plan needed, and your recordings stay on your own computers.
 </p>
 
 <p align="center">
-  <a href="https://github.com/Joseph-Rus/study-stash/releases/latest/download/Egghead-Notes.dmg"><b>Download for Mac</b></a>
+  <a href="https://github.com/Joseph-Rus/study-stash/releases/latest/download/Syft-Notes.dmg"><b>Download for Mac</b></a>
   &nbsp;·&nbsp;
-  <a href="https://github.com/Joseph-Rus/study-stash/releases/latest/download/Egghead-Notes-Setup.exe"><b>Download for Windows</b></a>
+  <a href="https://github.com/Joseph-Rus/study-stash/releases/latest/download/Syft-Notes-Setup.exe"><b>Download for Windows</b></a>
   &nbsp;·&nbsp;
   <a href="https://study-stash-app.web.app/assets/study-stash-demo.mp4">Watch the 50-second demo</a>
   &nbsp;·&nbsp;
@@ -25,14 +25,14 @@
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/images/notes-heart-dark.png">
-  <img src="docs/images/notes-heart-light.png" alt="A lecture's notes in Egghead Notes, with a labelled drawing of the heart cut open: aorta, atria, ventricles and valves">
+  <img src="docs/images/notes-heart-light.png" alt="A lecture's notes in Syft Notes, with a labelled drawing of the heart cut open: aorta, atria, ventricles and valves">
 </picture>
 
 Press Record when the lecture starts. It's written down as it goes, on your computer, and when you
 stop, the notes are written, filed under the right class next to your Canvas assignments, and ready
 to ask about. Two students build it, with Claude.
 
-Egghead Notes is an open-source alternative to Otter.ai, Granola and Notability for recording
+Syft Notes is an open-source alternative to Otter.ai, Granola and Notability for recording
 lectures: it's free, transcribes on your own computer, and writes notes with whichever AI you
 choose, including a free one that runs on your machine.
 
@@ -105,7 +105,7 @@ open the transcript at the line where it was said, and a question asked while a 
 recording is answered from that recording.
 
 Your chats are kept. A lecture's page opens on its latest chat, so you can pick up where you left
-off, even after closing Egghead Notes, and follow-ups like "and the second one?" or "explain that more
+off, even after closing Syft Notes, and follow-ups like "and the second one?" or "explain that more
 simply" know what was just said. **Chats**, at the top of the Ask card and in the ask bar, lists your
 past conversations; **New chat** starts a fresh one, and a chat can be renamed, or deleted with
 Undo. A folder's page lists its own chats and its lectures', and Home lists them all. Chats are kept
@@ -145,13 +145,13 @@ notes by week, and beside them what's due, its lists on Canvas and when it next 
 Paste your calendar's link (Google's secret iCal address, iCloud, Outlook or your school's) in
 **Settings → Calendars** and pick which calendars to share. Upcoming classes show in the menu bar,
 the quick panel and the library, and a lecture recorded during one is named after it and filed under
-its class. When a recurring event looks like one of your classes, Egghead Notes offers to file every
+its class. When a recurring event looks like one of your classes, Syft Notes offers to file every
 one of them there.
 
 Attach iPad handwriting, slides, PDFs or photos to a lecture or class (drag them in). Their words,
 handwriting included, are read on your computer and go into the lecture's notes, Ask and Claude.
 
-Not just for school: setup asks what you'll use Egghead Notes for (school, work, research, creative
+Not just for school: setup asks what you'll use Syft Notes for (school, work, research, creative
 work or personal). Without school there's no Canvas step, classes are called folders, and notes are
 written for meetings and talks: a summary, decisions, action items with who and when, and open
 questions. Change it any time in Settings → General.
@@ -171,7 +171,7 @@ with each class's highlighter the one colour. Light and dark, on a Mac and on Wi
 
 ## FAQ
 
-### Is Egghead Notes free?
+### Is Syft Notes free?
 
 Yes. It's free and open source under the MIT licence, with no account to make and nothing to
 subscribe to. If you already pay for Claude or ChatGPT it can use that plan, but it doesn't need one.
@@ -192,7 +192,7 @@ it any time in **Settings → Your AI**.
 
 No. Without any AI it still records, transcribes and files your lectures, and for notes you can use
 the free AI on your computer, a free Gemini API key, or the free Claude app, which saves the notes
-you ask it for straight into Egghead Notes. Any free chat works too: press **Copy for your AI** on a
+you ask it for straight into Syft Notes. Any free chat works too: press **Copy for your AI** on a
 lecture, paste it into ChatGPT, Claude or Gemini, and bring back what it writes with **Paste notes**.
 
 ### Does it work with Canvas?
@@ -210,7 +210,7 @@ also records is in [`ios/`](ios/), and isn't on the App Store yet. See
 
 ## One computer or two
 
-Egghead Notes is one app with two jobs, so you can use it the way that suits you:
+Syft Notes is one app with two jobs, so you can use it the way that suits you:
 
 - **One computer.** Your laptop records, keeps the library and writes the notes itself. Nothing
   else to set up. Notes are written while it's on.
@@ -233,13 +233,13 @@ One download for every computer, on the [latest release](https://github.com/Jose
 
 | Mac | Windows |
 |---|---|
-| [Egghead-Notes.dmg](https://github.com/Joseph-Rus/study-stash/releases/latest/download/Egghead-Notes.dmg) | [Egghead-Notes-Setup.exe](https://github.com/Joseph-Rus/study-stash/releases/latest/download/Egghead-Notes-Setup.exe) |
+| [Syft-Notes.dmg](https://github.com/Joseph-Rus/study-stash/releases/latest/download/Syft-Notes.dmg) | [Syft-Notes-Setup.exe](https://github.com/Joseph-Rus/study-stash/releases/latest/download/Syft-Notes-Setup.exe) |
 
 It's the same app either way; what a computer is for is chosen when you first open it, not when
 you download it. The Mac app needs macOS 15 (Sequoia) or later, on Apple silicon or Intel; the
 Windows one, Windows 10 or 11.
 
-- **Mac:** open the DMG and drag **Egghead Notes** into Applications. It's signed with a Developer ID
+- **Mac:** open the DMG and drag **Syft Notes** into Applications. It's signed with a Developer ID
   and notarized by Apple, so it opens like any app from the internet (macOS asks once whether to
   open it). Allow the microphone when it asks.
 - **Windows:** run the Setup.exe. It installs for your account only, no admin rights needed. If
@@ -256,28 +256,28 @@ curl -fsSL https://raw.githubusercontent.com/Joseph-Rus/study-stash/main/install
 irm https://raw.githubusercontent.com/Joseph-Rus/study-stash/main/install.ps1 | iex
 ```
 
-Then open **Egghead Notes**. See [Setting up](#setting-up).
+Then open **Syft Notes**. See [Setting up](#setting-up).
 
 ## Setting up
 
-The first time Egghead Notes opens, it says how it works, then asks which AI you have. An AI sets
-Egghead Notes up with you, writes your notes and answers your questions:
+The first time Syft Notes opens, it says how it works, then asks which AI you have. An AI sets
+Syft Notes up with you, writes your notes and answers your questions:
 
-- **Claude**: you have a paid Claude plan, Pro or Max. (Egghead Notes talks to it through Claude Code,
+- **Claude**: you have a paid Claude plan, Pro or Max. (Syft Notes talks to it through Claude Code,
   Anthropic's own helper for apps.)
 - **ChatGPT**: you have a paid ChatGPT plan, Plus or higher. (Through Codex, OpenAI's.)
 - **Gemini**: you connect it on the notes step, with an API key or Google's Antigravity app.
-- **I don't have a paid plan**: that's fine. Egghead Notes still records and transcribes. A free AI on
+- **I don't have a paid plan**: that's fine. Syft Notes still records and transcribes. A free AI on
   your computer (Ollama) or an API key is there too, marked Advanced.
 
 **If you already have the ChatGPT app or the Claude app on a Mac, there's nothing to install.** The
 ChatGPT app carries Codex inside it, signed in with the app, and the Claude app keeps its own Claude
-Code once its Code tab has been opened. Egghead Notes finds those copies: the one you have starts
+Code once its Code tab has been opened. Syft Notes finds those copies: the one you have starts
 picked, and **Continue** goes straight to the chat.
 
-Otherwise: pick the one you pay for, press **Download and set up** (Egghead Notes runs its maker's own
+Otherwise: pick the one you pay for, press **Download and set up** (Syft Notes runs its maker's own
 installer, for your account only, no admin password; nothing is downloaded until you press it), then
-**Open sign-in page** to sign in on Claude's or ChatGPT's own page. Egghead Notes never sees your
+**Open sign-in page** to sign in on Claude's or ChatGPT's own page. Syft Notes never sees your
 password or your sign-in. A tiny test message then checks your plan includes it. If the account is
 on a plan other apps can't use (a free one), setup says so, and you can carry on and add an API key
 on the notes step.
@@ -285,16 +285,16 @@ on the notes step.
 After that your AI walks you through the rest in a chat, with a checklist beside it: one computer or
 two, the microphone, the transcription model, your classes, Canvas, letting your ChatGPT or Claude
 app read your lectures (one **Connect**, if you have the app), and starting at login. It can
-only use Egghead Notes' own setup tools (no commands, files or web), and anything that changes your
+only use Syft Notes' own setup tools (no commands, files or web), and anything that changes your
 computer happens only when you press the button in its card. Close the window part-way and the chat
 picks up where it left off. The chat uses a little of your plan, and your AI then writes your
 notes and answers your questions (you can switch to a free local model in Settings any time).
 
 Choosing Gemini or **I don't have a paid plan**, or pressing **Set up by hand**, goes to setup by
 hand: a few plain steps. It asks **Where your lectures are kept**, with **Just this Mac** (or **Just this PC**) chosen, which is what
-most students want: check the microphone, choose who writes the notes, what you'll use Egghead Notes
+most students want: check the microphone, choose who writes the notes, what you'll use Syft Notes
 for, Canvas, your classes, and starting at login (recommended, so your library runs whenever you're
-logged in). There's no step for the speech model: Egghead Notes picks one that keeps up on your
+logged in). There's no step for the speech model: Syft Notes picks one that keeps up on your
 computer and downloads it while you finish.
 
 The notes step lists **Free AI on this Mac** (marked **Advanced**), **Claude** and **ChatGPT**, each
@@ -323,7 +323,7 @@ nothing is left behind. Nothing to reinstall or redownload.
 ## Record and transcribe lectures
 
 Click **Record** in the menu bar (Mac) or tray (Windows), press ⌥⇧R (Ctrl+Alt+R on Windows), or
-click an event in **Up next**. Egghead Notes transcribes as you go, so the recorder shows what's said
+click an event in **Up next**. Syft Notes transcribes as you go, so the recorder shows what's said
 and you can ask about it mid-lecture; or, to save battery, it only records during the lecture and
 transcribes it after class (Settings → Recording). The audio never leaves your computer.
 
@@ -379,7 +379,7 @@ get their maker's own installer and their own sign-in page. Nothing is typed int
 commands below are for doing it yourself, or on a library you set up another way.
 
 **Ollama**: free, and nothing leaves your computer. Install it from [ollama.com](https://ollama.com),
-and Egghead Notes offers to download a model.
+and Syft Notes offers to download a model.
 
 **Claude** (through Claude Code): uses your Claude plan. Install it, then run `claude` once in
 Terminal and sign in:
@@ -412,7 +412,7 @@ one from [OpenAI's platform](https://platform.openai.com/api-keys). A key is pai
 apart from a plan. Every key stays on your computer, readable by your account only, and only goes
 to its maker; once saved, only its last four characters are shown.
 
-On a Mac, Egghead Notes also uses the Codex inside the ChatGPT app and the Claude Code the Claude app
+On a Mac, Syft Notes also uses the Codex inside the ChatGPT app and the Claude Code the Claude app
 keeps, when there's no copy installed on its own: nothing to install.
 
 Where setup can't do it with buttons (a library you reach from another computer), its notes step
@@ -451,11 +451,11 @@ and tendons of the hand, the heart cut open, a circuit board, a robot arm, a cel
 set-up, a server rack) can also get an **illustration**: a detailed, labelled drawing of the thing
 itself, like a figure in a textbook. The designer plans it (the view, where things go, and the parts
 the lecturer named, each with a line from what was said). Then, most of the time, it's **composed
-from ready-made parts** in seconds: Egghead Notes ships a library of about 300 professionally drawn,
+from ready-made parts** in seconds: Syft Notes ships a library of about 300 professionally drawn,
 openly licensed parts (Servier Medical Art's hearts, organs, organelles and glassware, DBCLS's bones,
-public-domain cells, Wokwi's Arduino boards and modules, and Egghead Notes' own drone, robot-arm and
+public-domain cells, Wokwi's Arduino boards and modules, and Syft Notes' own drone, robot-arm and
 server-rack parts), finds the ones that fit the plan by its words, and a fast model (Claude Code's
-Sonnet) answers with a small plan of which parts go where; Egghead Notes draws the parts, any simple
+Sonnet) answers with a small plan of which parts go where; Syft Notes draws the parts, any simple
 shapes nothing in the library shows (a tendon, a wire, a white tile) and the labels itself, in the
 house style. The same plan again (a class that comes back to the drone) is drawn at once from the
 last one. When the library has nothing for the subject, the same engine draws it shape by shape
@@ -535,7 +535,7 @@ the notes, in a quick answer and in the Ask chat:
   notes by the engine that draws them (**Rich notes → Drawn by**, see
   [Your AI](#your-ai-claude-chatgpt-gemini-or-ollama)), each under a bold title with a caption and
   the moment of the lecture it comes from; rewriting a lecture's notes designs them again rather
-  than adding more. Either kind opens larger on a click, and a diagram Egghead Notes can't draw shows
+  than adding more. Either kind opens larger on a click, and a diagram Syft Notes can't draw shows
   its source with a plain reason instead of failing.
 - **Illustrations**: a drawing of a thing the lecture described has parts you can point at. The
   pointer over a part lights it (and shows its name, even with the labels off) while the rest dims;
@@ -583,34 +583,34 @@ What's due across your classes shows as a calendar, by month or by week, with wh
 what's handed in. Each assignment has its instructions, rubric, your submission and feedback, beside
 your classes' module files and pages, announcements, quizzes and discussions.
 
-Egghead Notes reads Canvas through your browser with your own sign-in (no Canvas password or token),
+Syft Notes reads Canvas through your browser with your own sign-in (no Canvas password or token),
 and only reads; nothing on Canvas changes. It works in Chrome and the browsers built on it (Edge,
 Brave, Arc, Opera, Vivaldi), and in Firefox and the browsers built on it (Zen, LibreWolf,
 Waterfox). On your library's computer:
 
 1. **Settings → Canvas** (or the Canvas step in setup): type your school's Canvas address.
 2. Click **Add to Chrome** (the button names your own browser: Add to Edge, Add to Firefox; if the
-   browser you usually use can't run the extension, like Safari, Egghead Notes says so and uses
+   browser you usually use can't run the extension, like Safari, Syft Notes says so and uses
    another one on your computer, or points you to Chrome when there's none).
    - **Chrome, Edge, Brave, Arc and Vivaldi:** it opens
-     [Egghead Notes for Canvas](https://chromewebstore.google.com/detail/study-stash-for-canvas/dfhoenhdjjbnopbepgkgjdgdnfmecjjd)
+     [Syft Notes for Canvas](https://chromewebstore.google.com/detail/study-stash-for-canvas/dfhoenhdjjbnopbepgkgjdgdnfmecjjd)
      on the Chrome Web Store. Click the blue **Add to Chrome** button (Add to Brave in Brave),
      then **Add extension**. In Edge the button says **Get extension**, and the first time Edge
      asks to allow extensions from other stores: click **Allow**. Then click the extension's
-     **Egghead Notes** button (it may be under the puzzle-piece Extensions button), paste the code
-     Egghead Notes shows, click **Connect**, then **Allow**.
+     **Syft Notes** button (it may be under the puzzle-piece Extensions button), paste the code
+     Syft Notes shows, click **Connect**, then **Allow**.
    - **Opera and Chromium**, or if your school's Chrome won't add it from the store (**Can't add
      it from the store? Load it from a folder instead**): it opens that browser's extensions page
      and shows the extension's folder. Turn on **Developer mode**, click **Load unpacked**, and
      pick that folder, or drag the folder onto the Extensions page. On a Mac the folder is
-     **Egghead Notes → Chrome extension** in your home folder (`~/Study Stash/Chrome extension`),
+     **Syft Notes → Chrome extension** in your home folder (`~/Study Stash/Chrome extension`),
      where the browser's window can see it; on Windows it's `chrome-extension` in
      `%USERPROFILE%\.study-stash`.
    - **Firefox and its family:** it opens
-     [Egghead Notes for Canvas](https://addons.mozilla.org/firefox/addon/study-stash-for-canvas/)
+     [Syft Notes for Canvas](https://addons.mozilla.org/firefox/addon/study-stash-for-canvas/)
      on Mozilla's add-ons site. Click the blue **Add to Firefox** button, then **Add**. Click the
-     add-on's **Egghead Notes** button (it may be under the puzzle-piece Extensions button), paste
-     the code Egghead Notes shows, click **Connect**, then **Allow**. It needs Firefox 140 or later.
+     add-on's **Syft Notes** button (it may be under the puzzle-piece Extensions button), paste
+     the code Syft Notes shows, click **Connect**, then **Allow**. It needs Firefox 140 or later.
 3. Sign in to Canvas in that browser, then click **Find my courses** and match each class to its
    course.
 
@@ -629,20 +629,20 @@ to a lecture. Install Tailscale on your phone and sign in to the same account, t
 page that opens to your home screen, and it opens like any other app; an iPhone or iPad can do the
 same from Safari ([docs/phone.md](docs/phone.md) has the details).
 
-A native Egghead Notes app for iPhone and iPad is in [`ios/`](ios/): it records lectures (written down
+A native Syft Notes app for iPhone and iPad is in [`ios/`](ios/): it records lectures (written down
 on the phone as they're said), reads your notes, asks, takes handwritten notes and adds files. It
 isn't on the App Store yet.
 
 ## Granola
 
-If you also record lectures in [Granola](https://granola.ai), Egghead Notes can bring them over. In
+If you also record lectures in [Granola](https://granola.ai), Syft Notes can bring them over. In
 **Settings → Granola**, press **Connect** and sign in on Granola's own page in your browser. Study
 Stash never sees your password. From then on it looks at your Granola every few minutes. When there's
 a lecture it doesn't have, a notification offers it with a **Transfer** button, and the Granola page
 lists every one that's waiting, each with **Transfer** and **Leave it**.
 
 A transferred lecture goes to your library the way a recording does: it's filed under its class and
-gets study notes. What the notes are written from depends on your Granola plan, because Egghead Notes
+gets study notes. What the notes are written from depends on your Granola plan, because Syft Notes
 only gets what Granola's own connection for apps shares:
 
 - **Free Granola plan:** each lecture's notes (Granola's summary, and anything you typed) from the
@@ -650,9 +650,9 @@ only gets what Granola's own connection for apps shares:
   only be as full as it is, and the lecture has no transcript to read or search.
 - **Paid Granola plan:** the transcript too, and the notes are written from that.
 
-Egghead Notes only reads from Granola and changes nothing there. **Disconnect** forgets the sign-in on
+Syft Notes only reads from Granola and changes nothing there. **Disconnect** forgets the sign-in on
 this computer, and the lectures already brought over stay. The page is on the computer you record
-on. Egghead Notes isn't affiliated with Granola.
+on. Syft Notes isn't affiliated with Granola.
 
 ## Connect Claude, ChatGPT and Gemini to your library (MCP)
 
@@ -660,13 +660,13 @@ Your library speaks [MCP](https://modelcontextprotocol.io), so AI apps can read 
 and Canvas work. Set it up in **Settings → AI apps**.
 
 - **AI apps on this computer** (Claude Desktop, Claude Code, ChatGPT, Gemini CLI): choose **Connect**
-  next to the app. Egghead Notes adds itself to that app's own settings file, keeping everything else
+  next to the app. Syft Notes adds itself to that app's own settings file, keeping everything else
   in it (and a copy of it as it was, `….study-stash-backup`). The app has to be quit and opened
   again to load it: on a Mac the row has a **Reopen** button that does that for you. The row then
   turns to **Connected** by itself (ChatGPT's, once you start a chat in Codex).
-  **Disconnect** takes only Egghead Notes back out. The **ChatGPT** row is the ChatGPT desktop app
+  **Disconnect** takes only Syft Notes back out. The **ChatGPT** row is the ChatGPT desktop app
   (the one with Codex built in) and Codex in the terminal or your editor: they share one settings
-  file. The app starts Egghead Notes itself and reads your library through this computer, so this
+  file. The app starts Syft Notes itself and reads your library through this computer, so this
   works on a computer on its own: no Tailscale, no internet address, and no password goes into the
   app's settings. Another MCP app: **Copy setup** and paste it into its settings.
 - **Notes from an AI app.** An app on this computer can also save notes you ask it to write: with
@@ -677,7 +677,7 @@ and Canvas work. Set it up in **Settings → AI apps**.
   and OpenAI's servers, so they need an internet address. Turn on **Let Claude and ChatGPT reach
   your library from the internet** (it uses a
   [Tailscale Funnel](https://tailscale.com/kb/1223/funnel), protected by signing in with your
-  library password), then add a custom connector named **Egghead Notes** with the address
+  library password), then add a custom connector named **Syft Notes** with the address
   `https://<your library's name>.<your tailnet>.ts.net/mcp`: in Claude under Settings → Connectors,
   in ChatGPT at chatgpt.com/plugins (**+** → **Add custom MCP server**). These only read. On a
   computer without Tailscale the card says so, and links to Tailscale (free); nothing is put on the
@@ -692,7 +692,7 @@ requirements are met and tested.
 - **Recordings stay on your computer.** Recording and transcription happen there, and the audio
   never leaves it.
 - **No account, and no server of ours.** Your library runs on your own computer (or a computer of
-  yours at home), your notes are plain Markdown files in a folder on it, and Egghead Notes sends no
+  yours at home), your notes are plain Markdown files in a folder on it, and Syft Notes sends no
   usage data anywhere.
 - **Your AI, under your own account.** With Claude, ChatGPT or Gemini, a lecture's transcript (and,
   for its diagrams, its notes) goes to that company under your plan or your key. With the free AI on
@@ -729,14 +729,14 @@ against the release's `SHA256SUMS.txt` first.
 ## Uninstall
 
 **Mac:** if you turned on **Open when you log in** (Settings → General), turn it off first, so no
-login item is left behind; then quit Egghead Notes and drag it from Applications to the Trash.
-**Windows:** Settings → Apps → **Egghead Notes** → Uninstall. Your lectures and settings stay where
+login item is left behind; then quit Syft Notes and drag it from Applications to the Trash.
+**Windows:** Settings → Apps → **Syft Notes** → Uninstall. Your lectures and settings stay where
 they are; only the app goes. To remove them too, delete the folders under
 [Where your data lives](#where-your-data-lives).
 
 ## Build from source
 
-Egghead Notes is C# on .NET 10: the Mac and Windows app is [Avalonia](https://avaloniaui.net), speech
+Syft Notes is C# on .NET 10: the Mac and Windows app is [Avalonia](https://avaloniaui.net), speech
 runs on Whisper.net and sherpa-onnx, the library and its MCP server are in the same program, the
 phone web app in `web/` is Preact and TypeScript, and the iPhone and iPad app in `ios/` is SwiftUI
 ([ios/README.md](ios/README.md)).
@@ -751,15 +751,15 @@ dotnet run --project engine/src/StudyStash.App -- --home /some/temp/dir
 (cd web && npm ci && npm test && npm run build)   # the phone app, into web/dist, which the app then carries
 ```
 
-`macos/build-app.sh` builds "Study Stash.app" and `Egghead-Notes.dmg` (with Xcode's command line tools), and
-`windows/build.ps1` `Egghead-Notes-Setup.exe`; both build the phone app into it first. `engine/README.md` has more on the projects and tests.
+`macos/build-app.sh` builds "Study Stash.app" and `Syft-Notes.dmg` (with Xcode's command line tools), and
+`windows/build.ps1` `Syft-Notes-Setup.exe`; both build the phone app into it first. `engine/README.md` has more on the projects and tests.
 
 Releases come from CI (`.github/workflows/ci.yml`), at two speeds. A change that reaches `main` is
 tested once: the engine's tests on macOS, Linux and Windows (side by side), and both apps built and
 self-tested for real. No installer is kept, installed or published for it. A release is a push to `main` with a new
 `StudyStashVersion` in `engine/Directory.Build.props` (no tag yet): CI also builds the installers,
 proves them (the Mac app natively on an Intel Mac; Setup.exe installed, updated in place and
-uninstalled), and publishes `Egghead-Notes.dmg`, `Egghead-Notes-Setup.exe` (and copies under the old
+uninstalled), and publishes `Syft-Notes.dmg`, `Syft-Notes-Setup.exe` (and copies under the old
 installers' names, so older copies still update) and `SHA256SUMS.txt`. A version already released is
 never published again. Code that already passed isn't tested twice: a push that only changes the
 version (or the docs) on top of a commit that passed, or a merge of a branch whose run passed on the
@@ -770,9 +770,9 @@ branch (a version with no tag yet) that run rehearses the whole release, install
 the checksums and short of publishing; merging that branch unchanged then publishes those very
 installers, with no rebuild, within a minute. Add `-f installers=true` to rehearse it on any branch.
 
-## Support Egghead Notes
+## Support Syft Notes
 
-Egghead Notes is free and open source, and two students build it with Claude. If it saves you time,
+Syft Notes is free and open source, and two students build it with Claude. If it saves you time,
 you can [buy us a coffee](https://ko-fi.com/studystashteam) on Ko-fi, and it goes into
 building the next version. A star on GitHub helps other students find it.
 
@@ -795,7 +795,7 @@ live words' models, which come inside the app unchanged with their licences: on 
 [Cactus Whistle](https://huggingface.co/Cactus-Compute/whistle) and the
 [needle](https://github.com/cactus-compute/needle) engine that runs it (both Apache-2.0, by Cactus
 Compute; needle/LICENSE.txt beside the app); on x64, Whisper tiny (MIT, OpenAI; whisper.cpp's
-ggml-tiny-q8_0 file; models/live-whisper-LICENSE.txt beside the app). Egghead Notes calls needle's
+ggml-tiny-q8_0 file; models/live-whisper-LICENSE.txt beside the app). Syft Notes calls needle's
 library directly: the anonymous usage counts that Cactus's Python package sends aren't part of it,
 and nothing either model hears leaves the computer.
 
@@ -804,7 +804,7 @@ Illustrations are composed from parts drawn by [Servier Medical Art](https://sma
 Gallery](https://togotv.dbcls.jp/en/pics.html) (© 2016 DBCLS TogoTV / CC-BY-4.0), Bioicons' CC0
 artists, Mariana Ruiz Villarreal (LadyofHats; public domain, via Wikimedia Commons) and
 [Wokwi elements](https://github.com/wokwi/wokwi-elements) (© 2020 Uri Shaked, MIT), every part
-recoloured to Egghead Notes' palette and simplified, and from Egghead Notes' own parts. Every part
+recoloured to Syft Notes' palette and simplified, and from Syft Notes' own parts. Every part
 and its licence is listed in [docs/parts-credits.md](docs/parts-credits.md); where they come from
 and why, in [docs/parts-sources.md](docs/parts-sources.md).
 

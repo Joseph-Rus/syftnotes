@@ -56,7 +56,7 @@ public sealed class PhoneDrive : IDisposable
     /// <summary>The account this laptop is connected to; null when it isn't.</summary>
     public GoogleAccount? Account { get; private set; }
 
-    /// <summary>This copy of Egghead Notes can sign in to Google (it was built with the Desktop client's secret).</summary>
+    /// <summary>This copy of Syft Notes can sign in to Google (it was built with the Desktop client's secret).</summary>
     public bool CanConnect => secret() is { Length: > 0 };
 
     /// <summary>The browser is open on Google's page, waiting for the student.</summary>

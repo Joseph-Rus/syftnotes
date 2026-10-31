@@ -18,4 +18,4 @@ summary_by: ""
 
 ## Notes
 
-_(Too short for notes: Egghead Notes writes them from about a minute and a half of speech.)_
+_(Too short for notes: Syft Notes writes them from about a minute and a half of speech.)_

@@ -453,7 +453,7 @@ public sealed partial class AiNotesModel : ObservableObject, IDisposable
     [RelayCommand]
     Task TryAgain() => Rewrite(lastEngine.Length > 0 ? lastEngine : WriterId);
 
-    // --- Notes from an AI Egghead Notes doesn't run, and putting earlier notes back ---------------------------------------
+    // --- Notes from an AI Syft Notes doesn't run, and putting earlier notes back ---------------------------------------
 
     /// <summary>The last change to the notes (what made it, who, when) and whether Undo or Redo can follow: the line
     /// over the notes ("Notes replaced by Claude · Undo") while it's recent.</summary>
@@ -563,7 +563,7 @@ public sealed partial class AiNotesModel : ObservableObject, IDisposable
         try
         {
             var versions = await library.NotesVersionsAsync(LectureId);
-            if (versions is null) { OlderLibrary = true; Say = "Your library runs an older Egghead Notes. Update it to see these notes' history."; return; }
+            if (versions is null) { OlderLibrary = true; Say = "Your library runs an older Syft Notes. Update it to see these notes' history."; return; }
             Versions.Clear();
             foreach (var v in versions) Versions.Add(new VersionRow(v, Now()));
             HistoryOpen = true;

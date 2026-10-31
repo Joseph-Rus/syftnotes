@@ -1,5 +1,5 @@
 <!-- First-run setup (Windows): the Mac's three flows (just this computer, the laptop, the library), each with its own
-     name and sidebar caption, chosen on the welcome, plus one step for Windows where Egghead Notes records: pin the tray
+     name and sidebar caption, chosen on the welcome, plus one step for Windows where Syft Notes records: pin the tray
      icon out of the overflow. The same page as the Mac's (MacSetup), as the library window is the same in both looks:
      the steps straight on the window's canvas under Windows' own title bar, the page one white sheet beside them
      (SetupStyles). The AI and Canvas steps widen the window. -->
@@ -76,7 +76,7 @@
                 <StackPanel Classes="setup-page">
                   <TextBlock Classes="step-label" Text="{Binding StepLabel}" />
 
-                  <!-- Welcome: how Egghead Notes will be used, three choices: icon | name (and Recommended) over a line
+                  <!-- Welcome: how Syft Notes will be used, three choices: icon | name (and Recommended) over a line
                        of help | the radio. -->
                   <!-- The first page: what happens to a lecture, before any choice. -->
                   <StackPanel IsVisible="{Binding OnIntro}">
@@ -208,7 +208,7 @@
                   <!-- The laptop: find and connect to your library (Continue connects) -->
                   <StackPanel IsVisible="{Binding OnLibrary}">
                     <TextBlock Classes="page-title step-title" Text="Connect to your library" />
-                    <TextBlock Classes="page-lede step-lede" Text="Your library is the computer at home that keeps your lectures. Type the address and password its setup showed, or let Egghead Notes look for it." />
+                    <TextBlock Classes="page-lede step-lede" Text="Your library is the computer at home that keeps your lectures. Type the address and password its setup showed, or let Syft Notes look for it." />
                     <Grid ColumnDefinitions="*,10,Auto" RowDefinitions="Auto,Auto,16,Auto,Auto" Margin="0,24,0,0" MaxWidth="480" HorizontalAlignment="Stretch">
                       <TextBlock Classes="label" Text="Address" />
                       <Border Grid.Row="1" Classes="field"><TextBox Classes="bare" Text="{Binding Address}" PlaceholderText="http://mac-mini:8787" /></Border>
@@ -241,7 +241,7 @@
 
                   <!-- The microphone -->
                   <StackPanel IsVisible="{Binding OnMicrophone}">
-                    <TextBlock Classes="page-title step-title" Text="Let Egghead Notes hear your lectures" />
+                    <TextBlock Classes="page-title step-title" Text="Let Syft Notes hear your lectures" />
                     <TextBlock Classes="page-lede step-lede" Text="It records with this PC's microphone. The recording stays on this PC; only the transcript goes to your library." />
                     <StackPanel Orientation="Horizontal" Spacing="8" Margin="0,28,0,0" IsVisible="{Binding ShowMicCheck}">
                       <c:Icon Classes="ok" Size="18" />
@@ -334,7 +334,7 @@
                        row on the same columns: marker | name | what it covers | action. -->
                   <!-- What it's for: school brings Canvas and classes; anything else is folders -->
                   <StackPanel IsVisible="{Binding OnUses}">
-                    <TextBlock Classes="page-title step-title" Text="What will you use Egghead Notes for?" />
+                    <TextBlock Classes="page-title step-title" Text="What will you use Syft Notes for?" />
                     <TextBlock Classes="page-lede step-lede" Text="Pick any that fit. School brings in Canvas and classes; anything else gets folders, and the notes are written for it." />
                     <ItemsControl ItemsSource="{Binding UseChoices}" Margin="0,20,0,0" MaxWidth="480" HorizontalAlignment="Stretch">
                       <ItemsControl.ItemsPanel><ItemsPanelTemplate><StackPanel Spacing="8" /></ItemsPanelTemplate></ItemsControl.ItemsPanel>
@@ -412,7 +412,7 @@
                   <!-- The library's last page: how to connect your laptop -->
                   <StackPanel IsVisible="{Binding OnLibraryDone}">
                     <TextBlock Classes="page-title step-title" Text="Your library is ready" />
-                    <TextBlock Classes="page-lede step-lede" Text="Connect your laptop: install Egghead Notes on it, and in its setup open Advanced and choose “My laptop for class”. Then enter:" />
+                    <TextBlock Classes="page-lede step-lede" Text="Connect your laptop: install Syft Notes on it, and in its setup open Advanced and choose “My laptop for class”. Then enter:" />
                     <Border Classes="group" Margin="0,22,0,0">
                       <StackPanel>
                         <ItemsControl ItemsSource="{Binding Addresses}">
@@ -512,10 +512,10 @@
                     </StackPanel>
                   </StackPanel>
 
-                  <!-- The taskbar (where Egghead Notes records) -->
+                  <!-- The taskbar (where Syft Notes records) -->
                   <StackPanel IsVisible="{Binding OnTaskbar}">
-                    <TextBlock Classes="page-title step-title" Text="Keep Egghead Notes on the taskbar" />
-                    <TextBlock Classes="page-lede step-lede" Text="Windows tucks new icons away under ^. Drag Egghead Notes next to the clock so Record is always one click away." />
+                    <TextBlock Classes="page-title step-title" Text="Keep Syft Notes on the taskbar" />
+                    <TextBlock Classes="page-lede step-lede" Text="Windows tucks new icons away under ^. Drag Syft Notes next to the clock so Record is always one click away." />
                     <Border Classes="group" Margin="0,24,0,0" Padding="20">
                       <Grid ColumnDefinitions="Auto,20,*">
                         <StackPanel Spacing="6" VerticalAlignment="Bottom">
@@ -539,7 +539,7 @@
                             </StackPanel>
                           </Border>
                         </StackPanel>
-                        <TextBlock Grid.Column="2" Classes="hint" Text="Select ^ in the taskbar corner, then drag the Egghead Notes icon down beside the clock." FontSize="14" LineHeight="21"
+                        <TextBlock Grid.Column="2" Classes="hint" Text="Select ^ in the taskbar corner, then drag the Syft Notes icon down beside the clock." FontSize="14" LineHeight="21"
                                    MaxWidth="240" HorizontalAlignment="Left" VerticalAlignment="Bottom" />
                       </Grid>
                     </Border>

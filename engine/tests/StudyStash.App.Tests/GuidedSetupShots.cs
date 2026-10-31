@@ -83,7 +83,7 @@ public sealed class GuidedSetupShots
             g.Picked = "claude";
             g.Screen = GuidedScreen.Install;
             g.InstallFailure = InstallFailure.Offline;
-            g.InstallProblem = "Egghead Notes couldn't reach claude.ai. Check your internet connection, then try again.";
+            g.InstallProblem = "Syft Notes couldn't reach claude.ai. Check your internet connection, then try again.";
             g.ShowDetails = true;
             g.InstallOutput = "curl: (6) Could not resolve host: claude.ai";
             return g;
@@ -164,7 +164,7 @@ public sealed class GuidedSetupShots
         });
     }
 
-    /// <summary>A chat under way: the AI's greeting, the student's answer, what Egghead Notes noted, and a card.
+    /// <summary>A chat under way: the AI's greeting, the student's answer, what Syft Notes noted, and a card.
     /// <paramref name="browsers"/> is what the helper card's computer can add the extension to (just Chrome unless said).</summary>
     internal static GuidedSetupModel Chat(SkinKind skin, string card, AppRole role = AppRole.Both, bool chosen = true, double? downloading = null,
         IReadOnlyList<Browser>? browsers = null)
@@ -204,13 +204,13 @@ public sealed class GuidedSetupShots
         {
             Text = card switch
             {
-                "microphone_check" => "Next, let's make sure Egghead Notes can hear your lectures.",
+                "microphone_check" => "Next, let's make sure Syft Notes can hear your lectures.",
                 "model_download" => "Next, the model that turns speech into text.",
                 "chrome_helper" => "Great, your school uses Canvas. Let's connect it through Chrome.",
                 "course_picker" => "Chrome is connected! Here are the courses Canvas found.",
                 "ai_app" => $"You have the ChatGPT app on this {device}. Want it to be able to answer questions from your own lectures?",
-                "start_at_login" => "Last thing: Egghead Notes can start when you log in, so notes get written.",
-                "taskbar_tip" => "One more tip for Windows: keep Egghead Notes on the taskbar.",
+                "start_at_login" => "Last thing: Syft Notes can start when you log in, so notes get written.",
+                "taskbar_tip" => "One more tip for Windows: keep Syft Notes on the taskbar.",
                 "finish" => "You're all set. Your library is ready, and Claude writes your notes.",
                 "library_password" => "Give your library a name and a password. Your laptop uses the password to connect.",
                 "library_connection" => "Let's connect this laptop to your library. Press Find it, or type its address.",
@@ -233,7 +233,7 @@ public sealed class GuidedSetupShots
                 break;
             case "chrome_helper":
                 var ctx = CanvasFixtures.Context(new FakeLibrary(), browsers: browsers);
-                s.Canvas = new CanvasConnectModel(ctx, new CanvasWatch(ctx), forSetup: true) { AddedToBrowser = true, ExtensionFolder = "/Users/student/Egghead Notes/Chrome extension" };
+                s.Canvas = new CanvasConnectModel(ctx, new CanvasWatch(ctx), forSetup: true) { AddedToBrowser = true, ExtensionFolder = "/Users/student/Syft Notes/Chrome extension" };
                 // A store's card (the Chrome Web Store's, Mozilla's) shows the code its second step pastes (as long as a student's own).
                 if (s.Canvas.FromStore)
                     s.Canvas.ConnectionCode = StudyStash.Core.Canvas.Extension.ConnectionCode("http://127.0.0.1:8787", "q1W2e3R4t5Y6u7I8o9P0a1S2d3F4g5H6", "https://school.instructure.com");

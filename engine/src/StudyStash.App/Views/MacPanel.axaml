@@ -183,7 +183,7 @@
                   Command="{Binding OpenAppCommand}">
             <StackPanel Orientation="Horizontal" Spacing="7">
               <c:Doodle Art="head" Size="18" VerticalAlignment="Center" />
-              <TextBlock Text="Open Egghead Notes" FontSize="13" VerticalAlignment="Center" />
+              <TextBlock Text="Open Syft Notes" FontSize="13" VerticalAlignment="Center" />
             </StackPanel>
           </Button>
           <Button Name="Settings" AutomationProperties.Name="Settings" Grid.Column="2" Classes="row" Width="26" Height="26" Padding="0" HorizontalContentAlignment="Center"

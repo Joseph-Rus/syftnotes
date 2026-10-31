@@ -56,7 +56,7 @@ public sealed partial class CanvasSync
     {
         string named = CanvasSettings.CleanBrowser(browser);
         if (named.Length == 0 || Settings.BrowsersSeen.GetValueOrDefault(where)?.ContainsKey(named) != true)
-            return "Egghead Notes hasn't heard from the extension in that browser.";
+            return "Syft Notes hasn't heard from the extension in that browser.";
         CanvasSettings.Update(home, st =>
         {
             st.BrowserChoice[where] = named;
@@ -72,7 +72,7 @@ public sealed partial class CanvasSync
     /// <summary>What Settings says while the browser with the extension isn't signed in to Canvas.</summary>
     public const string SignInError = "Your browser isn't signed in to Canvas. Open Canvas there and sign in; it syncs again within the hour.";
 
-    /// <summary>The same as an Egghead Notes that only knew Chrome said it: a canvas.json may still hold it, and signing
+    /// <summary>The same as a Syft Notes that only knew Chrome said it: a canvas.json may still hold it, and signing
     /// in clears it too.</summary>
     const string ChromeSignInError = "Chrome isn't signed in to Canvas. Open Canvas in Chrome and sign in; it syncs again within the hour.";
 
@@ -147,7 +147,7 @@ public sealed partial class CanvasSync
                 st.ExtensionProtocol = protocol;
                 st.ExtensionWhere = where;
                 if (extVersion is not { Length: > 0 }) return;
-                // Chrome reloaded a newer copy from the folder Egghead Notes keeps up to date: worth a word, once. Two
+                // Chrome reloaded a newer copy from the folder Syft Notes keeps up to date: worth a word, once. Two
                 // Chromes on different versions taking turns aren't an update, and nor is another browser taking over.
                 bool sameBrowser = had is null || had.Browser.Length == 0 || named.Length == 0 || had.Browser == named;
                 if (sameBrowser && before.Length > 0 && Extension.IsOlder(before, extVersion)) st.ExtensionUpdate = new ExtensionUpdate(before, extVersion, at, false);
@@ -360,7 +360,7 @@ public sealed partial class CanvasSync
     public async Task<JsonObject> FetchAsync(string given, string kind, string saveTo = "", CancellationToken ct = default, TimeSpan? timeout = null)
     {
         if (CanvasUrl(given) is not string url) return new JsonObject { ["error"] = NotCanvas };
-        if (DeniesOtherPeople(url)) return new JsonObject { ["error"] = "Egghead Notes doesn't read other people's Canvas data." };
+        if (DeniesOtherPeople(url)) return new JsonObject { ["error"] = "Syft Notes doesn't read other people's Canvas data." };
         string? dest = null;
         if (kind == "bytes" && (dest = SavePath(saveTo)) is null)
             return new JsonObject { ["error"] = "save_to must be \"<class>/<path in its folder>\", with a class this library has." };

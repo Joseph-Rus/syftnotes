@@ -1,13 +1,13 @@
-# Egghead Notes for Canvas on the Chrome Web Store
+# Syft Notes for Canvas on the Chrome Web Store
 
-The Canvas extension also works as an unpacked folder that Egghead Notes writes and keeps up to date ("Load unpacked"
+The Canvas extension also works as an unpacked folder that Syft Notes writes and keeps up to date ("Load unpacked"
 in `chrome://extensions`, see [canvas.md](canvas.md#the-extension)). That needs Developer mode, the hardest step for a
 student who isn't technical, and Chrome turns an unpacked extension off if Developer mode is switched off later. A copy
 from the Chrome Web Store has neither problem: the student clicks **Add to Chrome**, and Chrome keeps it up to date.
 
 Version 1.6 is published, Unlisted (anyone with the link can install it, nobody finds it by searching):
-[Egghead Notes for Canvas](https://chromewebstore.google.com/detail/study-stash-for-canvas/dfhoenhdjjbnopbepgkgjdgdnfmecjjd),
-item ID `dfhoenhdjjbnopbepgkgjdgdnfmecjjd`. `Extension.ChromeStorePublishedAt` names that page, so from the Egghead Notes
+[Syft Notes for Canvas](https://chromewebstore.google.com/detail/study-stash-for-canvas/dfhoenhdjjbnopbepgkgjdgdnfmecjjd),
+item ID `dfhoenhdjjbnopbepgkgjdgdnfmecjjd`. `Extension.ChromeStorePublishedAt` names that page, so from the Syft Notes
 after 0.16.13 the Canvas step offers the store first in Chrome, Edge, Brave, Arc and Vivaldi, and keeps the folder for
 the rest. Firefox has its own copy: [firefox-add-on.md](firefox-add-on.md).
 
@@ -34,11 +34,11 @@ lines:
 
 1. **The store's page.** "On the page that opens in Chrome, click the blue Add to Chrome button, then Add extension
    when Chrome asks." Brave's button says Add to Brave; Arc's and Vivaldi's say Add to Chrome. Chrome then asks
-   whether to add Egghead Notes for Canvas: **Add extension** or Cancel. Edge's page says **Get extension** instead, and
+   whether to add Syft Notes for Canvas: **Add extension** or Cancel. Edge's page says **Get extension** instead, and
    the first time Edge asks whether to allow extensions from other stores (**Allow**), then **Add extension**: "On the
    page that opens in Edge, click Get extension. If Edge asks to allow extensions from other stores, click Allow. Then
    click Add extension."
-2. **The extension's button.** "Click the Egghead Notes button (it may be under the puzzle-piece Extensions button),
+2. **The extension's button.** "Click the Syft Notes button (it may be under the puzzle-piece Extensions button),
    paste this code and click Connect." The code, with **Copy**, sits under this line.
 3. **The browser asks for the sites.** "Click Allow when Chrome asks." Chrome lists the school's Canvas,
    `inscloudgate.net` and the library's address, with **Allow** or Deny.
@@ -67,7 +67,7 @@ too; Microsoft's page now says Get extension.
   address's scheme (`moz-extension:` means Firefox). The code carries the library's address, the key and the Canvas
   address, no ID. Chrome sends `Origin: chrome-extension://<id>` with the extension's POSTs (its answers) and none
   with its GETs (its requests for work), so the library couldn't tell the store's copy by its ID reliably anyway.
-- **Never called outdated.** A store copy updates through the store, often days after a new Egghead Notes has a newer
+- **Never called outdated.** A store copy updates through the store, often days after a new Syft Notes has a newer
   folder. The library calls an extension outdated only when it can't bring itself up to date (from before protocol 2),
   so a store copy of any version is never told to reload, and every version gets work.
 
@@ -92,14 +92,14 @@ and no `key`.
   `host_permissions` and `"optional_host_permissions": ["https://*/*", "http://*/*"]`. When the extension is
   published nobody knows the student's school Canvas or where their library is, so the extension asks for exactly
   those sites later, when it is connected. Nothing is granted at install. Everything else is shared with the unpacked
-  folder: name **Egghead Notes for Canvas**, short name **Egghead Notes**, the description (132 characters at most),
+  folder: name **Syft Notes for Canvas**, short name **Syft Notes**, the description (132 characters at most),
   `minimum_chrome_version` 120, `permissions` `["alarms", "storage"]` and icons at 16, 32, 48 and 128 px.
-- **Connecting by code.** A store copy has no folder for Egghead Notes to write, so the student pastes a code instead:
+- **Connecting by code.** A store copy has no folder for Syft Notes to write, so the student pastes a code instead:
   - The code is `config.json`'s text (`{app, key, canvas, files, protocol}`) in base64url (`Extension.ConnectionCode`).
     The library gives it for Chrome on the library computer as `connection_code` in `GET /api/v2/canvas/extension`
     (library address `http://127.0.0.1:<port>`). The laptop app makes its own, with the library address the laptop
     uses (`ExtensionKeeper.ConnectionCode`). There's no code until the library has a Canvas address.
-  - With no connection, the popup shows **Paste the code from Egghead Notes** and a **Connect** button. The click decodes
+  - With no connection, the popup shows **Paste the code from Syft Notes** and a **Connect** button. The click decodes
     the code (`connection.js decodeCode`; spaces, line breaks and quotes from copying are fine), asks Chrome for the
     code's Canvas, Canvas's file store and the library (`chrome.permissions.request`, which must run inside the click)
     and saves the connection in `chrome.storage.local.connection`. When Chrome says yes, the service worker starts
@@ -145,7 +145,7 @@ StudyStash extension-zip ~/Desktop/study-stash-for-canvas-1.6.zip
 
 In the dashboard choose **New item** and upload the zip. The item gets its ID now (32 letters, a to p), and it never
 changes. The student's install link is `https://chromewebstore.google.com/detail/<id>`, which is the one link
-"Add to Chrome" in Egghead Notes should open.
+"Add to Chrome" in Syft Notes should open.
 
 **A stable ID for the unpacked copy too (not done).** An unpacked extension's ID comes from its folder's path, so it
 differs between computers. To give it the store's ID, copy the item's public key (dashboard, **Package**,
@@ -156,16 +156,16 @@ needs the extension's ID ([above](#the-extensions-id)), so the folder keeps its 
 
 ### 3. The listing
 
-- **Visibility: Unlisted.** Only people with the link can find it. That is enough for Egghead Notes, whose app hands out
+- **Visibility: Unlisted.** Only people with the link can find it. That is enough for Syft Notes, whose app hands out
   the link, and it keeps the extension out of search results where people without a library would install it.
   (Private is only for named testers or a Google Workspace domain.)
-- **Name and summary** come from the manifest: "Egghead Notes for Canvas" and its description.
+- **Name and summary** come from the manifest: "Syft Notes for Canvas" and its description.
 - **Detailed description**, plain text: what it does (copies your Canvas courses, meaning assignments, your
-  submissions and feedback, modules, files and announcements, into your own Egghead Notes library), that it only reads
-  and uses your own sign-in, that it does nothing until you paste a code from Egghead Notes, and that nothing goes
+  submissions and feedback, modules, files and announcements, into your own Syft Notes library), that it only reads
+  and uses your own sign-in, that it does nothing until you paste a code from Syft Notes, and that nothing goes
   anywhere except your library.
 - **Category**: Education. **Language**: English.
-- **Icon**: 128 × 128 (`extension/icon-128.png`: the egghead tile at 96 px inside Chrome's 16-px margin; redraw every
+- **Icon**: 128 × 128 (`extension/icon-128.png`: the app icon tile at 96 px inside Chrome's 16-px margin; redraw every
   size with `swift macos/make_icon.swift out.chrome` and copy them into `extension/`).
 - **Screenshots**: at least one, 1280 × 800 (or 640 × 400). For example: the popup connected ("Canvas synced just
   now") over a Canvas course page, and the popup asking for the code. Use the design's made-up classes (CS 101,
@@ -174,7 +174,7 @@ needs the extension's ID ([above](#the-extensions-id)), so the folder keeps its 
 
 ### 4. Privacy practices (the dashboard's Privacy tab)
 
-- **Single purpose**: "Copies the student's own Canvas course content into their own Egghead Notes library, which they
+- **Single purpose**: "Copies the student's own Canvas course content into their own Syft Notes library, which they
   run themselves."
 - **Permission justifications**:
   - `alarms`: checks in with the student's library every 30 seconds, so a sync or a question about Canvas starts

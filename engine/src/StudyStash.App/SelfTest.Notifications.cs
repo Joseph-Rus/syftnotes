@@ -14,7 +14,7 @@ public static partial class SelfTest
         var shelf = Shell.Windows.Toasts;
         shelf.CloseAll();
         Shell.Toast("Filed in CS 101", "Recursion and the call stack", "Open note", () => { }, TimeSpan.FromMinutes(1));
-        Shell.Toast("Recording saved", "Egghead Notes is writing it down; the library files it and writes your notes.", null, null, TimeSpan.FromMinutes(1));
+        Shell.Toast("Recording saved", "Syft Notes is writing it down; the library files it and writes your notes.", null, null, TimeSpan.FromMinutes(1));
         Shell.Toast("Syncing Canvas", "On your browser's next check, within a minute.", null, null, TimeSpan.FromMinutes(1));
         await Wait(1);
         CheckNotifications(shelf, "notifications", []);

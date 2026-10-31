@@ -358,7 +358,7 @@ public class AiTests
         Assert.Empty(g.Parse("""{"event":"step_update","step_update":{"state":"DONE","step_type":"tool"}}"""));
         Assert.Equal("Done", g.Parse("""{"event":"result","result":{"status":"SUCCESS","response":"Done","conversation_id":"c1"}}""").Last().Text);
         Assert.Equal("error", g.Parse("""{"event":"result","result":{"status":"FAILED","error":"quota"}}""").Single().Kind);
-        // A plain answer runs as Egghead Notes' answer agent, with no tools to reach for; agent work in plan mode.
+        // A plain answer runs as Syft Notes' answer agent, with no tools to reach for; agent work in plan mode.
         var plain = g.Command(new AiRequest("q", "/lib"), false);
         Assert.Equal("study-stash-answer", plain[plain.IndexOf("--agent") + 1]);
         Assert.DoesNotContain("--mode", plain);

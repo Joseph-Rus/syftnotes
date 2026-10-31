@@ -24,7 +24,7 @@ public class CanvasStatusTests
         yield return ["state-updated", CanvasStateKind.Updated, "The extension in Chrome updated itself",
             "Now version 1.4. Nothing to do.", "new_releases", CanvasTone.Info, "Dismiss", false, true, false];
         yield return ["state-error", CanvasStateKind.Error, "Canvas didn’t answer",
-            "school.instructure.com didn’t respond at 10:24. Egghead Notes will try again at 11:24.", "error", CanvasTone.Error, "Try now", false, false, true];
+            "school.instructure.com didn’t respond at 10:24. Syft Notes will try again at 11:24.", "error", CanvasTone.Error, "Try now", false, false, true];
     }
 
     [Theory]

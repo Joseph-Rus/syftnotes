@@ -277,7 +277,7 @@ public class CanvasApiTests
         var seen = await PostAsync(site, "/api/v2/canvas/announcements/seen", """{"class":"CS 101","ids":[6004]}""");
         Assert.True(seen.IsSuccessStatusCode);
         var after = await GetAsync(site, "/api/v2/canvas/announcements?class=CS%20101");
-        Assert.Equal(0, after["new"]!.GetValue<int>()); // opened in Egghead Notes, though still unread on Canvas itself
+        Assert.Equal(0, after["new"]!.GetValue<int>()); // opened in Syft Notes, though still unread on Canvas itself
     }
 
     [Fact]

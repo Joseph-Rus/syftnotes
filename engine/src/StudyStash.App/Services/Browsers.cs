@@ -6,7 +6,7 @@ using StudyStash.Core.Canvas;
 namespace StudyStash.App.Services;
 
 /// <summary>What a browser is built on, which is how the Canvas extension gets into it: Chrome's family adds it from the
-/// Chrome Web Store, or loads the folder Egghead Notes writes ("Load unpacked"); Firefox's family takes a signed add-on
+/// Chrome Web Store, or loads the folder Syft Notes writes ("Load unpacked"); Firefox's family takes a signed add-on
 /// from Mozilla. A store's copy is connected by a pasted code. Safari takes neither.</summary>
 public enum BrowserFamily
 {
@@ -16,7 +16,7 @@ public enum BrowserFamily
 }
 
 /// <summary>
-/// A browser Egghead Notes knows: its name for a sentence ("Edge"), its family, the Mac app's names (the usual one
+/// A browser Syft Notes knows: its name for a sentence ("Edge"), its family, the Mac app's names (the usual one
 /// first) and bundle id, where its exe lives on Windows (under Program Files, Program Files (x86) or the account's
 /// local app data), and how Windows names it as the default browser (the start of its ProgId). <see cref="Says"/> is
 /// what its extension tells the library it runs in, where that isn't its own name: Arc says Chrome; Zen and Firefox
@@ -37,19 +37,19 @@ public sealed record Browser(string Name, BrowserFamily Family, IReadOnlyList<st
 /// </summary>
 public sealed record BrowserAdvice(Browser? Usual, bool NoneHere)
 {
-    /// <summary>The sentences: why not their usual browser, then the one Egghead Notes will use instead
+    /// <summary>The sentences: why not their usual browser, then the one Syft Notes will use instead
     /// (<paramref name="use"/>, the step's browser), or to get Chrome when none here will do.</summary>
     public string Say(Browser use)
     {
         string why = Usual switch
         {
             null => "",
-            { Family: BrowserFamily.Firefox } => $"Your usual browser, {Usual.Name}, can’t run the Egghead Notes extension yet. ",
-            _ => $"Your usual browser, {Usual.Name}, can’t run the Egghead Notes extension. ",
+            { Family: BrowserFamily.Firefox } => $"Your usual browser, {Usual.Name}, can’t run the Syft Notes extension yet. ",
+            _ => $"Your usual browser, {Usual.Name}, can’t run the Syft Notes extension. ",
         };
         return NoneHere
             ? $"{why}It runs in {Browsers.Family()}, and none of them is on this computer. Get Chrome, then press Add to Chrome."
-            : $"{why}Egghead Notes will use {use.Name} instead.";
+            : $"{why}Syft Notes will use {use.Name} instead.";
     }
 }
 
@@ -88,12 +88,12 @@ public static class Browsers
         [@"Waterfox\waterfox.exe"], ["WaterfoxURL", "WaterfoxHTML"], StoreButton: "Add to Firefox");
     public static readonly Browser Safari = new("Safari", BrowserFamily.Safari, ["Safari"], "com.apple.Safari", [], []);
 
-    /// <summary>Every browser Egghead Notes knows, in the order it offers them: Chrome's family, then Firefox's.</summary>
+    /// <summary>Every browser Syft Notes knows, in the order it offers them: Chrome's family, then Firefox's.</summary>
     public static readonly IReadOnlyList<Browser> Known =
         [Chrome, Edge, Brave, Arc, Opera, Vivaldi, Chromium, Firefox, FirefoxDeveloper, Zen, LibreWolf, Waterfox, Safari];
 
     /// <summary>What the student reads when no browser could be started: the ones the extension goes in.</summary>
-    public static string NotInstalled => $"Egghead Notes reads Canvas through {Family("or")}. Install one, then try again.";
+    public static string NotInstalled => $"Syft Notes reads Canvas through {Family("or")}. Install one, then try again.";
 
     /// <summary>The browsers the extension goes in, for a sentence: "Chrome, Edge, Brave, Arc, Opera and Vivaldi",
     /// with Firefox once its add-on has somewhere to be fetched from.</summary>
@@ -104,7 +104,7 @@ public static class Browsers
     /// <summary>Where a student without any of them gets one: Chrome's own download page.</summary>
     public const string GetChrome = "https://www.google.com/chrome/";
 
-    /// <summary>The browser of that name ("Edge"), or null for one Egghead Notes doesn't know (and for "").</summary>
+    /// <summary>The browser of that name ("Edge"), or null for one Syft Notes doesn't know (and for "").</summary>
     public static Browser? Named(string? name) =>
         string.IsNullOrEmpty(name) ? null : Known.FirstOrDefault(b => b.Name.Equals(name, StringComparison.OrdinalIgnoreCase));
 
@@ -145,7 +145,7 @@ public static class Browsers
     public static string Heard { get; set; } = "";
 
     /// <summary>The browser an extension runs in, for opening it: the one it names. An extension from before 1.6
-    /// doesn't say, and Egghead Notes only ever added those to Chrome. "" when none has checked in.</summary>
+    /// doesn't say, and Syft Notes only ever added those to Chrome. "" when none has checked in.</summary>
     public static string HeardFrom(CanvasApi.ExtensionInfo? extension) =>
         extension is null ? ""
         : extension.Browser.Length > 0 ? extension.Browser
@@ -183,7 +183,7 @@ public static class Browsers
     static readonly Lock defaultGate = new();
     static (Browser? Browser, DateTime At)? defaultFound;
 
-    /// <summary>The browser this computer opens links with, when it's one Egghead Notes knows; null when it isn't, or
+    /// <summary>The browser this computer opens links with, when it's one Syft Notes knows; null when it isn't, or
     /// the system didn't say. A Mac is asked for LaunchServices' handlers, Windows for the https association the
     /// student chose. The answer is kept for <see cref="DefaultKept"/> (a test's own <paramref name="run"/> always asks).</summary>
     public static Browser? Default(Runner? run = null)

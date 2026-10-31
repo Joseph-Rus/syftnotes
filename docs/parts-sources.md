@@ -1,6 +1,6 @@
 # Where the illustration parts come from
 
-Egghead Notes composes most illustrations from a library of pre-made, properly licensed vector parts instead of
+Syft Notes composes most illustrations from a library of pre-made, properly licensed vector parts instead of
 having an AI draw every shape (see DESIGN.md, "Illustrations"). This page records which sources were looked at,
 their licences (checked per file where a source mixes licences), what they cover, and the verdict. The credits the
 app shows (About) and the README's list are generated from the library itself by `engine/tools/PartsImport`.
@@ -19,7 +19,7 @@ Non-commercial (NC), share-alike (SA) and GPL-family art is never imported.
 | ↳ Bioicons' CC0 contributors (OpenClipart, Mariana Ruiz Villarreal, Simon Dürr and others) | CC0 1.0 | Glassware, lab stands, a prokaryote, computer hardware | Same |
 | [Wokwi elements](https://github.com/wokwi/wokwi-elements) (npm `@wokwi/elements`) | MIT, © 2020 Uri Shaked | Arduino Uno, Nano and Mega, ESP32, LEDs, resistor, buttons, potentiometers, servo, stepper, sensors, displays, keypad | The importer reads the package's SVG templates with every light off, expands their repeated pin patterns into shapes, drops the glow filters |
 | [Wikimedia Commons](https://commons.wikimedia.org/) | **per file**, read from Commons' own licence field at import; only "Public domain", "CC0", "CC BY 3.0" and "CC BY 4.0" are accepted, anything else (CC BY-SA, GFDL) is refused | LadyofHats' (Mariana Ruiz Villarreal) animal and plant cells, both public domain | Their own labels and leader lines are taken out |
-| Egghead Notes' own parts (`engine/tools/PartsImport/house/`) | MIT, as the rest of this repo | Drone, robot-arm and machine parts, a server rack and its equipment: things no free illustration set covers well | The rack set drawn for this library, to scale in mm (by Claude, for this project); the drone and arm cut out of the illustrations the app's own illustrator drew for the earlier test lectures |
+| Syft Notes' own parts (`engine/tools/PartsImport/house/`) | MIT, as the rest of this repo | Drone, robot-arm and machine parts, a server rack and its equipment: things no free illustration set covers well | The rack set drawn for this library, to scale in mm (by Claude, for this project); the drone and arm cut out of the illustrations the app's own illustrator drew for the earlier test lectures |
 
 ## Looked at and not used
 

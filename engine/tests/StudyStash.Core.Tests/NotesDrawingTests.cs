@@ -243,7 +243,7 @@ public class NotesDrawingTests
         });
         Assert.Equal(notes, still);
         Assert.Equal(2, asked.Count);
-        Assert.StartsWith("This Mermaid flowchart has a problem: Egghead Notes draws flowcharts, state and sequence diagrams, timelines and mind maps; this is a class diagram. Reply", asked[1]);
+        Assert.StartsWith("This Mermaid flowchart has a problem: Syft Notes draws flowcharts, state and sequence diagrams, timelines and mind maps; this is a class diagram. Reply", asked[1]);
 
         Assert.Equal(notes, await Summarize.RepairDiagramsAsync(notes, _ => throw new InvalidOperationException("Claude: usage limit")));
         Assert.Equal(notes, await Summarize.RepairDiagramsAsync(notes, _ => throw new TimeoutException("Ollama did not answer within 15 minutes")));

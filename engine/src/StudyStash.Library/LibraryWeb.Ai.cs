@@ -389,7 +389,7 @@ public sealed partial class LibraryWeb
             return RewriteResult(() => Rewrites.Edit((string)ctx.Request.RouteValues["lecture"]!, markdown, Str(body, "based_on")));
         })));
 
-        // Notes an AI the library doesn't run wrote: an AI app through Egghead Notes' connection (from "app", which the
+        // Notes an AI the library doesn't run wrote: an AI app through Syft Notes' connection (from "app", which the
         // student can switch off in Settings → AI apps, checked here on every save), or a chat the student pasted them
         // from ("paste"). replace: the lecture's own notes may be replaced (they're kept, to put back).
         app.MapPost("/api/v2/ai/rewrite/{lecture}/save", Http.Handle(ctx => ApiAsync(ctx, async () =>
@@ -398,7 +398,7 @@ public sealed partial class LibraryWeb
             string? markdown = body?["markdown"] is JsonValue mv && mv.TryGetValue(out string? text) ? text : null;
             if (markdown is null) return Http.Detail(400, "what are the notes?");
             bool fromApp = Str(body, "from") == "app";
-            // Not a barrier: "from" is the caller's own word, and the library's password (which Egghead Notes' own MCP
+            // Not a barrier: "from" is the caller's own word, and the library's password (which Syft Notes' own MCP
             // server holds) already lets anyone change notes through /edit. This only makes the switch in Settings → AI
             // apps hold at once for the connection that says it's an AI app, whatever its server last heard.
             if (fromApp && !Claude.ToolsOn) return Http.Detail(403, ToolAccess.Off);
@@ -579,7 +579,7 @@ public sealed partial class LibraryWeb
         {
             var check = web.Check is { } c && c.Url == url && url.Length > 0 ? c : ((string, bool, string, double)?)null;
             var needs = url.Length == 0 ? web.Needs : null;
-            return new WebReach(url.Length > 0, "Egghead Notes", url.Length > 0 ? url + ClaudeWeb.McpPath : null, web.Problem?.Words, web.Problem?.FixUrl,
+            return new WebReach(url.Length > 0, "Syft Notes", url.Length > 0 ? url + ClaudeWeb.McpPath : null, web.Problem?.Words, web.Problem?.FixUrl,
                 check?.Item2, check?.Item3, check?.Item4, cfg.PoolPassword.Length > 0)
             { Needs = needs?.Words, NeedsUrl = needs?.FixUrl };
         }

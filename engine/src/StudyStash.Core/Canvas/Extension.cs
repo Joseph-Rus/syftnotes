@@ -8,7 +8,7 @@ namespace StudyStash.Core.Canvas;
 /// inside the engine; <see cref="Ensure"/> writes them out as a folder Chrome, or any browser built on it (Edge,
 /// Brave, Arc, Opera, Vivaldi), loads ("Load unpacked"), with a config.json (and config.js, for a copy from before
 /// 1.4) that says where the library is and holds the extension's key. The library keeps its own folder ready by
-/// itself: on start, and whenever the Canvas address changes. When Egghead Notes updates, the folder is brought up to
+/// itself: on start, and whenever the Canvas address changes. When Syft Notes updates, the folder is brought up to
 /// date, and the extension reloads itself from it the next time it checks in. Firefox, and the browsers built on it
 /// (Zen, LibreWolf, Waterfox), keep only an add-on Mozilla has signed, so theirs is packed instead
 /// (<see cref="PackForFirefox"/>) and connected by pasting a code (<see cref="ConnectionCode"/>), like a copy from the
@@ -27,7 +27,7 @@ public static class Extension
     /// itself before taking work when its folder is newer, and posts files one at a time. 3: it waits for work (the
     /// library holds its request until there is some), says which library address it uses, and reloads itself when
     /// its folder's host permissions change too. The extension sends its own as <c>p</c>; config.json says which one
-    /// the Egghead Notes that wrote the folder speaks.</summary>
+    /// the Syft Notes that wrote the folder speaks.</summary>
     public const int Protocol = 3;
 
     static IEnumerable<string> Files() =>
@@ -86,13 +86,13 @@ public static class Extension
         return Path.Combine(user, "Study Stash", name);
     }
 
-    /// <summary>The folder inside the home, where Egghead Notes wrote it before it had a folder of its own on a Mac. A
+    /// <summary>The folder inside the home, where Syft Notes wrote it before it had a folder of its own on a Mac. A
     /// Chrome that loaded it from there keeps loading it from there, so it's kept up to date too
     /// (<see cref="EnsureFor"/>).</summary>
     public static string InHome(string home) => Path.Combine(home, "chrome-extension");
 
     /// <summary>
-    /// <see cref="Ensure"/> for a home: its folder (<see cref="Folder(string)"/>), and the one an older Egghead Notes
+    /// <see cref="Ensure"/> for a home: its folder (<see cref="Folder(string)"/>), and the one an older Syft Notes
     /// wrote inside the home when that's another folder and it's there (a Chrome may have loaded it and still be
     /// connected through it: it gets the same update, so it never breaks). The result is the home's own folder.
     /// </summary>
@@ -102,7 +102,7 @@ public static class Extension
     /// <summary><see cref="EnsureFor(string, string, string, string)"/> with the home's folder given (tests).</summary>
     public static EnsureResult EnsureFor(string home, string folder, string library, string key, string canvasUrl)
     {
-        // The folder that holds it (~/Study Stash on a Mac), when Egghead Notes makes it, is only this person's too.
+        // The folder that holds it (~/Study Stash on a Mac), when Syft Notes makes it, is only this person's too.
         if (!OperatingSystem.IsWindows() && Path.GetDirectoryName(Path.GetFullPath(folder)) is { } parent && !Directory.Exists(parent))
             Directory.CreateDirectory(parent, OwnerOnlyFolder);
         var result = Ensure(folder, library, key, canvasUrl);
@@ -137,7 +137,7 @@ public static class Extension
     /// its file store and this library, and config.json + config.js (the same: where the library is, the extension's
     /// key, the Canvas address), readable only by this person. <paramref name="library"/> is the library's address as
     /// this computer reaches it. Writes only what differs, so calling it again with the same values changes nothing;
-    /// a folder an older Egghead Notes made (config.js only) gains config.json.
+    /// a folder an older Syft Notes made (config.js only) gains config.json.
     /// </summary>
     public static EnsureResult Ensure(string dir, string library, string key, string canvasUrl)
     {
@@ -165,7 +165,7 @@ public static class Extension
     }.ToJsonString();
 
     /// <summary>
-    /// The code a copy from a browser's store is connected with (it has no folder for Egghead Notes to write): the
+    /// The code a copy from a browser's store is connected with (it has no folder for Syft Notes to write): the
     /// config.json <see cref="Ensure"/> would write for this library address, key and Canvas, in base64url so it
     /// survives being copied and pasted. The popup decodes it (connection.js <c>decodeCode</c>). Empty while there's
     /// no Canvas address: the extension couldn't ask Chrome for Canvas yet.
@@ -315,7 +315,7 @@ public static class Extension
         File.Exists(Path.Combine(dir, "manifest.json")) && File.Exists(Path.Combine(dir, "background.js")) && File.Exists(Path.Combine(dir, "config.json"));
 
     /// <summary>
-    /// Bring a folder <see cref="Ensure"/> made (perhaps by an older Egghead Notes) up to this one, keeping what it
+    /// Bring a folder <see cref="Ensure"/> made (perhaps by an older Syft Notes) up to this one, keeping what it
     /// connects to: its scripts, pages and manifest take this version and config.json + config.js are rewritten with
     /// the same library address, key and Canvas. Chrome's running copy sees the new version on its next visit and
     /// reloads itself. A folder without manifest.json and a readable config isn't one of ours and is left alone.

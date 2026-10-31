@@ -35,7 +35,7 @@
 
       <TextBlock Classes="cv-h1" Text="Canvas" Margin="0,0,0,12" />
       <v:WinCanvasStatus DataContext="{Binding Status}" />
-      <TextBlock Classes="cv-intro" Text="Egghead Notes only reads from Canvas. Nothing there changes, and everything stays in your library." />
+      <TextBlock Classes="cv-intro" Text="Syft Notes only reads from Canvas. Nothing there changes, and everything stays in your library." />
 
       <!-- Connection -->
       <TextBlock Classes="cv-h2" Text="Connection" />

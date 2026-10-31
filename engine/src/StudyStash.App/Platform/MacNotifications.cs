@@ -69,7 +69,7 @@ public sealed unsafe class MacNotifications : ISystemNotifications
     /// <summary>0: not asked yet; 1: macOS is asking the student; 2: answered.</summary>
     int asked;
 
-    /// <summary>Whether macOS lets Egghead Notes show notifications: null until it has said.</summary>
+    /// <summary>Whether macOS lets Syft Notes show notifications: null until it has said.</summary>
     public bool? Allowed { get; private set; }
     /// <summary>What macOS said when it wouldn't even ask (its own words, for the log); null otherwise. It refuses an
     /// app run from a temporary folder or a disk image, and one that isn't properly signed.</summary>
@@ -121,7 +121,7 @@ public sealed unsafe class MacNotifications : ISystemNotifications
     {
         this.center = center;
         // macOS tells this object what the student did with a notification, and asks it whether to show one while
-        // Egghead Notes is the app in front.
+        // Syft Notes is the app in front.
         IntPtr type = objc_allocateClassPair(objc_getClass("NSObject"), "StudyStashNotificationDelegate", 0);
         class_addMethod(type, Sel("userNotificationCenter:willPresentNotification:withCompletionHandler:"), &WillPresent, "v@:@@@?");
         class_addMethod(type, Sel("userNotificationCenter:didReceiveNotificationResponse:withCompletionHandler:"), &DidReceive, "v@:@@@?");
@@ -129,7 +129,7 @@ public sealed unsafe class MacNotifications : ISystemNotifications
         SendVoid(center, Sel("setDelegate:"), Send(Send(type, Sel("alloc")), Sel("init")));
     }
 
-    /// <summary>Egghead Notes is in front: macOS shows the notification all the same, as a banner and in its list.</summary>
+    /// <summary>Syft Notes is in front: macOS shows the notification all the same, as a banner and in its list.</summary>
     [UnmanagedCallersOnly]
     static void WillPresent(IntPtr self, IntPtr cmd, IntPtr center, IntPtr notification, IntPtr completion)
     {
@@ -266,7 +266,7 @@ public sealed unsafe class MacNotifications : ISystemNotifications
         IntPtr pool = objc_autoreleasePoolPush();
         try
         {
-            // The words and the buttons: nothing else. No picture of Egghead Notes', no sound.
+            // The words and the buttons: nothing else. No picture of Syft Notes', no sound.
             IntPtr content = Send(Send(objc_getClass("UNMutableNotificationContent"), Sel("alloc")), Sel("init"));
             SendVoid(content, Sel("setTitle:"), Str(title));
             SendVoid(content, Sel("setBody:"), Str(body));

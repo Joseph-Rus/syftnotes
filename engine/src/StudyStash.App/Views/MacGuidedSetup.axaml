@@ -30,7 +30,7 @@
 
   <Border Name="Chrome" Classes="chrome" Background="{DynamicResource Canvas}" ClipToBounds="True">
     <DockPanel>
-      <c:WindowHeader Name="Header" DockPanel.Dock="Top" CanResize="False" Title="Set up Egghead Notes" />
+      <c:WindowHeader Name="Header" DockPanel.Dock="Top" CanResize="False" Title="Set up Syft Notes" />
       <Grid ColumnDefinitions="228,*" Margin="8,0,8,8">
         <!-- The steps before the chat, or the chat's checklist: straight on the canvas, as the library's sidebar is. -->
         <Panel>
@@ -63,7 +63,7 @@
               <TextBlock Classes="side-group" Text="{Binding SidebarTitle}" />
             </StackPanel>
             <StackPanel DockPanel.Dock="Bottom" Spacing="16" Margin="4,12,4,10">
-              <Button Name="FinishSide" Classes="btn ink" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" IsVisible="{Binding ReadyToFinish}" Command="{Binding FinishCommand}" Content="Open Egghead Notes" />
+              <Button Name="FinishSide" Classes="btn ink" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" IsVisible="{Binding ReadyToFinish}" Command="{Binding FinishCommand}" Content="Open Syft Notes" />
               <Button Name="ByHandChat" Classes="text-link" Margin="6,0" Command="{Binding ByHandCommand}" Content="Set up by hand" />
             </StackPanel>
             <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
@@ -306,7 +306,7 @@
                 </ScrollViewer>
               </DockPanel>
 
-              <!-- Screen 4 · The chat: the AI's words and the student's, Egghead Notes' notes, and the cards the AI opens. -->
+              <!-- Screen 4 · The chat: the AI's words and the student's, Syft Notes' notes, and the cards the AI opens. -->
               <DockPanel IsVisible="{Binding OnChat}">
                 <StackPanel DockPanel.Dock="Top" Margin="32,26,32,0">
                   <TextBlock Classes="step-label" Text="{Binding StepLabel}" />
@@ -668,7 +668,7 @@
                                       <v:ShortcutsEditor DataContext="{Binding Setup.Keys}" />
                                     </Panel>
                                   </StackPanel>
-                                  <Button Classes="btn sm ink" HorizontalAlignment="Right" Command="{Binding PressCommand}" CommandParameter="finish" Content="Open Egghead Notes" />
+                                  <Button Classes="btn sm ink" HorizontalAlignment="Right" Command="{Binding PressCommand}" CommandParameter="finish" Content="Open Syft Notes" />
                                 </StackPanel>
 
                                 <Grid ColumnDefinitions="Auto,8,*" IsVisible="{Binding HasProblem}">

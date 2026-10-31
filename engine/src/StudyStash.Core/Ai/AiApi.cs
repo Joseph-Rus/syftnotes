@@ -185,7 +185,7 @@ public sealed record RewriteInfo(string Lecture, string State)
 /// a student asks them to write for a lecture (save_notes), on unless the student switches it off.</summary>
 public sealed record ReadingScopes(bool Lectures = true, bool Notes = true, bool Canvas = true, bool Audio = false, bool SaveNotes = true);
 
-/// <summary>How Egghead Notes writes a lecture's notes (<see cref="Summarize.Brief"/>), for an AI it doesn't run itself,
+/// <summary>How Syft Notes writes a lecture's notes (<see cref="Summarize.Brief"/>), for an AI it doesn't run itself,
 /// and what "Copy for your AI" puts on the clipboard: the brief and the transcript, in one message or, for a lecture
 /// too long for one, in <see cref="Parts"/> of their own.</summary>
 public sealed record NotesBrief(string Brief, List<string> Parts);
@@ -303,7 +303,7 @@ public interface IAiLibrary
     Task<bool> RestoreChatAsync(string id) => Task.FromResult(false);
 }
 
-/// <summary>The library's AI over its API (/api/v2/ai), the way the Egghead Notes app reads it. Like
+/// <summary>The library's AI over its API (/api/v2/ai), the way the Syft Notes app reads it. Like
 /// <see cref="RemoteLibrary"/>: a plain 404 with no JSON detail means an older library without this route (null,
 /// not an error); one of our own refusals (400/409/503/401) throws <see cref="LibraryRefusedException"/> with its
 /// words.</summary>

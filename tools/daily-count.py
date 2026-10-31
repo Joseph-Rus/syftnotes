@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""How many copies of Egghead Notes are in use, from the app's daily count (docs/daily-count.md).
+"""How many copies of Syft Notes are in use, from the app's daily count (docs/daily-count.md).
 
   python3 tools/daily-count.py [days]     (default 30)
 

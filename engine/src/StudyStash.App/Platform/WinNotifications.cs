@@ -19,7 +19,7 @@ namespace StudyStash.App.Platform;
 [SupportedOSPlatform("windows")]
 public sealed unsafe class WinNotifications : ISystemNotifications
 {
-    /// <summary>Who Egghead Notes is to Windows' notifications.</summary>
+    /// <summary>Who Syft Notes is to Windows' notifications.</summary>
     public const string AppId = "StudyStash.App";
 
     const string Group = "study-stash";
@@ -100,7 +100,7 @@ public sealed unsafe class WinNotifications : ISystemNotifications
         return true;
     }
 
-    /// <summary>Tells Windows who Egghead Notes is, for this account: its name and icon for the notifications. The same
+    /// <summary>Tells Windows who Syft Notes is, for this account: its name and icon for the notifications. The same
     /// values every time, so doing it again changes nothing. (Setup.exe's uninstaller takes them out.)</summary>
     public static void RegisterApp(string appId, string name, string? icon)
     {
@@ -130,7 +130,7 @@ public sealed unsafe class WinNotifications : ISystemNotifications
 
     /// <summary>Windows' notifications for this app, or null where they can't be had (<see cref="LastError"/> says
     /// why). <paramref name="program"/> null leaves the link alone (a test, which must never take the real app's).</summary>
-    public static WinNotifications? Make(string appId = AppId, string name = "Egghead Notes", string? icon = null, string? program = null)
+    public static WinNotifications? Make(string appId = AppId, string name = "Syft Notes", string? icon = null, string? program = null)
     {
         if (!OperatingSystem.IsWindowsVersionAtLeast(10, 0, 17763)) return null;
         if (made is not null && made.appId == appId) return made;

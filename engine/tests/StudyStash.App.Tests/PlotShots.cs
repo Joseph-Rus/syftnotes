@@ -101,10 +101,10 @@ public class PlotShots
     /// <summary>A machine learning lecture's notes with the plots the diagram pass would add.</summary>
     internal static string MlLecture => "## Summary\n\nLogistic regression squashes a linear score into a probability with the sigmoid, and is fitted by gradient descent.\n\n"
         + "## Key points\n\n- The sigmoid turns a score into a probability:\n\n$$\\sigma(z) = \\frac{1}{1 + e^{-kz}}$$\n\n"
-        + "**The sigmoid squashes a score into a probability**\n\n```plot\n%% Egghead Notes diagram, from 12:40\n" + string.Join("\n", PlotDesign.Sigmoid.Split('\n').Skip(1)) + "\ntangent σ at 0 \"slope {slope}\"\n```\n\n"
+        + "**The sigmoid squashes a score into a probability**\n\n```plot\n%% Syft Notes diagram, from 12:40\n" + string.Join("\n", PlotDesign.Sigmoid.Split('\n').Skip(1)) + "\ntangent σ at 0 \"slope {slope}\"\n```\n\n"
         + "*σ goes to 0 for very negative scores and 1 for very positive ones, crossing one half at 0. Raise k and the S becomes a step.* (from 12:40)\n\n"
         + "## Gradient descent\n\n- Each step moves the weights against the gradient, scaled by the learning rate η.\n\n"
-        + "**Gradient descent on a long, narrow bowl**\n\n```plot\n%% Egghead Notes diagram, from 31:05\n" + string.Join("\n", PlotDesign.Surface.Split('\n').Skip(1)) + "\n```\n\n"
+        + "**Gradient descent on a long, narrow bowl**\n\n```plot\n%% Syft Notes diagram, from 31:05\n" + string.Join("\n", PlotDesign.Surface.Split('\n').Skip(1)) + "\n```\n\n"
         + "*Too large a learning rate zigzags across the narrow direction; past 0.2 it diverges.* (from 31:05)";
 
     /// <summary>The whole app on that lecture, scrolled to its first plot, the pointer reading it: its toolbar in the

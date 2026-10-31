@@ -9,7 +9,7 @@ using StudyStash.Core;
 namespace StudyStash.App;
 
 /// <summary>The shell's notifications: what the app says, and when. They're the computer's own (a Mac's Notification
-/// Center, Windows' notifications, through <see cref="SystemNotices"/>) wherever it will have them; Egghead Notes' own
+/// Center, Windows' notifications, through <see cref="SystemNotices"/>) wherever it will have them; Syft Notes' own
 /// cards (<see cref="ToastShelf"/>) where it won't (a build run from its folder, a copy opened from its disk image).</summary>
 public static partial class Shell
 {
@@ -51,7 +51,7 @@ public static partial class Shell
         }
         WinNotifications.Log = Program.Log;
         var made = WinNotifications.Make(icon: icon, program: Desktop.Program);
-        if (made is null) Program.Log($"[notifications] Windows won't have them here ({WinNotifications.LastError ?? "no reason given"}): Egghead Notes shows its own");
+        if (made is null) Program.Log($"[notifications] Windows won't have them here ({WinNotifications.LastError ?? "no reason given"}): Syft Notes shows its own");
         return made;
     }
 
@@ -75,7 +75,7 @@ public static partial class Shell
         if (ToastWords.HadCodes(title) || ToastWords.HadCodes(text)) Program.Log($"[toast] {title}: {text}");
         Notify(new Notice
         {
-            Title = ToastWords.Plain(title) is { Length: > 0 } plain ? plain : "Egghead Notes", Text = ToastWords.Plain(text),
+            Title = ToastWords.Plain(title) is { Length: > 0 } plain ? plain : "Syft Notes", Text = ToastWords.Plain(text),
             ActionLabel = action, Act = run, Stay = stay,
         });
     }
@@ -125,8 +125,8 @@ public static partial class Shell
         return Placement.FromAppKit(f.X + f.Width / 2, f.Y + f.Height / 2, main.Bounds.Height);
     }
 
-    /// <summary>After a click on a notification: on a Mac, if it opened none of Egghead Notes' windows, the app you were
-    /// in comes back to the front (AppKit brought Egghead Notes forward for the click).</summary>
+    /// <summary>After a click on a notification: on a Mac, if it opened none of Syft Notes' windows, the app you were
+    /// in comes back to the front (AppKit brought Syft Notes forward for the click).</summary>
     static void AfterToastClick()
     {
         if (!OperatingSystem.IsMacOS()) return;
@@ -178,11 +178,12 @@ public static partial class Shell
         }
     }
 
-    /// <summary>The first start after Egghead Notes updated itself says so, once, with the release's notes a click away;
+    /// <summary>The first start after Syft Notes updated itself says so, once, with the release's notes a click away;
     /// a start after quitting for an update that didn't take (Windows' Setup.exe stopped short) says that instead.
     /// Every start remembers its version.</summary>
     static void SayIfUpdated()
     {
+        RefreshBrandOnce();
         string last = host.Settings.LastVersion, tried = host.Settings.UpdatingTo;
         if (last == Engine.Version && tried.Length == 0) return;
         host.Save(s =>
@@ -203,6 +204,19 @@ public static partial class Shell
                 Title = said.Title, Text = said.Text, ActionLabel = said.Action, Act = () => Dialogs.OpenUrl(Updates.ReleasePage(Engine.Version)),
                 Stay = NoticeTimes.Advice,
             });
+    }
+
+    /// <summary>The first start after the app took its present name and icon: the system is asked, once, to read them
+    /// again (<see cref="BrandRefresh"/>), and on Windows the notifications' name and icon are written afresh now
+    /// rather than at the first notification. Off the UI thread: the Mac's commands take a moment.</summary>
+    static void RefreshBrandOnce()
+    {
+        if (host.Settings.Brand == BrandRefresh.Current || !Desktop.SameFolder(host.Home, Configs.DefaultHome)) return;
+        if (OperatingSystem.IsWindows() && File.Exists(Path.Combine(AppContext.BaseDirectory, "study-stash.ini"))) _ = WindowsNotifications();
+        _ = Task.Run(() =>
+        {
+            if (BrandRefresh.Run(Program.Log)) Dispatcher.UIThread.Post(() => host.Save(s => s.Brand = BrandRefresh.Current));
+        });
     }
 
     /// <summary>What the app's own updates say (<see cref="AppUpdates.Tell"/>, from the updater's thread): a new

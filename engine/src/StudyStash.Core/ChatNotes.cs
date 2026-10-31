@@ -5,7 +5,7 @@ using StudyStash.Core.Rich;
 namespace StudyStash.Core;
 
 /// <summary>
-/// Notes from an AI the library doesn't run itself: the Claude app or ChatGPT writing them through Egghead Notes'
+/// Notes from an AI the library doesn't run itself: the Claude app or ChatGPT writing them through Syft Notes'
 /// connection (<c>save_notes</c>), or any free chat on the web, with the student carrying the lecture there and the
 /// notes back ("Copy for your AI", "Paste notes"). What the AI is asked is the library's own notes prompt
 /// (<see cref="Summarize.Brief"/>), and what comes back is tidied of what chats put round notes before it's saved.

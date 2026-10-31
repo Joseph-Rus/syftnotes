@@ -71,9 +71,9 @@ distinguished_name = dn
 x509_extensions = ext
 prompt = no
 [dn]
-CN = Egghead Notes rehearsal (self-signed, not a real signature)
+CN = Syft Notes rehearsal (self-signed, not a real signature)
 OU = REHEARSAL
-O = Egghead Notes rehearsal
+O = Syft Notes rehearsal
 [ext]
 basicConstraints = critical,CA:false
 keyUsage = critical,digitalSignature

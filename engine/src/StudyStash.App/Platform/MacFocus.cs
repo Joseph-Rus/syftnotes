@@ -4,7 +4,7 @@ namespace StudyStash.App.Platform;
 
 /// <summary>
 /// A Mac: a notification never leaves you outside the app you were typing in. It shows without taking the keyboard,
-/// but AppKit brings Egghead Notes forward on any click in one of its windows, so the app that was in front when the
+/// but AppKit brings Syft Notes forward on any click in one of its windows, so the app that was in front when the
 /// pointer came onto the notification is remembered, and brought back after a click that opens nothing of Study
 /// Stash's own (the ×, Later). No-op off a Mac.
 /// </summary>
@@ -43,7 +43,7 @@ public static class MacFocus
         }
     }
 
-    /// <summary>The click is done and opened nothing of Egghead Notes': if that click brought Egghead Notes forward, the
+    /// <summary>The click is done and opened nothing of Syft Notes': if that click brought Syft Notes forward, the
     /// app you were in comes back to the front.</summary>
     public static void GiveBack()
     {

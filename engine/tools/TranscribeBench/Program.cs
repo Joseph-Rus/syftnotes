@@ -1,7 +1,7 @@
 // TranscribeBench: what writing a lecture down costs on this computer, live or after class.
 //
-// It records a slice of a real lecture through Egghead Notes' own Recorder (the WAV played as the microphone, in real
-// time unless --speed says otherwise) while Egghead Notes' own TranscriptionWorker writes it down with a real model,
+// It records a slice of a real lecture through Syft Notes' own Recorder (the WAV played as the microphone, in real
+// time unless --speed says otherwise) while Syft Notes' own TranscriptionWorker writes it down with a real model,
 // as the app does: live (as it records, Settings → Recording's "as you record") or after class (nothing while it
 // records, then all of it once it stops). Nothing is written under ~/.study-stash: the recording and the model are
 // only read, and the lecture is kept in a temporary folder of its own.
@@ -73,7 +73,7 @@ sealed record Options(string Wav, string Model, string Mode, double From, double
             else if (args[i].StartsWith("--", StringComparison.Ordinal) && i + 1 < args.Length) named[args[i][2..]] = args[++i];
             else wav = args[i];
         }
-        if (wav is null) throw new ArgumentException("Give a lecture's WAV (16 kHz mono, as Egghead Notes records).");
+        if (wav is null) throw new ArgumentException("Give a lecture's WAV (16 kHz mono, as Syft Notes records).");
         string model = named.GetValueOrDefault("model", WhisperModels.LargeV3TurboSmall.Id);
         string mode = named.GetValueOrDefault("mode", "live");
         string home = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);

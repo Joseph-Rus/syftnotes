@@ -293,7 +293,7 @@
         <v:DueCalendar Name="Calendar" DataContext="{Binding Calendar}" />
       </StackPanel>
 
-      <!-- Home: Egghead Notes is free, and a tip for the two students who build it goes to their Ko-fi page -->
+      <!-- Home: Syft Notes is free, and a tip for the two students who build it goes to their Ko-fi page -->
       <Button Name="Support" Classes="text-link" Content="{x:Static s:SupportAsk.Button}" Command="{Binding SupportCommand}" IsVisible="{Binding CanSupport}"
               ToolTip.Tip="{x:Static s:SupportAsk.HomeTip}" Margin="0,36,0,0" />
     </StackPanel>

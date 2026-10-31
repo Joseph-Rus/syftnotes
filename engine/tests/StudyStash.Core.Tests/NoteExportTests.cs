@@ -64,7 +64,7 @@ public class NoteExportTests
             date: 2026-09-23
             duration: "1 h 12 min"
             topics: ["cardiac output", "MAP"]
-            source: Egghead Notes
+            source: Syft Notes
             ---
 
             # Preload & afterload: what's the difference?
