@@ -93,7 +93,7 @@ public sealed class MicCheck(Func<DateTime>? clock = null) : IDisposable
         }
         catch (Exception e) when (e is InvalidOperationException or IOException or PlatformNotSupportedException or ExternalException or UnauthorizedAccessException)
         {
-            t = MicTrouble.Other(OperatingSystem.IsWindows());
+            t = MicTrouble.Other();
         }
         bool keep;
         lock (gate)

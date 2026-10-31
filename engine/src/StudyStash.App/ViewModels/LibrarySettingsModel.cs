@@ -205,7 +205,7 @@ public sealed partial class LibrarySettingsModel : ObservableObject
         ? "The library runs without the Syft Notes app there, so this is set on that computer."
         : OnlyThisComputer ? $"So your notes get written whenever this {Device} is on. Off until you turn it on."
         : "So your laptop can always reach it. Off until you turn it on.";
-    static string Device => OperatingSystem.IsWindows() ? "PC" : "Mac";
+    static string Device => Machine.Device;
     public static string RevealLabel => OperatingSystem.IsWindows() ? "Show in File Explorer" : "Show in Finder";
 
     // Classes

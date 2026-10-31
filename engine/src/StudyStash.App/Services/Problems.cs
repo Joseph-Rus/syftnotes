@@ -63,7 +63,7 @@ public static class Problems
     /// and goes when it's over, whatever's ahead of it).</summary>
     public static IEnumerable<AppProblem> All(IProblemSource host)
     {
-        string device = OperatingSystem.IsMacOS() ? "Mac" : "PC";
+        string device = Machine.Device;
 
         if (host.RecorderProblem == RecordingWords.DiskFull)
             yield return new(ProblemKind.DiskFull, "Your disk is full", "Free some space to record.", "");

@@ -85,7 +85,8 @@ public static class Apps
         };
     }
 
-    /// <summary>The version a Windows install's study-stash.ini says it is (both Setup.exe write it), or null.</summary>
+    /// <summary>The version a Windows install's study-stash.ini says it is (both Setup.exe write it), or null. A Linux
+    /// copy's tarball carries the same file.</summary>
     internal static string? WindowsIniVersion(string baseDir) => IniValue(Path.Combine(baseDir, "study-stash.ini"), "app", "version");
 
     /// <summary>D4's "is this an installed copy" check on a Mac: inside a *.app that says com.study-stash.app, not
@@ -119,6 +120,39 @@ public static class Apps
     {
         baseDir ??= AppContext.BaseDirectory;
         return File.Exists(Path.Combine(baseDir, "unins000.exe")) ? baseDir : null;
+    }
+
+    /// <summary>Linux: a copy unpacked from the release's tarball carries study-stash.ini (with its version, as a
+    /// Windows install's does) beside the program; a build folder has none, and doesn't update itself. Null with
+    /// <paramref name="problem"/> "unwritable" for one in a folder this account can't change (unpacked as root into
+    /// /opt): it can say a release is out, not install it.</summary>
+    public static string? LinuxInstallOf(string? baseDir, out string problem)
+    {
+        baseDir = Path.TrimEndingDirectorySeparator(baseDir ?? AppContext.BaseDirectory);
+        problem = "not-installed";
+        if (!File.Exists(Path.Combine(baseDir, "study-stash.ini"))) return null;
+        if (Path.GetDirectoryName(baseDir) is not { } parent || !Writable(parent) || !Writable(baseDir))
+        {
+            problem = "unwritable";
+            return null;
+        }
+        problem = "";
+        return baseDir;
+    }
+
+    static bool Writable(string dir)
+    {
+        try
+        {
+            string probe = Path.Combine(dir, ".syft-notes-write-" + Guid.NewGuid().ToString("N"));
+            File.WriteAllText(probe, "");
+            File.Delete(probe);
+            return true;
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException)
+        {
+            return false;
+        }
     }
 
     /// <summary>Swap `fresh` in for `current` (a Mac bundle an update just downloaded next to it): `current` becomes

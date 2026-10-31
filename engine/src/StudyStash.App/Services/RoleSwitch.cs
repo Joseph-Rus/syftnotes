@@ -19,7 +19,7 @@ public sealed record OldLibrary(string Url, string Password, string Name, bool F
 /// </summary>
 public static class RoleSwitch
 {
-    static string Device => OperatingSystem.IsWindows() ? "PC" : "Mac";
+    static string Device => Machine.Device;
 
     /// <summary>The library a laptop sends to now, if it's on another computer (so there's something to bring over).</summary>
     public static OldLibrary? OldLibraryOf(AppHost host)

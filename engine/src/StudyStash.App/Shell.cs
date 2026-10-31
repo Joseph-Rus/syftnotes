@@ -1840,7 +1840,7 @@ public static partial class Shell
         panel.Library = panel.LibraryOnly
             ? LibraryPanelWords.From(host.Library == LibraryState.Connected || host.LocalLibrary?.State is LibraryServiceState.Running or LibraryServiceState.Elsewhere,
                 host.Library == LibraryState.Starting || host.LocalLibrary?.State == LibraryServiceState.Starting,
-                OperatingSystem.IsMacOS() ? "Mac" : "PC", host.Overview, canvasWatch?.State, DateTimeOffset.Now, TimeZoneInfo.Local)
+                Machine.Device, host.Overview, canvasWatch?.State, DateTimeOffset.Now, TimeZoneInfo.Local)
             : null;
         KeepCanvasWatched();
         UpdateComingUp();
@@ -1900,7 +1900,7 @@ public static partial class Shell
         }
         card.RecordKeys = Keybindings.Show(KeyAction.Record, mac);
         card.IconHidden = mac && MacStatusItem.Check() is { Seen: false };
-        card.ShowModel(host.ModelReady, host.Downloading?.Fraction, host.DownloadProblem, mac ? "Mac" : "PC");
+        card.ShowModel(host.ModelReady, host.Downloading?.Fraction, host.DownloadProblem, Machine.DeviceForLook(mac));
         bool micRefused = host.MicAccess() is MicAccess.Denied or MicAccess.Restricted;
         card.MicLine = !micRefused ? ""
             : mac ? "Syft Notes can't use the microphone yet. Turn it on in System Settings → Privacy & Security → Microphone."

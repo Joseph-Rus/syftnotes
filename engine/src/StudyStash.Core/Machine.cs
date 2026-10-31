@@ -181,6 +181,23 @@ public static partial class Machine
         ["Windows"] = "Settings → System → Power: when plugged in, put the device to sleep after Never",
     };
 
+    /// <summary>This computer is a Linux one, as far as Syft Notes' words go: a "computer", not a "Mac" or a "PC".
+    /// Settable so the tests of the Mac and Windows wording read the same on a Linux test runner (they turn it off),
+    /// and the Linux tests can turn it on anywhere.</summary>
+    public static bool Linux { get; set; } = OperatingSystem.IsLinux();
+
+    /// <summary>What Syft Notes calls this computer in a sentence ("on this Mac", "restart your PC", "this
+    /// computer" on Linux).</summary>
+    public static string Device => OperatingSystem.IsMacOS() ? "Mac" : DeviceFor(windows: true);
+
+    /// <summary>The word for a computer said to be Windows or not (<paramref name="windows"/>): "PC" or "Mac", and
+    /// "computer" for either on Linux, which shares the Mac's commands (bash, curl) and the Windows look.</summary>
+    public static string DeviceFor(bool windows) => Linux ? "computer" : windows ? "PC" : "Mac";
+
+    /// <summary>The word for a computer in the Mac look or the Windows one (<paramref name="mac"/>): Linux has the
+    /// Windows look and says "computer".</summary>
+    public static string DeviceForLook(bool mac) => mac ? "Mac" : Linux ? "computer" : "PC";
+
     /// <summary>platform.system(): "Darwin", "Windows", or "Linux".</summary>
     public static string Platform => OperatingSystem.IsMacOS() ? "Darwin" : OperatingSystem.IsWindows() ? "Windows" : "Linux";
 

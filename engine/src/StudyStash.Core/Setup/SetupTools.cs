@@ -45,7 +45,7 @@ public sealed record SetupStatus
     /// <summary>What the card on screen is in the middle of ("connecting to the library"), or null.</summary>
     public string? Busy { get; init; }
 
-    public string Device => Windows ? "PC" : "Mac";
+    public string Device => Machine.DeviceFor(Windows);
     /// <summary>This computer records lectures (just this computer, or a laptop).</summary>
     public bool Records => Role is "one" or "laptop";
     public IEnumerable<ChecklistItem> Left => Items.Where(i => !i.Optional && !i.Done && !(i.Id == "model" && i.State == ChecklistState.Now));

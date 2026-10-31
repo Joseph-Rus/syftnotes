@@ -4,7 +4,8 @@ using System.Diagnostics;
 namespace StudyStash.App.Platform;
 
 /// <summary>Opens a terminal for the student to paste a command into (setup's "Open Terminal"): Terminal on a Mac,
-/// PowerShell in Windows Terminal (or on its own) on Windows. Never runs anything in it.</summary>
+/// PowerShell in Windows Terminal (or on its own) on Windows, the desktop's own terminal on Linux. Never runs anything
+/// in it.</summary>
 public static class TerminalApp
 {
     public static void Open()
@@ -25,6 +26,10 @@ public static class TerminalApp
                 {
                     using var ps = Process.Start(new ProcessStartInfo("powershell.exe") { UseShellExecute = true });
                 }
+            }
+            else if (OperatingSystem.IsLinux() && Core.Ai.Terminal.Available() is [var first, ..])
+            {
+                using var p = Process.Start(new ProcessStartInfo(first.Id) { UseShellExecute = false, WorkingDirectory = Core.Py.UserHome() });
             }
         }
         catch (Exception e) when (e is Win32Exception or InvalidOperationException)

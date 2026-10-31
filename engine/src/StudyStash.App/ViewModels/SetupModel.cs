@@ -210,7 +210,7 @@ public sealed partial class SetupModel : ObservableObject
     /// question); on Windows, which asks nothing, only where recordings stay.</summary>
     public string StartHint => skin == SkinKind.Mac
         ? "Your Mac will ask next to let Syft Notes use the microphone. Recordings stay on this Mac."
-        : "Recordings stay on this PC.";
+        : $"Recordings stay on this {DeviceWord}.";
     public const string StartAtLoginLabel = "Open Syft Notes when you log in";
     public bool OnStart => Step == SetupStep.Start;
     /// <summary>Get started is under way: the library is being made, the microphone asked for, an AI looked for.</summary>
@@ -446,7 +446,7 @@ public sealed partial class SetupModel : ObservableObject
     [ObservableProperty] public partial AiSetupModel? Ai { get; set; }
     [ObservableProperty] public partial CanvasConnectModel? Canvas { get; set; }
 
-    public string DeviceWord => skin == SkinKind.Mac ? "Mac" : "PC";
+    public string DeviceWord => StudyStash.Core.Machine.DeviceForLook(skin == SkinKind.Mac);
     public int Count => Steps.Count;
     public int Index => Steps.ToList().FindIndex(s => s.Step == Step) + 1;
     public bool IsLast => Index == Count;

@@ -64,7 +64,7 @@ public static class NoticeWords
 
     public static string Saved(LibraryState library, bool mac, bool? notes = true, bool off = false) => library switch
     {
-        LibraryState.Unreachable => $"Syft Notes is writing it down. It waits on this {(mac ? "Mac" : "PC")} and goes to your library when it's back.",
+        LibraryState.Unreachable => $"Syft Notes is writing it down. It waits on this {Machine.DeviceForLook(mac)} and goes to your library when it's back.",
         LibraryState.WrongPassword => "Syft Notes is writing it down. Type your library's new password in Settings to send it.",
         LibraryState.NotSetUp => "Syft Notes is writing it down. Connect to your library in Settings to file it.",
         _ when off => "Syft Notes is writing it down, and the library files it with its transcript. Its page offers to write the notes.",

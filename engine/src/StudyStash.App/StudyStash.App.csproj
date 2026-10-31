@@ -41,10 +41,12 @@
 
   <!-- StudyStash.Audio carries both live words' models (see Needle.targets): Cactus Whistle with its engine for ARM
        (needle/<rid>/), and the small Whisper for x64. A publish for one processor (the installers) keeps its own: on
-       ARM (osx-arm64, win-arm64) Whistle, its own engine and its licence; on x64 (osx-x64, win-x64) the small Whisper
-       and its licence. -->
+       ARM (osx-arm64, win-arm64) Whistle, its own engine and its licence; on x64 (osx-x64, win-x64, linux-x64) and on
+       linux-arm64 the small Whisper and its licence. -->
+  <!-- Linux has no needle engine (Cactus publishes none for it), so linux-arm64 keeps the small Whisper as x64 does. -->
   <PropertyGroup>
-    <LiveWordsArm>$([System.String]::Copy('$(RuntimeIdentifier)').EndsWith('-arm64'))</LiveWordsArm>
+    <LiveWordsArm>false</LiveWordsArm>
+    <LiveWordsArm Condition="'$(RuntimeIdentifier)' == 'osx-arm64' or '$(RuntimeIdentifier)' == 'win-arm64'">true</LiveWordsArm>
   </PropertyGroup>
   <Target Name="KeepThisProcessorsLiveWords" AfterTargets="ComputeResolvedFilesToPublishList" Condition="'$(RuntimeIdentifier)' != ''">
     <ItemGroup>

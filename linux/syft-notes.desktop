@@ -1,0 +1,12 @@
+[Desktop Entry]
+Type=Application
+Name=Syft Notes
+GenericName=Lecture recorder
+Comment=Record your lectures. Get the notes.
+Exec=StudyStash %u
+Icon=syft-notes
+Terminal=false
+Categories=Education;Office;AudioVideo;Audio;Recorder;
+Keywords=lecture;notes;record;transcribe;whisper;study;canvas;
+StartupWMClass=StudyStash
+SingleMainWindow=true

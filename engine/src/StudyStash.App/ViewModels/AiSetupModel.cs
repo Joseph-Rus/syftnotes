@@ -196,7 +196,7 @@ public sealed partial class AiSetupModel : ObservableObject
     /// <summary>Under Gemini's key box: what Google's free tier does with what's sent, and who can have a free key.</summary>
     public string KeyPrivacy => KeyFor == "gemini" ? string.Join("\n", ApiKeys.GeminiKeyNotes(Device)) : "";
     public bool HasKeyPrivacy => KeyPrivacy.Length > 0;
-    string Device => Windows ? "PC" : "Mac";
+    string Device => Machine.DeviceFor(Windows);
 
     void OpenKey(string id)
     {
@@ -353,8 +353,8 @@ public sealed partial class AiSetupModel : ObservableObject
             var row = new AiSetupRow
             {
                 Id = e.Id,
-                Name = AiWords.SetupName(e.Id, e.Name, Windows ? "PC" : "Mac"),
-                About = AiWords.SetupAbout(e.Id, e.State, Windows ? "PC" : "Mac", e.SetUpGb, e.Small, e.HasKey),
+                Name = AiWords.SetupName(e.Id, e.Name, Machine.DeviceFor(Windows)),
+                About = AiWords.SetupAbout(e.Id, e.State, Machine.DeviceFor(Windows), e.SetUpGb, e.Small, e.HasKey),
                 State = e.State,
                 Advanced = e.Id == "ollama",
                 OneButton = e.Id == "ollama" && freeNeedsWork || Buttons(e) || GeminiKey(e),
@@ -688,7 +688,7 @@ public sealed partial class AiSetupModel : ObservableObject
     /// what it said.</summary>
     string NotWorking(AiSetupRow row, string why)
     {
-        string device = Windows ? "PC" : "Mac";
+        string device = Machine.DeviceFor(Windows);
         return why switch
         {
             "signed out" => $"{row.Name} isn't signed in on this {device}. Sign in from its row, or pick another.",

@@ -305,7 +305,7 @@ public sealed partial class SettingsModel : ObservableObject, IDisposable
         "Classes" => "The classes your library files lectures into. It reads each lecture and picks the class it's about from these names and what each covers; a lecture you record for a class goes straight there.",
         "Notes" => "How your library writes the notes for each lecture and sorts it into a class.",
         "Folders" => "Folders on the library's computer (your school or work files) that search, and the AI when you chat, may read.",
-        _ => Lib.IsHere ? $"Your library, on this {(OperatingSystem.IsWindows() ? "PC" : "Mac")}." : "Your library, on the computer that keeps your lectures.",
+        _ => Lib.IsHere ? $"Your library, on this {Machine.Device}." : "Your library, on the computer that keeps your lectures.",
     };
     public bool OnAi => Section == "AI";
     public bool OnCanvas => Section == "Canvas";
@@ -343,7 +343,7 @@ public sealed partial class SettingsModel : ObservableObject, IDisposable
         bool records = host.Settings.Role != AppRole.Library;
         // Not for school (what the library is for says so): Folders, and no Canvas.
         bool school = host.Overview?["for_school"] is not System.Text.Json.Nodes.JsonValue fs || !fs.TryGetValue(out bool sc) || sc;
-        string device = OperatingSystem.IsWindows() ? "PC" : "Mac";
+        string device = Machine.Device;
         ComputerNavTitle = host.Settings.Role == AppRole.Laptop ? "This laptop" : $"This {device}";
         NavItem Nav(string id, string glyph, string label) => new() { Id = id, Glyph = glyph, Label = label };
         NavGroups =
@@ -527,7 +527,7 @@ public sealed partial class SettingsModel : ObservableObject, IDisposable
         LibraryLine = host.Library switch
         {
             LibraryState.Connected when runsHere && !host.OlderLibrary =>
-                $"{cc.PoolName} runs on this {(OperatingSystem.IsMacOS() ? "Mac" : "PC")}, on port {host.LocalLibrary!.Cfg.WebPort}.",
+                $"{cc.PoolName} runs on this {Machine.Device}, on port {host.LocalLibrary!.Cfg.WebPort}.",
             LibraryState.Connected when host.OlderLibrary => $"Connected to {cc.PoolName}. It runs an older Syft Notes: update it to browse, search and ask from here.",
             LibraryState.Connected => $"Connected to {cc.PoolName} at {cc.ServerUrl}.",
             LibraryState.Starting => "Starting your library…",
@@ -535,7 +535,7 @@ public sealed partial class SettingsModel : ObservableObject, IDisposable
             LibraryState.WrongPassword => "The library's password changed. Type the new one below.",
             _ => "No library yet.",
         };
-        string device = OperatingSystem.IsMacOS() ? "Mac" : "PC";
+        string device = Machine.Device;
         LibraryServiceLine = host.Settings.Role == AppRole.Laptop ? "" : host.LocalLibrary?.State switch
         {
             // Running and answering: the line above says so.
@@ -610,7 +610,7 @@ public sealed partial class SettingsModel : ObservableObject, IDisposable
 
     /// <summary>Under Open when you log in: with the library here, the same login item keeps it running too.</summary>
     public string StartAtLoginSub => LibraryHere
-        ? $"To the menu bar or tray, with your library, so notes get written whenever this {(OperatingSystem.IsWindows() ? "PC" : "Mac")} is on"
+        ? $"To the menu bar or tray, with your library, so notes get written whenever this {Machine.Device} is on"
         : "To the menu bar or tray";
 
     /// <summary>The credits, folded away under About until asked for.</summary>
@@ -865,7 +865,7 @@ public sealed partial class SettingsModel : ObservableObject, IDisposable
         if (host.LocalLibrary is { } svc) await svc.StopAsync();
     }
 
-    static string Device => OperatingSystem.IsWindows() ? "PC" : "Mac";
+    static string Device => Machine.Device;
 
     static string OldName(OldLibrary old) => old.Name.Length > 0 ? old.Name : "your library";
 

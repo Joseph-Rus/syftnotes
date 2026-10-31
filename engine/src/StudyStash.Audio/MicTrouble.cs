@@ -40,7 +40,7 @@ public sealed record MicTrouble(MicTroubleKind Kind, string Title, string Detail
         : new(MicTroubleKind.Denied, "Syft Notes can't use the microphone",
             "Allow it in System Settings → Privacy & Security → Microphone.", "Open System Settings", MacPrivacyUrl);
 
-    public static MicTrouble Denied() => Denied(OperatingSystem.IsWindows());
+    public static MicTrouble Denied() => OperatingSystem.IsLinux() ? Linux.Denied() : Denied(OperatingSystem.IsWindows());
 
     /// <summary>No microphone plugged in or picked.</summary>
     public static MicTrouble NoDevice(bool windows) => windows
@@ -49,7 +49,7 @@ public sealed record MicTrouble(MicTroubleKind Kind, string Title, string Detail
         : new(MicTroubleKind.NoDevice, "No microphone found", "Plug one in, or pick one in System Settings → Sound → Input.",
             "Open Sound settings", MacSoundUrl);
 
-    public static MicTrouble NoDevice() => NoDevice(OperatingSystem.IsWindows());
+    public static MicTrouble NoDevice() => OperatingSystem.IsLinux() ? Linux.NoDevice() : NoDevice(OperatingSystem.IsWindows());
 
     /// <summary>Another app took the microphone for itself alone (a call app, or a recorder in exclusive mode).</summary>
     public static MicTrouble InUse() => new(MicTroubleKind.InUse, "Another app is using the microphone",
@@ -78,6 +78,41 @@ public sealed record MicTrouble(MicTroubleKind Kind, string Title, string Detail
     /// <summary>Something else went wrong: trying again usually works.</summary>
     public static MicTrouble Other(bool windows) => new(MicTroubleKind.Other, "The microphone didn't start",
         $"Press Record to try again. If it keeps happening, restart your {(windows ? "PC" : "Mac")}.", "", "");
+
+    /// <summary><see cref="Other(bool)"/> in this computer's words.</summary>
+    public static MicTrouble Other() => OperatingSystem.IsLinux() ? Linux.Other() : Other(OperatingSystem.IsWindows());
+
+    /// <summary>The words for the sound server refusing to open the microphone with PulseAudio's error
+    /// <paramref name="code"/> (PipeWire answers with the same numbers).</summary>
+    public static MicTrouble FromPulse(int code) => code switch
+    {
+        PulseError.Access => Linux.Denied(),
+        PulseError.NoEntity => Linux.NoDevice(),
+        PulseError.ConnectionRefused => Linux.NoSoundServer(),
+        PulseError.Busy => Linux.InUse(),
+        _ => Linux.Other(),
+    };
+
+    /// <summary>The same troubles on Linux, where there's no settings page to open by address: each says where to
+    /// look instead.</summary>
+    public static class Linux
+    {
+        public static MicTrouble Denied() => new(MicTroubleKind.Denied, "Syft Notes can't use the microphone",
+            "Your system isn't letting Syft Notes record. If it was installed as a Flatpak or Snap, allow it the microphone in that app's permissions.", "", "");
+
+        public static MicTrouble NoDevice() => new(MicTroubleKind.NoDevice, "No microphone found",
+            "Plug one in, or pick one in your system's Sound settings, under Input.", "", "");
+
+        public static MicTrouble InUse() => new(MicTroubleKind.InUse, "Another app is using the microphone",
+            "Close the app that's using it, then press Record.", "", "");
+
+        /// <summary>No PulseAudio or PipeWire answering: nothing on this computer can record.</summary>
+        public static MicTrouble NoSoundServer() => new(MicTroubleKind.Other, "Syft Notes can't reach your sound system",
+            "Recording needs PipeWire or PulseAudio running (most desktops have one). Log out and back in, then press Record.", "", "");
+
+        public static MicTrouble Other() => new(MicTroubleKind.Other, "The microphone didn't start",
+            "Press Record to try again. If it keeps happening, restart your computer.", "", "");
+    }
 
     /// <summary>The words for a Mac's audio queue refusing to start with <paramref name="status"/>, given what macOS
     /// said about permission at the time.</summary>

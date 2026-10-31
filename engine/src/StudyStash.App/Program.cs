@@ -71,10 +71,17 @@ static class Program
         return code;
     }
 
+    // AVALONIA_X11_CSD: Avalonia marks drawn decorations on X11 experimental. Without them a Linux window shows the
+    // window manager's title bar above ours; if they're ever removed, that's what comes back, and nothing breaks.
+#pragma warning disable AVALONIA_X11_CSD
     public static AppBuilder BuildAvaloniaApp() => AppBuilder.Configure<App>()
         .UsePlatformDetect()
         .With(new MacOSPlatformOptions { ShowInDock = false })
+        // Linux: the app draws its windows' title bars itself, as on Windows (one bar, ours, with the minimise, maximise
+        // and close buttons on the right), wherever a window extends into its decorations; the rest keep the system's.
+        .With(new X11PlatformOptions { EnableDrawnDecorations = true })
         .LogToTrace();
+#pragma warning restore AVALONIA_X11_CSD
 }
 
 /// <summary>

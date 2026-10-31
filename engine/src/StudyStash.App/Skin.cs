@@ -28,7 +28,7 @@ public sealed record GlassFilter(double Blur, double Saturate, double Brightness
 /// </summary>
 public static class Skin
 {
-    public static SkinKind Current { get; set; } = OperatingSystem.IsWindows() ? SkinKind.Win : SkinKind.Mac;
+    public static SkinKind Current { get; set; } = OperatingSystem.IsMacOS() ? SkinKind.Mac : SkinKind.Win;
 
     /// <summary>The colour theme the accent is made from: Lagoon until the student picks another.</summary>
     public static ColourTheme Theme { get; private set; } = ColourThemes.Default;
@@ -39,7 +39,7 @@ public static class Skin
         {
             "win" or "windows" => SkinKind.Win,
             "mac" or "macos" => SkinKind.Mac,
-            _ => OperatingSystem.IsWindows() ? SkinKind.Win : SkinKind.Mac,
+            _ => OperatingSystem.IsMacOS() ? SkinKind.Mac : SkinKind.Win,
         };
 
     /// <summary>The design's colours for light or for dark (tokens.css): the window behind everything

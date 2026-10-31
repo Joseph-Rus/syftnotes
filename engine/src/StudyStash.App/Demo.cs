@@ -618,7 +618,7 @@ public static class Demo
             ["unsorted"] = 2,
             ["laptops"] = new System.Text.Json.Nodes.JsonArray(new System.Text.Json.Nodes.JsonObject { ["name"] = "Sam's MacBook Air", ["seen"] = now.AddSeconds(-20).ToString("o") }),
         };
-        string device = Skin.Current == SkinKind.Mac ? "Mac" : "PC";
+        string device = StudyStash.Core.Machine.DeviceForLook(Skin.Current == SkinKind.Mac);
         return new PanelModel
         {
             LibraryOnly = true,

@@ -28,6 +28,14 @@ public sealed record Browser(string Name, BrowserFamily Family, IReadOnlyList<st
     IReadOnlyList<string> ProgIds, string? SaysItIs = null, string? StoreButton = null)
 {
     public string Says => SaysItIs ?? Name;
+
+    /// <summary>Linux: the commands its packages put on the PATH, best first (google-chrome-stable). The first one
+    /// found is how it's opened.</summary>
+    public IReadOnlyList<string> LinuxCommands { get; init; } = [];
+
+    /// <summary>Linux: the names its desktop entry goes by (google-chrome.desktop, a Snap's firefox_firefox.desktop),
+    /// as <c>xdg-settings get default-web-browser</c> answers when it's the default.</summary>
+    public IReadOnlyList<string> LinuxDesktopIds { get; init; } = [];
 }
 
 /// <summary>
@@ -62,30 +70,41 @@ public sealed record BrowserAdvice(Browser? Usual, bool NoneHere)
 public static class Browsers
 {
     public static readonly Browser Chrome = new("Chrome", BrowserFamily.Chromium, ["Google Chrome"], "com.google.Chrome",
-        [@"Google\Chrome\Application\chrome.exe"], ["ChromeHTML"], StoreButton: "Add to Chrome");
+        [@"Google\Chrome\Application\chrome.exe"], ["ChromeHTML"], StoreButton: "Add to Chrome")
+        { LinuxCommands = ["google-chrome-stable", "google-chrome"], LinuxDesktopIds = ["google-chrome.desktop", "com.google.Chrome.desktop"] };
     public static readonly Browser Edge = new("Edge", BrowserFamily.Chromium, ["Microsoft Edge"], "com.microsoft.edgemac",
-        [@"Microsoft\Edge\Application\msedge.exe"], ["MSEdgeHTM"], StoreButton: "Get extension");
+        [@"Microsoft\Edge\Application\msedge.exe"], ["MSEdgeHTM"], StoreButton: "Get extension")
+        { LinuxCommands = ["microsoft-edge-stable", "microsoft-edge"], LinuxDesktopIds = ["microsoft-edge.desktop", "com.microsoft.Edge.desktop"] };
     public static readonly Browser Brave = new("Brave", BrowserFamily.Chromium, ["Brave Browser"], "com.brave.Browser",
-        [@"BraveSoftware\Brave-Browser\Application\brave.exe"], ["BraveHTML"], StoreButton: "Add to Brave");
+        [@"BraveSoftware\Brave-Browser\Application\brave.exe"], ["BraveHTML"], StoreButton: "Add to Brave")
+        { LinuxCommands = ["brave-browser", "brave"], LinuxDesktopIds = ["brave-browser.desktop", "brave_brave.desktop", "com.brave.Browser.desktop"] };
     public static readonly Browser Arc = new("Arc", BrowserFamily.Chromium, ["Arc"], "company.thebrowser.Browser",
         [@"Microsoft\WindowsApps\Arc.exe"], [], SaysItIs: "Chrome", StoreButton: "Add to Chrome");
     public static readonly Browser Opera = new("Opera", BrowserFamily.Chromium, ["Opera"], "com.operasoftware.Opera",
-        [@"Programs\Opera\opera.exe", @"Opera\opera.exe", @"Programs\Opera\launcher.exe", @"Opera\launcher.exe"], ["OperaStable"]);
+        [@"Programs\Opera\opera.exe", @"Opera\opera.exe", @"Programs\Opera\launcher.exe", @"Opera\launcher.exe"], ["OperaStable"])
+        { LinuxCommands = ["opera"], LinuxDesktopIds = ["opera.desktop", "opera_opera.desktop"] };
     public static readonly Browser Vivaldi = new("Vivaldi", BrowserFamily.Chromium, ["Vivaldi"], "com.vivaldi.Vivaldi",
-        [@"Vivaldi\Application\vivaldi.exe"], ["VivaldiHTM"], StoreButton: "Add to Chrome");
+        [@"Vivaldi\Application\vivaldi.exe"], ["VivaldiHTM"], StoreButton: "Add to Chrome")
+        { LinuxCommands = ["vivaldi-stable", "vivaldi"], LinuxDesktopIds = ["vivaldi-stable.desktop", "vivaldi.desktop"] };
     public static readonly Browser Chromium = new("Chromium", BrowserFamily.Chromium, ["Chromium"], "org.chromium.Chromium",
-        [@"Chromium\Application\chrome.exe"], ["ChromiumHTM"]);
+        [@"Chromium\Application\chrome.exe"], ["ChromiumHTM"])
+        { LinuxCommands = ["chromium", "chromium-browser"], LinuxDesktopIds = ["chromium.desktop", "chromium-browser.desktop", "chromium_chromium.desktop", "org.chromium.Chromium.desktop"] };
     public static readonly Browser Firefox = new("Firefox", BrowserFamily.Firefox, ["Firefox"], "org.mozilla.firefox",
-        [@"Mozilla Firefox\firefox.exe"], ["FirefoxURL", "FirefoxHTML"], StoreButton: "Add to Firefox");
+        [@"Mozilla Firefox\firefox.exe"], ["FirefoxURL", "FirefoxHTML"], StoreButton: "Add to Firefox")
+        { LinuxCommands = ["firefox"], LinuxDesktopIds = ["firefox.desktop", "firefox_firefox.desktop", "org.mozilla.firefox.desktop"] };
     public static readonly Browser FirefoxDeveloper = new("Firefox Developer Edition", BrowserFamily.Firefox, ["Firefox Developer Edition"],
         "org.mozilla.firefoxdeveloperedition", [@"Firefox Developer Edition\firefox.exe"], ["FirefoxURL-CA9422711AE1A81C", "FirefoxHTML-CA9422711AE1A81C"],
-        SaysItIs: "Firefox", StoreButton: "Add to Firefox");
+        SaysItIs: "Firefox", StoreButton: "Add to Firefox")
+        { LinuxCommands = ["firefox-developer-edition"], LinuxDesktopIds = ["firefox-developer-edition.desktop"] };
     public static readonly Browser Zen = new("Zen", BrowserFamily.Firefox, ["Zen", "Zen Browser"], "app.zen-browser.zen",
-        [@"Zen Browser\zen.exe"], ["ZenURL", "ZenHTML"], SaysItIs: "Firefox", StoreButton: "Add to Firefox");
+        [@"Zen Browser\zen.exe"], ["ZenURL", "ZenHTML"], SaysItIs: "Firefox", StoreButton: "Add to Firefox")
+        { LinuxCommands = ["zen-browser", "zen"], LinuxDesktopIds = ["zen.desktop", "zen-browser.desktop", "app.zen_browser.zen.desktop"] };
     public static readonly Browser LibreWolf = new("LibreWolf", BrowserFamily.Firefox, ["LibreWolf"], "io.gitlab.librewolf-community.librewolf",
-        [@"LibreWolf\librewolf.exe"], ["LibreWolfURL", "LibreWolfHTM"], StoreButton: "Add to Firefox");
+        [@"LibreWolf\librewolf.exe"], ["LibreWolfURL", "LibreWolfHTM"], StoreButton: "Add to Firefox")
+        { LinuxCommands = ["librewolf"], LinuxDesktopIds = ["librewolf.desktop", "io.gitlab.librewolf-community.desktop"] };
     public static readonly Browser Waterfox = new("Waterfox", BrowserFamily.Firefox, ["Waterfox"], "net.waterfox.waterfox",
-        [@"Waterfox\waterfox.exe"], ["WaterfoxURL", "WaterfoxHTML"], StoreButton: "Add to Firefox");
+        [@"Waterfox\waterfox.exe"], ["WaterfoxURL", "WaterfoxHTML"], StoreButton: "Add to Firefox")
+        { LinuxCommands = ["waterfox"], LinuxDesktopIds = ["waterfox.desktop"] };
     public static readonly Browser Safari = new("Safari", BrowserFamily.Safari, ["Safari"], "com.apple.Safari", [], []);
 
     /// <summary>Every browser Syft Notes knows, in the order it offers them: Chrome's family, then Firefox's.</summary>
@@ -155,12 +174,27 @@ public static class Browsers
 
     /// <summary>The known browsers on this computer, in <see cref="Known"/>'s order. On a Mac the one the system
     /// opens links with (<paramref name="usual"/>) counts wherever its app is: it's opened by its bundle id. Windows
-    /// opens a browser by its exe, so there it counts only where that's found.</summary>
+    /// opens a browser by its exe, and Linux by its command, so there it counts only where that's found.</summary>
     public static IReadOnlyList<Browser> Installed(Browser? usual = null) =>
         [.. Known.Where(b => b == usual && OperatingSystem.IsMacOS() || IsInstalled(b))];
 
     public static bool IsInstalled(Browser browser) =>
-        OperatingSystem.IsMacOS() ? MacApp(browser) is not null : OperatingSystem.IsWindows() && WindowsExe(browser) is not null;
+        OperatingSystem.IsMacOS() ? MacApp(browser) is not null
+        : OperatingSystem.IsWindows() ? WindowsExe(browser) is not null
+        : LinuxCommand(browser) is not null;
+
+    /// <summary>Linux: the browser's program on the PATH, or null. <paramref name="which"/> stands in for the PATH
+    /// in tests.</summary>
+    public static string? LinuxCommand(Browser browser, Func<string, string?>? which = null) =>
+        browser.LinuxCommands.Select(which ?? Machine.Which).FirstOrDefault(p => p is not null);
+
+    /// <summary>Linux: the default browser from its desktop entry's name (what <c>xdg-settings get
+    /// default-web-browser</c> prints), when it's one Syft Notes knows.</summary>
+    public static Browser? LinuxDefault(string? desktopId)
+    {
+        string id = (desktopId ?? "").Trim();
+        return id.Length == 0 ? null : Known.FirstOrDefault(b => b.LinuxDesktopIds.Contains(id, StringComparer.OrdinalIgnoreCase));
+    }
 
     /// <summary>A Mac: the browser's app in Applications (everyone's, or just this account's), or null.</summary>
     static string? MacApp(Browser browser) =>
@@ -219,6 +253,8 @@ public static class Browsers
                 return null;
             }
         }
+        if (OperatingSystem.IsLinux())
+            return run("xdg-settings", ["get", "default-web-browser"], TimeSpan.FromSeconds(5)) is { ExitCode: 0 } asked ? LinuxDefault(asked.Stdout) : null;
         return null;
     }
 
@@ -360,6 +396,9 @@ public static class Browsers
         // by its path, so a missing one is said here rather than in Windows' own "cannot find" box.
         if (OperatingSystem.IsWindows() && (windowsExe ?? WindowsExe)(browser) is { } exe)
             return (start ?? Machine.Start)(exe, target is null ? [] : [target]) ? null : NotInstalled;
+        // Linux: the same, with the program its package put on the PATH.
+        if (OperatingSystem.IsLinux() && LinuxCommand(browser) is { } command)
+            return (start ?? Machine.Start)(command, target is null ? [] : [target]) ? null : NotInstalled;
         return NotInstalled;
     }
 

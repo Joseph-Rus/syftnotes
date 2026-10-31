@@ -118,7 +118,7 @@ public static partial class SetupChat
     /// "gemini"), which is the one the student picked, so it's the one that writes their notes.</summary>
     public static string Brief(bool windows, bool again = false, bool library = false, string ai = "")
     {
-        string device = windows ? "PC" : "Mac";
+        string device = Machine.DeviceFor(windows);
         string hint = library ? " The installer they used was the library download, so this computer is probably their library: suggest that." : "";
         string you = ai is "claude" or "codex" or "gemini"
             ? $"\n- You are {Engines.Name(ai)}, the AI the student picked, so you write their notes. Once step 1 is done, if get_setup_status\n  still says notes are to do, call set_notes_writer with \"{ai}\" (unless they ask for another; on setup run again, ask first)."
