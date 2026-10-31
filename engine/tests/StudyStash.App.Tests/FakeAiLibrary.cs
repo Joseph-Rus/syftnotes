@@ -21,6 +21,9 @@ public sealed class FakeAiLibrary : IAiLibrary
     public Func<string, AiSaid?>? OnStart { get; set; }
     public Func<string, AiSaid?>? OnDownload { get; set; }
     public Func<string, AiSaid?>? OnSignIn { get; set; }
+    /// <summary>"Open the page again", and the terminal as a last resort (a library from before them says null).</summary>
+    public Func<string, AiSaid?>? OnSignInAgain { get; set; }
+    public Func<string, AiSaid?>? OnSignInTerminal { get; set; }
     public Func<string, string, AiSaid?>? OnCheck { get; set; }
     /// <summary>(engine, key): what the library says to a key. Without it, a key works at once.</summary>
     public Func<string, string, AiSaid?>? OnKey { get; set; }
@@ -123,7 +126,19 @@ public sealed class FakeAiLibrary : IAiLibrary
         if (OnSignIn is not null) return Task.FromResult(OnSignIn(engine));
         if (Overview is null) return Task.FromResult<AiSaid?>(null);
         Overview = Overview with { Engines = [.. Overview.Engines.Select(e => e.Id == engine ? e with { State = "ready" } : e)] };
-        return Task.FromResult<AiSaid?>(new AiSaid($"Opened a terminal to sign in to {Row(Overview, engine).Name}.", Overview));
+        return Task.FromResult<AiSaid?>(new AiSaid($"Finish signing in to {Row(Overview, engine).Name} in the browser page that just opened.", Overview));
+    }
+
+    public Task<AiSaid?> SignInAgainAsync(string engine)
+    {
+        Calls.Add($"sign-in-again:{engine}");
+        return Task.FromResult(OnSignInAgain?.Invoke(engine));
+    }
+
+    public Task<AiSaid?> SignInInTerminalAsync(string engine)
+    {
+        Calls.Add($"sign-in-terminal:{engine}");
+        return Task.FromResult(OnSignInTerminal?.Invoke(engine));
     }
 
     public Task<AiSaid?> CheckAsync(string engine, string model = "")

@@ -191,7 +191,10 @@
                         <Ellipse Classes="ai-dot" Classes.good="{Binding Good}" Classes.warn="{Binding Warn}" />
                         <TextBlock Classes="ai-state" Classes.warn="{Binding Warn}" Text="{Binding StateWords}" />
                       </StackPanel>
-                      <Button Classes="ai-pillbtn" Command="{Binding ActCommand}" IsVisible="{Binding !NeedsOptions}">
+                      <Button Classes="ai-textbtn" Name="SignInLink" Command="{Binding LinkCommand}" IsVisible="{Binding HasLink}">
+                        <Border Classes="ai-pill-plain"><TextBlock Text="{Binding LinkWords}" /></Border>
+                      </Button>
+                      <Button Classes="ai-pillbtn" Command="{Binding ActCommand}" IsVisible="{Binding ShowPill}">
                         <Border Classes="ai-pill" Classes.primary="{Binding IsPrimary}">
                           <TextBlock Text="{Binding ActionWords}" />
                         </Border>

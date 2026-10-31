@@ -91,7 +91,38 @@ public sealed partial class AiSetupModel : ObservableObject
     readonly IAiLibrary library;
     bool picked;
 
-    public AiSetupModel(IAiLibrary library) => this.library = library;
+    public AiSetupModel(IAiLibrary library)
+    {
+        this.library = library;
+        watch = new SignInWatch(library, SignInMovedAsync);
+    }
+
+    /// <summary>Keeps asking the library while a sign-in started from a row is going, so the row turns ready by itself.</summary>
+    readonly SignInWatch watch;
+    string shown = "";
+
+    /// <summary>How often a sign-in that's going is looked at; a test sets it small.</summary>
+    public TimeSpan SignInEvery
+    {
+        get => watch.Every;
+        set => watch.Every = value;
+    }
+
+    async Task SignInMovedAsync(AiOverview now)
+    {
+        if (SignInWatch.Signature(now) == shown) return;
+        var waiting = Engines.Where(r => r.Working && r.Id != "ollama").Select(r => r.Id).ToList();
+        Apply(now);
+        // The one that was waiting is signed in now: the same as pressing Check again, which picks it when it can write notes.
+        foreach (string id in waiting)
+        {
+            var e = now.Engines.FirstOrDefault(x => x.Id == id);
+            if (e is { State: not "not_signed_in" }) await CheckAgainAsync(id);
+            // It stopped without being signed in: said plainly, and its button tries again.
+            else if (e is { SignIn: SignInPhase.GaveUp or SignInPhase.Region or SignInPhase.Stuck })
+                Say = $"{AiWords.SignInTitle(AiWords.PlainName(e.Id, e.Name), e.SignIn)}. {AiWords.SignInAbout(AiWords.PlainName(e.Id, e.Name), e.SignIn)}";
+        }
+    }
 
     public ObservableCollection<AiSetupRow> Engines { get; } = [];
     public List<EngineChoice> AskChoices { get; private set; } = [new(SameAsNotes, "Same as notes")];
@@ -344,6 +375,8 @@ public sealed partial class AiSetupModel : ObservableObject
         bool GeminiKey(EngineInfo e) => TakesKeys && e is { Id: "gemini", State: "not_installed" };
         // Not a working pick: not here, signed out, or its last try failed (a plan other apps can't use, say).
         bool NotReady(EngineInfo e) => e.State is "not_installed" or "not_signed_in" or "failed";
+        // A sign-in going from a row (the AI's own, hidden, in the student's browser): the row says it's waiting.
+        static bool SigningIn(EngineInfo e) => e is { State: "not_signed_in", SignIn: SignInPhase.Waiting };
         Engines.Clear();
         // Every AI shows, each with what gets it going: the free AI, Claude, ChatGPT and Gemini.
         foreach (var e in overview.Engines)
@@ -358,10 +391,10 @@ public sealed partial class AiSetupModel : ObservableObject
                 State = e.State,
                 Advanced = e.Id == "ollama",
                 OneButton = e.Id == "ollama" && freeNeedsWork || Buttons(e) || GeminiKey(e),
-                Working = e.Id == "ollama" && working is not null,
-                Progress = e.Id == "ollama" && working is not null ? AiWords.FreeAiProgress(working) : "",
+                Working = e.Id == "ollama" && working is not null || SigningIn(e),
+                Progress = e.Id == "ollama" && working is not null ? AiWords.FreeAiProgress(working) : SigningIn(e) ? AiWords.SignInWaiting : "",
                 Fraction = working?.Fraction ?? 0,
-                Steady = working is { Step: "start" },
+                Steady = working is { Step: "start" } || SigningIn(e),
                 ShowSignIn = e.State == "not_signed_in" && steps.Count == 0 && !Buttons(e),
                 ShowKeyLink = TakesKeys && e.Id is ("claude" or "codex" or "gemini") && NotReady(e) && !GeminiKey(e),
                 CanWrite = CanWrite(e),
@@ -378,7 +411,7 @@ public sealed partial class AiSetupModel : ObservableObject
                     _ when GeminiKey(e) => "Add a key",
                     (_, "not_signed_in") when Buttons(e) => "Sign in",
                     _ when Buttons(e) => "Set it up",
-                    (_, "not_signed_in") => $"Sign in in {terminal}",
+                    (_, "not_signed_in") => "Sign in",
                     _ => $"Open {terminal}",
                 },
                 ShowHelp = open.Contains(e.Id) && steps.Count > 0,
@@ -412,6 +445,8 @@ public sealed partial class AiSetupModel : ObservableObject
         OnPropertyChanged(nameof(ChoiceWords));
         OnPropertyChanged(nameof(KeyAlternative));
         OnPropertyChanged(nameof(HasKeyAlternative));
+        shown = SignInWatch.Signature(overview);
+        watch.Begin(overview);
     }
 
     /// <summary>What the library said when it refused, for the student: turned away at the door ("wrong password"),

@@ -487,6 +487,49 @@ public static partial class AiWords
         _ => detail,
     };
 
+    // --- signing in from Syft Notes: the AI's own sign-in runs hidden and opens the browser itself --------------------
+
+    /// <summary>What a row says while the student finishes signing in, in their browser.</summary>
+    public const string SignInWaiting = "Waiting for you to finish in your browser…";
+
+    /// <summary>A row's line (or a card's message) for each place a sign-in can be at (<see cref="SignInPhase"/>); ""
+    /// when none is going.</summary>
+    public static string SignInAbout(string engineName, string phase) => phase switch
+    {
+        SignInPhase.Waiting => SignInWaiting,
+        SignInPhase.GaveUp => "It stopped waiting before you'd finished. Try again.",
+        SignInPhase.Region => $"{engineName} isn't offered in your country yet.",
+        SignInPhase.Stuck => "Syft Notes couldn't open the sign-in page by itself. Try again.",
+        _ => "",
+    };
+
+    /// <summary>A card's title for each place a sign-in can be at; "" when none is going.</summary>
+    public static string SignInTitle(string engineName, string phase) => phase switch
+    {
+        SignInPhase.Waiting => $"Finish signing in to {engineName}",
+        SignInPhase.GaveUp => $"Signing in to {engineName} stopped",
+        SignInPhase.Region => $"{engineName} isn't offered in your country",
+        SignInPhase.Stuck => $"{engineName}'s sign-in didn't start",
+        _ => "",
+    };
+
+    /// <summary>The small link beside a sign-in that's going: the page again while it waits, a terminal only when the
+    /// hidden sign-in couldn't start or stopped at once.</summary>
+    public static string SignInLink(string phase) => phase switch
+    {
+        SignInPhase.Waiting => "Open the page again",
+        SignInPhase.Stuck => "Sign in in Terminal instead",
+        _ => "",
+    };
+
+    /// <summary>The button for a sign-in that stopped (try once more); none while one waits, and none for a country that
+    /// isn't served.</summary>
+    public static string SignInButton(string phase) => phase switch
+    {
+        SignInPhase.GaveUp or SignInPhase.Stuck => "Try again",
+        _ => "",
+    };
+
     /// <summary>The card's primary action: Start Ollama · Sign in · Download · Dismiss · (none for Fell back) ·
     /// Deny/Allow · Try again · Try again/Dismiss.</summary>
     public static string ProblemAction(string kind) => kind switch
