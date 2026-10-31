@@ -13,7 +13,7 @@
              x:DataType="vm:PhonesModel">
   <StackPanel Spacing="8">
     <TextBlock Classes="h" Text="Phone" />
-    <TextBlock Classes="body" Text="{Binding Body}" />
+    <TextBlock Classes="body lede" Text="{Binding Body}" />
     <!-- Just this computer: through the student's Google account -->
     <Panel IsVisible="{Binding ViaGoogle}">
       <StackPanel Name="GooglePhone" DataContext="{Binding Google}" x:DataType="vm:PhoneGoogleModel" Spacing="8">
@@ -26,8 +26,8 @@
                 <TextBlock Classes="row-sub" Text="{Binding Lede}" TextWrapping="Wrap" />
                 <TextBlock Classes="row-sub" Text="{Binding CantConnect}" IsVisible="{Binding !CanConnect}" TextWrapping="Wrap" Margin="0,4,0,0" />
               </StackPanel>
-              <Button Grid.Column="4" Classes="pill primary" Command="{Binding ConnectCommand}" IsEnabled="{Binding CanConnect}" VerticalAlignment="Center">
-                <TextBlock Text="Connect with Google" FontSize="13" FontWeight="Medium" />
+              <Button Grid.Column="4" Classes="btn sm ink" Command="{Binding ConnectCommand}" IsEnabled="{Binding CanConnect}" VerticalAlignment="Center">
+                <TextBlock Text="Connect with Google" />
               </Button>
             </Grid>
           </Border>
@@ -40,7 +40,7 @@
                 <TextBlock Classes="row-title" Text="Finish in your browser" />
                 <TextBlock Classes="row-sub" Text="Pick your Google account there and press Allow. Then come back here." TextWrapping="Wrap" />
               </StackPanel>
-              <Button Grid.Column="4" Classes="pill" Command="{Binding CancelConnectCommand}" VerticalAlignment="Center"><TextBlock Text="Cancel" FontSize="13" /></Button>
+              <Button Grid.Column="4" Classes="btn sm" Command="{Binding CancelConnectCommand}" VerticalAlignment="Center"><TextBlock Text="Cancel" /></Button>
             </Grid>
           </Border>
         </Border>
@@ -62,14 +62,14 @@
                 <TextBlock Classes="row-sub" Text="{Binding HowItWorks}" TextWrapping="Wrap" Margin="0,4,0,0" />
                 <TextBlock Classes="row-sub" Text="{Binding Status}" IsVisible="{Binding Status, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" TextWrapping="Wrap" />
                 <StackPanel Orientation="Horizontal" Spacing="8" Margin="0,6,0,0" IsVisible="{Binding !ConfirmingDisconnect}">
-                  <Button Classes="pill primary" Command="{Binding ConnectCommand}" IsVisible="{Binding SignedOut}"><TextBlock Text="Connect again" FontSize="13" FontWeight="Medium" /></Button>
-                  <Button Classes="pill" Command="{Binding AskDisconnectCommand}" IsEnabled="{Binding !Busy}"><TextBlock Text="Disconnect…" FontSize="13" /></Button>
+                  <Button Classes="btn sm ink" Command="{Binding ConnectCommand}" IsVisible="{Binding SignedOut}"><TextBlock Text="Connect again" /></Button>
+                  <Button Classes="btn sm" Command="{Binding AskDisconnectCommand}" IsEnabled="{Binding !Busy}"><TextBlock Text="Disconnect…" /></Button>
                 </StackPanel>
                 <StackPanel Spacing="8" Margin="0,6,0,0" IsVisible="{Binding ConfirmingDisconnect}">
                   <TextBlock Classes="say" Text="{Binding ConfirmWords}" TextWrapping="Wrap" />
                   <StackPanel Orientation="Horizontal" Spacing="8">
-                    <Button Classes="pill" Command="{Binding KeepConnectedCommand}"><TextBlock Text="Cancel" FontSize="13" /></Button>
-                    <Button Classes="pill primary" Command="{Binding DisconnectCommand}"><TextBlock Text="Disconnect" FontSize="13" FontWeight="Medium" /></Button>
+                    <Button Classes="btn sm" Command="{Binding KeepConnectedCommand}"><TextBlock Text="Cancel" /></Button>
+                    <Button Classes="btn sm ink" Command="{Binding DisconnectCommand}"><TextBlock Text="Disconnect" /></Button>
                   </StackPanel>
                 </StackPanel>
               </StackPanel>
@@ -87,9 +87,9 @@
                           <TextBlock Classes="row-title" Text="{Binding Name}" TextTrimming="CharacterEllipsis" />
                           <TextBlock Classes="row-sub" Text="{Binding Meta}" />
                         </StackPanel>
-                        <Button Grid.Column="4" Classes="pill" VerticalAlignment="Center"
+                        <Button Grid.Column="4" Classes="btn sm" VerticalAlignment="Center"
                                 Command="{Binding $parent[ItemsControl].((vm:PhoneGoogleModel)DataContext).RemoveCommand}" CommandParameter="{Binding}">
-                          <TextBlock Text="Remove" FontSize="13" />
+                          <TextBlock Text="Remove" />
                         </Button>
                       </Grid>
                     </Border>
@@ -121,7 +121,7 @@
         <Grid ColumnDefinitions="Auto,12,*,12,Auto">
           <c:Icon Glyph="info" Size="18" Foreground="{DynamicResource Fg2}" VerticalAlignment="Center" />
           <TextBlock Grid.Column="2" Classes="row-title" Text="{Binding Problem}" TextWrapping="Wrap" />
-          <Button Grid.Column="4" Classes="pill" Command="{Binding LoadCommand}" IsVisible="{Binding CanRetry}" VerticalAlignment="Center"><TextBlock Text="Try again" FontSize="13" /></Button>
+          <Button Grid.Column="4" Classes="btn sm" Command="{Binding LoadCommand}" IsVisible="{Binding CanRetry}" VerticalAlignment="Center"><TextBlock Text="Try again" /></Button>
         </Grid>
       </Border>
     </Border>
@@ -136,8 +136,8 @@
               <TextBlock Classes="row-title" Text="{Binding AddTitle}" />
               <TextBlock Classes="row-sub" Text="{Binding AddSub}" TextWrapping="Wrap" />
             </StackPanel>
-            <Button Grid.Column="4" Classes="pill primary" Command="{Binding AddPhoneCommand}" IsEnabled="{Binding !Asking}" VerticalAlignment="Center">
-              <TextBlock Text="Add a phone" FontSize="13" FontWeight="Medium" />
+            <Button Grid.Column="4" Classes="btn sm ink" Command="{Binding AddPhoneCommand}" IsEnabled="{Binding !Asking}" VerticalAlignment="Center">
+              <TextBlock Text="Add a phone" />
             </Button>
           </Grid>
         </Border>
@@ -159,14 +159,14 @@
             <TextBlock Classes="row-sub" Text="{Binding Left}" />
             <TextBlock Classes="row-sub" Text="On Android, add the page that opens to your home screen." TextWrapping="Wrap" />
             <StackPanel Orientation="Horizontal" Spacing="8" Margin="0,6,0,0">
-              <Button Classes="pill" Command="{Binding AddPhoneCommand}" IsVisible="{Binding RanOut}"><TextBlock Text="New code" FontSize="13" /></Button>
-              <Button Classes="pill" Command="{Binding DoneCommand}"><TextBlock Text="Done" FontSize="13" /></Button>
+              <Button Classes="btn sm" Command="{Binding AddPhoneCommand}" IsVisible="{Binding RanOut}"><TextBlock Text="New code" /></Button>
+              <Button Classes="btn sm" Command="{Binding DoneCommand}"><TextBlock Text="Done" /></Button>
             </StackPanel>
           </StackPanel>
         </Grid>
       </Border>
       <c:PageText Classes="say" Text="{Binding Say}" IsVisible="{Binding Say, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" TextWrapping="Wrap" />
-      <Button Classes="pill" Command="{Binding OpenFixCommand}" IsVisible="{Binding HasFix}" HorizontalAlignment="Left"><TextBlock Text="Open the page" FontSize="13" /></Button>
+      <Button Classes="btn sm" Command="{Binding OpenFixCommand}" IsVisible="{Binding HasFix}" HorizontalAlignment="Left"><TextBlock Text="Open the page" /></Button>
 
       <!-- The phones already added -->
       <TextBlock Classes="section gap" Text="{Binding PhonesTitle}" IsVisible="{Binding !NoPhones}" />
@@ -183,9 +183,9 @@
                       <TextBlock Classes="row-title" Text="{Binding Name}" TextTrimming="CharacterEllipsis" />
                       <TextBlock Classes="row-sub" Text="{Binding Meta}" />
                     </StackPanel>
-                    <Button Grid.Column="4" Classes="pill" VerticalAlignment="Center"
+                    <Button Grid.Column="4" Classes="btn sm" VerticalAlignment="Center"
                             Command="{Binding $parent[ItemsControl].((vm:PhonesModel)DataContext).RemoveCommand}" CommandParameter="{Binding}">
-                      <TextBlock Text="Remove" FontSize="13" />
+                      <TextBlock Text="Remove" />
                     </Button>
                   </Grid>
                 </Border>

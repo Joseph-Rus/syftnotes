@@ -8,6 +8,7 @@
              x:DataType="vm:AiProblem">
   <UserControl.Styles>
     <StyleInclude Source="avares://StudyStash/Views/WinAiStyles.axaml" />
+    <StyleInclude Source="avares://StudyStash/Views/SettingsPaneStyles.axaml" />
   </UserControl.Styles>
 
   <StackPanel Spacing="8">
