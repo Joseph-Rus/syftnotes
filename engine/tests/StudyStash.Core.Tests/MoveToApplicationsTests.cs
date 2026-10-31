@@ -64,7 +64,7 @@ public class MoveToApplicationsTests
         string baseDir = Make(home, "Downloads");
         int asked = 0;
         bool Go() => MoveToApplications.Offer(baseDir, home, home, () => { asked++; return false; },
-            (_, _, _) => null, _ => throw new InvalidOperationException("nothing starts"), 1, _ => { }, applicationsWritable: true);
+            (_, _, _) => null, _ => throw new InvalidOperationException("nothing starts"), 1, _ => { }, applicationsWritable: true, otherCopyRunning: () => false);
         Assert.False(Go());
         Assert.False(Go());
         Assert.Equal(1, asked);
@@ -79,7 +79,7 @@ public class MoveToApplicationsTests
         string baseDir = Make(home, "Downloads");
         // applications=false so the destination is under the temp home, never the real /Applications
         bool went = MoveToApplications.Offer(baseDir, home, home, () => true, (_, _, _) => new ProcResult(1, ""),
-            _ => throw new InvalidOperationException("nothing starts"), 1, _ => { }, applicationsWritable: false);
+            _ => throw new InvalidOperationException("nothing starts"), 1, _ => { }, applicationsWritable: false, otherCopyRunning: () => false);
         Assert.False(went);
         Assert.False(Directory.Exists(Path.Combine(home, "Applications", "Study Stash.app.new")));
     }
