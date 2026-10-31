@@ -328,7 +328,7 @@ section { padding: clamp(4rem, 9vw, 6.5rem) 0; }
 .finale { padding-top: 0; }
 .finale .section-head img { width: 5.5rem; height: 5.5rem; margin-bottom: 1.6rem; filter: drop-shadow(0 10px 18px rgb(22 19 29 / 0.25)); }
 .finale .section-head h2 { font-size: clamp(2.4rem, 1.2rem + 4.6vw, 4.6rem); letter-spacing: -0.04em; line-height: 0.98; }
-.download { display: grid; grid-template-columns: repeat(2, 1fr); gap: 1.25rem; }
+.download { display: grid; grid-template-columns: repeat(auto-fit, minmax(17rem, 1fr)); gap: 1.25rem; }
 .dl { background: var(--surface); color: var(--ink); box-shadow: 0 0 0 1px var(--line); border-radius: var(--radius); padding: clamp(1.4rem, 3vw, 2rem); display: flex; flex-direction: column; gap: 1rem; }
 .dl.here { box-shadow: 0 0 0 2px var(--ink), var(--shadow); }
 .dl .os { display: flex; align-items: center; gap: 0.7rem; }
@@ -336,8 +336,10 @@ section { padding: clamp(4rem, 9vw, 6.5rem) 0; }
 .dl h3 { font-size: 1.6rem; }
 .dl p { color: var(--ink-2); font-size: 0.975rem; margin: 0; }
 .dl .btn { align-self: flex-start; }
-.dl .tag { font: 700 0.8rem/1 var(--font); color: var(--black); background: var(--mustard); padding: 0.35rem 0.55rem; border-radius: 0.3rem; margin-left: auto; visibility: hidden; }
+.dl .tag { white-space: nowrap; font: 700 0.8rem/1 var(--font); color: var(--black); background: var(--mustard); padding: 0.35rem 0.55rem; border-radius: 0.3rem; margin-left: auto; visibility: hidden; }
 .dl.here .tag { visibility: visible; }
+.dl .tag.soon { visibility: visible; background: var(--lilac, #CDBDFF); }
+.other-dl .soon { color: var(--ink-2); white-space: nowrap; }
 @media (max-width: 760px) { .download { grid-template-columns: 1fr; } }
 
 /* Long-form pages: the phone guide, privacy, terms, support. */
