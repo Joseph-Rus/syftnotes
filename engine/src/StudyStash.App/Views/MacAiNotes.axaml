@@ -141,7 +141,7 @@
 
     <!-- The notes, dimmed while the menu is open -->
     <Border Classes="ai-dim" Classes.dimmed="{Binding Dimmed}" IsVisible="{Binding ShowNotes}">
-      <c:NoteView Markdown="{Binding ShownMarkdown}" Provenance="True" />
+      <c:NoteView Markdown="{Binding ShownMarkdown}" Provenance="True" Highlights="{Binding Highlights}" />
     </Border>
 
     <!-- Editing: the notes as text, each diagram one line; Save and Cancel again under long notes -->

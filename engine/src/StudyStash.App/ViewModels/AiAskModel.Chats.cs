@@ -147,12 +147,14 @@ public sealed partial class AiAskModel
         }
         Stop();
         Turns.Clear();
+        reading = null;
         var earlier = new List<AiTurn>();
         for (int i = 0; i + 1 < messages.Count; i += 2)
         {
             if (messages[i].Role != "user" || messages[i + 1].Role != "assistant") continue;
             var a = messages[i + 1];
             var turn = new AiTurn(messages[i].Text, a.EngineName) { Answer = a.Text, Sources = a.Sources, Engine = a.Engine };
+            Quoting(turn, a.Quotes);
             if (a.Failed) turn.Failed = a.Text;
             else if (a.Stopped) turn.Byline = AiWords.Stopped;
             else

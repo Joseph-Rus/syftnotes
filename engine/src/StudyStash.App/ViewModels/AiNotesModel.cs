@@ -40,6 +40,10 @@ public sealed partial class AiNotesModel : ObservableObject, IDisposable
     /// "Rewrite notes with" menu shows it last, marked "Wrote the current notes".</summary>
     public string WriterId { get; private set; } = "ollama";
 
+    /// <summary>What the lecture's Ask answer quotes, for the notes to highlight (the page links it to its Ask bar's:
+    /// <see cref="AiAskModel.Highlights"/>); null until it does.</summary>
+    [ObservableProperty] public partial NoteHighlights? Highlights { get; set; }
+
     [ObservableProperty] public partial RewriteState State { get; set; } = RewriteState.Idle;
     [ObservableProperty] public partial string CurrentMarkdown { get; set; } = "";
     [ObservableProperty] public partial string CurrentByline { get; set; } = "";

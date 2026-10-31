@@ -103,6 +103,24 @@ public sealed partial class AiTurn : ObservableObject
     [ObservableProperty] public partial string? OlderLibraryNote { get; set; }
     [ObservableProperty] public partial string? Failed { get; set; }
     public List<AskSource> Sources { get; set; } = [];
+    /// <summary>The words of the lecture's notes the answer was built on, as the AI quoted them (<see cref="AskQuotes"/>):
+    /// the ones the notes hold are <see cref="Shown"/>, each a chip under the answer.</summary>
+    public List<string> Quotes { get; set; } = [];
+    /// <summary>The quotes the notes on the page hold: the highlights this answer asks for, and its chips.</summary>
+    public List<string> Shown { get; private set; } = [];
+    [ObservableProperty] public partial IReadOnlyList<QuoteChip> Chips { get; set; } = [];
+    public bool HasChips => Chips.Count > 0;
+    partial void OnChipsChanged(IReadOnlyList<QuoteChip> value) => OnPropertyChanged(nameof(HasChips));
+    /// <summary>The pointer is over this answer: if it quotes the notes, they're what the page highlights.</summary>
+    internal Action<AiTurn>? OnReading { get; set; }
+    public void Reading() => OnReading?.Invoke(this);
+
+    /// <summary>The quotes the notes hold now (<paramref name="found"/>), made into chips.</summary>
+    internal void Rematch(NoteHighlights notes, List<string> found)
+    {
+        Shown = found;
+        Chips = [.. found.Select((_, i) => new QuoteChip(notes, found, i))];
+    }
     /// <summary>The engine that answered (the one asked, until the answer says otherwise): whether the chat above has
     /// been to an AI before goes by it.</summary>
     public string Engine { get; set; } = "";
@@ -133,6 +151,7 @@ public sealed partial class AiAskModel : ObservableObject
     public AiAskModel(IAiLibrary library)
     {
         this.library = library;
+        Highlights.NotesChanged += NotesChanged;
         foreach (var c in ScopeChoices) c.Pick = new RelayCommand(() => Scope = c.Id);
         EngineChoice.Mark(ScopeChoices, Scope);
     }
@@ -218,6 +237,42 @@ public sealed partial class AiAskModel : ObservableObject
 
     partial void OnAnswerClosedChanged(bool value) => ThreadShown();
 
+    /// <summary>The words of the notes the answer being read points at: the notes on the page highlight them
+    /// (<see cref="NoteView"/>). The same object is the notes' (the page links them).</summary>
+    public NoteHighlights Highlights { get; } = new();
+
+    /// <summary>The answer the pointer is over, if it quotes the notes; null: the latest.</summary>
+    AiTurn? reading;
+
+    /// <summary>Highlights the quotes of the answer being read: the latest (while its card is open), or the one the pointer
+    /// went over. None once the card is closed, or on a new chat.</summary>
+    void ShowReading()
+    {
+        var turn = reading is not null && Turns.Contains(reading) ? reading : Latest;
+        Highlights.Show(HasLatest && turn is not null ? turn.Shown : []);
+    }
+
+    /// <summary>A turn added to the thread: it hears when the pointer is over it, and finds its quotes in the notes (again,
+    /// when the notes change).</summary>
+    void Quoting(AiTurn turn, IEnumerable<string>? quotes)
+    {
+        turn.Quotes = [.. quotes ?? []];
+        turn.OnReading = t =>
+        {
+            if (t.Shown.Count == 0 || ReferenceEquals(reading, t)) return;
+            reading = t;
+            ShowReading();
+        };
+        if (turn.Quotes.Count > 0) turn.Rematch(Highlights, Highlights.Found(turn.Quotes));
+    }
+
+    void NotesChanged()
+    {
+        foreach (var t in Turns)
+            if (t.Quotes.Count > 0) t.Rematch(Highlights, Highlights.Found(t.Quotes));
+        ShowReading();
+    }
+
     /// <summary>The answer card's close button: the notes get their room back, and an answer still being written stops.
     /// The conversation is kept: the next question carries it on, and it's in the Chats list.</summary>
     [RelayCommand]
@@ -236,6 +291,7 @@ public sealed partial class AiAskModel : ObservableObject
     {
         Stop();
         Turns.Clear();
+        reading = null;
         ChatId = null;
         foreach (var row in Chats) row.Current = false;
         AnswerClosed = false;
@@ -276,6 +332,7 @@ public sealed partial class AiAskModel : ObservableObject
     /// <summary>Whether the thread shows changed (a question asked, the chat closed or shown again).</summary>
     void ThreadShown()
     {
+        ShowReading();
         OnPropertyChanged(nameof(HasLatest));
         OnPropertyChanged(nameof(CanShowChat));
         OnPropertyChanged(nameof(CanStartOver));
@@ -436,6 +493,9 @@ public sealed partial class AiAskModel : ObservableObject
             turn.Answer = reply.Answer;
             turn.Sources = reply.Sources;
             turn.Engine = reply.Engine;
+            Quoting(turn, reply.Quotes);
+            reading = null;
+            ShowReading();
             // The chat above went to an AI that hadn't had it: Claude or ChatGPT, after the free AI kept it on the computer.
             bool readChat = reply.Remembered is int n && n > 0 && SentElsewhere(reply.Engine, answered.TakeLast(n));
             turn.Byline = AiWords.AskByline(reply.EngineName, reply.Sources, readChat);
