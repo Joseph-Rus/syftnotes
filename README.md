@@ -12,9 +12,7 @@
   &nbsp;·&nbsp;
   <a href="https://github.com/Joseph-Rus/study-stash/releases/latest/download/Syft-Notes-Setup.exe"><b>Download for Windows</b></a>
   &nbsp;·&nbsp;
-  <a href="https://study-stash-app.web.app/assets/study-stash-demo.mp4">Watch the 50-second demo</a>
-  &nbsp;·&nbsp;
-  <a href="https://study-stash-app.web.app">Website</a>
+  <a href="https://syftnotes.com">Website</a>
 </p>
 
 <p align="center">
@@ -92,10 +90,6 @@ this**, **Quiz me** and **Where was this said?**, which opens the transcript at 
   <source media="(prefers-color-scheme: dark)" srcset="docs/images/notes-formulas-dark.png">
   <img src="docs/images/notes-formulas-light.png" alt="A lecture's notes with a diagram of the cardiac cycle and two typeset formulas, a dose calculation and mean arterial pressure">
 </picture>
-
-[![The 50-second demo: a lecture's notes, with a labelled diagram of the organs of the torso](docs/images/demo-poster.png)](https://study-stash-app.web.app/assets/study-stash-demo.mp4)
-
-[Watch the 50-second demo](https://study-stash-app.web.app/assets/study-stash-demo.mp4) (it's narrated, so turn the sound on).
 
 ## Ask questions about your lectures
 

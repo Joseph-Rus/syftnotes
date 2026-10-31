@@ -3,11 +3,13 @@ using Avalonia.Controls;
 using Avalonia.Headless;
 using Avalonia.Headless.XUnit;
 using Avalonia.Layout;
+using Avalonia.Media;
 using Avalonia.Media.Imaging;
 using Avalonia.Styling;
 using Avalonia.Threading;
 using Avalonia.VisualTree;
 using StudyStash.App.Controls;
+using StudyStash.App.Platform;
 using StudyStash.App.Controls.Rich;
 using StudyStash.App.ViewModels;
 using StudyStash.App.Views;
@@ -18,7 +20,8 @@ namespace StudyStash.App.Tests;
 
 /// <summary>
 /// The README's pictures, drawn by the app's own views from demo lectures: the Mac's library window, 1280 × 800, with
-/// 28 points of desktop round it, light and dark (the README shows whichever the reader's GitHub is in). Only when
+/// 28 points of desktop round it, light and dark (the README shows whichever the reader's GitHub is in), and the menu
+/// bar's dropdown and the quick panel on the light desktop. Only when
 /// <c>STUDYSTASH_README</c> names the folder to put them in, so an ordinary test run draws none:
 /// <code>STUDYSTASH_README=$PWD/docs/images dotnet test engine/tests/StudyStash.App.Tests --filter ReadmeShots</code>
 /// </summary>
@@ -45,6 +48,8 @@ public class ReadmeShots
                 Formulas(t);
                 Home(t);
             }
+            MenuBar();
+            QuickPanel();
         }
         finally
         {
@@ -73,7 +78,7 @@ public class ReadmeShots
 
     /// <summary>A lecture on the heart with the figure its notes get: the parts library's heart, cut open, composed
     /// and labelled by the same code that draws one for a real lecture (the scene is what the composer answers with).</summary>
-    static string HeartLecture()
+    internal static string HeartLecture()
     {
         var library = PartsLibrary.Default;
         var heart = library.Get("heart-section")!;
@@ -144,6 +149,62 @@ public class ReadmeShots
     }
 
     static void Home(ThemeVariant t) => Save("home", t, Stage(new MacLibrary { DataContext = Demo.Overview() }, t));
+
+    // --- the menu bar's dropdown and the quick panel, light only, as the README shows them --------------------------
+
+    /// <summary>The menu bar's dropdown, ready to record and recording, side by side, each under the menu bar's ink s
+    /// (its top-right cell red while recording, the time beside it) as the Mac shows it.</summary>
+    static void MenuBar()
+    {
+        var bar = new Canvas { Width = 764, Height = 24, Background = new SolidColorBrush(Color.Parse("#F6F5F2"), 0.86), HorizontalAlignment = HorizontalAlignment.Left, VerticalAlignment = VerticalAlignment.Top };
+        // The status item over each dropdown's right-hand side, where the dropdown hangs from it.
+        Image Mark(bool recording) => new() { Source = new Bitmap(new MemoryStream(TrayMark.Png(18, Brushes.Black, recording))), Width = 18, Height = 18 };
+        var idle = Mark(false);
+        Canvas.SetLeft(idle, 34 + 320 - 46);
+        Canvas.SetTop(idle, 3);
+        var live = Mark(true);
+        Canvas.SetLeft(live, 410 + 320 - 86);
+        Canvas.SetTop(live, 3);
+        var time = new TextBlock { Text = "24:18", FontSize = 13, FontWeight = FontWeight.Medium, Foreground = Brushes.Black };
+        Canvas.SetLeft(time, 410 + 320 - 62);
+        Canvas.SetTop(time, 4);
+        bar.Children.Add(idle);
+        bar.Children.Add(live);
+        bar.Children.Add(time);
+        Surface("menu-bar", new Size(764, 446), Shot.Side(
+            new MacPanel { DataContext = Demo.Panel(recording: false), VerticalAlignment = VerticalAlignment.Top },
+            new MacPanel { DataContext = Demo.Panel(recording: true), VerticalAlignment = VerticalAlignment.Top }), new Thickness(34, 32, 34, 34), bar);
+    }
+
+    /// <summary>The quick panel with a search's results.</summary>
+    static void QuickPanel() => Surface("quick-panel", new Size(750, 540), new MacQuick { DataContext = Demo.Quick(answer: false) });
+
+    /// <summary>A surface 34 points in (or <paramref name="at"/>) on the light desktop, under <paramref name="over"/>
+    /// if there is one, cut to <paramref name="size"/>.</summary>
+    static void Surface(string name, Size size, Control surface, Thickness? at = null, Control? over = null)
+    {
+        Skin.UseTheme(ColourThemes.Default);
+        ((App)Application.Current!).UseSkin(SkinKind.Mac);
+        surface.HorizontalAlignment = HorizontalAlignment.Left;
+        surface.VerticalAlignment = VerticalAlignment.Top;
+        var desk = new WallpaperPicture(false) { Width = size.Width, Height = size.Height, HorizontalAlignment = HorizontalAlignment.Left, VerticalAlignment = VerticalAlignment.Top };
+        var on = new Border { Padding = at ?? new Thickness(34), Child = surface, HorizontalAlignment = HorizontalAlignment.Left, VerticalAlignment = VerticalAlignment.Top };
+        var root = new Panel { Children = { desk } };
+        if (over is not null) root.Children.Add(over);
+        root.Children.Add(on);
+        var window = new Window { Width = size.Width + 200, Height = size.Height + 200, RequestedThemeVariant = ThemeVariant.Light, Content = root };
+        Glass.SetBlurBackdrop(window, true);
+        Look.Apply(window);
+        window.Show();
+        DiagramsReady.Wait(window);
+        Dispatcher.UIThread.RunJobs();
+        var whole = window.CaptureRenderedFrame() ?? throw new InvalidOperationException("nothing rendered");
+        var frame = new RenderTargetBitmap(new PixelSize((int)size.Width, (int)size.Height));
+        using (var ctx = frame.CreateDrawingContext()) ctx.DrawImage(whole, new Rect(size), new Rect(size));
+        Directory.CreateDirectory(Folder!);
+        using (var file = File.Create(Path.Combine(Folder!, $"{name}.png"))) frame.Save(file, PngBitmapEncoderOptions.Default);
+        window.Close();
+    }
 
     // --- the stage ---------------------------------------------------------------------------------------------------
 
