@@ -405,9 +405,8 @@ public class AiShots
     }
 
     // ---------------------------------------------------------------------------------------------------------
-    // An answer being written (design 16's answer card and compact chat, mid-answer): the words so far, the formula
-    // it's in the middle of held back, and Stop where Send was. The design has no picture of this moment; it's the
-    // same card and chat as the picker's, a few words at a time.
+    // An answer being written (the conversation's panel beside the page, and the compact chat, mid-answer): the words
+    // so far, the formula it's in the middle of held back, and Stop where Send was.
     // ---------------------------------------------------------------------------------------------------------
 
     const string WritingSoFar = "The base case is the call that stops the recursion: it returns without calling itself again, so each paused call "
@@ -421,15 +420,27 @@ public class AiShots
         return m;
     }
 
+    /// <summary>A page beside its conversation's panel, the bar docked at the panel's foot, an answer being written.</summary>
     static Control WritingPage(SkinKind skin)
     {
-        var page = (Border)AskPage(skin, Writing("What's a base case?", "Ollama"));
-        var panel = (Panel)page.Child!;
-        panel.Children.RemoveAt(2); // no "Answer with" menu open: the answer card in its place, above the bar
-        var model = (AiAskModel)((Control)panel.Children[^1]).DataContext!;
-        panel.Children.Insert(2, skin == SkinKind.Mac
-            ? new MacAiAnswer { DataContext = model, HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Bottom, Margin = new Thickness(0, 0, 0, 84) }
-            : new WinAiAnswer { DataContext = model, HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Bottom, Margin = new Thickness(0, 0, 0, 84) });
+        var model = Writing("What's a base case?", "Ollama");
+        bool mac = skin == SkinKind.Mac;
+        var text = new TextBlock
+        {
+            Text = AskSample, FontSize = mac ? 16 : 15, LineHeight = mac ? 25.6 : 24, TextWrapping = TextWrapping.Wrap, Margin = new Thickness(40, 40, 40, 0),
+            VerticalAlignment = VerticalAlignment.Top,
+        };
+        if (mac) Res(text, TextBlock.FontFamilyProperty, text, "SerifFont");
+        Res(text, TextBlock.ForegroundProperty, text, "Fg");
+        var split = new AskSplit
+        {
+            Page = text,
+            Chat = mac ? new MacAiAnswer { DataContext = model } : new WinAiAnswer { DataContext = model },
+            Bar = mac ? new MacAiAskBar { DataContext = model } : new WinAiAskBar { DataContext = model },
+            IsOpen = true,
+        };
+        var page = new Border { Width = 920, Height = 520, ClipToBounds = true, Child = split, CornerRadius = new CornerRadius(mac ? 18 : 8) };
+        Res(page, Border.BackgroundProperty, page, "Surface");
         return page;
     }
 

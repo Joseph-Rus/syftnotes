@@ -83,7 +83,7 @@ public class NotesEditorTests
         double Middle(Visual v) => v.TranslatePoint(new Point(0, v.Bounds.Height / 2), page)!.Value.Y;
         Assert.Equal("Written by Claude from the recording", writer.Text);
         Assert.DoesNotContain(Texts(), t => t.Text == "What you wrote");
-        Assert.StartsWith("Written by Claude", (string)ToolTip.GetTip(page.GetVisualDescendants().OfType<StackPanel>().Single(p => p.Name == "Legend"))!);
+        Assert.StartsWith("Written by Claude", (string)ToolTip.GetTip(page.GetVisualDescendants().OfType<WrapPanel>().Single(p => p.Name == "Legend"))!);
         Assert.True(Math.Abs(Middle(writer) - Middle(edit)) <= 1.5, $"the line's middle is at {Middle(writer):0.00}, Edit's at {Middle(edit):0.00}");
         window.Close();
 

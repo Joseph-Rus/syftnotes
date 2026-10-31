@@ -400,8 +400,8 @@ public sealed partial class LibraryModel : ObservableObject
     public bool ShowAssignmentTools => ShowAssignment;
     public bool HasNotes => Notes is not null;
     public bool HasAsk => Ask is not null && ShowNotePage;
-    /// <summary>An answer to show above the ask bar: the page gives it its own room, and the notes end above it.</summary>
-    public bool HasAnswer => HasAsk && Ask?.HasLatest == true;
+    /// <summary>The conversation is open: the notes on the left, the chat in its panel on the right (or over them, narrow).</summary>
+    public bool HasAnswer => HasAsk && Ask?.PanelOpen == true;
     /// <summary>The library's own word on why there's nothing to show, when nothing else is.</summary>
     public bool ShowEmpty => Overview is null && Note is null && Assignment is null && Reader is null && !ShowCanvasLists && !string.IsNullOrEmpty(Empty);
 
@@ -445,7 +445,7 @@ public sealed partial class LibraryModel : ObservableObject
 
     void AskPropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
     {
-        if (e.PropertyName == nameof(AiAskModel.HasLatest)) OnPropertyChanged(nameof(HasAnswer));
+        if (e.PropertyName == nameof(AiAskModel.PanelOpen)) OnPropertyChanged(nameof(HasAnswer));
     }
 
     /// <summary>What the pane shows changed: every "is this showing" follows.</summary>

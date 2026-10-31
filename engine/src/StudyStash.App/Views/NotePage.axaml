@@ -3,7 +3,8 @@
      9:30 AM, 52 min"). The title is typed over to rename it. Under it Notes and Transcript, with "Only my notes" and
      Attach on the right. The notes are one document: what the student typed in ink, what was added from the recording
      in grey. While it records the page has the recording's bar at its top, the notes are the student's own typing,
-     and the other tab is what's been heard so far. Ask floats at the foot. -->
+     and the other tab is what's been heard so far. Ask floats at the foot; asked, the conversation opens beside the
+     notes (AskSplit). -->
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="using:StudyStash.App.ViewModels"
@@ -25,12 +26,20 @@
     <Style Selector="StackPanel.np-page.narrow">
       <Setter Property="Margin" Value="24,6,24,140" />
     </Style>
-    <Style Selector="Panel.np-ask">
-      <Setter Property="Margin" Value="56,0,56,20" />
-      <Setter Property="MaxWidth" Value="704" />
+    <!-- Notes | Transcript pinned at the top keep to the column's sides. -->
+    <Style Selector="StackPanel.np-pin">
+      <Setter Property="Margin" Value="56,0" />
     </Style>
-    <Style Selector="Panel.np-ask.narrow">
-      <Setter Property="Margin" Value="24,0,24,20" />
+    <Style Selector="StackPanel.np-pin.narrow">
+      <Setter Property="Margin" Value="24,0" />
+    </Style>
+    <!-- Beside the conversation the notes are a column of their own on the left, with no bar under them to make room
+         for. -->
+    <Style Selector="v|AskSplit:beside StackPanel.np-page">
+      <Setter Property="Margin" Value="40,6,40,56" />
+    </Style>
+    <Style Selector="v|AskSplit:beside StackPanel.np-pin">
+      <Setter Property="Margin" Value="40,0" />
     </Style>
     <!-- A transcript line a diagram pointed to: marked, a little room round it, the words where they were. -->
     <Style Selector="Border.heard">
@@ -84,21 +93,23 @@
         </Animation>
       </Style.Animations>
     </Style>
-    <!-- The notes fade out under the floating ask bar; with an answer open they end above it, so a short fade will do. -->
+    <!-- The notes fade out under the floating ask bar; beside the conversation there's no bar under them. -->
     <Style Selector="Border.fade">
       <Setter Property="Height" Value="120" />
     </Style>
-    <Style Selector="Border.fade.answer">
-      <Setter Property="Height" Value="40" />
+    <Style Selector="v|AskSplit:open Border.fade">
+      <Setter Property="Height" Value="0" />
     </Style>
   </UserControl.Styles>
 
-  <!-- The notes, and under them the latest answer in its own room: the notes end above it, never under it. The ask bar
-       floats over the bottom of the page (the notes fade out under it). -->
-  <Grid RowDefinitions="*,Auto" ClipToBounds="False">
+  <!-- The notes, and Ask: at rest the bar floats at the foot of the notes (they fade out under it); once something's
+       asked the notes keep the left and the conversation is a panel down the right, the bar docked at its foot. -->
+  <v:AskSplit Name="Split" IsOpen="{Binding HasAnswer}" Narrow="{Binding Narrow}" BackWords="Notes"
+              CloseCommand="{Binding Ask.CloseAnswerCommand, FallbackValue={x:Null}}">
+    <v:AskSplit.Page>
     <Panel>
       <ScrollViewer Name="NoteScroll" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" IsVisible="{Binding HasNote}">
-        <StackPanel Classes="np-page" Classes.narrow="{Binding $parent[UserControl].((vm:LibraryModel)DataContext).Narrow}" DataContext="{Binding Note}" x:DataType="vm:NoteModel">
+        <StackPanel Name="Column" Classes="np-page" Classes.narrow="{Binding $parent[UserControl].((vm:LibraryModel)DataContext).Narrow}" DataContext="{Binding Note}" x:DataType="vm:NoteModel">
 
           <!-- While it records: the bar. Pause keeps the file open; Stop ends the recording and starts the write-up. -->
           <Border Name="RecBar" Classes="recbar" IsVisible="{Binding Live}" Margin="0,2,0,26" AutomationProperties.Name="{Binding RecordingSaid}"
@@ -402,7 +413,7 @@
       <!-- Notes | Transcript stay at the top once the page has scrolled past them (while it records, the time and a
            quiet dot too): switching never means scrolling back up. -->
       <Border Name="PinnedTabs" VerticalAlignment="Top" Background="{DynamicResource Surface}" IsVisible="False">
-        <StackPanel Classes="np-page" Classes.narrow="{Binding $parent[UserControl].((vm:LibraryModel)DataContext).Narrow}" Margin="0" DataContext="{Binding Note}" x:DataType="vm:NoteModel">
+        <StackPanel Classes="np-page np-pin" Classes.narrow="{Binding $parent[UserControl].((vm:LibraryModel)DataContext).Narrow}" DataContext="{Binding Note}" x:DataType="vm:NoteModel">
           <Grid ColumnDefinitions="Auto,*,Auto" Margin="0,8,0,0">
             <StackPanel Orientation="Horizontal">
               <Button Classes="tab" Classes.on="{Binding ShowNotes}" Content="Notes" Command="{Binding NotesCommand}" Click="OnPinnedTab" />
@@ -416,7 +427,7 @@
           <Border Classes="rule" />
         </StackPanel>
       </Border>
-      <Border Name="Fade" Classes="fade" Classes.answer="{Binding HasAnswer}" VerticalAlignment="Bottom" IsHitTestVisible="False" IsVisible="{Binding HasAsk}" />
+      <Border Name="Fade" Classes="fade" VerticalAlignment="Bottom" IsHitTestVisible="False" IsVisible="{Binding HasAsk}" />
       <!-- A diagram showed where it was said: one click back to the notes, where the diagram is -->
       <Button Name="BackToNotes" Theme="{StaticResource Surface}" IsVisible="{Binding Note.CanGoBack, FallbackValue=False}"
               Command="{Binding Note.BackToNotesCommand, FallbackValue={x:Null}}" HorizontalAlignment="Center" VerticalAlignment="Top"
@@ -428,15 +439,16 @@
         </StackPanel>
       </Button>
     </Panel>
+    </v:AskSplit.Page>
 
-    <!-- The latest answer, just above the ask bar -->
-    <Panel Name="AnswerRoom" Grid.Row="1" IsVisible="{Binding HasAnswer}" HorizontalAlignment="Center" Margin="0,8,0,84" ClipToBounds="False">
-      <c:BySkin Mac="{x:Type v:MacAiAnswer}" Win="{x:Type v:WinAiAnswer}" DataContext="{Binding Ask}" />
-    </Panel>
+    <!-- The conversation: its panel's header and thread -->
+    <v:AskSplit.Chat>
+      <c:BySkin Name="Answer" Mac="{x:Type v:MacAiAnswer}" Win="{x:Type v:WinAiAnswer}" DataContext="{Binding Ask}" />
+    </v:AskSplit.Chat>
 
     <!-- Ask about this note (or, while it records, about what's been said so far), with any AI -->
-    <Panel Name="AskRoom" Classes="np-ask" Classes.narrow="{Binding Narrow}" Grid.RowSpan="2" IsVisible="{Binding HasAsk}" VerticalAlignment="Bottom">
-      <c:BySkin Name="AskBar" Mac="{x:Type v:MacAiAskBar}" Win="{x:Type v:WinAiAskBar}" DataContext="{Binding Ask}" />
-    </Panel>
-  </Grid>
+    <v:AskSplit.Bar>
+      <c:BySkin Name="AskBar" Mac="{x:Type v:MacAiAskBar}" Win="{x:Type v:WinAiAskBar}" DataContext="{Binding Ask}" IsVisible="{Binding $parent[UserControl].((vm:LibraryModel)DataContext).HasAsk, FallbackValue=False}" />
+    </v:AskSplit.Bar>
+  </v:AskSplit>
 </UserControl>

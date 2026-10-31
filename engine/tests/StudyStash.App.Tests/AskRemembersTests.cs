@@ -186,7 +186,7 @@ public class AskRemembersTests
     [AvaloniaTheory]
     [InlineData(SkinKind.Mac)]
     [InlineData(SkinKind.Win)]
-    public void The_answer_cards_conversation_is_capped_in_height_and_selects_from_a_question_into_its_answer(SkinKind skin)
+    public void The_panels_conversation_scrolls_in_its_own_height_and_selects_from_a_question_into_its_answer(SkinKind skin)
     {
         var model = new AiAskModel(new FakeAiLibrary { Overview = AiTestData.MixedOverview() });
         for (int i = 1; i <= 6; i++)
@@ -198,19 +198,14 @@ public class AskRemembersTests
 
         foreach (double height in new[] { 900.0, 560.0 })
         {
-            // As the page places it: just above the ask bar, as tall as it needs.
+            // As the panel holds it: the page area's height, the thread scrolling inside, the newest showing.
             Control placed = skin == SkinKind.Mac ? new MacAiAnswer { DataContext = model } : new WinAiAnswer { DataContext = model };
-            placed.VerticalAlignment = Avalonia.Layout.VerticalAlignment.Bottom;
             var window = Show(placed, skin, height);
             try
             {
-                var card = placed.GetVisualDescendants().OfType<Border>().First(b => b.Name == "Card");
-                var thread = card.GetVisualDescendants().OfType<ScrollViewer>().Single(s => s.Name == "Thread");
-                // Every turn is in it, and it scrolls within its own height, a third of the window at most, the newest showing.
-                Assert.Equal(6, card.GetVisualDescendants().OfType<NoteView>().Count());
-                Assert.Equal(AnswerHeight.For(height), thread.MaxHeight);
-                Assert.True(thread.Bounds.Height <= AnswerHeight.For(height) + 0.5, $"{thread.Bounds.Height} in a window {height} tall");
-                Assert.True(card.Bounds.Height <= AnswerHeight.For(height) + 48, $"the card is {card.Bounds.Height}");
+                var thread = placed.GetVisualDescendants().OfType<ScrollViewer>().Single(s => s.Name == "Thread");
+                Assert.Equal(6, thread.GetVisualDescendants().OfType<NoteView>().Count());
+                Assert.True(thread.TranslatePoint(new Point(0, thread.Bounds.Height), window)!.Value.Y <= height + 0.5, $"the thread runs out of a window {height} tall");
                 Assert.True(thread.Extent.Height > thread.Viewport.Height);
                 Assert.True(thread.Offset.Y > 0);
             }

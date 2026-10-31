@@ -35,16 +35,16 @@ public class AskRemembersFilm
 {
     const int Fps = 12;
 
-    static bool On => Environment.GetEnvironmentVariable("STUDYSTASH_FILM") == "1";
+    internal static bool On => Environment.GetEnvironmentVariable("STUDYSTASH_FILM") == "1";
 
-    static string Env(string key, string fallback = "") => Environment.GetEnvironmentVariable(key) is { Length: > 0 } v ? v : fallback;
+    internal static string Env(string key, string fallback = "") => Environment.GetEnvironmentVariable(key) is { Length: > 0 } v ? v : fallback;
 
     static void Log(string line)
     {
         if (Env("STUDYSTASH_FILM_LOG") is { Length: > 0 } log) File.AppendAllText(log, $"{DateTime.Now:HH:mm:ss} {line}\n");
     }
 
-    sealed class Film : IDisposable
+    internal sealed class Film : IDisposable
     {
         public readonly Window Window;
         readonly Canvas over = new() { IsHitTestVisible = false };
@@ -130,6 +130,19 @@ public class AskRemembersFilm
             Canvas.SetLeft(content, at.X - content.Bounds.Width / 2);
             Canvas.SetTop(content, at.Y - 12 - content.Bounds.Height);
             Settle();
+        }
+
+        /// <summary>A flyout's content drawn where its Placement puts it: over <paramref name="anchor"/> with their right
+        /// edges lined up (TopEdgeAlignedRight), or under it with their left edges lined up (BottomEdgeAlignedLeft).</summary>
+        public Control Popup(Control content, Control anchor, bool below)
+        {
+            popups.Children.Add(content);
+            Settle();
+            var box = new Rect(anchor.TranslatePoint(default, Window)!.Value, anchor.Bounds.Size);
+            Canvas.SetLeft(content, below ? box.Left : box.Right - content.Bounds.Width);
+            Canvas.SetTop(content, below ? box.Bottom + 4 : box.Top - 12 - content.Bounds.Height);
+            Settle();
+            return content;
         }
 
         public void ClosePopups() => popups.Children.Clear();
@@ -218,7 +231,7 @@ public class AskRemembersFilm
 
     /// <summary>A throwaway library in this test, on its own port, over a copy of a demo library (its state.db and notes
     /// folder), with the real AIs on this computer: the app asks it over HTTP as it asks any library.</summary>
-    sealed class RealLibrary : IAsyncDisposable
+    internal sealed class RealLibrary : IAsyncDisposable
     {
         public required WebApplication App { get; init; }
         public required Store Store { get; init; }
@@ -260,10 +273,10 @@ public class AskRemembersFilm
         }
     }
 
-    const string Lecture = "rec-20261008-093000-c00000";
+    internal const string Lecture = "rec-20261008-093000-c00000";
 
     /// <summary>A stand-in library for checking the film for free: the demo lecture alone, in a folder of its own.</summary>
-    static string StandInFolder()
+    internal static string StandInFolder()
     {
         string folder = System.IO.Path.Combine(System.IO.Path.GetTempPath(), "ask-film-" + Guid.NewGuid().ToString("N")[..8]);
         var cfg = new Config(System.IO.Path.Combine(folder, "home"), System.IO.Path.Combine(folder, "notes")) { Classes = [new ClassDef("BIO 110")] };
@@ -276,14 +289,14 @@ public class AskRemembersFilm
     }
 
     /// <summary>A stand-in Claude that writes <paramref name="answer"/> a few words at a time, as JSON.</summary>
-    static void Says(ScriptedAi ai, string answer)
+    internal static void Says(ScriptedAi ai, string answer)
     {
         string json = System.Text.Json.JsonSerializer.Serialize(new { answer, sources = new[] { 1 } });
         ai.Pause = TimeSpan.FromMilliseconds(60);
         ai.Script = [.. Enumerable.Range(0, (json.Length + 11) / 12).Select(i => new AiEvent("text", json.Substring(i * 12, Math.Min(12, json.Length - i * 12)))), new AiEvent("final", json)];
     }
 
-    static LibraryModel Page(string id, string title, string when, string markdown, AiAskModel ask)
+    internal static LibraryModel Page(string id, string title, string when, string markdown, AiAskModel ask)
     {
         string[] classes = ["BIO 110", "CHEM 121", "MATH 221", "PSYC 101"];
         var m = new LibraryModel { Status = "Library on this Mac", DrawChrome = false };
