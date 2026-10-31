@@ -38,7 +38,11 @@ public class LibrarySettingsModelTests
         Assert.Equal(["Classes", "Notes", "Your AI", "Canvas"], model.NavGroups[1].Items.Select(n => n.Label));
         Assert.Equal(["AI apps", "Granola", "Your files"], model.NavGroups[2].Items.Select(n => n.Label));
         Assert.Equal(["Library", "Connection"], model.NavGroups[3].Items.Select(n => n.Label));
-        Assert.Empty(fake.Calls); // nothing asked before a page that reads the library opens
+        // Settings opens on General (not Connection), and General reads the library.
+        Assert.Equal("General", model.Section);
+        Assert.True(model.OnGeneral);
+        Assert.Equal([true, false], model.NavItems.Where(n => n.Id is "General" or "Connection").Select(n => n.On));
+        Assert.NotEmpty(fake.Calls);
         // Shortcuts are part of General now: the old page's name opens it, which reads the library (what it's for).
         model.Section = "Shortcuts";
         Assert.Equal("General", model.Section);
@@ -167,6 +171,7 @@ public class LibrarySettingsModelTests
         using var _host = host;
         using var _m = model;
 
+        fake.Calls.Clear(); // General, which Settings opens on, has read it already
         model.Section = "Library";
 
         Assert.Equal([("GET", "")], fake.Calls.Select(c => (c.Method, c.Path)));

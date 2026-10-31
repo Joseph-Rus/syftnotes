@@ -298,6 +298,8 @@ public static partial class Shell
             note.Transcript.Add(new HeardLine { Time = timed ? TimedText.Clock(line.Start) : "", Text = line.Text, Start = timed ? line.Start : null });
             if (timed) note.Spoken.Add(line);
         }
+        // What the lecturer said is on the exam: only a lecture in one of the student's classes has an exam to flag.
+        if (noun == Nouns.Lecture) note.FlagExam();
         FlushTyped();
         library.NarrowDetail = false;
         library.Assignment = null;
@@ -313,6 +315,7 @@ public static partial class Shell
         // Notes to read that nothing is writing now (with none written, what the student typed) can be edited and rewritten.
         ShowLectureAi(l, note, written: !writing && (notes.Length > 0 || (mine && S(l["error"]).Length == 0)));
         ShowLectureFiles(note);
+        ShowLectureStudy(note);
     }
 
     /// <summary>

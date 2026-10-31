@@ -831,6 +831,8 @@ public sealed class AiJobs(string home, Func<string>? ollamaHost = null)
         if (engine == "ollama" && !cfg.OllamaEnabled && Providers is null)
             throw new InvalidOperationException("Asking needs an AI: choose one in Settings → Your AI.");
 
+        // A recipe (/study-guide) is asked as the whole of its prompt; the chat keeps what was typed.
+        string question = Recipes.Expand(request.Question, Recipes.All(home));
         string shown = "", note = "";
         int remembered = 0;
         async Task<JsonObject> RunAsync(string who, CancellationTokenSource timer)
@@ -848,7 +850,7 @@ public sealed class AiJobs(string home, Func<string>? ollamaHost = null)
                     answerSoFar(now);
                 }
             };
-            var answer = await reader.AskAsync(request.Question, request.Lecture, request.Class, request.Live,
+            var answer = await reader.AskAsync(question, request.Lecture, request.Class, request.Live,
                 request.LiveTitle is { Length: > 0 } t ? t : "This lecture", AskWith(who, model, timer.Token, written, said => note = said), earlier,
                 request.Agenda);
             Record(who, true, "");

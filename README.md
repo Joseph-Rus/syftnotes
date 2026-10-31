@@ -44,6 +44,10 @@ choose, including a free one that runs on your machine.
 - **Draws the diagrams**: flowcharts, labelled drawings, typeset formulas, and graphs worked out from the lecturer's formula.
 - **Keeps your own notes**: type while it records, in Markdown if you like, and every line of yours stays in the write-up.
 - **Answers questions about your lectures** from your notes and transcripts, with the moment it was said. Your chats are kept.
+- **Recipes**: the questions you ask of every lecture (a study guide, what's likely on the exam, key terms) are one `/` away.
+- **Hears what's on the exam**: "this will be on the midterm", "make sure you know", flagged on the lecture's page with the moment.
+- **Helps you study**: flashcards from your lectures in Review, brought back just before you'd forget them, and exam prep with a study guide and a practice test.
+- **Reads a lecture to you**: Listen turns it into a five-minute conversation for a walk, read by your computer's own voices.
 - **Never loses a version of your notes**: Undo after any change, and History to put back any earlier one.
 - **Files every lecture by class**, next to your Canvas assignments, due dates, rubrics, files and announcements.
 - **Works without a paid AI**: a free AI on your computer, a free Gemini key, the free Claude app, or copy and paste with any chat.
@@ -109,6 +113,36 @@ on your library, so your laptop sees them too.
 
 The quick panel (⌥Space on a Mac, Alt+Shift+Space on Windows) opens over any app. It searches
 lectures, passages in your notes and classes, and asks your notes a question.
+
+**Recipes** keep the questions you ask of every lecture one `/` away. Type `/` in the Ask bar and the
+recipes show over it (Tab takes the first), or press the bookmark beside the bar for the list: a study
+guide, what's likely on the exam, explain it simply, key terms, practice questions, five bullets, how
+it connects, what's tricky. Anything typed after one (`/study-guide just chapter 3`) goes with it. A
+question in the bar can be kept as a recipe of your own, and every device that asks your library has
+them.
+
+## Study: Review, exam prep and Listen
+
+**What's on the exam.** A lecture's page lists what the lecturer said would be on the exam ("this will
+be on the midterm", "make sure you know this", "write this down"), each with its moment, and what they
+said won't be. It's found in the transcript on your computer, with no AI.
+
+**Review.** Make review cards on a lecture's page has your AI write a dozen flashcards from its notes
+and what was flagged for the exam. **Study**, in the sidebar with how many are due, goes through them a
+card at a time: the question, then the answer (Space), then Again, Hard, Good or Easy (1 to 4). Each
+comes back just before you'd forget it, the way Anki spaces them: Again in ten minutes, Good tomorrow,
+then further apart each time you remember it.
+
+**Exam prep.** Study lists the exams coming up, from Canvas and your calendar. Prep for it writes a
+study guide and a practice test from the class's lectures since the exam before it, starting with what
+the lecturer said would be on it. The test marks each answer, keeps your score, and puts what you
+missed into Review.
+
+**Listen.** Listen on a lecture's page turns it into a five-minute conversation, a tutor and a
+classmate going over what was taught, read by your computer's own voices (on Linux, install
+`espeak-ng`). It plays on the page, so you can go over a lecture on a walk.
+
+See [docs/study-tools.md](docs/study-tools.md) for how each works and its API.
 
 ## Edit, undo and copy your notes
 

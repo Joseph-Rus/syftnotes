@@ -81,7 +81,8 @@ public sealed partial class SettingsModel : ObservableObject, IDisposable
 {
     readonly AppHost host;
 
-    [ObservableProperty] public partial string Section { get; set; } = "Connection";
+    /// <summary>The page shown; Settings opens on General (a library-only computer on its library).</summary>
+    [ObservableProperty] public partial string Section { get; set; } = "";
 
     /// <summary>The sidebar's first group: this computer's own settings (General, Appearance, then recording and the
     /// connection to the library; a library-only computer doesn't record, so it has no Recording).</summary>
@@ -404,8 +405,8 @@ public sealed partial class SettingsModel : ObservableObject, IDisposable
                 foreach (var (from, to) in renamed) host.FollowRename(from, to);
             },
         };
-        // A library-only computer opens on its library.
-        if (!records) Section = "Library";
+        // Settings opens on General, which reads the library; a library-only computer opens on its library.
+        Section = records ? "General" : "Library";
         var cc = host.Client();
         // The password as it is at each request: it can change while Settings is open (Add a laptop, Password → Change).
         ai ??= new AiRemote(cc.ServerUrl, () => host.Client().PoolKey);

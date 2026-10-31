@@ -94,6 +94,15 @@
             <TextBlock Grid.Column="4" Classes="count" Text="{Binding Due.Count, FallbackValue=0}" IsVisible="{Binding Due.ShowCount, FallbackValue=False}" />
           </Grid>
         </Button>
+        <!-- Study: Review, with how many cards are due -->
+        <Button Name="StudyRow" Classes="nav-item" Classes.selected="{Binding StudySelected}" AutomationProperties.Name="{Binding StudySaid}"
+                Command="{Binding OpenStudyCommand}">
+          <Grid ColumnDefinitions="Auto,10,*,10,Auto">
+            <c:Icon Glyph="school" Size="18" />
+            <TextBlock Grid.Column="2" Text="Study" VerticalAlignment="Center" />
+            <TextBlock Grid.Column="4" Classes="count" Text="{Binding StudyDue}" IsVisible="{Binding ShowStudyDue}" />
+          </Grid>
+        </Button>
         <Grid ColumnDefinitions="*,Auto" Margin="10,22,4,6">
           <TextBlock Classes="side-group" Text="{Binding ClassesHeading}" />
           <Button Name="AddClass" Grid.Column="1" Classes="icon-btn sm" Command="{Binding AddClassCommand}" IsVisible="{Binding CanAddClass}"

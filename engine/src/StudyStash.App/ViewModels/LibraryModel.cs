@@ -403,12 +403,40 @@ public sealed partial class LibraryModel : ObservableObject
     /// <summary>The conversation is open: the notes on the left, the chat in its panel on the right (or over them, narrow).</summary>
     public bool HasAnswer => HasAsk && Ask?.PanelOpen == true;
     /// <summary>The library's own word on why there's nothing to show, when nothing else is.</summary>
-    public bool ShowEmpty => Overview is null && Note is null && Assignment is null && Reader is null && !ShowCanvasLists && !string.IsNullOrEmpty(Empty);
+    public bool ShowEmpty => Overview is null && Study is null && Note is null && Assignment is null && Reader is null && !ShowCanvasLists && !string.IsNullOrEmpty(Empty);
 
     /// <summary>The Canvas lists' column: 360 (380 on Windows), and the whole pane when it's narrow.</summary>
     public double ListWidth => Narrow ? double.NaN : Skin.Current == SkinKind.Win ? 380 : 360;
     public bool ShowListColumn => ShowCanvasLists && (!Narrow || !NarrowDetail);
-    public bool ShowDetailColumn => Overview is null && (!ShowCanvasLists || !Narrow || NarrowDetail);
+    public bool ShowDetailColumn => Overview is null && Study is null && (!ShowCanvasLists || !Narrow || NarrowDetail);
+
+    // --- Study: Review and the rest, a page of its own from the sidebar --------------------------------------------
+
+    /// <summary>The Study page, when it's what the pane shows.</summary>
+    [ObservableProperty] public partial StudyModel? Study { get; set; }
+    public bool ShowStudy => Study is not null;
+    /// <summary>The sidebar's Study row: how many cards are due, and whether it's the page showing.</summary>
+    [ObservableProperty] public partial int StudyDue { get; set; }
+    public bool ShowStudyDue => StudyDue > 0;
+    public string StudySaid => StudyDue > 0 ? $"Study, {StudyDue} card{(StudyDue == 1 ? "" : "s")} to review" : "Study";
+    [ObservableProperty] public partial bool StudySelected { get; set; }
+    /// <summary>Opens the Study page (the host wires it).</summary>
+    public Action? OnStudy { get; set; }
+    [RelayCommand] void OpenStudy() => OnStudy?.Invoke();
+    /// <summary>A lecture's study tools under its exam flags: its cards in Review.</summary>
+    [ObservableProperty] public partial LectureStudyModel? LectureStudy { get; set; }
+
+    partial void OnStudyChanged(StudyModel? value)
+    {
+        OnPropertyChanged(nameof(ShowStudy));
+        PageChanged();
+    }
+
+    partial void OnStudyDueChanged(int value)
+    {
+        OnPropertyChanged(nameof(ShowStudyDue));
+        OnPropertyChanged(nameof(StudySaid));
+    }
     /// <summary>Where the page sits: beside the list, or in its place when there's none (or no room for both).</summary>
     public int DetailColumn => ShowCanvasLists && !Narrow ? 2 : 1;
     public int ColumnSpan => ShowCanvasLists && !Narrow ? 1 : 2;
@@ -530,6 +558,11 @@ public sealed partial class LibraryModel : ObservableObject
     partial void OnNoteChanged(NoteModel? value)
     {
         if (LectureFiles is { } files && files.LectureId != value?.Id) LectureFiles = null; // another note's files don't stay
+        if (LectureStudy is { } study && study.LectureId != value?.Id)
+        {
+            study.Listen = null; // what it was playing stops
+            LectureStudy = null;
+        }
         if (FreeAi is { } free && (free.LectureId != value?.Id || value is { Live: true })) FreeAi = null;
         OnPropertyChanged(nameof(HasNote));
         OnPropertyChanged(nameof(NoNote));

@@ -56,6 +56,10 @@ public sealed class LibraryWebOptions
     /// <summary>Wrong passwords, counted by the address they come from. Null: counted here; the service gives the one
     /// Claude's door counts in too, so a guess at either door uses up the same tries.</summary>
     public PasswordTries? Tries { get; init; }
+    /// <summary>The voices Listen speaks with. Null: this computer's own (say, Windows' speech, espeak).</summary>
+    public StudyStash.Core.Study.ISpeech? Speech { get; init; }
+    /// <summary>The time now, for Review's schedule and exam prep. Null: the clock's.</summary>
+    public Func<DateTimeOffset>? Now { get; init; }
 }
 
 /// <summary>Small pieces of HTTP the Python engine got from its web framework.</summary>
@@ -441,6 +445,7 @@ public sealed partial class LibraryWeb
         MapSettings(app);
         MapCalendar(app);
         MapPhone(app);
+        MapStudy(app);
         app.MapFallback(() => Http.Detail(404, "Not Found"));
     }
 

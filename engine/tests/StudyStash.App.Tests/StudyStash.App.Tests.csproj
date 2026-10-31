@@ -8,6 +8,7 @@
   <ItemGroup>
     <PackageReference Include="Avalonia.Headless.XUnit" Version="12.1.3" />
     <PackageReference Include="Avalonia.Skia" Version="12.1.3" />
+    <PackageReference Include="Microsoft.AspNetCore.TestHost" Version="10.0.12" />
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.14.1" />
     <PackageReference Include="xunit.v3" Version="3.2.2" />
     <PackageReference Include="xunit.runner.visualstudio" Version="3.1.4" />
@@ -37,6 +38,8 @@
     <Compile Include="..\StudyStash.Core.Tests\TestUtil.cs" Link="Library\TestUtil.cs" />
     <Compile Include="..\StudyStash.Core.Tests\FakeAi.cs" Link="Library\FakeAi.cs" />
     <Compile Include="..\StudyStash.Core.Tests\FakeAgents.cs" Link="Library\FakeAgents.cs" />
+    <Compile Include="..\StudyStash.Core.Tests\TestSite.cs" Link="Library\TestSite.cs" />
+    <Compile Include="..\StudyStash.Core.Tests\StudyLibrary.cs" Link="Library\StudyLibrary.cs" />
     <Compile Include="..\StudyStash.Core.Tests\E2E\FakeCanvasHttp.cs" Link="Library\FakeCanvasHttp.cs" />
     <Compile Include="..\StudyStash.Core.Tests\E2E\CanvasServer.cs" Link="Library\CanvasServer.cs" />
     <Compile Include="..\StudyStash.Core.Tests\E2E\ChromeRunner.cs" Link="Library\ChromeRunner.cs" />

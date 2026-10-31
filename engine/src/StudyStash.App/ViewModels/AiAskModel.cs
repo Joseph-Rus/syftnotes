@@ -364,6 +364,7 @@ public sealed partial class AiAskModel : ObservableObject
     {
         OnPropertyChanged(nameof(CanSend));
         OnPropertyChanged(nameof(ShowKeys));
+        RecipesFollowQuestion();
         if (value.Trim().Length == 0 || DateTime.UtcNow - warmedAt < TimeSpan.FromMinutes(1)) return;
         warmedAt = DateTime.UtcNow;
         _ = library.WarmAsync(Engine.Length > 0 ? Engine : null);
@@ -416,6 +417,7 @@ public sealed partial class AiAskModel : ObservableObject
             return;
         }
         Apply(overview);
+        await LoadRecipesAsync();
         // A lecture's page opens on its latest conversation (in the card, closed until it's asked in or opened).
         await LoadChatsAsync(openLatest: Place?.Scope == "lecture");
     }

@@ -56,6 +56,10 @@ public sealed class Config(string home, string poolDir)
     public string LogDir => Path.Combine(Home, "logs");
 
     public List<string> ClassNames() => Classes.Select(c => c.Name).ToList();
+
+    /// <summary>Whether <paramref name="name"/> is one of the student's classes: not Unsorted, and not a folder of
+    /// their own (Clubs, Work), whose notes are meetings rather than lectures.</summary>
+    public bool IsClass(string? name) => Classes.Any(c => c.Name == name && c.Group.Length == 0);
 }
 
 /// <summary>The laptop you record on: which library its lectures go to. Lives in client.toml.</summary>

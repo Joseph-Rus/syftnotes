@@ -1217,6 +1217,13 @@
     <Setter Property="BoxShadow" Value="{DynamicResource LineRing}" />
     <Setter Property="Padding" Value="18,16" />
   </Style>
+  <!-- A study card on a page (the exam flags over a lecture's notes, Review, exam prep, Listen): the same quiet card. -->
+  <Style Selector="Border.study-card">
+    <Setter Property="Background" Value="{DynamicResource Surface}" />
+    <Setter Property="CornerRadius" Value="{DynamicResource RadiusPanel}" />
+    <Setter Property="BoxShadow" Value="{DynamicResource LineRing}" />
+    <Setter Property="Padding" Value="18,14" />
+  </Style>
   <Style Selector="TextBlock.free-ai-lead">
     <Setter Property="FontSize" Value="15" />
     <Setter Property="LineHeight" Value="22" />

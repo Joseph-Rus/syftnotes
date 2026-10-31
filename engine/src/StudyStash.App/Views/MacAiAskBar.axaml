@@ -32,7 +32,7 @@
       <Setter Property="Padding" Value="16,8,8,8" />
     </Style>
     <Style Selector=":is(Control).stacked TextBox#AskInput">
-      <Setter Property="Grid.ColumnSpan" Value="9" />
+      <Setter Property="Grid.ColumnSpan" Value="11" />
       <Setter Property="Margin" Value="0,4,8,6" />
       <Setter Property="TextWrapping" Value="Wrap" />
       <Setter Property="MaxHeight" Value="132" />
@@ -51,13 +51,29 @@
   </UserControl.Styles>
 
   <Border Classes="ask" ClipToBounds="False">
-    <Grid Name="Row" ColumnDefinitions="*,12,Auto,2,Auto,2,Auto,8,Auto" RowDefinitions="Auto,Auto" VerticalAlignment="Center">
+    <Grid Name="Row" ColumnDefinitions="*,12,Auto,2,Auto,2,Auto,2,Auto,8,Auto" RowDefinitions="Auto,Auto" VerticalAlignment="Center">
       <TextBox Name="AskInput" c:OneLinePaste.IsOn="True" Classes="bare" Text="{Binding Question}" PlaceholderText="{Binding Placeholder}" PlaceholderForeground="{DynamicResource InkSubtle}"
                FontSize="15.5" VerticalAlignment="Center" AutomationProperties.Name="Ask about your lectures">
         <TextBox.KeyBindings>
           <KeyBinding Gesture="Enter" Command="{Binding AskCommand}" />
+          <KeyBinding Gesture="Tab" Command="{Binding PickFirstRecipeCommand}" />
         </TextBox.KeyBindings>
       </TextBox>
+      <!-- A slash word being typed (/stu): the recipes it could be, over the bar -->
+      <Popup Name="RecipeMatchesPopup" PlacementTarget="{Binding #AskInput}" Placement="TopEdgeAlignedLeft" VerticalOffset="-14"
+             IsOpen="{Binding ShowRecipeMatches}" IsLightDismissEnabled="False" OverlayInputPassThroughElement="{Binding #AskInput}">
+        <v:AiRecipeMatches />
+      </Popup>
+      <!-- The questions kept to ask again -->
+      <Button Name="RecipesButton" Grid.Column="4" Classes="icon-btn" VerticalAlignment="Center" IsVisible="{Binding HasRecipes}"
+              ToolTip.Tip="Recipes" AutomationProperties.Name="Recipes">
+        <c:Icon Glyph="bookmark" Size="18" />
+        <Button.Flyout>
+          <Flyout Placement="TopEdgeAlignedRight" VerticalOffset="-12" ShowMode="Standard" FlyoutPresenterClasses="bare">
+            <v:AiRecipesMenu />
+          </Flyout>
+        </Button.Flyout>
+      </Button>
       <!-- What it's asked about -->
       <Button Classes="ask-scope" AutomationProperties.Name="{Binding ScopeName}">
         <StackPanel Orientation="Horizontal" Spacing="4">
@@ -70,7 +86,7 @@
       </Button>
       <!-- Which AI answers: its own mark, no sparkle and no pill -->
       <!-- This place's kept conversations, when it has any: one picked opens in the panel, to carry on -->
-      <Panel Name="ChatsRoom" Grid.Column="4" VerticalAlignment="Center">
+      <Panel Name="ChatsRoom" Grid.Column="6" VerticalAlignment="Center">
       <Button Name="ChatsButton" Classes="icon-btn" VerticalAlignment="Center" IsVisible="{Binding HasChats}" AutomationProperties.Name="Chats" ToolTip.Tip="Chats">
         <c:Icon Glyph="forum" Size="18" />
         <Button.Flyout>
@@ -80,7 +96,7 @@
         </Button.Flyout>
       </Button>
       </Panel>
-      <Button Name="EngineChip" Grid.Column="6" Classes="icon-btn" VerticalAlignment="Center" ToolTip.Tip="{Binding EngineTip}" AutomationProperties.Name="{Binding EngineTip}">
+      <Button Name="EngineChip" Grid.Column="8" Classes="icon-btn" VerticalAlignment="Center" ToolTip.Tip="{Binding EngineTip}" AutomationProperties.Name="{Binding EngineTip}">
         <c:Icon Glyph="{Binding EngineIcon}" Size="18" />
         <Button.Flyout>
           <Flyout Placement="TopEdgeAlignedRight" VerticalOffset="-12" ShowMode="Standard" FlyoutPresenterClasses="bare">
@@ -95,14 +111,14 @@
         </Button.Flyout>
       </Button>
       <!-- Nothing typed: the keys that bring the caret here. A question: Send takes their place. -->
-      <Border Grid.Column="8" Classes="kbd" IsVisible="{Binding ShowKeys}" VerticalAlignment="Center">
+      <Border Grid.Column="10" Classes="kbd" IsVisible="{Binding ShowKeys}" VerticalAlignment="Center">
         <TextBlock Text="{x:Static v:AskKeys.Shown}" />
       </Border>
-      <Button AutomationProperties.Name="Send question" Grid.Column="8" Classes="ask-send" Command="{Binding AskCommand}" IsVisible="{Binding CanSend}" ToolTip.Tip="Send">
+      <Button AutomationProperties.Name="Send question" Grid.Column="10" Classes="ask-send" Command="{Binding AskCommand}" IsVisible="{Binding CanSend}" ToolTip.Tip="Send">
         <c:Icon Glyph="arrow_upward" Size="18" />
       </Button>
       <!-- While an answer is being written, the same place stops it -->
-      <Button Grid.Column="8" Classes="ask-send" Command="{Binding StopCommand}" IsVisible="{Binding Busy}" ToolTip.Tip="Stop" AutomationProperties.Name="Stop the answer">
+      <Button Grid.Column="10" Classes="ask-send" Command="{Binding StopCommand}" IsVisible="{Binding Busy}" ToolTip.Tip="Stop" AutomationProperties.Name="Stop the answer">
         <c:Icon Glyph="stop" Filled="True" Size="12" />
       </Button>
     </Grid>

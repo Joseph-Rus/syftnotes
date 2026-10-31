@@ -43,7 +43,12 @@ public sealed partial class LibraryWeb
         if (n > 0)
         {
             var gone = store.Gone().ToHashSet();
-            foreach (string id in trashed.Where(gone.Contains)) LibraryChats.ForgetLecture(id);
+            foreach (string id in trashed.Where(gone.Contains))
+            {
+                LibraryChats.ForgetLecture(id);
+                ReviewCards.ForgetLecture(id);
+                Listening.Delete(id);
+            }
         }
         return n;
     }

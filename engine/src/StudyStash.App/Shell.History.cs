@@ -14,7 +14,7 @@ public static partial class Shell
     /// page), a note, an assignment on a page of its own, or a class's Canvas lists (the list it was on, and the
     /// assignment or page open beside it).</summary>
     sealed record Place(string? Overview = null, string? DueOnly = null, string? Lecture = null, (string Class, string Id)? Assignment = null,
-        string? Canvas = null, ClassTab Tab = ClassTab.Assignments, CanvasReaderModel? Reader = null);
+        string? Canvas = null, ClassTab Tab = ClassTab.Assignments, CanvasReaderModel? Reader = null, bool Study = false);
 
     const int HistoryLimit = 50;
     static readonly List<Place> backPlaces = [], forwardPlaces = [];
@@ -31,6 +31,7 @@ public static partial class Shell
         if (openCanvasClass is { } cls) return new Place(Canvas: cls, Tab: canvasTab, Assignment: library.Assignment is null ? null : openAssignment, Reader: library.Reader);
         if (openAssignment is { } assignment) return new Place(Assignment: assignment);
         if (openLecture is { } id) return new Place(Lecture: id);
+        if (library.Study is not null) return new Place(Study: true);
         return new Place(Overview: "");
     }
 
@@ -90,6 +91,11 @@ public static partial class Shell
     static async Task GoToAsync(Place place)
     {
         library.NarrowDetail = false;
+        if (place.Study)
+        {
+            await ShowStudyAsync();
+            return;
+        }
         if (place.Overview is { } over)
         {
             if (over == DueHome) dueOnly = place.DueOnly;

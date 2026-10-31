@@ -1,0 +1,26 @@
+<!-- Over the Ask bar while a slash word is typed (/stu): the recipes it could be, best first. One pressed (or Tab for the
+     first) goes in the bar with a space after it, to send as it is or with more after it. -->
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:StudyStash.App.ViewModels"
+             x:Class="StudyStash.App.Views.AiRecipeMatches"
+             x:DataType="vm:AiAskModel">
+  <Border Background="{DynamicResource PopupBg}" BorderBrush="{DynamicResource PopupStroke}" BorderThickness="1" CornerRadius="12"
+          BoxShadow="{DynamicResource PopupShadow}" Padding="4" Width="320">
+    <ScrollViewer MaxHeight="260" HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
+      <ItemsControl ItemsSource="{Binding RecipeMatches}">
+        <ItemsControl.ItemTemplate>
+          <DataTemplate x:DataType="vm:RecipeRow">
+            <Button Theme="{StaticResource Surface}" HorizontalContentAlignment="Stretch" CornerRadius="8" Padding="10,5" Command="{Binding Pick}"
+                    AutomationProperties.Name="{Binding Name}" Focusable="False">
+              <Grid ColumnDefinitions="Auto,8,*">
+                <TextBlock Text="{Binding Slash}" FontSize="13" FontWeight="Medium" Foreground="{DynamicResource Fg}" />
+                <TextBlock Grid.Column="2" Text="{Binding Name}" FontSize="12" Foreground="{DynamicResource Fg2}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
+              </Grid>
+            </Button>
+          </DataTemplate>
+        </ItemsControl.ItemTemplate>
+      </ItemsControl>
+    </ScrollViewer>
+  </Border>
+</UserControl>

@@ -11,7 +11,7 @@
   <PropertyGroup>
     <!-- The one place Syft Notes' version lives: CI publishes v<version> when it changes on main. The laptop and
          setup check it. -->
-    <StudyStashVersion>0.20.0</StudyStashVersion>
+    <StudyStashVersion>0.21.0</StudyStashVersion>
     <Version>$(StudyStashVersion)</Version>
     <InformationalVersion>$(StudyStashVersion)</InformationalVersion>
     <IncludeSourceRevisionInInformationalVersion>false</IncludeSourceRevisionInInformationalVersion>
