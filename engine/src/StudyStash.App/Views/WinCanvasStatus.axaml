@@ -22,16 +22,7 @@
         <c:PageText Classes="cv-msg">
           <Run Text="{Binding Title}" FontWeight="SemiBold" /><Run Text=" " /><Run Text="{Binding Text}" />
         </c:PageText>
-        <Border Classes="cv-track" IsVisible="{Binding HasProgress}">
-          <Grid>
-            <Grid.ColumnDefinitions>
-              <ColumnDefinition Width="{Binding Progress, Converter={x:Static vm:CanvasConverters.FillStar}}" />
-              <ColumnDefinition Width="{Binding Progress, Converter={x:Static vm:CanvasConverters.RestStar}}" />
-            </Grid.ColumnDefinitions>
-            <Border Classes="cv-bar-fill" />
-            <Border Grid.Column="1" Classes="cv-bar-rest" />
-          </Grid>
-        </Border>
+        <c:SyftLoader Kind="PixelProgress" Size="8" IsVisible="{Binding HasProgress}" Progress="{Binding Progress, TargetNullValue=0}" IsIndeterminate="False" HorizontalAlignment="Left" Margin="0,6,0,0" />
       </StackPanel>
       <Button Grid.Column="2" Classes="cv-btn" Classes.cv-primary="{Binding IsPrimary}" IsVisible="{Binding ShowWinButton}" Command="{Binding ActCommand}">
         <TextBlock Text="{Binding ActionLabel}" />

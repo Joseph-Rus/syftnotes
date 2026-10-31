@@ -170,7 +170,7 @@
                     <StackPanel Grid.Column="2" VerticalAlignment="Center">
                       <TextBlock Text="{Binding Title}" FontSize="14" TextTrimming="CharacterEllipsis" />
                       <StackPanel Orientation="Horizontal" Spacing="6">
-                        <c:Spinner IsVisible="{Binding Busy}" Width="12" Height="12" Foreground="{DynamicResource Accent}" VerticalAlignment="Center" />
+                        <c:SyftLoader Kind="HoppingBits" Size="18" IsVisible="{Binding Busy}" VerticalAlignment="Center" />
                         <TextBlock Text="{Binding Detail}" FontSize="12" Foreground="{DynamicResource Fg2}" TextTrimming="CharacterEllipsis" />
                       </StackPanel>
                       <!-- Fluent's ProgressBar: the accent over a hairline -->

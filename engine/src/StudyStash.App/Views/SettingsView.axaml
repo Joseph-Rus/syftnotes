@@ -1799,7 +1799,7 @@
             <Panel Margin="0,16,0,0">
               <!-- Looking for the student's AI -->
               <StackPanel Orientation="Horizontal" Spacing="8" IsVisible="{Binding IsLooking}" VerticalAlignment="Top">
-                <c:Spinner Width="14" Height="14" Foreground="{DynamicResource Fg2}" />
+                <c:SyftLoader Kind="HoppingBits" Size="20" />
                 <TextBlock Classes="say" Text="Looking for your AI…" Margin="0" />
               </StackPanel>
 

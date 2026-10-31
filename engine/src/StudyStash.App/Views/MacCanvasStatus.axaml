@@ -13,21 +13,13 @@
     <!-- A Grid, not a horizontal StackPanel: the message column needs a real width bound to wrap its text against
          (a stacking panel measures its children at infinite width along the stack axis). -->
     <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="12">
-      <c:Spinner Grid.Column="0" IsVisible="{Binding IsSyncing}" Width="18" Height="18" Thickness="2" Foreground="{DynamicResource Fg2}" VerticalAlignment="Center" />
+      <c:SyftLoader Kind="HoppingBits" Size="24" IsVisible="{Binding IsSyncing}" Grid.Column="0" VerticalAlignment="Center" />
       <c:Icon Grid.Column="0" IsVisible="{Binding !IsSyncing}" Classes="cv-glyph" Glyph="{Binding Glyph}" VerticalAlignment="Center"
               Classes.cv-info="{Binding IsInfo}" Classes.cv-ok="{Binding IsOk}" Classes.cv-warn="{Binding IsWarn}" Classes.cv-error="{Binding IsError}" />
       <StackPanel Grid.Column="1" MinWidth="0" VerticalAlignment="Center" c:TextSelection.Area="True">
         <c:PageText Classes="cv-title" Text="{Binding Title}" TextWrapping="Wrap" />
         <c:PageText Classes="cv-text" Text="{Binding Text}" />
-        <Border Classes="cv-track" IsVisible="{Binding HasProgress}">
-          <Grid>
-            <Grid.ColumnDefinitions>
-              <ColumnDefinition Width="{Binding Progress, Converter={x:Static vm:CanvasConverters.FillStar}}" />
-              <ColumnDefinition Width="{Binding Progress, Converter={x:Static vm:CanvasConverters.RestStar}}" />
-            </Grid.ColumnDefinitions>
-            <Border Classes="cv-bar" />
-          </Grid>
-        </Border>
+        <c:SyftLoader Kind="PixelProgress" Size="8" IsVisible="{Binding HasProgress}" Progress="{Binding Progress, TargetNullValue=0}" IsIndeterminate="False" HorizontalAlignment="Left" Margin="0,6,0,0" />
       </StackPanel>
       <Button Grid.Column="2" Classes="cv-pill" Classes.cv-primary="{Binding IsPrimary}" Classes.cv-plain="{Binding IsPlain}"
               IsVisible="{Binding HasAction}" Command="{Binding ActCommand}" VerticalAlignment="Center">
