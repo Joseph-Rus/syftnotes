@@ -4,7 +4,7 @@
 // unchanged (it's in web/public/), and the library serves it at /app/sw.js with Service-Worker-Allowed: /app/.
 //
 // Bump CACHE when this file (or what it precaches) changes, so old entries are thrown away on activate.
-const CACHE = 'study-stash-shell-v1';
+const CACHE = 'study-stash-shell-v2';
 const SCOPE = '/app/';
 const SHELL = [SCOPE, `${SCOPE}manifest.webmanifest`, `${SCOPE}icon-192.png`, `${SCOPE}icon-512.png`];
 
