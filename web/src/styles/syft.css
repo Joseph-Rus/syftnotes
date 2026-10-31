@@ -1,0 +1,504 @@
+/* The pixel s: its splash screens and loaders (ui/Syft.tsx). Keyframes, easings, durations and delays are copied
+   from Joey's motion reference (syft-motion.html); only transform and opacity move. The reference loops each splash
+   for show: here a splash plays once, so each of its keyframes is the reference's up to where it holds, held there
+   (the fade at the end of a loop is the splash's own 250 ms fade when the app is ready). Colours: base.css and
+   themes.ts (--syft-*). */
+
+@font-face {
+  font-family: 'Syft Archivo';
+  font-style: italic;
+  font-weight: 900;
+  font-display: block;
+  src: url('/fonts/Archivo-BlackItalic.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Syft Archivo';
+  font-style: normal;
+  font-weight: 400;
+  font-display: block;
+  src: url('/fonts/Archivo-Regular.woff2') format('woff2');
+}
+
+/* The wordmark: "syft" in Archivo Black Italic, " notes" in Archivo Regular, −0.02em. */
+.syft-wordmark {
+  font-family: var(--font-brand);
+  letter-spacing: -0.02em;
+  white-space: nowrap;
+}
+.syft-wordmark-syft {
+  font-style: italic;
+  font-weight: 900;
+}
+.syft-wordmark-notes {
+  font-style: normal;
+  font-weight: 400;
+}
+
+.syft-mark {
+  display: block;
+  flex: none;
+  max-width: 100%;
+}
+
+/* A light or dark place whatever the page is: S1 and Path Trace's tile are always dark, S2 and S3 always light. */
+.syft-dark {
+  --syft-tile: var(--syft-ink);
+  --syft-base: var(--syft-mustard);
+  --syft-mesh: var(--syft-mesh-dark);
+  --syft-ghost: var(--syft-ghost-dark);
+  --syft-trace-mesh: var(--syft-trace-mesh-dark);
+  --syft-cell: var(--syft-paper);
+  --syft-word: var(--syft-white);
+}
+.syft-light {
+  --syft-tile: var(--syft-white);
+  --syft-base: var(--syft-ink);
+  --syft-mesh: var(--syft-mesh-light);
+  --syft-ghost: var(--syft-mesh-light);
+  --syft-trace-mesh: transparent;
+  --syft-cell: var(--syft-ink);
+  --syft-word: var(--syft-ink);
+}
+
+/* --- Splash: the whole screen, its 100 × 200 phone as tall as the screen and centred ------------------------------- */
+
+.syft-splash {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  overflow: hidden;
+  opacity: 1;
+  transition: opacity 250ms ease;
+}
+.syft-splash.sort-in {
+  background: var(--syft-ink);
+}
+.syft-splash.sieve-drop {
+  background: var(--syft-white);
+}
+.syft-splash.pop-back {
+  background: var(--syft-paper);
+}
+.syft-splash.framed {
+  position: absolute;
+  z-index: auto;
+}
+.syft-splash.leaving {
+  opacity: 0;
+  pointer-events: none;
+}
+.syft-splash > svg {
+  position: absolute;
+  top: 0;
+  left: 50%;
+  height: 100%;
+  width: auto;
+  aspect-ratio: 1 / 2;
+  translate: -50% 0;
+}
+
+/* S1 · Sort In (5 s): each cell falls in spinning from (--dx, --dy), with a small bounce; bottom rows first. */
+@keyframes syft-sf-in {
+  0% {
+    transform: translate(var(--dx), var(--dy)) rotate(var(--r));
+    opacity: 0;
+  }
+  6% {
+    opacity: 1;
+  }
+  26% {
+    transform: translate(0px, 0px) rotate(0deg);
+  }
+  29% {
+    transform: translate(0px, -1.5px) rotate(0deg);
+  }
+  32% {
+    transform: translate(0px, 0px) rotate(0deg);
+  }
+  86%,
+  100% {
+    transform: translate(0px, 0px) rotate(0deg);
+    opacity: 1;
+  }
+}
+.syft-sf-in {
+  animation: syft-sf-in 5s cubic-bezier(0.22, 0.9, 0.3, 1) 1 both;
+  transform-box: fill-box;
+  transform-origin: center;
+}
+@keyframes syft-sf-word {
+  0%,
+  36% {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  46%,
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+.syft-sf-word {
+  animation: syft-sf-word 5s ease-out 1 both;
+}
+
+/* S2 · Sieve Drop (5 s): the light mesh, bits falling straight through it, the s lighting up along its path. */
+@keyframes syft-sv-mesh {
+  0% {
+    opacity: 0;
+  }
+  8%,
+  100% {
+    opacity: 1;
+  }
+}
+.syft-sv-mesh {
+  animation: syft-sv-mesh 5s ease 1 both;
+}
+@keyframes syft-sv-pop {
+  0% {
+    opacity: 0;
+    transform: scale(0.3);
+  }
+  7% {
+    opacity: 1;
+    transform: scale(1.18);
+  }
+  11% {
+    transform: scale(1);
+  }
+  86%,
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+.syft-sv-pop {
+  animation: syft-sv-pop 5s cubic-bezier(0.3, 0.7, 0.4, 1) 1 both;
+  transform-box: fill-box;
+  transform-origin: center;
+}
+/* The bits keep falling while the splash waits for the app: sifting. */
+@keyframes syft-sv-fall {
+  0% {
+    transform: translateY(0) rotate(0deg);
+  }
+  100% {
+    transform: translateY(240px) rotate(var(--r));
+  }
+}
+.syft-sv-fall {
+  animation: syft-sv-fall 3s linear infinite backwards;
+  transform-box: fill-box;
+  transform-origin: center;
+}
+@keyframes syft-sv-word {
+  0%,
+  40% {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  50%,
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+.syft-sv-word {
+  animation: syft-sv-word 5s ease-out 1 both;
+}
+
+/* S3 · Pop Back (4.5 s): the ink s pops in a row at a time, then the coral bit hops home with three ticks. */
+@keyframes syft-sp-in {
+  0% {
+    opacity: 0;
+    transform: scale(0);
+  }
+  10% {
+    opacity: 1;
+    transform: scale(1.12);
+  }
+  14% {
+    transform: scale(1);
+  }
+  88%,
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+.syft-sp-in {
+  animation: syft-sp-in 4.5s cubic-bezier(0.3, 0.7, 0.4, 1) 1 both;
+  transform-box: fill-box;
+  transform-origin: center;
+}
+@keyframes syft-sp-hop {
+  0%,
+  20% {
+    opacity: 0;
+    transform: translate(10px, -14px) rotate(25deg);
+  }
+  26% {
+    opacity: 1;
+    transform: translate(10px, -14px) rotate(25deg);
+  }
+  40% {
+    transform: translate(4px, -22px) rotate(-12deg);
+  }
+  50% {
+    transform: translate(0px, 0px) rotate(0deg);
+  }
+  54% {
+    transform: translate(0px, -2.5px) rotate(0deg);
+  }
+  58% {
+    transform: translate(0px, 0px) rotate(0deg);
+  }
+  88%,
+  100% {
+    opacity: 1;
+    transform: translate(0px, 0px) rotate(0deg);
+  }
+}
+.syft-sp-hop {
+  animation: syft-sp-hop 4.5s cubic-bezier(0.4, 0, 0.2, 1) 1 both;
+  transform-box: fill-box;
+  transform-origin: center;
+}
+@keyframes syft-sp-tick {
+  0%,
+  49% {
+    opacity: 0;
+  }
+  53% {
+    opacity: 1;
+  }
+  66%,
+  100% {
+    opacity: 0;
+  }
+}
+.syft-sp-tick {
+  animation: syft-sp-tick 4.5s ease-out 1 both;
+}
+@keyframes syft-sp-word {
+  0%,
+  56% {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  66%,
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+.syft-sp-word {
+  animation: syft-sp-word 4.5s ease-out 1 both;
+}
+
+/* --- Loaders ------------------------------------------------------------------------------------------------------ */
+
+.syft-loader {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  flex: none;
+  vertical-align: middle;
+  line-height: 0;
+}
+.syft-loader > svg {
+  display: block;
+  overflow: hidden;
+}
+.syft-loader-label {
+  font-size: 14px;
+  line-height: 1.3;
+  color: var(--fg2);
+}
+.syft-sr {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* L1 · Path Trace (2 s): a lit trail runs along the s. */
+@keyframes syft-tr {
+  0% {
+    opacity: 0;
+  }
+  6% {
+    opacity: 1;
+  }
+  30% {
+    opacity: 1;
+  }
+  52%,
+  100% {
+    opacity: 0;
+  }
+}
+.syft-tr {
+  animation: syft-tr 2s linear infinite backwards;
+}
+
+/* L2 · Hopping Bits (1.2 s): four bits hop and flip in a wave. */
+@keyframes syft-bb {
+  0%,
+  60%,
+  100% {
+    transform: translateY(0) rotate(0deg);
+  }
+  30% {
+    transform: translateY(-14px) rotate(90deg);
+  }
+}
+.syft-bb {
+  animation: syft-bb 1.2s ease-in-out infinite;
+  transform-box: fill-box;
+  transform-origin: center;
+}
+
+/* L3 · Pixel Progress (3 s): ten cells fill left to right, then wipe. With a real value, the cells it's reached. */
+@keyframes syft-pg {
+  0% {
+    opacity: 0;
+    transform: scale(0.4);
+  }
+  6% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  78% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  88%,
+  100% {
+    opacity: 0;
+    transform: scale(1);
+  }
+}
+.syft-pg {
+  animation: syft-pg 3s ease-out infinite backwards;
+  transform-box: fill-box;
+  transform-origin: center;
+}
+.syft-pg-step {
+  transform-box: fill-box;
+  transform-origin: center;
+  opacity: 0;
+  transform: scale(0.4);
+  transition:
+    opacity 180ms ease-out,
+    transform 180ms ease-out;
+}
+.syft-pg-step.on {
+  opacity: 1;
+  transform: scale(1);
+}
+
+/* L4 · Row Shuffle (2.6 s): the chunky s deals itself in a row at a time from alternate sides, and out again. */
+@keyframes syft-rs-l {
+  0% {
+    transform: translateX(-80px);
+    opacity: 0;
+  }
+  16% {
+    transform: translateX(0);
+    opacity: 1;
+  }
+  70% {
+    transform: translateX(0);
+    opacity: 1;
+  }
+  86%,
+  100% {
+    transform: translateX(80px);
+    opacity: 0;
+  }
+}
+@keyframes syft-rs-r {
+  0% {
+    transform: translateX(80px);
+    opacity: 0;
+  }
+  16% {
+    transform: translateX(0);
+    opacity: 1;
+  }
+  70% {
+    transform: translateX(0);
+    opacity: 1;
+  }
+  86%,
+  100% {
+    transform: translateX(-80px);
+    opacity: 0;
+  }
+}
+.syft-rs-l {
+  animation: syft-rs-l 2.6s cubic-bezier(0.5, 0, 0.2, 1) infinite backwards;
+}
+.syft-rs-r {
+  animation: syft-rs-r 2.6s cubic-bezier(0.5, 0, 0.2, 1) infinite backwards;
+}
+
+/* --- Less motion: the finished s and its words, still; a splash only fades; a loader breathes ------------------------ */
+
+@keyframes syft-fade-in {
+  0% {
+    opacity: 0;
+  }
+  100% {
+    opacity: 1;
+  }
+}
+@keyframes syft-breathe {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.45;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .syft-sf-in,
+  .syft-sf-word,
+  .syft-sv-mesh,
+  .syft-sv-pop,
+  .syft-sv-fall,
+  .syft-sv-word,
+  .syft-sp-in,
+  .syft-sp-hop,
+  .syft-sp-tick,
+  .syft-sp-word,
+  .syft-tr,
+  .syft-bb,
+  .syft-pg,
+  .syft-rs-l,
+  .syft-rs-r {
+    animation: none !important;
+  }
+  .syft-sv-fall,
+  .syft-sp-tick {
+    opacity: 0;
+  }
+  .syft-pg-step {
+    transition: none;
+  }
+  .syft-splash > svg {
+    animation: syft-fade-in 250ms ease both;
+  }
+  .syft-loader.moving > svg {
+    animation: syft-breathe 2s ease-in-out infinite;
+  }
+}
