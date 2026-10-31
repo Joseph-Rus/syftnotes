@@ -197,6 +197,45 @@ public class ToastShelfTests
     }
 
     [AvaloniaFact]
+    public void A_card_the_window_system_leaves_somewhere_else_goes_back_where_it_belongs()
+    {
+        // X11 can hand a window a move it was given earlier after the latest one: the older cards stayed where they
+        // had been, under the newest, when three came at once.
+        using var rig = new Rig(mac: false);
+        var first = Say("First");
+        var second = Say("Second");
+        rig.Shelf.Show(first);
+        rig.Shelf.Show(second);
+        Dispatcher.UIThread.RunJobs();
+        var w = rig.Shelf.WindowOf(first)!;
+        var right = w.Position;
+        w.Position = right - new PixelPoint(0, 103);
+        Dispatcher.UIThread.RunJobs();
+        Assert.Equal(right, w.Position);
+        Assert.Equal(rig.Card(second).Y - 8, rig.Card(first).Bottom);
+    }
+
+    [AvaloniaFact]
+    public void A_card_the_window_manager_keeps_moving_is_put_back_a_few_times_then_left()
+    {
+        using var rig = new Rig(mac: false);
+        var n = Say("Recording saved");
+        rig.Shelf.Show(n);
+        Dispatcher.UIThread.RunJobs();
+        var w = rig.Shelf.WindowOf(n)!;
+        var right = w.Position;
+        for (int i = 0; i < ToastShelf.PutBackTries; i++)
+        {
+            w.Position = right - new PixelPoint(50, 0);
+            Dispatcher.UIThread.RunJobs();
+            Assert.Equal(right, w.Position);
+        }
+        w.Position = right - new PixelPoint(50, 0);
+        Dispatcher.UIThread.RunJobs();
+        Assert.Equal(right - new PixelPoint(50, 0), w.Position);
+    }
+
+    [AvaloniaFact]
     public void The_same_one_twice_is_one_window_and_three_at_most_show()
     {
         using var rig = new Rig(mac: true);

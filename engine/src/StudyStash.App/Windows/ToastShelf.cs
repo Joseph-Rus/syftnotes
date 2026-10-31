@@ -26,6 +26,14 @@ public sealed class ToastShelf
     bool arrangeQueued;
     /// <summary>The panels last stepped round, so a tick only moves the cards when one of them changed.</summary>
     string clearedFor = "";
+    /// <summary>Where each card was last put, and how many times it's been put back there since.</summary>
+    readonly Dictionary<Floating, (PixelPoint At, int Tries)> placed = [];
+    /// <summary>The cards are being put in place: their moves now are the shelf's own.</summary>
+    bool arranging;
+
+    /// <summary>How many times a card that turns up somewhere else is put back where it belongs, before it's left
+    /// where the window manager wants it.</summary>
+    internal const int PutBackTries = 3;
 
     /// <param name="mac">A Mac's corner and stacking (top right, downward) or Windows' (bottom right, upward).</param>
     /// <param name="screens">Every display; null to ask the cards' own windows.</param>
@@ -106,8 +114,15 @@ public sealed class ToastShelf
             {
                 if (e.Property == Window.ClientSizeProperty) ArrangeSoon();
             };
+            // X11 can hand a window a move it was given before the last one, after it: a card that turns up somewhere
+            // other than where it was put goes back there (a few times; a window manager that won't have it there wins).
+            w.PositionChanged += (_, _) =>
+            {
+                if (WantsPutBack(w)) ArrangeSoon();
+            };
             w.Closed += (_, _) =>
             {
+                placed.Remove(w);
                 w.Screens.Changed -= displaysChanged;
                 shown.Remove(notice);
                 Stack.Remove(notice);
@@ -196,20 +211,14 @@ public sealed class ToastShelf
         var clear = keepClear();
         clearedFor = string.Join(";", clear);
         var spots = Placement.ToastStack(screen, cards, clear, mac, room);
-        for (int i = 0; i < order.Count; i++)
+        arranging = true;
+        try
         {
-            var w = shown[order[i]].Window;
-            if (spots[i] is { } at)
-            {
-                w.MoveTo(at, screen.WorkingArea, screen.Scaling);
-                order[i].Wait(false, now);
-                if (!w.IsVisible) w.Show();
-            }
-            else
-            {
-                order[i].Wait(true, now);
-                if (w.IsVisible) w.Hide();
-            }
+            Place(order, spots, screen, now);
+        }
+        finally
+        {
+            arranging = false;
         }
         // Lower cards in front: a card's shadow falls mostly below it, so the one under it is never behind that shadow
         // (where a click would land on the shadow, not on the card). Only when the order changed.
@@ -220,6 +229,43 @@ public sealed class ToastShelf
             zOrder = z;
             foreach (var n in fronts) shown[n].Window.OrderFront();
         }
+    }
+
+    /// <summary>Moves each card to its spot and shows it, or hides it (and stops its time) where there's no room.</summary>
+    void Place(List<Notice> order, IReadOnlyList<PixelPoint?> spots, ScreenGeometry screen, DateTime now)
+    {
+        for (int i = 0; i < order.Count; i++)
+        {
+            var w = shown[order[i]].Window;
+            if (spots[i] is { } at)
+            {
+                w.MoveTo(at, screen.WorkingArea, screen.Scaling);
+                Placed(w);
+                order[i].Wait(false, now);
+                if (!w.IsVisible) w.Show();
+            }
+            else
+            {
+                order[i].Wait(true, now);
+                if (w.IsVisible) w.Hide();
+            }
+        }
+    }
+
+    /// <summary>Notes where <paramref name="w"/> was just put; put back where it already was, it keeps its count of tries.</summary>
+    void Placed(Floating w)
+    {
+        var at = w.Position;
+        placed[w] = placed.TryGetValue(w, out var last) && last.At == at ? last : (at, 0);
+    }
+
+    /// <summary>True when <paramref name="w"/> is shown somewhere other than where it was last put, and hasn't been
+    /// put back <see cref="PutBackTries"/> times already (each try is counted here).</summary>
+    internal bool WantsPutBack(Floating w)
+    {
+        if (arranging || !w.IsVisible || !placed.TryGetValue(w, out var p) || w.Position == p.At || p.Tries >= PutBackTries) return false;
+        placed[w] = (p.At, p.Tries + 1);
+        return true;
     }
 
     /// <summary>The cards' front-to-back order when it was last set, top to bottom.</summary>
