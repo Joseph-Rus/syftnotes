@@ -5,7 +5,7 @@ using NAudio.Wave;
 namespace StudyStash.Audio;
 
 /// <summary>Plays a lecture's recording from a moment (an answer's "18:05"): AVAudioPlayer on a Mac, WASAPI on
-/// Windows. One at a time; playing another stops the last.</summary>
+/// Windows, the sound server (PulseAudio or PipeWire) on Linux. One at a time; playing another stops the last.</summary>
 public static class Player
 {
     static IDisposable? playing;
@@ -17,8 +17,9 @@ public static class Player
         {
             if (OperatingSystem.IsMacOS()) playing = Mac.Play(wavPath, fromSeconds);
             else if (OperatingSystem.IsWindows()) playing = Win.Play(wavPath, fromSeconds);
+            else if (OperatingSystem.IsLinux()) playing = Linux.Play(wavPath, fromSeconds);
         }
-        catch (Exception e) when (e is DllNotFoundException or EntryPointNotFoundException or COMException or IOException or InvalidOperationException)
+        catch (Exception e) when (e is DllNotFoundException or EntryPointNotFoundException or COMException or IOException or InvalidOperationException or FormatException)
         {
         }
     }
@@ -97,6 +98,59 @@ public static class Player
             player.Init(reader);
             player.Play();
             return new Handle(player, reader);
+        }
+    }
+
+    [SupportedOSPlatform("linux")]
+    static class Linux
+    {
+        /// <summary>Feeds the recording to the speakers a tenth of a second at a time, on a thread of its own, until
+        /// it ends or another plays.</summary>
+        sealed class Handle : IDisposable
+        {
+            volatile bool stopped;
+
+            public Handle(WaveFileReader reader, PulseStream stream)
+            {
+                var floats = reader.ToSampleProvider();
+                var format = floats.WaveFormat;
+                new Thread(() =>
+                {
+                    var block = new float[format.SampleRate / 10 * format.Channels];
+                    try
+                    {
+                        int n;
+                        while (!stopped && (n = floats.Read(block)) > 0) stream.Write(block.AsSpan(0, n));
+                        if (!stopped) stream.Drain();
+                    }
+                    catch (IOException)
+                    {
+                        // The sound server went away mid-play: nothing to say, it just stops.
+                    }
+                    finally
+                    {
+                        stream.Dispose();
+                        reader.Dispose();
+                    }
+                })
+                { IsBackground = true, Name = "Syft Notes playback" }.Start();
+            }
+
+            public void Dispose() => stopped = true;
+        }
+
+        public static IDisposable Play(string path, double at)
+        {
+            var reader = new WaveFileReader(path) { CurrentTime = TimeSpan.FromSeconds(at) };
+            try
+            {
+                return new Handle(reader, PulseStream.Play(reader.WaveFormat.SampleRate, reader.WaveFormat.Channels));
+            }
+            catch
+            {
+                reader.Dispose();
+                throw;
+            }
         }
     }
 }

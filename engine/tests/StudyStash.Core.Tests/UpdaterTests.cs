@@ -37,13 +37,13 @@ public class UpdaterTests
     {
         Assert.Equal("Syft-Notes.dmg", Updates.Installer("Darwin"));
         Assert.Equal("Syft-Notes-Setup.exe", Updates.Installer("Windows"));
-        Assert.Null(Updates.Installer("Linux"));
         Assert.Null(Updates.Installer(""));
-        // The two downloads, then the names older copies still fetch, each once: the one download as it was named
-        // before Syft Notes (Egghead Notes', then Study Stash's), and the four role names.
-        Assert.Equal(["Syft-Notes.dmg", "Syft-Notes-Setup.exe", "Egghead-Notes.dmg", "Egghead-Notes-Setup.exe", "Study-Stash.dmg", "Study-Stash-Setup.exe", "Study-Stash-Laptop.dmg",
+        // The downloads (Linux has one per processor), then the names older copies still fetch, each once: the one
+        // download as it was named before Syft Notes (Egghead Notes', then Study Stash's), and the four role names.
+        Assert.Equal(["Syft-Notes.dmg", "Syft-Notes-Setup.exe", "Syft-Notes-linux-x64.tar.gz", "Syft-Notes-linux-arm64.tar.gz",
+            "Egghead-Notes.dmg", "Egghead-Notes-Setup.exe", "Study-Stash.dmg", "Study-Stash-Setup.exe", "Study-Stash-Laptop.dmg",
             "Study-Stash-Library.dmg", "Study-Stash-Laptop-Setup.exe", "Study-Stash-Library-Setup.exe"], Updates.Installers);
-        Assert.Equal(10, Updates.Installers.Distinct().Count());
+        Assert.Equal(12, Updates.Installers.Distinct().Count());
     }
 
     [Fact]
@@ -53,6 +53,8 @@ public class UpdaterTests
             {"tag_name": "v0.5.0", "html_url": "https://github.com/Joseph-Rus/study-stash/releases/tag/v0.5.0",
              "assets": [{"name": "Syft-Notes.dmg", "browser_download_url": "https://dl/study-stash.dmg"},
                         {"name": "Syft-Notes-Setup.exe", "browser_download_url": "https://dl/setup.exe"},
+                        {"name": "Syft-Notes-linux-x64.tar.gz", "browser_download_url": "https://dl/linux-x64.tar.gz"},
+                        {"name": "Syft-Notes-linux-arm64.tar.gz", "browser_download_url": "https://dl/linux-arm64.tar.gz"},
                         {"name": "Egghead-Notes.dmg", "browser_download_url": "https://dl/egg.dmg"},
                         {"name": "Egghead-Notes-Setup.exe", "browser_download_url": "https://dl/egg.exe"},
                         {"name": "Study-Stash.dmg", "browser_download_url": "https://dl/old.dmg"},
@@ -161,9 +163,11 @@ public class UpdaterTests
     }
 
     [Fact]
-    public void Linux_never_updates_itself()
+    public void Linux_updates_itself_only_from_an_installed_copy()
     {
-        Assert.Equal("Syft Notes updates itself on a Mac or a Windows PC.", Updates.WhyNotUpdatable(new UpdateHost { System = "Linux" }));
+        // A bare host has no folder of its own (a build folder): it says so, as a Mac's and a PC's do.
+        Assert.Equal("This copy runs from a build folder, so it doesn't update itself.", Updates.WhyNotUpdatable(new UpdateHost { System = "Linux" }));
+        Assert.Equal("Syft Notes updates itself on a Mac, a Windows PC or Linux.", Updates.WhyNotUpdatable(new UpdateHost { System = "FreeBSD", AppDir = "/x" }));
     }
 
     [Fact]

@@ -86,7 +86,7 @@ public sealed class LibraryHere
     /// is asked with the password too: "ready" is never said over a library that turns the app away.</summary>
     static async Task<string?> ProblemAsync(LibraryService svc, Config cfg)
     {
-        string device = OperatingSystem.IsMacOS() ? "Mac" : "PC";
+        string device = Machine.Device;
         if (svc.State == LibraryServiceState.Running) return null;
         if (svc.State != LibraryServiceState.Elsewhere)
             return "The library didn't start." + (svc.Failure is { Length: > 0 } f ? $" {f.TrimEnd('.')}." : "") + " Its log is in the logs folder.";
@@ -209,6 +209,6 @@ public sealed class LibraryHere
         cc.PoolName = cfg.PoolName;
         if (cc.DisplayName.Length == 0) cc.DisplayName = displayName;
         host.SaveClient(cc);
-        return $"{name} is ready on this {(OperatingSystem.IsMacOS() ? "Mac" : "PC")}.";
+        return $"{name} is ready on this {Machine.Device}.";
     }
 }

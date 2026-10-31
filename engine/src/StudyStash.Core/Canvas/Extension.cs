@@ -61,14 +61,15 @@ public static class Extension
 
     /// <summary>Where Chrome loads it from on this computer (<see cref="Folder(string, string, bool)"/> for this
     /// person and this system).</summary>
-    public static string Folder(string home) => Folder(home, Py.UserHome(), OperatingSystem.IsMacOS());
+    public static string Folder(string home) => Folder(home, Py.UserHome(), OperatingSystem.IsMacOS() || OperatingSystem.IsLinux());
 
     /// <summary>
     /// Where Chrome loads it from. On a Mac, Chrome's Load unpacked window hides dot-folders and ~/Library, and the
     /// home (~/.study-stash) is one, so the folder there is <c>~/Study Stash/Chrome extension</c>: a folder the window
     /// shows at once, never synced to iCloud (not Desktop or Documents), and only this person's (it holds what
     /// connects to the library). A second hidden home in the same account gets its own ("Chrome extension (1a2b3c4d)"),
-    /// so the two never write over each other. Anywhere else, and for a home outside <paramref name="userHome"/> (a
+    /// so the two never write over each other. Linux's Load unpacked window (GTK's) hides dot-folders too, so it has the
+    /// same folder (<paramref name="mac"/> is true for it). On Windows, and for a home outside <paramref name="userHome"/> (a
     /// test's, or one the student put somewhere Chrome shows), it's the home's own chrome-extension, as it always was.
     /// </summary>
     public static string Folder(string home, string userHome, bool mac)

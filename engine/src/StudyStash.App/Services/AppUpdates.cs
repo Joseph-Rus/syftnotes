@@ -348,6 +348,12 @@ public sealed class AppUpdates
             string command = $"Wait-Process -Id {pid} -ErrorAction SilentlyContinue; Start-Process -FilePath '{exe}' -ArgumentList '{string.Join(' ', args)}'";
             host.SpawnDetached(["powershell.exe", "-NoProfile", "-WindowStyle", "Hidden", "-Command", command]);
         }
+        else if (host.System == "Linux")
+        {
+            // Waits for this process to be gone (kill -0 says whether it still is), then starts the new copy in its place.
+            const string script = "exe=\"$1\"; shift; while kill -0 \"$0\" 2>/dev/null; do sleep 1; done; exec \"$exe\" \"$@\"";
+            host.SpawnDetached(["/bin/sh", "-c", script, pid, Updates.LinuxProgram(host.AppDir), .. args]);
+        }
     }
 
     /// <summary>How long after a recording stops an update waits for its notes to be written by the library on this

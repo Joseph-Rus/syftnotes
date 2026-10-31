@@ -6,7 +6,7 @@ namespace StudyStash.Core.Ai;
 /// <summary>
 /// "Open in Claude Code": a terminal in a class's folder, running the AI picked for agent work (Claude Code, Codex,
 /// or Antigravity for Gemini), briefed on where it is, for real work with the class's notes and Canvas material at
-/// hand. Ghostty unless another terminal is picked.
+/// hand. Ghostty unless another terminal is picked; on Linux, the first of <see cref="Linux"/> that's installed.
 /// </summary>
 public static class Terminal
 {
@@ -16,10 +16,44 @@ public static class Terminal
         ("iterm", "iTerm", "/Applications/iTerm.app"), ("warp", "Warp", "/Applications/Warp.app"),
     ];
 
+    /// <summary>Linux's terminals, by the program each puts on the PATH, in the order one is picked when the student
+    /// hasn't: the desktop's own first (GNOME's Ptyxis and Terminal, KDE's Konsole, Xfce's), then the rest, then
+    /// Debian's x-terminal-emulator and xterm, which nearly every system has.</summary>
+    public static readonly (string Id, string Name)[] Linux =
+    [
+        ("ptyxis", "Ptyxis"), ("gnome-terminal", "GNOME Terminal"), ("konsole", "Konsole"), ("xfce4-terminal", "Xfce Terminal"),
+        ("ghostty", "Ghostty"), ("kitty", "kitty"), ("alacritty", "Alacritty"), ("wezterm", "WezTerm"),
+        ("x-terminal-emulator", "Terminal"), ("xterm", "XTerm"),
+    ];
+
     /// <summary>The terminals on this computer: (id, name).</summary>
     public static List<(string Id, string Name)> Available() =>
         OperatingSystem.IsMacOS() ? Mac.Where(t => Directory.Exists(t.App)).Select(t => (t.Id, t.Name)).ToList()
-        : OperatingSystem.IsWindows() ? [("wt", "Windows Terminal")] : [];
+        : OperatingSystem.IsWindows() ? [("wt", "Windows Terminal")]
+        : Linux.Where(t => Machine.Which(t.Id) is not null).ToList();
+
+    /// <summary>Linux: how <paramref name="terminal"/> is told to open in <paramref name="folder"/> and run
+    /// <paramref name="script"/> with bash. Each one spells it its own way.</summary>
+    internal static List<string> LinuxArgs(string terminal, string folder, string script) => terminal switch
+    {
+        "ptyxis" => ["--new-window", $"--working-directory={folder}", "--", "bash", script],
+        "gnome-terminal" => [$"--working-directory={folder}", "--", "bash", script],
+        "konsole" => ["--workdir", folder, "-e", "bash", script],
+        "xfce4-terminal" => [$"--working-directory={folder}", "-x", "bash", script],
+        "ghostty" => [$"--working-directory={folder}", "-e", "bash", script],
+        "kitty" => ["--directory", folder, "bash", script],
+        "alacritty" => ["--working-directory", folder, "-e", "bash", script],
+        "wezterm" => ["start", "--cwd", folder, "--", "bash", script],
+        _ => ["-e", "bash", script], // x-terminal-emulator, xterm: the script goes into the folder itself
+    };
+
+    /// <summary>The script a Linux terminal runs: into the folder, the command (with <paramref name="env"/> set for
+    /// it alone), then the student's own shell.</summary>
+    internal static string LinuxScript(string folder, string exe, IReadOnlyList<string> args, IReadOnlyDictionary<string, string>? env = null)
+    {
+        string set = string.Concat((env ?? new Dictionary<string, string>()).Select(kv => $"{kv.Key}={Quote(kv.Value)} "));
+        return $"#!/bin/bash\ncd {Quote(folder)} || exit 1\n{set}{Quote(exe)} {string.Join(" ", args.Select(Quote))}\nexec \"${{SHELL:-bash}}\" -l\n";
+    }
 
     /// <summary>The terminal <see cref="Open"/> uses on a computer that has <paramref name="here"/>: the one picked
     /// when it's there, else the first that is ("" with none). The setting starts as a Mac's Ghostty, so a PC, or a Mac
@@ -134,21 +168,39 @@ public static class Terminal
                 return "a console window";
             }
         }
+        if (OperatingSystem.IsLinux())
+        {
+            var here = Available();
+            string id = Used(terminal, here);
+            if (id.Length == 0) throw new InvalidOperationException("No terminal app found. Install one (GNOME Terminal, Konsole or xterm), then try again.");
+            string sh = Script(home, ".sh", LinuxScript(folder, exe, args, env));
+            var run = new ProcessStartInfo(id) { UseShellExecute = false, WorkingDirectory = folder };
+            foreach (string a in LinuxArgs(id, folder, sh)) run.ArgumentList.Add(a);
+            using var started = Process.Start(run);
+            return here.First(h => h.Id == id).Name;
+        }
         var t = Mac.FirstOrDefault(m => m.Id == terminal);
         if (t.Id is null || !Directory.Exists(t.App)) t = Mac.FirstOrDefault(m => Directory.Exists(m.App));
         if (t.Id is null) throw new InvalidOperationException("No terminal app found.");
         // A small script the terminal runs: into the folder, start the AI, and stay in a shell after.
-        string dir = Path.Combine(home, "launch");
-        Directory.CreateDirectory(dir);
-        foreach (string old in Directory.EnumerateFiles(dir, "*.command").OrderByDescending(File.GetLastWriteTimeUtc).Skip(20)) File.Delete(old);
-        string script = Path.Combine(dir, Convert.ToHexStringLower(RandomNumberGenerator.GetBytes(4)) + ".command");
-        File.WriteAllText(script, MacScript(folder, exe, args, env));
-        File.SetUnixFileMode(script, UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute);
+        string script = Script(home, ".command", MacScript(folder, exe, args, env));
         var open = t.Id == "ghostty"
             ? new ProcessStartInfo("open") { ArgumentList = { "-na", t.App, "--args", $"--working-directory={folder}", "-e", "/bin/zsh", script } }
             : new ProcessStartInfo("open") { ArgumentList = { "-a", t.App, script } };
         open.UseShellExecute = false;
         using var _ = Process.Start(open);
         return t.Name;
+    }
+
+    /// <summary>Writes a terminal's script into home/launch (keeping the newest 20 of its kind) and makes it runnable.</summary>
+    static string Script(string home, string extension, string text)
+    {
+        string dir = Path.Combine(home, "launch");
+        Directory.CreateDirectory(dir);
+        foreach (string old in Directory.EnumerateFiles(dir, "*" + extension).OrderByDescending(File.GetLastWriteTimeUtc).Skip(20)) File.Delete(old);
+        string script = Path.Combine(dir, Convert.ToHexStringLower(RandomNumberGenerator.GetBytes(4)) + extension);
+        File.WriteAllText(script, text);
+        if (!OperatingSystem.IsWindows()) File.SetUnixFileMode(script, UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute);
+        return script;
     }
 }

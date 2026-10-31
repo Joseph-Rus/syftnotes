@@ -42,7 +42,7 @@ public sealed partial class PhoneGoogleModel : ObservableObject, IDisposable
 
     public string Title => "Connect your phone through your Google account";
     public string Lede => "Your notes go into a private Syft Notes folder in your Google Drive that only Syft Notes can see.";
-    public string Device => OperatingSystem.IsMacOS() ? "Mac" : "PC";
+    public string Device => StudyStash.Core.Machine.Device;
 
     [ObservableProperty] public partial bool Connected { get; set; }
     [ObservableProperty] public partial bool Connecting { get; set; }

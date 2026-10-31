@@ -895,7 +895,7 @@ public sealed partial class AppHost : IDisposable, IProblemSource
     public static string StatusText(LibraryState library, bool localLibraryRunning, bool modelReady, DownloadProgress? downloading, bool records = true)
     {
         string lib = localLibraryRunning
-            ? $"Library running on this {(OperatingSystem.IsMacOS() ? "Mac" : "PC")}"
+            ? $"Library running on this {Machine.Device}"
             : library switch
         {
             LibraryState.Connected => "Library connected",

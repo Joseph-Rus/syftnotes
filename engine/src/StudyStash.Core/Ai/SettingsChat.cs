@@ -14,7 +14,7 @@ public static class SettingsChat
     /// line ("This Mac records lectures and is your library, all in one place.").</summary>
     public static string Brief(bool windows, string computer)
     {
-        string device = windows ? "PC" : "Mac";
+        string device = Machine.DeviceFor(windows);
         string text = $"""
             You are Syft Notes' settings helper, in its Settings window. Syft Notes is a desktop app for students: it records
             lectures, turns the speech into text on the student's own {device}, files each lecture under its class, and writes study

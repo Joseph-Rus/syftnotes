@@ -15,7 +15,8 @@ public sealed class UpdateHost
     static Exception Off(string what) => new InvalidOperationException($"{what} is off for this update.");
 
     public string System { get; init; } = Machine.Platform;
-    /// <summary>This copy's own folder: the Mac bundle (Study Stash.app) or the Windows install folder. Empty when
+    /// <summary>This copy's own folder: the Mac bundle (Study Stash.app), the Windows install folder, or the folder a
+    /// Linux tarball was unpacked into (~/.local/share/syft-notes). Empty when
     /// this copy doesn't update itself - see <see cref="Updates.WhyNotUpdatable"/> and <see cref="NotInstalledReason"/>.</summary>
     public string AppDir { get; init; } = "";
     /// <summary>Why AppDir is empty, for the student. Ignored once AppDir is set.</summary>
@@ -61,6 +62,15 @@ public sealed class UpdateHost
         {
             appDir = Apps.WindowsInstallOf(baseDir) ?? "";
         }
+        else if (system == "Linux")
+        {
+            appDir = Apps.LinuxInstallOf(baseDir, out string problem) ?? "";
+            if (problem == "unwritable")
+            {
+                reason = "Syft Notes' folder isn't writable, so it can't update itself here. Install the new version the way you installed this one.";
+                cantReplace = true;
+            }
+        }
         return new UpdateHost
         {
             System = system, AppDir = appDir, NotInstalledReason = reason, CantReplace = cantReplace,
@@ -71,8 +81,8 @@ public sealed class UpdateHost
 
 /// <summary>
 /// Installing a release (D4). Only an installed copy updates: a Mac bundle swaps in the new one from its DMG, a
-/// Windows install runs the Setup.exe quietly and lets it relaunch the app. Both check the download's
-/// SHA-256 against the release's SHA256SUMS.txt first.
+/// Windows install runs the Setup.exe quietly and lets it relaunch the app, and a Linux copy swaps in the new folder
+/// from its tarball. Each checks the download's SHA-256 against the release's SHA256SUMS.txt first.
 /// </summary>
 public static partial class Updates
 {
@@ -89,7 +99,7 @@ public static partial class Updates
             string? v = (system ?? Machine.Platform) switch
             {
                 "Darwin" => Apps.PlistString(Path.Combine(appDir, "Contents", "Info.plist"), "CFBundleShortVersionString"),
-                "Windows" => Apps.WindowsIniVersion(appDir),
+                "Windows" or "Linux" => Apps.WindowsIniVersion(appDir),
                 _ => null,
             };
             return v is { Length: > 0 } ? v : Engine.Version;
@@ -102,11 +112,8 @@ public static partial class Updates
 
     /// <summary>Why this copy doesn't update itself, or null when it does.</summary>
     public static string? WhyNotUpdatable(UpdateHost host) =>
-        host.System switch
-        {
-            "Linux" => "Syft Notes updates itself on a Mac or a Windows PC.",
-            _ => host.AppDir.Length > 0 ? null : host.NotInstalledReason,
-        };
+        host.System is not ("Darwin" or "Windows" or "Linux") ? "Syft Notes updates itself on a Mac, a Windows PC or Linux."
+        : host.AppDir.Length > 0 ? null : host.NotInstalledReason;
 
     /// <summary>What running this exact program with `version` prints, or null when it doesn't run here.</summary>
     public static string? VersionOf(string exe)
@@ -243,6 +250,80 @@ public static partial class Updates
         }
     }
 
+    /// <summary>The program inside a Linux copy's folder.</summary>
+    public static string LinuxProgram(string appDir) => Path.Combine(appDir, "StudyStash");
+
+    /// <summary>Linux path of D4: the release's tarball for this processor, checked against its checksum, unpacked
+    /// beside this copy, run once to check it's really the release, then swapped in for it the way a Mac bundle is
+    /// (the old folder kept until the new one is in place), and the services running the old one restarted.</summary>
+    static async Task<bool> ApplyLinuxAsync(Release release, string home, UpdateHost host, string asset, string url,
+        IReadOnlyDictionary<string, string>? checksums, bool restartServices, Func<bool> ready, Action<string> log)
+    {
+        string scratch = Path.Combine(host.TempDir, "syft-notes-update-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(scratch);
+        string fresh = Path.Combine(Path.GetDirectoryName(host.AppDir)!, "." + Path.GetFileName(host.AppDir) + ".new");
+        try
+        {
+            string tarball = Path.Combine(scratch, asset);
+            try
+            {
+                await Ready.DownloadAsync(url, tarball, http: host.Http);
+            }
+            catch (Exception e) when (e is IOException or HttpRequestException or UnauthorizedAccessException or TaskCanceledException)
+            {
+                log($"Download failed: {e.Message}");
+                return false;
+            }
+            if (!ChecksumOk(tarball, asset, checksums))
+            {
+                log("The download didn't match its checksum, so this version stays.");
+                return false;
+            }
+            // Unpacked next to this copy (the same disk, so the swap is a rename), from its one folder, syft-notes/.
+            Apps.TryDeleteFolder(fresh);
+            Directory.CreateDirectory(fresh);
+            if (host.Run("tar", ["-xzf", tarball, "-C", fresh, "--strip-components=1"], TimeSpan.FromMinutes(5)) is not { ExitCode: 0 })
+            {
+                log($"The {release.Tag} download couldn't be unpacked, so this version stays.");
+                return false;
+            }
+            string freshVersion = Apps.WindowsIniVersion(fresh) ?? "";
+            bool runsOk = host.VersionOf(LinuxProgram(fresh)) is string v && Compare(ParseVersion(v), release.Version) == 0;
+            if (Compare(ParseVersion(freshVersion), release.Version) != 0 || !runsOk)
+            {
+                log($"The {release.Tag} download didn't run on this computer, so this version stays.");
+                return false;
+            }
+            if (!ready())
+            {
+                log(PutOff);
+                return false;
+            }
+            List<string> roles = restartServices ? ServicesRunning(LinuxProgram(host.AppDir), host) : [];
+            try
+            {
+                Apps.SwapMacBundle(host.AppDir, fresh, host.Run);
+            }
+            catch (Exception e) when (e is IOException or UnauthorizedAccessException)
+            {
+                log($"Install failed: {e.Message}");
+                return false;
+            }
+            log($"Installed {release.Tag}.");
+            foreach (string role in roles)
+            {
+                Autostart.Restart(role, host.Places, host.Run, host.System);
+                log($"Restarted the {role} service.");
+            }
+            return true;
+        }
+        finally
+        {
+            Apps.TryDeleteFolder(fresh);
+            Apps.TryDeleteFolder(scratch);
+        }
+    }
+
     /// <summary>Windows path of D4: hand the Setup.exe the quiet, self-relaunching arguments and return - Setup
     /// closes this copy, installs over it, and starts it again.</summary>
     static async Task<bool> ApplyWindowsAsync(Release release, string home, UpdateHost host, string asset, string url,
@@ -303,7 +384,7 @@ public static partial class Updates
         }
         if (Installer(host.System) is not { } asset)
         {
-            log("Syft Notes updates itself on a Mac or a Windows PC.");
+            log("There's no download of Syft Notes for this computer's processor.");
             return false;
         }
         string url = release.Assets?.GetValueOrDefault(asset) ?? "";
@@ -327,9 +408,12 @@ public static partial class Updates
             }
         }
         log($"Installing {release.Tag}...");
-        return host.System == "Darwin"
-            ? await ApplyMacAsync(release, home, host, asset, url, checksums, restartServices, ready, log)
-            : await ApplyWindowsAsync(release, home, host, asset, url, checksums, ready, log);
+        return host.System switch
+        {
+            "Darwin" => await ApplyMacAsync(release, home, host, asset, url, checksums, restartServices, ready, log),
+            "Linux" => await ApplyLinuxAsync(release, home, host, asset, url, checksums, restartServices, ready, log),
+            _ => await ApplyWindowsAsync(release, home, host, asset, url, checksums, ready, log),
+        };
     }
 
     // --- the background checker ------------------------------------------------------------------------------------

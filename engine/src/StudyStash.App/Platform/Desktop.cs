@@ -11,7 +11,8 @@ using StudyStash.Core;
 namespace StudyStash.App.Platform;
 
 /// <summary>The desktop around the app: the Dock (a Mac shows the app there only while a window is open), starting at
-/// login, the taskbar button's progress (Windows), and one copy of the app at a time.</summary>
+/// login (a LaunchAgent, the Run key, or an XDG autostart entry on Linux), the taskbar button's progress (Windows), and
+/// one copy of the app at a time.</summary>
 public static class Desktop
 {
     // --- the Mac's Dock and app activation --------------------------------------------------------------------------
@@ -142,6 +143,35 @@ public static class Desktop
     static string LaunchAgent(string label) =>
         Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), "Library", "LaunchAgents", label + ".plist");
 
+    /// <summary>Linux: the XDG autostart entry every desktop (GNOME, KDE, Xfce, Cinnamon) starts at login, in
+    /// $XDG_CONFIG_HOME/autostart (~/.config/autostart).</summary>
+    internal static string AutostartEntry(string label, string? configHome = null)
+    {
+        configHome ??= Environment.GetEnvironmentVariable("XDG_CONFIG_HOME") is { Length: > 0 } x
+            ? x : Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".config");
+        return Path.Combine(configHome, "autostart", label + ".desktop");
+    }
+
+    /// <summary>The autostart entry that starts the app when you log in to Linux. Exec's arguments are quoted as the
+    /// Desktop Entry spec says (double quotes, with ", `, $ and \ escaped), so a folder with spaces still opens.</summary>
+    internal static string AutostartDesktopFile(IEnumerable<string> args)
+    {
+        static string Quote(string a) => a.Length > 0 && a.All(c => char.IsLetterOrDigit(c) || "-_./=+:,@".Contains(c))
+            ? a : "\"" + string.Concat(a.Select(c => c is '"' or '`' or '$' or '\\' ? "\\" + c : c == '%' ? "%%" : c.ToString())) + "\"";
+        return $"""
+            [Desktop Entry]
+            Type=Application
+            Name=Syft Notes
+            Comment=Record your lectures. Get the notes.
+            Exec={string.Join(' ', args.Select(Quote))}
+            Icon=syft-notes
+            Terminal=false
+            X-GNOME-Autostart-enabled=true
+            NoDisplay=true
+
+            """;
+    }
+
     /// <summary>Whether the app starts when you log in, for this settings folder.</summary>
     public static bool StartsAtLogin(string home)
     {
@@ -149,6 +179,7 @@ public static class Desktop
         var (label, value) = LoginName(home);
         if (OperatingSystem.IsMacOS()) return File.Exists(LaunchAgent(label));
         if (OperatingSystem.IsWindows()) return Registry.CurrentUser.OpenSubKey(RunKey)?.GetValue(value) is string;
+        if (OperatingSystem.IsLinux()) return File.Exists(AutostartEntry(label));
         return false;
     }
 
@@ -174,6 +205,17 @@ public static class Desktop
             using var key = Registry.CurrentUser.CreateSubKey(RunKey);
             if (on) key.SetValue(value, RunCommand(Program, home));
             else key.DeleteValue(value, throwOnMissingValue: false);
+        }
+        else if (OperatingSystem.IsLinux())
+        {
+            string entry = AutostartEntry(label);
+            if (!on)
+            {
+                File.Delete(entry);
+                return;
+            }
+            Directory.CreateDirectory(Path.GetDirectoryName(entry)!);
+            File.WriteAllText(entry, AutostartDesktopFile(LoginArgs(Program, home)));
         }
     }
 

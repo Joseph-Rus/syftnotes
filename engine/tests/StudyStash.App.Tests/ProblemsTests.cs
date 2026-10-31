@@ -198,8 +198,7 @@ public class ProblemsTests
     [Fact]
     public void A_library_only_computers_status_line_never_mentions_the_transcription_model()
     {
-        string device = OperatingSystem.IsMacOS() ? "Mac" : "PC";
-        Assert.Equal($"Library running on this {device}", AppHost.StatusText(LibraryState.Connected, true, false, null, records: false));
+        Assert.Equal($"Library running on this {Core.Machine.Device}", AppHost.StatusText(LibraryState.Connected, true, false, null, records: false));
         Assert.Equal("Starting your library…", AppHost.StatusText(LibraryState.Starting, false, false, null, records: false));
     }
 }

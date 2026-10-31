@@ -6,8 +6,8 @@
 //  - a link, image, script or stylesheet on the site doesn't resolve, or a #fragment names no id on its page;
 //  - a link starts with "/" (the site must also work under <user>.github.io/study-stash/, so links are relative);
 //  - a page loads anything from another site (the privacy policy promises this site loads nothing from others);
-//  - the downloads aren't the two release assets, Syft-Notes.dmg and Syft-Notes-Setup.exe, or the home page
-//    doesn't offer both.
+//  - the downloads aren't the release assets (Syft-Notes.dmg, Syft-Notes-Setup.exe and the two Linux tarballs), or
+//    the home page doesn't offer them all.
 import { createServer } from "node:http";
 import { readFile, readdir, stat } from "node:fs/promises";
 import { dirname, extname, join, relative, resolve, sep } from "node:path";
@@ -15,7 +15,8 @@ import { fileURLToPath } from "node:url";
 
 const root = dirname(fileURLToPath(import.meta.url));
 const releases = "https://github.com/Joseph-Rus/study-stash/releases/latest/download/";
-const downloads = [releases + "Syft-Notes.dmg", releases + "Syft-Notes-Setup.exe"];
+const downloads = [releases + "Syft-Notes.dmg", releases + "Syft-Notes-Setup.exe", releases + "Syft-Notes-linux-x64.tar.gz",
+  releases + "Syft-Notes-linux-arm64.tar.gz"];
 const types = {
   ".html": "text/html; charset=utf-8", ".css": "text/css", ".js": "text/javascript", ".mjs": "text/javascript",
   ".png": "image/png", ".webp": "image/webp", ".svg": "image/svg+xml", ".ico": "image/x-icon", ".md": "text/plain",

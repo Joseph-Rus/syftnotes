@@ -49,7 +49,7 @@ public sealed class AgentInstall
         this.installer = installer ?? cli.Installer(windows);
         this.which = which ?? AiProvider.Which;
         this.logPath = logPath;
-        Device = windows ? "PC" : "Mac";
+        Device = Machine.DeviceFor(windows);
     }
 
     public string Device { get; }

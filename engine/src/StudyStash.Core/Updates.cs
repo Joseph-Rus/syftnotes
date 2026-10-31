@@ -39,6 +39,8 @@ public static partial class Updates
     // One download per system: the same app whatever the computer is for (setup asks, and Settings can change it).
     public const string MacAsset = "Syft-Notes.dmg";
     public const string WindowsAsset = "Syft-Notes-Setup.exe";
+    public const string LinuxX64Asset = "Syft-Notes-linux-x64.tar.gz";
+    public const string LinuxArm64Asset = "Syft-Notes-linux-arm64.tar.gz";
     public const string ChecksumsAsset = "SHA256SUMS.txt";
 
     // The one download's names before the rename to Syft Notes: 0.19.0 asks for the Egghead Notes names and 0.18.x
@@ -56,17 +58,25 @@ public static partial class Updates
     public const string WindowsLaptopAsset = "Study-Stash-Laptop-Setup.exe";
     public const string WindowsLibraryAsset = "Study-Stash-Library-Setup.exe";
 
-    /// <summary>What a release holds for installing: the two downloads, then the eight old names kept for older copies.</summary>
-    public static readonly IReadOnlyList<string> Installers = [MacAsset, WindowsAsset, .. OldInstallers()];
+    /// <summary>What a release holds for installing: the downloads (Mac, Windows, and Linux for each processor), then
+    /// the eight old names kept for older copies.</summary>
+    public static readonly IReadOnlyList<string> Installers = [MacAsset, WindowsAsset, LinuxX64Asset, LinuxArm64Asset, .. OldInstallers()];
 
     static string[] OldInstallers() => [EggheadMacAsset, EggheadWindowsAsset, StudyStashMacAsset, StudyStashWindowsAsset, MacLaptopAsset, MacLibraryAsset, WindowsLaptopAsset, WindowsLibraryAsset];
 
-    /// <summary>The download this system installs from, whatever the computer is for, or null when it doesn't update
-    /// itself (Linux).</summary>
-    public static string? Installer(string system) => system switch
+    /// <summary>The download this system installs from, whatever the computer is for, or null when there's none for
+    /// it. Linux has one per processor (<paramref name="arch"/>, this one's when not given); a Mac's DMG and Windows'
+    /// Setup.exe carry both.</summary>
+    public static string? Installer(string system, System.Runtime.InteropServices.Architecture? arch = null) => system switch
     {
         "Darwin" => MacAsset,
         "Windows" => WindowsAsset,
+        "Linux" => (arch ?? System.Runtime.InteropServices.RuntimeInformation.ProcessArchitecture) switch
+        {
+            System.Runtime.InteropServices.Architecture.X64 => LinuxX64Asset,
+            System.Runtime.InteropServices.Architecture.Arm64 => LinuxArm64Asset,
+            _ => null,
+        },
         _ => null,
     };
 

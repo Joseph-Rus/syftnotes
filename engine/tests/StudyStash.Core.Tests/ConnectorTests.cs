@@ -26,6 +26,8 @@ static class NoInternetFetch
     internal static void Set()
     {
         Environment.SetEnvironmentVariable("STUDYSTASH_TESTS", "1");
+        // The Mac and Windows wording reads the same on a Linux test runner; the Linux tests ask for Linux's words.
+        StudyStash.Core.Machine.Linux = false;
         // Codex's own config.toml is the student's: no test reads the real one (a turn that reads it keeps the MCP
         // servers it names off, and would look there for their names).
         StudyStash.Core.Ai.SetupChat.CodexConfig = () => Path.Combine(Path.GetTempPath(), "studystash-core-tests-no-codex", "config.toml");

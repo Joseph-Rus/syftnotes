@@ -218,7 +218,7 @@ public static partial class Shell
     static string LibraryStatus()
     {
         string status = host.Settings.Role != AppRole.Laptop && host.LocalLibrary?.State == LibraryServiceState.Running
-            ? $"Library running on this {(OperatingSystem.IsMacOS() ? "Mac" : "PC")}"
+            ? $"Library running on this {Machine.Device}"
             : host.Library switch
             {
                 LibraryState.Connected => "Library connected",

@@ -317,6 +317,7 @@ public static partial class Shell
         string quick = Keybindings.Show(KeyAction.Quick);
         string record = Keybindings.Show(KeyAction.Record);
         string icon = OperatingSystem.IsMacOS() ? "menu bar" : "tray";
+        if (hotkeys.Unsupported) return $"Your desktop (Wayland) doesn't let apps have shortcuts of their own, so search and record from the {icon}, or give {quick} and {record} to Syft Notes in your desktop's keyboard settings.";
         if (!hotkeys.Quick) return $"{quick} is taken by another app, so search from the {icon}.";
         if (!hotkeys.Record) return $"{record} is taken by another app, so record from the {icon}.";
         return null;
@@ -494,7 +495,7 @@ public static partial class Shell
         bool mac = OperatingSystem.IsMacOS();
         bool hidden = mac && MacStatusItem.Check() is { Seen: false };
         if (!IconWords.WorthSaying(hidden, panelWindow?.IsVisible == true)) return;
-        var (title, text) = IconWords.WhereItIs(mac, hidden);
+        var (title, text) = IconWords.WhereItIs(mac, hidden, Core.Machine.Linux);
         // Longer than most: it's the one way to find the app when its icon can't be seen.
         Toast(title, text, hidden ? IconWords.ShowIt : null, hidden ? MoveIconIntoView : null, hidden ? NoticeTimes.Advice : TimeSpan.FromSeconds(12));
     }
@@ -1840,7 +1841,7 @@ public static partial class Shell
         panel.Library = panel.LibraryOnly
             ? LibraryPanelWords.From(host.Library == LibraryState.Connected || host.LocalLibrary?.State is LibraryServiceState.Running or LibraryServiceState.Elsewhere,
                 host.Library == LibraryState.Starting || host.LocalLibrary?.State == LibraryServiceState.Starting,
-                OperatingSystem.IsMacOS() ? "Mac" : "PC", host.Overview, canvasWatch?.State, DateTimeOffset.Now, TimeZoneInfo.Local)
+                Machine.Device, host.Overview, canvasWatch?.State, DateTimeOffset.Now, TimeZoneInfo.Local)
             : null;
         KeepCanvasWatched();
         UpdateComingUp();
@@ -1900,7 +1901,7 @@ public static partial class Shell
         }
         card.RecordKeys = Keybindings.Show(KeyAction.Record, mac);
         card.IconHidden = mac && MacStatusItem.Check() is { Seen: false };
-        card.ShowModel(host.ModelReady, host.Downloading?.Fraction, host.DownloadProblem, mac ? "Mac" : "PC");
+        card.ShowModel(host.ModelReady, host.Downloading?.Fraction, host.DownloadProblem, Machine.DeviceForLook(mac));
         bool micRefused = host.MicAccess() is MicAccess.Denied or MicAccess.Restricted;
         card.MicLine = !micRefused ? ""
             : mac ? "Syft Notes can't use the microphone yet. Turn it on in System Settings → Privacy & Security → Microphone."

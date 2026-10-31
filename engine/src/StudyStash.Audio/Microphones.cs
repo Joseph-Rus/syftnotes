@@ -11,17 +11,20 @@ public static class Microphones
         if (OperatingSystem.IsMacOSVersionAtLeast(14, 2) && withComputerAudio) return new MacSound(withComputerAudio: true);
         if (OperatingSystem.IsMacOS()) return new MacMicrophone();
         if (OperatingSystem.IsWindows()) return new WindowsSound(withComputerAudio);
-        throw new PlatformNotSupportedException("Recording works on a Mac or a Windows PC.");
+        if (OperatingSystem.IsLinux()) return new LinuxSound(withComputerAudio);
+        throw new PlatformNotSupportedException("Recording works on a Mac, a Windows PC or Linux.");
     }
 
-    /// <summary>Recording the computer's own sound (a lecture on Zoom) works on Windows, and on a Mac with macOS 14.2
-    /// or later (process taps).</summary>
-    public static bool CanRecordComputerAudio => OperatingSystem.IsWindows() || OperatingSystem.IsMacOSVersionAtLeast(14, 2);
+    /// <summary>Recording the computer's own sound (a lecture on Zoom) works on Windows, on Linux (the speakers'
+    /// monitor), and on a Mac with macOS 14.2 or later (process taps).</summary>
+    public static bool CanRecordComputerAudio => OperatingSystem.IsWindows() || OperatingSystem.IsLinux() || OperatingSystem.IsMacOSVersionAtLeast(14, 2);
 
     public static MicAccess Access()
     {
         if (OperatingSystem.IsMacOS()) return MacPermissions.Microphone();
         if (OperatingSystem.IsWindows()) return WindowsPermissions.Microphone();
+        // Linux has no microphone switch of its own to ask: a sandbox that refuses says so when recording starts.
+        if (OperatingSystem.IsLinux()) return MicAccess.Allowed;
         return MicAccess.Unknown;
     }
 

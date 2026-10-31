@@ -480,6 +480,7 @@ public class Floating : Window
                 var at = MouseLocation(objc_getClass("NSEvent"), sel_registerName("mouseLocation"));
                 return new PixelPoint((int)at.X, 0); // points from the bottom left; only across matters for the menu bar
             }
+            if (OperatingSystem.IsLinux()) return Platform.LinuxPointer.Where();
         }
         catch (Exception e) when (e is DllNotFoundException or EntryPointNotFoundException)
         {

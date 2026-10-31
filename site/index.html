@@ -56,11 +56,16 @@
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M1 3.8 10 2.6v8.7H1zm10.2-1.4L23 .8v10.5H11.2zM1 12.6h9v8.8l-9-1.3zm10.2 0H23v10.6l-11.8-1.7z"/></svg>
             <span>Download for Windows<small>Windows 10 and 11</small></span>
           </a>
+          <a class="btn btn-quiet" data-os="linux" hidden href="#download">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2c-2.2 0-3.6 1.9-3.6 4.6 0 1.3.3 2.3.1 3.3-.3 1.4-2 2.9-2.9 4.7-.9 1.8-.8 3.4-.2 4.4-.9.3-1.6.9-1.4 1.7.3 1 2.1.8 3.3 1.1 1.3.4 2.2 1 3.2.6.5-.2.8-.6 1-1h1c.2.4.5.8 1 1 1 .4 1.9-.2 3.2-.6 1.2-.3 3-.1 3.3-1.1.2-.8-.5-1.4-1.4-1.7.6-1 .7-2.6-.2-4.4-.9-1.8-2.6-3.3-2.9-4.7-.2-1 .1-2 .1-3.3C15.6 3.9 14.2 2 12 2zm-1.3 4.3c.4 0 .7.5.7 1.1 0 .3-.1.6-.3.8l-.6-.2c.1-.2.2-.4.2-.6 0-.3-.1-.5-.3-.5s-.3.3-.3.6v.2l-.6-.1v-.2c0-.6.5-1.1 1.2-1.1zm2.6 0c.7 0 1.1.5 1.1 1.1v.2l-.5.2v-.4c0-.3-.2-.6-.4-.6-.3 0-.4.3-.4.6 0 .2.1.4.2.6l-.6.2c-.2-.2-.3-.5-.3-.8 0-.6.4-1.1.9-1.1zM12 9.2c.9 0 2 .6 2 1 0 .3-1.2 1.1-2 1.1s-2-.8-2-1.1c0-.4 1.1-1 2-1z"/></svg>
+            <span>Download for Linux<small>x64 and ARM64</small></span>
+          </a>
         </div>
         <p class="next" data-next hidden aria-live="polite"></p>
         <p class="fine other-dl" data-other-downloads hidden>Other downloads:
           <a data-other="windows" href="https://github.com/Joseph-Rus/study-stash/releases/latest/download/Syft-Notes-Setup.exe">Windows</a>
           <a data-other="mac" href="https://github.com/Joseph-Rus/study-stash/releases/latest/download/Syft-Notes.dmg">Mac</a>
+          <a data-other="linux" href="#download">Linux</a>
           <a href="phone/">iPhone app</a></p>
         <p class="fine">Free and open source.
           <a href="https://github.com/Joseph-Rus/study-stash/releases/latest">Release notes and every file on GitHub</a>.</p>
@@ -125,7 +130,7 @@
     <div class="feature-text">
       <h2 id="record-title">Record</h2>
       <p class="feature-sub">Every word, written down live.</p>
-      <p>Click <strong>Record</strong> on Home, in the menu bar or the tray, or press <kbd>⌥⇧R</kbd> (<kbd>Ctrl+Alt+R</kbd> on Windows). Syft Notes writes the lecture down as it's said, on your own computer. The audio never leaves it.</p>
+      <p>Click <strong>Record</strong> on Home, in the menu bar or the tray, or press <kbd>⌥⇧R</kbd> (<kbd>Ctrl+Alt+R</kbd> on Windows and Linux). Syft Notes writes the lecture down as it's said, on your own computer. The audio never leaves it.</p>
         <ul>
           <li>Type your own notes while it records; the write-up is built round them</li>
           <li>Pause or stop from the menu bar</li>
@@ -249,7 +254,7 @@
       <p>Ask about one lecture, a class, or all of them. The answer comes from your own notes, with the lecture and the minute it was said.</p>
         <ul>
           <li>An Ask bar on Home, on every class and under every lecture's notes</li>
-          <li>The quick panel from anywhere: <kbd>⌥Space</kbd> on a Mac, <kbd>Alt+Shift+Space</kbd> on Windows</li>
+          <li>The quick panel from anywhere: <kbd>⌥Space</kbd> on a Mac, <kbd>Alt+Shift+Space</kbd> on Windows and Linux</li>
           <li>Answers appear as they're written</li>
         </ul>
     </div>
@@ -313,7 +318,7 @@
   <div class="wrap">
     <div class="section-head">
       <img src="assets/img/icon.webp?v=5" width="256" height="256" alt="" loading="lazy">
-      <h2 id="download-title">Free, for Mac and Windows.</h2>
+      <h2 id="download-title">Free, for Mac, Windows and Linux.</h2>
       <p>The same app for every computer, and setup is one button. It comes in light and dark and twenty colour
         themes, and keeps itself up to date, never while it's recording.</p>
     </div>
@@ -339,6 +344,18 @@
           Syft Notes by itself. If Windows says
           "Windows protected your PC", click <strong>More info</strong>, then <strong>Run anyway</strong>.</p>
         <a class="btn btn-primary" href="https://github.com/Joseph-Rus/study-stash/releases/latest/download/Syft-Notes-Setup.exe">Download Syft-Notes-Setup.exe</a>
+      </div>
+      <div class="dl" data-for-os="linux">
+        <div class="os">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2c-2.2 0-3.6 1.9-3.6 4.6 0 1.3.3 2.3.1 3.3-.3 1.4-2 2.9-2.9 4.7-.9 1.8-.8 3.4-.2 4.4-.9.3-1.6.9-1.4 1.7.3 1 2.1.8 3.3 1.1 1.3.4 2.2 1 3.2.6.5-.2.8-.6 1-1h1c.2.4.5.8 1 1 1 .4 1.9-.2 3.2-.6 1.2-.3 3-.1 3.3-1.1.2-.8-.5-1.4-1.4-1.7.6-1 .7-2.6-.2-4.4-.9-1.8-2.6-3.3-2.9-4.7-.2-1 .1-2 .1-3.3C15.6 3.9 14.2 2 12 2zm-1.3 4.3c.4 0 .7.5.7 1.1 0 .3-.1.6-.3.8l-.6-.2c.1-.2.2-.4.2-.6 0-.3-.1-.5-.3-.5s-.3.3-.3.6v.2l-.6-.1v-.2c0-.6.5-1.1 1.2-1.1zm2.6 0c.7 0 1.1.5 1.1 1.1v.2l-.5.2v-.4c0-.3-.2-.6-.4-.6-.3 0-.4.3-.4.6 0 .2.1.4.2.6l-.6.2c-.2-.2-.3-.5-.3-.8 0-.6.4-1.1.9-1.1zM12 9.2c.9 0 2 .6 2 1 0 .3-1.2 1.1-2 1.1s-2-.8-2-1.1c0-.4 1.1-1 2-1z"/></svg>
+          <h3>Linux</h3>
+          <span class="tag">This computer</span>
+        </div>
+        <p>Needs a desktop with PipeWire or PulseAudio (Ubuntu, Fedora, Debian, Mint and the like). Unpack it and run
+          <code>sh syft-notes/install.sh</code>: it installs for your account only, no root needed, with Syft Notes in
+          your applications menu. It looks like the Windows app and waits in your desktop's tray.</p>
+        <p class="btns"><a class="btn btn-primary" href="https://github.com/Joseph-Rus/study-stash/releases/latest/download/Syft-Notes-linux-x64.tar.gz">Download for x64</a>
+          <a class="btn btn-quiet" href="https://github.com/Joseph-Rus/study-stash/releases/latest/download/Syft-Notes-linux-arm64.tar.gz">ARM64</a></p>
       </div>
     </div>
     <p class="fine">Every update is checked against the release's <code>SHA256SUMS.txt</code> before it installs.
