@@ -586,7 +586,7 @@ public class LibraryWebTests
         Assert.Equal("{\"detail\":\"wrong password\"}", await nope.Content.ReadAsStringAsync());
         var r = await c.Client.SendAsync(Req(HttpMethod.Get, "/api/health", "pw"));
         Assert.Equal(HttpStatusCode.OK, r.StatusCode);
-        Assert.True(JsonNode.DeepEquals(JsonNode.Parse($$"""{"ok": true, "pool_name": "Fall pool", "classes": ["CS 101", "Bio 110"], "notes": 0, "version": "{{Engine.Version}}"}"""),
+        Assert.True(JsonNode.DeepEquals(JsonNode.Parse($$"""{"ok": true, "pool_name": "Fall pool", "classes": ["CS 101", "Bio 110"], "notes": 0, "version": "{{Engine.Version}}", "background": false}"""),
             JsonNode.Parse(await r.Content.ReadAsStringAsync())));
         Assert.Equal(Engine.Version, r.Headers.GetValues("X-Study-Stash").Single());
     }
