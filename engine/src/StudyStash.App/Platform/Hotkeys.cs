@@ -12,15 +12,17 @@ public enum Shortcut
     Record = 2,
 }
 
-/// <summary>Whether each shortcut is registered, so Settings can say which one (if any) is taken by another app.</summary>
-public readonly record struct HotkeyResult(bool Quick, bool Record)
+/// <summary>Whether each shortcut is registered, so Settings can say which one (if any) is taken by another app.
+/// <see cref="Unsupported"/>: neither could be, because this desktop doesn't let an app have keys of its own (Wayland).</summary>
+public readonly record struct HotkeyResult(bool Quick, bool Record, bool Unsupported = false)
 {
     public bool All => Quick && Record;
 }
 
 /// <summary>
 /// The app's shortcuts, working from any app: Carbon's hot keys on a Mac (no permission needed), RegisterHotKey on
-/// Windows. Pressed, they call back on the UI thread. <see cref="Register"/> can be called again after
+/// Windows, XGrabKey on Linux's X11 (a Wayland desktop gives no app keys of its own: there they're said to be
+/// unavailable). Pressed, they call back on the UI thread. <see cref="Register"/> can be called again after
 /// <see cref="Unregister"/> (the Shortcuts toggle in Settings turns them on and off without restarting).
 /// </summary>
 public static class Hotkeys
@@ -34,6 +36,7 @@ public static class Hotkeys
         {
             if (OperatingSystem.IsMacOS()) return Mac.Register(quick, record);
             if (OperatingSystem.IsWindows()) return Win.Register(quick, record);
+            if (OperatingSystem.IsLinux()) return X11Keys.Wayland ? new HotkeyResult(false, false, Unsupported: true) : X11Keys.Register(quick, record, Fire);
         }
         catch (Exception e) when (e is DllNotFoundException or EntryPointNotFoundException)
         {
@@ -48,6 +51,7 @@ public static class Hotkeys
         {
             if (OperatingSystem.IsMacOS()) Mac.Unregister();
             else if (OperatingSystem.IsWindows()) Win.Unregister();
+            else if (OperatingSystem.IsLinux()) X11Keys.Unregister();
         }
         catch (Exception e) when (e is DllNotFoundException or EntryPointNotFoundException)
         {

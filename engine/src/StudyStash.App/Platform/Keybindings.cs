@@ -159,6 +159,35 @@ public readonly record struct KeyCombo(KeyMods Mods, string Key)
         int at = Find(Key);
         return (at < 0 ? 0u : Table[at].Win, mods);
     }
+
+    /// <summary>X11's name for the key (what XStringToKeysym takes: "r", "space", "F5", "comma") and XGrabKey's
+    /// ShiftMask, ControlMask, Mod1Mask (Alt) and Mod4Mask (Super, the Windows key). The name is "" for a key it
+    /// doesn't know.</summary>
+    public (string Keysym, uint Mods) X11()
+    {
+        uint mods = (Mods.HasFlag(KeyMods.Shift) ? 0x1u : 0) | (Mods.HasFlag(KeyMods.Control) ? 0x4u : 0)
+            | (Mods.HasFlag(KeyMods.Alt) ? 0x8u : 0) | (Mods.HasFlag(KeyMods.Command) ? 0x40u : 0);
+        string keysym = Find(Key) < 0 ? "" : Key switch
+        {
+            { Length: 1 } k when char.IsLetter(k[0]) => k.ToLowerInvariant(),
+            { Length: 1 } k when char.IsDigit(k[0]) => k,
+            "Space" => "space",
+            "Enter" => "Return",
+            "Comma" => "comma",
+            "Period" => "period",
+            "Slash" => "slash",
+            "Semicolon" => "semicolon",
+            "Quote" => "apostrophe",
+            "LeftBracket" => "bracketleft",
+            "RightBracket" => "bracketright",
+            "Backslash" => "backslash",
+            "Minus" => "minus",
+            "Equals" => "equal",
+            "Backtick" => "grave",
+            _ => Key, // F1 to F12
+        };
+        return (keysym, mods);
+    }
 }
 
 /// <summary>

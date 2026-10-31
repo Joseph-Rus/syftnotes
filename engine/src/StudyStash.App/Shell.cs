@@ -317,6 +317,7 @@ public static partial class Shell
         string quick = Keybindings.Show(KeyAction.Quick);
         string record = Keybindings.Show(KeyAction.Record);
         string icon = OperatingSystem.IsMacOS() ? "menu bar" : "tray";
+        if (hotkeys.Unsupported) return $"Your desktop (Wayland) doesn't let apps have shortcuts of their own, so search and record from the {icon}, or give {quick} and {record} to Syft Notes in your desktop's keyboard settings.";
         if (!hotkeys.Quick) return $"{quick} is taken by another app, so search from the {icon}.";
         if (!hotkeys.Record) return $"{record} is taken by another app, so record from the {icon}.";
         return null;
@@ -494,7 +495,7 @@ public static partial class Shell
         bool mac = OperatingSystem.IsMacOS();
         bool hidden = mac && MacStatusItem.Check() is { Seen: false };
         if (!IconWords.WorthSaying(hidden, panelWindow?.IsVisible == true)) return;
-        var (title, text) = IconWords.WhereItIs(mac, hidden);
+        var (title, text) = IconWords.WhereItIs(mac, hidden, Core.Machine.Linux);
         // Longer than most: it's the one way to find the app when its icon can't be seen.
         Toast(title, text, hidden ? IconWords.ShowIt : null, hidden ? MoveIconIntoView : null, hidden ? NoticeTimes.Advice : TimeSpan.FromSeconds(12));
     }

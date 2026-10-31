@@ -533,7 +533,8 @@ public sealed partial class SetupModel : ObservableObject
         if (forSchool) steps.Add(SetupStep.Canvas);
         steps.Add(SetupStep.Classes);
         if (role != AppRole.Laptop) steps.Add(SetupStep.StartAtLogin);
-        if (role != AppRole.Library && skin == SkinKind.Win) steps.Add(SetupStep.Taskbar);
+        // Windows' taskbar corner, with its ^; Linux's tray is the desktop's own, with nothing to drag.
+        if (role != AppRole.Library && skin == SkinKind.Win && !StudyStash.Core.Machine.Linux) steps.Add(SetupStep.Taskbar);
         steps.Add(SetupStep.Done);
         return steps;
     }

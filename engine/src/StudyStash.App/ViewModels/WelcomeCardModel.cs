@@ -27,7 +27,12 @@ public sealed partial class WelcomeCardModel(bool mac) : ObservableObject
     [NotifyPropertyChangedFor(nameof(WhereLine), nameof(CanShowIt))]
     public partial bool IconHidden { get; set; }
 
-    public string WhereLine => !mac
+    /// <summary>Linux: the tray is the desktop's own (GNOME's top bar, KDE's or Xfce's panel), and some show none.</summary>
+    public bool Linux { get; init; } = StudyStash.Core.Machine.Linux;
+
+    public string WhereLine => !mac && Linux
+        ? "Syft Notes also waits in your desktop's tray: click its icon in the top bar or panel to record or search. No icon? Open Syft Notes from your applications menu (on GNOME, the AppIndicator extension shows it)."
+        : !mac
         ? "Syft Notes also waits by the clock: click the Syft Notes icon in the taskbar corner. Can't see it? Click ^ and drag it next to the clock."
         : IconHidden
             ? "Your menu bar is full, so the Syft Notes icon is hidden behind other icons."

@@ -94,4 +94,52 @@ public class LinuxDesktopTests
         Assert.Equal("computer", Core.Machine.DeviceForLook(mac: false, linux: true));
         Assert.Equal("PC", Core.Machine.DeviceForLook(mac: false, linux: false));
     }
+
+    [Theory]
+    [InlineData("Alt+Shift+Space", "space", 0x9u)]
+    [InlineData("Control+Alt+R", "r", 0xCu)]
+    [InlineData("Command+Shift+7", "7", 0x41u)]
+    [InlineData("Control+F5", "F5", 0x4u)]
+    [InlineData("Alt+Comma", "comma", 0x8u)]
+    [InlineData("Control+Enter", "Return", 0x4u)]
+    [InlineData("Shift+Backtick", "grave", 0x1u)]
+    public void A_shortcut_is_grabbed_on_x11_by_its_keysym_and_modifier_masks(string saved, string keysym, uint mods)
+    {
+        Assert.True(KeyCombo.TryParse(saved, out var combo));
+        Assert.Equal((keysym, mods), combo.X11());
+    }
+
+    [Fact]
+    public void Every_key_a_shortcut_can_use_has_an_x11_name()
+    {
+        foreach (string key in new[] { "A", "Z", "0", "9", "F1", "F12", "Space", "Enter", "Comma", "Period", "Slash", "Semicolon", "Quote",
+                     "LeftBracket", "RightBracket", "Backslash", "Minus", "Equals", "Backtick" })
+        {
+            Assert.True(KeyCombo.TryParse(key, out var combo), key);
+            Assert.NotEqual("", combo.X11().Keysym);
+        }
+    }
+
+    [Fact]
+    public void Linux_points_at_its_desktops_tray_never_at_windows_taskbar_corner()
+    {
+        var card = new ViewModels.WelcomeCardModel(mac: false) { Linux = true };
+        Assert.Contains("tray", card.WhereLine);
+        Assert.DoesNotContain("^", card.WhereLine);
+        Assert.Contains("applications menu", card.WhereLine);
+        Assert.Contains("^", new ViewModels.WelcomeCardModel(mac: false) { Linux = false }.WhereLine);
+        var (title, text) = ViewModels.IconWords.WhereItIs(mac: false, hidden: false, linux: true);
+        Assert.Equal("Syft Notes is in your tray", title);
+        Assert.DoesNotContain("^", text);
+        Assert.Equal("Syft Notes is in the taskbar corner", ViewModels.IconWords.WhereItIs(mac: false, hidden: false).Title);
+    }
+
+    [Fact]
+    public void A_wayland_desktop_is_told_why_there_are_no_shortcuts_not_that_another_app_took_them()
+    {
+        var none = new HotkeyResult(false, false, Unsupported: true);
+        Assert.False(none.All);
+        Assert.True(none.Unsupported);
+        Assert.False(new HotkeyResult(false, true).Unsupported);
+    }
 }
