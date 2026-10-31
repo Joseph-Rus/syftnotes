@@ -49,8 +49,9 @@ python3 -m http.server 8000 --directory site     # then open http://localhost:80
 node site/check.mjs                              # the same check CI runs
 ```
 
-Every link is relative, so the site works at `https://study-stash-app.web.app/`, on its own domain, and under a
-folder such as `<user>.github.io/study-stash/` alike.
+Every link is relative, so the site works at `https://syftnotes.com/`, at `https://study-stash-app.web.app/`, and under a
+folder such as `<user>.github.io/study-stash/` alike. Only the link-preview tags (`og:url`, `og:image`) and each page's
+`canonical` address name `https://syftnotes.com/`.
 `check.mjs` fails if one starts with `/`. Pages are folders (`privacy/index.html`), so addresses are
 `/privacy/`, `/phone/` and so on.
 
@@ -65,8 +66,9 @@ before a release with those assets exists.
 
 The site is hosted by **Firebase Hosting** in the `study-stash-app` Google Cloud project (the same project as the
 Google Calendar sign-in), set up by `firebase.json` and `.firebaserc` at the repository's root: `site/` as it is,
-without `check.mjs` and this README, with clean addresses (`/privacy/`). It's free at
-`https://study-stash-app.web.app/` (and `study-stash-app.firebaseapp.com`).
+without `check.mjs` and this README, with clean addresses (`/privacy/`). Its address is `https://syftnotes.com/`
+once the domain is connected (below); it's also always at `https://study-stash-app.web.app/` (and
+`study-stash-app.firebaseapp.com`).
 
 By hand, from the repository's root, with the Firebase CLI signed in to an owner of the project:
 
@@ -81,15 +83,14 @@ secret, it only checks.
 
 ## The domain
 
-The site is built for its own domain, which isn't bought yet. When it is:
+The domain is **syftnotes.com**, bought on Cloudflare. To connect it:
 
-1. Firebase console → **Hosting → Add custom domain**, type it (the bare domain, and `www` redirecting to it).
-2. At the domain's DNS, add the `TXT` and `A` records Firebase shows; it issues the HTTPS certificate itself (up to a
-   day).
-3. Make `og:image` in `index.html` absolute (`https://<domain>/assets/social.png`): link previews need a full
-   address.
+1. Firebase console → **Hosting → Add custom domain**, type `syftnotes.com` (and `www.syftnotes.com`, redirecting to
+   it).
+2. In Cloudflare's DNS for the domain, add the `TXT` and `A` records Firebase shows, set to **DNS only** (the grey
+   cloud, not proxied) so Firebase can see them and issue the HTTPS certificate itself (up to a day).
 
-Nothing else changes: every link is relative.
+Nothing else changes: every link is relative, and the pages' link-preview tags already name `https://syftnotes.com/`.
 
 ## What Google and Microsoft need from this site
 
@@ -98,10 +99,10 @@ policy on a domain the publisher controls.
 
 | | Address (with the domain) |
 |---|---|
-| Homepage | `https://<domain>/` |
-| Privacy policy | `https://<domain>/privacy/` |
-| Terms of service | `https://<domain>/terms/` |
-| Support | `https://<domain>/support/` |
+| Homepage | `https://syftnotes.com/` |
+| Privacy policy | `https://syftnotes.com/privacy/` |
+| Terms of service | `https://syftnotes.com/terms/` |
+| Support | `https://syftnotes.com/support/` |
 
 ### Google (OAuth consent screen, then verification)
 
@@ -131,7 +132,7 @@ What reviewers check on the site, and where it is:
   **Terms of service URL** and **Privacy statement URL**, the addresses above. The home page's domain should be the
   publisher domain.
 - **Publisher domain**: verify the domain (**Branding & properties → Publisher domain → Verify**). Entra gives a
-  JSON file to publish at `https://<domain>/.well-known/microsoft-identity-association.json`. Put it at
+  JSON file to publish at `https://syftnotes.com/.well-known/microsoft-identity-association.json`. Put it at
   `site/.well-known/microsoft-identity-association.json`; Firebase Hosting publishes dot-folders (`firebase.json`
   ignores only the check and this README) and serves the file as it is. (Adding a DNS `TXT` record instead also works for a verified domain in
   the tenant.)
