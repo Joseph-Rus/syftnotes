@@ -7,8 +7,8 @@ using StudyStash.App.Platform;
 
 namespace StudyStash.App.Tests;
 
-/// <summary>The pixel s in the menu bar and the tray (and the app icon files it comes with): one ink, a red dot only while
-/// recording, and every icon file the installers and the library's pages need.</summary>
+/// <summary>The pixel s in the menu bar and the tray (and the app icon files it comes with): one ink, its top-right cell
+/// red only while recording, and every icon file the installers and the library's pages need.</summary>
 public class TrayMarkTests
 {
     static Color[,] Pixels(byte[] png)
@@ -56,23 +56,26 @@ public class TrayMarkTests
     }
 
     [AvaloniaFact]
-    public void Recording_turns_the_top_right_bit_into_a_red_dot_kept_clear_of_the_rest()
+    public void Recording_turns_the_top_right_cell_red_a_square_in_its_own_slot()
     {
-        var px = Pixels(TrayMark.Png(36, Brushes.White, recording: true));
-        var (centre, r) = TrayMark.Badge(36);
-
-        Assert.True(Reddish(px[(int)centre.X, (int)centre.Y]), $"no red dot at {centre}: {px[(int)centre.X, (int)centre.Y]}");
-        Assert.True((int)centre.X > 18 && (int)centre.Y < 18, "the dot sits at the top right");
-        // Just outside the dot, toward the s: nothing drawn, so the dot doesn't run into the cells round it.
-        int ringX = (int)Math.Round(centre.X - r * 1.0), ringY = (int)Math.Round(centre.Y + r * 1.0);
-        Assert.True(px[ringX, ringY].A < 40, $"the ring isn't clear: {px[ringX, ringY]}");
-        // Every other cell of the s is still there, in the ink.
-        var cells = TrayMark.CellRects(36);
-        for (int i = 0; i < cells.Length; i++)
+        foreach (int size in new[] { 36, 32 })
         {
-            if (i == 1) continue;
-            var c = px[(int)cells[i].Center.X, (int)cells[i].Center.Y];
-            Assert.True(c.A == 255 && c.R > 240 && c.G > 240 && c.B > 240, $"cell p{i} isn't white ink: {c}");
+            var px = Pixels(TrayMark.Png(size, Brushes.White, recording: true));
+            var cells = TrayMark.CellRects(size);
+            var red = cells[TrayMark.RecordingCell];
+            Assert.True(red.Center.X > size / 2 && red.Center.Y < size / 2, "the red cell is the s's top right");
+            // The whole square red, its corners too (a cell, not a dot), and nothing red outside it.
+            for (int y = 0; y < size; y++)
+                for (int x = 0; x < size; x++)
+                    Assert.True(Reddish(px[x, y]) == red.Contains(new Point(x + 0.5, y + 0.5)), $"{size} px at {x},{y}: {px[x, y]}");
+            // Every other cell of the s is still there, in the ink, and the slot round the red one is clear as before.
+            for (int i = 0; i < cells.Length; i++)
+            {
+                if (i == TrayMark.RecordingCell) continue;
+                var c = px[(int)cells[i].Center.X, (int)cells[i].Center.Y];
+                Assert.True(c.A == 255 && c.R > 240 && c.G > 240 && c.B > 240, $"cell p{i} isn't white ink: {c}");
+            }
+            Assert.True(px[(int)red.X - 1, (int)red.Bottom].A == 0, "the gap beside the red cell is clear");
         }
         Assert.DoesNotContain(All(Pixels(TrayMark.Png(32, Brushes.Black, recording: false))), Reddish);
     }

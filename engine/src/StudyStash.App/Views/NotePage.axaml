@@ -73,8 +73,9 @@
     <Style Selector="Button.crumb-link:pointerover TextBlock">
       <Setter Property="TextDecorations" Value="Underline" />
     </Style>
-    <!-- The recording's dot breathes while it records (not while paused, and not for someone who asked for less motion). -->
-    <Style Selector="Ellipse.pulse">
+    <!-- The recording's dot, one of the s's cells, breathes while it records (not while paused, and not for someone who
+         asked for less motion). -->
+    <Style Selector="c|SyftCell.pulse">
       <Style.Animations>
         <Animation Duration="0:0:1.6" IterationCount="INFINITE">
           <KeyFrame Cue="0%"><Setter Property="Opacity" Value="1" /></KeyFrame>
@@ -107,12 +108,12 @@
                 <!-- Listening: the Path Trace loader on its own dark tile, its trail running while it records and the
                      whole s lit while it's paused. -->
                 <c:SyftLoader Kind="PathTrace" Size="38" IsActive="{Binding Recorder.IsRunning, FallbackValue=False}" VerticalAlignment="Center" AutomationProperties.AccessibilityView="Raw" />
-                <Ellipse Width="10" Height="10" Fill="{DynamicResource Record}" Classes.pulse="{Binding Pulses}" VerticalAlignment="Center" />
+                <c:SyftCell Width="10" Height="10" Fill="{DynamicResource Record}" Classes.pulse="{Binding Pulses}" VerticalAlignment="Center" />
               </StackPanel>
               <TextBlock Grid.Column="2" Text="{Binding RecordingWord}" FontSize="15" FontWeight="SemiBold" VerticalAlignment="Center" />
               <TextBlock Grid.Column="4" Classes="num" Text="{Binding Recorder.Elapsed, FallbackValue=''}" FontSize="15" FontWeight="Medium" Foreground="{DynamicResource InkMuted}"
                          VerticalAlignment="Center" />
-              <c:Waveform Grid.Column="6" Bars="3" Height="14" MinBar="4" Levels="{Binding Recorder.Levels, FallbackValue={x:Null}}" Foreground="{DynamicResource Record}"
+              <c:Waveform Grid.Column="6" Bars="5" Height="16" Lively="True" Levels="{Binding Recorder.Levels, FallbackValue={x:Null}}" Foreground="{DynamicResource Record}"
                           VerticalAlignment="Center" IsVisible="{Binding Recorder.IsRunning, FallbackValue=False}" />
               <Button Name="Pause" Grid.Column="8" Classes="btn sm" Command="{Binding Recorder.PauseCommand, FallbackValue={x:Null}}" AutomationProperties.Name="{Binding PauseWord}">
                 <StackPanel Orientation="Horizontal" Spacing="6">
@@ -133,11 +134,11 @@
           <!-- Planned for a calendar event: when it starts, and Start now -->
           <Border Name="PlanBar" Classes="recbar" IsVisible="{Binding Planned}" Margin="0,2,0,26">
             <Grid ColumnDefinitions="Auto,14,*,14,Auto">
-              <Ellipse Width="12" Height="12" Stroke="{DynamicResource Record}" StrokeThickness="2" VerticalAlignment="Center" />
+              <c:SyftCell Width="12" Height="12" Stroke="{DynamicResource Record}" StrokeThickness="2" VerticalAlignment="Center" />
               <TextBlock Grid.Column="2" Text="{Binding PlanWords}" FontSize="15" FontWeight="SemiBold" VerticalAlignment="Center" TextWrapping="Wrap" />
               <Button Name="StartNow" Grid.Column="4" Classes="btn sm ink" Command="{Binding StartNowCommand}" AutomationProperties.Name="Start recording now">
                 <StackPanel Orientation="Horizontal" Spacing="8">
-                  <Ellipse Width="10" Height="10" Fill="{DynamicResource Record}" VerticalAlignment="Center" />
+                  <c:SyftCell Width="10" Height="10" Fill="{DynamicResource Record}" VerticalAlignment="Center" />
                   <TextBlock Text="Start now" VerticalAlignment="Center" />
                 </StackPanel>
               </Button>
@@ -350,7 +351,7 @@
               <Button Classes="tab" Classes.on="{Binding ShowTranscript}" Content="{Binding TranscriptTab}" Command="{Binding TranscriptsCommand}" Click="OnPinnedTab" />
             </StackPanel>
             <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center" Margin="0,0,0,6" IsVisible="{Binding Live}">
-              <Ellipse Width="8" Height="8" Fill="{DynamicResource Record}" VerticalAlignment="Center" />
+              <c:SyftCell Width="8" Height="8" Fill="{DynamicResource Record}" VerticalAlignment="Center" />
               <TextBlock Text="{Binding Recorder.Elapsed, FallbackValue=''}" FontSize="13" FontWeight="Medium" Foreground="{DynamicResource InkMuted}" VerticalAlignment="Center" />
             </StackPanel>
           </Grid>

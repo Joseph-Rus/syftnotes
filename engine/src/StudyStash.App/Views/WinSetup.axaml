@@ -248,7 +248,7 @@
                       <TextBlock Classes="say" Text="The microphone is allowed." />
                     </StackPanel>
                     <StackPanel IsVisible="{Binding ShowMicCheck}" Margin="0,16,0,0" Spacing="8">
-                      <c:Waveform Height="28" Bars="24" Levels="{Binding MicLevels}" Foreground="{DynamicResource Ink}" HorizontalAlignment="Left" />
+                      <c:Waveform Height="28" Bars="24" Levels="{Binding MicLevels}" Foreground="{DynamicResource Record}" HorizontalAlignment="Left" />
                       <TextBlock Classes="hint" Text="{Binding MicLine}" />
                     </StackPanel>
                     <Button Classes="btn sm ink" HorizontalAlignment="Left" Margin="0,28,0,0" Command="{Binding AllowMicCommand}" IsVisible="{Binding ShowAllowMic}">

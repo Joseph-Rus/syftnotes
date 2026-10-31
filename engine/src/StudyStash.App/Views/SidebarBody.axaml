@@ -42,7 +42,7 @@
               HorizontalContentAlignment="Stretch" Margin="0,0,0,8" ToolTip.Tip="Open what's recording" AutomationProperties.Name="{Binding Recording.PillSaid, FallbackValue=''}">
         <StackPanel>
           <Grid ColumnDefinitions="Auto,8,*">
-            <Ellipse Width="9" Height="9" Fill="{DynamicResource Record}" VerticalAlignment="Center" />
+            <c:SyftCell Width="9" Height="9" Fill="{DynamicResource Record}" VerticalAlignment="Center" />
             <TextBlock Grid.Column="2" Classes="coming-title" Text="{Binding Recording.ShortClass, FallbackValue=''}" />
           </Grid>
           <TextBlock Classes="coming-when num" Text="{Binding Recording.Elapsed, FallbackValue=''}" />

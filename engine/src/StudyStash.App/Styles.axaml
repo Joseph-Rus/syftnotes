@@ -479,8 +479,9 @@
     <Setter Property="BorderBrush" Value="{DynamicResource Ink}" />
   </Style>
 
-  <!-- Record: a white pill, and red only in its dot. Recording, the pill is ringed in red and the dot's centre is a
-       stop square; paused, the dot is a red ring round a red centre. The words beside it are the view's. -->
+  <!-- Record: a white pill, and red only in its dot, one of the s's cells (a rounded square, its corners 27 % of its
+       side). Recording, the pill is ringed in red and the cell grows to hold a stop square; paused, it's a red outline
+       round a red centre. The words beside it are the view's. -->
   <Style Selector="Button.record">
     <Setter Property="Theme" Value="{StaticResource Surface}" />
     <Setter Property="Height" Value="48" />
@@ -504,21 +505,32 @@
   <Style Selector="Button.record.recording /template/ Border#PART_Bg, Button.record.paused /template/ Border#PART_Bg">
     <Setter Property="BoxShadow" Value="{DynamicResource RecordRing}" />
   </Style>
+  <!-- Ready to record, the red cell alone, in the middle of its room; recording or paused it fills it (about as much
+       red as the round dot it replaced), and its centre shows: Stop, or the red centre. -->
   <Style Selector="Border.record-dot">
-    <Setter Property="Width" Value="40" />
-    <Setter Property="Height" Value="40" />
-    <Setter Property="CornerRadius" Value="20" />
+    <Setter Property="Width" Value="22" />
+    <Setter Property="Height" Value="22" />
+    <Setter Property="Margin" Value="9,9,3,9" />
+    <Setter Property="CornerRadius" Value="6" />
     <Setter Property="Background" Value="{DynamicResource Record}" />
   </Style>
+  <Style Selector=".recording Border.record-dot, .paused Border.record-dot">
+    <Setter Property="Width" Value="36" />
+    <Setter Property="Height" Value="36" />
+    <Setter Property="Margin" Value="2" />
+    <Setter Property="CornerRadius" Value="9.8" />
+  </Style>
   <Style Selector="Border.record-dot > Border">
+    <Setter Property="IsVisible" Value="False" />
     <Setter Property="Width" Value="14" />
     <Setter Property="Height" Value="14" />
-    <Setter Property="CornerRadius" Value="7" />
+    <Setter Property="CornerRadius" Value="3.8" />
     <Setter Property="Background" Value="{DynamicResource OnRecord}" />
     <Setter Property="HorizontalAlignment" Value="Center" />
     <Setter Property="VerticalAlignment" Value="Center" />
   </Style>
   <Style Selector=".recording Border.record-dot > Border">
+    <Setter Property="IsVisible" Value="True" />
     <Setter Property="Width" Value="12" />
     <Setter Property="Height" Value="12" />
     <Setter Property="CornerRadius" Value="2" />
@@ -529,18 +541,20 @@
     <Setter Property="BorderThickness" Value="2" />
   </Style>
   <Style Selector=".paused Border.record-dot > Border">
+    <Setter Property="IsVisible" Value="True" />
     <Setter Property="Background" Value="{DynamicResource Record}" />
   </Style>
   <!-- The floating recorder's dot is smaller. -->
   <Style Selector="Border.record-dot.mini">
-    <Setter Property="Width" Value="32" />
-    <Setter Property="Height" Value="32" />
-    <Setter Property="CornerRadius" Value="16" />
+    <Setter Property="Width" Value="28" />
+    <Setter Property="Height" Value="28" />
+    <Setter Property="Margin" Value="2" />
+    <Setter Property="CornerRadius" Value="7.6" />
   </Style>
   <Style Selector="Border.record-dot.mini > Border">
     <Setter Property="Width" Value="11" />
     <Setter Property="Height" Value="11" />
-    <Setter Property="CornerRadius" Value="5.5" />
+    <Setter Property="CornerRadius" Value="3" />
   </Style>
   <Style Selector=".recording Border.record-dot.mini > Border">
     <Setter Property="Width" Value="10" />

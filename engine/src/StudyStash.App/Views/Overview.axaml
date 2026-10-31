@@ -78,13 +78,13 @@
           <Button Name="Record" Classes="record" Classes.recording="{Binding Running}" Classes.paused="{Binding Paused}" Command="{Binding RecordCommand}"
                   IsVisible="{Binding CanRecord}" AutomationProperties.Name="{Binding RecordTip}" ToolTip.Tip="{Binding RecordTip}">
             <StackPanel Orientation="Horizontal" Spacing="12">
-              <Button Name="StopRecording" Theme="{StaticResource Surface}" Padding="0" CornerRadius="20" Background="Transparent"
+              <Button Name="StopRecording" Theme="{StaticResource Surface}" Padding="0" CornerRadius="10.9" Background="Transparent"
                       Command="{Binding StopCommand}" IsHitTestVisible="{Binding Recording}" Focusable="{Binding Recording}"
                       ToolTip.Tip="{Binding StopTip}" AutomationProperties.Name="Stop recording">
                 <Border Classes="record-dot"><Border /></Border>
               </Button>
               <TextBlock Name="RecordWords" Text="{Binding RecordWords}" VerticalAlignment="Center" />
-              <c:Waveform Bars="3" Height="16" MinBar="5" Levels="{Binding Recorder.Levels, FallbackValue={x:Null}}" Foreground="{DynamicResource Record}"
+              <c:Waveform Bars="3" Height="16" Lively="True" Levels="{Binding Recorder.Levels, FallbackValue={x:Null}}" Foreground="{DynamicResource Record}"
                           VerticalAlignment="Center" IsVisible="{Binding Running}" />
               <TextBlock Text="{Binding Elapsed}" FontWeight="Medium" Foreground="{DynamicResource InkMuted}" VerticalAlignment="Center" IsVisible="{Binding Recording}" />
               <TextBlock Classes="kbd" Text="{Binding RecordKeys}" FontSize="12" VerticalAlignment="Center" Margin="2,0,0,0" IsVisible="{Binding Idle}" />
