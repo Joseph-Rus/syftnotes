@@ -69,8 +69,8 @@ MINOS=$( { tree_minos "$MACOS/arm64"; tree_minos "$MACOS/x64"; } | sort -t. -k1,
 # The launcher: the one universal binary in the bundle, built for both trees' minimum OS (D1).
 clang -O2 -Wall -Werror -arch arm64 -arch x86_64 -mmacosx-version-min="$MINOS" -o "$MACOS/StudyStash" "$HERE/launcher.c"
 
-# Icon: the egghead on its cream tile (macos/make_icon.swift draws every size from Eli's drawing). Light only: an asset catalog's
-# dark appearance is dropped for Mac app icons (macOS 26's dark and tinted icons need an Icon Composer file).
+# Icon: Joey's pixel s on its dark tile (macos/make_icon.swift draws every size through tools/syft/make_art.swift). One look
+# only: an asset catalog's dark appearance is dropped for Mac app icons (macOS 26's dark and tinted icons need an Icon Composer file).
 xcrun swift "$HERE/make_icon.swift" "$OUT/AppIcon.iconset"
 iconutil -c icns "$OUT/AppIcon.iconset" -o "$APP/Contents/Resources/AppIcon.icns"
 rm -rf "$OUT/AppIcon.iconset"
