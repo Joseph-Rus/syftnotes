@@ -66,7 +66,8 @@ public class PhonesShots
         string home = Path.Combine(Path.GetTempPath(), "studystash-phone-" + Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(home);
         new AppSettings { SetupDone = true, Role = AppRole.Both }.Save(home);
-        var (drive, driveHome) = await PhonesViewTests.GoogleDrive(account: state is not ("not-connected" or "other-ways"), phones: state == "phones" ? 2 : 0);
+        var google = await PhonesViewTests.GoogleDrive(account: state is not ("not-connected" or "other-ways"), phones: state == "phones" ? 2 : 0);
+        var drive = google.Drive;
         var host = new AppHost(home, phoneDrive: _ => drive);
         ViewModels.LibrarySettingsModel.Call call = (method, path, _) => Task.FromResult<JsonObject?>((method.Method, path) switch
         {
@@ -105,7 +106,7 @@ public class PhonesShots
         {
             model.Dispose();
             host.Dispose();
-            driveHome.Dispose();
+            await google.DisposeAsync();
             if (Directory.Exists(home)) Directory.Delete(home, recursive: true);
         }
     }

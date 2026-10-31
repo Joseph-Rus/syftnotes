@@ -13,18 +13,29 @@ public enum LibraryServiceState
     Starting,
     /// <summary>Our child is up and the library answers.</summary>
     Running,
-    /// <summary>Something else already answers as a Syft Notes library on this port: we didn't start anything.</summary>
+    /// <summary>Something else already answers as a Syft Notes library on this port: we didn't start anything. That's
+    /// also the background library (<see cref="LibraryService.InBackground"/>), which the app uses and leaves running.</summary>
     Elsewhere,
     /// <summary>Another program holds the port.</summary>
     PortTaken,
     Failed,
 }
 
+/// <summary>The background library, as <see cref="LibraryService"/> uses it: the computer's own registration of it,
+/// whether it's wanted now, and what it runs.</summary>
+/// <param name="Wanted">On by default on just this computer once a phone is linked through Google, unless Settings →
+/// Phone's switch is off (see <see cref="AppHost.BackgroundWanted"/>).</param>
+/// <param name="Extra">The self-test's stand-in for Google Drive (--drive-folder); none for a student.</param>
+public sealed record BackgroundPlan(IBackgroundLibrary System, Func<bool> Wanted, string Program, IReadOnlyList<string>? Extra = null);
+
 /// <summary>
 /// Runs `StudyStash --home H serve` as a child of this app: starts it, waits for it to answer, restarts it with a
-/// growing pause if it dies (giving up after too many restarts in a row), and stops it cleanly on quit. Never installs
-/// a LaunchAgent, Startup entry or systemd unit, and never touches a library that's already answering on the port —
-/// it steps aside instead. What actually starts the process is swappable, so a test runs a real, short-lived copy.
+/// growing pause if it dies (giving up after too many restarts in a row), and stops it cleanly on quit. It never
+/// touches a library that's already answering on the port — it steps aside instead. The one exception to running a
+/// child is the background library (<see cref="Background"/>): when the student wants the phone answered with the app
+/// closed, the computer runs the library at login instead (a LaunchAgent, the Run key, a systemd --user unit), this
+/// steps aside for it, and quitting the app leaves it running. What actually starts the process is swappable, so a
+/// test runs a real, short-lived copy.
 /// </summary>
 public sealed class LibraryService : IDisposable
 {
@@ -39,6 +50,7 @@ public sealed class LibraryService : IDisposable
     readonly Func<ProcessStartInfo, Process> spawn;
     readonly Func<Config, TimeSpan, Task<bool>> waitHealthy;
     readonly Func<int, Task<string>> portStatus;
+    readonly Func<Config, Task<(string Version, bool Background)?>> health;
     readonly Action<string> log;
     readonly Lock gate = new();
     readonly List<DateTime> recentExits = [];
@@ -61,12 +73,23 @@ public sealed class LibraryService : IDisposable
     /// <summary>Called (on a worker thread) whenever <see cref="State"/> or <see cref="Failure"/> changes.</summary>
     public event Action? Changed;
 
+    /// <summary>The background library, when the app can have one (just this computer); null keeps to a child.</summary>
+    public BackgroundPlan? Background { get; set; }
+
+    /// <summary>The library that answers is the background one: the app uses it and leaves it running when it quits.</summary>
+    public bool InBackground { get; private set; }
+
+    /// <summary>Why the background library couldn't be used just now, in the student's words (Settings → Phone shows
+    /// it); null while it works or isn't wanted. The app's own library answers meanwhile, as before.</summary>
+    public string? BackgroundProblem { get; private set; }
+
     public string LogDir => Path.Combine(home, "logs");
     public string LogPath => Path.Combine(LogDir, "library.log");
     public string PidPath => Path.Combine(home, "library.pid");
 
     public LibraryService(string home, Config cfg, IReadOnlyList<string>? command = null, Func<ProcessStartInfo, Process>? spawn = null,
-        Func<Config, TimeSpan, Task<bool>>? waitHealthy = null, Func<int, Task<string>>? portStatus = null, Action<string>? log = null)
+        Func<Config, TimeSpan, Task<bool>>? waitHealthy = null, Func<int, Task<string>>? portStatus = null, Action<string>? log = null,
+        Func<Config, Task<(string Version, bool Background)?>>? health = null)
     {
         this.home = home;
         this.cfg = cfg;
@@ -75,6 +98,27 @@ public sealed class LibraryService : IDisposable
         this.waitHealthy = waitHealthy ?? ((c, t) => HostInfo.WaitForServerAsync(c, t));
         this.portStatus = portStatus ?? (p => HostInfo.PortStatusAsync(p));
         this.log = log ?? Console.WriteLine;
+        this.health = health ?? HealthAsync;
+    }
+
+    static readonly HttpClient Http = new() { Timeout = TimeSpan.FromSeconds(5) };
+
+    /// <summary>The library on the port, as it says itself: its version, and whether it's the background one.</summary>
+    static async Task<(string Version, bool Background)?> HealthAsync(Config cfg)
+    {
+        try
+        {
+            using var request = new HttpRequestMessage(HttpMethod.Get, $"http://127.0.0.1:{cfg.WebPort}/api/health");
+            request.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", cfg.PoolPassword);
+            using var r = await Http.SendAsync(request);
+            if (!r.IsSuccessStatusCode) return null;
+            var o = System.Text.Json.Nodes.JsonNode.Parse(await r.Content.ReadAsStringAsync()) as System.Text.Json.Nodes.JsonObject;
+            return ((string?)o?["version"] ?? "", o?["background"]?.GetValue<bool>() == true);
+        }
+        catch (Exception e) when (e is HttpRequestException or TaskCanceledException or System.Text.Json.JsonException or InvalidOperationException)
+        {
+            return null;
+        }
     }
 
     void SetState(LibraryServiceState s, string? failure = null)
@@ -99,6 +143,23 @@ public sealed class LibraryService : IDisposable
             return;
         }
         SetState(LibraryServiceState.Starting);
+        InBackground = false;
+        if (Background is { } plan)
+        {
+            if (plan.Wanted())
+            {
+                if (await UseBackgroundAsync(plan)) return;
+            }
+            else if (plan.System.IsRegistered(home))
+            {
+                // Not wanted any more (switched off, Google disconnected, no longer just this computer): it goes, and
+                // the app's own library takes its place.
+                log("[library] the background library isn't wanted any more: removing it");
+                await Task.Run(() => plan.System.Unregister(home));
+                await WaitPortFreeAsync();
+                BackgroundProblem = null;
+            }
+        }
         string status;
         try { status = await portStatus(cfg.WebPort); }
         catch (Exception e) when (e is HttpRequestException or SocketException) { status = "free"; }
@@ -113,6 +174,108 @@ public sealed class LibraryService : IDisposable
     public async Task TakeOverIfGoneAsync()
     {
         if (State != LibraryServiceState.Elsewhere) return;
+        await StartAsync();
+    }
+
+    /// <summary>
+    /// The background library answers instead of a child of ours: registered with the computer (again, when it runs
+    /// another copy's program or an older version than this app: after an update), started if it isn't running, and
+    /// waited for. True once it answers as this version. Otherwise it's taken away again and false: the app's own
+    /// library takes over, as before, and <see cref="BackgroundProblem"/> says why.
+    /// </summary>
+    async Task<bool> UseBackgroundAsync(BackgroundPlan plan)
+    {
+        var bg = plan.System;
+        try
+        {
+            bool fresh = false;
+            var registered = bg.Registered(home);
+            if (registered is not { Count: > 0 } || !SameProgram(registered[0], plan.Program))
+            {
+                log("[library] registering the background library, so the phone is answered with the app closed");
+                await Task.Run(() => bg.Register(home, plan.Program, plan.Extra));
+                fresh = true;
+            }
+            else if (await portStatus(cfg.WebPort) == "free")
+            {
+                await Task.Run(() => bg.Start(home));
+            }
+            if (!fresh && await health(cfg) is { } said && (said.Version != Engine.Version || !said.Background))
+            {
+                // Running an older copy (updated since, by something that didn't restart it): onto this one.
+                log($"[library] the background library runs {said.Version}; starting it again on {Engine.Version}");
+                await Task.Run(() => bg.Register(home, plan.Program, plan.Extra));
+            }
+            if (await waitHealthy(cfg, TimeSpan.FromSeconds(30)) && await health(cfg) is { Background: true })
+            {
+                InBackground = true;
+                BackgroundProblem = null;
+                SetState(LibraryServiceState.Elsewhere);
+                return true;
+            }
+            log("[library] the background library didn't answer in time: the app runs its own library instead");
+            BackgroundProblem = "It didn't start, so for now your phone is answered only while Syft Notes is open.";
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException or InvalidOperationException or PlatformNotSupportedException or Win32Exception)
+        {
+            log($"[library] couldn't register the background library: {e.Message}");
+            BackgroundProblem = "This computer didn't let Syft Notes run in the background, so for now your phone is answered only while Syft Notes is open.";
+        }
+        try
+        {
+            await Task.Run(() => bg.Unregister(home));
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException or InvalidOperationException or PlatformNotSupportedException or Win32Exception)
+        {
+            log($"[library] couldn't remove the background library: {e.Message}");
+        }
+        await WaitPortFreeAsync();
+        return false;
+    }
+
+    static bool SameProgram(string a, string b) =>
+        string.Equals(Path.GetFullPath(a), Path.GetFullPath(b), OperatingSystem.IsWindows() ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal);
+
+    /// <summary>Up to 15 s for the port to be let go (a background library stopping): a child started sooner couldn't
+    /// listen on it.</summary>
+    async Task WaitPortFreeAsync()
+    {
+        var until = DateTime.UtcNow + TimeSpan.FromSeconds(15);
+        while (DateTime.UtcNow < until && await portStatus(cfg.WebPort) != "free") await Task.Delay(100);
+    }
+
+    /// <summary>
+    /// Settings → Phone's switch, Google connected or disconnected, or this computer no longer just this computer: the
+    /// library moves to the background (our child stops, the computer runs it) or back (the background one goes, our
+    /// child starts). Nothing changes when it's already where it should be.
+    /// </summary>
+    public async Task SwitchAsync()
+    {
+        bool wanted = Background?.Wanted() == true;
+        if (wanted == InBackground && State is LibraryServiceState.Running or LibraryServiceState.Elsewhere or LibraryServiceState.Starting) return;
+        if (State == LibraryServiceState.Running) await StopAsync();
+        lock (gate) State = LibraryServiceState.Stopped;
+        await StartAsync();
+    }
+
+    /// <summary>The library starts again to read new settings (a new password, laptops let in): the background one is
+    /// restarted by the computer; otherwise our child stops and starts.</summary>
+    public async Task RestartAsync()
+    {
+        if (InBackground && Background is { } plan && plan.Wanted())
+        {
+            SetState(LibraryServiceState.Starting);
+            await Task.Run(() => plan.System.Restart(home));
+            if (await waitHealthy(cfg, TimeSpan.FromSeconds(30)))
+            {
+                SetState(LibraryServiceState.Elsewhere);
+                return;
+            }
+            lock (gate) State = LibraryServiceState.Stopped;
+            await StartAsync();
+            return;
+        }
+        await StopAsync();
         await StartAsync();
     }
 
@@ -217,7 +380,8 @@ public sealed class LibraryService : IDisposable
     }
 
     /// <summary>Stops the child we started or adopted; does nothing when the library is <see cref="LibraryServiceState.Elsewhere"/>
-    /// or not running — we only ever stop a process we hold, never one just answering on the port.</summary>
+    /// or not running — we only ever stop a process we hold, never one just answering on the port. So quitting the app
+    /// leaves the background library running: that's what it's for.</summary>
     public async Task StopAsync()
     {
         stopping = true;
@@ -268,6 +432,23 @@ public sealed class LibraryService : IDisposable
         try { if (!p.HasExited) p.Kill(entireProcessTree: true); }
         catch (InvalidOperationException) { }
     }
+}
+
+/// <summary>No background library: tests and the self-test (unless it's the self-test's own background run), so
+/// nothing there ever registers anything with the computer.</summary>
+public sealed class NoBackground : IBackgroundLibrary
+{
+    public static readonly NoBackground Instance = new();
+
+    public bool IsRegistered(string home) => false;
+    public IReadOnlyList<string>? Registered(string home) => null;
+    public void Register(string home, string program, IReadOnlyList<string>? extra = null) =>
+        throw new InvalidOperationException("Running in the background is off here.");
+    public void Unregister(string home) { }
+    public List<(string Home, IReadOnlyList<string> Args)> All() => [];
+    public void Stop(string home) { }
+    public void Start(string home) { }
+    public void Restart(string home) { }
 }
 
 static class Native
