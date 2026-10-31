@@ -1,4 +1,4 @@
-/* The Egghead Notes look on a phone: the Mac's Liquid Glass, iOS's layout. Colours come from themes.ts as custom
+/* The Syft Notes look on a phone: the Mac's Liquid Glass, iOS's layout. Colours come from themes.ts as custom
    properties on :root; these are the fallbacks (Lagoon, light) until it runs. */
 
 :root {

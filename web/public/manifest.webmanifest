@@ -1,6 +1,6 @@
 {
-  "name": "Egghead Notes",
-  "short_name": "Egghead Notes",
+  "name": "Syft Notes",
+  "short_name": "Syft Notes",
   "description": "Your lecture library, on your phone.",
   "start_url": "/app/",
   "scope": "/app/",

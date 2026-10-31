@@ -13,7 +13,7 @@ export function Install({ platform, onSkip }: { platform: Platform; onSkip: () =
     <div class="install">
       <div class="install-body">
         <Doodle name="hello" size={120} />
-        <h1>Add Egghead Notes to your Home Screen</h1>
+        <h1>Add Syft Notes to your Home Screen</h1>
         <p class="lede">
           So it opens full screen, like any other app, and reads your notes even when you're offline. Get your
           assignments over easy.

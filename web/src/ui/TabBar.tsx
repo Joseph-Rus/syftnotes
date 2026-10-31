@@ -14,7 +14,7 @@ const TABS: { tab: Tab; label: string; icon: (p: { filled?: boolean }) => JSX.El
  * badge (how much is overdue) sits on its icon. */
 export function TabBar({ active, badges = {} }: { active: Tab; badges?: Partial<Record<Tab, number>> }) {
   return (
-    <nav class="tabbar" aria-label="Egghead Notes">
+    <nav class="tabbar" aria-label="Syft Notes">
       {TABS.map((t) => {
         const badge = badges[t.tab] ?? 0;
         return (

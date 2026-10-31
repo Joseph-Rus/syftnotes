@@ -1,4 +1,4 @@
-/* Egghead Notes' website, in the look of its film: the app's own typeface (Atkinson Hyperlegible Next, served from
+/* Syft Notes' website, in the look of its film: the app's own typeface (Atkinson Hyperlegible Next, served from
    this site), a paper-coloured page, and one band of bold colour for each thing the app does, with a big word, a
    sentence, a picture of the app as a card and a cut-paper object. Nothing loads from anyone else's server. */
 
@@ -7,6 +7,21 @@
   src: url("fonts/AtkinsonHyperlegibleNext-Variable.woff2") format("woff2");
   font-weight: 200 800;
   font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Archivo";
+  src: url("fonts/Archivo-Regular.woff2") format("woff2");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Archivo";
+  src: url("fonts/Archivo-BlackItalic.woff2") format("woff2");
+  font-weight: 900;
+  font-style: italic;
   font-display: swap;
 }
 
@@ -124,6 +139,8 @@ mark, .hl {
 .site-head.scrolled { border-bottom-color: var(--rule); }
 .site-head .wrap { display: flex; align-items: center; gap: 1rem; min-height: 3.9rem; }
 .brand { display: inline-flex; align-items: center; gap: 0.6rem; color: var(--ink); text-decoration: none; font: 800 1.15rem/1 var(--font); letter-spacing: -0.02em; margin-right: auto; }
+.brand .wordmark { font-family: "Archivo", var(--font); font-weight: 400; letter-spacing: -0.02em; text-transform: lowercase; }
+.brand .wordmark b { font-weight: 900; font-style: italic; }
 .brand img { width: 32px; height: 32px; border-radius: 8px; box-shadow: 0 1px 3px rgb(24 24 28 / 0.25); }
 .nav { display: flex; align-items: center; gap: 0.25rem; list-style: none; margin: 0; padding: 0; }
 .nav a { display: block; padding: 0.45rem 0.7rem; border-radius: 9px; color: var(--ink-2); text-decoration: none; font-size: 0.975rem; font-weight: 600; }
