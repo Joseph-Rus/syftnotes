@@ -283,8 +283,8 @@ public sealed class StudyClassRow(string name, int due, IRelayCommand review)
 }
 
 /// <summary>
-/// The Study page, from the sidebar: Review (how many cards are due, by class, and Start), and while a review is on,
-/// the review itself in its place.
+/// The Study page, from the sidebar: Review (how many cards are due, by class, and Start), exam prep (the exams coming
+/// up, from Canvas and the calendar, and the prep made for them), and while a review or a prep is open, it in its place.
 /// </summary>
 public sealed partial class StudyModel(IStudyLibrary library, Func<DateTimeOffset>? now = null) : ObservableObject
 {
@@ -299,7 +299,27 @@ public sealed partial class StudyModel(IStudyLibrary library, Func<DateTimeOffse
     /// <summary>A review under way, in the page's place.</summary>
     [ObservableProperty] public partial ReviewSessionModel? Session { get; set; }
     public bool Reviewing => Session is not null;
-    public bool ShowHub => Session is null;
+    public bool ShowHub => Session is null && Prep is null;
+
+    /// <summary>An exam's prep open, in the page's place.</summary>
+    [ObservableProperty] public partial ExamPrepModel? Prep { get; set; }
+    public bool Prepping => Prep is not null;
+    /// <summary>The exams coming up (Canvas, the calendar) and the ones prepped for, soonest first.</summary>
+    public ObservableCollection<ExamRow> Exams { get; } = [];
+    public bool HasExams => Exams.Count > 0;
+    public bool ExamPrepAvailable { get; private set; }
+
+    /// <summary>Prepping for an exam Canvas and the calendar don't know of: its class, name and (if known) date.</summary>
+    public ObservableCollection<ExamClassChoice> ClassChoices { get; } = [];
+    public bool HasClassChoices => ClassChoices.Count > 0;
+    [ObservableProperty] public partial string? NewClass { get; set; }
+    [ObservableProperty] public partial string NewTitle { get; set; } = "";
+    [ObservableProperty] public partial DateTime? NewWhen { get; set; }
+    [ObservableProperty] public partial bool MakingNew { get; set; }
+    [ObservableProperty] public partial string? NewProblem { get; set; }
+    public bool HasNewProblem => !string.IsNullOrEmpty(NewProblem);
+    public bool CanMakeNew => !MakingNew && NewClass is { Length: > 0 } && NewTitle.Trim().Length > 0;
+    public string MakeNewSaid => MakingNew ? "Writing your prep…" : "Write the prep";
 
     public bool HasDue => Due > 0;
     public bool NoCards => !Loading && Total == 0;
@@ -317,10 +337,27 @@ public sealed partial class StudyModel(IStudyLibrary library, Func<DateTimeOffse
     partial void OnTotalChanged(int value) => Said();
     partial void OnLoadingChanged(bool value) => Said();
     partial void OnSessionChanged(ReviewSessionModel? value) => Shown();
+    partial void OnPrepChanged(ExamPrepModel? value) => Shown();
+    partial void OnNewClassChanged(string? value)
+    {
+        foreach (var c in ClassChoices) c.Picked = c.Name == value;
+        NewChanged();
+    }
+    partial void OnNewTitleChanged(string value) => NewChanged();
+    partial void OnMakingNewChanged(bool value) => NewChanged();
+    partial void OnNewProblemChanged(string? value) => OnPropertyChanged(nameof(HasNewProblem));
+
+    void NewChanged()
+    {
+        OnPropertyChanged(nameof(CanMakeNew));
+        OnPropertyChanged(nameof(MakeNewSaid));
+        MakeNewPrepCommand.NotifyCanExecuteChanged();
+    }
 
     void Shown()
     {
         OnPropertyChanged(nameof(Reviewing));
+        OnPropertyChanged(nameof(Prepping));
         OnPropertyChanged(nameof(ShowHub));
     }
 
@@ -357,7 +394,145 @@ public sealed partial class StudyModel(IStudyLibrary library, Func<DateTimeOffse
         {
             Available = false;
         }
+        await LoadExamsAsync();
         Loading = false;
+    }
+
+    /// <summary>The classes a new exam prep can be for (the host gives the library's).</summary>
+    public void Classes(IEnumerable<string> names)
+    {
+        ClassChoices.Clear();
+        foreach (string n in names) ClassChoices.Add(new ExamClassChoice(n, new RelayCommand(() => NewClass = n)) { Picked = n == NewClass });
+        NewClass ??= ClassChoices.FirstOrDefault()?.Name;
+        OnPropertyChanged(nameof(HasClassChoices));
+    }
+
+    /// <summary>The exams coming up and the prep made: each exam once, its prep beside it when it has one.</summary>
+    public async Task LoadExamsAsync()
+    {
+        ExamsNow? now;
+        try
+        {
+            now = await library.ExamsAsync();
+        }
+        catch
+        {
+            now = null;
+        }
+        ExamPrepAvailable = now is not null;
+        OnPropertyChanged(nameof(ExamPrepAvailable));
+        Exams.Clear();
+        if (now is null)
+        {
+            OnPropertyChanged(nameof(HasExams));
+            return;
+        }
+        var t = clock();
+        var rows = new List<ExamRow>();
+        foreach (var e in now.Upcoming) rows.Add(Row(e.Class, e.Title, e.When, t));
+        foreach (var p in now.Preps)
+        {
+            var row = rows.FirstOrDefault(r => r.Class == p.Class && ExamPrep.Same(r.Title) == ExamPrep.Same(p.Title));
+            if (row is null) rows.Add(row = Row(p.Class, p.Title, p.When, t));
+            if (row.PrepId is not null) continue; // the newest prep (they come newest first)
+            row.PrepId = p.Id;
+            row.Score = p.LastRight is { } right ? $"Last practice test: {right} of {p.Questions}" : $"{p.Questions} practice questions";
+        }
+        foreach (var r in rows.OrderBy(r => r.When is null).ThenBy(r => r.When)) Exams.Add(r);
+        OnPropertyChanged(nameof(HasExams));
+    }
+
+    ExamRow Row(string cls, string title, DateTimeOffset? when, DateTimeOffset now)
+    {
+        ExamRow? row = null;
+        row = new ExamRow
+        {
+            Class = cls, Title = title, When = when, WhenSaid = ExamWhen.Say(when, now),
+            Go = new AsyncRelayCommand(() => row!.PrepId is { } id ? OpenPrepAsync(id) : MakePrepAsync(row)),
+        };
+        return row;
+    }
+
+    async Task MakePrepAsync(ExamRow row)
+    {
+        if (row.Making) return;
+        row.Making = true;
+        row.Problem = null;
+        try
+        {
+            if (await library.MakePrepAsync(row.Class, row.Title, row.When) is { } prep)
+            {
+                row.PrepId = prep.Id;
+                row.Score = $"{prep.Questions.Count} practice questions";
+                Show(prep);
+            }
+        }
+        catch (LibraryRefusedException e)
+        {
+            row.Problem = e.Message;
+        }
+        catch
+        {
+            row.Problem = "Your library isn't answering. Try again in a moment.";
+        }
+        finally
+        {
+            row.Making = false;
+        }
+    }
+
+    [RelayCommand(CanExecute = nameof(CanMakeNew))]
+    async Task MakeNewPrep()
+    {
+        if (NewClass is not { } cls) return;
+        MakingNew = true;
+        NewProblem = null;
+        try
+        {
+            DateTimeOffset? when = NewWhen is { } d ? new DateTimeOffset(d.Date.AddHours(9)) : null;
+            if (await library.MakePrepAsync(cls, NewTitle.Trim(), when) is { } prep)
+            {
+                NewTitle = "";
+                NewWhen = null;
+                await LoadExamsAsync();
+                Show(prep);
+            }
+        }
+        catch (LibraryRefusedException e)
+        {
+            NewProblem = e.Message;
+        }
+        catch
+        {
+            NewProblem = "Your library isn't answering. Try again in a moment.";
+        }
+        finally
+        {
+            MakingNew = false;
+        }
+    }
+
+    public async Task OpenPrepAsync(string id)
+    {
+        try
+        {
+            if (await library.PrepAsync(id) is { } prep) Show(prep);
+        }
+        catch
+        {
+        }
+    }
+
+    void Show(ExamPrepDoc prep)
+    {
+        var model = new ExamPrepModel(library, prep, clock(), OnOpenLecture);
+        model.OnClose = () =>
+        {
+            Prep = null;
+            _ = LoadExamsAsync();
+        };
+        model.OnDeleted = model.OnClose;
+        Prep = model;
     }
 
     [RelayCommand(CanExecute = nameof(HasDue))]
@@ -376,4 +551,13 @@ public sealed partial class StudyModel(IStudyLibrary library, Func<DateTimeOffse
         Session = session;
         await session.StartAsync(className, lectureId);
     }
+}
+
+/// <summary>A class a new exam prep can be for, as a chip: picked or not.</summary>
+public sealed partial class ExamClassChoice(string name, IRelayCommand pick) : ObservableObject
+{
+    public string Name { get; } = name;
+    public string Display => ClassNames.Display(Name);
+    public IRelayCommand Pick { get; } = pick;
+    [ObservableProperty] public partial bool Picked { get; set; }
 }

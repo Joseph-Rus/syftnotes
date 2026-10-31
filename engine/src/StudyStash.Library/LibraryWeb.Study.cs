@@ -3,6 +3,8 @@ using System.Text.Json.Nodes;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using StudyStash.Core;
+using StudyStash.Core.Calendar;
+using StudyStash.Core.Canvas;
 using StudyStash.Core.Study;
 
 namespace StudyStash.Library;
@@ -100,8 +102,116 @@ public sealed partial class LibraryWeb
         app.MapDelete("/api/v2/review/cards/{id}", (HttpContext ctx, string id) => Api(ctx, () =>
             ReviewCards.Delete(id) ? Http.Json(new JsonObject { ["deleted"] = id }) : Http.Detail(404, "no such card")));
 
+        MapExamPrep(app);
+
         // What the lecturer said is on the exam, for the phone and Claude.
         app.MapGet("/api/v2/lectures/{id}/exam-flags", (HttpContext ctx, string id) => Api(ctx, () =>
             StudyMaterial.Read(store, id) is { } l ? StudyJson(l.Flags) : Http.Detail(404, "no such lecture")));
+    }
+
+    ExamPrep? examPreps;
+    ExamPrep ExamPreps => examPreps ??= new ExamPrep(cfg.Home);
+    /// <summary>Exams whose prep is being written right now (class and title), so a second press doesn't write it twice.</summary>
+    readonly HashSet<string> prepping = [];
+
+    /// <summary>Every exam Canvas and the calendar know of, past and coming, in the library's classes.</summary>
+    List<ExamDate> ExamDates()
+    {
+        var found = new List<ExamDate>();
+        try
+        {
+            foreach (var a in Assignments.Load(cfg.Home))
+                if (When(a.DueAt.Length > 0 ? a.DueAt : a.Due) is { } due) found.Add(new ExamDate(a.ClassName, a.Name, due, "canvas"));
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException or JsonException)
+        {
+        }
+        try
+        {
+            foreach (var e in (LibraryCalendar.Read(cfg.Home, EventClass.Of(cfg), Now().AddDays(-1))["events"] as JsonArray ?? []).OfType<JsonObject>())
+                if (Str(e, "class") is { Length: > 0 } cls && When(Str(e, "start")) is { } start)
+                    found.Add(new ExamDate(cls, Str(e, "title") ?? "", start, "calendar"));
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException or JsonException)
+        {
+        }
+        return found;
+    }
+
+    static DateTimeOffset? When(string? iso) =>
+        DateTimeOffset.TryParse(iso, System.Globalization.CultureInfo.InvariantCulture, System.Globalization.DateTimeStyles.AssumeUniversal, out var d) ? d : null;
+
+    void MapExamPrep(WebApplication app)
+    {
+        // The exams coming up, and the prep made.
+        app.MapGet("/api/v2/exam-prep", (HttpContext ctx) => Api(ctx, () =>
+            StudyJson(new ExamsNow(ExamPrep.Upcoming(ExamDates(), Now(), cfg.ClassNames().ToHashSet()), ExamPreps.Summaries()))));
+
+        app.MapGet("/api/v2/exam-prep/{id}", (HttpContext ctx, string id) => Api(ctx, () =>
+            ExamPreps.Get(id) is { } prep ? StudyJson(prep) : Http.Detail(404, "no such exam prep")));
+
+        app.MapDelete("/api/v2/exam-prep/{id}", (HttpContext ctx, string id) => Api(ctx, () =>
+            ExamPreps.Delete(id) ? Http.Json(new JsonObject { ["deleted"] = id }) : Http.Detail(404, "no such exam prep")));
+
+        // A study guide and a practice test for an exam, from the class's lectures since the exam before it.
+        app.MapPost("/api/v2/exam-prep", Http.Handle(ctx => ApiAsync(ctx, async () =>
+        {
+            var body = await Http.JsonBodyAsync(ctx.Request);
+            string cls = (Str(body, "class") ?? "").Trim(), title = (Str(body, "title") ?? "").Trim();
+            var when = When(Str(body, "when"));
+            if (cls.Length == 0 || title.Length == 0) return Http.Detail(400, "an exam prep needs a class and the exam's name");
+            if (!cfg.ClassNames().Contains(cls)) return Http.Detail(404, $"there's no class called {cls}");
+            var now = Now();
+            // The exam before this one in the same class: its lectures were for that one.
+            var since = ExamDates().Where(e => e.Class == cls && ExamPrep.IsExam(e.Title) && e.When is { } w && w < (when ?? now).AddHours(-12)
+                    && ExamPrep.Same(e.Title) != ExamPrep.Same(title))
+                .Select(e => e.When).Max();
+            var lectures = ExamPrep.Covered(store, cls, since, when, now).Select(r => StudyMaterial.Read(store, r.Id)).OfType<StudyLecture>()
+                .Where(l => l.HasWords).ToList();
+            if (lectures.Count == 0) return Http.Detail(409, $"{cls} has no lectures with notes to prep from yet.");
+            string key = $"{cls}\u0001{ExamPrep.Same(title)}";
+            lock (prepping)
+                if (!prepping.Add(key)) return Http.Detail(409, "That exam's prep is already being written.");
+            try
+            {
+                string json = await Jobs.PlanAsync("ask", ExamPrep.Prompt(cls, title, when, lectures), ExamPrep.Schema);
+                string by = Core.Ai.Engines.Name(Core.Ai.AiSettings.Load(cfg.Home).For("ask").Provider);
+                var prep = ExamPrep.Read(json, cls, title, when, lectures, now, by);
+                ExamPreps.Save(prep);
+                return StudyJson(prep);
+            }
+            catch (Exception e) when (e is InvalidOperationException or InvalidDataException or HttpRequestException or TimeoutException or JsonException)
+            {
+                return Http.Detail(503, $"The prep couldn't be written: {e.Message}");
+            }
+            finally
+            {
+                lock (prepping) prepping.Remove(key);
+            }
+        })));
+
+        // A go at the practice test: which questions were right. With review_missed, the missed ones go into Review.
+        app.MapPost("/api/v2/exam-prep/{id}/attempt", Http.Handle(ctx => ApiAsync(ctx, async () =>
+        {
+            string id = (string)ctx.Request.RouteValues["id"]!;
+            var body = await Http.JsonBodyAsync(ctx.Request);
+            var marks = (body?["marks"] as JsonObject ?? []).Where(m => m.Value is JsonValue v && v.TryGetValue(out bool _))
+                .ToDictionary(m => m.Key, m => m.Value!.GetValue<bool>());
+            if (ExamPreps.Attempt(id, marks, Now()) is not { } prep) return Http.Detail(404, "no such exam prep");
+            int added = 0;
+            if (body?["review_missed"] is JsonValue rv && rv.TryGetValue(out bool review) && review)
+            {
+                var missed = prep.Questions.Where(q => marks.TryGetValue(q.Id, out bool right) && !right).Select(q =>
+                {
+                    var (front, back) = ExamPrep.Card(q);
+                    string title = q.Lecture.Length > 0 ? store.Get(q.Lecture)?.Title ?? "" : "";
+                    return Review.New(q.Lecture, prep.Class, title, front, back, q.At, "exam", Now());
+                });
+                added = ReviewCards.Add(missed).Count;
+            }
+            var result = JsonSerializer.SerializeToNode(prep, Review.Options)!.AsObject();
+            result["added_to_review"] = added;
+            return Http.Json(result);
+        })));
     }
 }

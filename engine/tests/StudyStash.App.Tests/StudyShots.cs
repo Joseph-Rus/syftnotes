@@ -64,6 +64,26 @@ public class StudyShots
         Shot.Take(Name("review", skin), skin, variant, () => new StudyPage { DataContext = review, Width = 900, Height = 620 }, size: new Size(1028, 748));
     }
 
+    [AvaloniaTheory]
+    [MemberData(nameof(Looks))]
+    public async Task Exam_prep_its_guide_and_its_test(SkinKind skin, bool dark)
+    {
+        await using var lib = await ExamPrepPageTests.LibraryAsync();
+        var variant = dark ? ThemeVariant.Dark : ThemeVariant.Light;
+        var model = new StudyModel(lib.Study, () => lib.Now);
+        model.Classes(["BIO 110", "CHEM 121"]);
+        await model.LoadAsync();
+        Shot.Take(Name("exams", skin), skin, variant, () => new StudyPage { DataContext = model, Width = 900, Height = 760 }, size: new Size(1028, 888));
+
+        await model.Exams[0].Go.ExecuteAsync(null);
+        Shot.Take(Name("prep-guide", skin), skin, variant, () => new StudyPage { DataContext = model, Width = 900, Height = 640 }, size: new Size(1028, 768));
+        model.Prep!.TestTabCommand.Execute(null);
+        model.Prep.Questions[0].Choices[0].Pick.Execute(null);
+        model.Prep.Questions[1].Typed = "Intima, media, externa";
+        model.Prep.Questions[1].RevealCommand.Execute(null);
+        Shot.Take(Name("prep-test", skin), skin, variant, () => new StudyPage { DataContext = model, Width = 900, Height = 900 }, size: new Size(1028, 1028));
+    }
+
     /// <summary>A library that's never asked: a picture's models are filled in by hand.</summary>
     sealed class StudyLibraryStub : StudyStash.Core.Study.IStudyLibrary
     {

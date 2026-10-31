@@ -26,6 +26,17 @@ public interface IStudyLibrary
     Task<ReviewCard?> EditCardAsync(string card, string front, string back);
     Task<bool> DeleteCardAsync(string card);
     Task<List<ExamHint>?> ExamFlagsAsync(string lecture);
+    /// <summary>The exams coming up and the prep made; null from a library too old for exam prep.</summary>
+    Task<ExamsNow?> ExamsAsync() => Task.FromResult<ExamsNow?>(null);
+    Task<ExamPrepDoc?> PrepAsync(string id) => Task.FromResult<ExamPrepDoc?>(null);
+    /// <summary>The library's AI writes a study guide and practice test for an exam. Throws
+    /// <see cref="LibraryRefusedException"/> with why when it can't.</summary>
+    Task<ExamPrepDoc?> MakePrepAsync(string className, string title, DateTimeOffset? when) => Task.FromResult<ExamPrepDoc?>(null);
+    Task<bool> DeletePrepAsync(string id) => Task.FromResult(false);
+    /// <summary>Keeps a go at the practice test; with <paramref name="reviewMissed"/> the missed questions go into Review
+    /// (how many did comes back with it).</summary>
+    Task<(ExamPrepDoc Prep, int AddedToReview)?> AttemptAsync(string id, Dictionary<string, bool> marks, bool reviewMissed) =>
+        Task.FromResult<(ExamPrepDoc, int)?>(null);
 }
 
 /// <summary>The study tools over the library's API (/api/v2/review and the rest), the way the Syft Notes app reads them.
@@ -111,6 +122,35 @@ public sealed partial class StudyRemote(string serverUrl, Func<string> key, Http
         {
             return false;
         }
+    }
+
+    public async Task<ExamsNow?> ExamsAsync() => As<ExamsNow>(await SendAsync(HttpMethod.Get, "/api/v2/exam-prep"));
+
+    public async Task<ExamPrepDoc?> PrepAsync(string id) => As<ExamPrepDoc>(await SendAsync(HttpMethod.Get, $"/api/v2/exam-prep/{Seg(id)}"));
+
+    public async Task<ExamPrepDoc?> MakePrepAsync(string className, string title, DateTimeOffset? when) =>
+        As<ExamPrepDoc>(await SendAsync(HttpMethod.Post, "/api/v2/exam-prep", new JsonObject
+        {
+            ["class"] = className, ["title"] = title, ["when"] = when?.ToString("o", System.Globalization.CultureInfo.InvariantCulture),
+        }));
+
+    public async Task<bool> DeletePrepAsync(string id)
+    {
+        try
+        {
+            return await SendAsync(HttpMethod.Delete, $"/api/v2/exam-prep/{Seg(id)}") is not null;
+        }
+        catch (LibraryRefusedException e) when (e.Status == 404)
+        {
+            return false;
+        }
+    }
+
+    public async Task<(ExamPrepDoc Prep, int AddedToReview)?> AttemptAsync(string id, Dictionary<string, bool> marks, bool reviewMissed)
+    {
+        var body = new JsonObject { ["marks"] = new JsonObject(marks.Select(m => KeyValuePair.Create(m.Key, (JsonNode?)m.Value))), ["review_missed"] = reviewMissed };
+        if (await SendAsync(HttpMethod.Post, $"/api/v2/exam-prep/{Seg(id)}/attempt", body) is not JsonObject o || As<ExamPrepDoc>(o) is not { } prep) return null;
+        return (prep, o["added_to_review"] is JsonValue v && v.TryGetValue(out int n) ? n : 0);
     }
 
     public async Task<List<ExamHint>?> ExamFlagsAsync(string lecture) =>

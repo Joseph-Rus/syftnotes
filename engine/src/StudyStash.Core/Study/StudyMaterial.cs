@@ -7,7 +7,7 @@ namespace StudyStash.Core.Study;
 
 /// <summary>What a lecture gives the study tools to work from: its notes (or, with none, its transcript), what the
 /// lecturer flagged for the exam, and where it is.</summary>
-public sealed record Lecture(string Id, string Title, string Class, string Date, string Notes, string Transcript, IReadOnlyList<ExamHint> Flags)
+public sealed record StudyLecture(string Id, string Title, string Class, string Date, string Notes, string Transcript, IReadOnlyList<ExamHint> Flags)
 {
     /// <summary>The lecture as an AI is given it: its title and date, what was flagged for the exam with the moments,
     /// and its notes (cut to <paramref name="max"/> characters), or its transcript when there are no notes.</summary>
@@ -43,12 +43,12 @@ public sealed record Lecture(string Id, string Title, string Class, string Date,
 public static partial class StudyMaterial
 {
     /// <summary>A lecture from the library, with its exam flags found; null when there's no such lecture.</summary>
-    public static Lecture? Read(Store store, string id)
+    public static StudyLecture? Read(Store store, string id)
     {
         if (store.Get(id) is not { } row) return null;
         var m = store.Meeting(row);
         string notes = !string.IsNullOrEmpty(row.SummaryMd) ? row.SummaryMd : m.NotesMarkdown;
-        return new Lecture(row.Id, row.Title ?? m.Title, row.ClassName ?? "", row.Date ?? m.Date, notes ?? "", m.Transcript ?? "", ExamHints.Find(m.Transcript ?? ""));
+        return new StudyLecture(row.Id, row.Title ?? m.Title, row.ClassName ?? "", row.Date ?? m.Date, notes ?? "", m.Transcript ?? "", ExamHints.Find(m.Transcript ?? ""));
     }
 
     /// <summary>A JSON answer from the library's AI: (prompt, schema) → the JSON text.</summary>
@@ -61,7 +61,7 @@ public static partial class StudyMaterial
         """)!.AsObject();
 
     /// <summary>What an AI is asked for a lecture's flashcards.</summary>
-    public static string CardsPrompt(Lecture l, int count) =>
+    public static string CardsPrompt(StudyLecture l, int count) =>
         $"Write {count} flashcards for reviewing this lecture with spaced repetition. Each card tests one thing: a term, a " +
         "fact, a formula, a cause and its effect, a step in a process, or how two ideas differ. The front is a question " +
         "that can be answered from memory in a few seconds, without seeing the lecture; the back is the answer, short " +
@@ -70,7 +70,7 @@ public static partial class StudyMaterial
         "it was taught is known, give it as \"moment\" (mm:ss).\n\n" + l.ForAi();
 
     /// <summary>Flashcards for a lecture from the AI: new cards, due now. None from a lecture with no words.</summary>
-    public static async Task<List<ReviewCard>> MakeCardsAsync(Planner plan, Lecture l, DateTimeOffset now, int count = 12)
+    public static async Task<List<ReviewCard>> MakeCardsAsync(Planner plan, StudyLecture l, DateTimeOffset now, int count = 12)
     {
         if (!l.HasWords) return [];
         string json = await plan(CardsPrompt(l, count), CardsSchema);

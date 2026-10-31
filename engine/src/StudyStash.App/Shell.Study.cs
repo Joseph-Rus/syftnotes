@@ -3,8 +3,8 @@ using StudyStash.Core.Study;
 
 namespace StudyStash.App;
 
-/// <summary>The study tools in the library window: the Study page from the sidebar (Review), and a lecture's own tools
-/// under its exam flags (its cards in Review).</summary>
+/// <summary>The study tools in the library window: the Study page from the sidebar (Review and exam prep), and a
+/// lecture's own tools under its exam flags (its cards in Review).</summary>
 public static partial class Shell
 {
     /// <summary>The connected library's study tools.</summary>
@@ -32,6 +32,7 @@ public static partial class Shell
             },
             OnCount = due => library.StudyDue = due,
         };
+        study.Classes(library.Classes.Where(c => !c.IsDue && !c.IsHome && c.Name != Core.Configs.Unsorted).Select(c => c.Name));
         ClearPane();
         library.Overview = null;
         library.Study = study;
