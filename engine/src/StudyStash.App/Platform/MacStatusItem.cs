@@ -186,7 +186,7 @@ public static unsafe class MacStatusItem
     }
 
     /// <summary>The icon at 18×18 pt: the pixel s as a template image (the menu bar tints it), or — while recording,
-    /// when its red dot must stay red — an ordinary one drawn in the menu bar's own ink (see <see cref="DarkMenuBar"/>).
+    /// when its red cell must stay red — an ordinary one drawn in the menu bar's own ink (see <see cref="DarkMenuBar"/>).
     /// <paramref name="png"/> is the 2× picture (36 px); the image also carries the s drawn again for a 1× screen (18 px,
     /// <see cref="TrayMark.OneX"/>), so neither screen scales its cells to a blur.</summary>
     public static void SetIcon(byte[] png, bool template = true)

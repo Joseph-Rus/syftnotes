@@ -70,6 +70,50 @@ public class IdleCostTests
         w.Close();
     }
 
+    /// <summary>A level meter is the s's cells: whole cells lit from the bottom by the level (a lively one never less than
+    /// the bottom cell, none at all while nothing records), on whole pixels; and its clock runs only while a cell is
+    /// fading, so a quiet room, or someone who asked for less motion, costs no frames.</summary>
+    [AvaloniaFact]
+    public async Task A_meter_lights_whole_cells_and_moves_only_while_one_changes()
+    {
+        static int[] Columns(float[] lit) => [.. lit.Chunk(StudyStash.App.Controls.Waveform.Rows).Select(c => (int)c.Sum())];
+        Assert.Equal([0, 0, 0], Columns(StudyStash.App.Controls.Waveform.Lit(null, 3, lively: true)));
+        Assert.Equal([1, 2, 4], Columns(StudyStash.App.Controls.Waveform.Lit([0.9, 0.25, 0.5, 1.0], 3, lively: false)));
+        Assert.Equal([1, 4, 1], Columns(StudyStash.App.Controls.Waveform.Lit([0.2, 0.9, 0.25], 3, lively: true)));
+        foreach (var (height, scale) in new[] { (10.0, 2.0), (16, 1), (16, 2), (20, 1), (22, 1), (28, 1), (28, 2) })
+        {
+            var (pitch, cell) = StudyStash.App.Controls.Waveform.Grid(height, scale);
+            Assert.Equal(Math.Round(pitch * scale), pitch * scale, 6);
+            Assert.Equal(Math.Round(cell * scale), cell * scale, 6);
+            Assert.True(cell < pitch && 3 * pitch + cell <= height + 1e-9, $"{height} at {scale}x: {pitch}, {cell}");
+        }
+
+        string? still = Environment.GetEnvironmentVariable("STUDYSTASH_STILL");
+        Environment.SetEnvironmentVariable("STUDYSTASH_STILL", null); // other tests' pictures set it for the whole run
+        Motion.Override = false;
+        try
+        {
+            var wave = new StudyStash.App.Controls.Waveform { Bars = 3, Height = 16, Levels = [0.1, 0.1, 0.1] };
+            var w = Show(wave);
+            Assert.False(wave.Turning);
+            wave.Levels = [0.9, 0.9, 0.9];
+            Assert.True(wave.Turning); // three columns filling
+            var clock = System.Diagnostics.Stopwatch.StartNew();
+            while (wave.Turning && clock.Elapsed < TimeSpan.FromSeconds(3))
+                await Task.Delay(10, TestContext.Current.CancellationToken);
+            Assert.False(wave.Turning); // settled: the clock stopped by itself
+            Motion.Override = true;
+            wave.Levels = [0.1, 0.1, 0.1];
+            Assert.False(wave.Turning); // less motion: straight there
+            w.Close();
+        }
+        finally
+        {
+            Motion.Override = null;
+            Environment.SetEnvironmentVariable("STUDYSTASH_STILL", still);
+        }
+    }
+
     [AvaloniaFact]
     public void A_loader_in_a_window_that_closes_stops_for_good()
     {

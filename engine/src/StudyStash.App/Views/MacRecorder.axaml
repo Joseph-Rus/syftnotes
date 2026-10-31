@@ -20,9 +20,10 @@
       <Setter Property="CornerRadius" Value="16" />
       <Setter Property="HorizontalContentAlignment" Value="Center" />
     </Style>
+    <!-- The red dot that's Stop (and Resume in its place) is one of the s's cells: its corners a cell's, 27 % of its side. -->
     <Style Selector="Button.stop, Button.resume">
       <Setter Property="Theme" Value="{StaticResource Surface}" />
-      <Setter Property="CornerRadius" Value="12" />
+      <Setter Property="CornerRadius" Value="6.5" />
       <Setter Property="HorizontalContentAlignment" Value="Center" />
       <Setter Property="VerticalContentAlignment" Value="Center" />
     </Style>
@@ -65,7 +66,8 @@
             <c:Icon Glyph="play_arrow" Filled="True" Size="14" Foreground="{DynamicResource Fg}" />
           </Button>
         </Panel>
-        <c:Waveform Bars="3" Height="12" MinBar="4" Lively="True" Levels="{Binding Levels}" Foreground="{DynamicResource Record}" HorizontalAlignment="Center"
+        <!-- Its cells about the size of the s's over it (2.5 a pitch on a Retina screen, 3 at 1×) -->
+        <c:Waveform Bars="3" Height="11" Lively="True" Levels="{Binding Levels}" Foreground="{DynamicResource Record}" HorizontalAlignment="Center"
                     Opacity="{Binding IsPaused, Converter={x:Static c:Converters.Dim}}" />
       </StackPanel>
     </Border>
@@ -75,9 +77,8 @@
       <Border CornerRadius="{DynamicResource RadiusPane}" ClipToBounds="True">
         <DockPanel>
           <Grid DockPanel.Dock="Top" Height="60" Margin="20,0,12,0" ColumnDefinitions="Auto,10,Auto,10,Auto,*,Auto">
-            <Border Width="8" Height="8" CornerRadius="4" Background="{DynamicResource Rec}" VerticalAlignment="Center"
-                    IsVisible="{Binding IsRunning}" />
-            <Border Width="8" Height="8" CornerRadius="4" Background="{DynamicResource Fg3}" VerticalAlignment="Center" IsVisible="{Binding IsPaused}" />
+            <c:SyftCell Width="8" Height="8" Fill="{DynamicResource Rec}" VerticalAlignment="Center" IsVisible="{Binding IsRunning}" />
+            <c:SyftCell Width="8" Height="8" Fill="{DynamicResource Fg3}" VerticalAlignment="Center" IsVisible="{Binding IsPaused}" />
             <TextBlock Grid.Column="2" Text="{Binding DisplayClass}" FontSize="13" FontWeight="SemiBold" VerticalAlignment="Center" />
             <TextBlock Grid.Column="4" Classes="num" Text="{Binding Elapsed}" FontSize="13" Foreground="{DynamicResource Fg2}" VerticalAlignment="Center" />
             <!-- Make it small, pause, stop: one pill of three round buttons -->

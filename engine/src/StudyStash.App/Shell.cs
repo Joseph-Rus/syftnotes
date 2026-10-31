@@ -390,8 +390,8 @@ public static partial class Shell
     // --- the tray ---------------------------------------------------------------------------------------------------
 
     /// <summary>The icon, as PNG bytes: the pixel s — black on a Mac (a template image the menu bar tints, or, while
-    /// recording, in the menu bar's own ink so its red dot stays red), black or white on Windows by theme — with a red
-    /// dot while recording.</summary>
+    /// recording, in the menu bar's own ink so its red cell stays red), black or white on Windows by theme — with its
+    /// top-right cell red while recording.</summary>
     static byte[] TrayImageBytes(bool recording)
     {
         if (OperatingSystem.IsMacOS())
@@ -1664,7 +1664,7 @@ public static partial class Shell
             if (trayRecording && !trayLogged)
             {
                 trayLogged = true;
-                Program.Log($"[tray] recording: the S. with its red dot, {(trayDark ? "white on a dark" : "black on a light")} menu bar, \"{MacStatusItem.Title()}\" beside it");
+                Program.Log($"[tray] recording: the S. with its red cell, {(trayDark ? "white on a dark" : "black on a light")} menu bar, \"{MacStatusItem.Title()}\" beside it");
             }
         }
         else if (tray is not null)

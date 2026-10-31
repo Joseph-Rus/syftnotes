@@ -481,7 +481,7 @@
                                     </StackPanel>
                                   </Button>
                                   <StackPanel Spacing="8" IsVisible="{Binding Setup.ShowMicCheck}">
-                                    <c:Waveform Height="28" Bars="24" Levels="{Binding Setup.MicLevels}" Foreground="{DynamicResource Ink}" HorizontalAlignment="Left" />
+                                    <c:Waveform Height="28" Bars="24" Levels="{Binding Setup.MicLevels}" Foreground="{DynamicResource Record}" HorizontalAlignment="Left" />
                                     <TextBlock Classes="hint" Text="{Binding Setup.MicLine}" />
                                   </StackPanel>
                                   <StackPanel Spacing="8" IsVisible="{Binding Setup.ShowMicProblem}">

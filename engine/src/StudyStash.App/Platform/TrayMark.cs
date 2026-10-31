@@ -6,12 +6,12 @@ namespace StudyStash.App.Platform;
 
 /// <summary>
 /// The menu bar's and the tray's icon: Syft Notes' pixel s in one ink, every cell on whole pixels (the same cells as
-/// Assets/mark-&lt;px&gt;.png, which tools/syft/make_art.swift draws), and while recording the s's top-right bit (p1, its
-/// odd one out) a red dot in its place, kept clear of the cells round it the way the system's own badges are.
+/// Assets/mark-&lt;px&gt;.png, which tools/syft/make_art.swift draws), and while recording the s's top-right cell (p1, its
+/// odd one out) turned the recording red: a square like the rest, in its own slot, where a round dot used to sit.
 /// </summary>
 public static class TrayMark
 {
-    /// <summary>The recording dot: the system's recording red, the one colour the mark ever has.</summary>
+    /// <summary>The recording cell's red: the system's recording red, the one colour the mark ever has.</summary>
     public static readonly Color Red = Color.Parse("#E5484D");
 
     /// <summary>The s's 24 cells as (column, row) on its 6 × 7 grid, in path order p0 → p23 (Joey's syft-motion.html).</summary>
@@ -51,39 +51,27 @@ public static class TrayMark
     }
 
     /// <summary>The icon as PNG bytes, <paramref name="size"/> pixels square (36 for the Mac's 18 pt menu bar at 2×, 18
-    /// at 1×, 32 for the Windows tray), the s in <paramref name="ink"/>.</summary>
+    /// at 1×, 32 for the Windows tray), the s in <paramref name="ink"/>, its top-right cell red while
+    /// <paramref name="recording"/>.</summary>
     public static byte[] Png(int size, IBrush ink, bool recording)
     {
         var cells = CellRects(size);
-        var (centre, r) = Badge(size);
-        double ring = r + Math.Max(0.5, size / 64.0);
         var bmp = new RenderTargetBitmap(new PixelSize(size, size), new Vector(96, 96));
         using (var ctx = bmp.CreateDrawingContext())
         {
-            var all = new Rect(0, 0, size, size);
-            Geometry clip = recording
-                ? new CombinedGeometry(GeometryCombineMode.Exclude, new RectangleGeometry(all), new EllipseGeometry(new Rect(centre.X - ring, centre.Y - ring, ring * 2, ring * 2)))
-                : new RectangleGeometry(all);
-            using (ctx.PushGeometryClip(clip))
-                for (int i = 0; i < cells.Length; i++)
-                    if (!recording || i != 1) ctx.FillRectangle(ink, cells[i]);
-            if (recording) ctx.DrawEllipse(new SolidColorBrush(Red), null, centre, r, r);
+            var red = new SolidColorBrush(Red);
+            for (int i = 0; i < cells.Length; i++)
+                ctx.FillRectangle(recording && i == RecordingCell ? red : ink, cells[i]);
         }
         using var stream = new MemoryStream();
         bmp.Save(stream, PngBitmapEncoderOptions.Default);
         return stream.ToArray();
     }
 
-    /// <summary>Where the recording dot sits in a <paramref name="size"/>-pixel icon: on the s's top-right cell, a
-    /// little bigger than it, and inside the picture.</summary>
-    public static (Point Centre, double Radius) Badge(int size)
-    {
-        var p1 = CellRects(size)[1];
-        double r = size * 0.08;
-        return (new Point(p1.Center.X, Math.Max(p1.Center.Y, r + size * 0.01)), r);
-    }
+    /// <summary>The cell that turns red while recording: p1, the s's top-right corner.</summary>
+    public const int RecordingCell = 1;
 
-    /// <summary>The 1× picture of a 36-pixel (2×) icon: the same ink and the same dot, drawn again at 18 pixels so the
+    /// <summary>The 1× picture of a 36-pixel (2×) icon: the same ink and the same red cell, drawn again at 18 pixels so the
     /// cells land on whole pixels there too instead of being scaled to a blur. Null for any other picture.</summary>
     public static byte[]? OneX(byte[] png)
     {
