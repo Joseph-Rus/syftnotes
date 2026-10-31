@@ -5,6 +5,7 @@ import type { Attachment } from '../api/types';
 import { fileSize } from '../format';
 import { Camera, Folder, Photo } from '../ui/icons';
 import { Button, Screen, Section } from '../ui/kit';
+import { SyftLoader } from '../ui/Syft';
 import { AttachmentRow } from './attachments';
 
 const MAX_BYTES = 200 * 1024 * 1024;
@@ -151,9 +152,7 @@ function JobRow({ job, onRetry }: { job: Job; onRetry: () => void }) {
       <div class="upload-row-body">
         <div class="upload-row-title">{job.file.name}</div>
         {job.status === 'uploading' ? (
-          <div class="upload-progress">
-            <div class="upload-progress-bar" style={{ width: `${pct}%` }} />
-          </div>
+          <SyftLoader variant="pixelProgress" size={10} progress={pct / 100} class="upload-pixels" />
         ) : job.status === 'error' ? (
           <div class="upload-row-error">{job.error}</div>
         ) : (

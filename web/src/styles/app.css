@@ -368,14 +368,14 @@ a.detail-eyebrow {
   opacity: 0.8;
   margin-bottom: 2px;
 }
-/* The egghead answers: his face beside each answer. */
+/* The answer's side: the pixel s beside each one. */
 .theirs-row {
   display: flex;
   align-items: flex-start;
   gap: 8px;
   max-width: 100%;
 }
-.theirs-row > .doodle {
+.theirs-row > .syft-mark {
   flex: none;
   margin-top: 4px;
 }
@@ -695,11 +695,6 @@ a.detail-eyebrow {
   align-items: center;
   font-size: 14px;
   color: var(--fg2);
-}
-.send-progress .upload-progress {
-  width: 100%;
-  height: 6px;
-  border-radius: 3px;
 }
 .centred {
   text-align: center;

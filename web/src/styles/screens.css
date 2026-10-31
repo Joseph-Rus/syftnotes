@@ -281,17 +281,8 @@
   overflow: hidden;
   text-overflow: ellipsis;
 }
-.upload-progress {
-  height: 4px;
-  background: var(--fill);
-  border-radius: 2px;
+.upload-pixels {
   margin-top: 6px;
-  overflow: hidden;
-}
-.upload-progress-bar {
-  height: 100%;
-  background: var(--accent);
-  transition: width 0.15s linear;
 }
 .upload-row-done,
 .upload-row-error {

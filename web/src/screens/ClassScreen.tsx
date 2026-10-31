@@ -4,7 +4,7 @@ import { useResource } from '../data/resource';
 import { dueWhen, lectureMeta, groupBy, lectureGroup } from '../format';
 import { href } from '../router';
 import { Paperclip, PlusCircle } from '../ui/icons';
-import { Doodle } from '../ui/Doodle';
+import { SyftMark } from '../ui/Syft';
 import { Empty, IconButton, Problem, Row, Screen, Section, SkeletonRows } from '../ui/kit';
 import { AttachmentRow } from './attachments';
 import { statusWord } from './Home';
@@ -93,7 +93,7 @@ function Lectures({
   if (loading && !lectures) return <SkeletonRows count={6} />;
   if (!lectures || lectures.length === 0)
     return (
-      <Empty icon={<Doodle name="chicklet" />} title="No lectures yet">
+      <Empty icon={<SyftMark size={96} oddOneOut />} title="No lectures yet">
         Record a lecture in {className} on your library computer.
       </Empty>
     );

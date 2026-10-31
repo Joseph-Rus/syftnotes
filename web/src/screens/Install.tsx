@@ -1,7 +1,7 @@
 import type { Platform } from '../platform';
 import { AddSquare, Share } from '../ui/icons';
 import { Button } from '../ui/kit';
-import { Doodle } from '../ui/Doodle';
+import { SyftHello } from '../ui/Syft';
 
 /**
  * Shown in a phone's browser, before the app is on the Home Screen: how to add it, for iOS (Share → Add to Home
@@ -12,7 +12,7 @@ export function Install({ platform, onSkip }: { platform: Platform; onSkip: () =
   return (
     <div class="install">
       <div class="install-body">
-        <Doodle name="hello" size={120} />
+        <SyftHello size={120} />
         <h1>Add Egghead Notes to your Home Screen</h1>
         <p class="lede">
           So it opens full screen, like any other app, and reads your notes even when you're offline. Get your
