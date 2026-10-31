@@ -646,7 +646,7 @@ public class AiShots
 
     // --- 14: AI tool access --------------------------------------------------------------------------------------
 
-    static AiAccessModel AccessModel(string web = "off")
+    internal static AiAccessModel AccessModel(string web = "off")
     {
         // "ready" sets WebOn through the property, which round-trips through the library like the real toggle does
         // (FakeAiLibrary's own Access must be non-null for that: its default, unscripted SetWebAsync then answers
