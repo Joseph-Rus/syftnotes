@@ -1,0 +1,42 @@
+<!-- The first run's one page (MacWelcome, WinWelcome): everything centred in the sheet, the title and its line under
+     the pixel s, one ink pill, and the quiet lines under it. -->
+<Styles xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+  <Style Selector="StackPanel.welcome">
+    <Setter Property="VerticalAlignment" Value="Center" />
+    <Setter Property="HorizontalAlignment" Value="Center" />
+    <Setter Property="MaxWidth" Value="420" />
+    <Setter Property="Margin" Value="32,0,32,8" />
+  </Style>
+  <Style Selector="TextBlock.welcome-title">
+    <Setter Property="TextAlignment" Value="Center" />
+    <Setter Property="TextWrapping" Value="Wrap" />
+    <Setter Property="Margin" Value="0,14,0,0" />
+  </Style>
+  <Style Selector="TextBlock.welcome-lede">
+    <Setter Property="TextAlignment" Value="Center" />
+    <Setter Property="TextWrapping" Value="Wrap" />
+    <Setter Property="HorizontalAlignment" Value="Center" />
+  </Style>
+  <Style Selector="Button.welcome-go">
+    <Setter Property="HorizontalAlignment" Value="Center" />
+    <Setter Property="HorizontalContentAlignment" Value="Center" />
+    <Setter Property="MinWidth" Value="220" />
+    <Setter Property="Margin" Value="0,30,0,0" />
+  </Style>
+  <Style Selector="TextBlock.welcome-hint">
+    <Setter Property="TextAlignment" Value="Center" />
+    <Setter Property="HorizontalAlignment" Value="Center" />
+    <Setter Property="MaxWidth" Value="340" />
+    <Setter Property="Margin" Value="0,14,0,0" />
+  </Style>
+  <Style Selector="Grid.welcome-problem">
+    <Setter Property="HorizontalAlignment" Value="Center" />
+    <Setter Property="MaxWidth" Value="360" />
+    <Setter Property="Margin" Value="0,14,0,0" />
+  </Style>
+  <Style Selector="CheckBox.welcome-login">
+    <Setter Property="HorizontalAlignment" Value="Center" />
+    <Setter Property="Margin" Value="0,22,0,0" />
+  </Style>
+</Styles>

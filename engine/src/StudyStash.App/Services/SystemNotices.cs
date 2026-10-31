@@ -56,6 +56,9 @@ public sealed class SystemNotices
         system.StateChanged += () => post(StateChanged);
     }
 
+    /// <summary>Asks the system now whether its notifications may be shown (<see cref="ISystemNotifications.Ask"/>).</summary>
+    public void Ask() => system.Ask();
+
     /// <summary>A notice's id with the system: the same notice said twice is one notification, shown afresh.</summary>
     public static string IdOf(Notice notice) => "ss-" + Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(notice.Key)))[..24];
 

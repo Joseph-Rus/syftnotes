@@ -383,6 +383,23 @@ public sealed partial class Store : IDisposable
                 Queued, Now(), Done, Ai.Engines.NotesNeedSignIn(engineName));
     }
 
+    /// <summary>Lectures filed with no notes because <paramref name="engineName"/> hit its usage limit
+    /// (<see cref="Ai.Engines.NotesWaitForLimit"/>), queued to be written now the limit's over: how many.</summary>
+    public int RequeueLimited(string engineName)
+    {
+        lock (gate)
+            return Exec("UPDATE notes SET status=?, updated_at=? WHERE status=? AND COALESCE(summary_md, '')='' AND error LIKE ?",
+                Queued, Now(), Done, Ai.Engines.WaitPrefix(engineName).Replace("%", "").Replace("_", "") + "%");
+    }
+
+    /// <summary>Every lecture filed with no notes (notes were off, or nothing wrote them), queued to have them written:
+    /// a first AI was just chosen on a lecture's page. How many.</summary>
+    public int RequeueMissing()
+    {
+        lock (gate)
+            return Exec("UPDATE notes SET status=?, updated_at=? WHERE status=? AND COALESCE(summary_md, '')=''", Queued, Now(), Done);
+    }
+
     public int RequeueAll()
     {
         lock (gate) return Exec("UPDATE notes SET status=?, updated_at=? WHERE status IN (?, ?)", Queued, Now(), Done, Failed);

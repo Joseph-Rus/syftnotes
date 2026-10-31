@@ -10,6 +10,9 @@ namespace StudyStash.App.ViewModels;
 /// <summary>Setup's pages, in the order they come in any flow (each flow uses some of them).</summary>
 public enum SetupStep
 {
+    /// <summary>A first run's only page: "Record your lectures. Get the notes." and Get started, which makes the library
+    /// here, asks for the microphone and leaves everything else to defaults, or to the moment it's needed.</summary>
+    Start,
     /// <summary>The first page: what Syft Notes does, in four steps, before any choice.</summary>
     Intro,
     /// <summary>What this computer is for, and what setting it up involves.</summary>
@@ -180,6 +183,46 @@ public sealed partial class SetupModel : ObservableObject
     partial void OnAgainChanged(bool value)
     {
         if (Steps.Count > 0) SetRole(Role);
+    }
+
+    /// <summary>A first run on a computer that's just this one (not a library, not a laptop already connected to one):
+    /// one page, one button (<see cref="SetupStep.Start"/>). Everything setup by hand asks is defaulted, or asked when
+    /// it's needed: which AI on the first lecture's page, Canvas from Due, the phone from Settings.</summary>
+    [ObservableProperty] public partial bool OneButton { get; set; }
+
+    partial void OnOneButtonChanged(bool value)
+    {
+        // Just this computer, and opening when the student logs in unless they untick it (the welcome shows the tick).
+        if (value)
+        {
+            StartAtLogin = true;
+            if (Role != AppRole.Both) Role = AppRole.Both;
+        }
+        if (Steps.Count > 0) SetRole(AppRole.Both);
+    }
+
+    // The welcome's words (the first run's one page).
+    public const string StartTitle = "Record your lectures. Get the notes.";
+    /// <summary>The title as the page sets it: a line each, so neither half is left with one word.</summary>
+    public const string StartTitleLines = "Record your lectures.\nGet the notes.";
+    public string StartLede => $"Press Record when class starts. Syft Notes writes down what's said, here on this {DeviceWord}, and turns it into study notes.";
+    /// <summary>Under Get started: on a Mac, that the microphone is asked for next (one sentence before the system's own
+    /// question); on Windows, which asks nothing, only where recordings stay.</summary>
+    public string StartHint => skin == SkinKind.Mac
+        ? "Your Mac will ask next to let Syft Notes use the microphone. Recordings stay on this Mac."
+        : "Recordings stay on this PC.";
+    public const string StartAtLoginLabel = "Open Syft Notes when you log in";
+    public bool OnStart => Step == SetupStep.Start;
+    /// <summary>Get started is under way: the library is being made, the microphone asked for, an AI looked for.</summary>
+    [ObservableProperty] public partial bool Starting { get; set; }
+    /// <summary>Get started couldn't make the library: why (the line under the button), and the button says Try again.</summary>
+    public bool HasStartProblem => OnStart && HasLibraryResult && !LibraryOk && !Starting && !Connecting;
+
+    partial void OnStartingChanged(bool value)
+    {
+        OnPropertyChanged(nameof(ContinueLabel));
+        OnPropertyChanged(nameof(CanContinue));
+        OnPropertyChanged(nameof(HasStartProblem));
     }
     public string WelcomeTitle => Again ? "Set up Syft Notes again" : "Where your lectures are kept";
     public string WelcomeBody => Again
@@ -412,7 +455,8 @@ public sealed partial class SetupModel : ObservableObject
         : OnAi && IsLibrary ? $"Library setup · step {Index} of {Count}"
         : $"Step {Index} of {Count}";
     public string ContinueLabel =>
-        IsLast ? "Open Syft Notes"
+        OnStart ? (Starting || Connecting ? "Getting ready…" : HasStartProblem ? "Try again" : "Get started")
+        : IsLast ? "Open Syft Notes"
         : OnIntro ? "Get started"
         : OnPassword && !LibraryOk ? (ExistingLibrary ? "Start library" : "Create library")
         : OnLibrary && !LibraryOk ? "Connect"
@@ -441,7 +485,7 @@ public sealed partial class SetupModel : ObservableObject
     public bool Wide => OnAi || OnCanvas;
     /// <summary>Continue waits while Canvas is finding courses or linking one, and while the library is being made or
     /// reached.</summary>
-    public bool CanContinue => (!OnCanvas || Canvas?.CanFinish != false) && !Connecting && !AddingCourses;
+    public bool CanContinue => (!OnCanvas || Canvas?.CanFinish != false) && !Connecting && !AddingCourses && !Starting;
     public bool HasLibraryResult => !string.IsNullOrEmpty(LibraryResult);
     /// <summary>The library's name and password can't change once it's made here (Settings changes them later).</summary>
     public bool CanEditLibrary => !LibraryOk && !Connecting;
@@ -471,8 +515,10 @@ public sealed partial class SetupModel : ObservableObject
     /// <summary>The steps of each flow, in order. Windows adds the taskbar where Syft Notes records.</summary>
     public static IReadOnlyList<SetupStep> StepsFor(AppRole role, SkinKind skin) => StepsFor(role, skin, forSchool: true);
 
-    public static IReadOnlyList<SetupStep> StepsFor(AppRole role, SkinKind skin, bool forSchool, bool intro = true)
+    public static IReadOnlyList<SetupStep> StepsFor(AppRole role, SkinKind skin, bool forSchool, bool intro = true, bool oneButton = false)
     {
+        // The first run on just this computer: one page.
+        if (oneButton) return [SetupStep.Start];
         // How it works comes first, the first time; run again, it's known.
         var steps = intro ? new List<SetupStep> { SetupStep.Intro, SetupStep.Welcome } : new List<SetupStep> { SetupStep.Welcome };
         steps.AddRange(role switch
@@ -494,6 +540,7 @@ public sealed partial class SetupModel : ObservableObject
 
     string TitleOf(SetupStep step) => step switch
     {
+        SetupStep.Start => "Welcome",
         SetupStep.Intro => "Welcome",
         SetupStep.Welcome => $"This {DeviceWord}",
         SetupStep.Password => "Password",
@@ -527,7 +574,7 @@ public sealed partial class SetupModel : ObservableObject
         var wanted = Step;
         Steps.Clear();
         int n = 1;
-        foreach (var step in StepsFor(role, skin, ForSchool, intro: !Again))
+        foreach (var step in StepsFor(role, skin, ForSchool, intro: !Again, oneButton: OneButton && !Again))
             Steps.Add(new StepItem { Step = step, Number = n++, Title = TitleOf(step), Optional = step is SetupStep.Canvas or SetupStep.Classes });
         Go(Steps.Any(s => s.Step == wanted) ? wanted : Steps[0].Step);
         foreach (string p in new[] { nameof(IsOneComputer), nameof(IsLibrary), nameof(IsLaptop), nameof(LibraryIsHere), nameof(HeaderTitle), nameof(FlowName),
@@ -562,7 +609,7 @@ public sealed partial class SetupModel : ObservableObject
 
     void NotifyStepDerived()
     {
-        foreach (string p in new[] { nameof(Index), nameof(IsLast), nameof(StepLabel), nameof(ContinueLabel), nameof(CanGoBack), nameof(OnWelcome), nameof(OnPassword),
+        foreach (string p in new[] { nameof(Index), nameof(IsLast), nameof(StepLabel), nameof(ContinueLabel), nameof(CanGoBack), nameof(OnWelcome), nameof(OnStart), nameof(HasStartProblem), nameof(OnPassword),
                      nameof(OnMicrophone), nameof(OnUses), nameof(OnIntro), nameof(OnLibrary), nameof(OnModel), nameof(OnClasses), nameof(OnStartAtLogin), nameof(OnTaskbar), nameof(OnAi),
                      nameof(OnCanvas), nameof(OnDone), nameof(OnLibraryDone), nameof(OnLaptopDone), nameof(OnOneComputerDone), nameof(OnPlainStep),
                      nameof(Wide), nameof(CanContinue), nameof(AiHelpOpen) })
@@ -641,6 +688,7 @@ public sealed partial class SetupModel : ObservableObject
 
     partial void OnLibraryResultChanged(string? value)
     {
+        OnPropertyChanged(nameof(HasStartProblem));
         OnPropertyChanged(nameof(HasLibraryResult));
         OnPropertyChanged(nameof(HasWelcomeProblem));
         OnPropertyChanged(nameof(ShowWelcomeStatus));
@@ -649,6 +697,7 @@ public sealed partial class SetupModel : ObservableObject
 
     partial void OnLibraryOkChanged(bool value)
     {
+        OnPropertyChanged(nameof(HasStartProblem));
         OnPropertyChanged(nameof(LibrarySummary));
         OnPropertyChanged(nameof(HasWelcomeProblem));
         OnPropertyChanged(nameof(ShowWelcomeStatus));
@@ -658,6 +707,8 @@ public sealed partial class SetupModel : ObservableObject
 
     partial void OnConnectingChanged(bool value)
     {
+        OnPropertyChanged(nameof(HasStartProblem));
+        OnPropertyChanged(nameof(ContinueLabel));
         OnPropertyChanged(nameof(HasWelcomeProblem));
         OnPropertyChanged(nameof(ShowWelcomeStatus));
         OnPropertyChanged(nameof(CanContinue));
@@ -730,6 +781,10 @@ public sealed partial class SetupModel : ObservableObject
     /// <summary>Creates the library here (library flow) or connects to it (laptop flow).</summary>
     public Func<Task>? OnConnect { get; set; }
     public Func<Task>? OnFind { get; set; }
+    /// <summary>Get started's part after the library is made: the microphone asked for, the model's download started, an
+    /// AI already signed in here picked for the notes (or notes left for the first lecture's page). Never fails Get
+    /// started: what it couldn't do is asked later, where it's needed.</summary>
+    public Func<Task>? OnGetStarted { get; set; }
     public Action? OnRetryModel { get; set; }
     /// <summary>Another model picked: it's the one that downloads now (what came of the other stays).</summary>
     public Action<ModelChoice>? OnPickModel { get; set; }
@@ -840,6 +895,25 @@ public sealed partial class SetupModel : ObservableObject
     [RelayCommand]
     async Task Next()
     {
+        if (OnStart)
+        {
+            // Get started: the library made here (once: Try again after a problem makes it again), then the host's
+            // part (the microphone, an AI already here), then the window closes on the library.
+            if (Starting) return;
+            Starting = true;
+            try
+            {
+                if (!LibraryOk && OnConnect is not null) await OnConnect();
+                if (!LibraryOk) return;
+                if (OnGetStarted is not null) await OnGetStarted();
+            }
+            finally
+            {
+                Starting = false;
+            }
+            OnFinish?.Invoke();
+            return;
+        }
         if ((OnPassword || OnLibrary || OnWelcome && IsOneComputer) && !LibraryOk && OnConnect is not null)
         {
             await OnConnect();

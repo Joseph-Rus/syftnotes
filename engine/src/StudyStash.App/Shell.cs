@@ -163,6 +163,8 @@ public static partial class Shell
         public static ViewModels.SetupModel? SetupModel => setup;
         /// <summary>Guided setup's model, while setup's window is open.</summary>
         public static ViewModels.GuidedSetupModel? Guided => guidedSetup;
+        /// <summary>Home's "Ready when class starts", while it shows.</summary>
+        public static ViewModels.WelcomeCardModel? WelcomeCard => library.Welcome;
         public static void TogglePanel() => Shell.TogglePanel();
         public static void ToggleQuick() => Shell.ToggleQuick();
         public static void Record() => ToggleRecording();
@@ -170,6 +172,13 @@ public static partial class Shell
         public static void TogglePause() => Shell.TogglePause();
         public static void ShowRecorder(bool expanded) => Shell.ShowRecorder(expanded);
         public static void ShowLibrary() => Shell.ShowLibrary();
+        /// <summary>The frozen setup by hand in place of a first run's one page: how the self-test still proves a laptop
+        /// connecting to a library elsewhere (a student reaches that from Settings → Connection).</summary>
+        public static void SetupByHand()
+        {
+            if (setupWindow is { } w && setup is { OneButton: true }) w.Close();
+            ShowSetup(byHand: true);
+        }
         /// <summary>One step of dragging the recorder, as the pointer would take it: the self-test's check that it
         /// goes right up to a Mac's menu bar and down to Windows' taskbar.</summary>
         public static void DragRecorder(PixelPoint at, PixelPoint pointer)
@@ -630,6 +639,18 @@ public static partial class Shell
         // Stopped before there was enough to keep: nothing is saved (or, for a note picked up again, added), and it says so.
         if (NoticeWords.NotKept(how) is var (title, text)) Toast(title, text, null, null);
         else if (l is { State: LectureState.Failed }) Toast(l.Error, "Its sound file is damaged, so it can't be written down.", null, null);
+        else if (l is not null && host.Settings.AskNotificationsAtStop && SystemNotifications() is { } system)
+        {
+            // The first Stop after a first run: the Mac asks for its notifications now, with the app's own card saying
+            // why beside its question (it used to ask cold, a second after setup closed).
+            host.Save(s => s.AskNotificationsAtStop = false);
+            Shelf().Show(new Notice
+            {
+                Title = "Recording saved",
+                Text = NoticeWords.Saved(host.Library, OperatingSystem.IsMacOS(), WillHaveNotes(l), NotesOff) + " " + NoticeWords.AllowToHear,
+            });
+            system.Ask();
+        }
         else if (l is not null) Toast("Recording saved", NoticeWords.Saved(host.Library, OperatingSystem.IsMacOS(), WillHaveNotes(l), NotesOff), null, null);
         if (onPage)
         {
@@ -1254,6 +1275,13 @@ public static partial class Shell
             Raise(setupWindow);
             return;
         }
+        // A first run on just this computer: one page, one button. Setup by hand (and guided setup from it) stays for
+        // Run setup again, an old library installer, and a laptop already connected to a library elsewhere.
+        if (!byHand && Setup.OneButtonFits(host))
+        {
+            ShowWelcome();
+            return;
+        }
         library.Support = null; // the ask for a tip never shows during setup
         bool again = host.Settings.SetupDone;
         setup = Setup.Make(host);
@@ -1364,6 +1392,53 @@ public static partial class Shell
                 guided.Screen = GuidedScreen.Manual;
             }
         }
+    }
+
+    /// <summary>
+    /// A first run's one page (<see cref="SetupStep.Start"/>): Get started makes the library here, asks for the
+    /// microphone, starts the model's download and picks an AI already signed in here for the notes (FirstRun), then
+    /// the window closes on the library's Home, with "Ready when class starts" over it. No guided setup and no setup
+    /// tools' door: there's nothing left to guide.
+    /// </summary>
+    static void ShowWelcome()
+    {
+        library.Support = null; // the ask for a tip never shows during setup
+        var model = setup = Setup.Make(host, AppRole.Both);
+        model.OneButton = true;
+        var view = Skin.Current == SkinKind.Mac ? (Control)new MacWelcome { DataContext = model, DrawChrome = false } : new WinWelcome { DataContext = model, DrawChrome = false };
+        var w = new Window
+        {
+            Title = "Syft Notes", CanResize = false, CanMaximize = false, Content = view,
+            ExtendClientAreaToDecorationsHint = true, ExtendClientAreaTitleBarHeightHint = Skin.Current == SkinKind.Mac ? WindowHeader.MacHeight : 32,
+        };
+        Look.Apply(w);
+        AppMenu.Attach(w, ShowLibrary, SettingsFromAnywhere);
+        if (Skin.Current == SkinKind.Mac) MacTitleBar.Attach(w);
+        WinChrome.Apply(w);
+        // The self-test finds no AI's CLI at all, so it never reaches an account.
+        Func<Core.Ai.AgentCliInfo, AgentFound> find = SelfTest.Dir is not null ? _ => AgentFound.None : cli => AgentInstall.Find(cli);
+        model.OnGetStarted = () => FirstRun.AfterLibraryAsync(model, host, Ai(), () => FirstRun.Detect(find, FirstRun.Status), WriteNotesAsync);
+        model.OnFinish = () =>
+        {
+            Setup.Finish(model, host);
+            w.Close();
+            ShowLibrary();
+            // Home's "Ready when class starts" shows at once.
+            RequestRefresh();
+        };
+        w.Closed += (_, _) =>
+        {
+            // Only this window's own: setup by hand may have opened in its place already.
+            if (setupWindow == w) setupWindow = null;
+            if (setup == model) setup = null;
+            UpdateDock();
+        };
+        FollowView(w, view);
+        setupWindow = w;
+        w.Show();
+        UpdateDock();
+        w.Activate();
+        Desktop.Activate();
     }
 
     /// <summary>Guided setup's model for this window, reaching the app's own installer, sign-in, terminal and pages.
@@ -1746,7 +1821,8 @@ public static partial class Shell
         panel.ProblemTitle = problem?.Title;
         panel.ProblemDetail = problem?.Detail;
         panel.ProblemAction = problem is { HasAction: true } p ? p.ActionLabel : null;
-        panel.CanRecord = recording || (host.ModelReady && host.MicAccess() is not (MicAccess.Denied or MicAccess.Restricted));
+        // Record works before the model has arrived (the lecture waits for it), so only a refused microphone stops it.
+        panel.CanRecord = recording || host.MicAccess() is not (MicAccess.Denied or MicAccess.Restricted);
         panel.Hint = recording ? null
             : !panel.CanRecord && problem is not null ? problem.Title
             : RecordClass().Length > 0 ? "Picked by you"
@@ -1796,6 +1872,47 @@ public static partial class Shell
         }
         if (OperatingSystem.IsWindows()) UpdateTaskbar(problem);
         if (setup is not null) Setup.Refresh(setup, host);
+        ShowWelcomeCard();
+    }
+
+    /// <summary>Home's "Ready when class starts" after a first run, kept up to date: the Record keys, where the S. is,
+    /// the model's download, the microphone. Gone once put away (Got it, or the first recording), and never for an
+    /// update or a library.</summary>
+    static void ShowWelcomeCard()
+    {
+        if (!host.Settings.WelcomeCard || !host.Settings.SetupDone || host.Settings.Role == AppRole.Library)
+        {
+            if (library.Welcome is not null) library.Welcome = null;
+            return;
+        }
+        bool mac = OperatingSystem.IsMacOS();
+        var card = library.Welcome;
+        if (card is null)
+        {
+            card = new WelcomeCardModel(mac)
+            {
+                OnShowIt = MoveIconIntoView,
+                OnRetry = () => _ = host.DownloadModelAsync(),
+                OnMic = () => Dialogs.OpenUrl(host.MicSettingsUrl),
+                OnGotIt = PutWelcomeCardAway,
+            };
+            library.Welcome = card;
+        }
+        card.RecordKeys = Keybindings.Show(KeyAction.Record, mac);
+        card.IconHidden = mac && MacStatusItem.Check() is { Seen: false };
+        card.ShowModel(host.ModelReady, host.Downloading?.Fraction, host.DownloadProblem, mac ? "Mac" : "PC");
+        bool micRefused = host.MicAccess() is MicAccess.Denied or MicAccess.Restricted;
+        card.MicLine = !micRefused ? ""
+            : mac ? "Syft Notes can't use the microphone yet. Turn it on in System Settings → Privacy & Security → Microphone."
+            : "Windows is keeping the microphone from desktop apps. Turn on Settings → Privacy & security → Microphone → Let desktop apps access your microphone.";
+        card.MicButton = mac ? "Open System Settings" : "Open microphone settings";
+    }
+
+    /// <summary>"Ready when class starts" goes for good (Got it, or the first recording started).</summary>
+    static void PutWelcomeCardAway()
+    {
+        if (host.Settings.WelcomeCard) host.Save(s => s.WelcomeCard = false);
+        library.Welcome = null;
     }
 
     static int lastTaskbarPercent = -1;

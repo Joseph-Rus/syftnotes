@@ -96,6 +96,13 @@ public sealed partial class LibraryWeb
             pipeline.Wake();
             return Http.Json(new JsonObject { ["queued"] = n });
         }));
+        // A first AI was just chosen on a lecture's page: every lecture filed without notes gets them now.
+        app.MapPost("/api/v2/settings/write-missing", (HttpContext ctx) => Api(ctx, () =>
+        {
+            int n = store.RequeueMissing();
+            pipeline.Wake();
+            return Http.Json(new JsonObject { ["queued"] = n });
+        }));
         // "Use Canvas course names": the preview, and doing it (for every class in the preview, or the ones named in
         // "classes"). The answer says what was renamed, so the app can follow on its own computer.
         app.MapGet("/api/v2/settings/course-names", (HttpContext ctx) => Api(ctx, () => Http.Json(CourseNamesJson())));

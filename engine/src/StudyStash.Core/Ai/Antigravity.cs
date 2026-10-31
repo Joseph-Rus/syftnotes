@@ -421,6 +421,20 @@ public static class Antigravity
     /// <summary>The allowance is used up (<see cref="UsageWords"/> found none left).</summary>
     public static bool UsedUp(string printed) => Allowance(printed) is { Left: <= 0 };
 
+    /// <summary>When a used-up allowance is back, as <c>agy -p=/usage</c> printed it; null when it isn't used up, or
+    /// doesn't say.</summary>
+    public static DateTime? BackOf(string printed) => Allowance(printed) is { Left: <= 0, Back: { } back } ? back.UtcDateTime : null;
+
+    /// <summary>Asks agy, in Syft Notes' own home for it, when the account's used-up allowance is back (a slash command
+    /// that answers itself: no turn, nothing spent). Null when agy isn't here, doesn't answer in 20 seconds, or says
+    /// nothing about it.</summary>
+    public static DateTime? Back()
+    {
+        if (AiProvider.Which(Binary) is not { } agy) return null;
+        var r = Machine.Run(agy, ["-p=/usage", "--output-format", "json"], TimeSpan.FromSeconds(20), HomeEnv());
+        return r is { ExitCode: 0 } ? BackOf(r.Stdout) : null;
+    }
+
     /// <summary>How the plan check says it: "About 80% of this week's Gemini allowance is left."</summary>
     public static string Words(double left, string window, DateTimeOffset? back)
     {

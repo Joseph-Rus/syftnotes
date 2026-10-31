@@ -71,12 +71,8 @@ public static partial class Shell
             Toast("This computer is your library", "Record on your laptop: this one keeps the lectures and writes the notes.", "Settings", SettingsFromAnywhere);
             return false;
         }
-        if (!host.ModelReady)
-        {
-            var (title, text, action) = NoticeWords.NoModelYet(host.Downloading);
-            Toast(title, text, action, () => _ = host.DownloadModelAsync());
-            return false;
-        }
+        // Before the model has arrived (a first lecture right after setup) Record still records: the lecture is written
+        // down once the model is here (AppHost.StartRecording), and the recorder says so.
         RecordStart start;
         askingForMic = true;
         try
@@ -112,12 +108,17 @@ public static partial class Shell
             return false;
         }
         liveId = l.Id;
+        // The first recording: Home's "Ready when class starts" has said what it had to.
+        PutWelcomeCardAway();
         recorder.Lines.Clear();
         recorder.QuickWords = host.LiveWordsOn;
-        // Written down after class: nothing to show or ask about until it stops, and the recorder says so.
-        recorder.AfterClass = l.AfterClass;
+        // Written down after class: nothing to show or ask about until it stops, and the recorder says so. One only waiting
+        // for its model shows the live words meanwhile.
+        recorder.WaitsForModel = l.WaitsForModel;
+        recorder.AfterClass = l.AfterClass && !l.WaitsForModel;
         recorder.Ask = l.AfterClass ? null : LiveAsk();
-        panel.LastLine = l.AfterClass ? "Only recording. It's written down after class." : "";
+        panel.LastLine = l.WaitsForModel ? "Recording. The transcript is written once speech-to-text is ready."
+            : l.AfterClass ? "Only recording. It's written down after class." : "";
         panelWindow?.Hide();
         Refresh();
         if (openPage)

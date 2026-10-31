@@ -48,9 +48,9 @@ public class ProblemsTests
         var host = Ready();
         host.ModelReady = false;
         host.Model = WhisperModels.LargeV3TurboSmall;
-        Assert.Equal("Recording starts once it's here, about 574 MB.", Problems.For(host)!.Detail);
+        Assert.Equal("Record works now: lectures are written down once it's here, about 574 MB.", Problems.For(host)!.Detail);
         host.Model = WhisperModels.LargeV3;
-        Assert.Equal("Recording starts once it's here, about 3 GB.", Problems.For(host)!.Detail);
+        Assert.Equal("Record works now: lectures are written down once it's here, about 3 GB.", Problems.For(host)!.Detail);
     }
 
     [Fact]

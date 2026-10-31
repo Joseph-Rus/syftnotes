@@ -252,6 +252,10 @@ public sealed unsafe class MacNotifications : ISystemNotifications
         post();
     }
 
+    /// <summary>The Mac's question now, with nothing waiting on its answer (a first run's first Stop asks it, under
+    /// the app's own card saying why).</summary>
+    public void Ask() => WhenAnswered(() => { });
+
     public bool Show(string id, string title, string body, IReadOnlyList<NotificationButton> buttons)
     {
         lock (gate) withdrawn.Remove(id);

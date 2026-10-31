@@ -103,6 +103,13 @@ public sealed class AppSettings
     /// <summary>The browser the student added the Canvas extension to on this computer ("Chrome", "Firefox"…): the
     /// one Syft Notes opens Canvas in, and offers first next time. "" until they've added it.</summary>
     public string CanvasBrowser { get; set; } = "";
+    /// <summary>Home shows "Ready when class starts" (how to record, where the S. lives, the model's download): set by a
+    /// first run's Get started, off once the student presses Got it or records. An update never turns it on.</summary>
+    public bool WelcomeCard { get; set; }
+    /// <summary>The first Stop after a first run asks a Mac for its notifications, with the app's own card saying why
+    /// first ("To hear when it's ready, allow Syft Notes' notifications when your Mac asks."): set by Get started on a
+    /// Mac, cleared once asked. An update never sets it (they were asked long ago).</summary>
+    public bool AskNotificationsAtStop { get; set; }
 
     public static string PathIn(string home) => System.IO.Path.Combine(home, "app.json");
 
@@ -282,6 +289,8 @@ public sealed partial class AppHost : IDisposable, IProblemSource
         Whisper = new TranscriptionWorker(Lectures, whisper ?? LoadWhisper, () => Recorder.Current, this.log)
         {
             EngineName = () => engineName,
+            // A lecture recorded before the model arrived waits for it quietly; the download's end wakes the worker.
+            Ready = () => whisper is not null || ModelReady,
             LabelVoices = () => Settings.Speakers && SpeakerModelReady,
             LoadVoices = () => voices?.Invoke() ?? new SherpaSpeakerLabeler(WhisperModels.PathFor(Home, WhisperModels.Speakers)),
         };
@@ -997,9 +1006,12 @@ public sealed partial class AppHost : IDisposable, IProblemSource
     /// its title and its folder from it, whatever else is on. Null records what's on now, as Record does.</param>
     public Lecture StartRecording(string className, CalendarEvent? forEvent = null)
     {
-        if (!ModelReady) throw new InvalidOperationException("Download the transcription model first (Settings → Recording).");
+        // Before the model has arrived (a first lecture, minutes after setup) Record still records: the lecture is
+        // written down once the model is here, and the download is started if it isn't going.
+        bool waits = !ModelReady;
+        if (waits && Downloading is null) _ = DownloadModelAsync();
         var calendar = CalendarStart(className, forEvent);
-        var l = WithEvent(Recorder.Start(calendar.ClassName, Client().DisplayName, afterClass: !Settings.LiveTranscript), calendar);
+        var l = WithEvent(Recorder.Start(calendar.ClassName, Client().DisplayName, afterClass: !Settings.LiveTranscript, waitsForModel: waits), calendar);
         awake ??= new KeepAwake("Recording a lecture");
         // Live, Whisper starts on it; after class, the look lets go of a model still loaded from the lecture before.
         Whisper.Wake();

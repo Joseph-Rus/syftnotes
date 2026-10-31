@@ -25,6 +25,10 @@ public interface ISystemNotifications
     /// <summary>Takes one down, wherever it is (on screen, or in the list of earlier ones).</summary>
     void Remove(string id);
 
+    /// <summary>Asks the system now whether Syft Notes may show notifications (a Mac's own question, once ever),
+    /// without showing one. Nothing where the system doesn't ask.</summary>
+    void Ask() { }
+
     /// <summary>The student did something with a notification: its id, and what (<see cref="NotificationResponse"/>,
     /// or a button's id). May come on any thread.</summary>
     event Action<string, string>? Responded;

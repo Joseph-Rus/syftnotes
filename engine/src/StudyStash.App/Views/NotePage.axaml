@@ -238,6 +238,64 @@
                    and the box a chat's notes are pasted into (from here, or the notes' ⋯ menu). -->
               <StackPanel Name="FreeAi" Spacing="12" DataContext="{Binding $parent[UserControl].((vm:LibraryModel)DataContext).FreeAi}" x:DataType="vm:FreeAiModel"
                           IsVisible="{Binding $parent[UserControl].((vm:LibraryModel)DataContext).FreeAi, Converter={x:Static ObjectConverters.IsNotNull}}">
+                <!-- No AI writes notes yet: which, asked once, here. Continue with Google (free with a personal Google
+                     account) first, Claude and ChatGPT for a paid plan, and copy and paste as the quiet other free way. -->
+                <Border Name="GetNotes" Classes="free-ai" IsVisible="{Binding ShowChoose}">
+                  <StackPanel Spacing="8">
+                    <TextBlock Name="GetNotesTitle" Classes="free-ai-lead" Text="{Binding ChooseTitle}" />
+                    <TextBlock Classes="free-ai-more" Text="{x:Static vm:FreeAiModel.ChooseText}" />
+                    <Button Name="ContinueWithGoogle" Classes="btn ink" HorizontalAlignment="Left" Margin="0,8,0,0" Command="{Binding ContinueWithGoogleCommand}"
+                            Content="{x:Static vm:FreeAiModel.GoogleButton}" AutomationProperties.Name="{x:Static vm:FreeAiModel.GoogleButton}" />
+                    <TextBlock Classes="free-ai-more" FontSize="12.5" Text="{x:Static vm:FreeAiModel.GoogleLine}" />
+                    <WrapPanel Margin="0,8,0,0" ItemSpacing="8" LineSpacing="8">
+                      <Button Name="UseClaude" Classes="btn sm" Command="{Binding UseClaudeCommand}" AutomationProperties.Name="Claude">
+                        <StackPanel Orientation="Horizontal" Spacing="8">
+                          <c:Icon Glyph="brand:claude" Size="15" VerticalAlignment="Center" />
+                          <TextBlock Text="Claude" VerticalAlignment="Center" />
+                        </StackPanel>
+                      </Button>
+                      <Button Name="UseChatGpt" Classes="btn sm" Command="{Binding UseChatGptCommand}" AutomationProperties.Name="ChatGPT">
+                        <StackPanel Orientation="Horizontal" Spacing="8">
+                          <c:Icon Glyph="brand:chatgpt" Size="15" VerticalAlignment="Center" />
+                          <TextBlock Text="ChatGPT" VerticalAlignment="Center" />
+                        </StackPanel>
+                      </Button>
+                    </WrapPanel>
+                    <TextBlock Classes="free-ai-more" FontSize="12.5" Text="{x:Static vm:FreeAiModel.PaidLine}" />
+                    <Button Name="OtherFreeWay" Classes="text-link small" HorizontalAlignment="Left" Margin="0,4,0,0" Command="{Binding ToggleCopyWayCommand}"
+                            Content="{Binding OtherWayLabel}" />
+                  </StackPanel>
+                </Border>
+                <!-- What stops the AIs being offered as they are: Google turned the account down (a school or work one),
+                     or the AI is over its usage limit (its notes come by themselves once it's back). Copy and paste opens. -->
+                <Border Name="NotesFallback" Classes="free-ai" IsVisible="{Binding ShowFallback}">
+                  <StackPanel Spacing="8">
+                    <TextBlock Name="FallbackTitle" Classes="free-ai-lead" Text="{Binding FallbackTitle}" />
+                    <TextBlock Name="FallbackText" Classes="free-ai-more" Text="{Binding FallbackText}" />
+                    <Button Name="GoogleAgain" Classes="btn sm ink" HorizontalAlignment="Left" Margin="0,6,0,0" Command="{Binding ContinueWithGoogleCommand}"
+                            Content="{x:Static vm:FreeAiModel.GoogleButton}" IsVisible="{Binding ShowGoogleAgain}" />
+                  </StackPanel>
+                </Border>
+                <!-- The other free way: copy this lecture for any free chat, and paste back what it writes. -->
+                <Border Name="CopyWay" Classes="free-ai" IsVisible="{Binding ShowCopyWay}">
+                  <StackPanel Spacing="8">
+                    <TextBlock Classes="free-ai-more" Text="{x:Static vm:FreeAiModel.CopyWayText}" />
+                    <WrapPanel Margin="0,4,0,0">
+                      <Button Name="CopyWayCopy" Classes="btn sm" Margin="0,0,8,8" Command="{Binding CopyForAiCommand}" AutomationProperties.Name="Copy for your AI">
+                        <StackPanel Orientation="Horizontal" Spacing="8">
+                          <c:Icon Glyph="content_copy" Size="15" VerticalAlignment="Center" />
+                          <TextBlock Text="Copy for your AI" VerticalAlignment="Center" />
+                        </StackPanel>
+                      </Button>
+                      <Button Name="CopyWayPaste" Classes="btn sm" Margin="0,0,8,8" Command="{Binding PasteCommand}" AutomationProperties.Name="Paste notes">
+                        <StackPanel Orientation="Horizontal" Spacing="8">
+                          <c:Icon Glyph="content_paste" Size="15" VerticalAlignment="Center" />
+                          <TextBlock Text="Paste notes" VerticalAlignment="Center" />
+                        </StackPanel>
+                      </Button>
+                    </WrapPanel>
+                  </StackPanel>
+                </Border>
                 <Border Name="FreeAiOffer" Classes="free-ai" IsVisible="{Binding ShowOffer}">
                   <StackPanel Spacing="8">
                     <c:PageText Name="OfferLine" Classes="free-ai-lead" Text="{Binding OfferLine}" />

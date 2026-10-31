@@ -90,7 +90,7 @@ public static class Problems
             yield return new(ProblemKind.DownloadFailed, "The download stopped", download, "Try again");
 
         if (!host.ModelReady && host.Downloading is null)
-            yield return new(ProblemKind.NoModel, "Download the transcription model", $"Recording starts once it's here, about {Setup.About(host.Model.Bytes)}.", "Download");
+            yield return new(ProblemKind.NoModel, "Download the transcription model", $"Record works now: lectures are written down once it's here, about {Setup.About(host.Model.Bytes)}.", "Download");
 
         if (!host.ModelReady && host.Downloading is { } d)
             yield return new(ProblemKind.Downloading, "Downloading the transcription model",
