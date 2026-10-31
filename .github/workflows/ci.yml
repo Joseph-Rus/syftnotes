@@ -111,6 +111,7 @@ jobs:
         run: git rev-parse 'HEAD^{tree}' > tested-tree.txt
       - if: github.event_name != 'push'
         uses: actions/upload-artifact@v4
+        continue-on-error: true
         with:
           name: tested-tree
           path: tested-tree.txt
@@ -201,6 +202,7 @@ jobs:
       - name: Crash reports, if a test process crashed
         if: ${{ failure() && runner.os != 'Windows' }}
         uses: actions/upload-artifact@v4
+        continue-on-error: true
         with:
           name: crash-${{ matrix.os }}-${{ matrix.suite }}
           path: ${{ runner.temp }}/crash/*.crashreport.json
@@ -208,6 +210,7 @@ jobs:
       - name: The notes' formulas and diagrams, as Windows draws them
         if: ${{ always() && runner.os == 'Windows' && matrix.suite == 'App' }}
         uses: actions/upload-artifact@v4
+        continue-on-error: true
         with:
           name: windows-rich-notes
           path: |
@@ -217,6 +220,7 @@ jobs:
       - name: Notifications, as Windows draws them, where they land above the taskbar
         if: ${{ always() && runner.os == 'Windows' && matrix.suite == 'App' }}
         uses: actions/upload-artifact@v4
+        continue-on-error: true
         with:
           name: windows-notifications
           path: |
@@ -344,6 +348,7 @@ jobs:
           path: dist/mac/Syft-Notes.dmg
           retention-days: 30
       - uses: actions/upload-artifact@v4
+        continue-on-error: true
         if: always() && needs.version.outputs.tested != 'true'
         with:
           name: mac-selftest
@@ -353,6 +358,7 @@ jobs:
         if: needs.version.outputs.installers == 'true'
         run: echo "${{ needs.version.outputs.mac_signing }}" > "$RUNNER_TEMP/mac-signing.txt"
       - uses: actions/upload-artifact@v4
+        continue-on-error: true
         if: needs.version.outputs.installers == 'true'
         with:
           name: signing-mac-${{ needs.version.outputs.mac_signing }}
@@ -395,6 +401,7 @@ jobs:
           grep -q "^the phone got its answer with the app closed" "$RUNNER_TEMP/selftest/one-computer/background.txt" || { echo "the phone wasn't answered with the app closed"; exit 1; }
           [ ! -e "$HOME/Library/LaunchAgents/"com.study-stash.background.*.plist ] || { echo "a LaunchAgent was left behind"; ls "$HOME/Library/LaunchAgents"; exit 1; }
       - uses: actions/upload-artifact@v4
+        continue-on-error: true
         if: always()
         with:
           name: mac-one-computer-selftest
@@ -432,6 +439,7 @@ jobs:
       - name: Self-test, natively on Intel
         run: sh macos/selftest.sh "$RUNNER_TEMP/Study Stash.app" "$RUNNER_TEMP/selftest"
       - uses: actions/upload-artifact@v4
+        continue-on-error: true
         if: always()
         with:
           name: mac-intel-selftest
@@ -750,6 +758,7 @@ jobs:
           path: dist\windows\Syft-Notes-Setup.exe
           retention-days: 30
       - uses: actions/upload-artifact@v4
+        continue-on-error: true
         if: always()
         with:
           name: windows-selftest
@@ -761,6 +770,7 @@ jobs:
         run: |
           "${{ needs.version.outputs.win_signing }}" | Set-Content "$env:RUNNER_TEMP\windows-signing.txt"
       - uses: actions/upload-artifact@v4
+        continue-on-error: true
         if: needs.version.outputs.installers == 'true'
         with:
           name: signing-windows-${{ needs.version.outputs.win_signing }}
@@ -890,6 +900,7 @@ jobs:
           path: dist/linux/Syft-Notes-${{ matrix.rid }}.tar.gz
           retention-days: 30
       - uses: actions/upload-artifact@v4
+        continue-on-error: true
         if: always()
         with:
           name: linux-selftest-${{ matrix.rid }}
