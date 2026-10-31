@@ -14,7 +14,6 @@ namespace StudyStash.Audio;
 /// Each stream is read on a thread of its own, a tenth of a second at a time (a read blocks until that much has come).
 /// Opening is given <see cref="OpenTimeout"/>, so Record never hangs on a sound server that doesn't answer.
 /// </remarks>
-[SupportedOSPlatform("linux")]
 public sealed class LinuxSound : IAudioSource
 {
     /// <summary>A read's worth: a tenth of a second.</summary>
@@ -28,6 +27,7 @@ public sealed class LinuxSound : IAudioSource
     readonly PlayedSound played = new();
     Running? running;
 
+    [SupportedOSPlatform("linux")]
     public LinuxSound(bool withComputerAudio) : this(withComputerAudio, PulseStream.Record)
     {
     }

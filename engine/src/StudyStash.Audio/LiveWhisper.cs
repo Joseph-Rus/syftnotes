@@ -6,21 +6,24 @@ namespace StudyStash.Audio;
 
 /// <summary>What hears the recorder's live words on a computer: Cactus Whistle where its engine has the processor's
 /// own fast code (ARM: Apple silicon, Windows on ARM), a small Whisper elsewhere (x64: Intel Macs, most PCs), where
-/// Whistle's engine has no AVX code and took 1.2–1.5× the sound it heard on CI's runners.</summary>
+/// Whistle's engine has no AVX code and took 1.2–1.5× the sound it heard on CI's runners, and on Linux, which Cactus
+/// publishes no engine for.</summary>
 public enum LiveEngine { None, Whistle, SmallWhisper }
 
 public static class LiveEngines
 {
-    /// <summary>The live words' engine for a processor.</summary>
-    public static LiveEngine EngineFor(Architecture processor) => processor switch
+    /// <summary>The live words' engine for a processor (<paramref name="linux"/>: on Linux, where ARM has the small
+    /// Whisper too).</summary>
+    public static LiveEngine EngineFor(Architecture processor, bool linux = false) => processor switch
     {
+        Architecture.Arm64 when linux => LiveEngine.SmallWhisper,
         Architecture.Arm64 => LiveEngine.Whistle,
         Architecture.X64 => LiveEngine.SmallWhisper,
         _ => LiveEngine.None,
     };
 
     /// <summary>This computer's live words' engine, when this copy of the app carries it; None otherwise.</summary>
-    public static LiveEngine Here => EngineFor(RuntimeInformation.ProcessArchitecture) switch
+    public static LiveEngine Here => EngineFor(RuntimeInformation.ProcessArchitecture, OperatingSystem.IsLinux()) switch
     {
         LiveEngine.Whistle when WhistleTranscriber.Available => LiveEngine.Whistle,
         LiveEngine.SmallWhisper when LiveWhisperHearer.Available => LiveEngine.SmallWhisper,

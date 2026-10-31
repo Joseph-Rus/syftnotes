@@ -55,13 +55,14 @@ tested=false
 reuse=""
 why=""
 
-# Does this run (by hand, on a branch) have both installers still to download?
+# Does this run (by hand, on a branch) have every installer still to download (the Mac's, Windows', and Linux's two)?
 has_installers() {
   local names
   names=$(gh api "repos/$REPO/actions/runs/$1/artifacts" --paginate --jq '.artifacts[] | select(.expired == false) | .name' 2>/dev/null) || return 1
   # Installers signed by a rehearsal's throwaway identities (signing-plan.sh) are never published, so never reused.
   if printf '%s\n' "$names" | grep -qxE 'signing-(mac|windows)-rehearsal'; then return 1; fi
-  printf '%s\n' "$names" | grep -qx mac-installers && printf '%s\n' "$names" | grep -qx windows-installers
+  printf '%s\n' "$names" | grep -qx mac-installers && printf '%s\n' "$names" | grep -qx windows-installers \
+    && printf '%s\n' "$names" | grep -qx linux-installers-linux-x64 && printf '%s\n' "$names" | grep -qx linux-installers-linux-arm64
 }
 
 # Did this run (which passed) test exactly this tree? Runs by hand leave the tree they tested as an artifact.

@@ -192,11 +192,15 @@ public static partial class Machine
 
     /// <summary>The word for a computer said to be Windows or not (<paramref name="windows"/>): "PC" or "Mac", and
     /// "computer" for either on Linux, which shares the Mac's commands (bash, curl) and the Windows look.</summary>
-    public static string DeviceFor(bool windows) => Linux ? "computer" : windows ? "PC" : "Mac";
+    public static string DeviceFor(bool windows) => DeviceFor(windows, Linux);
+
+    public static string DeviceFor(bool windows, bool linux) => linux ? "computer" : windows ? "PC" : "Mac";
 
     /// <summary>The word for a computer in the Mac look or the Windows one (<paramref name="mac"/>): Linux has the
     /// Windows look and says "computer".</summary>
-    public static string DeviceForLook(bool mac) => mac ? "Mac" : Linux ? "computer" : "PC";
+    public static string DeviceForLook(bool mac) => DeviceForLook(mac, Linux);
+
+    public static string DeviceForLook(bool mac, bool linux) => mac ? "Mac" : linux ? "computer" : "PC";
 
     /// <summary>platform.system(): "Darwin", "Windows", or "Linux".</summary>
     public static string Platform => OperatingSystem.IsMacOS() ? "Darwin" : OperatingSystem.IsWindows() ? "Windows" : "Linux";

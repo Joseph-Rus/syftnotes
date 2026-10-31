@@ -1,17 +1,20 @@
-# The build and release pipeline for Syft Notes (C# on .NET 10, one app for both roles). Two speeds, one workflow.
+# The build and release pipeline for Syft Notes (C# on .NET 10, one app for both roles, on a Mac, Windows and Linux). Two
+# speeds, one workflow.
 #
 #   A merge (a push to main) proves the code, and nothing it would throw away:
 #     - the engine's two test projects (Core and App) on macOS, Linux and Windows, each in a job of its own, so all six
 #       run side by side (the old single job ran the two one after the other);
-#     - the Mac app and the Windows app built and self-tested for real (windows open, the pretend microphone records,
-#       Whisper hears it), once as a laptop and once as "just this computer"; the Mac's two run on two computers.
+#     - the Mac app, the Windows app and the Linux app (x64 and arm64, each on its own processor) built and self-tested
+#       for real (windows open, the pretend microphone records, Whisper hears it), once as a laptop and once as "just
+#       this computer"; the Mac's two run on two computers.
 #     No installers are made for it: no Setup.exe (the build leaves it out), no DMG kept (macos/build-app.sh makes
 #     it as its last step either way), no Intel Mac, no install, update or uninstall, and nothing is published.
 #
 #   A release is a push to main with a StudyStashVersion in engine/Directory.Build.props that has no tag yet. On top of
 #   all of the above it builds the installers, proves them where they will really run (the Mac app natively on an
 #   Intel Mac; Setup.exe installed, self-tested from the installed copy, updated in place with a silent Setup.exe and
-#   uninstalled cleanly), and then publishes release v<version> with the four installers and SHA256SUMS.txt. Installed
+#   uninstalled cleanly; each Linux tarball installed with its install.sh, self-tested from there and uninstalled), and then
+#   publishes release v<version> with the installers and SHA256SUMS.txt. Installed
 #   copies pick it up within a few hours (auto_update), or right away with Update now. A version already released is
 #   never published again. Nothing is published unless every test and proof above passed.
 #
@@ -169,9 +172,21 @@ jobs:
       - name: Where a crashed test process leaves its report
         shell: bash
         run: mkdir -p "$RUNNER_TEMP/crash"
+      # Linux: a real sound server with a stand-in microphone, so the Core tests record through PulseAudio itself.
+      - name: PulseAudio, with a microphone that hears silence
+        if: runner.os == 'Linux' && matrix.suite == 'Core'
+        run: |
+          sudo apt-get update -qq && sudo apt-get install -y -qq --no-install-recommends pulseaudio pulseaudio-utils libpulse0
+          pulseaudio -D --exit-idle-time=-1
+          pactl load-module module-null-sink sink_name=speakers
+          pactl load-module module-null-sink sink_name=mic
+          pactl set-default-sink speakers
+          pactl set-default-source mic.monitor
       - name: Run the ${{ matrix.suite }} tests
         run: dotnet test engine/tests/StudyStash.${{ matrix.suite }}.Tests
         env:
+          # Linux: record through the PulseAudio started above.
+          STUDYSTASH_PULSE_TESTS: ${{ runner.os == 'Linux' && matrix.suite == 'Core' && '1' || '' }}
           # Windows: also run the library as a real background service, from the Startup folder with no window.
           STUDYSTASH_LIVE_SERVICE: ${{ runner.os == 'Windows' && matrix.suite == 'Core' && '1' || '' }}
           # Windows: the pictures the tests draw are kept, so the notes' formulas and diagrams can be seen as Windows
@@ -733,6 +748,119 @@ jobs:
         shell: pwsh
         run: .\windows\signing-setup.ps1 -Cleanup
 
+  # Linux: one self-contained folder per processor, each packed as its one download, Syft-Notes-linux-<x64|arm64>.tar.gz
+  # (linux/build.sh), with the install.sh that puts it in ~/.local/share/syft-notes. Each is built and proved on its own
+  # processor (ubuntu-24.04 and ubuntu-24.04-arm), under Xvfb: self-tested as just this computer and as a laptop, then
+  # installed for an account of its own, run from there, and uninstalled. A merge throws the tarballs away; a release
+  # keeps them for publishing.
+  linux-app:
+    name: Linux app (${{ matrix.rid }}, self-test, tarball)
+    needs: [version]
+    if: needs.version.outputs.tested != 'true' || needs.version.outputs.installers == 'true'
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - rid: linux-x64
+            runner: ubuntu-24.04
+            elf: x86-64
+          - rid: linux-arm64
+            runner: ubuntu-24.04-arm
+            elf: aarch64
+    timeout-minutes: 30
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "10.0.x"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - uses: ./.github/actions/whisper-tiny
+      - name: What the app needs from a desktop, on a runner that has none - a virtual display, and fonts
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq --no-install-recommends xvfb xauth libx11-6 libice6 libsm6 libfontconfig1 fonts-dejavu-core fonts-noto-core libpulse0
+      - name: Build ${{ matrix.rid }} and Syft-Notes-${{ matrix.rid }}.tar.gz
+        env:
+          STUDYSTASH_LINUX_RIDS: ${{ matrix.rid }}
+          GOOGLE_DESKTOP_CLIENT_SECRET: ${{ secrets.GOOGLE_DESKTOP_CLIENT_SECRET }}
+        run: sh linux/build.sh dist/linux
+      - name: The tarball holds one folder that runs, its native code built for this processor, the live words' small Whisper, and no transcription model or debug symbols
+        env:
+          RID: ${{ matrix.rid }}
+          ELF: ${{ matrix.elf }}
+        run: |
+          app=dist/linux/$RID/syft-notes
+          V=$(sed -n 's:.*<StudyStashVersion>\(.*\)</StudyStashVersion>.*:\1:p' engine/Directory.Build.props)
+          printed=$(env -u DOTNET_ROOT "$app/StudyStash" version)
+          [ "$printed" = "$V" ] || { echo "version printed '$printed', expected '$V'"; exit 1; }
+          echo "V=$V" >> "$GITHUB_ENV"
+          [ "$(tar -tzf "dist/linux/Syft-Notes-$RID.tar.gz" | cut -d/ -f1 | sort -u)" = syft-notes ] || { echo "the tarball isn't one syft-notes/ folder"; exit 1; }
+          grep -q "^version = $V\$" "$app/study-stash.ini" || { echo "study-stash.ini doesn't say $V"; exit 1; }
+          for f in install.sh uninstall.sh syft-notes.desktop syft-notes.png models/live-whisper-tiny-q8_0.bin libSkiaSharp.so libHarfBuzzSharp.so \
+                   libsherpa-onnx-c-api.so "runtimes/$RID/libwhisper.so" CSharpMath.SkiaSharp.dll Svg.Skia.dll Microsoft.Msagl.dll Markdig.dll; do
+            [ -e "$app/$f" ] || { echo "$RID has no $f"; exit 1; }
+          done
+          for f in libSkiaSharp.so libHarfBuzzSharp.so "runtimes/$RID/libwhisper.so" StudyStash; do
+            file -L "$app/$f" | grep -q "$ELF" || { echo "$f isn't built for $ELF: $(file -L "$app/$f")"; exit 1; }
+          done
+          [ -z "$(find "$app" -name '*.pdb')" ] || { echo "$RID carries debug symbols"; exit 1; }
+          [ -z "$(find "$app" -name '*.bin' -size +1M ! -name 'live-whisper-*.bin')" ] || { echo "a model file is bundled"; exit 1; }
+          [ ! -e "$app/needle" ] && [ ! -e "$app/models/whistle.cact" ] || { echo "$RID carries Cactus Whistle, which has no Linux engine"; exit 1; }
+      - name: Self-test, just this computer - setup makes the app's own library, the notes are written here, and quitting stops it
+        if: needs.version.outputs.tested != 'true'
+        timeout-minutes: 12
+        env:
+          STUDYSTASH_SELFTEST_FLOW: one-computer
+          RID: ${{ matrix.rid }}
+        run: |
+          out="$RUNNER_TEMP/selftest/one-computer"
+          sh linux/selftest.sh "dist/linux/$RID/syft-notes" "$out"
+          grep -q "just this computer" "$out/selftest.txt" || { echo "the self-test didn't run Just this computer"; exit 1; }
+          grep -q "notes written on this computer by its own library" "$out/selftest.txt" || { echo "the notes weren't written by this computer's own library"; exit 1; }
+          # The library ran as the app's own child (StudyStash serve): quitting the app stops it too.
+          for i in $(seq 20); do pgrep -f "dist/linux/$RID/syft-notes/StudyStash" >/dev/null || break; sleep 1; done
+          if pgrep -fa "dist/linux/$RID/syft-notes/StudyStash"; then echo "the app's library was still running 20 s after the app quit"; exit 1; fi
+      - name: install.sh puts Syft Notes on an account of its own (the app, its menu entry, its icon, syft-notes on the PATH), the installed copy self-tests as a laptop, and uninstall.sh takes it off again
+        timeout-minutes: 12
+        env:
+          RID: ${{ matrix.rid }}
+        run: |
+          export HOME="$RUNNER_TEMP/student"
+          mkdir -p "$HOME"
+          tar -xzf "dist/linux/Syft-Notes-$RID.tar.gz" -C "$RUNNER_TEMP"
+          STUDYSTASH_NO_OPEN=1 sh "$RUNNER_TEMP/syft-notes/install.sh"
+          app="$HOME/.local/share/syft-notes"
+          [ "$("$HOME/.local/bin/syft-notes" version)" = "$V" ] || { echo "syft-notes on the PATH isn't $V"; exit 1; }
+          grep -q "^Exec=\"$app/StudyStash\" %u$" "$HOME/.local/share/applications/syft-notes.desktop" || { echo "the menu entry doesn't start the installed app"; cat "$HOME/.local/share/applications/syft-notes.desktop"; exit 1; }
+          [ -s "$HOME/.local/share/icons/hicolor/256x256/apps/syft-notes.png" ] || { echo "no icon"; exit 1; }
+          # Installing again over it (as a second download does) replaces it in place.
+          STUDYSTASH_NO_OPEN=1 sh "$RUNNER_TEMP/syft-notes/install.sh"
+          [ ! -e "$app.old" ] || { echo "an old copy was left beside the new one"; exit 1; }
+          out="$RUNNER_TEMP/selftest/laptop"
+          sh linux/selftest.sh "$app" "$out"
+          grep -q "^rich notes: .* typeset; a flowchart laid out" "$out/selftest.txt" || { echo "the self-test didn't see the notes' formulas and flowchart drawn"; exit 1; }
+          grep -q "^opened larger: " "$out/selftest.txt" || { echo "the self-test didn't open the flowchart larger"; exit 1; }
+          sh "$app/uninstall.sh"
+          for f in "$app" "$HOME/.local/bin/syft-notes" "$HOME/.local/share/applications/syft-notes.desktop"; do
+            [ ! -e "$f" ] || { echo "$f survived uninstalling"; exit 1; }
+          done
+      - uses: actions/upload-artifact@v4
+        if: needs.version.outputs.installers == 'true'
+        with:
+          name: linux-installers-${{ matrix.rid }}
+          path: dist/linux/Syft-Notes-${{ matrix.rid }}.tar.gz
+          retention-days: 30
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: linux-selftest-${{ matrix.rid }}
+          path: ${{ runner.temp }}/selftest
+
   # Publish v<version> the first time it passes everything above, with the one download per system, the four old role
   # names as byte-for-byte copies of them (0.8.x and older copies update themselves by those names, and old libraries'
   # "Connect your laptop" links point at them), and their checksums. A version already tagged is never published
@@ -740,8 +868,8 @@ jobs:
   # exactly this code. A run by hand goes through all of it but the last step, and publishes nothing.
   release:
     name: publish release
-    needs: [version, engine, mac-app, mac-one-computer, mac-intel, windows-app]
-    if: ${{ !cancelled() && !failure() && needs.version.outputs.installers == 'true' && (needs.version.outputs.reuse_run != '' || (needs.mac-app.result == 'success' && needs.mac-intel.result == 'success' && needs.windows-app.result == 'success')) }}
+    needs: [version, engine, mac-app, mac-one-computer, mac-intel, windows-app, linux-app]
+    if: ${{ !cancelled() && !failure() && needs.version.outputs.installers == 'true' && (needs.version.outputs.reuse_run != '' || (needs.mac-app.result == 'success' && needs.mac-intel.result == 'success' && needs.windows-app.result == 'success' && needs.linux-app.result == 'success')) }}
     timeout-minutes: 10
     runs-on: ubuntu-latest
     permissions:
@@ -773,13 +901,21 @@ jobs:
           path: dist
           run-id: ${{ needs.version.outputs.reuse_run || github.run_id }}
           github-token: ${{ github.token }}
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: linux-installers-*
+          merge-multiple: true
+          path: dist
+          run-id: ${{ needs.version.outputs.reuse_run || github.run_id }}
+          github-token: ${{ github.token }}
       - name: ${{ github.event_name == 'push' && 'Publish' || 'Rehearse publishing (a run by hand publishes nothing)' }} v${{ needs.version.outputs.version }}
         env:
           GH_TOKEN: ${{ github.token }}
           V: ${{ needs.version.outputs.version }}
           PUBLISH: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
         run: |
-          test -s dist/Syft-Notes.dmg && test -s dist/Syft-Notes-Setup.exe || { echo "an installer is missing or empty"; ls -l dist; exit 1; }
+          test -s dist/Syft-Notes.dmg && test -s dist/Syft-Notes-Setup.exe && test -s dist/Syft-Notes-linux-x64.tar.gz && test -s dist/Syft-Notes-linux-arm64.tar.gz \
+            || { echo "an installer is missing or empty"; ls -l dist; exit 1; }
           # Re-check the race: another push could have published this tag while this run was building.
           released=false
           if git rev-parse -q --verify "refs/tags/v$V" >/dev/null || gh release view "v$V" >/dev/null 2>&1; then released=true; fi
@@ -808,6 +944,7 @@ jobs:
           fi
           gh release create "v$V" --target "$GITHUB_SHA" --title "Syft Notes $V" --generate-notes \
             dist/Syft-Notes.dmg dist/Syft-Notes-Setup.exe \
+            dist/Syft-Notes-linux-x64.tar.gz dist/Syft-Notes-linux-arm64.tar.gz \
             dist/Egghead-Notes.dmg dist/Egghead-Notes-Setup.exe \
             dist/Study-Stash.dmg dist/Study-Stash-Setup.exe \
             dist/Study-Stash-Laptop.dmg dist/Study-Stash-Library.dmg \

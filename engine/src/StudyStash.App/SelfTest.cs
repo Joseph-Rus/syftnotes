@@ -581,6 +581,7 @@ public static partial class SelfTest
             double waited = opened.Elapsed.TotalSeconds;
             bool stillHearing = host.Captions.Passes != passes;
             if (appleSilicon && host.LiveEngine != LiveEngine.Whistle) Say($"FAILED live words: Apple silicon without Cactus Whistle ({speed})");
+            else if (OperatingSystem.IsLinux() && host.LiveEngine != LiveEngine.SmallWhisper) Say($"FAILED live words: Linux without its small Whisper ({speed})");
             else if (!came) Say($"FAILED live words: off here ({speed}), and the transcript's own lines didn't come either in 90 s");
             else if (stillHearing) Say($"FAILED live words: off here ({speed}), yet {host.Captions.Passes - passes} more pass(es) heard the sound");
             else if (recorder.QuickWords) Say("FAILED live words: off here, yet the recorder still says the words come in a few seconds");
@@ -588,6 +589,7 @@ public static partial class SelfTest
                      + $"and the recorder showed the transcript's own line {waited:0.0} s after it opened");
         }
         else if (appleSilicon && host.LiveEngine != LiveEngine.Whistle) Say($"FAILED live words: Apple silicon without Cactus Whistle ({speed})");
+        else if (OperatingSystem.IsLinux() && host.LiveEngine != LiveEngine.SmallWhisper) Say($"FAILED live words: Linux without its small Whisper ({speed})");
         else if (shown && took <= allowed) Say($"live words: the recorder showed \"{lines[^1].Text}\" {took:0.0} s after it opened ({speed})");
         // A computer near the limit (its first passes a little over 0.3×, then under) shows the words later than 8 s,
         // but shows them: said, not failed. Only no words and no verdict at all is a failure.

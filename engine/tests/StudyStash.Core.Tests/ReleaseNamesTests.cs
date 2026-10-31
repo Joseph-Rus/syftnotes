@@ -24,6 +24,20 @@ public class ReleaseNamesTests
     }
 
     [Fact]
+    public void The_Linux_build_script_packs_each_tarball_by_its_real_name_with_what_makes_it_installed()
+    {
+        string build = Read("linux", "build.sh");
+        // Syft-Notes-$RID.tar.gz for linux-x64 and linux-arm64 is exactly the two names the updater looks for.
+        Assert.Contains("NAME=\"Syft-Notes-$RID.tar.gz\"", build);
+        Assert.Contains("linux-x64 linux-arm64", build);
+        Assert.Equal(Updates.LinuxX64Asset, "Syft-Notes-linux-x64.tar.gz");
+        Assert.Equal(Updates.LinuxArm64Asset, "Syft-Notes-linux-arm64.tar.gz");
+        Assert.Contains("study-stash.ini", build); // Apps.LinuxInstallOf's mark, with the version
+        Assert.Contains("-C \"$OUT/$RID\" syft-notes", build); // one folder, which the updater strips
+        Assert.DoesNotContain("STUDYSTASH_ROLE", build);
+    }
+
+    [Fact]
     public void The_Windows_installer_makes_the_one_Setup_exe_and_writes_no_role()
     {
         string setupIss = Read("windows", "setup.iss");
