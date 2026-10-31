@@ -16,6 +16,8 @@ public sealed record ChatMessage(string Role, string Text, string When)
     /// <summary>An Ask answer's: what it drew on (each moment a link in the app), the AI that wrote it, and whether
     /// the student stopped it partway.</summary>
     public List<AskSource> Sources { get; init; } = [];
+    /// <summary>The words of the lecture's notes the answer was built on, kept so a chat opened again highlights them.</summary>
+    public List<string> Quotes { get; init; } = [];
     public string Engine { get; init; } = "";
     public string EngineName { get; init; } = "";
     public bool Stopped { get; init; }
@@ -288,7 +290,7 @@ public sealed class Chats(string home, string library, AiJobs ai, History histor
             now.Messages.Add(new ChatMessage("user", question, Now()));
             now.Messages.Add(new ChatMessage("assistant", answer, Now())
             {
-                Sources = reply?.Sources ?? [], Engine = reply?.Engine ?? "", EngineName = reply?.EngineName ?? "", Stopped = stopped, Failed = failed,
+                Sources = reply?.Sources ?? [], Quotes = reply?.Quotes ?? [], Engine = reply?.Engine ?? "", EngineName = reply?.EngineName ?? "", Stopped = stopped, Failed = failed,
             });
             now.Updated = Now();
             Save(now);
