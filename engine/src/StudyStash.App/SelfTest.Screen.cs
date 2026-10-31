@@ -140,7 +140,7 @@ public static partial class SelfTest
     {
         if (!OperatingSystem.IsWindows()) return;
         Shell.ShowLibrary();
-        await Wait(1.5);
+        await Settle();
         foreach (var (appearance, theme, name) in new[]
                  {
                      (AppAppearance.Light, ColourThemes.Default, "looks-library-light"),
@@ -152,22 +152,22 @@ public static partial class SelfTest
             Skin.UseTheme(theme);
             Skin.UseAppearance(appearance);
             Shell.Windows.Main?.Activate();
-            await Wait(1.5);
+            await Settle();
             Shot(Shell.Windows.Main, name);
         }
         Skin.UseTheme(ColourThemes.Default);
         Skin.UseAppearance(AppAppearance.Dark);
         Shell.ShowSettings();
-        await Wait(1.5);
+        await Settle();
         Shot(Shell.Windows.Settings, "looks-settings-dark");
         Shell.Windows.Settings?.Close();
         Shell.Windows.ToggleQuick();
-        await Wait(1);
+        await Settle();
         Shot(Shell.Windows.Quick, "looks-quick-dark");
         Shell.Windows.Quick?.Hide();
         Skin.UseAppearance(AppAppearance.Light);
         Shell.ShowCanvasConnect();
-        await Wait(1.5);
+        await Settle();
         Shot(Shell.Windows.CanvasConnect, "looks-canvas-connect-light");
         Shell.Windows.CanvasConnect?.Close();
         // For comparison: the same window on the design's own colour, as Windows 10 (or transparency effects off)
@@ -176,12 +176,12 @@ public static partial class SelfTest
         {
             Shell.ShowLibrary();
             WinChrome.Use(main, WinChrome.Ground.Solid);
-            await Wait(1);
+            await Settle();
             Shot(main, "looks-library-solid-light");
             WinChrome.Use(main, WinChrome.Wanted());
         }
         Skin.UseAppearance(AppAppearance.System);
-        await Wait(0.5);
+        await Settle();
     }
 
     [StructLayout(LayoutKind.Sequential)]
