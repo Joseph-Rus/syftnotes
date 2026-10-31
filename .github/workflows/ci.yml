@@ -583,11 +583,10 @@ jobs:
           if (-not ($lines -match "just this computer")) { throw "the self-test didn't run Just this computer" }
           if (-not ($lines -match "notes written on this computer by its own library")) { throw "the notes weren't written by this computer's own library" }
           # The library ran as the app's own child (StudyStash.exe serve): quitting the app stops it too.
-          $left = $null
-          for ($i = 0; $i -lt 20; $i++) {
+          $left = @(Get-Process -Name StudyStash -ErrorAction SilentlyContinue | Where-Object { $_.Path -eq $exe })
+          if ($left.Count -gt 0) {
+            $left | Wait-Process -Timeout 20 -ErrorAction SilentlyContinue
             $left = @(Get-Process -Name StudyStash -ErrorAction SilentlyContinue | Where-Object { $_.Path -eq $exe })
-            if ($left.Count -eq 0) { break }
-            Start-Sleep 1
           }
           if ($left.Count -ne 0) { $left | Stop-Process -Force; throw "the app's library (StudyStash.exe serve) was still running 20 s after the app quit" }
       - name: The installer puts Syft Notes on this account, with no role of its own (setup asks)
@@ -655,17 +654,25 @@ jobs:
           $app = "$env:LOCALAPPDATA\Programs\Study Stash"
           $updateHome = "$env:RUNNER_TEMP\update-home"
           New-Item -ItemType Directory -Force -Path $updateHome | Out-Null
-          Start-Process -FilePath "$app\StudyStash.exe" -ArgumentList "--home", $updateHome, "--background" | Out-Null
-          Start-Sleep 3
+          $old = Start-Process -FilePath "$app\StudyStash.exe" -ArgumentList "--home", $updateHome, "--background" -PassThru
+          # It's running (a process that is gone already would make the rest of this prove nothing); the installer finds it by its file.
+          if ($old.WaitForExit(0)) { throw "StudyStash.exe quit by itself right after starting (exit code $($old.ExitCode))" }
+          # Windows says when a StudyStash.exe starts: queued from here on, so one that starts before the wait begins is still seen.
+          Register-CimIndicationEvent -Query "SELECT * FROM Win32_ProcessStartTrace WHERE ProcessName = 'StudyStash.exe'" -SourceIdentifier started | Out-Null
           # Wait for the installer only: -Wait would also wait for the app it relaunches, which keeps running.
           $setup = Start-Process "dist\windows\Syft-Notes-Setup.exe" -ArgumentList "/VERYSILENT", "/SUPPRESSMSGBOXES", "/CLOSEAPPLICATIONS", "/relaunch=1" -PassThru
-          $setup.WaitForExit()
+          if (-not $setup.WaitForExit(240000)) { $setup.Kill(); throw "the silent update didn't finish within 240 s" }
+          # A new process (not the one the installer stopped) running from the same folder.
+          $deadline = [DateTime]::UtcNow.AddSeconds(30)
           $ok = $false
-          for ($i = 0; $i -lt 30; $i++) {
-            if (Get-Process -Name StudyStash -ErrorAction SilentlyContinue | Where-Object { $_.Path -eq "$app\StudyStash.exe" }) { $ok = $true; break }
-            Start-Sleep 1
+          while ($true) {
+            if (Get-Process -Name StudyStash -ErrorAction SilentlyContinue | Where-Object { $_.Path -eq "$app\StudyStash.exe" -and $_.Id -ne $old.Id }) { $ok = $true; break }
+            $remaining = [int]($deadline - [DateTime]::UtcNow).TotalSeconds
+            if ($remaining -le 0 -or -not (Wait-Event -SourceIdentifier started -Timeout $remaining)) { break }
+            Remove-Event -SourceIdentifier started
           }
-          if (-not $ok) { throw "no StudyStash.exe from $app running again within 30 s of the silent update" }
+          Unregister-Event -SourceIdentifier started
+          if (-not $ok) { throw "no new StudyStash.exe from $app running within 30 s of the silent update" }
           Get-Process -Name StudyStash -ErrorAction SilentlyContinue | Stop-Process -Force
       - name: Uninstalling removes only the app; lectures and settings stay
         if: needs.version.outputs.installers == 'true'
@@ -678,9 +685,22 @@ jobs:
           New-Item -ItemType Directory -Force -Path (Split-Path $settingsKeep), (Split-Path $lectureKeep) | Out-Null
           "keep" | Out-File $settingsKeep
           "keep" | Out-File $lectureKeep
+          # Windows says when the app's folder is deleted (queued from here on): the uninstaller hands the work to a copy of itself and quits.
+          $watch = [IO.FileSystemWatcher]::new((Split-Path $app))
+          $watch.NotifyFilter = [IO.NotifyFilters]::DirectoryName
+          $watch.EnableRaisingEvents = $true
+          Register-ObjectEvent -InputObject $watch -EventName Deleted -SourceIdentifier appgone | Out-Null
           Start-Process "$app\unins000.exe" -ArgumentList "/VERYSILENT", "/SUPPRESSMSGBOXES" -Wait
+          $deadline = [DateTime]::UtcNow.AddSeconds(60)
           $gone = $false
-          for ($i = 0; $i -lt 60; $i++) { if (-not (Test-Path $app)) { $gone = $true; break }; Start-Sleep 1 }
+          while ($true) {
+            if (-not (Test-Path $app)) { $gone = $true; break }
+            $remaining = [int]($deadline - [DateTime]::UtcNow).TotalSeconds
+            if ($remaining -le 0 -or -not (Wait-Event -SourceIdentifier appgone -Timeout $remaining)) { break }
+            Remove-Event -SourceIdentifier appgone
+          }
+          Unregister-Event -SourceIdentifier appgone
+          $watch.Dispose()
           if (-not $gone) { throw "$app is still there 60 s after uninstalling" }
           if (Test-Path "$env:APPDATA\Microsoft\Windows\Start Menu\Programs\Syft Notes.lnk") { throw "the Start Menu entry survived" }
           if (-not (Test-Path $settingsKeep)) { throw "settings outside the app folder were deleted" }

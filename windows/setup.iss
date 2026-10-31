@@ -135,6 +135,43 @@ begin
   end;
 end;
 
+// Waits, for up to TimeoutMs in all, for every process AppCopies counts to end, on Windows' own signal for a process
+// ending (WaitForSingleObject on the process), not on a guessed pause between looks. True when none is left.
+function OpenProcess(Access: Cardinal; Inherit: Boolean; Pid: Cardinal): THandle; external 'OpenProcess@kernel32.dll stdcall';
+function WaitForSingleObject(Handle: THandle; Milliseconds: Cardinal): Cardinal; external 'WaitForSingleObject@kernel32.dll stdcall';
+function CloseHandle(Handle: THandle): Boolean; external 'CloseHandle@kernel32.dll stdcall';
+function GetTickCount: Cardinal; external 'GetTickCount@kernel32.dll stdcall';
+
+function WaitForAppCopies(TimeoutMs: Cardinal): Boolean;
+var
+  Wmi, Found, Proc: Variant;
+  I: Integer;
+  Handle: THandle;
+  Started, Spent: Cardinal;
+begin
+  Result := True;
+  Wmi := CreateOleObject('WbemScripting.SWbemLocator');
+  Wmi := Wmi.ConnectServer('.', 'root\CIMV2');
+  Found := Wmi.ExecQuery('SELECT ProcessId, ExecutablePath FROM Win32_Process WHERE Name = ''StudyStash.exe''');
+  Started := GetTickCount;
+  for I := 0 to Found.Count - 1 do
+  begin
+    Proc := Found.ItemIndex(I);
+    if not VarIsNull(Proc.ExecutablePath) then
+      if CompareText(Proc.ExecutablePath, ExpandConstant('{app}\StudyStash.exe')) = 0 then
+      begin
+        Handle := OpenProcess($00100000, False, Proc.ProcessId); // SYNCHRONIZE
+        if Handle <> 0 then
+        begin
+          Spent := GetTickCount - Started;
+          if Spent > TimeoutMs then Spent := TimeoutMs;
+          if WaitForSingleObject(Handle, TimeoutMs - Spent) <> 0 then Result := False; // 0 = WAIT_OBJECT_0: it ended
+          CloseHandle(Handle);
+        end;
+      end;
+  end;
+end;
+
 // A copy before 0.10.1 that updated itself also left a hidden PowerShell waiting for it to quit, to open it again.
 // That copy would start in the middle of this install and hold the old files open, and the install would stop half
 // done. Those waiters go first: this Setup opens the app again itself when it's finished.
@@ -168,24 +205,16 @@ end;
 // when the new ones go in. Anything that goes wrong here is only logged: Restart Manager (CloseApplications) still
 // closes what it finds.
 function PrepareToInstall(var NeedsRestart: Boolean): String;
-var
-  Tries: Integer;
 begin
   Result := '';
   if not Relaunch then Exit;
   try
     StopOldRelaunchers;
-    Tries := 0;
-    while (Tries < 20) and (AppCopies(False) > 0) do
+    // The copy that started this is quitting by itself: given up to 10 s, then stopped (and given up to 5 s more).
+    if not WaitForAppCopies(10000) then
     begin
-      Sleep(500);
-      Tries := Tries + 1;
-    end;
-    Tries := 0;
-    while (Tries < 5) and (AppCopies(True) > 0) do
-    begin
-      Sleep(500);
-      Tries := Tries + 1;
+      AppCopies(True);
+      if not WaitForAppCopies(5000) then Log('Syft Notes was still running 5 s after it was stopped');
     end;
   except
     Log('Couldn''t check for a running Syft Notes: ' + GetExceptionMessage);

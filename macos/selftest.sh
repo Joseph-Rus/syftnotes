@@ -36,25 +36,22 @@ run_app() {
     "$@" --home "$HOME_DIR"
 }
 
+# perl's alarm is the time limit: it survives the exec into the app (and through arch), so the clock is the kernel's
+# and nothing here sleeps or polls. SIGALRM ends the app, which is exit status 142 below.
+limit=480
 if [ "${STUDYSTASH_ARCH:-}" = "x86_64" ]; then
-  run_app arch -x86_64 "$BIN" &
+  run_app perl -e 'alarm shift; exec @ARGV' "$limit" arch -x86_64 "$BIN" &
 else
-  run_app "$BIN" &
+  run_app perl -e 'alarm shift; exec @ARGV' "$limit" "$BIN" &
 fi
 pid=$!
 
-seconds=0
-while kill -0 "$pid" 2>/dev/null; do
-  seconds=$((seconds + 1))
-  if [ "$seconds" -ge 480 ]; then
-    kill -9 "$pid" 2>/dev/null || true
-    echo "selftest.sh: Syft Notes didn't exit within 480 s" >&2
-    exit 1
-  fi
-  sleep 1
-done
 code=0
 wait "$pid" || code=$?
+if [ "$code" = 142 ]; then
+  echo "selftest.sh: Syft Notes didn't exit within $limit s" >&2
+  exit 1
+fi
 
 TXT="$OUT/selftest.txt"
 [ -f "$TXT" ] || { echo "selftest.sh: Syft Notes exited ($code) without writing selftest.txt" >&2; exit 1; }

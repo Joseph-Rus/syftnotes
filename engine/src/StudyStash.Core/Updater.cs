@@ -232,7 +232,7 @@ public static partial class Updates
             }
             if (host.RelaunchPid != 0)
             {
-                const string script = "app=\"$1\"; shift; while kill -0 \"$0\" 2>/dev/null; do sleep 1; done; exec /usr/bin/open \"$app\" --args \"$@\"";
+                const string script = "app=\"$1\"; shift; /usr/bin/caffeinate -w \"$0\"; exec /usr/bin/open \"$app\" --args \"$@\"";
                 host.SpawnDetached(["/bin/sh", "-c", script, host.RelaunchPid.ToString(CultureInfo.InvariantCulture), host.AppDir, .. host.RelaunchArgs]);
             }
             return true;

@@ -7,9 +7,11 @@
 # The DMG: a stage folder with the app plus a link to /Applications. The disk shows the app's icon when it opens
 # (.VolumeIcon.icns, flagged on the volume, which only a mounted read-write copy can take), and the .dmg file itself
 # wears it too.
-# hdiutil, tried up to three times. On a busy Mac (CI's, now and then) it fails once and works a few seconds later:
+# hdiutil, tried up to three times. On a busy Mac (CI's, now and then) it fails once and works on a second try:
 # two release rehearsals stopped here, after the app was built and signed, with nothing in the log, because it runs
-# quietly. So the first try is quiet, and a try after a failure says everything it does.
+# quietly. So the first try is quiet, and a try after a failure says everything it does. Between tries `sync` returns
+# once the disk has taken every write still pending (what a busy volume or image is usually still doing), where a fixed
+# wait only guessed at it.
 hdi() {
   hdi_verb=$1
   shift
@@ -24,9 +26,9 @@ hdi() {
       echo "hdiutil $hdi_verb failed three times" >&2
       return 1
     fi
-    echo "hdiutil $hdi_verb didn't work (try $hdi_try of 3); trying again in 5 seconds" >&2
+    echo "hdiutil $hdi_verb didn't work (try $hdi_try of 3); trying again once the disk has caught up" >&2
     hdi_try=$((hdi_try + 1))
-    sleep 5
+    sync
   done
 }
 
