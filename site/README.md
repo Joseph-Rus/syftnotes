@@ -12,22 +12,35 @@ site/
   terms/index.html    terms of use (MIT, as is)
   support/index.html  support: GitHub issues, private security reports
   404.html            the page for a missing address
-  assets/             site.css, site.js, the app's font, the icon, favicon, social picture, pictures of the app and the
-                      film's paper objects (WebP), and the film
+  assets/             site.css, site.js, the app's font and the wordmark's (Archivo), the icon, favicon, social picture,
+                      the pixel s (img/tile-light.svg, img/mark-dark.svg), pictures of the app, light and dark (WebP),
+                      and the old films (on no page)
   check.mjs           the check CI runs before publishing (not published)
 ```
 
-The look is the promo film's. The page is paper-coloured, set in the app's own typeface (Atkinson Hyperlegible
-Next, served from `assets/fonts/` under its Open Font License, so still nothing loads from another site), and each
-thing the app does gets a band of one bold colour with a big word, a sentence, a picture of the app as a card and a
-cut-paper object: Record, Notes, Formulas, Graphs, Diagrams, Due dates, Ask, Connect. The bands keep their colours
-in the dark; only the paper and its ink follow the system.
+The look is the app's. The page is the app's grey canvas with white pages on it, a hairline round each, set in the
+app's own typeface (Atkinson Hyperlegible Next, served from `assets/fonts/` under its Open Font License, so still
+nothing loads from another site), with the app's ink pill buttons. The brand is Joey's pixel s: the wordmark in Archivo
+beside the logo board's lockup in the header, the s on its tile in the opening (S2 Sieve Drop played once in the light,
+S1 Sort In in the dark, copied from his motion reference; the still mark for anyone who asked for less motion), and its
+four colours (lilac, sky, coral, mustard) as the accents: every dot, bullet and step number is a cell of the s on its
+8-unit grid. Each thing the app does is a row of one white sheet, like the app's page: Record, Notes, Formulas,
+Graphs, Diagrams, Due dates, Ask, Connect, each with a big word, a sentence and a picture of the app as a card. Light
+and dark follow the visitor's system. No gradients anywhere.
 
-**The pictures** are the real app (0.16.2) on a made-up library, never redrawn: `home.webp` is its whole window, and
-each card is a piece of the window at twice the size it's shown. The film in the opening is
-`assets/study-stash-promo.mp4` (its poster is `img/promo-poster.webp`), and the paper objects (`img/paper-*.webp`)
-are the film's own. `assets/study-stash-demo.mp4`, the older 50-second demo, is no longer on a page but stays
-published: the repository's README links to it.
+**The pictures** are the real app, never redrawn: drawn off-screen by its own views from its demo lectures, light and
+dark, at twice the size they're shown (`engine/tests/StudyStash.App.Tests/SiteShots.cs`), standing on the site's
+page colour so the sidebar's glass takes the page's tint. `home.webp` is its whole window, cut to its rounded edge;
+each card is a piece of it. To draw them again:
+
+```sh
+STUDYSTASH_SITE=/tmp/site-shots dotnet test engine/tests/StudyStash.App.Tests --filter SiteShots
+python3 tools/site_pictures.py /tmp/site-shots     # rounds the window's corners, writes img/<name>(-dark).webp
+```
+
+The old films (`assets/study-stash-promo.mp4`, its poster `img/promo-poster.webp`, and the 50-second
+`assets/study-stash-demo.mp4`) show the old name and logo, so they're on no page and the README no longer links to
+them; they stay published until a new film replaces them.
 
 ## Preview
 
