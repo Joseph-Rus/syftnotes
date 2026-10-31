@@ -79,6 +79,9 @@ public sealed class AskSplit : Panel
     const double RestBelow = 20, RestSide = 56, RestSideNarrow = 24;
     /// <summary>The bar's room docked in the panel: from the panel's edges and its foot, and between the thread's end and the bar.</summary>
     const double DockSide = 16, DockBelow = 16, ThreadGap = 12;
+    /// <summary>Room between the page and the panel's edge beside it, so the page's scroll bar doesn't sit on the panel's
+    /// line and read as a second one.</summary>
+    const double Gutter = 12;
 
     /// <summary>What drives a glide: the app's eased frame clock; a test's film steps it itself.</summary>
     internal static Func<Visual, TimeSpan, Action<double>, Action?, IDisposable> Animate { get; set; } = Motion.Animate;
@@ -258,7 +261,7 @@ public sealed class AskSplit : Panel
         asSheet = w < SheetBelow;
         if (wasSheet != asSheet) Mark();
         double panel = PanelWidth(w);
-        page?.Measure(new Size(Beside ? w - panel : w, h));
+        page?.Measure(new Size(Beside ? w - panel - Gutter : w, h));
         if (bar is not null) MeasureBar(BarAt(w, h, open).Width);
         sheet.Padding = new Thickness(0, 0, 0, BarRoom());
         sheet.BorderThickness = new Thickness(asSheet ? 0 : 1, 0, 0, 0);
@@ -292,7 +295,7 @@ public sealed class AskSplit : Panel
         double panel = PanelWidth(w);
         if (page is not null)
         {
-            page.Arrange(new Rect(0, 0, Beside ? w - panel : w, h));
+            page.Arrange(new Rect(0, 0, Beside ? w - panel - Gutter : w, h));
             // Where the page's column lands, against where it was: the glide moves it across from there.
             if (anchorWas is { } was)
             {
