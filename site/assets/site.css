@@ -429,3 +429,7 @@ section { padding: clamp(4rem, 9vw, 6.5rem) 0; }
 .lost .kicker { justify-content: center; }
 .lost .odd { width: 7rem; margin: 0 auto 1.6rem; }
 .lost .odd svg { display: block; width: 100%; height: auto; }
+
+/* The hero's wave (site.js draws it): behind everything in the hero, never in the way of a click. */
+.hero { position: relative; isolation: isolate; }
+.hero-wave { position: absolute; left: 0; width: 100%; z-index: -1; pointer-events: none; }
