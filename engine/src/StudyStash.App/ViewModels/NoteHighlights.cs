@@ -1,5 +1,6 @@
 using CommunityToolkit.Mvvm.ComponentModel;
 using StudyStash.App.Controls;
+using StudyStash.Core.Ai;
 
 namespace StudyStash.App.ViewModels;
 
@@ -72,11 +73,18 @@ public sealed class QuoteChip
     {
         (this.notes, this.quotes, this.index) = (notes, quotes, index);
         Quote = quotes[index];
-        Text = Short(Quote);
+        Full = AskQuotes.Label(Quote) ?? Quote;
+        Text = Short(Full);
     }
 
     public string Quote { get; }
+
+    /// <summary>The quote as a student reads it: a formula in it as plain symbols, not LaTeX (<see cref="AskQuotes.Label"/>).</summary>
+    public string Full { get; }
     public string Text { get; }
+
+    /// <summary>Whether a quote earns a chip: not one that's only a formula, whose highlight in the notes is enough.</summary>
+    public static bool Readable(string quote) => AskQuotes.Label(quote) is not null;
 
     /// <summary>The first words of a quote, cut at a word, with an ellipsis when it goes on.</summary>
     public static string Short(string quote, int most = 34)

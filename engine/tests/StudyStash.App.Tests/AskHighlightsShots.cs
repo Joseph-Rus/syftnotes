@@ -46,18 +46,18 @@ public class AskHighlightsShots
         "Mitochondria are the powerhouse of the cell",
     ];
 
-    static async Task<LibraryModel> Page()
+    internal static async Task<LibraryModel> Page(string notes = Notes, string answer = Answer, string[]? quotes = null, string question = "How do the three kinds of vessel differ?")
     {
         var lib = new FakeAiLibrary { Overview = AiTestData.MixedOverview() };
-        lib.OnAsk = _ => new AskReply(Answer, [new AskSource("rec-1", "Blood vessels and blood pressure", "BIO 110", "2026-10-08", null, "Three kinds of vessel")], "claude", "Claude")
+        lib.OnAsk = _ => new AskReply(answer, [new AskSource("rec-1", "Blood vessels and blood pressure", "BIO 110", "2026-10-08", null, "Three kinds of vessel")], "claude", "Claude")
         {
-            Quotes = [.. Quotes], Chat = "c1", Remembered = 0,
+            Quotes = [.. quotes ?? Quotes], Chat = "c1", Remembered = 0,
         };
         var ask = new AiAskModel(lib) { LectureId = "rec-1", ClassName = "BIO 110", OpenSettings = () => { }, Place = new AskPlace("lecture", "rec-1", "BIO 110") };
         ask.NameScopes(Nouns.Lecture, "BIO 110");
         await ask.Load();
         ask.Engine = "claude";
-        ask.Question = "How do the three kinds of vessel differ?";
+        ask.Question = question;
         await ask.AskCommand.ExecuteAsync(null);
 
         string[] classes = ["BIO 110", "CHEM 121", "MATH 221", "PSYC 101"];
@@ -67,15 +67,15 @@ public class AskHighlightsShots
         m.Note = new NoteModel
         {
             Id = "rec-1", ClassName = "BIO 110", Dot = Skin.ClassDot(0), Noun = Nouns.Lecture, When = "Thursday 8 October at 9:30 AM, 50 min",
-            Title = "Blood vessels and blood pressure", Markdown = Notes, OnRename = _ => Task.FromResult(true),
+            Title = "Blood vessels and blood pressure", Markdown = notes, OnRename = _ => Task.FromResult(true),
         }.Titled();
-        m.Notes = AiDemo.LectureNotes(Notes, "Claude");
+        m.Notes = AiDemo.LectureNotes(notes, "Claude");
         m.Notes.Highlights = ask.Highlights; // as the app's Shell links them
         m.Ask = ask;
         return m;
     }
 
-    static void Take(Control view, SkinKind skin, ThemeVariant variant, string name, Action? afterShown = null)
+    internal static void Take(Control view, SkinKind skin, ThemeVariant variant, string name, Action? afterShown = null)
     {
         Skin.UseTheme(ColourThemes.Default);
         ((App)Application.Current!).UseSkin(skin);

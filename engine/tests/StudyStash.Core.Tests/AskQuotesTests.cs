@@ -24,6 +24,18 @@ public class AskQuotesTests
         Assert.Empty(AskQuotes.Clean(JsonNode.Parse("[1, null, {\"a\": 2}]")));
     }
 
+    [Theory]
+    [InlineData(@"used to weight the values: $$\text{Attention}(Q,K,V)=\text{softmax}\left(\frac{QK^T}{\sqrt{d_k}}\right)V$$", "used to weight the values: Attention(Q,K,V)=softmax((QKT)/(√(dk)))V")]
+    [InlineData(@"the cost is $\mathrm{O}(n^2 \cdot d)$ for each layer", "the cost is O(n² · d) for each layer")]
+    [InlineData("Arteries carry blood away from the heart", "Arteries carry blood away from the heart")]
+    [InlineData("it costs $5 and then $6 more", "it costs $5 and then $6 more")]
+    public void A_chip_says_a_quotes_formula_as_plain_symbols(string quote, string label) => Assert.Equal(label, AskQuotes.Label(quote));
+
+    [Theory]
+    [InlineData(@"$$\frac{QK^T}{\sqrt{d_k}} = \sum_{i=1}^{n} x_i$$")]
+    [InlineData(@"\frac{QK^T}{\sqrt{d_k}}\right)V$$")]
+    public void A_quote_that_is_only_a_formula_makes_no_chip(string quote) => Assert.Null(AskQuotes.Label(quote));
+
     [Fact]
     public void A_half_written_reply_shows_the_answer_and_never_its_quotes()
     {

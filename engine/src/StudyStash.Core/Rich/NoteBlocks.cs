@@ -77,6 +77,18 @@ public static partial class NoteBlocks
         return (c, n, info);
     }
 
+    /// <summary>A line that ends a <c>$$</c> formula: the line up to its closing <c>$$</c>, and the full stop, comma,
+    /// semicolon or colon the writer put right after it (<c>…V$$.</c>), which belongs to the formula's sentence: it goes
+    /// back inside, before the <c>$$</c>, so it's drawn just after the formula the usual LaTeX way. Null when the line
+    /// doesn't end a formula.</summary>
+    public static (string Before, string Punctuation)? ClosingDollars(string line)
+    {
+        string t = line.TrimEnd();
+        string punctuation = t.Length > 2 && ".,;:".Contains(t[^1]) ? t[^1].ToString() : "";
+        string bare = t[..(t.Length - punctuation.Length)];
+        return bare.EndsWith("$$", StringComparison.Ordinal) ? (bare[..^2], punctuation) : null;
+    }
+
     /// <summary>The note's blocks, in order. A fence still open at the end runs to the last line (not
     /// <see cref="NoteBlock.Closed"/>).</summary>
     public static List<NoteBlock> Find(IReadOnlyList<string> lines)
@@ -98,18 +110,23 @@ public static partial class NoteBlocks
             }
             if (t.StartsWith("$$", StringComparison.Ordinal))
             {
-                if (t.Length >= 4 && t.EndsWith("$$", StringComparison.Ordinal))
+                if (t.Length >= 4 && ClosingDollars(t) is { } whole)
                 {
-                    blocks.Add(new NoteBlock(NoteBlockKind.Math, "", t[2..^2].Trim(), i, i, true));
+                    blocks.Add(new NoteBlock(NoteBlockKind.Math, "", (whole.Before[2..] + whole.Punctuation).Trim(), i, i, true));
                     i++;
                     continue;
                 }
                 int j = i + 1;
-                while (j < lines.Count && !lines[j].TrimEnd().EndsWith("$$", StringComparison.Ordinal)) j++;
+                while (j < lines.Count && ClosingDollars(lines[j]) is null) j++;
                 bool closed = j < lines.Count;
                 var body = new List<string> { t[2..] };
                 for (int k = i + 1; k < Math.Min(j + 1, lines.Count); k++) body.Add(lines[k].Trim());
-                if (closed) body[^1] = body[^1][..^2];
+                if (closed && ClosingDollars(body[^1]) is { } close)
+                {
+                    // $$ alone on the closing line: its punctuation goes on the formula's last line.
+                    if (close.Before.Trim().Length == 0 && body.Count > 1) { body[^2] += close.Punctuation; body.RemoveAt(body.Count - 1); }
+                    else body[^1] = close.Before + close.Punctuation;
+                }
                 blocks.Add(new NoteBlock(NoteBlockKind.Math, "", string.Join("\n", body).Trim(), i, closed ? j : lines.Count - 1, closed));
                 i = closed ? j + 1 : lines.Count;
                 continue;

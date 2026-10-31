@@ -91,6 +91,30 @@ public class AskHighlightsTests
     }
 
     [AvaloniaFact]
+    public async Task A_quote_with_a_formula_reads_plainly_and_one_that_is_only_a_formula_has_a_highlight_but_no_chip()
+    {
+        const string formulaNotes = "## Attention\nScores are used to weight the values: $\\text{Attention}(Q,K,V)=\\text{softmax}\\left(\\frac{QK^T}{\\sqrt{d_k}}\\right)V$ and nothing else.\n\n$$\\frac{QK^T}{\\sqrt{d_k}} = \\sum_{i=1}^{n} x_i$$";
+        var lib = new FakeAiLibrary { Overview = AiTestData.MixedOverview() };
+        var model = new AiAskModel(lib) { LectureId = "lec-vessels" };
+        await model.Load();
+        model.Highlights.SetNotes(formulaNotes);
+        lib.OnAsk = r => new AskReply("Scores weight the values.", [new AskSource("lec-vessels", "Vessels", null, null, null, "Attention")], "claude", "Claude")
+        {
+            Quotes = ["used to weight the values: $\\text{Attention}(Q,K,V)=\\text{softmax}\\left(\\frac{QK^T}{\\sqrt{d_k}}\\right)V$", "$$\\frac{QK^T}{\\sqrt{d_k}} = \\sum_{i=1}^{n} x_i$$"],
+        };
+        model.Question = "How does attention work?";
+        await model.AskCommand.ExecuteAsync(null);
+
+        var turn = model.Turns[0];
+        // Both are still found in the notes and highlighted; only the readable one is a chip, and its words have no LaTeX.
+        Assert.Equal(2, turn.Shown.Count);
+        var chip = Assert.Single(turn.Chips);
+        Assert.Equal("used to weight the values: Attention(Q,K,V)=softmax((QKT)/(√(dk)))V", chip.Full);
+        Assert.DoesNotContain('\\', chip.Text);
+        Assert.DoesNotContain('$', chip.Text);
+    }
+
+    [AvaloniaFact]
     public async Task Quotes_wait_for_the_notes_and_follow_them()
     {
         var (model, _) = await Asked("capillaries are one cell thick");
