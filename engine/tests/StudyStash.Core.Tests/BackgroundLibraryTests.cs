@@ -44,7 +44,8 @@ public class BackgroundLibraryTests
 
         bg.Register(home, program);
 
-        string plist = File.ReadAllText(Path.Combine(dir["agents"], "com.study-stash.background.plist"));
+        // Written on a Mac, but on a Windows runner the checkout's line ends are \r\n
+        string plist = File.ReadAllText(Path.Combine(dir["agents"], "com.study-stash.background.plist")).ReplaceLineEndings("\n");
         Assert.Contains("<string>/Applications/Syft Notes.app/Contents/MacOS/StudyStash</string>", plist);
         Assert.Contains($"<string>{Path.GetFullPath(home)}</string>\n        <string>helper</string>\n    </array>", plist);
         // Kept alive while its program is there, so an app in the Trash leaves nothing that keeps failing; and never
@@ -74,7 +75,7 @@ public class BackgroundLibraryTests
         using var dir = new TempDir();
         var s = new Stand();
         var bg = Make(dir, "Windows", s);
-        string home = dir["Joey's \"odd\" home"], program = @"C:\Users\Joey Q\AppData\Local\Programs\Study Stash\StudyStash.exe";
+        string home = dir["Joey's odd home"], program = @"C:\Users\Joey Q\AppData\Local\Programs\Study Stash\StudyStash.exe";
 
         bg.Register(home, program, ["--drive-folder", @"C:\temp\drive\"]);
 
@@ -106,7 +107,7 @@ public class BackgroundLibraryTests
 
         bg.Register(home, program);
 
-        string unit = File.ReadAllText(bg.UnitPath(home));
+        string unit = File.ReadAllText(bg.UnitPath(home)).ReplaceLineEndings("\n");
         Assert.Contains($"ConditionPathExists={program}\n", unit);
         Assert.Contains($"ExecStart=\"{program}\" \"--home\" \"{Path.GetFullPath(home)}\" \"helper\"\n", unit);
         Assert.Contains("Restart=on-failure\n", unit);
@@ -127,7 +128,7 @@ public class BackgroundLibraryTests
         s.Calls.Clear();
         bg.Register(home, program);
         Assert.Equal("autostart", bg.LinuxWay(home));
-        Assert.Contains($"Exec={program} --home {Path.GetFullPath(home)} helper --keep-alive\n", File.ReadAllText(bg.AutostartPath(home)));
+        Assert.Contains($"Exec={program} --home {Path.GetFullPath(home)} helper --keep-alive\n", File.ReadAllText(bg.AutostartPath(home)).ReplaceLineEndings("\n"));
         Assert.Equal([program, "--home", Path.GetFullPath(home), "helper", "--keep-alive"], Assert.Single(s.Started));
         BackgroundLibrary.WritePids(home, 777);
         bg.Unregister(home);

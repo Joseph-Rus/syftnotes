@@ -211,6 +211,7 @@ var
   Handle: THandle;
   Started, Spent: Cardinal;
   Pids: array of Integer;
+  Cmd: String;
 begin
   Result := True;
   Wmi := CreateOleObject('WbemScripting.SWbemLocator');
@@ -221,7 +222,10 @@ begin
   begin
     Proc := Found.ItemIndex(I);
     if (not VarIsNull(Proc.ExecutablePath)) and (not VarIsNull(Proc.CommandLine)) then
-      if (CompareText(Proc.ExecutablePath, ExpandConstant('{app}\StudyStash.exe')) = 0) and (Pos(' helper', Proc.CommandLine) > 0) then
+    begin
+      // Pos takes a String, not the Variant WMI hands back
+      Cmd := Proc.CommandLine;
+      if (CompareText(Proc.ExecutablePath, ExpandConstant('{app}\StudyStash.exe')) = 0) and (Pos(' helper', Cmd) > 0) then
       begin
         Pid := Proc.ProcessId;
         Log('Stopping Syft Notes in the background (' + IntToStr(Pid) + ')');
@@ -229,6 +233,7 @@ begin
         SetArrayLength(Pids, GetArrayLength(Pids) + 1);
         Pids[GetArrayLength(Pids) - 1] := Pid;
       end;
+    end;
   end;
   Started := GetTickCount;
   for I := 0 to GetArrayLength(Pids) - 1 do
