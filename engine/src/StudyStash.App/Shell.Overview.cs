@@ -46,6 +46,7 @@ public static partial class Shell
     static void SelectInSidebar(string? cls, bool home = false, bool due = false)
     {
         library.Home.Selected = home;
+        library.StudySelected = false;
         foreach (var c in library.Classes) c.Selected = c.IsDue ? due : !home && !due && cls is not null && c.Name == cls;
     }
 
@@ -61,6 +62,7 @@ public static partial class Shell
         LeaveNotes(library.Notes);
         library.Notes = null;
         library.Note = null;
+        library.Study = null;
         // An answer about the note being left isn't wanted any more (the recorder's own ask goes on with the recording).
         if (!ReferenceEquals(library.Ask, recorder.Ask)) library.Ask?.Stop();
         library.Ask = null;
@@ -104,6 +106,7 @@ public static partial class Shell
         Equip(home, null);
         ClearPane();
         library.Overview = home;
+        _ = CountStudyAsync();
     }
 
     // --- a folder's page ----------------------------------------------------------------------------------------------

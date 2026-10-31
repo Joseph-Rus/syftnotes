@@ -314,6 +314,7 @@ public static partial class Shell
         // Notes to read that nothing is writing now (with none written, what the student typed) can be edited and rewritten.
         ShowLectureAi(l, note, written: !writing && (notes.Length > 0 || (mine && S(l["error"]).Length == 0)));
         ShowLectureFiles(note);
+        ShowLectureStudy(note);
     }
 
     /// <summary>

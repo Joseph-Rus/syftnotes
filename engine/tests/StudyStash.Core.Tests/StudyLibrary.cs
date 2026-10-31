@@ -1,4 +1,5 @@
 using StudyStash.Core.Ai;
+using StudyStash.Core.Study;
 using StudyStash.Library;
 
 namespace StudyStash.Core.Tests;
@@ -15,6 +16,11 @@ public sealed class StudyLibrary : IAsyncDisposable
     public TestSite Site { get; private set; } = null!;
     public AiRemote Remote => new("http://localhost", "pw", Site.Client);
     public AiJobs Ai { get; private set; } = null!;
+
+    /// <summary>The library's clock: a fixed morning, moved on by hand.</summary>
+    public DateTimeOffset Now { get; set; } = new(2026, 10, 20, 9, 0, 0, TimeSpan.Zero);
+
+    public StudyRemote Study => new("http://localhost", "pw", Site.Client);
 
     /// <summary>What the stand-in Claude says, one a call.</summary>
     public List<string> Answers { get; } = [];
@@ -72,7 +78,7 @@ public sealed class StudyLibrary : IAsyncDisposable
         Site = await TestSite.StartAsync(b => LibraryWeb.Build(b, Cfg, Store, new Pipeline(Cfg, Store, log: _ => { }), new LibraryWebOptions
         {
             ListModels = _ => Task.FromResult<List<(string, double)>?>(null), Tailscale = () => new TailscaleInfo(),
-            Latest = _ => Task.FromResult<Release?>(null), Ai = Ai,
+            Latest = _ => Task.FromResult<Release?>(null), Ai = Ai, Now = () => Now,
         }));
     }
 

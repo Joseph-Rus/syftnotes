@@ -73,6 +73,11 @@
         <v:Overview Name="Overview" DataContext="{Binding Overview}" />
       </Panel>
 
+      <!-- Study: Review, a page of its own -->
+      <Panel Grid.Column="1" Grid.ColumnSpan="2" IsVisible="{Binding ShowStudy}">
+        <v:StudyPage Name="Study" DataContext="{Binding Study}" />
+      </Panel>
+
       <!-- What's open: a note, an assignment, or a Canvas page (beside Canvas's lists, or the whole pane) -->
       <Panel Name="Detail" Grid.Column="{Binding DetailColumn}" Grid.ColumnSpan="{Binding ColumnSpan}" IsVisible="{Binding ShowDetailColumn}">
         <Border Width="1" Background="{DynamicResource Line}" HorizontalAlignment="Left" IsVisible="{Binding ShowListColumn}" />

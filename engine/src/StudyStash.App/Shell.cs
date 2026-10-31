@@ -578,6 +578,11 @@ public static partial class Shell
             }
             else _ = ShowFolderAsync(c.Name);
         };
+        library.OnStudy = () =>
+        {
+            Remember();
+            _ = ShowStudyAsync();
+        };
         library.OnMoveToFolder = MoveToFolderAsync;
         library.OnFolder = name =>
         {
