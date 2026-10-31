@@ -285,6 +285,9 @@ public sealed partial class LibraryReader(Config cfg, Store store)
         foreach (var p in BestOf(pieces, lookFor, 4))
             Add(attachedTo[p].NoteId is { } id ? Store.Get(id) : null, p);
         var sources = new JsonArray();
+        // A question about one lecture, answered from its written notes: the AI also says which of their words it used,
+        // for the app to highlight in them.
+        bool quoting = lectureId is not null && !live && picked.Any(x => x.Note is not null && x.Passage.Kind == Passage.NotesKind);
         // No notes matched: with the date and the Due list to go on ("what's due Sunday?"), the AI is still asked.
         if (picked.Count == 0 && string.IsNullOrWhiteSpace(agenda)) return new JsonObject { ["answer"] = NoAnswer, ["sources"] = sources, ["remembered"] = 0 };
 
@@ -296,6 +299,7 @@ public sealed partial class LibraryReader(Config cfg, Store store)
             Return JSON: answer (the answer), sources (the numbers of the sources you used, most important first).
 
             """);
+        if (quoting) prompt.Append(AskQuotes.Instructions).Append('\n');
         if (!string.IsNullOrWhiteSpace(agenda))
             prompt.Append("Also below, from the student's own Canvas and calendar, always up to date: today's date and what's due and coming up. ")
                 .Append("For a question about what's due, deadlines, dates or what's on, answer from this, with the day and time; ")
@@ -313,6 +317,7 @@ public sealed partial class LibraryReader(Config cfg, Store store)
             string where = file ? note is null ? $"Attached to {attachedTo[p].ClassName}" : $"Attached to {Title(note)} ({note.ClassName}, {note.Date})"
                 : note is null ? liveTitle : $"{Title(note)} ({note.ClassName}, {note.Date})";
             string at = p.Start is double s ? $" at {TimedText.Clock(s)}" : p.Section.Length > 0 ? $", {p.Section}" : "";
+            if (quoting && !file && p.Kind == Passage.NotesKind && note is not null) at += " (notes)";
             prompt.Append('[').Append(i + 1).Append("] ").Append(where).Append(at).Append(":\n").Append(p.Text).Append("\n\n");
         }
         if (earlier.Count > 0)
@@ -324,14 +329,16 @@ public sealed partial class LibraryReader(Config cfg, Store store)
                 .Append("or \"the second one\", work out from the conversation what it means, and don't repeat an earlier answer.\n");
         }
         prompt.Append("Question: ").Append(question.Trim());
-        string text = await (chat ?? OllamaAsk)(prompt.ToString(), AnswerSchema);
+        string text = await (chat ?? OllamaAsk)(prompt.ToString(), quoting ? AskQuotes.Schema(AnswerSchema) : AnswerSchema);
         string answer;
         List<int> used;
+        var quotes = new List<string>();
         try
         {
             var data = ParseAnswer(text);
             answer = Py.Strip(MathText.RepairJsonEscapes(Py.AsString(data?["answer"]) ?? ""));
             used = (data?["sources"] as JsonArray ?? []).Select(n => n is JsonValue v && v.TryGetValue(out int k) ? k : 0).ToList();
+            if (quoting) quotes = AskQuotes.Clean(data?["quotes"]);
         }
         catch (System.Text.Json.JsonException)
         {
@@ -356,7 +363,10 @@ public sealed partial class LibraryReader(Config cfg, Store store)
             }
             sources.Add(source);
         }
-        return new JsonObject { ["answer"] = answer, ["sources"] = sources, ["remembered"] = earlier.Count };
+        return new JsonObject
+        {
+            ["answer"] = answer, ["sources"] = sources, ["quotes"] = new JsonArray([.. quotes.Select(q => (JsonNode)q)]), ["remembered"] = earlier.Count,
+        };
     }
 
     /// <summary>The passages an earlier answer drew on, found again where the question looks now: one of this lecture's

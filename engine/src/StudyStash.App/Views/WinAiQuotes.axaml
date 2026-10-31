@@ -1,0 +1,42 @@
+<!-- Under an answer about one lecture, the words of its notes the answer drew on (Win look): "From your notes" and a
+     chip for each, a few words of it. The pointer on a chip makes its highlight in the notes stronger; pressing it scrolls the
+     notes to it. Only the quotes the notes hold are here, and none for an answer that gave any. -->
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:StudyStash.App.ViewModels"
+             x:Class="StudyStash.App.Views.WinAiQuotes"
+             x:DataType="vm:AiTurn"
+             IsVisible="{Binding HasChips}">
+  <UserControl.Styles>
+    <!-- The pen's mustard, flat: the chip is a small piece of the highlight it points at. -->
+    <Style Selector="Button.quote-chip > Border">
+      <Setter Property="Background" Value="#33FFC943" />
+      <Setter Property="CornerRadius" Value="4" />
+      <Setter Property="Padding" Value="8,3" />
+    </Style>
+    <Style Selector="Button.quote-chip:pointerover > Border">
+      <Setter Property="Background" Value="#66FFC943" />
+    </Style>
+    <Style Selector="Button.quote-chip TextBlock">
+      <Setter Property="FontSize" Value="12" />
+      <Setter Property="Foreground" Value="{DynamicResource Fg}" />
+    </Style>
+  </UserControl.Styles>
+
+  <StackPanel Spacing="4">
+    <TextBlock Classes="ai-byline" Text="From your notes" />
+    <ItemsControl ItemsSource="{Binding Chips}">
+      <ItemsControl.ItemsPanel>
+        <ItemsPanelTemplate><WrapPanel /></ItemsPanelTemplate>
+      </ItemsControl.ItemsPanel>
+      <ItemsControl.ItemTemplate>
+        <DataTemplate x:DataType="vm:QuoteChip">
+          <Button Classes="quote-chip" Theme="{StaticResource Surface}" Margin="0,0,6,6" Click="OnChip" PointerEntered="OnChipEnter"
+                  PointerExited="OnChipLeave" ToolTip.Tip="{Binding Quote}" AutomationProperties.Name="{Binding Quote}">
+            <Border><TextBlock Text="{Binding Text}" TextTrimming="CharacterEllipsis" MaxWidth="260" /></Border>
+          </Button>
+        </DataTemplate>
+      </ItemsControl.ItemTemplate>
+    </ItemsControl>
+  </StackPanel>
+</UserControl>

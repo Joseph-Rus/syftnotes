@@ -872,6 +872,7 @@ public sealed class AiJobs(string home, Func<string>? ollamaHost = null)
         return new AskReply(Py.AsString(result["answer"]) ?? "", sources, engine, note.Length > 0 ? note : Engines.Name(engine))
         {
             Asked = asked, AskedName = Engines.Name(asked), FellBack = fellBack, Why = why, Remembered = remembered,
+            Quotes = AskQuotes.Clean(result["quotes"]),
         };
     }
 }

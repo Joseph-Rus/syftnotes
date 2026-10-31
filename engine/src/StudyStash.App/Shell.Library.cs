@@ -519,7 +519,11 @@ public static partial class Shell
         if (fresh && EarlierDrafts().Remove(note.Id, out var draft)) notes!.RestoreEdit(draft.From, draft.Text);
         else if (notes is not null && !ReferenceEquals(before, notes)) _ = notes.Refresh(); // kept: the library says where they stand now
         // The same note read again keeps its ask bar, with what's typed and answered in it.
-        if (library.Ask is { } kept && kept.LectureId == note.Id && kept.Live is null) return;
+        if (library.Ask is { } kept && kept.LectureId == note.Id && kept.Live is null)
+        {
+            if (library.Notes is { } shown) shown.Highlights = kept.Highlights;
+            return;
+        }
         var ask = new AiAskModel(ai)
         {
             LectureId = note.Id, ClassName = note.HasClass ? note.ClassName : null,
@@ -534,6 +538,8 @@ public static partial class Shell
         ask.NameScopes(note.Noun, note.HasClass ? note.ClassShown : null);
         if (!ReferenceEquals(library.Ask, recorder.Ask)) library.Ask?.Stop(); // an answer about the note being left isn't wanted any more
         library.Ask = ask;
+        // What an answer here quotes is highlighted in these notes.
+        if (library.Notes is { } these) these.Highlights = ask.Highlights;
         _ = ask.Load();
     }
 

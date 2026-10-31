@@ -64,6 +64,7 @@
                 <StackPanel Grid.Column="2" Spacing="6">
                   <c:NoteView Compact="True" BodySize="13" BodyLineHeight="18.85" Markdown="{Binding Answer}" IsVisible="{Binding Answer, Converter={x:Static c:Converters.NotEmpty}}" />
                   <v:AiByline HorizontalAlignment="Left" IsVisible="{Binding Byline, Converter={x:Static c:Converters.NotEmpty}}" />
+                  <v:MacAiQuotes />
                   <TextBlock Classes="ai-byline" Text="{Binding FellBackNote}" TextWrapping="Wrap" IsVisible="{Binding FellBackNote, Converter={x:Static c:Converters.NotEmpty}}" />
                   <TextBlock Classes="ai-byline" Text="{Binding OlderLibraryNote}" TextWrapping="Wrap" IsVisible="{Binding OlderLibraryNote, Converter={x:Static c:Converters.NotEmpty}}" />
                 </StackPanel>

@@ -113,6 +113,9 @@ public sealed record AskChat(string Id, string Title, string Updated)
 public sealed record AskChatMessage(string Role, string Text)
 {
     public List<AskSource> Sources { get; init; } = [];
+    /// <summary>The words of the lecture's notes the answer was built on (<see cref="AskQuotes"/>); empty for an answer
+    /// that gave none, or from a library too old to.</summary>
+    public List<string> Quotes { get; init; } = [];
     public string Engine { get; init; } = "";
     public string EngineName { get; init; } = "";
     public bool Failed { get; init; }
@@ -131,6 +134,9 @@ public sealed record AskTurn(string Question, string Answer)
 
 public sealed record AskReply(string Answer, List<AskSource> Sources, string Engine, string EngineName)
 {
+    /// <summary>For a question about one lecture: the words of its notes the answer was built on, to highlight there
+    /// (<see cref="AskQuotes"/>). Empty when it gave none; an older library has none.</summary>
+    public List<string> Quotes { get; init; } = [];
     public string Asked { get; init; } = "";
     public string AskedName { get; init; } = "";
     public bool FellBack { get; init; }

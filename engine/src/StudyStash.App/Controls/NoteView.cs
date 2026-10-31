@@ -155,6 +155,7 @@ public sealed partial class NoteView : StackPanel
     protected override void OnPropertyChanged(AvaloniaPropertyChangedEventArgs change)
     {
         base.OnPropertyChanged(change);
+        QuotesChanged(change);
         if (change.Property == CompactProperty || change.Property == BodyFontProperty || change.Property == BodySizeProperty
             || change.Property == BodyLineHeightProperty || change.Property == PageHeightProperty || change.Property == ProvenanceProperty)
         {
@@ -417,6 +418,7 @@ public sealed partial class NoteView : StackPanel
             else if (!first) first = false;
         }
         previous.Clear();
+        MarkQuotes(true);
     }
 
     /// <summary>A drawing written straight into the Markdown ends at its first blank line; it's taken to </svg>
