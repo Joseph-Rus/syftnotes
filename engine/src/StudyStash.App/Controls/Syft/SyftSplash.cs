@@ -176,8 +176,9 @@ public sealed class SyftSplash : Clocked
         double still = StillAt;
         DrawClocked(context, (canvas, seconds, mark) =>
         {
-            // Less motion: the finished mark and wordmark, fading in (and out), nothing moving.
-            double alpha = reduced ? Math.Clamp(seconds / FadeSeconds, 0, 1) : 1;
+            // Less motion: the finished mark and wordmark, nothing moving; inline it fades in, and over a window it's
+            // there at once (fading its ground in would show the page under it first) and only fades out.
+            double alpha = reduced && inline ? Math.Clamp(seconds / FadeSeconds, 0, 1) : 1;
             // Going: faded from the moment the render thread noted (until it has, it's still all there).
             if (fadingNow && !double.IsNaN(mark)) alpha *= 1 - Ease.Out.Apply(Math.Clamp((seconds - mark) / FadeSeconds, 0, 1));
             if (alpha <= 0) return;
