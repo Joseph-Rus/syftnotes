@@ -34,7 +34,7 @@ public static class Apps
 
     /// <summary>Walking up from a folder inside the bundle (e.g. Contents/MacOS/arm64) to "Study Stash.app" itself, or
     /// null short of the root (a build folder isn't inside one).</summary>
-    static string? EnclosingMacBundle(string baseDir)
+    internal static string? EnclosingMacBundle(string baseDir)
     {
         for (var dir = new DirectoryInfo(baseDir); dir is not null; dir = dir.Parent)
             if (dir.Name.EndsWith(".app", StringComparison.OrdinalIgnoreCase)) return dir.FullName;

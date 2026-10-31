@@ -47,6 +47,8 @@ static class Program
             Log($"[error] a background task failed: {e.Exception}");
             e.SetObserved();
         };
+        // A Mac copy opened from its DMG or Downloads offers once to move into Applications; moved, it opens there.
+        if (MoveSheet.Run(Home, Background)) return 0;
         // One copy at a time: a second one asks the first to show itself (or record), then goes. One started at login
         // has nothing to show, so it just goes.
         if (!Desktop.Claim(Home))
