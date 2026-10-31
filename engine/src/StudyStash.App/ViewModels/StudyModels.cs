@@ -9,7 +9,7 @@ namespace StudyStash.App.ViewModels;
 
 /// <summary>
 /// A lecture's study tools, under its exam flags: its flashcards in Review (made by the library's AI from its notes on
-/// a press, then "12 cards in Review" and a way to review just them).
+/// a press, then "12 cards in Review" and a way to review just them), and Listen.
 /// </summary>
 public sealed partial class LectureStudyModel(IStudyLibrary library, string lectureId, string noun = "lecture") : ObservableObject
 {
@@ -88,6 +88,13 @@ public sealed partial class LectureStudyModel(IStudyLibrary library, string lect
     }
 
     [RelayCommand] void Review() => OnReview?.Invoke(LectureId);
+
+    /// <summary>Listening to the lecture as a short conversation; null when the library can't make them.</summary>
+    [ObservableProperty] public partial ListenModel? Listen { get; set; }
+    partial void OnListenChanged(ListenModel? oldValue, ListenModel? newValue)
+    {
+        if (!ReferenceEquals(oldValue, newValue)) oldValue?.Dispose();
+    }
 }
 
 /// <summary>One grade button under a card: its word, when it brings the card back, and what it does.</summary>

@@ -84,6 +84,48 @@ public class StudyShots
         Shot.Take(Name("prep-test", skin), skin, variant, () => new StudyPage { DataContext = model, Width = 900, Height = 900 }, size: new Size(1028, 1028));
     }
 
+    /// <summary>Voices that say a second of quiet a word.</summary>
+    sealed class QuietVoices : StudyStash.Core.Study.ISpeech
+    {
+        public (bool Ok, string Why) Ready() => (true, "");
+        public Task SayAsync(string text, string who, string wav, CancellationToken ct)
+        {
+            StudyStash.Core.Study.Wav.Write(wav, new short[StudyStash.Core.Study.Wav.Rate * text.Split(' ').Length]);
+            return Task.CompletedTask;
+        }
+    }
+
+    [AvaloniaTheory]
+    [MemberData(nameof(Looks))]
+    public async Task Listen_on_a_lectures_page(SkinKind skin, bool dark)
+    {
+        await using var lib = await StudyLibrary.StartAsync(l => l.Speech = new QuietVoices());
+        lib.Answers.Add("""
+            {"lines":[
+              {"who":"A","text":"Today was blood vessels: arteries, capillaries and veins, and the one thing the lecturer said twice."},
+              {"who":"B","text":"The three layers of an artery wall, right? Intima, media and externa."},
+              {"who":"A","text":"Exactly. And veins bring blood back, with valves to stop it flowing the wrong way."}
+            ]}
+            """);
+        var note = new NoteModel { Id = "v1", Title = "Blood vessels", Markdown = "## Three kinds of vessel\n- Arteries carry blood away." };
+        var listen = new ListenModel(lib.Study, "v1", new NoPlayer());
+        var study = new LectureStudyModel(lib.Study, "v1") { Listen = listen };
+        await study.LoadAsync();
+        await lib.Study.MakeListenAsync("v1");
+        await lib.ListenedAsync("v1");
+        await listen.LoadAsync();
+        listen.ToggleScriptCommand.Execute(null);
+        listen.Position = 31;
+        Shot.Take(Name("listen", skin), skin, dark ? ThemeVariant.Dark : ThemeVariant.Light,
+            () => new NotePage { DataContext = new LibraryModel { Note = note, LectureStudy = study }, Width = 900, Height = 640 }, size: new Size(1028, 768));
+    }
+
+    sealed class NoPlayer : IListenPlayer
+    {
+        public void Play(string wav, double fromSeconds) { }
+        public void Stop() { }
+    }
+
     /// <summary>A library that's never asked: a picture's models are filled in by hand.</summary>
     sealed class StudyLibraryStub : StudyStash.Core.Study.IStudyLibrary
     {

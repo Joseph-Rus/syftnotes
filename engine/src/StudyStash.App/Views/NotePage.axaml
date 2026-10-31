@@ -291,6 +291,57 @@
                 <c:PageText Classes="free-ai-problem" Text="{Binding Problem}" IsVisible="{Binding HasProblem}" />
               </StackPanel>
             </Panel>
+            <!-- Listen: the lecture as a short conversation, made on a press and played here -->
+            <Panel IsVisible="{Binding !Typing}">
+              <StackPanel Name="Listen" DataContext="{Binding $parent[UserControl].((vm:LibraryModel)DataContext).LectureStudy.Listen, FallbackValue={x:Null}}"
+                          x:DataType="vm:ListenModel" IsVisible="{Binding Available, FallbackValue=False}" Margin="0,-14,0,22" Spacing="8">
+                <Button Name="MakeListen" Classes="btn sm" HorizontalAlignment="Left" Command="{Binding MakeCommand}" IsVisible="{Binding CanMake}"
+                        ToolTip.Tip="{Binding MakeTip}" AutomationProperties.Name="{Binding MakeSaid}">
+                  <StackPanel Orientation="Horizontal" Spacing="8">
+                    <c:Icon Glyph="headphones" Size="15" VerticalAlignment="Center" />
+                    <TextBlock Text="{Binding MakeSaid}" VerticalAlignment="Center" />
+                  </StackPanel>
+                </Button>
+                <StackPanel Orientation="Horizontal" Spacing="10" IsVisible="{Binding Making}">
+                  <c:SyftLoader Kind="HoppingBits" Size="16" IsActive="{Binding Making}" VerticalAlignment="Center" />
+                  <TextBlock Text="{Binding MakingSaid}" FontSize="13" Foreground="{DynamicResource InkMuted}" TextWrapping="Wrap" VerticalAlignment="Center" MaxWidth="600" />
+                </StackPanel>
+                <Border Name="Player" Classes="study-card" IsVisible="{Binding Ready}" Padding="14,10">
+                  <StackPanel Spacing="8">
+                    <Grid ColumnDefinitions="Auto,6,Auto,12,*,12,Auto,8,Auto">
+                      <Button Name="PlayListen" Classes="btn sm ink" Command="{Binding PlayPauseCommand}" AutomationProperties.Name="{Binding PlaySaid}" ToolTip.Tip="{Binding PlaySaid}">
+                        <Panel>
+                          <c:Icon Glyph="play_arrow" Size="16" IsVisible="{Binding !Playing}" />
+                          <c:Icon Glyph="pause" Size="16" IsVisible="{Binding Playing}" />
+                        </Panel>
+                      </Button>
+                      <Button Grid.Column="2" Classes="icon-btn sm" Command="{Binding BackCommand}" ToolTip.Tip="Back 15 seconds" AutomationProperties.Name="Back 15 seconds">
+                        <c:Icon Glyph="undo" Size="15" />
+                      </Button>
+                      <ProgressBar Grid.Column="4" Minimum="0" Maximum="1" Value="{Binding Progress}" VerticalAlignment="Center" Height="4" MinHeight="4"
+                                   Foreground="{DynamicResource Ink}" Background="{DynamicResource Line}" CornerRadius="2" />
+                      <TextBlock Grid.Column="6" Text="{Binding Time}" FontSize="12" Classes="num" Foreground="{DynamicResource InkSubtle}" VerticalAlignment="Center" />
+                      <Button Grid.Column="8" Classes="link-btn" Command="{Binding ToggleScriptCommand}" Content="{Binding ScriptToggleSaid}" VerticalAlignment="Center" />
+                    </Grid>
+                    <ItemsControl ItemsSource="{Binding Script}" IsVisible="{Binding ScriptOpen}">
+                      <ItemsControl.ItemsPanel>
+                        <ItemsPanelTemplate><StackPanel Spacing="8" /></ItemsPanelTemplate>
+                      </ItemsControl.ItemsPanel>
+                      <ItemsControl.ItemTemplate>
+                        <DataTemplate x:DataType="vm:ScriptRow">
+                          <Grid ColumnDefinitions="78,*">
+                            <TextBlock Text="{Binding Who}" FontSize="12" FontWeight="Bold" Foreground="{DynamicResource InkSubtle}" Margin="0,2,0,0" />
+                            <c:PageText Grid.Column="1" Text="{Binding Text}" FontSize="14" LineHeight="21" TextWrapping="Wrap" />
+                          </Grid>
+                        </DataTemplate>
+                      </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                  </StackPanel>
+                </Border>
+                <c:PageText Classes="free-ai-problem" Text="{Binding Problem}" IsVisible="{Binding HasProblem}" />
+                <c:PageText Classes="free-ai-more" Text="{Binding CantSpeak}" IsVisible="{Binding ShowCantSpeak}" />
+              </StackPanel>
+            </Panel>
             <!-- While it records: the student's own, kept as they type, in Markdown that shows formatted. A line that
                  starts "# " becomes a heading, "- " a bullet, "[ ] " a checkbox, as the space is typed. -->
             <StackPanel IsVisible="{Binding Typing}" Spacing="18">

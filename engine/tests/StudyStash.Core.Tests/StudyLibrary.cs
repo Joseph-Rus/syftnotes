@@ -21,6 +21,19 @@ public sealed class StudyLibrary : IAsyncDisposable
     public DateTimeOffset Now { get; set; } = new(2026, 10, 20, 9, 0, 0, TimeSpan.Zero);
 
     public StudyRemote Study => new("http://localhost", "pw", Site.Client);
+    /// <summary>The voices Listen speaks with; null for this computer's own.</summary>
+    public ISpeech? Speech { get; set; }
+
+    /// <summary>Waits while a lecture's listen is being made, and says what it came to.</summary>
+    public async Task<ListenInfo> ListenedAsync(string lecture)
+    {
+        for (int i = 0; i < 500; i++)
+        {
+            if (await Study.ListenAsync(lecture) is { State: not ListenInfo.Making } info) return info;
+            await Task.Delay(20);
+        }
+        throw new TimeoutException($"{lecture}'s listen was still being made");
+    }
 
     /// <summary>What the stand-in Claude says, one a call.</summary>
     public List<string> Answers { get; } = [];
@@ -78,7 +91,7 @@ public sealed class StudyLibrary : IAsyncDisposable
         Site = await TestSite.StartAsync(b => LibraryWeb.Build(b, Cfg, Store, new Pipeline(Cfg, Store, log: _ => { }), new LibraryWebOptions
         {
             ListModels = _ => Task.FromResult<List<(string, double)>?>(null), Tailscale = () => new TailscaleInfo(),
-            Latest = _ => Task.FromResult<Release?>(null), Ai = Ai, Now = () => Now,
+            Latest = _ => Task.FromResult<Release?>(null), Ai = Ai, Now = () => Now, Speech = Speech,
         }));
     }
 

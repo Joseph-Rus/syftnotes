@@ -103,6 +103,7 @@ public sealed partial class LibraryWeb
             ReviewCards.Delete(id) ? Http.Json(new JsonObject { ["deleted"] = id }) : Http.Detail(404, "no such card")));
 
         MapExamPrep(app);
+        MapListen(app);
 
         // What the lecturer said is on the exam, for the phone and Claude.
         app.MapGet("/api/v2/lectures/{id}/exam-flags", (HttpContext ctx, string id) => Api(ctx, () =>
@@ -213,5 +214,32 @@ public sealed partial class LibraryWeb
             result["added_to_review"] = added;
             return Http.Json(result);
         })));
+    }
+
+    Listen? listening;
+    Listen Listening => listening ??= new Listen(cfg.Home, options.Speech);
+
+    void MapListen(WebApplication app)
+    {
+        // A lecture to listen to: whether it's made (or being made), its script and how long it is.
+        app.MapGet("/api/v2/listen/{id}", (HttpContext ctx, string id) => Api(ctx, () =>
+            store.Get(id) is null ? Http.Detail(404, "no such lecture") : StudyJson(Listening.Info(id))));
+
+        // Makes it: the library's AI writes the script, this computer's voices read it, in the background.
+        app.MapPost("/api/v2/listen/{id}", (HttpContext ctx, string id) => Api(ctx, () =>
+        {
+            if (StudyMaterial.Read(store, id) is not { } lecture) return Http.Detail(404, "no such lecture");
+            if (!lecture.HasWords) return Http.Detail(409, "This lecture has no notes or transcript to make a listen from yet.");
+            if (Listening.Speech.Ready() is (false, var why)) return Http.Detail(409, why);
+            return StudyJson(Listening.Start(lecture, (p, s) => Jobs.PlanAsync("ask", p, s), Now(), Console.WriteLine));
+        }));
+
+        app.MapGet("/api/v2/listen/{id}/audio", (HttpContext ctx, string id) => Api(ctx, () =>
+            Listening.Info(id).State == ListenInfo.Ready && File.Exists(Listening.AudioPath(id))
+                ? Results.File(Listening.AudioPath(id), "audio/wav", enableRangeProcessing: true)
+                : Http.Detail(404, "this lecture has nothing to listen to yet")));
+
+        app.MapDelete("/api/v2/listen/{id}", (HttpContext ctx, string id) => Api(ctx, () =>
+            Listening.Delete(id) ? Http.Json(new JsonObject { ["deleted"] = id }) : Http.Detail(404, "this lecture has nothing to listen to")));
     }
 }

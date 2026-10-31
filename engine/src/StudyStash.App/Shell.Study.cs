@@ -4,7 +4,7 @@ using StudyStash.Core.Study;
 namespace StudyStash.App;
 
 /// <summary>The study tools in the library window: the Study page from the sidebar (Review and exam prep), and a
-/// lecture's own tools under its exam flags (its cards in Review).</summary>
+/// lecture's own tools under its exam flags (its cards in Review, and Listen).</summary>
 public static partial class Shell
 {
     /// <summary>The connected library's study tools.</summary>
@@ -71,7 +71,9 @@ public static partial class Shell
                 _ = ShowStudyAsync(reviewLecture: id);
             },
         };
+        study.Listen = new ListenModel(Study(), note.Id);
         library.LectureStudy = study;
         _ = study.LoadAsync();
+        _ = study.Listen.LoadAsync();
     }
 }

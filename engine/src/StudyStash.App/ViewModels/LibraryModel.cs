@@ -558,7 +558,11 @@ public sealed partial class LibraryModel : ObservableObject
     partial void OnNoteChanged(NoteModel? value)
     {
         if (LectureFiles is { } files && files.LectureId != value?.Id) LectureFiles = null; // another note's files don't stay
-        if (LectureStudy is { } study && study.LectureId != value?.Id) LectureStudy = null;
+        if (LectureStudy is { } study && study.LectureId != value?.Id)
+        {
+            study.Listen = null; // what it was playing stops
+            LectureStudy = null;
+        }
         if (FreeAi is { } free && (free.LectureId != value?.Id || value is { Live: true })) FreeAi = null;
         OnPropertyChanged(nameof(HasNote));
         OnPropertyChanged(nameof(NoNote));

@@ -47,6 +47,7 @@ public sealed partial class LibraryWeb
             {
                 LibraryChats.ForgetLecture(id);
                 ReviewCards.ForgetLecture(id);
+                Listening.Delete(id);
             }
         }
         return n;

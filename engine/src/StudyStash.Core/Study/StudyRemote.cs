@@ -37,6 +37,12 @@ public interface IStudyLibrary
     /// (how many did comes back with it).</summary>
     Task<(ExamPrepDoc Prep, int AddedToReview)?> AttemptAsync(string id, Dictionary<string, bool> marks, bool reviewMissed) =>
         Task.FromResult<(ExamPrepDoc, int)?>(null);
+    /// <summary>A lecture's listen: made, being made, or not yet. Null from a library too old to make them.</summary>
+    Task<ListenInfo?> ListenAsync(string lecture) => Task.FromResult<ListenInfo?>(null);
+    /// <summary>Starts making it. Throws <see cref="LibraryRefusedException"/> with why when it can't.</summary>
+    Task<ListenInfo?> MakeListenAsync(string lecture) => Task.FromResult<ListenInfo?>(null);
+    /// <summary>Its sound, saved to <paramref name="path"/>; false when there's none yet.</summary>
+    Task<bool> ListenAudioAsync(string lecture, string path) => Task.FromResult(false);
 }
 
 /// <summary>The study tools over the library's API (/api/v2/review and the rest), the way the Syft Notes app reads them.
@@ -151,6 +157,19 @@ public sealed partial class StudyRemote(string serverUrl, Func<string> key, Http
         var body = new JsonObject { ["marks"] = new JsonObject(marks.Select(m => KeyValuePair.Create(m.Key, (JsonNode?)m.Value))), ["review_missed"] = reviewMissed };
         if (await SendAsync(HttpMethod.Post, $"/api/v2/exam-prep/{Seg(id)}/attempt", body) is not JsonObject o || As<ExamPrepDoc>(o) is not { } prep) return null;
         return (prep, o["added_to_review"] is JsonValue v && v.TryGetValue(out int n) ? n : 0);
+    }
+
+    public async Task<ListenInfo?> ListenAsync(string lecture) => As<ListenInfo>(await SendAsync(HttpMethod.Get, $"/api/v2/listen/{Seg(lecture)}"));
+
+    public async Task<ListenInfo?> MakeListenAsync(string lecture) => As<ListenInfo>(await SendAsync(HttpMethod.Post, $"/api/v2/listen/{Seg(lecture)}"));
+
+    public async Task<bool> ListenAudioAsync(string lecture, string path)
+    {
+        if (await BytesAsync($"/api/v2/listen/{Seg(lecture)}/audio") is not { } bytes) return false;
+        Directory.CreateDirectory(Path.GetDirectoryName(path)!);
+        await File.WriteAllBytesAsync(path + ".part", bytes);
+        File.Move(path + ".part", path, overwrite: true);
+        return true;
     }
 
     public async Task<List<ExamHint>?> ExamFlagsAsync(string lecture) =>
