@@ -5,7 +5,7 @@ import { secureAddress, withoutOffer } from './upgrade';
 import { currentPlatform, isStandalone } from './platform';
 import { onLinkClick, tabOf, useRoute } from './router';
 import { useTheme } from './theme/useTheme';
-import { Spinner } from './ui/kit';
+import { SyftLoader, SyftSplash, useSplashVariant } from './ui/Syft';
 import { TabBar } from './ui/TabBar';
 import { Install } from './screens/Install';
 import { Pair } from './screens/Pair';
@@ -46,6 +46,8 @@ function writeFlag(key: string, value: boolean) {
 /** The app: decides what to show first (install, pair, unreachable, or the library), then routes between screens. */
 export function App() {
   useTheme();
+  const splashVariant = useSplashVariant();
+  const [splash, setSplash] = useState(true);
   const api = useMemo(() => new Api({ onUnauthorized: () => setGate({ kind: 'pair', library: null }) }), []);
   const [gate, setGate] = useState<Gate | 'loading'>('loading');
   const { route } = useRoute();
@@ -78,6 +80,32 @@ export function App() {
     void check();
   }, []);
 
+  // The pixel s's splash plays once over whatever's first, and fades when the first screen is decided.
+  const splashView = splash ? (
+    <SyftSplash variant={splashVariant} ready={gate !== 'loading'} onFinish={() => setSplash(false)} />
+  ) : null;
+  return (
+    <>
+      <First api={api} gate={gate} check={check} setGate={setGate} route={route} />
+      {splashView}
+    </>
+  );
+}
+
+/** The first screen: install, pair, unreachable, or the library; still deciding, the s tracing its path. */
+function First({
+  api,
+  gate,
+  check,
+  setGate,
+  route,
+}: {
+  api: Api;
+  gate: Gate | 'loading';
+  check: () => Promise<void>;
+  setGate: (g: Gate) => void;
+  route: ReturnType<typeof useRoute>['route'];
+}) {
   if (gate === 'loading') return <Splash />;
 
   if (gate.kind === 'install')
@@ -155,7 +183,7 @@ function Screens({ api, offline, onRemoved }: { api: Api; offline: boolean; onRe
 function Splash() {
   return (
     <div class="splash">
-      <Spinner size={28} />
+      <SyftLoader variant="pathTrace" size={88} />
     </div>
   );
 }

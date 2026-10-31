@@ -7,7 +7,7 @@ import { href } from '../router';
 import { renderMath } from '../ui/math';
 import { scrollTables } from '../ui/tables';
 import { Checklist, Paperclip, Sparkle } from '../ui/icons';
-import { Doodle } from '../ui/Doodle';
+import { SyftLoader, SyftMark } from '../ui/Syft';
 import { Dot, Empty, IconButton, Problem, Row, Screen, Section, SkeletonRows } from '../ui/kit';
 import { AttachmentRow } from './attachments';
 import { useClassColors } from './classColors';
@@ -121,7 +121,7 @@ function NoNotes({ lecture }: { lecture: Lecture }) {
     return (
       <div class="section">
         <Empty
-          icon={<Doodle name={writing ? 'writing' : 'cracked'} busy={writing} />}
+          icon={writing ? <SyftLoader variant="pathTrace" size={88} /> : <SyftMark size={96} oddOneOut />}
           title={writing ? 'Writing your notes' : "Notes didn't happen"}
         >
           {words}

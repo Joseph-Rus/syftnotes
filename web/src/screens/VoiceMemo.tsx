@@ -6,7 +6,8 @@ import { forget, useResource } from '../data/resource';
 import { ago, fileSize } from '../format';
 import { href } from '../router';
 import { Check, Mic, Refresh, Trash } from '../ui/icons';
-import { Button, Dot, IconButton, Problem, Screen, Section, Spinner } from '../ui/kit';
+import { Button, Dot, IconButton, Problem, Screen, Section } from '../ui/kit';
+import { SyftLoader } from '../ui/Syft';
 import { useClassColors } from './classColors';
 
 /** A recording's name without its ending, as a first guess at the lecture's title: "Bio lab.m4a" → "Bio lab". */
@@ -131,9 +132,7 @@ export function VoiceMemoScreen({ api }: { api: Api }) {
           <div class="section">
             {progress !== null ? (
               <div class="send-progress">
-                <div class="upload-progress">
-                  <div class="upload-progress-bar" style={{ width: `${Math.round(progress * 100)}%` }} />
-                </div>
+                <SyftLoader variant="pixelProgress" size={14} progress={progress} />
                 <span>Sending… {Math.round(progress * 100)}%</span>
               </div>
             ) : (
@@ -199,7 +198,13 @@ function MemoRow({
   const body = (
     <>
       <span class="memo-state-icon">
-        {ready ? <Check size={18} /> : memo.state === 'failed' ? <span class="bang">!</span> : <Spinner size={16} />}
+        {ready ? (
+          <Check size={18} />
+        ) : memo.state === 'failed' ? (
+          <span class="bang">!</span>
+        ) : (
+          <SyftLoader variant="hoppingBits" size={10} />
+        )}
       </span>
       <span class="row-text">
         <span class="row-title">{memo.title || memo.name}</span>

@@ -2,7 +2,7 @@ import { useEffect, useState } from 'preact/hooks';
 import type { Api } from '../api/client';
 import { ApiError } from '../api/client';
 import { useResource } from '../data/resource';
-import { Doodle } from '../ui/Doodle';
+import { SyftLoader, SyftMark } from '../ui/Syft';
 import { Refresh } from '../ui/icons';
 import { Button, Empty, IconButton, Screen, Segmented } from '../ui/kit';
 
@@ -118,12 +118,12 @@ export function StudyScreen({ api, id }: { api: Api; id: string }) {
         </div>
       ) : making || !lecture.data ? (
         <div class="study-making">
-          <Doodle name="writing" size={104} busy />
+          <SyftLoader variant="pathTrace" size={88} />
           <p>Making flashcards and a quiz from your notes…</p>
         </div>
       ) : (
         <Empty
-          icon={<Doodle name="cracked" />}
+          icon={<SyftMark size={96} oddOneOut />}
           title="Couldn't make them"
           action={<Button onClick={() => void make()}>Try again</Button>}
         >
@@ -150,7 +150,7 @@ function Cards({ cards }: { cards: StudyDeck['cards'] }) {
   if (!card)
     return (
       <Empty
-        icon={<Doodle name="overeasy" />}
+        icon={<SyftMark size={112} />}
         title={`You went through all ${cards.length}`}
         action={
           <Button

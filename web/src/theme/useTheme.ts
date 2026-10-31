@@ -1,4 +1,4 @@
-import { useEffect } from 'preact/hooks';
+import { useEffect, useState } from 'preact/hooks';
 import { persistedStore, useStore } from '../data/store';
 import { chromeColour, findTheme, themeCss, type Appearance } from './themes';
 
@@ -38,4 +38,23 @@ export function useTheme() {
     media?.addEventListener('change', paint);
     return () => media?.removeEventListener('change', paint);
   }, [theme, appearance]);
+}
+
+const DARK_QUERY = '(prefers-color-scheme: dark)';
+
+/**
+ * Whether the page is dark right now (dark chosen in Settings, or the phone's own look when it's left to the phone):
+ * for what draws itself differently in the dark, like the pixel s's splash and its tile.
+ */
+export function useIsDark(): boolean {
+  const { appearance } = useStore(look);
+  const [system, setSystem] = useState(() => typeof window !== 'undefined' && (window.matchMedia?.(DARK_QUERY).matches ?? false));
+  useEffect(() => {
+    const media = typeof window !== 'undefined' ? window.matchMedia?.(DARK_QUERY) : undefined;
+    if (!media) return;
+    const follow = () => setSystem(media.matches);
+    media.addEventListener('change', follow);
+    return () => media.removeEventListener('change', follow);
+  }, []);
+  return appearance === 'dark' || (appearance === 'system' && system);
 }

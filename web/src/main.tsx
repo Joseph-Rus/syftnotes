@@ -4,9 +4,14 @@ import './styles/base.css';
 import './styles/kit.css';
 import './styles/screens.css';
 import './styles/app.css';
+import './styles/syft.css';
 import { App } from './App';
 
-render(<App />, document.getElementById('app')!);
+const root = document.getElementById('app')!;
+// `npm run dev`, then /app/syft-demo: the pixel s's three splash screens and four loaders, side by side (never built in).
+if (import.meta.env.DEV && location.pathname.replace(/\/+$/, '') === '/app/syft-demo')
+  void import('./ui/SyftDemo').then(({ SyftDemo }) => render(<SyftDemo />, root));
+else render(<App />, root);
 
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
