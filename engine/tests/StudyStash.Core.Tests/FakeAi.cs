@@ -132,6 +132,8 @@ public sealed class ScriptedAi(string id, string name = "") : AiProvider
 
     /// <summary>What it says, in order. Defaults to one plain answer.</summary>
     public List<AiEvent> Script { get; set; } = [new("final", "ready")];
+    /// <summary>When set, what it says to each prompt, in place of <see cref="Script"/>.</summary>
+    public Func<string, List<AiEvent>>? Respond { get; set; }
     /// <summary>Hangs until the run's own CancellationToken fires, then throws — for a timeout that must fall back.</summary>
     public bool Hang { get; set; }
     /// <summary>Thrown as soon as it's asked to run, instead of yielding anything.</summary>
@@ -175,13 +177,14 @@ public sealed class ScriptedAi(string id, string name = "") : AiProvider
         lock (Requests) Requests.Add(req);
         if (Throws is not null) throw Throws;
         if (Hang) await Task.Delay(Timeout.InfiniteTimeSpan, ct);
-        for (int i = 0; i < Script.Count; i++)
+        var script = Respond?.Invoke(req.Prompt) ?? Script;
+        for (int i = 0; i < script.Count; i++)
         {
             if (Gate is not null && i == GateAfter) await Held(Gate.Task, ct);
             if (Pause > TimeSpan.Zero) await Task.Delay(Pause, ct);
-            yield return Script[i];
+            yield return script[i];
         }
-        if (Gate is not null && GateAfter >= Script.Count) await Held(Gate.Task, ct);
+        if (Gate is not null && GateAfter >= script.Count) await Held(Gate.Task, ct);
         Finished = true;
     }
 

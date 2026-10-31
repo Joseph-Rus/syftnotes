@@ -1,0 +1,72 @@
+<!-- The Recipes list of an Ask bar (both looks): the questions kept to ask again, the student's own first, each with the
+     slash word that asks it from the bar. Pressing one asks it now, about what the bar is on. At the foot, the question
+     in the bar can be kept as a recipe of the student's own, under a name they give it. -->
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:StudyStash.App.ViewModels"
+             xmlns:c="using:StudyStash.App.Controls"
+             x:Class="StudyStash.App.Views.AiRecipesMenu"
+             x:DataType="vm:AiAskModel">
+  <UserControl.Styles>
+    <Style Selector="Button.recipe-row">
+      <Setter Property="Theme" Value="{StaticResource Surface}" />
+      <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+      <Setter Property="CornerRadius" Value="8" />
+      <Setter Property="Padding" Value="10,6" />
+    </Style>
+    <Style Selector="Button.recipe-row:pointerover">
+      <Setter Property="Background" Value="{DynamicResource Hover}" />
+    </Style>
+    <Style Selector="Button.recipe-tool">
+      <Setter Property="Theme" Value="{StaticResource Surface}" />
+      <Setter Property="Width" Value="26" />
+      <Setter Property="Height" Value="26" />
+      <Setter Property="CornerRadius" Value="13" />
+      <Setter Property="HorizontalContentAlignment" Value="Center" />
+      <Setter Property="VerticalAlignment" Value="Center" />
+    </Style>
+  </UserControl.Styles>
+
+  <Border Background="{DynamicResource PopupBg}" BorderBrush="{DynamicResource PopupStroke}" BorderThickness="1" CornerRadius="14"
+          BoxShadow="{DynamicResource PopupShadow}" Padding="6" Width="340">
+    <StackPanel Spacing="2">
+      <TextBlock Text="Recipes" FontSize="11" FontWeight="Medium" Foreground="{DynamicResource Fg2}" Margin="10,4,10,0" />
+      <TextBlock Text="Ask one now, or type / in the bar." FontSize="11" Foreground="{DynamicResource Fg2}" Margin="10,0,10,4" />
+      <ScrollViewer MaxHeight="320" HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
+        <ItemsControl Name="Rows" ItemsSource="{Binding Recipes}">
+          <ItemsControl.ItemTemplate>
+            <DataTemplate x:DataType="vm:RecipeRow">
+              <Grid ColumnDefinitions="*,4,Auto">
+                <Button Classes="recipe-row" Command="{Binding Run}" AutomationProperties.Name="{Binding Name}" ToolTip.Tip="{Binding Slash}">
+                  <StackPanel Spacing="1">
+                    <StackPanel Orientation="Horizontal" Spacing="6">
+                      <TextBlock Text="{Binding Name}" FontSize="13" FontWeight="Medium" Foreground="{DynamicResource Fg}" />
+                      <TextBlock Text="{Binding Slash}" FontSize="11" Foreground="{DynamicResource Fg2}" VerticalAlignment="Center" />
+                    </StackPanel>
+                    <TextBlock Text="{Binding About}" FontSize="11" Foreground="{DynamicResource Fg2}" TextTrimming="CharacterEllipsis" />
+                  </StackPanel>
+                </Button>
+                <Button Grid.Column="2" Classes="recipe-tool" Command="{Binding Delete}" IsVisible="{Binding CanDelete}" AutomationProperties.Name="{Binding DeleteSaid}" ToolTip.Tip="Delete">
+                  <c:Icon Glyph="delete" Size="14" Foreground="{DynamicResource Fg2}" />
+                </Button>
+              </Grid>
+            </DataTemplate>
+          </ItemsControl.ItemTemplate>
+        </ItemsControl>
+      </ScrollViewer>
+      <Border Height="1" Background="{DynamicResource PopupStroke}" Margin="4,4" />
+      <TextBlock Text="{Binding SaveRecipeHint}" FontSize="11" Foreground="{DynamicResource Fg2}" TextWrapping="Wrap" Margin="10,2,10,4" />
+      <Grid ColumnDefinitions="*,6,Auto" Margin="8,0,8,4" IsVisible="{Binding CanSaveRecipe}">
+        <TextBox Name="RecipeNameBox" Text="{Binding RecipeName}" PlaceholderText="Name it, like Lab check" FontSize="13" VerticalAlignment="Center"
+                 AutomationProperties.Name="The new recipe's name">
+          <TextBox.KeyBindings>
+            <KeyBinding Gesture="Enter" Command="{Binding SaveRecipeCommand}" />
+          </TextBox.KeyBindings>
+        </TextBox>
+        <Button Grid.Column="2" Classes="recipe-tool" Command="{Binding SaveRecipeCommand}" AutomationProperties.Name="Keep it as a recipe" ToolTip.Tip="Keep">
+          <c:Icon Glyph="check" Size="14" Foreground="{DynamicResource Fg2}" />
+        </Button>
+      </Grid>
+    </StackPanel>
+  </Border>
+</UserControl>

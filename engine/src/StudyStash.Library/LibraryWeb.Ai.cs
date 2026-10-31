@@ -360,6 +360,18 @@ public sealed partial class LibraryWeb
         app.MapPost("/api/v2/ai/warm", Http.Handle(ctx => ApiAsync(ctx, async () =>
             Http.Json(new JsonObject { ["warming"] = Jobs.Warm(Str(await Http.JsonBodyAsync(ctx.Request), "engine"), cfg) }))));
 
+        // Recipes: the questions kept to ask again (/study-guide), Syft Notes' own and the student's.
+        app.MapGet("/api/v2/ai/recipes", Http.Handle(ctx => ApiAsync(ctx, () => Task.FromResult(AiJson(Recipes.All(cfg.Home))))));
+        app.MapPost("/api/v2/ai/recipes", Http.Handle(ctx => ApiAsync(ctx, async () =>
+        {
+            var body = await Http.JsonBodyAsync(ctx.Request);
+            if (Recipes.Save(cfg.Home, Str(body, "name") ?? "", Str(body, "prompt") ?? "") is not { } saved)
+                return Http.Detail(400, "a recipe needs a name and what to ask");
+            return AiJson(saved);
+        })));
+        app.MapDelete("/api/v2/ai/recipes/{id}", (HttpContext ctx, string id) => ApiAsync(ctx, () => Task.FromResult(
+            Recipes.Delete(cfg.Home, id) ? AiJson(Recipes.All(cfg.Home)) : Http.Detail(404, "no recipe of yours is called that"))));
+
         app.MapGet("/api/v2/ai/rewrite/{lecture}", Http.Handle(ctx => ApiAsync(ctx, () =>
             Task.FromResult(RewriteResult(() => Rewrites.Get((string)ctx.Request.RouteValues["lecture"]!))))));
 

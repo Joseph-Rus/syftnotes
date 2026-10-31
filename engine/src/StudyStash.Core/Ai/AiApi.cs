@@ -301,6 +301,13 @@ public interface IAiLibrary
     /// <summary>Deletes a chat, kept a while for <see cref="RestoreChatAsync"/>; false when it was gone already.</summary>
     Task<bool> DeleteChatAsync(string id) => Task.FromResult(false);
     Task<bool> RestoreChatAsync(string id) => Task.FromResult(false);
+    /// <summary>Every recipe the library has (<see cref="Recipes.All"/>). Empty from a library too old to have them,
+    /// which then asks "/study-guide" as it's typed.</summary>
+    Task<List<Recipe>> RecipesAsync() => Task.FromResult(new List<Recipe>());
+    /// <summary>Keeps a recipe of the student's own; null from a library too old to.</summary>
+    Task<Recipe?> SaveRecipeAsync(string name, string prompt) => Task.FromResult<Recipe?>(null);
+    /// <summary>Deletes one of the student's own recipes: every recipe left, or null when it was gone already.</summary>
+    Task<List<Recipe>?> DeleteRecipeAsync(string id) => Task.FromResult<List<Recipe>?>(null);
 }
 
 /// <summary>The library's AI over its API (/api/v2/ai), the way the Syft Notes app reads it. Like
@@ -554,6 +561,23 @@ public sealed class AiRemote(string serverUrl, Func<string> key, HttpClient? htt
         catch (LibraryRefusedException e) when (e.Status == 404)
         {
             return false;
+        }
+    }
+
+    public async Task<List<Recipe>> RecipesAsync() => As<List<Recipe>>(await SendAsync(HttpMethod.Get, "/recipes")) ?? [];
+
+    public async Task<Recipe?> SaveRecipeAsync(string name, string prompt) =>
+        As<Recipe>(await SendAsync(HttpMethod.Post, "/recipes", new JsonObject { ["name"] = name, ["prompt"] = prompt }));
+
+    public async Task<List<Recipe>?> DeleteRecipeAsync(string id)
+    {
+        try
+        {
+            return As<List<Recipe>>(await SendAsync(HttpMethod.Delete, $"/recipes/{Seg(id)}"));
+        }
+        catch (LibraryRefusedException e) when (e.Status == 404)
+        {
+            return null;
         }
     }
 }

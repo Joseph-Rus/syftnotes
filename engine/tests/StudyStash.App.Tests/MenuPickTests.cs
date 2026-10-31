@@ -25,7 +25,7 @@ public class MenuPickTests
 {
     const string Lecture = "lec-1";
 
-    static Window Host(Control content, SkinKind skin)
+    internal static Window Host(Control content, SkinKind skin)
     {
         ((App)Application.Current!).UseSkin(skin);
         var w = new Window { Width = 1000, Height = 800, RequestedThemeVariant = ThemeVariant.Light, Content = content };
@@ -35,7 +35,7 @@ public class MenuPickTests
     }
 
     /// <summary>A left click in the middle of <paramref name="target"/>, sent to whichever window (or popup) it's in.</summary>
-    static void Click(Visual target)
+    internal static void Click(Visual target)
     {
         var top = TopLevel.GetTopLevel(target) ?? throw new InvalidOperationException("not on screen");
         var at = target.TranslatePoint(new Point(target.Bounds.Width / 2, target.Bounds.Height / 2), top)!.Value;
@@ -46,7 +46,7 @@ public class MenuPickTests
     }
 
     /// <summary>Clicks <paramref name="button"/> and hands back what its flyout shows.</summary>
-    static Control OpenFlyout(Button button)
+    internal static Control OpenFlyout(Button button)
     {
         Click(button);
         var flyout = Assert.IsAssignableFrom<PopupFlyoutBase>(button.Flyout);
