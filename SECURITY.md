@@ -6,7 +6,7 @@ Please report security problems privately: on GitHub, open this repository's **S
 choose **Report a vulnerability**. Please don't open a public issue for them. You'll get a reply
 within a week.
 
-## What Egghead Notes protects, and how
+## What Syft Notes protects, and how
 
 - **The library** is protected by one password, sent over your own network or Tailscale. It's
   plain http, so keep it on Tailscale or a network you trust; don't expose its port to the
