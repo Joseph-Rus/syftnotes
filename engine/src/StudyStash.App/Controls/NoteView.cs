@@ -512,11 +512,21 @@ public sealed partial class NoteView : StackPanel
         var segments = new List<Control>();
         var current = Body();
         bool split = false;
-        foreach (var piece in Runs(inline, null, null, null, current.FontSize, null))
+        var pieces = Runs(inline, null, null, null, current.FontSize, null).ToList();
+        for (int p = 0; p < pieces.Count; p++)
         {
+            var piece = pieces[p];
             if (piece is InlineUIContainer { Child: MathView { Display: false } mv } && mv.DesiredSize.Height > current.FontSize * 2)
             {
                 if (current.Inlines!.Count > 0) segments.Add(current);
+                // A full stop or comma right after it belongs to the formula's sentence: drawn after the formula, not
+                // starting the line below it.
+                if (p + 1 < pieces.Count && pieces[p + 1] is Run { Text: { } after } next && MathText.TrailingPunctuation(after) is { } mark)
+                {
+                    mv.Latex += mark;
+                    next.Text = after[1..].TrimStart();
+                    if (next.Text.Length == 0) pieces.RemoveAt(p + 1);
+                }
                 // The same size and style a display formula gets, just still sitting in the paragraph's flow.
                 mv.Display = true;
                 mv.Size = current.FontSize * DisplayMathFactor;
