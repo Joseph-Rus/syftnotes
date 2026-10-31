@@ -254,7 +254,7 @@ public sealed class FirstRunTests
         Assert.Equal("Speech-to-text is ready.", card.ModelLine);
         card.IconHidden = true;
         Assert.True(card.CanShowIt);
-        Assert.Equal("Your menu bar is full, so the S. is hidden behind other icons.", card.WhereLine);
+        Assert.Equal("Your menu bar is full, so the Syft Notes icon is hidden behind other icons.", card.WhereLine);
         Assert.False(new WelcomeCardModel(mac: false) { IconHidden = true }.CanShowIt);
     }
 

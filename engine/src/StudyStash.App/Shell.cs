@@ -1739,7 +1739,7 @@ public static partial class Shell
             if (trayRecording && !trayLogged)
             {
                 trayLogged = true;
-                Program.Log($"[tray] recording: the S. with its red cell, {(trayDark ? "white on a dark" : "black on a light")} menu bar, \"{MacStatusItem.Title()}\" beside it");
+                Program.Log($"[tray] recording: the s with its red cell, {(trayDark ? "white on a dark" : "black on a light")} menu bar, \"{MacStatusItem.Title()}\" beside it");
             }
         }
         else if (tray is not null)
@@ -1861,7 +1861,7 @@ public static partial class Shell
                 {
                     MacStatusItem.ShowElapsed("");
                     trayLogged = false;
-                    Program.Log($"[tray] idle: the S. mark as a template image, \"{MacStatusItem.Title()}\" beside it");
+                    Program.Log($"[tray] idle: the s mark as a template image, \"{MacStatusItem.Title()}\" beside it");
                 }
             }
             else if (tray is not null)

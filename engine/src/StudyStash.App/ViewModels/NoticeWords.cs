@@ -99,7 +99,7 @@ public static class NoticeWords
         ("A lighter model would keep up better", $"{advice.Why} Switch in Settings → Recording.");
 
     /// <summary>Syft Notes updates itself while nothing's recording and starts again: the first start of a newer
-    /// version than <paramref name="lastRun"/> says so, once (the S. went from the menu bar for a moment), with the
+    /// version than <paramref name="lastRun"/> says so, once (the s went from the menu bar for a moment), with the
     /// release's notes as the button. Nothing on the very first start, or starting an older or the same version.</summary>
     public static (string Title, string Text, string Action)? Updated(string lastRun, string running)
     {

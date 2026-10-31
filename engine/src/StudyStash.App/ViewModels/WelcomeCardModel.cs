@@ -28,10 +28,10 @@ public sealed partial class WelcomeCardModel(bool mac) : ObservableObject
     public partial bool IconHidden { get; set; }
 
     public string WhereLine => !mac
-        ? "Syft Notes also waits by the clock: click the S. in the taskbar corner. Can't see it? Click ^ and drag it next to the clock."
+        ? "Syft Notes also waits by the clock: click the Syft Notes icon in the taskbar corner. Can't see it? Click ^ and drag it next to the clock."
         : IconHidden
-            ? "Your menu bar is full, so the S. is hidden behind other icons."
-            : "Syft Notes also waits in your menu bar: click the S. at the top right of your screen to record without opening this window.";
+            ? "Your menu bar is full, so the Syft Notes icon is hidden behind other icons."
+            : "Syft Notes also waits in your menu bar: click the Syft Notes icon at the top right of your screen to record without opening this window.";
 
     public bool CanShowIt => mac && IconHidden;
     public const string ShowItLabel = "Show it";

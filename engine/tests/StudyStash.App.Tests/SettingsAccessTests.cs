@@ -14,7 +14,7 @@ namespace StudyStash.App.Tests;
 /// <summary>
 /// Settings can be reached from everywhere: a gear in the dropdown (beside Open Syft Notes) and in the library
 /// window's toolbar, the Mac's app menu (Settings… ⌘,), ⌘, / Ctrl+, in any window; and when a full menu bar hides
-/// the S., the app says so and can move it into view.
+/// the icon, the app says so and can move it into view.
 /// </summary>
 public class SettingsAccessTests
 {
@@ -159,7 +159,7 @@ public class SettingsAccessTests
     {
         var (title, text) = IconWords.WhereItIs(mac: true, hidden: false);
         Assert.Equal("Syft Notes is in your menu bar", title);
-        Assert.Contains("the S. at the top right", text, StringComparison.Ordinal);
+        Assert.Contains("the Syft Notes icon at the top right", text, StringComparison.Ordinal);
         (title, text) = IconWords.WhereItIs(mac: true, hidden: true);
         Assert.Equal("Your menu bar is full", title);
         Assert.Contains(IconWords.ShowIt, text, StringComparison.Ordinal);
