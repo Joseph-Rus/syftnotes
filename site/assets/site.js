@@ -46,80 +46,110 @@
   });
 })();
 
-// The hero's wave: the pixel s's cells flowing behind the page, a ribbon four cells deep sorted into the s's colour
-// bands (lilac, sky, coral, mustard, top to bottom) rolling across the gap above the app's picture and behind it. Cells
-// stay on the grid and only fade as the wave moves through them. Still for anyone who asks for less motion, and it
-// only runs while it's on screen.
+// The hero's wave: the pixel s's cells swelling across the whole hero and round its words. A diagonal swell rolls
+// through a grid that isn't there until it arrives: cells rise from nothing, first the quiet grey of the s's empty
+// grid, then, at the crest, the colour of the band they're in (the hero's height sorted like the s: lilac, sky, coral,
+// mustard, top to bottom), and sink back as it passes. The headline, the buttons and the logo keep a clear margin, and
+// the app's picture sits in front of it. Still for anyone who asks for less motion, running only while it's on
+// screen. #wave=4.5 on the address draws it held at 4.5 seconds, for pictures.
 (function () {
   var hero = document.querySelector(".hero");
-  var stage = hero && hero.querySelector(".stage");
   var canvas = document.createElement("canvas");
-  if (!stage || !canvas.getContext) return;
+  if (!hero || !canvas.getContext) return;
   canvas.className = "hero-wave";
   canvas.setAttribute("aria-hidden", "true");
   hero.insertBefore(canvas, hero.firstChild);
   var ctx = canvas.getContext("2d");
-  var PITCH = 24, CELL = 0, RADIUS = 0, ROWS = 13, MOST = 0.38;
-  var BANDS = ["#CDBDFF", "#A3DAF2", "#FF6E4E", "#FFC943"];
+  var BANDS = ["#CDBDFF", "#A3DAF2", "#FF6E4E", "#FFC943"], MESH = "#E2DFD8";
   var still = window.matchMedia("(prefers-reduced-motion: reduce)");
-  var w = 0, start = performance.now(), frame = 0, onScreen = true;
+  var held = /[#&]wave=([\d.]+)/.exec(location.hash);
+  var pitch = 24, cell = 0, w = 0, h = 0, cols = 0, rows = 0, left = 0, keep = [];
+  var start = performance.now(), frame = 0, onScreen = true;
+
+  // What the wave goes round: the words and buttons, and the logo's tile, each with a margin, in canvas points.
+  function clearOf() {
+    var at = hero.getBoundingClientRect();
+    return Array.prototype.map.call(hero.querySelectorAll(".hero-grid > div, .hero-mark .tile"), function (el) {
+      var r = el.getBoundingClientRect(), m = pitch * 1.5;
+      return [r.left - at.left - m, r.top - at.top - m, r.right - at.left + m, r.bottom - at.top + m];
+    });
+  }
 
   function place() {
-    // Smaller cells on a phone. The ribbon's middle is two rows down the app's picture, so mostly it flows behind and
-    // round the picture and only its crests rise into the gap above, clear of the words.
     w = hero.clientWidth;
-    PITCH = w < 700 ? 14 : 24;
-    CELL = PITCH * 6.6 / 8;
-    RADIUS = CELL * 1.8 / 6.6;
-    var top = stage.getBoundingClientRect().top - hero.getBoundingClientRect().top - ROWS * PITCH / 2 + 2 * PITCH;
+    h = hero.clientHeight;
+    pitch = w < 700 ? 14 : 22;
+    cell = pitch * 6.6 / 8;
+    cols = Math.ceil(w / pitch) + 1;
+    rows = Math.ceil(h / pitch) + 1;
+    left = (w - cols * pitch) / 2;
+    keep = clearOf();
     var dpr = window.devicePixelRatio || 1;
-    canvas.style.top = top + "px";
-    canvas.style.height = ROWS * PITCH + "px";
+    canvas.style.top = "0px";
+    canvas.style.height = h + "px";
     canvas.width = Math.round(w * dpr);
-    canvas.height = Math.round(ROWS * PITCH * dpr);
+    canvas.height = Math.round(h * dpr);
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   }
 
-  function cell(x, y) {
-    ctx.beginPath();
-    if (ctx.roundRect) ctx.roundRect(x, y, CELL, CELL, RADIUS); else ctx.rect(x, y, CELL, CELL);
-    ctx.fill();
+  // How far a point is inside the margin round the words (0 well clear of them, 1 on them), fading over two cells.
+  function covered(x, y) {
+    var most = 0;
+    for (var i = 0; i < keep.length; i++) {
+      var k = keep[i];
+      var dx = Math.max(k[0] - x, 0, x - k[2]), dy = Math.max(k[1] - y, 0, y - k[3]);
+      most = Math.max(most, 1 - Math.min(1, Math.sqrt(dx * dx + dy * dy) / (pitch * 2)));
+    }
+    return most;
+  }
+
+  // A steady unevenness for each cell, so the swell isn't ruled.
+  function grain(c, r) {
+    var n = Math.sin(c * 12.9898 + r * 78.233) * 43758.5453;
+    return n - Math.floor(n);
   }
 
   function draw(t) {
-    ctx.clearRect(0, 0, w, ROWS * PITCH);
-    var cols = Math.ceil(w / PITCH) + 1, left = (w - cols * PITCH) / 2 + (PITCH - CELL) / 2;
-    for (var c = 0; c < cols; c++) {
-      // Where the ribbon's top is in this column, in rows: one long slow swell and a shorter one riding on it.
-      var top = (ROWS - 4) / 2 + 1.8 * Math.sin(c * 0.3 - t * 0.8) + 0.7 * Math.sin(c * 0.11 + t * 0.45);
-      for (var r = 0; r < ROWS; r++) {
-        var d = r + 0.5 - top;
-        if (d <= -0.5 || d >= 4.5) continue;
-        ctx.globalAlpha = MOST * Math.min(1, d + 0.5, 4.5 - d);
-        ctx.fillStyle = BANDS[Math.max(0, Math.min(3, Math.floor(d)))];
-        cell(left + c * PITCH, r * PITCH + (PITCH - CELL) / 2);
+    ctx.clearRect(0, 0, w, h);
+    for (var r = 0; r < rows; r++) {
+      var y = r * pitch;
+      var band = BANDS[Math.min(3, Math.floor((y / h) * 4))];
+      for (var c = 0; c < cols; c++) {
+        var x = left + c * pitch;
+        // Two swells crossing at a slant: a long slow one and a shorter one, each a narrow crest of a sine.
+        var u = (x * 0.94 + y * 0.34) / pitch, v = (x * 0.5 - y * 0.87) / pitch;
+        var a = Math.pow(Math.max(0, Math.sin(u * 0.16 - t * 0.55)), 6) * 0.85 + Math.pow(Math.max(0, Math.sin(v * 0.23 + t * 0.4)), 8) * 0.45;
+        a *= 0.55 + 0.45 * grain(c, r);
+        a *= 1 - covered(x + pitch / 2, y + pitch / 2);
+        if (a < 0.06) continue;
+        var size = cell * (0.35 + 0.65 * Math.min(1, a * 1.25)), off = (pitch - size) / 2;
+        ctx.globalAlpha = Math.min(0.62, a * 0.75);
+        ctx.fillStyle = a > 0.42 ? band : MESH;
+        ctx.beginPath();
+        if (ctx.roundRect) ctx.roundRect(x + off, y + off, size, size, size * 1.8 / 6.6); else ctx.rect(x + off, y + off, size, size);
+        ctx.fill();
       }
     }
     ctx.globalAlpha = 1;
   }
 
-  function tick(now) {
-    draw((now - start) / 1000);
-    frame = requestAnimationFrame(tick);
-  }
-
+  function now() { return (performance.now() - start) / 1000; }
+  function tick() { draw(now()); frame = requestAnimationFrame(tick); }
   function run() {
     cancelAnimationFrame(frame);
     frame = 0;
-    if (still.matches) draw(0);
+    if (held) draw(parseFloat(held[1]));
+    else if (still.matches) draw(6);
     else if (onScreen && !document.hidden) frame = requestAnimationFrame(tick);
   }
 
   place();
-  draw(0);
+  draw(held ? parseFloat(held[1]) : 6);
   run();
-  if (window.ResizeObserver) new ResizeObserver(function () { place(); draw((performance.now() - start) / 1000); }).observe(hero);
+  if (window.ResizeObserver) new ResizeObserver(function () { place(); draw(held ? parseFloat(held[1]) : now()); }).observe(hero);
   if (window.IntersectionObserver) new IntersectionObserver(function (seen) { onScreen = seen[0].isIntersecting; run(); }).observe(canvas);
+  // The words settle once the fonts arrive: measure round them again then.
+  window.addEventListener("load", function () { place(); draw(held ? parseFloat(held[1]) : now()); });
   document.addEventListener("visibilitychange", run);
   if (still.addEventListener) still.addEventListener("change", run);
 })();
