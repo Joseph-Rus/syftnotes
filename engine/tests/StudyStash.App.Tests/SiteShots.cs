@@ -205,19 +205,32 @@ public class SiteShots
     /// <summary>Settings → AI apps: Claude Desktop and ChatGPT connected, Claude Code with its Connect button.</summary>
     static void AiApps(ThemeVariant t)
     {
-        // Each button as it is in the app, where every row's Connect, Reopen and Disconnect do something.
+        // As a student sees it once it's set up: Claude and ChatGPT connected, Claude Code one Connect away. Each
+        // button as it is in the app, where every row's Connect and Disconnect do something.
         var access = AiShots.AccessModel();
-        foreach (var row in access.Apps)
+        access.Apps.Clear();
+        var now = new DateTime(2026, 10, 4, 14, 0, 0);
+        foreach (var (id, name, connected, started) in new (string, string, bool, DateTime?)[]
         {
+            ("claude-desktop", "Claude Desktop", true, now.AddMinutes(-20)),
+            ("codex", "ChatGPT", true, now.AddMinutes(-6)),
+            ("claude-code", "Claude Code", false, null),
+        })
+        {
+            var row = new AiAppRow { Id = id, Name = name, First = access.Apps.Count == 0 };
+            row.Show(new Services.AiAppState(id, name, true, connected, false, connected ? now.AddHours(-2) : null, started, "", CanReopen: false), now);
             row.Connect = new AsyncRelayCommand(() => Task.CompletedTask);
-            row.Reopen = new AsyncRelayCommand(() => Task.CompletedTask);
             row.Disconnect = new AsyncRelayCommand(() => Task.CompletedTask);
+            access.Apps.Add(row);
         }
         var page = new Border { Padding = new Thickness(32, 28), Child = new MacAiAccess { DataContext = access, Width = 620 } };
         page.Bind(Border.BackgroundProperty, page.GetResourceObservable("Surface"));
         var window = Stage(page, t, null);
         var at = Bounds(window, page);
-        Save("ai-apps", t, window, new Rect(at.X, at.Y, at.Width - 44, Math.Min(at.Height, 486)));
+        // Down to the Try it row: the setup to copy for other AI apps (their MCP settings) is for the few who need it.
+        var other = window.GetVisualDescendants().OfType<TextBlock>().FirstOrDefault(b => b.Text?.StartsWith("Using another AI app", StringComparison.Ordinal) == true);
+        double bottom = other is null ? Math.Min(at.Height, 486) : Bounds(window, other).Y - at.Y - 18;
+        Save("ai-apps", t, window, new Rect(at.X, at.Y, at.Width - 44, bottom));
     }
 
     // --- the stage ---------------------------------------------------------------------------------------------------

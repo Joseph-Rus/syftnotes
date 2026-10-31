@@ -28,7 +28,7 @@
 }
 
 :root {
-  color-scheme: light dark;
+  color-scheme: light;
   /* The pixel s's colours. They stay as they are in the dark, as they do on the dark app icon. */
   --lilac: #cdbdff;
   --sky: #a3daf2;
@@ -64,25 +64,6 @@
   --cell-r: 0.18rem;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    /* The dark tile's colours: ink, its mesh and ghost cells. */
-    --page: #16131d;
-    --surface: #1e1b26;
-    --mesh: #24212d;
-    --line: #2e2a39;
-    --line-2: #3b3648;
-    --ink: #f6f4ef;
-    --ink-2: #d2cfd8;
-    --ink-3: #a6a3ae;
-    --on-ink: #16131d;
-    --band: #1e1b26;
-    --band-line: #2e2a39;
-    --hl: #685f83;
-    --shadow: 0 1px 2px rgb(0 0 0 / 0.35), 0 14px 34px -14px rgb(0 0 0 / 0.6);
-    --lift: 0 1px 2px rgb(0 0 0 / 0.35), 0 24px 60px -24px rgb(0 0 0 / 0.7);
-  }
-}
 
 *, *::before, *::after { box-sizing: border-box; }
 /* What the script hides stays hidden, buttons too (their display would otherwise win over the attribute). */
@@ -142,7 +123,6 @@ mark, .hl {
 .brand picture, .brand img { display: block; }
 .brand img { width: 34px; height: 34px; object-fit: contain; }
 .brand .tile-light { border-radius: 8px; box-shadow: 0 0 0 1px var(--line); }
-@media (prefers-color-scheme: dark) { .brand .tile-light { border-radius: 0; box-shadow: none; } }
 .wordmark { font: 400 1.3rem/1 "Archivo", var(--font); letter-spacing: -0.02em; text-transform: lowercase; color: var(--ink); white-space: nowrap; }
 .wordmark b { font-weight: 900; font-style: italic; }
 .nav { display: flex; align-items: center; gap: 0.2rem; list-style: none; margin: 0; padding: 0; }
@@ -191,10 +171,6 @@ mark, .hl {
 .hero-mark .tile svg { display: block; width: 100%; height: 100%; }
 .hero-mark .tile-light { background: #fff; box-shadow: 0 0 0 1px var(--line), var(--lift); }
 .hero-mark .tile-dark { display: none; background: var(--black); box-shadow: 0 0 0 1px var(--band-line), var(--lift); }
-@media (prefers-color-scheme: dark) {
-  .hero-mark .tile-light { display: none; }
-  .hero-mark .tile-dark { display: block; }
-}
 /* The light mesh only shows while the bits are sieved (the light look has no grid behind it). */
 .sv-mesh { opacity: 0; }
 
@@ -268,9 +244,6 @@ mark, .hl {
 /* The whole app once, its window on the canvas. */
 .stage { margin: clamp(2.5rem, 6vw, 4rem) 0 0; }
 .stage img { margin: 0 auto; width: 100%; filter: drop-shadow(0 1px 2px rgb(22 19 29 / 0.1)) drop-shadow(0 24px 40px rgb(22 19 29 / 0.18)); }
-@media (prefers-color-scheme: dark) {
-  .stage img { filter: drop-shadow(0 0 1px rgb(255 255 255 / 0.12)) drop-shadow(0 24px 40px rgb(0 0 0 / 0.5)); }
-}
 
 /* What it does: one white page with a hairline round it, as the app's own page sits on its canvas, and each thing the
    app does a row of it, split by hairlines like the notes on Home. Each row's colour is one of the s's. */
@@ -329,7 +302,6 @@ section { padding: clamp(4rem, 9vw, 6.5rem) 0; }
 
 /* The privacy promise, on the app icon's ink. */
 .night { background: var(--band); color: #f6f4ef; }
-@media (prefers-color-scheme: dark) { .night { box-shadow: inset 0 1px 0 var(--band-line), inset 0 -1px 0 var(--band-line); } }
 .night h2 { max-width: 16ch; font-size: clamp(2.3rem, 1.2rem + 4vw, 4.2rem); letter-spacing: -0.04em; line-height: 0.98; }
 .night a { color: #fff; text-decoration-color: var(--mustard); }
 .night :focus-visible { outline-color: #fff; }
