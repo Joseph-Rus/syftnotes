@@ -170,7 +170,7 @@
           </Button>
         </Grid>
         <StackPanel Orientation="Horizontal" Spacing="18" IsVisible="{Binding NoNotes}">
-          <c:Doodle Art="hello" Size="96" VerticalAlignment="Center" />
+          <c:SyftMark Size="96" VerticalAlignment="Center" />
           <TextBlock Name="NoNotes" Classes="empty" Text="{Binding NotesEmpty}" IsVisible="{Binding NoNotes}" MaxWidth="560" VerticalAlignment="Center" />
         </StackPanel>
         <ItemsControl Name="NoteRows" ItemsSource="{Binding Notes}" ClipToBounds="False">
@@ -189,7 +189,7 @@
         <StackPanel>
           <TextBlock Name="FolderNotes" Classes="h2" Text="{Binding NotesHeading}" Margin="0,0,0,14" />
           <StackPanel Orientation="Horizontal" Spacing="18" IsVisible="{Binding NoNotes}">
-            <c:Doodle Art="chicklet" Size="80" VerticalAlignment="Center" />
+            <c:SyftMark Look="OddOneOut" Size="80" VerticalAlignment="Center" />
             <TextBlock Classes="empty" Text="{Binding NotesEmpty}" IsVisible="{Binding NoNotes}" VerticalAlignment="Center" />
           </StackPanel>
           <ItemsControl ItemsSource="{Binding Groups}" ClipToBounds="False">

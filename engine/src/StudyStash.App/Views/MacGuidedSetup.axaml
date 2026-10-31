@@ -355,9 +355,9 @@
                       </ItemsControl.ItemsPanel>
                       <ItemsControl.DataTemplates>
                         <DataTemplate DataType="vm:AiEntry">
-                          <!-- The egghead says it: his face beside each of the AI's messages -->
+                          <!-- Syft says it: the pixel s beside each of the AI's messages -->
                           <Grid ColumnDefinitions="Auto,12,*" HorizontalAlignment="Left">
-                          <c:Doodle Art="head" Size="34" VerticalAlignment="Top" Margin="0,2,0,0" />
+                          <c:SyftMark Size="34" Bits="False" VerticalAlignment="Top" Margin="0,2,0,0" />
                           <StackPanel Grid.Column="2" Spacing="4" HorizontalAlignment="Left" MaxWidth="540">
                             <TextBlock Classes="ai-byline" Text="{Binding Byline}" />
                             <TextBlock Classes="ai-answer" Text="{Binding Text}" />
@@ -682,7 +682,7 @@
                       </ItemsControl.DataTemplates>
                     </ItemsControl>
                     <StackPanel Orientation="Horizontal" Spacing="12" IsVisible="{Binding Busy}">
-                      <c:Doodle Art="thinking" Size="44" Busy="{Binding Busy}" VerticalAlignment="Center" />
+                      <c:SyftLoader Kind="HoppingBits" Size="24" IsActive="{Binding Busy}" VerticalAlignment="Center" />
                       <TextBlock Classes="ai-thinking" Text="{Binding Thinking}" VerticalAlignment="Center" />
                     </StackPanel>
                   </StackPanel>

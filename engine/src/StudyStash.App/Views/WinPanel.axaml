@@ -51,7 +51,7 @@
           <Button Name="OpenApp" AutomationProperties.Name="Open Egghead Notes" Grid.Column="3" Theme="{StaticResource Surface}" Height="32" CornerRadius="4" Padding="8,0"
                   Command="{Binding OpenAppCommand}">
             <StackPanel Orientation="Horizontal" Spacing="6">
-              <c:Doodle Art="head" Size="18" VerticalAlignment="Center" />
+              <c:SyftMark Size="18" Bits="False" VerticalAlignment="Center" />
               <TextBlock Text="Open" FontSize="13" VerticalAlignment="Center" />
             </StackPanel>
           </Button>
@@ -125,7 +125,7 @@
               </Button>
             </Grid>
             <Grid ColumnDefinitions="Auto,10,Auto,12,*">
-              <c:Doodle Art="listening" Size="34" Busy="{Binding IsRecording}" VerticalAlignment="Center" />
+              <c:SyftLoader Kind="PathTrace" Size="34" IsActive="{Binding IsRecording}" VerticalAlignment="Center" AutomationProperties.AccessibilityView="Raw" />
               <TextBlock Grid.Column="2" Classes="num" Text="{Binding Elapsed}" FontFamily="{DynamicResource DisplayFont}" FontSize="28" FontWeight="Light" VerticalAlignment="Center" />
               <c:Waveform Grid.Column="4" Height="22" Bars="20" Levels="{Binding Levels}" Foreground="{DynamicResource Fg2}" VerticalAlignment="Center" />
             </Grid>

@@ -80,8 +80,8 @@
                        of help | the radio. -->
                   <!-- The first page: what happens to a lecture, before any choice. -->
                   <StackPanel IsVisible="{Binding OnIntro}">
-                    <!-- The egghead says hello, first thing -->
-                    <c:Doodle Art="hello" Size="120" HorizontalAlignment="Left" Margin="0,0,0,14" />
+                    <!-- The pixel s says hello, first thing: Pop Back, played once, and the wordmark -->
+                    <c:SyftSplash Kind="PopBack" Inline="True" Size="150" HorizontalAlignment="Left" Margin="-11,-14,0,10" />
                     <TextBlock Classes="page-title step-title" Text="{Binding IntroTitle}" />
                     <TextBlock Classes="page-lede step-lede" Text="{Binding IntroBody}" />
                     <ItemsControl ItemsSource="{Binding IntroPoints}" Margin="0,20,0,0" MaxWidth="500" HorizontalAlignment="Stretch">

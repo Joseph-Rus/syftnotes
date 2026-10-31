@@ -67,9 +67,9 @@
                 <Border Classes="ai-bubble-q" MaxWidth="280">
                   <c:PageText Text="{Binding Question}" />
                 </Border>
-                <!-- The egghead answers: his face beside the bubble, thinking while it's written -->
+                <!-- The answer: the pixel s beside the bubble, the hopping bits while it's written -->
                 <Grid ColumnDefinitions="Auto,8,*" HorizontalAlignment="Left" IsVisible="{Binding !IsThinking}">
-                  <c:Doodle Art="head" Size="24" VerticalAlignment="Top" Margin="0,4,0,0" />
+                  <c:SyftMark Size="24" Bits="False" VerticalAlignment="Top" Margin="0,4,0,0" />
                   <Border Classes="ai-bubble-a" Grid.Column="2" MaxWidth="298">
                     <StackPanel Spacing="6">
                       <c:NoteView Compact="True" BodySize="14" BodyLineHeight="20.3" Markdown="{Binding Answer}" IsVisible="{Binding Answer, Converter={x:Static c:Converters.NotEmpty}}" />
@@ -82,7 +82,7 @@
                   </Border>
                 </Grid>
                 <StackPanel Orientation="Horizontal" Spacing="10" IsVisible="{Binding IsThinking}">
-                  <c:Doodle Art="thinking" Size="36" Busy="{Binding IsThinking}" VerticalAlignment="Center" />
+                  <c:SyftLoader Kind="HoppingBits" Size="22" IsActive="{Binding IsThinking}" VerticalAlignment="Center" />
                   <TextBlock Classes="ai-thinking" Text="{Binding ThinkingWords}" VerticalAlignment="Center" />
                 </StackPanel>
               </StackPanel>
