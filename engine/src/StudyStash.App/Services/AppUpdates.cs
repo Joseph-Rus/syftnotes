@@ -339,7 +339,7 @@ public sealed class AppUpdates
         string pid = Environment.ProcessId.ToString(CultureInfo.InvariantCulture);
         if (host.System == "Darwin")
         {
-            const string script = "app=\"$1\"; shift; while kill -0 \"$0\" 2>/dev/null; do sleep 1; done; exec /usr/bin/open \"$app\" --args \"$@\"";
+            const string script = "app=\"$1\"; shift; /usr/bin/caffeinate -w \"$0\"; exec /usr/bin/open \"$app\" --args \"$@\"";
             host.SpawnDetached(["/bin/sh", "-c", script, pid, host.AppDir, .. args]);
         }
         else if (host.System == "Windows")
