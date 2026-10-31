@@ -100,6 +100,8 @@ public class BackgroundLibraryTests
     [Fact]
     public void Linux_gets_a_systemd_user_unit_or_an_autostart_entry_without_one()
     {
+        // A unit is only ever written on Linux: a Windows runner's C:\ home would come out in systemd's escaping.
+        if (OperatingSystem.IsWindows()) return;
         using var dir = new TempDir();
         var s = new Stand();
         var bg = Make(dir, "Linux", s);
