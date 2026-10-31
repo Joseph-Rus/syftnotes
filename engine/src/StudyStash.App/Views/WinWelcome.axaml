@@ -1,0 +1,56 @@
+<!-- A first run's one page (Windows): the pixel s says hello (Pop Back, played once, over the wordmark), "Record your
+     lectures. Get the notes.", one line on what happens, and Get started, with where recordings stay under it (Windows
+     asks nothing for the microphone) and "Open Syft Notes when you log in" ticked below. Everything else setup by hand asks is
+     defaulted or asked where it's needed. The same white sheet on the window's canvas as setup's pages (SetupStyles),
+     with no list of steps: there's one. -->
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:StudyStash.App.ViewModels"
+             xmlns:c="using:StudyStash.App.Controls"
+             x:Class="StudyStash.App.Views.WinWelcome"
+             x:DataType="vm:SetupModel"
+             Classes="in-setup"
+             Width="560" Height="600">
+  <UserControl.Styles>
+    <StyleInclude Source="avares://StudyStash/Views/SetupStyles.axaml" />
+    <StyleInclude Source="avares://StudyStash/Views/WelcomeStyles.axaml" />
+    <!-- The window's frame, for a screenshot only: a real window has Windows' own corners, edge and shadow. -->
+    <Style Selector="Border#Chrome.chrome">
+      <Setter Property="CornerRadius" Value="8" />
+      <Setter Property="BoxShadow" Value="{DynamicResource ShadowLg}" />
+    </Style>
+  </UserControl.Styles>
+
+  <Border Name="Chrome" Classes="chrome" Background="{DynamicResource Canvas}" ClipToBounds="True">
+    <DockPanel>
+      <!-- The title bar: drag the window by it; the system's caption buttons sit on its right. -->
+      <c:WindowHeader Name="Header" DockPanel.Dock="Top" CanResize="False" Title="Syft Notes" />
+      <Panel Margin="8,0,8,8">
+        <Border Classes="setup-pane" />
+        <Border Classes="setup-clip">
+          <StackPanel Classes="welcome">
+            <c:SyftSplash Name="Mark" Kind="PopBack" Inline="True" Size="150" HorizontalAlignment="Center" />
+            <TextBlock Name="WelcomeTitle" Classes="page-title step-title welcome-title" Text="{x:Static vm:SetupModel.StartTitleLines}"
+                       AutomationProperties.Name="{x:Static vm:SetupModel.StartTitle}" />
+            <TextBlock Classes="page-lede step-lede welcome-lede" Text="{Binding StartLede}" />
+            <!-- One button: it never greys while it works (the loader says it is), and a second press does nothing. -->
+            <Button Name="GetStarted" Classes="btn ink welcome-go" Command="{Binding NextCommand}" IsDefault="True"
+                    AutomationProperties.Name="{Binding ContinueLabel}" AutomationProperties.HelpText="{Binding StartHint}">
+              <StackPanel Orientation="Horizontal" Spacing="10" HorizontalAlignment="Center">
+                <c:SyftLoader Kind="HoppingBits" Size="20" IsActive="{Binding Starting}" IsVisible="{Binding Starting}" VerticalAlignment="Center" />
+                <TextBlock Text="{Binding ContinueLabel}" VerticalAlignment="Center" />
+              </StackPanel>
+            </Button>
+            <TextBlock Name="StartHint" Classes="hint welcome-hint" Text="{Binding StartHint}" IsVisible="{Binding !HasStartProblem}" />
+            <Grid Classes="welcome-problem" ColumnDefinitions="Auto,8,*" IsVisible="{Binding HasStartProblem}">
+              <c:Icon Classes="warn" Size="16" VerticalAlignment="Top" Margin="0,2,0,0" />
+              <TextBlock Grid.Column="2" Name="StartProblem" Classes="say" Text="{Binding LibraryResult}" />
+            </Grid>
+            <CheckBox Name="OpenAtLogin" Classes="welcome-login" IsChecked="{Binding StartAtLogin}" IsEnabled="{Binding !Starting}"
+                      Content="{x:Static vm:SetupModel.StartAtLoginLabel}" AutomationProperties.Name="{x:Static vm:SetupModel.StartAtLoginLabel}" />
+          </StackPanel>
+        </Border>
+      </Panel>
+    </DockPanel>
+  </Border>
+</UserControl>

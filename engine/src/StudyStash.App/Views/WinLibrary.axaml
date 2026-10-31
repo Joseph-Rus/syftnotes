@@ -21,7 +21,7 @@
     <DockPanel>
     <!-- The title bar: drag the window by it; the app's mark and name on its left, the system's caption buttons on
          its right. -->
-    <c:WindowHeader Name="Header" DockPanel.Dock="Top" Title="Egghead Notes" DrawChrome="{Binding DrawChrome}" />
+    <c:WindowHeader Name="Header" DockPanel.Dock="Top" Title="Syft Notes" DrawChrome="{Binding DrawChrome}" />
     <Grid ColumnDefinitions="Auto,*" Margin="8,0,8,8">
       <!-- The sidebar: straight on the canvas, no panel behind it -->
       <DockPanel Name="Sidebar" Width="244" Margin="0,0,8,0" IsVisible="{Binding ShowSidebar}" Background="Transparent" c:WindowHeader.MovesWindow="True">

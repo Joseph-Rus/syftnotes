@@ -3,21 +3,21 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Egghead Notes: your lectures, turned into notes</title>
-<meta name="description" content="Record a lecture and Egghead Notes writes it down on your own computer, then writes the notes: formulas, graphs and diagrams, next to your Canvas due dates. Free and open source, for Mac and Windows.">
-<meta name="theme-color" content="#f1efe6" media="(prefers-color-scheme: light)">
-<meta name="theme-color" content="#1b1b1f" media="(prefers-color-scheme: dark)">
+<title>Syft Notes: your lectures, turned into notes</title>
+<meta name="description" content="Record a lecture and Syft Notes writes it down on your own computer, then writes the notes: formulas, graphs and diagrams, next to your Canvas due dates. Free and open source, for Mac and Windows.">
+<meta name="theme-color" content="#f4f4f1">
 <meta property="og:type" content="website">
-<meta property="og:url" content="https://study-stash-app.web.app/">
-<meta property="og:site_name" content="Egghead Notes">
-<meta property="og:title" content="Egghead Notes: your lectures, turned into notes">
+<meta property="og:url" content="https://syftnotes.com/">
+<meta property="og:site_name" content="Syft Notes">
+<meta property="og:title" content="Syft Notes: your lectures, turned into notes">
 <meta property="og:description" content="Record a lecture; it's written down on your computer, filed by class and turned into study notes with formulas, graphs and diagrams. Free, open source, for Mac and Windows.">
-<meta property="og:image" content="https://study-stash-app.web.app/assets/social.png">
+<meta property="og:image" content="https://syftnotes.com/assets/social.png?v=4">
 <meta name="twitter:card" content="summary_large_image">
-<link rel="icon" type="image/png" href="assets/favicon.png">
-<link rel="apple-touch-icon" href="assets/apple-touch-icon.png">
+<link rel="canonical" href="https://syftnotes.com/">
+<link rel="icon" type="image/png" href="assets/favicon.png?v=4">
+<link rel="apple-touch-icon" href="assets/apple-touch-icon.png?v=4">
 <link rel="preload" href="assets/fonts/AtkinsonHyperlegibleNext-Variable.woff2" as="font" type="font/woff2" crossorigin>
-<link rel="stylesheet" href="assets/site.css?v=3">
+<link rel="stylesheet" href="assets/site.css?v=5">
 <script src="assets/site.js" defer></script>
 </head>
 <body>
@@ -25,13 +25,13 @@
 
 <header class="site-head">
   <div class="wrap">
-    <a class="brand" href="./"><img src="assets/img/icon.webp" alt="" width="30" height="30">Egghead Notes</a>
+    <a class="brand" href="./"><picture><img class="tile-light" src="assets/img/tile-light.svg?v=4" alt="" width="34" height="34"></picture><span class="wordmark"><b>syft</b> notes</span></a>
     <nav aria-label="Site">
       <ul class="nav">
         <li><a href="phone/">Phone app</a></li>
         <li class="hide-sm"><a href="privacy/">Privacy</a></li>
         <li class="hide-sm"><a href="support/">Support</a></li>
-        <li><a class="gh" href="https://github.com/Joseph-Rus/study-stash" aria-label="Egghead Notes on GitHub"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 .3a12 12 0 0 0-3.8 23.4c.6.1.8-.3.8-.6v-2c-3.3.7-4-1.6-4-1.6-.6-1.4-1.4-1.8-1.4-1.8-1-.7.1-.7.1-.7 1.2.1 1.8 1.2 1.8 1.2 1.1 1.8 2.8 1.3 3.5 1 .1-.8.4-1.3.8-1.6-2.7-.3-5.5-1.3-5.5-5.9 0-1.3.5-2.4 1.2-3.2-.1-.3-.5-1.5.1-3.2 0 0 1-.3 3.3 1.2a11.5 11.5 0 0 1 6 0c2.3-1.5 3.3-1.2 3.3-1.2.6 1.7.2 2.9.1 3.2.8.8 1.2 1.9 1.2 3.2 0 4.6-2.8 5.6-5.5 5.9.4.4.8 1.1.8 2.2v3.3c0 .3.2.7.8.6A12 12 0 0 0 12 .3"/></svg></a></li>
+        <li><a class="gh" href="https://github.com/Joseph-Rus/study-stash" aria-label="Syft Notes on GitHub"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 .3a12 12 0 0 0-3.8 23.4c.6.1.8-.3.8-.6v-2c-3.3.7-4-1.6-4-1.6-.6-1.4-1.4-1.8-1.4-1.8-1-.7.1-.7.1-.7 1.2.1 1.8 1.2 1.8 1.2 1.1 1.8 2.8 1.3 3.5 1 .1-.8.4-1.3.8-1.6-2.7-.3-5.5-1.3-5.5-5.9 0-1.3.5-2.4 1.2-3.2-.1-.3-.5-1.5.1-3.2 0 0 1-.3 3.3 1.2a11.5 11.5 0 0 1 6 0c2.3-1.5 3.3-1.2 3.3-1.2.6 1.7.2 2.9.1 3.2.8.8 1.2 1.9 1.2 3.2 0 4.6-2.8 5.6-5.5 5.9.4.4.8 1.1.8 2.2v3.3c0 .3.2.7.8.6A12 12 0 0 0 12 .3"/></svg></a></li>
       </ul>
     </nav>
   </div>
@@ -44,62 +44,105 @@
     <div class="hero-grid">
       <div>
         <h1 id="hero-title">Your lectures, turned into notes.</h1>
-        <p class="lede">Record a lecture. Egghead Notes writes down every word on your own computer, then writes the
+        <p class="lede">Record a lecture. Syft Notes writes down every word on your own computer, then writes the
           notes for you: formulas worked through, graphs you can move, diagrams you can click, right next to your
           Canvas due dates.</p>
         <div class="btns" data-hero-downloads>
-          <a class="btn btn-primary" data-os="mac" href="https://github.com/Joseph-Rus/study-stash/releases/latest/download/Egghead-Notes.dmg">
+          <a class="btn btn-primary" data-os="mac" href="https://github.com/Joseph-Rus/study-stash/releases/latest/download/Syft-Notes.dmg">
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M16.4 12.7c0-2.6 2.1-3.8 2.2-3.9-1.2-1.8-3.1-2-3.7-2-1.6-.2-3.1.9-3.9.9-.8 0-2-.9-3.4-.9-1.7 0-3.3 1-4.2 2.6-1.8 3.1-.5 7.8 1.3 10.3.9 1.2 1.9 2.6 3.2 2.6 1.3-.1 1.8-.8 3.3-.8 1.6 0 2 .8 3.4.8 1.4 0 2.3-1.3 3.1-2.5 1-1.4 1.4-2.8 1.4-2.9 0 0-2.7-1-2.7-4.2zM13.8 5.1c.7-.9 1.2-2 1.1-3.2-1 0-2.3.7-3 1.5-.7.8-1.2 2-1.1 3.1 1.1.1 2.3-.6 3-1.4z"/></svg>
             <span>Download for Mac<small>macOS 15 or later, Apple silicon or Intel</small></span>
           </a>
-          <a class="btn btn-quiet" data-os="windows" href="https://github.com/Joseph-Rus/study-stash/releases/latest/download/Egghead-Notes-Setup.exe">
+          <a class="btn btn-quiet" data-os="windows" href="https://github.com/Joseph-Rus/study-stash/releases/latest/download/Syft-Notes-Setup.exe">
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M1 3.8 10 2.6v8.7H1zm10.2-1.4L23 .8v10.5H11.2zM1 12.6h9v8.8l-9-1.3zm10.2 0H23v10.6l-11.8-1.7z"/></svg>
             <span>Download for Windows<small>Windows 10 and 11</small></span>
           </a>
         </div>
-        <p class="fine">Free and open source. One download for each computer, whether it records, keeps the library, or both.
+        <p class="next" data-next hidden aria-live="polite"></p>
+        <p class="fine other-dl" data-other-downloads hidden>Other downloads:
+          <a data-other="windows" href="https://github.com/Joseph-Rus/study-stash/releases/latest/download/Syft-Notes-Setup.exe">Windows</a>
+          <a data-other="mac" href="https://github.com/Joseph-Rus/study-stash/releases/latest/download/Syft-Notes.dmg">Mac</a>
+          <a href="phone/">iPhone app</a></p>
+        <p class="fine">Free and open source.
           <a href="https://github.com/Joseph-Rus/study-stash/releases/latest">Release notes and every file on GitHub</a>.</p>
       </div>
-      <figure class="film">
-        <video controls playsinline preload="none" width="720" height="1280" poster="assets/img/promo-poster.webp"
-          aria-label="Egghead Notes in 37 seconds: recording a lecture, the notes, formulas, graphs and diagrams it writes, due dates from Canvas, asking a question, and connecting Claude and ChatGPT.">
-          <source src="assets/study-stash-promo.mp4" type="video/mp4">
-          <a href="assets/study-stash-promo.mp4">Watch Egghead Notes in 37 seconds</a>.
-        </video>
-        <figcaption class="fine">The whole app in 37 seconds.</figcaption>
+      <!-- The pixel s on its tile: in the light S2 Sieve Drop plays once into the logo board's white tile, in the dark
+           S1 Sort In plays once into the app icon; with less motion asked for it's the finished mark, still. -->
+      <figure class="hero-mark">
+        <div class="tile tile-light">
+          <svg class="mark-light" viewBox="0 0 100 100" role="img" aria-label="Syft Notes">
+            <g transform="translate(50 50) scale(0.85) translate(-50 -57.1)">
+            <g class="sv-mesh" fill="#EFEDE8"><rect x="26.7" y="29.8" width="6.6" height="6.6" rx="1.8"/><rect x="34.7" y="29.8" width="6.6" height="6.6" rx="1.8"/><rect x="42.7" y="29.8" width="6.6" height="6.6" rx="1.8"/><rect x="50.7" y="29.8" width="6.6" height="6.6" rx="1.8"/><rect x="58.7" y="29.8" width="6.6" height="6.6" rx="1.8"/><rect x="66.7" y="29.8" width="6.6" height="6.6" rx="1.8"/><rect x="26.7" y="37.8" width="6.6" height="6.6" rx="1.8"/><rect x="34.7" y="37.8" width="6.6" height="6.6" rx="1.8"/><rect x="42.7" y="37.8" width="6.6" height="6.6" rx="1.8"/><rect x="50.7" y="37.8" width="6.6" height="6.6" rx="1.8"/><rect x="58.7" y="37.8" width="6.6" height="6.6" rx="1.8"/><rect x="66.7" y="37.8" width="6.6" height="6.6" rx="1.8"/><rect x="26.7" y="45.8" width="6.6" height="6.6" rx="1.8"/><rect x="34.7" y="45.8" width="6.6" height="6.6" rx="1.8"/><rect x="42.7" y="45.8" width="6.6" height="6.6" rx="1.8"/><rect x="50.7" y="45.8" width="6.6" height="6.6" rx="1.8"/><rect x="58.7" y="45.8" width="6.6" height="6.6" rx="1.8"/><rect x="66.7" y="45.8" width="6.6" height="6.6" rx="1.8"/><rect x="26.7" y="53.8" width="6.6" height="6.6" rx="1.8"/><rect x="34.7" y="53.8" width="6.6" height="6.6" rx="1.8"/><rect x="42.7" y="53.8" width="6.6" height="6.6" rx="1.8"/><rect x="50.7" y="53.8" width="6.6" height="6.6" rx="1.8"/><rect x="58.7" y="53.8" width="6.6" height="6.6" rx="1.8"/><rect x="66.7" y="53.8" width="6.6" height="6.6" rx="1.8"/><rect x="26.7" y="61.8" width="6.6" height="6.6" rx="1.8"/><rect x="34.7" y="61.8" width="6.6" height="6.6" rx="1.8"/><rect x="42.7" y="61.8" width="6.6" height="6.6" rx="1.8"/><rect x="50.7" y="61.8" width="6.6" height="6.6" rx="1.8"/><rect x="58.7" y="61.8" width="6.6" height="6.6" rx="1.8"/><rect x="66.7" y="61.8" width="6.6" height="6.6" rx="1.8"/><rect x="26.7" y="69.8" width="6.6" height="6.6" rx="1.8"/><rect x="34.7" y="69.8" width="6.6" height="6.6" rx="1.8"/><rect x="42.7" y="69.8" width="6.6" height="6.6" rx="1.8"/><rect x="50.7" y="69.8" width="6.6" height="6.6" rx="1.8"/><rect x="58.7" y="69.8" width="6.6" height="6.6" rx="1.8"/><rect x="66.7" y="69.8" width="6.6" height="6.6" rx="1.8"/><rect x="26.7" y="77.8" width="6.6" height="6.6" rx="1.8"/><rect x="34.7" y="77.8" width="6.6" height="6.6" rx="1.8"/><rect x="42.7" y="77.8" width="6.6" height="6.6" rx="1.8"/><rect x="50.7" y="77.8" width="6.6" height="6.6" rx="1.8"/><rect x="58.7" y="77.8" width="6.6" height="6.6" rx="1.8"/><rect x="66.7" y="77.8" width="6.6" height="6.6" rx="1.8"/></g>
+            <g class="sv-bits"><rect class="sv-fall b0" x="30" y="-10" width="5.6" height="5.6" rx="1.6" fill="#FF6E4E"/><rect class="sv-fall b1" x="46" y="-10" width="5.6" height="5.6" rx="1.6" fill="#A3DAF2"/><rect class="sv-fall b2" x="58" y="-10" width="5.6" height="5.6" rx="1.6" fill="#CDBDFF"/><rect class="sv-fall b3" x="70" y="-10" width="5.6" height="5.6" rx="1.6" fill="#FFC943"/><rect class="sv-fall b4" x="38" y="-10" width="5.6" height="5.6" rx="1.6" fill="#16131D"/><rect class="sv-fall b5" x="64" y="-10" width="5.6" height="5.6" rx="1.6" fill="#FF6E4E"/></g>
+            <g class="sv-s"><rect class="sv-pop p0" x="66.7" y="37.8" width="6.6" height="6.6" rx="1.8" fill="#CDBDFF"/><rect class="sv-pop p1" x="66.7" y="29.8" width="6.6" height="6.6" rx="1.8" fill="#CDBDFF"/><rect class="sv-pop p2" x="58.7" y="29.8" width="6.6" height="6.6" rx="1.8" fill="#CDBDFF"/><rect class="sv-pop p3" x="50.7" y="29.8" width="6.6" height="6.6" rx="1.8" fill="#CDBDFF"/><rect class="sv-pop p4" x="42.7" y="29.8" width="6.6" height="6.6" rx="1.8" fill="#CDBDFF"/><rect class="sv-pop p5" x="34.7" y="29.8" width="6.6" height="6.6" rx="1.8" fill="#CDBDFF"/><rect class="sv-pop p6" x="26.7" y="37.8" width="6.6" height="6.6" rx="1.8" fill="#CDBDFF"/><rect class="sv-pop p7" x="34.7" y="37.8" width="6.6" height="6.6" rx="1.8" fill="#CDBDFF"/><rect class="sv-pop p8" x="26.7" y="45.8" width="6.6" height="6.6" rx="1.8" fill="#A3DAF2"/><rect class="sv-pop p9" x="34.7" y="45.8" width="6.6" height="6.6" rx="1.8" fill="#A3DAF2"/><rect class="sv-pop p10" x="34.7" y="53.8" width="6.6" height="6.6" rx="1.8" fill="#A3DAF2"/><rect class="sv-pop p11" x="42.7" y="53.8" width="6.6" height="6.6" rx="1.8" fill="#A3DAF2"/><rect class="sv-pop p12" x="50.7" y="53.8" width="6.6" height="6.6" rx="1.8" fill="#A3DAF2"/><rect class="sv-pop p13" x="58.7" y="53.8" width="6.6" height="6.6" rx="1.8" fill="#A3DAF2"/><rect class="sv-pop p14" x="58.7" y="61.8" width="6.6" height="6.6" rx="1.8" fill="#FF6E4E"/><rect class="sv-pop p15" x="66.7" y="61.8" width="6.6" height="6.6" rx="1.8" fill="#FF6E4E"/><rect class="sv-pop p16" x="58.7" y="69.8" width="6.6" height="6.6" rx="1.8" fill="#FF6E4E"/><rect class="sv-pop p17" x="66.7" y="69.8" width="6.6" height="6.6" rx="1.8" fill="#FF6E4E"/><rect class="sv-pop p18" x="58.7" y="77.8" width="6.6" height="6.6" rx="1.8" fill="#16131D"/><rect class="sv-pop p19" x="50.7" y="77.8" width="6.6" height="6.6" rx="1.8" fill="#16131D"/><rect class="sv-pop p20" x="42.7" y="77.8" width="6.6" height="6.6" rx="1.8" fill="#16131D"/><rect class="sv-pop p21" x="34.7" y="77.8" width="6.6" height="6.6" rx="1.8" fill="#16131D"/><rect class="sv-pop p22" x="26.7" y="77.8" width="6.6" height="6.6" rx="1.8" fill="#16131D"/><rect class="sv-pop p23" x="26.7" y="69.8" width="6.6" height="6.6" rx="1.8" fill="#FF6E4E"/></g>
+            <g class="sv-above"><g transform="rotate(-21 32.08 21.02)"><rect class="sv-pop q0" x="28.78" y="17.72" width="6.6" height="6.6" rx="1.8" fill="#FF6E4E"/></g><g transform="rotate(13 38.16 19.34)"><rect class="sv-pop q1" x="34.86" y="16.04" width="6.6" height="6.6" rx="1.8" fill="#CDBDFF"/></g><g transform="rotate(15 42.16 12.54)"><rect class="sv-pop q2" x="38.86" y="9.24" width="6.6" height="6.6" rx="1.8" fill="#A3DAF2"/></g><g transform="rotate(-7 51.12 16.54)"><rect class="sv-pop q3" x="47.82" y="13.24" width="6.6" height="6.6" rx="1.8" fill="#FFC943"/></g><g transform="rotate(25 60.08 14.78)"><rect class="sv-pop q4" x="56.78" y="11.48" width="6.6" height="6.6" rx="1.8" fill="#CDBDFF"/></g><g transform="rotate(-31 68.08 18.7)"><rect class="sv-pop q5" x="64.78" y="15.4" width="6.6" height="6.6" rx="1.8" fill="#16131D"/></g></g>
+            </g>
+          </svg>
+        </div>
+        <div class="tile tile-dark">
+          <svg class="mark-dark" viewBox="0 0 100 100" role="img" aria-label="Syft Notes">
+            <g transform="translate(50 50) scale(0.85) translate(-50 -41.3)">
+            <g fill="#24212D"><rect x="26.7" y="14" width="6.6" height="6.6" rx="1.8"/><rect x="34.7" y="14" width="6.6" height="6.6" rx="1.8"/><rect x="42.7" y="14" width="6.6" height="6.6" rx="1.8"/><rect x="50.7" y="14" width="6.6" height="6.6" rx="1.8"/><rect x="58.7" y="14" width="6.6" height="6.6" rx="1.8"/><rect x="66.7" y="14" width="6.6" height="6.6" rx="1.8"/><rect x="26.7" y="22" width="6.6" height="6.6" rx="1.8"/><rect x="34.7" y="22" width="6.6" height="6.6" rx="1.8"/><rect x="42.7" y="22" width="6.6" height="6.6" rx="1.8"/><rect x="50.7" y="22" width="6.6" height="6.6" rx="1.8"/><rect x="58.7" y="22" width="6.6" height="6.6" rx="1.8"/><rect x="66.7" y="22" width="6.6" height="6.6" rx="1.8"/><rect x="26.7" y="30" width="6.6" height="6.6" rx="1.8"/><rect x="34.7" y="30" width="6.6" height="6.6" rx="1.8"/><rect x="42.7" y="30" width="6.6" height="6.6" rx="1.8"/><rect x="50.7" y="30" width="6.6" height="6.6" rx="1.8"/><rect x="58.7" y="30" width="6.6" height="6.6" rx="1.8"/><rect x="66.7" y="30" width="6.6" height="6.6" rx="1.8"/><rect x="26.7" y="38" width="6.6" height="6.6" rx="1.8"/><rect x="34.7" y="38" width="6.6" height="6.6" rx="1.8"/><rect x="42.7" y="38" width="6.6" height="6.6" rx="1.8"/><rect x="50.7" y="38" width="6.6" height="6.6" rx="1.8"/><rect x="58.7" y="38" width="6.6" height="6.6" rx="1.8"/><rect x="66.7" y="38" width="6.6" height="6.6" rx="1.8"/><rect x="26.7" y="46" width="6.6" height="6.6" rx="1.8"/><rect x="34.7" y="46" width="6.6" height="6.6" rx="1.8"/><rect x="42.7" y="46" width="6.6" height="6.6" rx="1.8"/><rect x="50.7" y="46" width="6.6" height="6.6" rx="1.8"/><rect x="58.7" y="46" width="6.6" height="6.6" rx="1.8"/><rect x="66.7" y="46" width="6.6" height="6.6" rx="1.8"/><rect x="26.7" y="54" width="6.6" height="6.6" rx="1.8"/><rect x="34.7" y="54" width="6.6" height="6.6" rx="1.8"/><rect x="42.7" y="54" width="6.6" height="6.6" rx="1.8"/><rect x="50.7" y="54" width="6.6" height="6.6" rx="1.8"/><rect x="58.7" y="54" width="6.6" height="6.6" rx="1.8"/><rect x="66.7" y="54" width="6.6" height="6.6" rx="1.8"/><rect x="26.7" y="62" width="6.6" height="6.6" rx="1.8"/><rect x="34.7" y="62" width="6.6" height="6.6" rx="1.8"/><rect x="42.7" y="62" width="6.6" height="6.6" rx="1.8"/><rect x="50.7" y="62" width="6.6" height="6.6" rx="1.8"/><rect x="58.7" y="62" width="6.6" height="6.6" rx="1.8"/><rect x="66.7" y="62" width="6.6" height="6.6" rx="1.8"/></g>
+            <g class="s1"><rect class="sf-in p0" x="66.7" y="22" width="6.6" height="6.6" rx="1.8" fill="#CDBDFF"/><rect class="sf-in p1" x="66.7" y="14" width="6.6" height="6.6" rx="1.8" fill="#CDBDFF"/><rect class="sf-in p2" x="58.7" y="14" width="6.6" height="6.6" rx="1.8" fill="#CDBDFF"/><rect class="sf-in p3" x="50.7" y="14" width="6.6" height="6.6" rx="1.8" fill="#CDBDFF"/><rect class="sf-in p4" x="42.7" y="14" width="6.6" height="6.6" rx="1.8" fill="#CDBDFF"/><rect class="sf-in p5" x="34.7" y="14" width="6.6" height="6.6" rx="1.8" fill="#CDBDFF"/><rect class="sf-in p6" x="26.7" y="22" width="6.6" height="6.6" rx="1.8" fill="#CDBDFF"/><rect class="sf-in p7" x="34.7" y="22" width="6.6" height="6.6" rx="1.8" fill="#CDBDFF"/><rect class="sf-in p8" x="26.7" y="30" width="6.6" height="6.6" rx="1.8" fill="#A3DAF2"/><rect class="sf-in p9" x="34.7" y="30" width="6.6" height="6.6" rx="1.8" fill="#A3DAF2"/><rect class="sf-in p10" x="34.7" y="38" width="6.6" height="6.6" rx="1.8" fill="#A3DAF2"/><rect class="sf-in p11" x="42.7" y="38" width="6.6" height="6.6" rx="1.8" fill="#A3DAF2"/><rect class="sf-in p12" x="50.7" y="38" width="6.6" height="6.6" rx="1.8" fill="#A3DAF2"/><rect class="sf-in p13" x="58.7" y="38" width="6.6" height="6.6" rx="1.8" fill="#A3DAF2"/><rect class="sf-in p14" x="58.7" y="46" width="6.6" height="6.6" rx="1.8" fill="#FF6E4E"/><rect class="sf-in p15" x="66.7" y="46" width="6.6" height="6.6" rx="1.8" fill="#FF6E4E"/><rect class="sf-in p16" x="58.7" y="54" width="6.6" height="6.6" rx="1.8" fill="#FF6E4E"/><rect class="sf-in p17" x="66.7" y="54" width="6.6" height="6.6" rx="1.8" fill="#FF6E4E"/><rect class="sf-in p18" x="58.7" y="62" width="6.6" height="6.6" rx="1.8" fill="#FFC943"/><rect class="sf-in p19" x="50.7" y="62" width="6.6" height="6.6" rx="1.8" fill="#FFC943"/><rect class="sf-in p20" x="42.7" y="62" width="6.6" height="6.6" rx="1.8" fill="#FFC943"/><rect class="sf-in p21" x="34.7" y="62" width="6.6" height="6.6" rx="1.8" fill="#FFC943"/><rect class="sf-in p22" x="26.7" y="62" width="6.6" height="6.6" rx="1.8" fill="#FFC943"/><rect class="sf-in p23" x="26.7" y="54" width="6.6" height="6.6" rx="1.8" fill="#FF6E4E"/></g>
+            <g class="sf-out"><g transform="rotate(20 38 78.1)"><rect class="fo k0" x="34.7" y="74.8" width="6.6" height="6.6" rx="1.8" fill="#FF6E4E"/></g><g transform="rotate(-17 52.08 84.1)"><rect class="fo k1" x="49.18" y="81.2" width="5.8" height="5.8" rx="1.58" fill="#A3DAF2"/></g><g transform="rotate(35 63.12 77.06)"><rect class="fo k2" x="60.62" y="74.56" width="5" height="5" rx="1.36" fill="#CDBDFF"/></g></g>
+            </g>
+          </svg>
+        </div>
       </figure>
     </div>
     <div class="stage">
-      <img src="assets/img/home.webp" width="2000" height="1218" fetchpriority="high"
-        alt="Egghead Notes' Home page: today's date, the day's classes under Up next, the newest notes with a line about each, an Ask bar, and the classes and what's due down the side.">
+      <picture>
+        <img src="assets/img/home.webp?v=5" width="2560" height="1600" fetchpriority="high"
+          alt="Syft Notes' Home page: Monday, October 12, the day's classes and meetings under Up next, the newest notes with a line about each, a Record button and an Ask bar, and the classes, clubs and what's coming up down the side.">
+      </picture>
     </div>
   </div>
 </section>
 
-<section class="reel reel-brick" aria-labelledby="record-title">
-  <div class="wrap reel-grid">
-    <div class="reel-text">
+<section class="features" aria-label="What it does">
+  <div class="wrap">
+  <div class="sheet">
+
+<article class="feature c-mustard" aria-labelledby="start-title">
+  <div class="feature-grid">
+    <div class="feature-text">
+      <h2 id="start-title">Start</h2>
+      <p class="feature-sub">One button to set up.</p>
+      <p>Open Syft Notes and press <strong>Get started</strong>. It makes your library on this computer, asks once for the microphone, and you can record straight away, even while speech-to-text is still downloading.</p>
+        <ul>
+          <li>No account to make and nothing to configure</li>
+          <li>Opens when you log in, so Record is in the menu bar on class day</li>
+          <li>The same one window on a Mac and on Windows</li>
+        </ul>
+    </div>
+    <figure class="card"><picture>
+      <img src="assets/img/setup.webp?v=5" width="1120" height="1240" loading="lazy"
+      alt="Syft Notes' first window: the pixel s and the syft notes wordmark, Record your lectures. Get the notes., a Get started button, and Open Syft Notes when you log in ticked."></picture></figure>
+  </div>
+</article>
+
+<article class="feature c-coral flip" aria-labelledby="record-title">
+  <div class="feature-grid">
+    <div class="feature-text">
       <h2 id="record-title">Record</h2>
-      <p class="reel-sub">Every word, written down live.</p>
-      <p>Click <strong>Record</strong> on Home, in the menu bar or the tray, or press <kbd>⌥⇧R</kbd> (<kbd>Ctrl+Alt+R</kbd> on Windows). Egghead Notes writes the lecture down as it's said, on your own computer. The audio never leaves it.</p>
+      <p class="feature-sub">Every word, written down live.</p>
+      <p>Click <strong>Record</strong> on Home, in the menu bar or the tray, or press <kbd>⌥⇧R</kbd> (<kbd>Ctrl+Alt+R</kbd> on Windows). Syft Notes writes the lecture down as it's said, on your own computer. The audio never leaves it.</p>
         <ul>
           <li>Type your own notes while it records; the write-up is built round them</li>
           <li>Pause or stop from the menu bar</li>
           <li>Or have it written down after class, to save battery</li>
         </ul>
     </div>
-    <figure class="card"><img src="assets/img/record.webp" width="1280" height="597" loading="lazy"
-      alt="A lecture being recorded for BIO 110, with Live transcript open: the lecturer's first sentences, each with the time it was said."></figure>
+    <figure class="card"><picture>
+      <img src="assets/img/record.webp?v=5" width="1568" height="1328" loading="lazy"
+      alt="A Machine Learning lecture being recorded: the recording bar with its time, the sound level, Pause and Stop, and the student's own notes typed under Notes as it records."></picture></figure>
   </div>
-  <img class="paper right" src="assets/img/paper-microphone.webp" width="501" height="872" alt="" loading="lazy">
-  <img class="paper left" src="assets/img/paper-headphones.webp" width="640" height="563" alt="" loading="lazy">
-</section>
+</article>
 
-<section class="reel reel-butter flip" aria-labelledby="notes-title">
-  <div class="wrap reel-grid">
-    <div class="reel-text">
+<article class="feature c-lilac" aria-labelledby="notes-title">
+  <div class="feature-grid">
+    <div class="feature-text">
       <h2 id="notes-title">Notes</h2>
-      <p class="reel-sub">Written for you after class.</p>
+      <p class="feature-sub">Written for you after class.</p>
       <p>When you stop, the lecture is filed under its class and written up: a summary, key points, definitions and questions to review, by the AI you choose.</p>
         <ul>
           <li>Filed under the right class, worked out from what was said</li>
@@ -107,43 +150,61 @@
           <li>Plain Markdown files on your computer, one folder per class</li>
         </ul>
     </div>
-    <figure class="card"><img src="assets/img/notes.webp" width="1280" height="938" loading="lazy"
-      alt="The notes for 'The Cardiac Cycle: Phases, Valves, and Cardiac Output': a line saying Claude wrote them from the recording, a summary, and the first key points."></figure>
+    <figure class="card"><picture>
+      <img src="assets/img/notes.webp?v=5" width="1568" height="1096" loading="lazy"
+      alt="The notes for 'The cardiac cycle and cardiac output': a summary, then the key points, with cardiac output and mean arterial pressure written as formulas."></picture></figure>
   </div>
-  <img class="paper left" src="assets/img/paper-pencil.webp" width="640" height="125" alt="" loading="lazy">
-</section>
+</article>
 
-<section class="reel reel-sky" aria-labelledby="formulas-title">
-  <div class="wrap reel-grid">
-    <div class="reel-text">
+<article class="feature c-sky flip" aria-labelledby="free-title">
+  <div class="feature-grid">
+    <div class="feature-text">
+      <h2 id="free-title">Free</h2>
+      <p class="feature-sub">Notes free with your Google account.</p>
+      <p>Your first lecture asks who should write its notes. <strong>Continue with Google</strong> writes them free with a personal Google account, through Gemini; a Claude or ChatGPT plan you already pay for works too. After that one sign-in, notes come after every class.</p>
+        <ul>
+          <li>You sign in on Google's own page; Syft Notes never sees your password</li>
+          <li>If the free allowance runs out, the notes come by themselves when it's back</li>
+          <li>Or copy and paste the lecture into any AI chat</li>
+        </ul>
+    </div>
+    <figure class="card"><picture>
+      <img src="assets/img/first-notes.webp?v=5" width="1568" height="1076" loading="lazy"
+      alt="A first lecture's page: Get study notes from this lecture, with Continue with Google, then Claude and ChatGPT, and Other free way: copy and paste."></picture></figure>
+  </div>
+</article>
+
+<article class="feature c-sky" aria-labelledby="formulas-title">
+  <div class="feature-grid">
+    <div class="feature-text">
       <h2 id="formulas-title">Formulas</h2>
-      <p class="reel-sub">Every formula, worked through.</p>
+      <p class="feature-sub">Every formula, worked through.</p>
       <p>Maths is written the way it was on the board, in proper notation, with each step of a worked example in the order it was done.</p>
     </div>
-    <figure class="card"><img src="assets/img/formulas.webp" width="1280" height="581" loading="lazy"
-      alt="Notes from a calculus lecture: the local maximum and minimum of x cubed minus 3x worked out line by line, then the second derivative and the intercepts."></figure>
+    <figure class="card"><picture>
+      <img src="assets/img/formulas.webp?v=5" width="1568" height="643" loading="lazy"
+      alt="Formulas in the notes: a dose worked out as desired over have times quantity, and mean arterial pressure worked through line by line to 93.3 mmHg."></picture></figure>
   </div>
-  <img class="paper right" src="assets/img/paper-signs.webp" width="640" height="357" alt="" loading="lazy">
-</section>
+</article>
 
-<section class="reel reel-charcoal flip" aria-labelledby="graphs-title">
-  <div class="wrap reel-grid">
-    <div class="reel-text">
+<article class="feature c-mustard flip" aria-labelledby="graphs-title">
+  <div class="feature-grid">
+    <div class="feature-text">
       <h2 id="graphs-title">Graphs</h2>
-      <p class="reel-sub">Drag a slider, watch it change.</p>
+      <p class="feature-sub">Drag a slider, watch it change.</p>
       <p>When a lecture is about a curve, the notes draw it from its formula. Move a slider, or press play, and see what each number does.</p>
     </div>
-    <figure class="card"><img src="assets/img/graph.webp" width="1280" height="1023" loading="lazy"
-      alt="A graph in the notes: the curve x cubed minus a x with its maximum, minimum and inflection point marked, a tangent line, and sliders for the coefficient and the tangent's point."></figure>
+    <figure class="card"><picture>
+      <img src="assets/img/graph.webp?v=5" width="1568" height="1086" loading="lazy"
+      alt="A graph in the notes: the sigmoid with its tangent at zero and a reading pinned on the curve, Explain this, Quiz me and Where was this said?, and a slider for its steepness."></picture></figure>
   </div>
-  <img class="paper left" src="assets/img/paper-chart.webp" width="640" height="392" alt="" loading="lazy">
-</section>
+</article>
 
-<section class="reel reel-forest" aria-labelledby="diagrams-title">
-  <div class="wrap reel-grid">
-    <div class="reel-text">
+<article class="feature c-lilac" aria-labelledby="diagrams-title">
+  <div class="feature-grid">
+    <div class="feature-text">
       <h2 id="diagrams-title">Diagrams</h2>
-      <p class="reel-sub">Click a step to follow it.</p>
+      <p class="feature-sub">Click a step to follow it.</p>
       <p>A process becomes a diagram you can click through, and anatomy becomes a labelled drawing, made from what your lecturer said.</p>
         <ul>
           <li>Click a box to follow its arrows</li>
@@ -151,21 +212,22 @@
         </ul>
     </div>
     <div class="cards">
-      <figure class="card"><img src="assets/img/heart.webp" width="1280" height="946" loading="lazy"
-      alt="A labelled drawing of the heart cut open in the notes: the aorta, both atria and ventricles, the four valves, and the veins and arteries."></figure>
-      <figure class="card"><img src="assets/img/cycle.webp" width="1280" height="987" loading="lazy"
-      alt="A diagram of the five phases of the cardiac cycle as a loop of boxes joined by arrows, each arrow saying what moves the heart to the next phase."></figure>
+      <figure class="card"><picture>
+        <img src="assets/img/heart.webp?v=5" width="1568" height="1108" loading="lazy"
+        alt="A labelled drawing of the heart cut open in the notes: the aorta, the superior vena cava, both atria and ventricles, the valves and the pulmonary veins."></picture></figure>
+      <figure class="card"><picture>
+        <img src="assets/img/cycle.webp?v=5" width="1568" height="674" loading="lazy"
+        alt="A diagram of the five phases of the cardiac cycle as a loop of boxes joined by arrows."></picture></figure>
     </div>
   </div>
-  <img class="paper right" src="assets/img/paper-shapes.webp" width="640" height="673" alt="" loading="lazy">
-</section>
+</article>
 
-<section class="reel reel-pink flip" aria-labelledby="due-title">
-  <div class="wrap reel-grid">
-    <div class="reel-text">
+<article class="feature c-sky flip" aria-labelledby="due-title">
+  <div class="feature-grid">
+    <div class="feature-text">
       <h2 id="due-title">Due dates</h2>
-      <p class="reel-sub">Pulled in from Canvas for you.</p>
-      <p>Egghead Notes reads Canvas through your browser with your own sign-in, so there's no password or token to hand over, and it only reads. Nothing on Canvas changes.</p>
+      <p class="feature-sub">Pulled in from Canvas for you.</p>
+      <p>Syft Notes reads Canvas through your browser with your own sign-in, so there's no password or token to hand over, and it only reads. Nothing on Canvas changes.</p>
         <ul>
           <li>Everything due across your classes, as a calendar</li>
           <li>Each assignment's instructions and rubric, your submissions and feedback</li>
@@ -173,17 +235,17 @@
           <li>And in Firefox 140 or later and the browsers built on it, such as Zen, with <a href="https://addons.mozilla.org/firefox/addon/study-stash-for-canvas/">the add-on from Mozilla's site</a></li>
         </ul>
     </div>
-    <figure class="card"><img src="assets/img/due.webp" width="1280" height="774" loading="lazy"
-      alt="The Due page: October as a calendar, with each class's assignments, quizzes and midterms on the days they're due, in the class's colour."></figure>
+    <figure class="card"><picture>
+      <img src="assets/img/due.webp?v=5" width="1996" height="1548" loading="lazy"
+      alt="The Due page: October as a calendar, with each class's assignments, quizzes and projects on the days they're due, in the class's colour, and what's missing."></picture></figure>
   </div>
-  <img class="paper left" src="assets/img/paper-calendar.webp" width="640" height="736" alt="" loading="lazy">
-</section>
+</article>
 
-<section class="reel reel-indigo" aria-labelledby="ask-title">
-  <div class="wrap reel-grid">
-    <div class="reel-text">
+<article class="feature c-coral" aria-labelledby="ask-title">
+  <div class="feature-grid">
+    <div class="feature-text">
       <h2 id="ask-title">Ask</h2>
-      <p class="reel-sub">Answers from your own lectures.</p>
+      <p class="feature-sub">Answers from your own lectures.</p>
       <p>Ask about one lecture, a class, or all of them. The answer comes from your own notes, with the lecture and the minute it was said.</p>
         <ul>
           <li>An Ask bar on Home, on every class and under every lecture's notes</li>
@@ -191,63 +253,30 @@
           <li>Answers appear as they're written</li>
         </ul>
     </div>
-    <figure class="card"><img src="assets/img/ask.webp" width="1104" height="240" loading="lazy"
-      alt="An answer to 'What is a normal ejection fraction?': 55% to 70%, with the formula and the lecture's own example, from Claude, with the minute of the lecture it came from."></figure>
+    <figure class="card"><picture>
+      <img src="assets/img/ask.webp?v=5" width="1328" height="549" loading="lazy"
+      alt="An answer to 'What's a normal MAP?': 70 to 100 mmHg, with its formula, from Claude, with the minutes of the lecture it came from, above the Ask bar."></picture></figure>
   </div>
-  <img class="paper right" src="assets/img/paper-bubble.webp" width="640" height="656" alt="" loading="lazy">
-</section>
+</article>
 
-<section class="reel reel-teal flip" aria-labelledby="connect-title">
-  <div class="wrap reel-grid">
-    <div class="reel-text">
+<article class="feature c-mustard flip" aria-labelledby="connect-title">
+  <div class="feature-grid">
+    <div class="feature-text">
       <h2 id="connect-title">Connect</h2>
-      <p class="reel-sub">Works with Claude and ChatGPT.</p>
-      <p>Turn it on in Settings, and the Claude and ChatGPT apps on your computer can read your lectures and notes to answer your questions. They can't change or delete anything.</p>
+      <p class="feature-sub">Works with Claude, ChatGPT and Gemini.</p>
+      <p>Turn it on in Settings, and the Claude, ChatGPT and Gemini apps on your computer can read your lectures and notes to answer your questions. They can't change or delete anything.</p>
         <ul>
           <li>One Connect button for each app, nothing to type or paste</li>
           <li>You choose what they can read: lectures, notes, Canvas</li>
         </ul>
     </div>
-    <figure class="card"><img src="assets/img/ai-apps.webp" width="1212" height="500" loading="lazy"
-      alt="Settings, AI apps: Claude Desktop and ChatGPT shown as connected, Claude Code with a Connect button, and a question to try in Claude."></figure>
+    <figure class="card"><picture>
+      <img src="assets/img/ai-apps.webp?v=7" width="1280" height="949" loading="lazy"
+      alt="Settings, AI apps: Claude Desktop, ChatGPT and Gemini connected, Claude Code one Connect button away, and a question to try in Claude."></picture></figure>
   </div>
-  <img class="paper left" src="assets/img/paper-plug.webp" width="349" height="846" alt="" loading="lazy">
-</section>
-<section aria-labelledby="pair-title">
-  <div class="wrap">
-    <div class="section-head">
-      <h2 id="pair-title">One computer, or two.</h2>
-      <p>Start on one computer. Later, record on a laptop too with <strong>Settings → Your library → Add a laptop</strong>,
-        or move your library to a computer at home in <strong>Settings → Connection</strong>, with nothing to reinstall.</p>
-    </div>
-    <div class="pair">
-      <div>
-        <svg viewBox="0 0 320 110" role="img" aria-label="One laptop that records, keeps the library and writes the notes.">
-          <rect class="lib" x="70" y="12" width="180" height="86" rx="12"/>
-          <text x="160" y="46" text-anchor="middle">your laptop</text>
-          <text x="160" y="68" text-anchor="middle">records · transcribes · notes</text>
-        </svg>
-        <h3>Just this computer</h3>
-        <p>Your laptop records, keeps the library and writes the notes itself. Nothing else to set up; notes are
-          written while it's on.</p>
-      </div>
-      <div>
-        <svg viewBox="0 0 320 110" role="img" aria-label="A laptop that records sends lectures to a library computer at home, which sends back notes.">
-          <rect class="box" x="4" y="22" width="120" height="66" rx="12"/>
-          <text x="64" y="52" text-anchor="middle">your laptop</text>
-          <text x="64" y="70" text-anchor="middle">records</text>
-          <path class="line" d="M130 46 H186"/><path class="arrow" d="M192 46 l-8 -4 v8z"/>
-          <path class="line" d="M190 64 H134"/><path class="arrow" d="M128 64 l8 -4 v8z"/>
-          <rect class="lib" x="196" y="22" width="120" height="66" rx="12"/>
-          <text x="256" y="52" text-anchor="middle">your library</text>
-          <text x="256" y="70" text-anchor="middle">notes · Canvas</text>
-        </svg>
-        <h3>A laptop and a library</h3>
-        <p>A computer that stays on at home (a Mac mini, an old laptop, any Mac or PC) keeps the library, writes the
-          notes and syncs Canvas, even while your laptop sleeps. Your laptop reaches it at home or, anywhere, over
-          <a href="https://tailscale.com">Tailscale</a>.</p>
-      </div>
-    </div>
+</article>
+
+  </div>
   </div>
 </section>
 
@@ -256,10 +285,10 @@
     <h2 id="privacy-title">Your recordings never leave your computers.</h2>
     <ul class="promises">
       <li><strong>Your audio never leaves.</strong>It's transcribed on the computer that recorded it.</li>
-      <li><strong>No account, no server.</strong>There's no Egghead Notes cloud. Your library is a folder on a computer you own, and your notes are Markdown files you can open, back up or sync however you like.</li>
-      <li><strong>No tracking.</strong>The app doesn't track you or report on what you do. Once a day it sends one anonymous count (a random code for this copy, the app's version, and Mac or Windows) so we know how many people use it. You can turn it off in Settings. Nobody at Egghead Notes can see your lectures.</li>
-      <li><strong>You choose the AI.</strong>Ollama keeps everything on your computer. Claude Code, Codex or Gemini use the plan you already have, and only when you pick them.</li>
-      <li><strong>Canvas and calendars are read-only.</strong>Egghead Notes reads with your own sign-in and changes nothing. What it reads goes only to your library.</li>
+      <li><strong>No account, no server.</strong>There's no Syft Notes cloud. Your library is a folder on a computer you own, and your notes are Markdown files you can open, back up or sync however you like.</li>
+      <li><strong>No tracking.</strong>The app doesn't track you or report on what you do. Once a day it sends one anonymous count (a random code for this copy, the app's version, and Mac or Windows) so we know how many people use it. You can turn it off in Settings. Nobody at Syft Notes can see your lectures.</li>
+      <li><strong>You choose the AI.</strong>Notes are written by Claude or ChatGPT with the plan you already have, or free by Gemini with your Google account, only once you pick one. A free AI that runs on your computer is there too, in Settings.</li>
+      <li><strong>Canvas and calendars are read-only.</strong>Syft Notes reads with your own sign-in and changes nothing. What it reads goes only to your library.</li>
       <li><strong>Open source.</strong>Every line is <a href="https://github.com/Joseph-Rus/study-stash">on GitHub</a>, so you don't have to take our word for any of this.</li>
     </ul>
     <p class="fine">The details are in the <a href="privacy/">privacy policy</a>.</p>
@@ -283,11 +312,10 @@
 <section class="finale" id="download" aria-labelledby="download-title">
   <div class="wrap">
     <div class="section-head">
-      <img src="assets/img/icon.webp" width="256" height="256" alt="" loading="lazy">
+      <img src="assets/img/icon.webp?v=5" width="256" height="256" alt="" loading="lazy">
       <h2 id="download-title">Free, for Mac and Windows.</h2>
-      <p>The same app for every computer. Setup asks how you'll use it: just this computer, your library, or your
-        laptop. It comes in light and dark and twenty colour themes, and keeps itself up to date, never while it's
-        recording.</p>
+      <p>The same app for every computer, and setup is one button. It comes in light and dark and twenty colour
+        themes, and keeps itself up to date, never while it's recording.</p>
     </div>
     <div class="download">
       <div class="dl" data-for-os="mac">
@@ -296,9 +324,10 @@
           <h3>Mac</h3>
           <span class="tag">This computer</span>
         </div>
-        <p>Needs macOS 15 or later. Open the DMG and drag <strong>Egghead Notes</strong> into Applications. It's signed
+        <p>Needs macOS 15 or later. Open the DMG and drag <strong>Syft Notes</strong> onto Applications (or just open
+          it: it offers to move itself there). It's signed
           and notarized by Apple, so it opens like any app from the internet. Allow the microphone when it asks.</p>
-        <a class="btn btn-primary" href="https://github.com/Joseph-Rus/study-stash/releases/latest/download/Egghead-Notes.dmg">Download Egghead-Notes.dmg</a>
+        <a class="btn btn-primary" href="https://github.com/Joseph-Rus/study-stash/releases/latest/download/Syft-Notes.dmg">Download Syft-Notes.dmg</a>
       </div>
       <div class="dl" data-for-os="windows">
         <div class="os">
@@ -306,15 +335,16 @@
           <h3>Windows</h3>
           <span class="tag">This computer</span>
         </div>
-        <p>Run the Setup.exe. It installs for your account only, with no admin rights needed. If Windows says
+        <p>Open the Setup.exe. It installs for your account only, with no questions and no admin rights, then opens
+          Syft Notes by itself. If Windows says
           "Windows protected your PC", click <strong>More info</strong>, then <strong>Run anyway</strong>.</p>
-        <a class="btn btn-primary" href="https://github.com/Joseph-Rus/study-stash/releases/latest/download/Egghead-Notes-Setup.exe">Download Egghead-Notes-Setup.exe</a>
+        <a class="btn btn-primary" href="https://github.com/Joseph-Rus/study-stash/releases/latest/download/Syft-Notes-Setup.exe">Download Syft-Notes-Setup.exe</a>
       </div>
     </div>
     <p class="fine">Every update is checked against the release's <code>SHA256SUMS.txt</code> before it installs.
       Prefer a terminal? The <a href="https://github.com/Joseph-Rus/study-stash#install">install commands are in the README</a>.
       Record only where you're allowed to: many schools and places need everyone's consent.</p>
-    <p class="fine">Egghead Notes is free. If it helps you,
+    <p class="fine">Syft Notes is free. If it helps you,
       <a href="https://ko-fi.com/studystashteam" target="_blank" rel="noopener">buy us a coffee</a>.</p>
   </div>
 </section>
@@ -324,7 +354,7 @@
 <footer class="site-foot">
   <div class="wrap">
     <div>
-      <a class="brand" href="./"><img src="assets/img/icon.webp" alt="" width="24" height="24">Egghead Notes</a>
+      <a class="brand" href="./"><picture><img class="tile-light" src="assets/img/tile-light.svg?v=4" alt="" width="28" height="28"></picture><span class="wordmark"><b>syft</b> notes</span></a>
       <p>Your own lecture library. Free and open source under the MIT licence.</p>
     </div>
     <ul class="foot-links">

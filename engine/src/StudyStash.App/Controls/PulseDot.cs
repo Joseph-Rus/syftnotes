@@ -1,18 +1,17 @@
 using System.Diagnostics;
 using Avalonia;
-using Avalonia.Controls.Shapes;
 using Avalonia.Threading;
 
 namespace StudyStash.App.Controls;
 
 /// <summary>
-/// The recording dot, breathing slowly (full to a third and back, once every 3.2 seconds): it's alive, and never glows.
-/// It steps ten times a second, which reads as the same slow breath on a dot eight pixels across. An animation that runs
-/// every frame (Avalonia's own, in a style) kept the recorder's window, with its shadow and blur, redrawn sixty times a
-/// second for the whole lecture, which cost more of the computer than the microphone and the recorder together. It
-/// only breathes while it's on screen.
+/// The recording dot, one of the pixel s's cells (<see cref="SyftCell"/>), breathing slowly (full to a third and back,
+/// once every 3.2 seconds): it's alive, and never glows. It steps ten times a second, which reads as the same slow
+/// breath on a dot eight pixels across. An animation that runs every frame (Avalonia's own, in a style) kept the
+/// recorder's window, with its shadow and blur, redrawn sixty times a second for the whole lecture, which cost more of
+/// the computer than the microphone and the recorder together. It only breathes while it's on screen.
 /// </summary>
-public sealed class PulseDot : Ellipse
+public sealed class PulseDot : SyftCell
 {
     public static readonly TimeSpan Step = TimeSpan.FromMilliseconds(100);
     public const double Period = 3.2, Faintest = 0.35;

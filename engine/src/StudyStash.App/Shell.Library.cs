@@ -160,7 +160,7 @@ public static partial class Shell
             ClearPane();
             library.Overview = null;
             SelectInSidebar(null, home: true);
-            library.Empty = host.OlderLibrary ? "Your library runs an older Egghead Notes. It files your lectures, but update it to browse, search and ask here."
+            library.Empty = host.OlderLibrary ? "Your library runs an older Syft Notes. It files your lectures, but update it to browse, search and ask here."
                 : host.Library switch
             {
                 LibraryState.NotSetUp => "Connect to your library in Settings to see your notes here.",
@@ -305,19 +305,23 @@ public static partial class Shell
         library.CanvasClass = null;
         library.Overview = null;
         library.Note = note;
-        ShowFreeAi(note, has: notes.Length > 0 && !mine, offer: !writing && notes.Length == 0 && heard && S(l["no_notes"]) != Summarize.NoNotesShort);
+        string error = S(l["error"]);
+        ShowFreeAi(note, has: notes.Length > 0 && !mine, offer: !writing && notes.Length == 0 && heard && S(l["no_notes"]) != Summarize.NoNotesShort,
+            // No AI writes notes yet: the card asks which. Over its usage limit: it says until when.
+            choose: S(l["no_notes"]) == Summarize.NoNotesOff, limitedBy: notes.Length == 0 ? Core.Ai.Engines.WaitsForLimit(error) : null,
+            limitedUntil: Core.Ai.Engines.LimitUntil(error));
         // Notes to read that nothing is writing now (with none written, what the student typed) can be edited and rewritten.
         ShowLectureAi(l, note, written: !writing && (notes.Length > 0 || (mine && S(l["error"]).Length == 0)));
         ShowLectureFiles(note);
     }
 
     /// <summary>
-    /// Notes from an AI Egghead Notes doesn't run, for a lecture's page (<see cref="FreeAiModel"/>): over one with no notes
+    /// Notes from an AI Syft Notes doesn't run, for a lecture's page (<see cref="FreeAiModel"/>): over one with no notes
     /// (<paramref name="offer"/>: none written, nothing writing them, a transcript to write them from), that the Claude
     /// app or any free chat can write them; Copy for your AI and Paste notes, there and in the notes' ⋯ menu. The same
     /// lecture read again keeps its model, so what's pasted and not saved stays.
     /// </summary>
-    static void ShowFreeAi(NoteModel note, bool has, bool offer)
+    static void ShowFreeAi(NoteModel note, bool has, bool offer, bool choose = false, string? limitedBy = null, string limitedUntil = "")
     {
         if (library.FreeAi is not { } free || free.LectureId != note.Id)
         {
@@ -335,6 +339,17 @@ public static partial class Shell
         }
         free.HasNotes = has;
         free.Offer = offer && !has;
+        free.Choose = choose;
+        free.OnGetReady = engine => GetNotesWith(engine, note.Id);
+        // Over its usage limit says so (and until when); a school account Google turned down stays said until the page
+        // is left.
+        if (limitedBy is not null)
+        {
+            free.LimitedAi = limitedBy;
+            free.LimitedUntil = limitedUntil;
+            free.Fallback = NotesFallback.Limit;
+        }
+        else if (free.Fallback == NotesFallback.Limit) free.Fallback = NotesFallback.None;
         library.FreeAi = free;
     }
 
@@ -411,6 +426,10 @@ public static partial class Shell
                 // are promised for it.
                 _ when NotesOff => NoteModel.NotesAreOff(noun, l.Segments.Count > 0),
                 _ when WillHaveNotes(l) == false => NoteModel.TooShort(noun, l.Segments.Count > 0, keepRecording is not null),
+                // Recorded before the model arrived: it waits for it (the download's on Home and in the menu bar).
+                LectureState.Transcribing when l.WaitsForModel && !host.ModelReady => host.Downloading is { } d
+                    ? $"This {noun} is written down as soon as speech-to-text is ready on this computer ({Math.Clamp((int)Math.Round(d.Fraction * 100), 0, 99)}% downloaded)."
+                    : $"This {noun} is written down as soon as speech-to-text is ready on this computer.",
                 LectureState.Transcribing => $"This {noun} is being written down on this computer. Its notes come once that's done and your library has it.",
                 _ => host.Library == LibraryState.Connected ? $"On its way to your library, which writes the notes for this {noun}. They show here when they're done."
                     : $"Waiting for your library. The notes for this {noun} are written once it's back.",
@@ -672,7 +691,7 @@ public static partial class Shell
             {
                 try
                 {
-                    Toast("Egghead Notes", await lib.TerminalAsync(cls), null, null);
+                    Toast("Syft Notes", await lib.TerminalAsync(cls), null, null);
                 }
                 catch (Exception e) when (e is HttpRequestException or TaskCanceledException or LibraryRefusedException)
                 {
@@ -803,7 +822,7 @@ public static partial class Shell
         try
         {
             var r = await lib.CaptureAsync(text);
-            Toast("Kept", r is null ? "Your library runs an older Egghead Notes." : "It's filed under its class in a minute.", null, null);
+            Toast("Kept", r is null ? "Your library runs an older Syft Notes." : "It's filed under its class in a minute.", null, null);
         }
         catch (Exception e) when (e is HttpRequestException or TaskCanceledException or LibraryRefusedException)
         {

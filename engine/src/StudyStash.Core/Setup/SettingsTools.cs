@@ -80,7 +80,7 @@ public sealed class SettingsTools(ISettingsDriver driver)
             }
             catch (Exception e) when (e is not OperationCanceledException)
             {
-                return No($"Egghead Notes couldn't do that just now ({e.Message.TrimEnd('.')}). Tell the student, and show them the place with open_settings.");
+                return No($"Syft Notes couldn't do that just now ({e.Message.TrimEnd('.')}). Tell the student, and show them the place with open_settings.");
             }
         }
     }

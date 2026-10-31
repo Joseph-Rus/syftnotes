@@ -151,7 +151,7 @@
             </Viewbox>
           </Border>
           <StackPanel Grid.Column="2" Spacing="6" VerticalAlignment="Center">
-            <TextBlock Classes="row-sub" Text="1. Scan this with your phone: in the Egghead Notes app on your iPhone or iPad, tap Scan the QR code. On Android, point the camera at it." TextWrapping="Wrap" />
+            <TextBlock Classes="row-sub" Text="1. Scan this with your phone: in the Syft Notes app on your iPhone or iPad, tap Scan the QR code. On Android, point the camera at it." TextWrapping="Wrap" />
             <TextBlock Classes="row-sub" Text="2. If it asks for a code, type this:" TextWrapping="Wrap" />
             <c:PageText Name="PhoneCode" Text="{Binding Code}" FontFamily="Cascadia Mono, Consolas, SF Mono, Menlo, monospace" FontSize="32" FontWeight="SemiBold" LetterSpacing="4" Margin="0,2" />
             <TextBlock Classes="row-sub" Text="{Binding Left}" />

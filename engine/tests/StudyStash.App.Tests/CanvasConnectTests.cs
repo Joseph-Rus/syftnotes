@@ -162,7 +162,7 @@ public class CanvasConnectTests
         // The store comes first: no Developer mode, no folder. Its first step is what the store's page takes.
         Assert.True(m.FromStore);
         Assert.Equal("Add to Chrome", m.AddLabel);
-        Assert.Equal("Egghead Notes reads Canvas through your own sign-in in Chrome. Add to Chrome opens Egghead Notes for Canvas on the Chrome Web Store there. Then:", m.BrowserHelp);
+        Assert.Equal("Syft Notes reads Canvas through your own sign-in in Chrome. Add to Chrome opens Syft Notes for Canvas on the Chrome Web Store there. Then:", m.BrowserHelp);
         Assert.Equal("On the page that opens in Chrome, click the blue Add to Chrome button, then Add extension when Chrome asks.", m.StoreStep1);
         Assert.Equal("Click Allow when Chrome asks.", m.StoreStep3);
         Assert.Equal("https://chromewebstore.google.com/detail/study-stash-for-canvas/dfhoenhdjjbnopbepgkgjdgdnfmecjjd", Browsers.StorePage(Browsers.Chrome));
@@ -174,7 +174,7 @@ public class CanvasConnectTests
         Assert.False(m.ShowFolderLinks);
         Assert.True(m.ShowAddOnLink);
         Assert.Equal("Open the Chrome Web Store again", m.AddOnAgainLabel);
-        Assert.Equal("Egghead Notes for Canvas is open on the Chrome Web Store in Chrome. There:", m.BrowserHelp);
+        Assert.Equal("Syft Notes for Canvas is open on the Chrome Web Store in Chrome. There:", m.BrowserHelp);
         // The store's copy has no folder to read: the code connects it to the library as this computer reaches it.
         Assert.True(m.ShowCode);
         Assert.Equal(new StudyStash.Core.Canvas.ExtensionConnection("https://library.test", "test-key-abc123", "https://school.instructure.com"),
@@ -270,7 +270,7 @@ public class CanvasConnectTests
         m.Dispose();
     }
 
-    /// <summary>A student who uses Safari is told the extension can't go in it and which browser Egghead Notes will use
+    /// <summary>A student who uses Safari is told the extension can't go in it and which browser Syft Notes will use
     /// (the one the step offers, also after they pick another); one with nothing that will do gets a way to Chrome.</summary>
     [Fact]
     public async Task A_usual_browser_that_cant_take_the_extension_is_said_with_the_one_to_use_or_where_to_get_one()
@@ -282,10 +282,10 @@ public class CanvasConnectTests
         var m = Model(handler, home: "the-home", log: log, browsers: [Browsers.Chrome, Browsers.Edge], advice: new BrowserAdvice(Browsers.Safari, NoneHere: false));
         await m.StartAsync(CanvasFixtures.Load<CanvasApi.State>("state-no-extension"), [], TestContext.Current.CancellationToken);
         Assert.True(m.ShowAdvice);
-        Assert.Equal("Your usual browser, Safari, can’t run the Egghead Notes extension. Egghead Notes will use Chrome instead.", m.AdviceText);
+        Assert.Equal("Your usual browser, Safari, can’t run the Syft Notes extension. Syft Notes will use Chrome instead.", m.AdviceText);
         Assert.False(m.ShowGetBrowser);
         m.BrowserChoices[1].Pick.Execute(null);
-        Assert.EndsWith("Egghead Notes will use Edge instead.", m.AdviceText);
+        Assert.EndsWith("Syft Notes will use Edge instead.", m.AdviceText);
         await m.AddToBrowserCommand.ExecuteAsync(null);
         Assert.False(m.ShowAdvice); // added: the step is about Edge's own page now
         m.Dispose();
@@ -327,10 +327,10 @@ public class CanvasConnectTests
         Assert.Equal("Add to Edge", m.AddLabel);
         // Edge adds it from the Chrome Web Store too, after a question of its own the first time.
         Assert.True(m.FromStore);
-        Assert.Equal("Egghead Notes reads Canvas through your own sign-in in Edge. Add to Edge opens Egghead Notes for Canvas on the Chrome Web Store there. Then:", m.BrowserHelp);
+        Assert.Equal("Syft Notes reads Canvas through your own sign-in in Edge. Add to Edge opens Syft Notes for Canvas on the Chrome Web Store there. Then:", m.BrowserHelp);
         Assert.Equal("On the page that opens in Edge, click Get extension. If Edge asks to allow extensions from other stores, click Allow. Then click Add extension.", m.StoreStep1);
         Assert.Equal([false, true], m.BrowserChoices.Select(c => c.Current));
-        Assert.Equal([("RememberBrowser", "Edge")], log); // the one Egghead Notes opens Canvas in from now on
+        Assert.Equal([("RememberBrowser", "Edge")], log); // the one Syft Notes opens Canvas in from now on
 
         log.Clear();
         await m.AddToBrowserCommand.ExecuteAsync(null);
@@ -381,16 +381,16 @@ public class CanvasConnectTests
     [Fact]
     public async Task A_student_who_already_has_the_add_on_in_firefox_gets_its_code_though_theres_nowhere_to_send_them_for_it()
     {
-        // Firefox is their usual browser and its add-on isn't published where this Egghead Notes knows of: the step
+        // Firefox is their usual browser and its add-on isn't published where this Syft Notes knows of: the step
         // offers Chrome. But they have the add-on (Mozilla published it since, or they added it from a file), and its
-        // own button asks for a code from Egghead Notes. The step said only that Firefox can't run the extension yet.
+        // own button asks for a code from Syft Notes. The step said only that Firefox can't run the extension yet.
         var log = new List<(string What, string Arg)>();
         var handler = new FakeLibrary()
             .Json(HttpMethod.Get, "/api/v2/canvas", NoExtensionYet)
             .Json(HttpMethod.Get, "/api/v2/canvas/extension", "extension");
         var m = Model(handler, home: "the-home", log: log, browsers: [Browsers.Chrome, Browsers.Edge], advice: new BrowserAdvice(Browsers.FirefoxDeveloper, NoneHere: false));
         await m.StartAsync(CanvasFixtures.Load<CanvasApi.State>("state-no-extension"), [], TestContext.Current.CancellationToken);
-        Assert.Equal("Your usual browser, Firefox Developer Edition, can’t run the Egghead Notes extension yet. Egghead Notes will use Chrome instead.", m.AdviceText);
+        Assert.Equal("Your usual browser, Firefox Developer Edition, can’t run the Syft Notes extension yet. Syft Notes will use Chrome instead.", m.AdviceText);
         Assert.True(m.ShowHaveIt);
         Assert.Equal("I already have it in Firefox Developer Edition", m.HaveItLabel);
         Assert.Equal("Chrome", m.BrowserName); // Chrome's step (its store, and the same code) until they say so
@@ -404,8 +404,8 @@ public class CanvasConnectTests
         Assert.True(m.ShowCode);
         Assert.Equal(new StudyStash.Core.Canvas.ExtensionConnection("https://library.test", "test-key-abc123", "https://school.instructure.com"),
             StudyStash.Core.Canvas.Extension.ReadConnectionCode(m.ConnectionCode));
-        Assert.Equal("Egghead Notes reads Canvas through your own sign-in in Firefox Developer Edition. To connect the add-on you have there:", m.BrowserHelp);
-        Assert.Equal("In Firefox Developer Edition, click the Egghead Notes button (it may be under the puzzle-piece Extensions button).", m.StoreStep1);
+        Assert.Equal("Syft Notes reads Canvas through your own sign-in in Firefox Developer Edition. To connect the add-on you have there:", m.BrowserHelp);
+        Assert.Equal("In Firefox Developer Edition, click the Syft Notes button (it may be under the puzzle-piece Extensions button).", m.StoreStep1);
         Assert.Equal("Paste this code and click Connect.", m.StoreStep2);
         Assert.True(m.WaitingForBrowser);
         Assert.Equal("Waiting for Firefox Developer Edition…", m.WaitingLabel);
@@ -420,7 +420,7 @@ public class CanvasConnectTests
         Assert.True(m.IsChromium);
         Assert.True(m.ShowHaveIt);
         Assert.Equal("On the page that opens in Chrome, click the blue Add to Chrome button, then Add extension when Chrome asks.", m.StoreStep1);
-        Assert.Equal("Click the Egghead Notes button (it may be under the puzzle-piece Extensions button), paste this code and click Connect.", m.StoreStep2);
+        Assert.Equal("Click the Syft Notes button (it may be under the puzzle-piece Extensions button), paste this code and click Connect.", m.StoreStep2);
 
         // Safari can't run it at all: there's nothing to already have.
         var safari = Model(handler, advice: new BrowserAdvice(Browsers.Safari, NoneHere: false));
@@ -510,7 +510,7 @@ public class CanvasConnectTests
 
         await m.StartAsync(CanvasFixtures.Load<CanvasApi.State>("state-signed-out"), [], TestContext.Current.CancellationToken);
         Assert.True(m.SignedOut);
-        Assert.Equal("Sign in to Canvas in Chrome. Egghead Notes looks again by itself once you have.", m.SignInHelp); // the browser that checked in
+        Assert.Equal("Sign in to Canvas in Chrome. Syft Notes looks again by itself once you have.", m.SignInHelp); // the browser that checked in
 
         m.OpenCanvasCommand.Execute(null);
         Assert.Contains(log, l => l.What == "OpenInBrowser" && l.Arg == "https://school.instructure.com");

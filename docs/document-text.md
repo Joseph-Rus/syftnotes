@@ -1,4 +1,4 @@
-# Egghead Notes: document text
+# Syft Notes: document text
 
 Files handed to the library — a PDF, a photo or scan (png, jpg, heic), a Word document, a PowerPoint — have their
 words read once, and those words feed the file search, attachments, notes, Ask and Claude. Typed text is read as

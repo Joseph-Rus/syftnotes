@@ -75,13 +75,13 @@ public sealed class LocalLibrary(LibraryReader reader, Canvas.CanvasSync? canvas
     public Task<string> ReadFileAsync(string path, int offset) => Task.FromResult(ReadFile(path, offset));
 
     /// <summary>A file's words, only when it's one the file search holds, in a folder that isn't private, and it
-    /// really is there (a link can't lead out of the folder, or into Egghead Notes' own settings).</summary>
+    /// really is there (a link can't lead out of the folder, or into Syft Notes' own settings).</summary>
     string ReadFile(string path, int offset)
     {
-        const string NotHere = "That isn't a file Egghead Notes shares with AI tools. Use a path exactly as search_files, class_files or get_assignment gave it.";
+        const string NotHere = "That isn't a file Syft Notes shares with AI tools. Use a path exactly as search_files, class_files or get_assignment gave it.";
         if (files is null) return "This library can't open files.";
         path = path.Trim();
-        // "<class>/<path in its folder>": how class_files and get_assignment name what Egghead Notes saved.
+        // "<class>/<path in its folder>": how class_files and get_assignment name what Syft Notes saved.
         if (!Path.IsPathFullyQualified(path) && path.IndexOf('/') is > 0 and var slash)
             path = Path.GetFullPath(Path.Combine(reader.Store.PoolDir, Notes.Slugify(path[..slash], 60), path[(slash + 1)..]));
         if (path.Length == 0 || !Path.IsPathFullyQualified(path)) return NotHere;
@@ -92,7 +92,7 @@ public sealed class LocalLibrary(LibraryReader reader, Canvas.CanvasSync? canvas
             return NotHere;
         if (home is not null && RealPath(home) is { } h && real.StartsWith(h.TrimEnd(Path.DirectorySeparatorChar) + Path.DirectorySeparatorChar, StringComparison.Ordinal))
             return NotHere;
-        return ClaudeTools.Page(Ai.FileIndex.TextOf(real), offset, "Egghead Notes can't read the words in this file (it may be a picture or a scan).");
+        return ClaudeTools.Page(Ai.FileIndex.TextOf(real), offset, "Syft Notes can't read the words in this file (it may be a picture or a scan).");
     }
 
     /// <summary>Where a path really is, every link along it followed; null when it can't be followed (a loop, or
@@ -184,8 +184,8 @@ public sealed class LocalLibrary(LibraryReader reader, Canvas.CanvasSync? canvas
 }
 
 /// <summary>
-/// The library over its API (/api/v2), with the laptop's password: what the Egghead Notes app shows, and what Claude
-/// reads through <c>Egghead Notes mcp</c> on a laptop.
+/// The library over its API (/api/v2), with the laptop's password: what the Syft Notes app shows, and what Claude
+/// reads through <c>Syft Notes mcp</c> on a laptop.
 /// </summary>
 public sealed class RemoteLibrary(string serverUrl, string key, HttpClient? http = null) : ILibrarySource, IAttachmentLibrary, IVoiceMemoLibrary
 {
@@ -261,7 +261,7 @@ public sealed class RemoteLibrary(string serverUrl, string key, HttpClient? http
     public async Task<bool> DeleteAsync(string id) => await SendAsync(HttpMethod.Delete, $"/lectures/{Q(id)}") is not null;
 
     /// <summary>Brings a deleted lecture back from the library's trash. Null: it isn't there any more (the trash was
-    /// emptied, or the library runs an Egghead Notes without one).</summary>
+    /// emptied, or the library runs a Syft Notes without one).</summary>
     public async Task<JsonObject?> RestoreAsync(string id) => await SendAsync(HttpMethod.Post, $"/lectures/{Q(id)}/restore", new JsonObject()) as JsonObject;
 
     /// <summary>Adds a class to the library, with what it covers when given (the AI reads it to sort lectures).</summary>
@@ -272,7 +272,7 @@ public sealed class RemoteLibrary(string serverUrl, string key, HttpClient? http
     public async Task<JsonObject?> SetAliasAsync(string className, string alias, bool remove = false) =>
         await SendAsync(HttpMethod.Post, "/classes/alias", new JsonObject { ["class"] = className, ["alias"] = alias, ["remove"] = remove }) as JsonObject;
 
-    /// <summary>What Egghead Notes is for ("student", "work", ...): not a student, and it's folders rather than classes.</summary>
+    /// <summary>What Syft Notes is for ("student", "work", ...): not a student, and it's folders rather than classes.</summary>
     public async Task<JsonObject?> SetUsesAsync(IEnumerable<string> uses) =>
         await SendAsync(HttpMethod.Post, "/uses", new JsonObject { ["uses"] = new JsonArray([.. uses.Select(u => (JsonNode?)u)]) }) as JsonObject;
 
@@ -392,7 +392,7 @@ public sealed class RemoteLibrary(string serverUrl, string key, HttpClient? http
             using var r = await client.SendAsync(request, stop);
             string text = await r.Content.ReadAsStringAsync(stop);
             if (r.StatusCode == HttpStatusCode.NotFound && !text.Contains("lecture", StringComparison.Ordinal))
-                throw new LibraryRefusedException(404, "Your library runs an older Egghead Notes: update it to attach files.");
+                throw new LibraryRefusedException(404, "Your library runs an older Syft Notes: update it to attach files.");
             if (!r.IsSuccessStatusCode)
                 throw new LibraryRefusedException((int)r.StatusCode, (JsonNode.Parse(text.Length > 0 && text[0] == '{' ? text : "{}") as JsonObject)?["detail"]?.GetValue<string>() ?? r.ReasonPhrase ?? "");
             return (JsonNode.Parse(text) as JsonObject)?["attachments"] as JsonArray ?? [];
@@ -419,7 +419,7 @@ public sealed class RemoteLibrary(string serverUrl, string key, HttpClient? http
     }
 
     static JsonObject CanvasErr(string msg) => new() { ["error"] = msg };
-    const string OlderLibrary = "The library runs an older Egghead Notes, without this.";
+    const string OlderLibrary = "The library runs an older Syft Notes, without this.";
 
     static string S(JsonNode? n) => n is JsonValue v && v.TryGetValue(out string? s) ? s ?? "" : "";
 
@@ -430,8 +430,8 @@ public sealed class RemoteLibrary(string serverUrl, string key, HttpClient? http
         {
             switch (what)
             {
-                case "courses": return await SendAsync(HttpMethod.Get, "/canvas/agent-courses") ?? CanvasErr("The library runs an older Egghead Notes, without Canvas.");
-                case "fetch": return await SendAsync(HttpMethod.Post, "/canvas/fetch", body) ?? CanvasErr("The library runs an older Egghead Notes, without Canvas.");
+                case "courses": return await SendAsync(HttpMethod.Get, "/canvas/agent-courses") ?? CanvasErr("The library runs an older Syft Notes, without Canvas.");
+                case "fetch": return await SendAsync(HttpMethod.Post, "/canvas/fetch", body) ?? CanvasErr("The library runs an older Syft Notes, without Canvas.");
                 case "assignment":
                 {
                     if (cls is null) return CanvasErr("Give a class name.");
@@ -463,7 +463,7 @@ public sealed class RemoteLibrary(string serverUrl, string key, HttpClient? http
                 }
                 default:
                     return await SendAsync(HttpMethod.Get, $"/assignments?days={(body?["days"] is JsonValue d && d.TryGetValue(out int n) ? n : 14)}"
-                        + (cls is null ? "" : "&class=" + Q(cls))) ?? CanvasErr("The library runs an older Egghead Notes, without Canvas.");
+                        + (cls is null ? "" : "&class=" + Q(cls))) ?? CanvasErr("The library runs an older Syft Notes, without Canvas.");
             }
         }
         catch (LibraryRefusedException e)
@@ -510,7 +510,7 @@ public sealed class RemoteLibrary(string serverUrl, string key, HttpClient? http
     /// <summary>Open a terminal with the AI in a class's folder, on the library's own computer. What happened.</summary>
     public async Task<string> TerminalAsync(string? className) =>
         (await SendAsync(HttpMethod.Post, "/terminal", new JsonObject { ["class"] = className }) as JsonObject)?["said"]?.GetValue<string>()
-        ?? "Your library runs an older Egghead Notes.";
+        ?? "Your library runs an older Syft Notes.";
 
     /// <summary>A chat turn can take minutes (an AI reading around): its own client with no time limit.</summary>
     static readonly HttpClient ChatClient = new() { Timeout = Timeout.InfiniteTimeSpan };
@@ -531,28 +531,28 @@ public static class ClaudeTools
 
     /// <summary>What the stdio server tells Claude Code and Claude Desktop about the library.</summary>
     public const string Instructions =
-        "Egghead Notes is the user's own lecture library: lectures they recorded, transcribed on their laptop, with notes "
+        "Syft Notes is the user's own lecture library: lectures they recorded, transcribed on their laptop, with notes "
         + "written from each transcript. Search it before answering anything about their classes, lectures, exams or "
         + "assignments, and say which lecture (and the time in it) an answer comes from. Lecture ids look like rec-... "
         + "or a long hex string; pass them to get_lecture and get_transcript. When Canvas is linked, due_assignments, "
-        + "get_assignment, class_modules, class_files and class_announcements read what Egghead Notes already mirrors from "
+        + "get_assignment, class_modules, class_files and class_announcements read what Syft Notes already mirrors from "
         + "Canvas; canvas_api, canvas_page and canvas_download read Canvas directly and never other students' data. "
         + "When the student asks you to write notes for a lecture, read notes_brief and get_transcript for it, write the "
-        + "notes as notes_brief says, and save them with save_notes: they appear on the lecture's page in Egghead Notes. "
-        + "If a tool says reading is switched off for AI apps, tell the user what it says: the student turns it on in Egghead Notes.";
+        + "notes as notes_brief says, and save them with save_notes: they appear on the lecture's page in Syft Notes. "
+        + "If a tool says reading is switched off for AI apps, tell the user what it says: the student turns it on in Syft Notes.";
 
     /// <summary>What the internet door tells Claude on the web and in the desktop app: nothing here writes, and
     /// nothing points at files on a computer Claude can't open.</summary>
     public const string WebInstructions =
-        "Egghead Notes is the student's own lecture library: lectures they recorded and transcribed, with study notes "
+        "Syft Notes is the student's own lecture library: lectures they recorded and transcribed, with study notes "
         + "written from each transcript, and what their classes have on Canvas. Search it (search_notes) before answering "
         + "anything about their classes, lectures, exams or assignments, and say which lecture, and the time in it, an "
         + "answer comes from. Class names come from list_classes. Lecture ids look like rec-... or a long hex string: "
         + "list_lectures and search_notes give them, get_lecture and get_transcript take them. When Canvas is linked, "
-        + "due_assignments, get_assignment, class_modules, class_files and class_announcements read what Egghead Notes "
+        + "due_assignments, get_assignment, class_modules, class_files and class_announcements read what Syft Notes "
         + "already mirrors from Canvas; search_files and read_file find and read course files; canvas_api and canvas_page "
         + "read Canvas live, and never other students' data. Every tool only reads. If a tool says reading is switched "
-        + "off for AI apps, or that a setting doesn't allow something, tell the student what it says: they change it in Egghead Notes.";
+        + "off for AI apps, or that a setting doesn't allow something, tell the student what it says: they change it in Syft Notes.";
 
     /// <summary>The most characters one call hands back, of a transcript or a file.</summary>
     public const int PageChars = 40000;
@@ -908,7 +908,7 @@ public static class ClaudeTools
         {
             return await lib.NotesBriefAsync(id.Trim()) is { } brief
                 ? brief + "\n\n" + ChatNotes.SaveWith
-                : "Your library runs an older Egghead Notes, without this. The student can update it, or ask you to write the notes here in the chat.";
+                : "Your library runs an older Syft Notes, without this. The student can update it, or ask you to write the notes here in the chat.";
         }
         catch (LibraryRefusedException e)
         {
@@ -933,8 +933,8 @@ public static class ClaudeTools
         {
             return "Nothing was saved: " + e.Message;
         }
-        if (info is null) return "Nothing was saved: the student's library runs an older Egghead Notes, which can't take notes from here. They can update it, or copy these notes into Egghead Notes with Paste notes.";
-        var said = new StringBuilder("Saved. The notes are on the lecture's page in Egghead Notes now");
+        if (info is null) return "Nothing was saved: the student's library runs an older Syft Notes, which can't take notes from here. They can update it, or copy these notes into Syft Notes with Paste notes.";
+        var said = new StringBuilder("Saved. The notes are on the lecture's page in Syft Notes now");
         said.Append(info.Current is { By.Length: > 0 } cur ? $", written by {cur.By}." : ".");
         if (info.Change is { CanUndo: true } && replace) said.Append(" The notes it had before are kept: the student can undo this, or put them back from the notes' History.");
         var broken = Rich.NoteBlocks.Find(markdown).Where(b => b.IsDiagram && b.Closed)
@@ -958,7 +958,7 @@ public static class ClaudeTools
         List<McpServerTool> tools =
         [
             McpServerTool.Create(() => ListClassesAsync(lib),
-                Named("list_classes", "List classes", "The student's classes in Egghead Notes, each with how many lectures it has, and how "
+                Named("list_classes", "List classes", "The student's classes in Syft Notes, each with how many lectures it has, and how "
                     + "many lectures aren't in a class yet. Use it first to learn the exact class names every class_name takes.")),
             McpServerTool.Create(
                 ([Description("Only this class (a name from list_classes). Leave out for every class.")] string? class_name = null,
@@ -1012,7 +1012,7 @@ public static class ClaudeTools
             [
                 McpServerTool.Create(
                     ([Description("The lecture's id, from list_lectures or search_notes.")] string lecture_id) => NotesBriefAsync(lib, lecture_id),
-                    Named("notes_brief", "How to write a lecture's notes", "How Egghead Notes writes study notes for one lecture: the "
+                    Named("notes_brief", "How to write a lecture's notes", "How Syft Notes writes study notes for one lecture: the "
                         + "sections, how formulas and diagrams are written, and the lines the student typed during the lecture, which the "
                         + "notes keep word for word, marked ==like this==. Read it, and the lecture's transcript (get_transcript), before "
                         + "writing notes to save with save_notes. The id comes from list_lectures or search_notes.")),
@@ -1022,7 +1022,7 @@ public static class ClaudeTools
                      [Description("True only when the student has said to replace the notes the lecture already has. Leave out otherwise.")] bool replace = false,
                      McpServer? server = null) =>
                         SaveNotesAsync(lib, lecture_id, markdown, replace, writer ?? McpClients.Writer(null, server?.ClientInfo?.Name)),
-                    Named("save_notes", "Save a lecture's notes", "Saves study notes you wrote as a lecture's notes in Egghead Notes, where "
+                    Named("save_notes", "Save a lecture's notes", "Saves study notes you wrote as a lecture's notes in Syft Notes, where "
                         + "the student reads them, named as yours. Use it when the student asks you to write (or save) notes for a lecture: "
                         + "read notes_brief and get_transcript first, write the notes as notes_brief says, then save them here. A lecture "
                         + "that already has notes keeps them unless replace is true: ask the student before replacing them. Whatever "
@@ -1033,7 +1033,7 @@ public static class ClaudeTools
         tools.Add(McpServerTool.Create(
             ([Description("Words to look for.")] string query, [Description("How many files (1 to 30).")] int limit = 10) => SearchFilesText(lib, query, limit),
             Named("search_files", "Search files", "Full-text search of everything in the library that isn't a lecture (Canvas files "
-                + "and pages, slides, PDFs, study guides) and the folders the student lets Egghead Notes read. Returns each file's "
+                + "and pages, slides, PDFs, study guides) and the folders the student lets Syft Notes read. Returns each file's "
                 + "path, the folder it's in, and the words around the match. Use it to find course materials. "
                 + (!web ? "Open a file it finds with your own file tools."
                     : canRead ? "read_file reads a file's words by the path given here (a private folder's files are found by name only)."
@@ -1070,11 +1070,11 @@ public static class ClaudeTools
                     + "assignment. The class comes from list_classes; the assignment from due_assignments.")),
             McpServerTool.Create(([Description(ClassName)] string class_name) => ClassModulesAsync(lib, class_name),
                 Named("class_modules", "Read a class's modules", "A class's Canvas modules in order, each item with its kind (file, page, "
-                    + "assignment, quiz, discussion, link, tool), whether Egghead Notes saved it, and whether it's locked. Use it to see "
+                    + "assignment, quiz, discussion, link, tool), whether Syft Notes saved it, and whether it's locked. Use it to see "
                     + "how a course is laid out, week by week. The class comes from list_classes.")),
             McpServerTool.Create(([Description(ClassName)] string class_name) => ClassFilesAsync(lib, class_name, canRead),
                 Named("class_files", "Read a class's Files area", "A class's Canvas Files area: folders and files with their sizes, and "
-                    + (canRead ? "the path of each one Egghead Notes saved (read_file reads it)" : "where Egghead Notes saved each one")
+                    + (canRead ? "the path of each one Syft Notes saved (read_file reads it)" : "where Syft Notes saved each one")
                     + "; or says when Canvas hides the area from the student. Use it to find course materials by name. The class "
                     + "comes from list_classes.")),
             McpServerTool.Create(
@@ -1111,14 +1111,14 @@ public static class ClaudeTools
     public static List<McpServerPrompt> Prompts() =>
     [
         McpServerPrompt.Create(
-            ([Description("The class, as named in Egghead Notes.")] string class_name) =>
-                $"Make me a study guide for {class_name} from my Egghead Notes lectures. Use list_lectures for {class_name}, read the "
+            ([Description("The class, as named in Syft Notes.")] string class_name) =>
+                $"Make me a study guide for {class_name} from my Syft Notes lectures. Use list_lectures for {class_name}, read the "
                 + "lectures with get_lecture, and organize the guide by topic: key ideas, definitions, worked examples, and anything "
                 + "announced about exams or assignments. Say which lecture each part comes from.",
             new McpServerPromptCreateOptions { Name = "study_guide", Title = "Study guide for a class", Description = "A study guide for a class, from its lectures." }),
         McpServerPrompt.Create(
             ([Description("A class, a topic, or a lecture title.")] string topic) =>
-                $"Quiz me on {topic}, using my Egghead Notes lectures (search_notes, then get_lecture). Ask one question at a time, "
+                $"Quiz me on {topic}, using my Syft Notes lectures (search_notes, then get_lecture). Ask one question at a time, "
                 + "wait for my answer, then tell me what I got right and what the lecture said, with the lecture and time.",
             new McpServerPromptCreateOptions { Name = "quiz_me", Title = "Quiz me", Description = "Questions on a class or topic, one at a time, from your lectures." }),
     ];
@@ -1131,14 +1131,14 @@ public static class ClaudeTools
         foreach (var p in Prompts()) prompts.Add(p);
         return new McpServerOptions
         {
-            ServerInfo = new Implementation { Name = ServerName, Title = "Egghead Notes", Version = Engine.Version },
+            ServerInfo = new Implementation { Name = ServerName, Title = "Syft Notes", Version = Engine.Version },
             ServerInstructions = Instructions,
             ToolCollection = tools,
             PromptCollection = prompts,
         };
     }
 
-    /// <summary>The MCP server over stdin and stdout: what Claude Code and Claude Desktop start (<c>Egghead Notes mcp</c>).
+    /// <summary>The MCP server over stdin and stdout: what Claude Code and Claude Desktop start (<c>Syft Notes mcp</c>).
     /// <paramref name="wrapTools"/> lets a caller guard which tools may actually run (AI tool access, read from the
     /// library); left out, every tool runs as listed. <paramref name="writer"/>: who notes saved through it are written
     /// by (<see cref="McpClients.Writer"/>); left out, the app's own name for itself says.</summary>

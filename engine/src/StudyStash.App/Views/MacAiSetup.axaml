@@ -57,7 +57,7 @@
                 </Grid>
                 <!-- The free AI being got ready: how far along -->
                 <StackPanel IsVisible="{Binding Working}" Margin="34,10,0,4" Spacing="6">
-                  <ProgressBar Classes="work" Minimum="0" Maximum="1" Value="{Binding Fraction}" IsIndeterminate="{Binding Steady}" />
+                  <c:SyftLoader Kind="PixelProgress" Size="9" Progress="{Binding Fraction}" IsIndeterminate="{Binding Steady}" HorizontalAlignment="Left" />
                   <TextBlock Classes="hint" Text="{Binding Progress}" />
                 </StackPanel>
                 <!-- How to get it going: numbered steps under the name, then Open Terminal | Check again -->
@@ -162,7 +162,7 @@
         </Grid>
       </Border>
       <Grid ColumnDefinitions="Auto,8,*" Margin="2,12,0,0" IsVisible="{Binding HasSay}">
-        <c:Spinner IsVisible="{Binding Busy}" Width="14" Height="14" Foreground="{DynamicResource InkMuted}" VerticalAlignment="Center" />
+        <c:SyftLoader Kind="HoppingBits" Size="20" IsVisible="{Binding Busy}" VerticalAlignment="Center" />
         <TextBlock Grid.Column="2" Classes="hint" Text="{Binding Say}" VerticalAlignment="Center" />
       </Grid>
 

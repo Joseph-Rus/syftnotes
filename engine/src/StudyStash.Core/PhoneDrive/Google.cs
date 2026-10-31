@@ -16,7 +16,7 @@ namespace StudyStash.Core.PhoneDrive;
 public static class GoogleClient
 {
     public const string DesktopClientId = "1073354844610-rlceur96jtct2rnhb5616c14n3fnmf6e.apps.googleusercontent.com";
-    /// <summary>Who the student is (openid email) and Egghead Notes' own hidden folder in their Drive. Nothing else.</summary>
+    /// <summary>Who the student is (openid email) and Syft Notes' own hidden folder in their Drive. Nothing else.</summary>
     public const string Scopes = "openid email https://www.googleapis.com/auth/drive.appdata";
     public const string DriveScope = "https://www.googleapis.com/auth/drive.appdata";
     public const string AuthorizeUrl = "https://accounts.google.com/o/oauth2/v2/auth";
@@ -41,7 +41,7 @@ public enum GoogleTrouble
     Denied,
     /// <summary>A school (Workspace) account whose admin doesn't let outside apps in.</summary>
     School,
-    /// <summary>They unticked the Google Drive box on Google's page: Egghead Notes can't keep its folder.</summary>
+    /// <summary>They unticked the Google Drive box on Google's page: Syft Notes can't keep its folder.</summary>
     NoDrive,
     /// <summary>Nothing came back from the browser in time (Google showed its own error, or the tab was closed).</summary>
     NoAnswer,
@@ -49,7 +49,7 @@ public enum GoogleTrouble
     Offline,
     /// <summary>Google no longer takes this laptop's sign-in (revoked from the account, or it expired).</summary>
     SignedOut,
-    /// <summary>This copy of Egghead Notes was built without the Desktop client's secret.</summary>
+    /// <summary>This copy of Syft Notes was built without the Desktop client's secret.</summary>
     NotBuilt,
 }
 
@@ -61,13 +61,13 @@ public sealed class GoogleException(GoogleTrouble trouble, string words) : Excep
     /// <summary>The words for each kind of trouble: plain, second person, no jargon.</summary>
     public static string Words(GoogleTrouble t) => t switch
     {
-        GoogleTrouble.School => "Your school's Google account doesn't allow Egghead Notes. Try a personal Gmail on both.",
-        GoogleTrouble.NoDrive => "Egghead Notes needs its private folder in your Google Drive. Press Connect with Google again and leave the Google Drive box ticked.",
-        GoogleTrouble.NoAnswer => "Google didn't send you back to Egghead Notes. Press Connect with Google to try again. If Google said your account isn't allowed (a school account often isn't), try a personal Gmail on both.",
+        GoogleTrouble.School => "Your school's Google account doesn't allow Syft Notes. Try a personal Gmail on both.",
+        GoogleTrouble.NoDrive => "Syft Notes needs its private folder in your Google Drive. Press Connect with Google again and leave the Google Drive box ticked.",
+        GoogleTrouble.NoAnswer => "Google didn't send you back to Syft Notes. Press Connect with Google to try again. If Google said your account isn't allowed (a school account often isn't), try a personal Gmail on both.",
         GoogleTrouble.Offline => "Can't reach Google right now. Check this computer is online, then try again.",
-        GoogleTrouble.SignedOut => "Google signed Egghead Notes out of your account, so your phone isn't kept up to date. Connect again to carry on.",
-        GoogleTrouble.NotBuilt => "This copy of Egghead Notes can't connect to Google: it was built without Google sign-in. The download from studystash.app can.",
-        _ => "Google didn't connect. If you pressed Cancel, press Connect with Google again. If it's a school account, it may not allow Egghead Notes: try a personal Gmail on both.",
+        GoogleTrouble.SignedOut => "Google signed Syft Notes out of your account, so your phone isn't kept up to date. Connect again to carry on.",
+        GoogleTrouble.NotBuilt => "This copy of Syft Notes can't connect to Google: it was built without Google sign-in. The download from studystash.app can.",
+        _ => "Google didn't connect. If you pressed Cancel, press Connect with Google again. If it's a school account, it may not allow Syft Notes: try a personal Gmail on both.",
     };
 
     public static GoogleException Of(GoogleTrouble t) => new(t, Words(t));
@@ -321,9 +321,9 @@ public sealed class GoogleSignIn(string secret, HttpClient? http = null, string 
             int q = target.IndexOf('?');
             var got = q >= 0 ? Py.ParseQs(target[(q + 1)..]) : [];
             bool ours = got.GetValueOrDefault("state") == state && (got.ContainsKey("code") || got.ContainsKey("error"));
-            string page = !ours ? Page("This page is from an older try.", "Go back to Egghead Notes and press Connect with Google again.")
-                : got.ContainsKey("code") ? Page("Egghead Notes is connected to your Google account.", "You can close this tab and go back to Egghead Notes.")
-                : Page("Egghead Notes didn't connect.", "Go back to Egghead Notes: it says what to do.");
+            string page = !ours ? Page("This page is from an older try.", "Go back to Syft Notes and press Connect with Google again.")
+                : got.ContainsKey("code") ? Page("Syft Notes is connected to your Google account.", "You can close this tab and go back to Syft Notes.")
+                : Page("Syft Notes didn't connect.", "Go back to Syft Notes: it says what to do.");
             byte[] bytes = Encoding.UTF8.GetBytes(page);
             string reply = $"HTTP/1.1 {(target.StartsWith("/favicon", StringComparison.Ordinal) ? "404 Not Found" : "200 OK")}\r\nContent-Type: text/html; charset=utf-8\r\nContent-Length: {bytes.Length}\r\nConnection: close\r\nCache-Control: no-store\r\n\r\n";
             try
@@ -339,7 +339,7 @@ public sealed class GoogleSignIn(string secret, HttpClient? http = null, string 
     }
 
     static string Page(string title, string line) =>
-        "<!doctype html><meta charset=utf-8><meta name=viewport content=\"width=device-width\"><title>Egghead Notes</title>"
+        "<!doctype html><meta charset=utf-8><meta name=viewport content=\"width=device-width\"><title>Syft Notes</title>"
         + "<body style=\"font:16px -apple-system,Segoe UI,sans-serif;max-width:32em;margin:15vh auto;padding:0 1em;color:#1d2433\">"
         + $"<h2 style=\"font-weight:600\">{WebUtility.HtmlEncode(title)}</h2><p>{WebUtility.HtmlEncode(line)}</p></body>";
 }

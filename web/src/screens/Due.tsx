@@ -5,7 +5,7 @@ import { ago, dayLabel, dueWhen, parseWhen, relative, timeRange } from '../forma
 import { useResource } from '../data/resource';
 import { href } from '../router';
 import { Calendar, ChevronRight } from '../ui/icons';
-import { Doodle } from '../ui/Doodle';
+import { SyftMark } from '../ui/Syft';
 import { Dot, Empty, Problem, Row, Screen, Section, SkeletonRows } from '../ui/kit';
 import { useClassColors } from './classColors';
 
@@ -102,14 +102,14 @@ function Groups({ list, colorOf }: { list: DueList; colorOf: (c: string | null) 
   const done = list.groups.find((g) => g.key === 'handed_in')?.items ?? [];
   if (todo.length === 0 && done.length === 0)
     return (
-      <Empty icon={<Doodle name="sleepy" />} title="Nothing due">
-        Link your classes to Canvas in Egghead Notes on your computer, and what's due shows up here.
+      <Empty icon={<SyftMark size={96} oddOneOut />} title="Nothing due">
+        Link your classes to Canvas in Syft Notes on your computer, and what's due shows up here.
       </Empty>
     );
   return (
     <>
       {todo.length === 0 ? (
-        <Empty icon={<Doodle name="overeasy" />} title="All caught up">
+        <Empty icon={<SyftMark size={112} />} title="All caught up">
           Nothing left to hand in. Assignments, over easy.
         </Empty>
       ) : null}

@@ -55,7 +55,7 @@ public class ToastTests
     public void A_toast_is_one_plain_panel_with_no_picture_on_it(SkinKind skin, double radius)
     {
         ((App)Application.Current!).UseSkin(skin);
-        var view = new ToastView { Title = "Recording saved", Text = "Egghead Notes is writing it down." };
+        var view = new ToastView { Title = "Recording saved", Text = "Syft Notes is writing it down." };
         var w = Host(view, skin);
         try
         {
@@ -201,7 +201,7 @@ public class ToastTests
                      IconWords.WhereItIs(mac: false, hidden: false).Text,
                  })
         {
-            var view = new ToastView { Title = "Egghead Notes", Text = text, ActionLabel = "Settings" };
+            var view = new ToastView { Title = "Syft Notes", Text = text, ActionLabel = "Settings" };
             var w = Host(view, skin);
             try
             {

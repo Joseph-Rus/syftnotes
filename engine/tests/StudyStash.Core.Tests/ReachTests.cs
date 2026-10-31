@@ -268,7 +268,7 @@ public class ReachTests
                 Content = JsonContent.Create(new { resource = "https://other.example/mcp" }),
             })),
         };
-        Assert.Equal((false, "mini.tail1234.ts.net answers, but not with Egghead Notes. Is Funnel pointing at another app?"), await check.RunAsync(Ts));
+        Assert.Equal((false, "mini.tail1234.ts.net answers, but not with Syft Notes. Is Funnel pointing at another app?"), await check.RunAsync(Ts));
     }
 
     [Fact]
@@ -349,7 +349,7 @@ public class ReachTests
         var before = (await remote.AccessAsync())!.Web!;
         Assert.False(before.On);
         Assert.Null(before.McpUrl);
-        Assert.Equal("Egghead Notes", before.Name);
+        Assert.Equal("Syft Notes", before.Name);
         Assert.Null(before.Needs); // Tailscale is ready: nothing to do first
 
         var on = (await remote.SetWebAsync(true))!.Web!;

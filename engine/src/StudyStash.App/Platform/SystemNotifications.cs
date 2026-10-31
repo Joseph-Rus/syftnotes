@@ -5,13 +5,13 @@ namespace StudyStash.App.Platform;
 public sealed record NotificationButton(string Id, string Label, bool OpensApp = true);
 
 /// <summary>
-/// The computer's own notifications (a Mac's Notification Center): Egghead Notes hands over the words and the system
+/// The computer's own notifications (a Mac's Notification Center): Syft Notes hands over the words and the system
 /// shows them its way, with its own look, its own place on screen, its own time, Do Not Disturb and Focus. Nothing of
-/// Egghead Notes' is drawn on one: no picture, no sound.
+/// Syft Notes' is drawn on one: no picture, no sound.
 /// </summary>
 public interface ISystemNotifications
 {
-    /// <summary>Whether the system shows Egghead Notes' notifications: not known until it has been asked (the first
+    /// <summary>Whether the system shows Syft Notes' notifications: not known until it has been asked (the first
     /// <see cref="Show"/> asks).</summary>
     NotificationState State { get; }
 
@@ -25,6 +25,10 @@ public interface ISystemNotifications
     /// <summary>Takes one down, wherever it is (on screen, or in the list of earlier ones).</summary>
     void Remove(string id);
 
+    /// <summary>Asks the system now whether Syft Notes may show notifications (a Mac's own question, once ever),
+    /// without showing one. Nothing where the system doesn't ask.</summary>
+    void Ask() { }
+
     /// <summary>The student did something with a notification: its id, and what (<see cref="NotificationResponse"/>,
     /// or a button's id). May come on any thread.</summary>
     event Action<string, string>? Responded;
@@ -36,10 +40,10 @@ public enum NotificationState
     Unknown,
     Allowed,
     /// <summary>The student said no (the system's question, or its settings): the system shows none, and neither
-    /// does Egghead Notes.</summary>
+    /// does Syft Notes.</summary>
     Denied,
     /// <summary>The system won't have them from this copy of the app at all (run from a disk image or a temporary
-    /// folder, or not signed): Egghead Notes shows its own cards instead.</summary>
+    /// folder, or not signed): Syft Notes shows its own cards instead.</summary>
     Unavailable,
 }
 

@@ -9,7 +9,7 @@ using Avalonia.Styling;
 namespace StudyStash.App.Platform;
 
 /// <summary>
-/// An Egghead Notes window on Windows (the library, setup, Settings, Connect Canvas): one title bar, ours — the app's
+/// A Syft Notes window on Windows (the library, setup, Settings, Connect Canvas): one title bar, ours — the app's
 /// mark and name on the left (<see cref="Controls.WindowHeader"/>), the minimise, maximise and close buttons on the
 /// right, drawn by Avalonia so Windows treats them as its own (Snap layouts on maximise) — and Windows 11's Mica behind
 /// the window. Where Windows has no Mica (Windows 10, the first Windows 11, transparency effects off), the design's Mica

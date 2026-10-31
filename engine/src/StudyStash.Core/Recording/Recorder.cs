@@ -49,11 +49,11 @@ public static class RecordingWords
     public const string DiskFull = "Your disk is full: recording paused. Free some space, then press Resume.";
     public const string NearlyFull = "Your disk is nearly full: free some space to record.";
     public const string MicStopped = "The microphone stopped. Plug it back in, then press Resume.";
-    public const string CantHearMac = "Egghead Notes can't hear the microphone. Allow it in System Settings → Privacy & Security → Microphone.";
-    public const string CantHearWindows = "Windows isn't letting Egghead Notes use the microphone. Turn on Settings → Privacy & security → Microphone → Let desktop apps access your microphone.";
+    public const string CantHearMac = "Syft Notes can't hear the microphone. Allow it in System Settings → Privacy & Security → Microphone.";
+    public const string CantHearWindows = "Windows isn't letting Syft Notes use the microphone. Turn on Settings → Privacy & security → Microphone → Let desktop apps access your microphone.";
     public const string CouldntRead = "The recording couldn't be read";
 
-    /// <summary>A microphone that gives only silence: the system isn't letting Egghead Notes hear it.</summary>
+    /// <summary>A microphone that gives only silence: the system isn't letting Syft Notes hear it.</summary>
     public static string CantHear => OperatingSystem.IsWindows() ? CantHearWindows : CantHearMac;
 
     public static string CouldntSave(string why) => $"Recording paused: the recording couldn't be saved ({why.TrimEnd('.')}).";
@@ -179,8 +179,10 @@ public sealed class Recorder : IDisposable
     /// <summary>Start recording a lecture for a class ("" lets the library sort it); <paramref name="afterClass"/>: it's
     /// written down once it stops, not as it records (<see cref="Lecture.AfterClass"/>). Throws
     /// InvalidOperationException with words to show when it can't: the microphone's, or the disk's.</summary>
-    public Lecture Start(string className, string owner = "", bool afterClass = false)
+    public Lecture Start(string className, string owner = "", bool afterClass = false, bool waitsForModel = false)
     {
+        // Waiting for the model is written down after class, whatever the setting says: there's nothing to write with yet.
+        afterClass |= waitsForModel;
         lock (transitions)
         {
             if (Current is { } already) return already;
@@ -193,7 +195,7 @@ public sealed class Recorder : IDisposable
             var lecture = new Lecture
             {
                 Id = Lecture.NewId(now), Started = now.ToString("yyyy-MM-dd'T'HH:mm:sszzz", System.Globalization.CultureInfo.InvariantCulture),
-                ClassName = className, Owner = owner, AfterClass = afterClass,
+                ClassName = className, Owner = owner, AfterClass = afterClass, WaitsForModel = waitsForModel,
             };
             try
             {
@@ -213,7 +215,7 @@ public sealed class Recorder : IDisposable
                 throw;
             }
             LastProblem = null;
-            log($"[recorder] recording {lecture.Id} for '{className}'{(afterClass ? ", written down after class" : "")}");
+            log($"[recorder] recording {lecture.Id} for '{className}'{(waitsForModel ? ", written down once the model is here" : afterClass ? ", written down after class" : "")}");
         }
         Changed?.Invoke();
         return Current!;
@@ -832,6 +834,10 @@ public sealed class TranscriptionWorker(LectureStore store, Func<ITranscriber> l
     /// <summary>The time, for keeping Whisper loaded and trying it again (a test's own clock).</summary>
     public Func<DateTime> Clock { get; init; } = () => DateTime.UtcNow;
 
+    /// <summary>The model is on this computer. While it isn't (it's still downloading), lectures wait for it quietly:
+    /// nothing is tried, and no problem is said; the download's end wakes the worker.</summary>
+    public Func<bool> Ready { get; init; } = () => true;
+
     /// <summary>There's work, or something changed (a model arrived): look now, and load Whisper now if it failed.</summary>
     public void Wake()
     {
@@ -1102,6 +1108,7 @@ public sealed class TranscriptionWorker(LectureStore store, Func<ITranscriber> l
     ITranscriber? Model()
     {
         if (model is not null) return model;
+        if (!Ready()) return null;
         var now = Clock();
         if (loadFailedAt is { } failedAt && now - failedAt < LoadAgainAfter && !loadNow) return null;
         loadNow = false;

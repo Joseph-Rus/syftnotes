@@ -13,7 +13,7 @@ using StudyStash.Core.Rich;
 namespace StudyStash.App.Tests;
 
 /// <summary>
-/// What the app does while nobody is looking at it, or while it is looked at: a spinner that went on turning in a panel
+/// What the app does while nobody is looking at it, or while it is looked at: a loader (once a spinner) that went on moving in a panel
 /// that's hidden, or in a library window closed to the menu bar, woke the app thirty times a second for as long as it
 /// ran; the recording dot, redrawn sixty times a second, cost the recorder most of its CPU; a notes view built the same
 /// lecture again for each hidden copy of it; a slider left playing went on being redrawn in a closed window. Each stops
@@ -30,13 +30,13 @@ public class IdleCostTests
     }
 
     [AvaloniaFact]
-    public void A_spinner_turns_only_while_it_can_be_seen()
+    public void A_loader_moves_only_while_it_can_be_seen()
     {
         string? still = Environment.GetEnvironmentVariable("STUDYSTASH_STILL");
         Environment.SetEnvironmentVariable("STUDYSTASH_STILL", null); // other tests' pictures set it for the whole run
         try
         {
-            var spinner = new StudyStash.App.Controls.Spinner { Width = 12, Height = 12 };
+            var spinner = new SyftLoader { Kind = SyftLoaderKind.HoppingBits, Size = 12 };
             var row = new StackPanel { Children = { spinner }, IsVisible = false };
             var w = Show(row);
             Assert.False(spinner.Turning); // in a panel that's hidden (the "Attaching…" row, with nothing attaching)
@@ -70,8 +70,52 @@ public class IdleCostTests
         w.Close();
     }
 
+    /// <summary>A level meter is the s's cells: whole cells lit from the bottom by the level (a lively one never less than
+    /// the bottom cell, none at all while nothing records), on whole pixels; and its clock runs only while a cell is
+    /// fading, so a quiet room, or someone who asked for less motion, costs no frames.</summary>
     [AvaloniaFact]
-    public void A_spinner_in_a_window_that_closes_stops_for_good()
+    public async Task A_meter_lights_whole_cells_and_moves_only_while_one_changes()
+    {
+        static int[] Columns(float[] lit) => [.. lit.Chunk(StudyStash.App.Controls.Waveform.Rows).Select(c => (int)c.Sum())];
+        Assert.Equal([0, 0, 0], Columns(StudyStash.App.Controls.Waveform.Lit(null, 3, lively: true)));
+        Assert.Equal([1, 2, 4], Columns(StudyStash.App.Controls.Waveform.Lit([0.9, 0.25, 0.5, 1.0], 3, lively: false)));
+        Assert.Equal([1, 4, 1], Columns(StudyStash.App.Controls.Waveform.Lit([0.2, 0.9, 0.25], 3, lively: true)));
+        foreach (var (height, scale) in new[] { (10.0, 2.0), (16, 1), (16, 2), (20, 1), (22, 1), (28, 1), (28, 2) })
+        {
+            var (pitch, cell) = StudyStash.App.Controls.Waveform.Grid(height, scale);
+            Assert.Equal(Math.Round(pitch * scale), pitch * scale, 6);
+            Assert.Equal(Math.Round(cell * scale), cell * scale, 6);
+            Assert.True(cell < pitch && 3 * pitch + cell <= height + 1e-9, $"{height} at {scale}x: {pitch}, {cell}");
+        }
+
+        string? still = Environment.GetEnvironmentVariable("STUDYSTASH_STILL");
+        Environment.SetEnvironmentVariable("STUDYSTASH_STILL", null); // other tests' pictures set it for the whole run
+        Motion.Override = false;
+        try
+        {
+            var wave = new StudyStash.App.Controls.Waveform { Bars = 3, Height = 16, Levels = [0.1, 0.1, 0.1] };
+            var w = Show(wave);
+            Assert.False(wave.Turning);
+            wave.Levels = [0.9, 0.9, 0.9];
+            Assert.True(wave.Turning); // three columns filling
+            var clock = System.Diagnostics.Stopwatch.StartNew();
+            while (wave.Turning && clock.Elapsed < TimeSpan.FromSeconds(3))
+                await Task.Delay(10, TestContext.Current.CancellationToken);
+            Assert.False(wave.Turning); // settled: the clock stopped by itself
+            Motion.Override = true;
+            wave.Levels = [0.1, 0.1, 0.1];
+            Assert.False(wave.Turning); // less motion: straight there
+            w.Close();
+        }
+        finally
+        {
+            Motion.Override = null;
+            Environment.SetEnvironmentVariable("STUDYSTASH_STILL", still);
+        }
+    }
+
+    [AvaloniaFact]
+    public void A_loader_in_a_window_that_closes_stops_for_good()
     {
         // A window that closes is hidden first and taken apart after, and a spinner taken apart counted as seen again:
         // its timer started with nothing left listening to stop it, whether it was showing or hidden when the window
@@ -83,7 +127,7 @@ public class IdleCostTests
         {
             foreach (bool showing in new[] { true, false })
             {
-                var spinner = new StudyStash.App.Controls.Spinner { Width = 12, Height = 12 };
+                var spinner = new SyftLoader { Kind = SyftLoaderKind.PathTrace, Size = 12 };
                 var dot = new PulseDot { Width = 8, Height = 8 };
                 var row = new StackPanel { Children = { spinner, dot }, IsVisible = showing };
                 var w = Show(row);

@@ -1,4 +1,4 @@
-// The Egghead Notes look on a phone: the app's twenty colour themes (ColourThemes.cs) and the Mac's Liquid Glass tokens
+// The Syft Notes look on a phone: the app's twenty colour themes (ColourThemes.cs) and the Mac's Liquid Glass tokens
 // worked out from them the way Skin.cs does, as CSS oklch() colours.
 
 /** A colour theme: the accent's hue, chroma and lightness, and the faint hue the neutral surfaces lean to. */
@@ -64,6 +64,29 @@ const ok = (l: number, c: number, h: number, a = 1) =>
 
 export type Tokens = Record<string, string>;
 
+/**
+ * The pixel s (Joey's Pixel Sift boards) on a light page, as on his white tile, and on a dark one, as on the app
+ * icon's ink tile. Its colours themselves (--syft-lilac, --syft-ink…) are the same in every theme: base.css.
+ */
+const brandLight: Tokens = {
+  '--syft-tile': 'var(--syft-white)',
+  '--syft-base': 'var(--syft-ink)',
+  '--syft-mesh': 'var(--syft-mesh-light)',
+  '--syft-ghost': 'var(--syft-mesh-light)',
+  '--syft-trace-mesh': 'transparent',
+  '--syft-cell': 'var(--syft-ink)',
+  '--syft-word': 'var(--syft-ink)',
+};
+const brandDark: Tokens = {
+  '--syft-tile': 'var(--syft-ink)',
+  '--syft-base': 'var(--syft-mustard)',
+  '--syft-mesh': 'var(--syft-mesh-dark)',
+  '--syft-ghost': 'var(--syft-ghost-dark)',
+  '--syft-trace-mesh': 'var(--syft-trace-mesh-dark)',
+  '--syft-cell': 'var(--syft-paper)',
+  '--syft-word': 'var(--syft-white)',
+};
+
 /** The Mac's light tokens (Skin.MacTokens, not dark). */
 export function lightTokens(theme: ColourTheme): Tokens {
   const { l: L, c, h } = theme;
@@ -94,6 +117,7 @@ export function lightTokens(theme: ColourTheme): Tokens {
     '--press': 'rgba(0,0,0,0.06)',
     '--shadow': '0 1px 2px rgba(0,0,0,0.06), 0 4px 16px rgba(0,0,0,0.06)',
     '--edge': 'inset 0 1px 0 rgba(255,255,255,0.85), inset 0 0 0 0.5px rgba(0,0,0,0.06)',
+    ...brandLight,
   };
 }
 
@@ -127,6 +151,7 @@ export function darkTokens(theme: ColourTheme): Tokens {
     '--press': 'rgba(255,255,255,0.08)',
     '--shadow': '0 1px 2px rgba(0,0,0,0.3), 0 4px 16px rgba(0,0,0,0.25)',
     '--edge': 'inset 0 1px 0 rgba(255,255,255,0.08), inset 0 0 0 0.5px rgba(255,255,255,0.08)',
+    ...brandDark,
   };
 }
 

@@ -1,4 +1,4 @@
-/* The Egghead Notes look on a phone: the Mac's Liquid Glass, iOS's layout. Colours come from themes.ts as custom
+/* The Syft Notes look on a phone: the Mac's Liquid Glass, iOS's layout. Colours come from themes.ts as custom
    properties on :root; these are the fallbacks (Lagoon, light) until it runs. */
 
 :root {
@@ -33,15 +33,28 @@
   --radius: 12px;
   --ease: cubic-bezier(0.32, 0.72, 0, 1);
 
-  /* The egghead's doodles (ui/Doodle.tsx): near-black ink on an eggshell egg; in the dark, chalk lines. */
-  --egg-ink: #1d1d1f;
-  --egg-fill: #f3ead9;
-  --egg-white: #fffdf8;
-  --egg-yolk: #f6cf7e;
-  --egg-ink: light-dark(#1d1d1f, #ebe4d6);
-  --egg-fill: light-dark(#f3ead9, #34343a);
-  --egg-white: light-dark(#fffdf8, #34343a);
-  --egg-yolk: light-dark(#f6cf7e, #8a6a32);
+  /* The pixel s (Joey's Pixel Sift boards; ui/Syft.tsx): its colours, the same in every theme. What changes between
+     light and dark (--syft-base, --syft-mesh, --syft-cell…) comes from themes.ts; these are its light fallbacks. */
+  --syft-lilac: #cdbdff;
+  --syft-sky: #a3daf2;
+  --syft-coral: #ff6e4e;
+  --syft-mustard: #ffc943;
+  --syft-ink: #16131d;
+  --syft-paper: #fbfaf7;
+  --syft-white: #ffffff;
+  --syft-mesh-light: #efede8;
+  --syft-mesh-dark: #24212d;
+  --syft-ghost-dark: #2e2a39;
+  --syft-trace-mesh-dark: #1f1c27;
+  --syft-muted: #5c5b63;
+  --syft-tile: var(--syft-white);
+  --syft-base: var(--syft-ink);
+  --syft-mesh: var(--syft-mesh-light);
+  --syft-ghost: var(--syft-mesh-light);
+  --syft-trace-mesh: transparent;
+  --syft-cell: var(--syft-ink);
+  --syft-word: var(--syft-ink);
+  --font-brand: 'Syft Archivo', var(--font-display);
 
   color-scheme: light dark;
   -webkit-text-size-adjust: 100%;

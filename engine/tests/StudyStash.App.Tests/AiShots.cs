@@ -99,7 +99,7 @@ public class AiShots
         var titleBar = new Grid { ColumnDefinitions = new ColumnDefinitions("Auto,Auto,*"), Height = 32, Margin = new Thickness(16, 0, 0, 0) };
         var badge = new AppIcon { VerticalAlignment = VerticalAlignment.Center };
         titleBar.Children.Add(badge);
-        var titleText = new TextBlock { Text = "Egghead Notes settings", FontSize = 12, Margin = new Thickness(10, 0, 0, 0), VerticalAlignment = VerticalAlignment.Center };
+        var titleText = new TextBlock { Text = "Syft Notes settings", FontSize = 12, Margin = new Thickness(10, 0, 0, 0), VerticalAlignment = VerticalAlignment.Center };
         Grid.SetColumn(titleText, 1);
         titleBar.Children.Add(titleText);
 
@@ -646,7 +646,7 @@ public class AiShots
 
     // --- 14: AI tool access --------------------------------------------------------------------------------------
 
-    static AiAccessModel AccessModel(string web = "off")
+    internal static AiAccessModel AccessModel(string web = "off")
     {
         // "ready" sets WebOn through the property, which round-trips through the library like the real toggle does
         // (FakeAiLibrary's own Access must be non-null for that: its default, unscripted SetWebAsync then answers

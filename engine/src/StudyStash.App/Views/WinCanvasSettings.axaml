@@ -35,7 +35,7 @@
 
       <TextBlock Classes="cv-h1" Text="Canvas" Margin="0,0,0,12" />
       <v:WinCanvasStatus DataContext="{Binding Status}" />
-      <TextBlock Classes="cv-intro" Text="Egghead Notes only reads from Canvas. Nothing there changes, and everything stays in your library." />
+      <TextBlock Classes="cv-intro" Text="Syft Notes only reads from Canvas. Nothing there changes, and everything stays in your library." />
 
       <!-- Connection -->
       <TextBlock Classes="cv-h2" Text="Connection" />
@@ -138,7 +138,7 @@
                 <StackPanel Grid.Column="1" Spacing="2" Margin="16,0,0,0" VerticalAlignment="Center" MinWidth="0">
                   <TextBlock Classes="cv-dot-label" Text="{Binding Class}" />
                   <StackPanel Orientation="Horizontal" Spacing="6">
-                    <c:Spinner IsVisible="{Binding ScoutSpinning}" Width="14" Height="14" Thickness="2" Foreground="{DynamicResource Accent}" />
+                    <c:SyftLoader Kind="HoppingBits" Size="20" IsVisible="{Binding ScoutSpinning}" />
                     <c:Icon IsVisible="{Binding !ScoutSpinning}" Classes="cv-scout" Glyph="{Binding ScoutGlyph}"
                             Classes.cv-ok="{Binding ScoutOk}" Classes.cv-warn="{Binding ScoutWarn}" />
                     <TextBlock Classes="cv-scout" Text="{Binding ScoutLine}" />

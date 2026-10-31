@@ -115,7 +115,7 @@ public sealed partial class LibraryWeb
             }
             if (sent is null) return Http.Detail(400, "there's no recording in it (send it as a part named \"file\")");
             if (size == 0) return Http.Detail(400, "that recording is empty");
-            if (!VoiceMemos.IsAudio(sent)) return Http.Detail(415, "That isn't a recording Egghead Notes can read. Send an .m4a from Voice Memos, or an .mp3 or .wav.");
+            if (!VoiceMemos.IsAudio(sent)) return Http.Detail(415, "That isn't a recording Syft Notes can read. Send an .m4a from Voice Memos, or an .mp3 or .wav.");
             if (className is not null && className != Configs.Unsorted && !cfg.ClassNames().Contains(className)) return Http.Detail(400, $"there's no class {className}");
             string by = PhoneOf(ctx)?.Name ?? (ctx.Request.Headers["X-Study-Stash-Computer"].ToString() is { Length: > 0 } c ? c : "this computer");
             var memo = Memos.Add(staged, sent, size, className == Configs.Unsorted ? null : className, title, by);

@@ -8,7 +8,7 @@ using StudyStash.Library;
 namespace StudyStash.Core.Tests;
 
 /// <summary>The Chrome Web Store copy of the extension: the zip to upload holds only the extension, asks for no site
-/// until the student connects it, and connects with the code Egghead Notes hands out.</summary>
+/// until the student connects it, and connects with the code Syft Notes hands out.</summary>
 public partial class ExtensionStoreTests
 {
     static JsonObject ManifestIn(ZipArchive zip) => JsonNode.Parse(Text(zip, "manifest.json"))!.AsObject();
@@ -55,7 +55,7 @@ public partial class ExtensionStoreTests
         Assert.Equal(["alarms", "storage"], m["permissions"]!.AsArray().Select(p => p!.GetValue<string>()));
 
         // The store's rules: a name of 45 characters at most, a description of 132, a short name of 12.
-        Assert.Equal("Egghead Notes for Canvas", m["name"]!.GetValue<string>());
+        Assert.Equal("Syft Notes for Canvas", m["name"]!.GetValue<string>());
         Assert.InRange(m["description"]!.GetValue<string>().Length, 1, 132);
         Assert.InRange(m["short_name"]!.GetValue<string>().Length, 1, 12);
         Assert.Matches(@"^\d+$", m["minimum_chrome_version"]!.GetValue<string>());
@@ -126,7 +126,7 @@ public partial class ExtensionStoreTests
         string ext = dir["chrome-extension"];
         Extension.Ensure(ext, "http://127.0.0.1:8787", "k3y", "https://canvas.test");
         var m = JsonNode.Parse(File.ReadAllText(Path.Combine(ext, "manifest.json")))!.AsObject();
-        Assert.Equal("Egghead Notes for Canvas", m["name"]!.GetValue<string>());
+        Assert.Equal("Syft Notes for Canvas", m["name"]!.GetValue<string>());
         Assert.Null(m["optional_host_permissions"]);
         Assert.NotEmpty(m["host_permissions"]!.AsArray());
         foreach (var (_, icon) in m["icons"]!.AsObject()) Assert.True(File.Exists(Path.Combine(ext, icon!.GetValue<string>())));

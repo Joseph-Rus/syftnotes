@@ -30,7 +30,7 @@
           </StackPanel>
         </Button>
       </Grid>
-      <TextBlock Classes="cv-intro" Text="Egghead Notes only reads from Canvas. Nothing there changes, and everything stays in your library." />
+      <TextBlock Classes="cv-intro" Text="Syft Notes only reads from Canvas. Nothing there changes, and everything stays in your library." />
       <Border IsVisible="{Binding !Status.IsCompact}">
         <v:MacCanvasStatus DataContext="{Binding Status}" />
       </Border>
@@ -122,7 +122,7 @@
                       <TextBlock Classes="cv-dot-label" Text="{Binding Class}" />
                     </StackPanel>
                     <StackPanel Orientation="Horizontal" Spacing="6" Margin="16,0,0,0">
-                      <c:Spinner IsVisible="{Binding ScoutSpinning}" Width="12" Height="12" Thickness="2" Foreground="{DynamicResource Fg2}" />
+                      <c:SyftLoader Kind="HoppingBits" Size="18" IsVisible="{Binding ScoutSpinning}" />
                       <c:Icon IsVisible="{Binding !ScoutSpinning}" Classes="cv-scout" Glyph="{Binding ScoutGlyph}"
                               Classes.cv-ok="{Binding ScoutOk}" Classes.cv-warn="{Binding ScoutWarn}" />
                       <TextBlock Classes="cv-scout" Text="{Binding ScoutLine}" />

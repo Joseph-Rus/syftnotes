@@ -14,15 +14,15 @@ public static partial class SelfTest
         var shelf = Shell.Windows.Toasts;
         shelf.CloseAll();
         Shell.Toast("Filed in CS 101", "Recursion and the call stack", "Open note", () => { }, TimeSpan.FromMinutes(1));
-        Shell.Toast("Recording saved", "Egghead Notes is writing it down; the library files it and writes your notes.", null, null, TimeSpan.FromMinutes(1));
+        Shell.Toast("Recording saved", "Syft Notes is writing it down; the library files it and writes your notes.", null, null, TimeSpan.FromMinutes(1));
         Shell.Toast("Syncing Canvas", "On your browser's next check, within a minute.", null, null, TimeSpan.FromMinutes(1));
-        await Wait(1);
+        await Settle();
         CheckNotifications(shelf, "notifications", []);
         if (OperatingSystem.IsWindows() && Stack(shelf) is { } stack && shelf.Screen is { } display)
             AreaShot(Around(stack, display), "notifications");
 
         Shell.Windows.OpenPanelViaIcon();
-        await Wait(1);
+        await Settle();
         if (Shell.Windows.Panel is Floating { IsVisible: true } dropdown && dropdown.Panel() is { } panel)
         {
             CheckDropdown(panel, shelf.Screen);
@@ -30,7 +30,7 @@ public static partial class SelfTest
             if (OperatingSystem.IsWindows() && shelf.Screen is { } flyoutDisplay)
                 AreaShot(Around(Stack(shelf) is { } s ? s.Union(panel) : panel, flyoutDisplay), "notifications-flyout");
             dropdown.Hide();
-            await Wait(1);
+            await Settle();
             CheckNotifications(shelf, "notifications, dropdown closed again", []);
         }
         else

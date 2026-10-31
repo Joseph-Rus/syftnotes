@@ -4,7 +4,7 @@ using System.Xml.Linq;
 namespace StudyStash.Core;
 
 /// <summary>
-/// Where the Egghead Notes app lives on this computer, and which role it was installed as (D3): a Mac bundle
+/// Where the Syft Notes app lives on this computer, and which role it was installed as (D3): a Mac bundle
 /// (Study Stash.app) or a Windows install folder. What the updater (Updates.cs) needs to find and replace it.
 /// </summary>
 public static class Apps
@@ -34,7 +34,7 @@ public static class Apps
 
     /// <summary>Walking up from a folder inside the bundle (e.g. Contents/MacOS/arm64) to "Study Stash.app" itself, or
     /// null short of the root (a build folder isn't inside one).</summary>
-    static string? EnclosingMacBundle(string baseDir)
+    internal static string? EnclosingMacBundle(string baseDir)
     {
         for (var dir = new DirectoryInfo(baseDir); dir is not null; dir = dir.Parent)
             if (dir.Name.EndsWith(".app", StringComparison.OrdinalIgnoreCase)) return dir.FullName;

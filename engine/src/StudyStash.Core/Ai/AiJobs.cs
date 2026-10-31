@@ -206,7 +206,7 @@ public sealed class AiJobs(string home, Func<string>? ollamaHost = null)
     /// pre-flight check only, before the run starts; a job already under way never changes engines mid-run (the
     /// pipeline's own retry does that, not this).</summary>
     bool NotesOnOllama(AiSettings settings) =>
-        settings.Local("notes") || (settings.Fallback && Engines.KnownUnusableWhy(settings.For("notes").Provider, settings, Checks) is not null);
+        settings.Local("notes") || (settings.Fallback && Checks.OllamaInstalled() && Engines.KnownUnusableWhy(settings.For("notes").Provider, settings, Checks) is not null);
 
     /// <summary>What an engine's notes may draw: Ollama's small models keep to flowcharts; the CLI engines, whose
     /// SVG holds together, may draw what's spatial too.</summary>
@@ -220,6 +220,11 @@ public sealed class AiJobs(string home, Func<string>? ollamaHost = null)
         notesNote = "";
         bool onOllama = NotesOnOllama(settings);
         string engine = onOllama ? "ollama" : settings.For("notes").Provider;
+        // Over its usage limit with no free AI on this computer to fall back to (a student on Gemini's free plan): said at
+        // once as the limit it is, so the lecture is filed with its transcript and its notes come once the limit's over,
+        // rather than waiting in the queue for an Ollama that isn't here.
+        if (!onOllama && Engines.KnownUnusableWhy(engine, settings, Checks) is { } why && Engines.LooksLikeLimit(why))
+            throw new InvalidOperationException($"{Engines.Name(engine)}: {why}");
         var (drawings, designer) = await DiagramPlanAsync(m, cfg, settings, engine);
         string notes;
         if (onOllama)
@@ -609,15 +614,21 @@ public sealed class AiJobs(string home, Func<string>? ollamaHost = null)
     {
         var s = Settings;
         bool back = false;
+        bool unlimited = false;
+        DateTime? limitedUntil = null;
         if (ok)
         {
             back = Engines.LooksLikeAuth(s.Tests.GetValueOrDefault(id, ""));
             s.Tests[id] = "works";
-            s.Limits.Remove(id);
+            unlimited = s.Limits.Remove(id);
         }
         else if (Engines.LooksLikeLimit(error))
         {
-            s.Limits[id] = Engines.UntilFrom(error, Checks.Now()).ToString("o");
+            // Gemini's own count says when its allowance is back (agy's /usage, no turn spent); the others' words do.
+            var until = id == "gemini" && GeminiBack?.Invoke() is { } t && t.ToLocalTime() is var local && local > Checks.Now()
+                ? local : Engines.UntilFrom(error, Checks.Now());
+            s.Limits[id] = until.ToString("o");
+            limitedUntil = until;
         }
         else if (Engines.LooksLikeAuth(error))
         {
@@ -626,6 +637,37 @@ public sealed class AiJobs(string home, Func<string>? ollamaHost = null)
         else return; // a plain failure: not lasting enough to change the engine's remembered state
         s.Save(home);
         if (back) SignedInAgain?.Invoke(id);
+        if (limitedUntil is { } over) Limited?.Invoke(id, over);
+        if (unlimited) LimitOver?.Invoke(id);
+    }
+
+    /// <summary>An AI hit its usage limit, until when (the library writes the notes it couldn't once that's passed).</summary>
+    public event Action<string, DateTime>? Limited;
+
+    /// <summary>An AI that was over its limit answered again: the notes it couldn't write meanwhile are written now.</summary>
+    public event Action<string>? LimitOver;
+
+    /// <summary>When Gemini's allowance is back, as agy's own count says it (null when it doesn't say): set by the
+    /// library, which can run agy.</summary>
+    public Func<DateTime?>? GeminiBack { get; init; }
+
+    /// <summary>When the AI named <paramref name="name"/> ("Gemini") is over its usage limit, as last recorded; null
+    /// when it isn't limited, or nothing says.</summary>
+    public DateTime? LimitUntil(string name)
+    {
+        var s = Settings;
+        foreach (var (id, until) in s.Limits)
+            if (Engines.Name(id) == name && DateTime.TryParse(until, System.Globalization.CultureInfo.InvariantCulture, System.Globalization.DateTimeStyles.RoundtripKind, out var t)) return t;
+        return null;
+    }
+
+    /// <summary>Every AI over its usage limit now, and until when.</summary>
+    public IReadOnlyList<(string Id, DateTime Until)> LimitsNow()
+    {
+        var list = new List<(string, DateTime)>();
+        foreach (var (id, until) in Settings.Limits)
+            if (DateTime.TryParse(until, System.Globalization.CultureInfo.InvariantCulture, System.Globalization.DateTimeStyles.RoundtripKind, out var t)) list.Add((id, t));
+        return list;
     }
 
     /// <summary>Download <paramref name="model"/> through Ollama, in the background, reporting progress through

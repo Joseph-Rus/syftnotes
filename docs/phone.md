@@ -1,4 +1,4 @@
-# Egghead Notes: the phone app
+# Syft Notes: the phone app
 
 The phone app is a web app (a PWA) that each student's own library serves. There's no App Store app and no server of
 ours: the phone reaches the student's library over Tailscale, the student adds the page to their Home Screen, and it

@@ -41,6 +41,12 @@ public static class Setup
         return SetupModel.Suggested(installer);
     }
 
+    /// <summary>A first run opens the one-button welcome: setup isn't done, and the computer isn't a library (an old
+    /// library installer) or a laptop already connected to a library on another computer. Those keep setup by hand,
+    /// which is frozen as it is (the two-computer setup is hidden, not removed).</summary>
+    public static bool OneButtonFits(AppHost host) =>
+        !host.Settings.SetupDone && StartingRole(Preset(Apps.RolePreset()), host.Settings.Role, host.Client().ServerUrl) == AppRole.Both;
+
     /// <summary>An address on this computer itself (the library a one-computer setup made).</summary>
     public static bool IsThisComputer(string url) =>
         Uri.TryCreate(url, UriKind.Absolute, out var u) && (u.IsLoopback || u.Host.Equals("localhost", StringComparison.OrdinalIgnoreCase));
@@ -66,7 +72,7 @@ public static class Setup
             m.Password = had.PoolPassword;
             m.NotesFolder = had.PoolDir;
         }
-        // The switch shows what the student last chose: on only when Egghead Notes already starts at login (Finish
+        // The switch shows what the student last chose: on only when Syft Notes already starts at login (Finish
         // then writes the login item afresh, pointing at this copy of the app). A library already here doesn't turn
         // it on by itself: setup closed part-way and opened again would write a login item nobody asked for.
         if (host.LoginItems.StartsAtLogin(host.Home)) m.StartAtLogin = true;
@@ -136,7 +142,7 @@ public static class Setup
         };
         m.CanLeave = step =>
         {
-            if ((step is SetupStep.Password or SetupStep.Library || step == SetupStep.Welcome && m.IsOneComputer) && !m.LibraryOk)
+            if ((step is SetupStep.Password or SetupStep.Library || step is SetupStep.Welcome or SetupStep.Start && m.IsOneComputer) && !m.LibraryOk)
             {
                 m.LibraryResult = m.IsLaptop ? "Connect to your library first." : "Create the library first.";
                 return false;
@@ -163,7 +169,7 @@ public static class Setup
 
     /// <summary>This computer records (a laptop, or just this computer), so it needs a transcription model: a library
     /// on its own doesn't.</summary>
-    static bool Records(SetupModel m) => m.Steps.Any(s => s.Step == SetupStep.Microphone);
+    static bool Records(SetupModel m) => m.Steps.Any(s => s.Step is SetupStep.Microphone or SetupStep.Start);
 
     /// <summary>The models to pick from, the one for this computer marked (and picked, unless another already was),
     /// with one line why it suits this computer.</summary>
@@ -222,6 +228,13 @@ public static class Setup
         {
             s.Role = m.Role;
             s.SetupDone = true;
+            // A first run's one page ends on Home, with "Ready when class starts" over it.
+            if (m.OneButton && !m.Again)
+            {
+                s.WelcomeCard = true;
+                // The notification question waits for the first Stop, where it means something (a Mac's only).
+                s.AskNotificationsAtStop = OperatingSystem.IsMacOS();
+            }
             // The model setup showed stays the one in use, and its advice has been heard: no suggestion later (the
             // suggestion is of the heaviest model this computer keeps up with, so that's the one marked heard).
             if (records && !host.ModelFromEnvironment)
@@ -230,8 +243,9 @@ public static class Setup
                 s.ModelSuggested = WhisperModels.Heaviest(host.Hardware, host.ParakeetFits).Model.Id;
             }
         });
-        // Only the library's flows ask; a laptop's setup never changes its login items.
-        if (m.StartAtLogin && m.Steps.Any(s => s.Step == SetupStep.StartAtLogin))
+        // Only the library's flows ask (and a first run's welcome, ticked unless the student unticked it); a laptop's
+        // setup never changes its login items.
+        if (m.StartAtLogin && m.Steps.Any(s => s.Step is SetupStep.StartAtLogin or SetupStep.Start))
         {
             try
             {

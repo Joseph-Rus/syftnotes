@@ -4,7 +4,7 @@ import { useResource } from '../data/resource';
 import { clock, lectureMeta } from '../format';
 import { href, navigate } from '../router';
 import { Doc, Search as SearchIcon } from '../ui/icons';
-import { Doodle } from '../ui/Doodle';
+import { SyftMark } from '../ui/Syft';
 import { Dot, Empty, Problem, Row, Screen, Section, SkeletonRows } from '../ui/kit';
 import { useClassColors } from './classColors';
 
@@ -51,7 +51,7 @@ export function SearchScreen({ api, q }: { api: Api; q: string }) {
         />
       </div>
       {!key ? (
-        <Empty icon={<Doodle name="search" />} title="Search your library">
+        <Empty icon={<SyftMark size={112} showMesh />} title="Search your library">
           Any word from your notes and transcripts, or a class's name.
         </Empty>
       ) : results.error && !data ? (
@@ -59,7 +59,7 @@ export function SearchScreen({ api, q }: { api: Api; q: string }) {
       ) : !data ? (
         <SkeletonRows count={5} />
       ) : data.lectures.length === 0 && data.passages.length === 0 && data.classes.length === 0 ? (
-        <Empty icon={<Doodle name="scrambled" />} title="Nothing found">
+        <Empty icon={<SyftMark size={96} oddOneOut />} title="Nothing found">
           Nothing in your library says “{q.trim()}”. Try another word.
         </Empty>
       ) : (

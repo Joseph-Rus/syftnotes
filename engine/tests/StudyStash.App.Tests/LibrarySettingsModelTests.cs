@@ -33,7 +33,7 @@ public class LibrarySettingsModelTests
         using var _m = model;
 
         Assert.Equal("This laptop", model.ComputerNavTitle);
-        Assert.Equal(["Egghead Notes", "Your library", "Connect and import", "Advanced"], model.NavGroups.Select(g => g.Title));
+        Assert.Equal(["Syft Notes", "Your library", "Connect and import", "Advanced"], model.NavGroups.Select(g => g.Title));
         Assert.Equal(["General", "Appearance", "Recording", "Calendars", "Phone"], model.NavGroups[0].Items.Select(n => n.Label));
         Assert.Equal(["Classes", "Notes", "Your AI", "Canvas"], model.NavGroups[1].Items.Select(n => n.Label));
         Assert.Equal(["AI apps", "Granola", "Your files"], model.NavGroups[2].Items.Select(n => n.Label));
@@ -344,7 +344,7 @@ public class LibrarySettingsModelTests
         await lib.AddClassCommand.ExecuteAsync(null);
         Assert.Equal("PHYS 150", lib.Classes.Last().Name);
         Assert.Equal("", lib.NewClass);
-        Assert.Equal("/Users/sam/Egghead Notes/Lecture notes/PHYS 150", lib.Classes.Last().Folder); // from the library's answer
+        Assert.Equal("/Users/sam/Syft Notes/Lecture notes/PHYS 150", lib.Classes.Last().Folder); // from the library's answer
         Assert.Same(cs, lib.Classes[0]);
 
         await lib.RemoveClassCommand.ExecuteAsync(lib.Classes.Single(c => c.Name == "HIST 210"));
@@ -475,7 +475,7 @@ public class LibrarySettingsModelTests
 
         Assert.False(model.Lib.CanStartAtLogin);
         Assert.DoesNotContain(fake.Calls, c => c.Method == "POST");
-        Assert.Contains("without the Egghead Notes app", model.Lib.StartAtLoginSub);
+        Assert.Contains("without the Syft Notes app", model.Lib.StartAtLoginSub);
     }
 
     /// <summary>A laptop updates itself on its own say: General's Update automatically is client.toml's, it survives a

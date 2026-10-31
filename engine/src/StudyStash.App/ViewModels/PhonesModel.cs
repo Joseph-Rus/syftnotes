@@ -89,8 +89,8 @@ public sealed partial class PhonesModel : ObservableObject
     /// <summary>What the phone does, under the page's title. Through Google it's the iPhone and iPad app: Android's web
     /// app is served over Tailscale.</summary>
     public string Body => ViaGoogle
-        ? "Record lectures, read your notes, search, ask and study, write by hand and add files from your phone: the Egghead Notes app on iPhone and iPad."
-        : "Record lectures, read your notes, search, ask and study, write by hand and add files from your phone: the Egghead Notes app on iPhone and iPad, or on Android the web app your library serves.";
+        ? "Record lectures, read your notes, search, ask and study, write by hand and add files from your phone: the Syft Notes app on iPhone and iPad."
+        : "Record lectures, read your notes, search, ask and study, write by hand and add files from your phone: the Syft Notes app on iPhone and iPad, or on Android the web app your library serves.";
     /// <summary>Through Google, the Tailscale way is folded under "Other ways" (an Android phone, or the phone's web
     /// page), closed until it's pressed; phones added over Tailscale stay listed either way.</summary>
     [ObservableProperty] public partial bool OtherWays { get; set; }
@@ -107,7 +107,7 @@ public sealed partial class PhonesModel : ObservableObject
     {
         LibrarySettingsState.NoLibrary => "There's no library yet. Connect to one in Connection, then add your phone here.",
         LibrarySettingsState.Unreachable => "Can't reach your library right now. Is its computer on, and Tailscale connected?",
-        LibrarySettingsState.Older => "Your library runs an older Egghead Notes, without the phone app. Update it to add your phone.",
+        LibrarySettingsState.Older => "Your library runs an older Syft Notes, without the phone app. Update it to add your phone.",
         _ => "",
     };
     public bool NoPhones => Phones.Count == 0;

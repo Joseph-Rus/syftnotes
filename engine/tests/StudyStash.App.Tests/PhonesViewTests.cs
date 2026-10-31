@@ -184,7 +184,7 @@ public class PhonesViewTests
             Assert.True(connect.IsEffectivelyVisible);
             Assert.Equal(secret, connect.IsEffectivelyEnabled);
             Assert.Equal(!secret, view.GetVisualDescendants().OfType<TextBlock>().Any(t => t.Text == Core.PhoneDrive.GoogleException.Words(Core.PhoneDrive.GoogleTrouble.NotBuilt) && t.IsEffectivelyVisible));
-            Assert.Contains(view.GetVisualDescendants().OfType<TextBlock>(), t => t.Text == "Your notes go into a private Egghead Notes folder in your Google Drive that only Egghead Notes can see." && t.IsEffectivelyVisible);
+            Assert.Contains(view.GetVisualDescendants().OfType<TextBlock>(), t => t.Text == "Your notes go into a private Syft Notes folder in your Google Drive that only Syft Notes can see." && t.IsEffectivelyVisible);
             Assert.DoesNotContain(view.GetVisualDescendants().OfType<Button>(), b => b.Content is TextBlock { Text: "Add a phone" } && b.IsEffectivelyVisible);
         }
         finally

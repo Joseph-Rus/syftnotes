@@ -19,8 +19,17 @@ public sealed partial class CopyPart(int number, string text) : ObservableObject
     public string Glyph => Copied ? "check" : "content_copy";
 }
 
+/// <summary>Why the lecture page's card can't just offer the AIs: Google turned the account down (a school or work
+/// one), or the AI writing the notes is over its usage limit (Gemini's free allowance used up for the week).</summary>
+public enum NotesFallback
+{
+    None,
+    GoogleAccount,
+    Limit,
+}
+
 /// <summary>
-/// Notes from an AI Egghead Notes doesn't run, on a lecture's page: over a lecture with no notes, the line that says a
+/// Notes from an AI Syft Notes doesn't run, on a lecture's page: over a lecture with no notes, the line that says a
 /// student with no paid AI can ask the Claude app for them; "Copy for your AI" (what to ask any free chat for the notes,
 /// and the transcript, in parts when the lecture is long for one message); and "Paste notes", a box for what the chat
 /// wrote, saved as the lecture's notes (tidied of what chats put round them, the student's typed lines kept, any notes
@@ -48,7 +57,7 @@ public sealed partial class FreeAiModel : ObservableObject
     /// <summary>The lecture has no notes yet, nothing is writing them, and there's a transcript to write them from:
     /// the page offers this over where they'd be.</summary>
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(ShowOffer))]
+    [NotifyPropertyChangedFor(nameof(ShowOffer), nameof(ShowChoose), nameof(ShowFallback), nameof(ShowCopyWay))]
     public partial bool Offer { get; set; }
 
     /// <summary>The lecture has notes of its own (an AI's, or ones it came with): pasted ones replace them, and the
@@ -80,7 +89,75 @@ public sealed partial class FreeAiModel : ObservableObject
     public partial string? Say { get; set; }
     public bool HasSay => Say is { Length: > 0 };
 
-    public bool ShowOffer => Offer && !Pasting;
+    public bool ShowOffer => Offer && !Pasting && !Choose && Fallback == NotesFallback.None;
+
+    // --- Get study notes from this lecture -------------------------------------------------------------------------
+
+    /// <summary>No AI writes notes yet (a first run found none here, or "No AI for now"): the card asks which, once, on
+    /// the lecture's page. Continue with Google first (free with a personal Google account), Claude and ChatGPT for
+    /// a paid plan, and copy and paste as the quiet other free way.</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(ShowOffer), nameof(ShowChoose), nameof(ShowCopyWay))]
+    public partial bool Choose { get; set; }
+
+    /// <summary>The card says why it can't just offer the AIs (<see cref="NotesFallback"/>), with copy and paste open.</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(ShowOffer), nameof(ShowChoose), nameof(ShowFallback), nameof(ShowCopyWay), nameof(FallbackTitle), nameof(FallbackText),
+        nameof(ShowGoogleAgain))]
+    public partial NotesFallback Fallback { get; set; }
+
+    /// <summary>The AI over its usage limit ("Gemini"), and until when ("Tue 3 Nov, 9:00 am"; "" when nothing says).</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(FallbackTitle), nameof(FallbackText))]
+    public partial string LimitedAi { get; set; } = "";
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(FallbackText))]
+    public partial string LimitedUntil { get; set; } = "";
+
+    /// <summary>"Other free way: copy and paste" was pressed: Copy for your AI and Paste notes show under the card.</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(ShowCopyWay), nameof(OtherWayLabel))]
+    public partial bool CopyWayOpen { get; set; }
+
+    public bool ShowChoose => Offer && Choose && !Pasting && Fallback == NotesFallback.None;
+    public bool ShowFallback => Offer && Fallback != NotesFallback.None && !Pasting;
+    /// <summary>Copy for your AI and Paste notes, under the card: opened from it, or with a fallback, which offers them.</summary>
+    public bool ShowCopyWay => !Pasting && (ShowFallback || ShowChoose && CopyWayOpen);
+    public bool ShowGoogleAgain => Fallback == NotesFallback.GoogleAccount;
+
+    public string ChooseTitle => $"Get study notes from this {Noun}";
+    public const string ChooseText = "An AI reads the transcript and writes a summary, the key points, definitions and questions to review.";
+    public const string GoogleButton = "Continue with Google";
+    public const string GoogleLine = "Free with a personal Google account, through Gemini. After this, notes are written after every class. Google's free plan may use what's sent to improve its products.";
+    public const string PaidLine = "Have a paid Claude or ChatGPT plan? Notes then write themselves after every class too.";
+    public string OtherWayLabel => CopyWayOpen ? "Hide the other free way" : "Other free way: copy and paste";
+    public const string CopyWayText = "Copy for your AI, paste it into ChatGPT, Claude or Gemini in your browser, then bring back what it writes with Paste notes.";
+
+    public string FallbackTitle => Fallback switch
+    {
+        NotesFallback.GoogleAccount => "Use a personal Google account",
+        NotesFallback.Limit when LimitedAi == "Gemini" => "Google's free allowance is used up for now",
+        NotesFallback.Limit => $"{(LimitedAi.Length > 0 ? LimitedAi : "Your AI")} hit its usage limit",
+        _ => "",
+    };
+
+    public string FallbackText => Fallback switch
+    {
+        NotesFallback.GoogleAccount => "Google doesn't let school and work accounts use Gemini from other apps. Continue with a personal Google account (like Gmail), or copy and paste this "
+            + Noun + " into any free AI chat.",
+        NotesFallback.Limit => $"This {Noun} keeps its transcript, and its notes are written by themselves once {(LimitedAi == "Gemini" ? "Google's allowance" : "the limit")} is back"
+            + (LimitedUntil.Length > 0 ? $" ({LimitedUntil})" : "") + ". Meanwhile, you can copy and paste it into any free AI chat.",
+        _ => "",
+    };
+
+    /// <summary>Continue with Google, Claude or ChatGPT: the host gets that AI ready ("gemini", "claude", "codex"), in
+    /// its own small window, and it writes this lecture's notes (and every one after).</summary>
+    public Action<string>? OnGetReady { get; set; }
+
+    [RelayCommand] void ContinueWithGoogle() => OnGetReady?.Invoke("gemini");
+    [RelayCommand] void UseClaude() => OnGetReady?.Invoke("claude");
+    [RelayCommand] void UseChatGpt() => OnGetReady?.Invoke("codex");
+    [RelayCommand] void ToggleCopyWay() => CopyWayOpen = !CopyWayOpen;
 
     /// <summary>The one line a student with no paid AI is told, over a lecture with no notes.</summary>
     public string OfferLine => $"No paid AI? Ask the Claude app to “write notes for this {Noun}” and they'll appear here.";
@@ -104,7 +181,7 @@ public sealed partial class FreeAiModel : ObservableObject
             var brief = await library.NotesBriefAsync(LectureId);
             if (brief is null || brief.Parts.Count == 0)
             {
-                Say = "Your library runs an older Egghead Notes. Update it to copy a lecture for another AI.";
+                Say = "Your library runs an older Syft Notes. Update it to copy a lecture for another AI.";
                 return;
             }
             Parts.Clear();
@@ -147,7 +224,7 @@ public sealed partial class FreeAiModel : ObservableObject
 
     /// <summary>The paste box is open, where the notes would be.</summary>
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(ShowOffer))]
+    [NotifyPropertyChangedFor(nameof(ShowOffer), nameof(ShowChoose), nameof(ShowFallback), nameof(ShowCopyWay))]
     public partial bool Pasting { get; set; }
 
     [ObservableProperty]
@@ -162,7 +239,7 @@ public sealed partial class FreeAiModel : ObservableObject
 
     public bool CanSavePaste => !Busy && PasteText.Trim().Length > 0;
 
-    public const string PasteHint = "Copy the chat's whole answer and paste it here. Egghead Notes tidies away what chats add around notes.";
+    public const string PasteHint = "Copy the chat's whole answer and paste it here. Syft Notes tidies away what chats add around notes.";
     public string ReplacesWords => HasNotes ? $"These replace this {Noun}'s notes. You can put those back from the ⋯ menu by the notes." : "";
     public bool HasReplacesWords => HasNotes;
 
@@ -194,7 +271,7 @@ public sealed partial class FreeAiModel : ObservableObject
             var info = await library.SaveNotesAsync(LectureId, PasteText, replace: HasNotes || overChanged, basedOn: overChanged ? null : BasedOn?.Invoke());
             if (info is null)
             {
-                PasteProblem = "Your library runs an older Egghead Notes. Update it to save notes from another AI.";
+                PasteProblem = "Your library runs an older Syft Notes. Update it to save notes from another AI.";
                 return;
             }
             Pasting = false;

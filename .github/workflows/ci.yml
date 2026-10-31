@@ -1,4 +1,4 @@
-# The build and release pipeline for Egghead Notes (C# on .NET 10, one app for both roles). Two speeds, one workflow.
+# The build and release pipeline for Syft Notes (C# on .NET 10, one app for both roles). Two speeds, one workflow.
 #
 #   A merge (a push to main) proves the code, and nothing it would throw away:
 #     - the engine's two test projects (Core and App) on macOS, Linux and Windows, each in a job of its own, so all six
@@ -271,7 +271,7 @@ jobs:
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
           STUDYSTASH_LIBRARY_VALIDATION: ${{ vars.STUDYSTASH_LIBRARY_VALIDATION }}
           HOW: ${{ needs.version.outputs.mac_signing == 'rehearsal' && 'rehearsal' || (needs.version.outputs.mac_notarize == 'true' && 'notarized' || 'signed') }}
-        run: sh macos/verify-signing.sh "dist/mac/Study Stash.app" dist/mac/Egghead-Notes.dmg "$HOW"
+        run: sh macos/verify-signing.sh "dist/mac/Study Stash.app" dist/mac/Syft-Notes.dmg "$HOW"
       - name: The app carries the phone app, which the library serves at /app/
         run: |
           for arch in arm64 x64; do
@@ -308,17 +308,17 @@ jobs:
         run: |
           mnt="$RUNNER_TEMP/mnt-dmg"
           mkdir -p "$mnt"
-          hdiutil attach -nobrowse -readonly -noautoopen -mountpoint "$mnt" dist/mac/Egghead-Notes.dmg
+          hdiutil attach -nobrowse -readonly -noautoopen -mountpoint "$mnt" dist/mac/Syft-Notes.dmg
           if /usr/libexec/PlistBuddy -c "Print :StudyStashRole" "$mnt/Study Stash.app/Contents/Info.plist" >/dev/null 2>&1; then
             hdiutil detach -quiet "$mnt"
-            echo "Egghead-Notes.dmg's app still says a role" >&2
+            echo "Syft-Notes.dmg's app still says a role" >&2
             exit 1
           fi
           [ -L "$mnt/Applications" ]
           # Bar the live words' small Whisper (models/live-whisper-*.bin, Intel only), which comes with the app.
           if find "$mnt" \( -iname 'ggml-*.bin' -o -name '*.bin' -size +1M \) ! -name 'live-whisper-*.bin' | grep -q .; then
             hdiutil detach -quiet "$mnt"
-            echo "a model file is bundled in Egghead-Notes.dmg" >&2
+            echo "a model file is bundled in Syft-Notes.dmg" >&2
             exit 1
           fi
           hdiutil detach -quiet "$mnt"
@@ -326,7 +326,7 @@ jobs:
         if: needs.version.outputs.installers == 'true'
         with:
           name: mac-installers
-          path: dist/mac/Egghead-Notes.dmg
+          path: dist/mac/Syft-Notes.dmg
           retention-days: 30
       - uses: actions/upload-artifact@v4
         if: always() && needs.version.outputs.tested != 'true'
@@ -396,7 +396,7 @@ jobs:
       - name: Mount the DMG and copy the app out (artifacts lose exec bits, so it travels as a DMG)
         run: |
           mkdir -p "$RUNNER_TEMP/mnt"
-          hdiutil attach -nobrowse -readonly -noautoopen -mountpoint "$RUNNER_TEMP/mnt" dist/mac/Egghead-Notes.dmg
+          hdiutil attach -nobrowse -readonly -noautoopen -mountpoint "$RUNNER_TEMP/mnt" dist/mac/Syft-Notes.dmg
           ditto "$RUNNER_TEMP/mnt/Study Stash.app" "$RUNNER_TEMP/Study Stash.app"
           hdiutil detach -quiet "$RUNNER_TEMP/mnt"
           codesign --verify --deep --strict "$RUNNER_TEMP/Study Stash.app"
@@ -406,7 +406,7 @@ jobs:
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
           STUDYSTASH_LIBRARY_VALIDATION: ${{ vars.STUDYSTASH_LIBRARY_VALIDATION }}
           HOW: ${{ needs.version.outputs.mac_signing == 'rehearsal' && 'rehearsal' || (needs.version.outputs.mac_notarize == 'true' && 'notarized' || 'signed') }}
-        run: sh macos/verify-signing.sh "$RUNNER_TEMP/Study Stash.app" dist/mac/Egghead-Notes.dmg "$HOW"
+        run: sh macos/verify-signing.sh "$RUNNER_TEMP/Study Stash.app" dist/mac/Syft-Notes.dmg "$HOW"
       - name: Self-test, natively on Intel
         run: sh macos/selftest.sh "$RUNNER_TEMP/Study Stash.app" "$RUNNER_TEMP/selftest"
       - uses: actions/upload-artifact@v4
@@ -468,7 +468,7 @@ jobs:
           node-version: 22
           cache: npm
           cache-dependency-path: web/package-lock.json
-      - name: Build win-x64 and win-arm64, and Egghead-Notes-Setup.exe
+      - name: Build win-x64 and win-arm64, and Syft-Notes-Setup.exe
         shell: pwsh
         # The laptop's Google sign-in secret, built into the app as on the Mac.
         env:
@@ -509,7 +509,7 @@ jobs:
         run: |
           $check = @{}
           if ($env:HOW -eq "rehearsal") { $check.Rehearsal = $true }
-          .\windows\verify-signing.ps1 @check dist\windows\Egghead-Notes-Setup.exe dist\windows\win-x64\StudyStash.exe dist\windows\win-arm64\StudyStash.exe dist\windows\win-x64\StudyStash.Core.dll dist\windows\win-x64\libSkiaSharp.dll
+          .\windows\verify-signing.ps1 @check dist\windows\Syft-Notes-Setup.exe dist\windows\win-x64\StudyStash.exe dist\windows\win-arm64\StudyStash.exe dist\windows\win-x64\StudyStash.Core.dll dist\windows\win-x64\libSkiaSharp.dll
       - name: Both trees carry the phone app, which the library serves at /app/
         shell: pwsh
         run: |
@@ -573,7 +573,7 @@ jobs:
           $env:STUDYSTASH_MODEL_FILE = $env:STUDYSTASH_WHISPER_MODEL
           $exe = (Resolve-Path "dist\windows\win-x64\StudyStash.exe").Path
           $p = Start-Process -FilePath $exe -ArgumentList "--home", $selftestHome -PassThru
-          if (-not $p.WaitForExit(480000)) { $p.Kill(); throw "Egghead Notes didn't exit within 480 s" }
+          if (-not $p.WaitForExit(480000)) { $p.Kill(); throw "Syft Notes didn't exit within 480 s" }
           $lines = Get-Content "$out\selftest.txt"
           $lines | Write-Host
           if (Test-Path "$selftestHome\logs\library.log") { Write-Host "--- library.log"; Get-Content "$selftestHome\logs\library.log" -Tail 40 | Write-Host }
@@ -583,21 +583,20 @@ jobs:
           if (-not ($lines -match "just this computer")) { throw "the self-test didn't run Just this computer" }
           if (-not ($lines -match "notes written on this computer by its own library")) { throw "the notes weren't written by this computer's own library" }
           # The library ran as the app's own child (StudyStash.exe serve): quitting the app stops it too.
-          $left = $null
-          for ($i = 0; $i -lt 20; $i++) {
+          $left = @(Get-Process -Name StudyStash -ErrorAction SilentlyContinue | Where-Object { $_.Path -eq $exe })
+          if ($left.Count -gt 0) {
+            $left | Wait-Process -Timeout 20 -ErrorAction SilentlyContinue
             $left = @(Get-Process -Name StudyStash -ErrorAction SilentlyContinue | Where-Object { $_.Path -eq $exe })
-            if ($left.Count -eq 0) { break }
-            Start-Sleep 1
           }
           if ($left.Count -ne 0) { $left | Stop-Process -Force; throw "the app's library (StudyStash.exe serve) was still running 20 s after the app quit" }
-      - name: The installer puts Egghead Notes on this account, with no role of its own (setup asks)
+      - name: The installer puts Syft Notes on this account, with no role of its own (setup asks)
         if: needs.version.outputs.installers == 'true'
         shell: pwsh
         run: |
-          Start-Process "dist\windows\Egghead-Notes-Setup.exe" -ArgumentList "/VERYSILENT", "/SUPPRESSMSGBOXES", "/NORESTART" -Wait
+          Start-Process "dist\windows\Syft-Notes-Setup.exe" -ArgumentList "/VERYSILENT", "/SUPPRESSMSGBOXES", "/NORESTART" -Wait
           $app = "$env:LOCALAPPDATA\Programs\Study Stash"
-          if (-not (Test-Path "$app\StudyStash.exe")) { throw "Egghead Notes isn't installed" }
-          if (-not (Test-Path "$env:APPDATA\Microsoft\Windows\Start Menu\Programs\Egghead Notes.lnk")) { throw "no Start Menu entry" }
+          if (-not (Test-Path "$app\StudyStash.exe")) { throw "Syft Notes isn't installed" }
+          if (-not (Test-Path "$env:APPDATA\Microsoft\Windows\Start Menu\Programs\Syft Notes.lnk")) { throw "no Start Menu entry" }
           if (Select-String -Path "$app\study-stash.ini" -Pattern "^\s*role\s*=" -Quiet) { throw "the one download wrote a role" }
           $printed = (& "$app\StudyStash.exe" version | Out-String).Trim()
           if ($printed -ne $env:V) { throw "installed version '$printed', expected '$env:V'" }
@@ -626,7 +625,7 @@ jobs:
           $exe = if ("${{ needs.version.outputs.installers }}" -eq "true") { "$env:LOCALAPPDATA\Programs\Study Stash\StudyStash.exe" } else { (Resolve-Path "dist\windows\win-x64\StudyStash.exe").Path }
           Write-Host "Self-testing $exe"
           $p = Start-Process -FilePath $exe -ArgumentList "--home", $selftestHome -PassThru
-          if (-not $p.WaitForExit(480000)) { $p.Kill(); throw "Egghead Notes didn't exit within 480 s" }
+          if (-not $p.WaitForExit(480000)) { $p.Kill(); throw "Syft Notes didn't exit within 480 s" }
           $lines = Get-Content "$out\selftest.txt"
           $lines | Write-Host
           if ($p.ExitCode -ne 0) { throw "exit code $($p.ExitCode)" }
@@ -641,12 +640,12 @@ jobs:
           $app = "$env:LOCALAPPDATA\Programs\Study Stash"
           # What an old Study-Stash-Library-Setup.exe left behind.
           "[app]`r`nrole=library`r`nversion=0.8.0`r`n" | Set-Content -NoNewline "$app\study-stash.ini"
-          Start-Process "dist\windows\Egghead-Notes-Setup.exe" -ArgumentList "/VERYSILENT", "/SUPPRESSMSGBOXES", "/NORESTART" -Wait
+          Start-Process "dist\windows\Syft-Notes-Setup.exe" -ArgumentList "/VERYSILENT", "/SUPPRESSMSGBOXES", "/NORESTART" -Wait
           if (-not (Select-String -Path "$app\study-stash.ini" -Pattern "role\s*=\s*library" -Quiet)) { throw "the old install's role was lost" }
           if (-not (Select-String -Path "$app\study-stash.ini" -Pattern "version\s*=\s*$env:V" -Quiet)) { throw "study-stash.ini doesn't say $env:V" }
           $entries = @(Get-ItemProperty "HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall\*" -ErrorAction SilentlyContinue |
-            Where-Object { $_.DisplayName -eq "Egghead Notes" })
-          if ($entries.Count -ne 1) { throw "expected one uninstall entry for Egghead Notes, found $($entries.Count)" }
+            Where-Object { $_.DisplayName -eq "Syft Notes" })
+          if ($entries.Count -ne 1) { throw "expected one uninstall entry for Syft Notes, found $($entries.Count)" }
       - name: A silent update (relaunch=1) starts the app again from the same folder
         if: needs.version.outputs.installers == 'true'
         shell: pwsh
@@ -655,17 +654,25 @@ jobs:
           $app = "$env:LOCALAPPDATA\Programs\Study Stash"
           $updateHome = "$env:RUNNER_TEMP\update-home"
           New-Item -ItemType Directory -Force -Path $updateHome | Out-Null
-          Start-Process -FilePath "$app\StudyStash.exe" -ArgumentList "--home", $updateHome, "--background" | Out-Null
-          Start-Sleep 3
+          $old = Start-Process -FilePath "$app\StudyStash.exe" -ArgumentList "--home", $updateHome, "--background" -PassThru
+          # It's running (a process that is gone already would make the rest of this prove nothing); the installer finds it by its file.
+          if ($old.WaitForExit(0)) { throw "StudyStash.exe quit by itself right after starting (exit code $($old.ExitCode))" }
+          # Windows says when a StudyStash.exe starts: queued from here on, so one that starts before the wait begins is still seen.
+          Register-CimIndicationEvent -Query "SELECT * FROM Win32_ProcessStartTrace WHERE ProcessName = 'StudyStash.exe'" -SourceIdentifier started | Out-Null
           # Wait for the installer only: -Wait would also wait for the app it relaunches, which keeps running.
-          $setup = Start-Process "dist\windows\Egghead-Notes-Setup.exe" -ArgumentList "/VERYSILENT", "/SUPPRESSMSGBOXES", "/CLOSEAPPLICATIONS", "/relaunch=1" -PassThru
-          $setup.WaitForExit()
+          $setup = Start-Process "dist\windows\Syft-Notes-Setup.exe" -ArgumentList "/VERYSILENT", "/SUPPRESSMSGBOXES", "/CLOSEAPPLICATIONS", "/relaunch=1" -PassThru
+          if (-not $setup.WaitForExit(240000)) { $setup.Kill(); throw "the silent update didn't finish within 240 s" }
+          # A new process (not the one the installer stopped) running from the same folder.
+          $deadline = [DateTime]::UtcNow.AddSeconds(30)
           $ok = $false
-          for ($i = 0; $i -lt 30; $i++) {
-            if (Get-Process -Name StudyStash -ErrorAction SilentlyContinue | Where-Object { $_.Path -eq "$app\StudyStash.exe" }) { $ok = $true; break }
-            Start-Sleep 1
+          while ($true) {
+            if (Get-Process -Name StudyStash -ErrorAction SilentlyContinue | Where-Object { $_.Path -eq "$app\StudyStash.exe" -and $_.Id -ne $old.Id }) { $ok = $true; break }
+            $remaining = [int]($deadline - [DateTime]::UtcNow).TotalSeconds
+            if ($remaining -le 0 -or -not (Wait-Event -SourceIdentifier started -Timeout $remaining)) { break }
+            Remove-Event -SourceIdentifier started
           }
-          if (-not $ok) { throw "no StudyStash.exe from $app running again within 30 s of the silent update" }
+          Unregister-Event -SourceIdentifier started
+          if (-not $ok) { throw "no new StudyStash.exe from $app running within 30 s of the silent update" }
           Get-Process -Name StudyStash -ErrorAction SilentlyContinue | Stop-Process -Force
       - name: Uninstalling removes only the app; lectures and settings stay
         if: needs.version.outputs.installers == 'true'
@@ -678,18 +685,31 @@ jobs:
           New-Item -ItemType Directory -Force -Path (Split-Path $settingsKeep), (Split-Path $lectureKeep) | Out-Null
           "keep" | Out-File $settingsKeep
           "keep" | Out-File $lectureKeep
+          # Windows says when the app's folder is deleted (queued from here on): the uninstaller hands the work to a copy of itself and quits.
+          $watch = [IO.FileSystemWatcher]::new((Split-Path $app))
+          $watch.NotifyFilter = [IO.NotifyFilters]::DirectoryName
+          $watch.EnableRaisingEvents = $true
+          Register-ObjectEvent -InputObject $watch -EventName Deleted -SourceIdentifier appgone | Out-Null
           Start-Process "$app\unins000.exe" -ArgumentList "/VERYSILENT", "/SUPPRESSMSGBOXES" -Wait
+          $deadline = [DateTime]::UtcNow.AddSeconds(60)
           $gone = $false
-          for ($i = 0; $i -lt 60; $i++) { if (-not (Test-Path $app)) { $gone = $true; break }; Start-Sleep 1 }
+          while ($true) {
+            if (-not (Test-Path $app)) { $gone = $true; break }
+            $remaining = [int]($deadline - [DateTime]::UtcNow).TotalSeconds
+            if ($remaining -le 0 -or -not (Wait-Event -SourceIdentifier appgone -Timeout $remaining)) { break }
+            Remove-Event -SourceIdentifier appgone
+          }
+          Unregister-Event -SourceIdentifier appgone
+          $watch.Dispose()
           if (-not $gone) { throw "$app is still there 60 s after uninstalling" }
-          if (Test-Path "$env:APPDATA\Microsoft\Windows\Start Menu\Programs\Egghead Notes.lnk") { throw "the Start Menu entry survived" }
+          if (Test-Path "$env:APPDATA\Microsoft\Windows\Start Menu\Programs\Syft Notes.lnk") { throw "the Start Menu entry survived" }
           if (-not (Test-Path $settingsKeep)) { throw "settings outside the app folder were deleted" }
           if (-not (Test-Path $lectureKeep)) { throw "a lecture outside the app folder was deleted" }
       - uses: actions/upload-artifact@v4
         if: needs.version.outputs.installers == 'true'
         with:
           name: windows-installers
-          path: dist\windows\Egghead-Notes-Setup.exe
+          path: dist\windows\Syft-Notes-Setup.exe
           retention-days: 30
       - uses: actions/upload-artifact@v4
         if: always()
@@ -759,7 +779,7 @@ jobs:
           V: ${{ needs.version.outputs.version }}
           PUBLISH: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
         run: |
-          test -s dist/Egghead-Notes.dmg && test -s dist/Egghead-Notes-Setup.exe || { echo "an installer is missing or empty"; ls -l dist; exit 1; }
+          test -s dist/Syft-Notes.dmg && test -s dist/Syft-Notes-Setup.exe || { echo "an installer is missing or empty"; ls -l dist; exit 1; }
           # Re-check the race: another push could have published this tag while this run was building.
           released=false
           if git rev-parse -q --verify "refs/tags/v$V" >/dev/null || gh release view "v$V" >/dev/null 2>&1; then released=true; fi
@@ -768,14 +788,17 @@ jobs:
             exit 0
           fi
           for role in Laptop Library; do
-            cp dist/Egghead-Notes.dmg "dist/Study-Stash-$role.dmg"
-            cp dist/Egghead-Notes-Setup.exe "dist/Study-Stash-$role-Setup.exe"
+            cp dist/Syft-Notes.dmg "dist/Study-Stash-$role.dmg"
+            cp dist/Syft-Notes-Setup.exe "dist/Study-Stash-$role-Setup.exe"
           done
-          # The names 0.18.x and older ask for when they update themselves (before the rename to Egghead Notes), and
-          # older download links: byte for byte the one download, so every copy finds its way to this release.
-          cp dist/Egghead-Notes.dmg dist/Study-Stash.dmg
-          cp dist/Egghead-Notes-Setup.exe dist/Study-Stash-Setup.exe
-          (cd dist && sha256sum Egghead-Notes* Study-Stash* > SHA256SUMS.txt)
+          # The names from before the rename to Syft Notes: 0.19.0 asks for Egghead-Notes.*, 0.18.x and older for
+          # Study-Stash.*, when they update themselves (and older download links use them): byte for byte the one
+          # download, so every copy finds its way to this release.
+          cp dist/Syft-Notes.dmg dist/Egghead-Notes.dmg
+          cp dist/Syft-Notes-Setup.exe dist/Egghead-Notes-Setup.exe
+          cp dist/Syft-Notes.dmg dist/Study-Stash.dmg
+          cp dist/Syft-Notes-Setup.exe dist/Study-Stash-Setup.exe
+          (cd dist && sha256sum Syft-Notes* Egghead-Notes* Study-Stash* > SHA256SUMS.txt)
           ls -l dist
           cat dist/SHA256SUMS.txt
           if [ "$PUBLISH" != true ]; then
@@ -783,7 +806,8 @@ jobs:
             if [ "$released" = true ]; then echo "(v$V is already released, so a push would stop before this.)"; fi
             exit 0
           fi
-          gh release create "v$V" --target "$GITHUB_SHA" --title "Egghead Notes $V" --generate-notes \
+          gh release create "v$V" --target "$GITHUB_SHA" --title "Syft Notes $V" --generate-notes \
+            dist/Syft-Notes.dmg dist/Syft-Notes-Setup.exe \
             dist/Egghead-Notes.dmg dist/Egghead-Notes-Setup.exe \
             dist/Study-Stash.dmg dist/Study-Stash-Setup.exe \
             dist/Study-Stash-Laptop.dmg dist/Study-Stash-Library.dmg \

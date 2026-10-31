@@ -1,9 +1,9 @@
-// Egghead Notes · Canvas: a read-only fetcher for your Egghead Notes library.
+// Syft Notes · Canvas: a read-only fetcher for your Syft Notes library.
 // The library decides what to read (assignments, submissions, modules, pages, files, or whatever a course's
 // scout asks for); this extension only fetches those Canvas URLs with the session you're already
 // signed into and hands the answers back. It never writes to Canvas, and it refuses any URL outside Canvas
 // and its file store. It checks every second or two only while the library has work queued.
-importScripts('config.js'); // STUDY_STASH = {app, key, canvas, files, protocol}, written by Egghead Notes
+importScripts('config.js'); // STUDY_STASH = {app, key, canvas, files, protocol}, written by Syft Notes
 
 const MAX_BYTES = 40 * 1024 * 1024;
 // What this copy of the extension does, told to the library on every visit (docs/canvas.md, "The extension"):
@@ -89,7 +89,7 @@ async function run(job) {
   }
 }
 
-// Egghead Notes rewrites this folder when it updates: when the manifest there isn't the one running, reload to pick up
+// Syft Notes rewrites this folder when it updates: when the manifest there isn't the one running, reload to pick up
 // the new files. Checked before asking for work, so a reload never drops work already taken.
 async function newerOnDisk() {
   try {

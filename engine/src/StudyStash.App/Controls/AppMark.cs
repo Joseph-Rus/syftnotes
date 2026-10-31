@@ -1,49 +1,25 @@
-using Avalonia;
-using Avalonia.Controls;
-using Avalonia.Media;
-using Avalonia.Media.Imaging;
-using Avalonia.Platform;
-
 namespace StudyStash.App.Controls;
 
-/// <summary>Egghead Notes' own icon in a view: the cream tile with the egghead on it (Assets/icon.png, drawn by
-/// macos/make_icon.swift), e.g. at the left of a Windows title bar.</summary>
-public sealed class AppIcon : Image
+/// <summary>Syft Notes' own icon in a view: the app icon's dark tile, the pixel s on its empty grid (the boards' "app
+/// icon ladder"), drawn as vectors, e.g. at the left of a Windows title bar. The bits under the s come at sizes with
+/// room for them.</summary>
+public sealed class AppIcon : SyftMark
 {
-    static Bitmap? tile;
-
     public AppIcon()
     {
-        Source = tile ??= new Bitmap(AssetLoader.Open(new Uri("avares://StudyStash/Assets/icon.png")));
-        Width = Height = 16;
-        RenderOptions.SetBitmapInterpolationMode(this, BitmapInterpolationMode.HighQuality);
+        Look = SyftLook.Dark;
+        Tile = SyftTile.Square;
+        Size = Width = Height = 16;
     }
 }
 
-/// <summary>The monochrome egghead (the menu bar's and the tray's icon) in <see cref="Foreground"/>: for pictures of the
-/// tray or menu bar inside the app, like setup's "Keep Egghead Notes on the taskbar".</summary>
-public sealed class AppMarkGlyph : Border
+/// <summary>The one-colour pixel s (the menu bar's and the tray's icon) in <see cref="SyftMark.Foreground"/>: for
+/// pictures of the tray or menu bar inside the app, like setup's "Keep Syft Notes on the taskbar".</summary>
+public sealed class AppMarkGlyph : SyftMark
 {
-    public static readonly StyledProperty<IBrush?> ForegroundProperty = AvaloniaProperty.Register<AppMarkGlyph, IBrush?>(nameof(Foreground));
-
-    static Bitmap? mark;
-
     public AppMarkGlyph()
     {
-        mark ??= new Bitmap(AssetLoader.Open(new Uri("avares://StudyStash/Assets/mark-32.png")));
-        OpacityMask = new ImageBrush(mark) { Stretch = Stretch.Uniform };
-        Width = Height = 16;
-    }
-
-    public IBrush? Foreground
-    {
-        get => GetValue(ForegroundProperty);
-        set => SetValue(ForegroundProperty, value);
-    }
-
-    protected override void OnPropertyChanged(AvaloniaPropertyChangedEventArgs change)
-    {
-        base.OnPropertyChanged(change);
-        if (change.Property == ForegroundProperty) Background = Foreground;
+        Look = SyftLook.Ink;
+        Size = Width = Height = 16;
     }
 }

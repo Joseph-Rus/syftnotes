@@ -68,7 +68,7 @@ export interface Lecture extends LectureSummary {
   /** Why no notes were written from it, when the library knows ("short": too little was said); a library from
    * before it says nothing. */
   no_notes?: string | null;
-  /** That reason in a sentence ("This lecture is too short for notes: Egghead Notes writes them from about …"). */
+  /** That reason in a sentence ("This lecture is too short for notes: Syft Notes writes them from about …"). */
   no_notes_why?: string | null;
 }
 

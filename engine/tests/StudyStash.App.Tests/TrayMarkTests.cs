@@ -7,8 +7,8 @@ using StudyStash.App.Platform;
 
 namespace StudyStash.App.Tests;
 
-/// <summary>The egghead in the menu bar and the tray (and the app icon files it comes with): one ink, a red dot only while
-/// recording, and every icon file the installers and the library's pages need.</summary>
+/// <summary>The pixel s in the menu bar and the tray (and the app icon files it comes with): one ink, its top-right cell
+/// red only while recording, and every icon file the installers and the library's pages need.</summary>
 public class TrayMarkTests
 {
     static Color[,] Pixels(byte[] png)
@@ -56,18 +56,42 @@ public class TrayMarkTests
     }
 
     [AvaloniaFact]
-    public void Recording_adds_a_red_dot_at_the_top_right_set_off_by_a_clear_ring()
+    public void Recording_turns_the_top_right_cell_red_a_square_in_its_own_slot()
     {
-        var px = Pixels(TrayMark.Png(36, Brushes.White, recording: true));
-        var (centre, r) = TrayMark.Badge(36);
-
-        Assert.True(Reddish(px[(int)centre.X, (int)centre.Y]), $"no red dot at {centre}: {px[(int)centre.X, (int)centre.Y]}");
-        Assert.True((int)centre.X > 18 && (int)centre.Y < 18, "the dot sits at the top right");
-        // Just outside the dot, in the ring (TrayMark cuts the mark back to 1.55 × the dot's radius): nothing drawn.
-        int ringX = (int)Math.Round(centre.X - r * 1.0), ringY = (int)Math.Round(centre.Y + r * 1.0);
-        Assert.True(px[ringX, ringY].A < 40, $"the ring isn't clear: {px[ringX, ringY]}");
-        Assert.Contains(All(px), c => c.A == 255 && c.R > 240 && c.G > 240 && c.B > 240); // the mark, white
+        foreach (int size in new[] { 36, 32 })
+        {
+            var px = Pixels(TrayMark.Png(size, Brushes.White, recording: true));
+            var cells = TrayMark.CellRects(size);
+            var red = cells[TrayMark.RecordingCell];
+            Assert.True(red.Center.X > size / 2 && red.Center.Y < size / 2, "the red cell is the s's top right");
+            // The whole square red, its corners too (a cell, not a dot), and nothing red outside it.
+            for (int y = 0; y < size; y++)
+                for (int x = 0; x < size; x++)
+                    Assert.True(Reddish(px[x, y]) == red.Contains(new Point(x + 0.5, y + 0.5)), $"{size} px at {x},{y}: {px[x, y]}");
+            // Every other cell of the s is still there, in the ink, and the slot round the red one is clear as before.
+            for (int i = 0; i < cells.Length; i++)
+            {
+                if (i == TrayMark.RecordingCell) continue;
+                var c = px[(int)cells[i].Center.X, (int)cells[i].Center.Y];
+                Assert.True(c.A == 255 && c.R > 240 && c.G > 240 && c.B > 240, $"cell p{i} isn't white ink: {c}");
+            }
+            Assert.True(px[(int)red.X - 1, (int)red.Bottom].A == 0, "the gap beside the red cell is clear");
+        }
         Assert.DoesNotContain(All(Pixels(TrayMark.Png(32, Brushes.Black, recording: false))), Reddish);
+    }
+
+    [AvaloniaFact]
+    public void The_menu_bar_has_a_one_x_picture_on_whole_pixels_too()
+    {
+        var idle = Pixels(TrayMark.OneX(TrayMark.Png(36, Brushes.Black, recording: false))!);
+        Assert.Equal(18, idle.GetLength(0));
+        // Cells two pixels square on whole pixels (a 12 × 14 pixel letter): no half-covered pixels anywhere.
+        Assert.All(All(idle), c => Assert.True(c.A is 0 or 255, $"a blurred pixel: {c}"));
+        Assert.Equal(24 * 4, All(idle).Count(c => c.A == 255));
+        var recording = Pixels(TrayMark.OneX(TrayMark.Png(36, Brushes.White, recording: true))!);
+        Assert.Contains(All(recording), Reddish);
+        Assert.Contains(All(recording), c => c.A == 255 && c.R > 240 && c.G > 240 && c.B > 240);
+        Assert.Null(TrayMark.OneX(TrayMark.Png(32, Brushes.Black, recording: false)));
     }
 
     static string Repo([System.Runtime.CompilerServices.CallerFilePath] string here = "") =>
@@ -91,10 +115,22 @@ public class TrayMarkTests
             using var bmp = new Bitmap(AssetLoader.Open(new Uri($"avares://StudyStash/Assets/{name}")));
             Assert.Equal(new PixelSize(size, size), bmp.PixelSize);
         }
+        // The marks make_art.swift drew are the cells TrayMark draws.
+        foreach (int size in new[] { 32, 36 })
+        {
+            using var file = AssetLoader.Open(new Uri($"avares://StudyStash/Assets/mark-{size}.png"));
+            using var copy = new MemoryStream();
+            file.CopyTo(copy);
+            var shipped = Pixels(copy.ToArray());
+            var drawn = Pixels(TrayMark.Png(size, Brushes.Black, recording: false));
+            for (int y = 0; y < size; y++)
+                for (int x = 0; x < size; x++)
+                    Assert.True(shipped[x, y].A > 127 == drawn[x, y].A > 127, $"mark-{size}.png differs from TrayMark at {x},{y}");
+        }
     }
 
-    /// <summary>With STUDYSTASH_SHOTS set, the four icons as they're drawn (Mac idle and recording, Windows light and
-    /// dark), to look at beside the design.</summary>
+    /// <summary>With STUDYSTASH_SHOTS set, the icons as they're drawn (Mac idle and recording at 2× and 1×, Windows
+    /// light and dark, idle and recording), to look at beside the design.</summary>
     [AvaloniaFact]
     public void Shots_of_the_marks()
     {
@@ -103,7 +139,12 @@ public class TrayMarkTests
         File.WriteAllBytes(Path.Combine(dir, "tray-mac-idle.png"), TrayMark.Png(36, Brushes.Black, false));
         File.WriteAllBytes(Path.Combine(dir, "tray-mac-recording-dark-bar.png"), TrayMark.Png(36, Brushes.White, true));
         File.WriteAllBytes(Path.Combine(dir, "tray-mac-recording-light-bar.png"), TrayMark.Png(36, Brushes.Black, true));
+        File.WriteAllBytes(Path.Combine(dir, "tray-mac-idle-1x.png"), TrayMark.OneX(TrayMark.Png(36, Brushes.Black, false))!);
+        File.WriteAllBytes(Path.Combine(dir, "tray-mac-recording-dark-bar-1x.png"), TrayMark.OneX(TrayMark.Png(36, Brushes.White, true))!);
         File.WriteAllBytes(Path.Combine(dir, "tray-win-dark.png"), TrayMark.Png(32, Brushes.White, false));
+        File.WriteAllBytes(Path.Combine(dir, "tray-win-light.png"), TrayMark.Png(32, Brushes.Black, false));
+        File.WriteAllBytes(Path.Combine(dir, "tray-win-dark-recording.png"), TrayMark.Png(32, Brushes.White, true));
+        File.WriteAllBytes(Path.Combine(dir, "tray-win-light-recording.png"), TrayMark.Png(32, Brushes.Black, true));
     }
 
     [AvaloniaFact]
@@ -114,6 +155,6 @@ public class TrayMarkTests
         Assert.Equal("Record", Items(Services.AppRole.Both)[0]);
         Assert.Equal("Record", Items(Services.AppRole.Laptop)[0]);
         Assert.DoesNotContain("Record", Items(Services.AppRole.Library));
-        Assert.Equal("Quit Egghead Notes", Items(Services.AppRole.Both)[^1]);
+        Assert.Equal("Quit Syft Notes", Items(Services.AppRole.Both)[^1]);
     }
 }

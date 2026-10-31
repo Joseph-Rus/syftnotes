@@ -362,7 +362,7 @@ public sealed partial class OverviewModel : ObservableObject
     }
     [RelayCommand] void Record() => OnRecord?.Invoke();
 
-    /// <summary>Home's "Buy us a coffee": Egghead Notes is free, and a tip for the two students who build it goes to
+    /// <summary>Home's "Buy us a coffee": Syft Notes is free, and a tip for the two students who build it goes to
     /// their Ko-fi page (<see cref="Services.SupportAsk"/>). Only on Home, a quiet line at the foot of the page.</summary>
     public Action? OnSupport { get; set; }
     public bool CanSupport => IsHome && OnSupport is not null;
@@ -372,6 +372,11 @@ public sealed partial class OverviewModel : ObservableObject
     [ObservableProperty] public partial SupportAskModel? Asking { get; set; }
     public bool HasAsking => Asking is not null;
     partial void OnAskingChanged(SupportAskModel? value) => OnPropertyChanged(nameof(HasAsking));
+
+    /// <summary>Home's "Ready when class starts", after a first run (<see cref="WelcomeCardModel"/>); null otherwise.</summary>
+    [ObservableProperty] public partial WelcomeCardModel? Welcome { get; set; }
+    public bool HasWelcome => Welcome is not null;
+    partial void OnWelcomeChanged(WelcomeCardModel? value) => OnPropertyChanged(nameof(HasWelcome));
 
     /// <summary>Ask about every note (Home) or this folder's (its page), floating at the foot of the page as under a note.</summary>
     [ObservableProperty] public partial AiAskModel? Ask { get; set; }

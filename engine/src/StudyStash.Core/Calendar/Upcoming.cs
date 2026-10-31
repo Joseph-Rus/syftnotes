@@ -137,7 +137,7 @@ public sealed class Upcoming
                 }
                 catch (Exception e) when (e is not OperationCanceledException || !ct.IsCancellationRequested)
                 {
-                    problems[s.Id] = e is CalendarFeedException ? e.Message : $"Couldn't read it ({e.Message.TrimEnd('.')}). Egghead Notes tries again soon.";
+                    problems[s.Id] = e is CalendarFeedException ? e.Message : $"Couldn't read it ({e.Message.TrimEnd('.')}). Syft Notes tries again soon.";
                     log($"[calendar] {s.Name}: {e.Message}");
                     // What it had last time stays until it can be read again.
                     events.AddRange(cache.Events.Where(x => x.SourceId == s.Id));

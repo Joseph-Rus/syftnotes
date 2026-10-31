@@ -73,13 +73,13 @@ public class DiagramDesignTests
     {
         string one = DiagramDesign.Insert(Notes, [Designed("Key points")]);
         Assert.Equal("## Summary\nHow the kidney raises blood pressure.\n\n## Key points\n- Renin starts it.\n- Angiotensin II does the work.\n\n"
-            + "**The renin chain**\n\n```mermaid\n%% Egghead Notes diagram, from 00:25\n" + Chain + "\n```\n\n*Low pressure releases renin.* (from 00:25)\n\n"
+            + "**The renin chain**\n\n```mermaid\n%% Syft Notes diagram, from 00:25\n" + Chain + "\n```\n\n*Low pressure releases renin.* (from 00:25)\n\n"
             + "## Details and examples\n### Drugs\n- ACE inhibitors block it.\n\n## Questions to review\n1. What releases renin?", one);
         Assert.Null(Summarize.DiagramProblem(NoteBlockKind.Mermaid, NoteBlocks.Find(one).Single().Text));
 
         // Under a subheading, before the next heading of its level; two for one section keep their order.
         string two = DiagramDesign.Insert(Notes, [Designed("Drugs", "First", null), Designed("### drugs:", "Second", null)]);
-        Assert.Contains("- ACE inhibitors block it.\n\n**First**\n\n```mermaid\n%% Egghead Notes diagram\n", two);
+        Assert.Contains("- ACE inhibitors block it.\n\n**First**\n\n```mermaid\n%% Syft Notes diagram\n", two);
         Assert.Contains("*Low pressure releases renin.*\n\n**Second**", two);
         Assert.EndsWith("*Low pressure releases renin.*\n\n## Questions to review\n1. What releases renin?", two);
 

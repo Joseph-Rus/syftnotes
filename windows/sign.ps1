@@ -78,24 +78,25 @@ try {
       "AzureCliCredential", "AzurePowerShellCredential", "AzureDeveloperCliCredential", "InteractiveBrowserCredential")
     @{ Endpoint = $env:WINDOWS_SIGNING_ENDPOINT; CodeSigningAccountName = $env:WINDOWS_SIGNING_ACCOUNT; CertificateProfileName = $env:WINDOWS_SIGNING_PROFILE; ExcludeCredentials = $skip } |
       ConvertTo-Json | Set-Content -Path $MetaPath -Encoding ASCII
-    $Timestamp = "http://timestamp.acs.microsoft.com"
+    $Timestamps = @("http://timestamp.acs.microsoft.com", "http://timestamp.digicert.com", "http://timestamp.sectigo.com")
     $Identity = @("/dlib", $Dlib.FullName, "/dmdf", $MetaPath)
   } else {
     $Pfx = Join-Path $Work "signing-certificate.pfx"
     [IO.File]::WriteAllBytes($Pfx, [Convert]::FromBase64String($env:WINDOWS_CERT_PFX_BASE64))
-    $Timestamp = if ($env:WINDOWS_TIMESTAMP_URL) { $env:WINDOWS_TIMESTAMP_URL } else { "http://timestamp.digicert.com" }
+    $Timestamps = @(if ($env:WINDOWS_TIMESTAMP_URL) { $env:WINDOWS_TIMESTAMP_URL } else { "http://timestamp.digicert.com" }) + "http://timestamp.sectigo.com" + "http://timestamp.acs.microsoft.com"
     $Identity = @("/f", $Pfx, "/p", $env:WINDOWS_CERT_PASSWORD)
   }
 
   # A few files to a signtool, so a command line stays short; each batch is tried again, as the timestamp server (and
-  # Azure) now and then don't answer.
+  # Azure) now and then don't answer: at once, against the next timestamp server (any of them stamps the same), not
+  # after a guessed wait.
   for ($i = 0; $i -lt $Files.Count; $i += 20) {
     $batch = @($Files[$i..([Math]::Min($i + 19, $Files.Count - 1))])
     for ($attempt = 1; ; $attempt++) {
+      $Timestamp = $Timestamps[($attempt - 1) % $Timestamps.Count]
       $said = & $SignTool sign /q /fd SHA256 /tr $Timestamp /td SHA256 @Identity @batch 2>&1 | Out-String
       if ($LASTEXITCODE -eq 0) { break }
       if ($attempt -ge 3) { throw "signtool failed on $($batch -join ', '): $said" }
-      Start-Sleep -Seconds (10 * $attempt)
     }
   }
   # signtool's success is the proof for most files; for an exe or dll, Windows is asked as well. (Get-AuthenticodeSignature

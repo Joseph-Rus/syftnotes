@@ -1,4 +1,4 @@
-import { Doodle } from '../ui/Doodle';
+import { SyftMark } from '../ui/Syft';
 import { Button } from '../ui/kit';
 
 /**
@@ -11,12 +11,12 @@ export function Unreachable({ onRetry, outdated = false }: { onRetry: () => void
     <div class="unreachable">
       <div class="empty">
         <div class="empty-icon">
-          <Doodle name={outdated ? 'cracked' : 'sleepy'} />
+          <SyftMark size={104} oddOneOut />
         </div>
         <h2>{outdated ? "Your library doesn't know phones yet" : "Can't reach your library"}</h2>
         <p>
           {outdated
-            ? 'Update Egghead Notes on the library computer, then try again.'
+            ? 'Update Syft Notes on the library computer, then try again.'
             : "Make sure Tailscale is on here and on the library's computer, and that computer is awake."}
         </p>
         <div class="empty-action">

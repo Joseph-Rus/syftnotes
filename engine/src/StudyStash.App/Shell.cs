@@ -63,6 +63,9 @@ public static partial class Shell
     static AppProblem? currentProblem;
     static LibraryState lastLibraryState = LibraryState.NotSetUp;
     static bool hotkeysOn;
+    /// <summary>The library window opened as the app starts plays the splash over itself while the library is first read.</summary>
+    static bool splashAtLaunch;
+    static SyftSplash? librarySplash;
     static HotkeyResult hotkeys;
 
     public static AppHost Host => host;
@@ -115,7 +118,7 @@ public static partial class Shell
             if (title == AppHost.RecordingPaused) SayRecordingPaused(why);
             else Toast(title, why, null, null);
         });
-        // Granola has a lecture Egghead Notes doesn't: said once, with Transfer.
+        // Granola has a lecture Syft Notes doesn't: said once, with Transfer.
         host.Granola.Found += found => Dispatcher.UIThread.Post(() => SayGranolaHas(found));
         if (host.PretendMic) Program.Log("[app] recording from a pretend microphone (STUDYSTASH_MIC_FILE)");
         Wire();
@@ -136,7 +139,12 @@ public static partial class Shell
         Refresh();
         SayIfUpdated();
         if (!host.Settings.SetupDone) ShowSetup();
-        else if (!Program.Background) ShowLibrary();
+        else if (!Program.Background)
+        {
+            // Not for the self-test, which looks at the window straight away.
+            splashAtLaunch = SelfTest.Dir is null;
+            ShowLibrary();
+        }
         if (SelfTest.Dir is not null) SelfTest.Run();
     }
 
@@ -155,6 +163,8 @@ public static partial class Shell
         public static ViewModels.SetupModel? SetupModel => setup;
         /// <summary>Guided setup's model, while setup's window is open.</summary>
         public static ViewModels.GuidedSetupModel? Guided => guidedSetup;
+        /// <summary>Home's "Ready when class starts", while it shows.</summary>
+        public static ViewModels.WelcomeCardModel? WelcomeCard => library.Welcome;
         public static void TogglePanel() => Shell.TogglePanel();
         public static void ToggleQuick() => Shell.ToggleQuick();
         public static void Record() => ToggleRecording();
@@ -162,6 +172,13 @@ public static partial class Shell
         public static void TogglePause() => Shell.TogglePause();
         public static void ShowRecorder(bool expanded) => Shell.ShowRecorder(expanded);
         public static void ShowLibrary() => Shell.ShowLibrary();
+        /// <summary>The frozen setup by hand in place of a first run's one page: how the self-test still proves a laptop
+        /// connecting to a library elsewhere (a student reaches that from Settings → Connection).</summary>
+        public static void SetupByHand()
+        {
+            if (setupWindow is { } w && setup is { OneButton: true }) w.Close();
+            ShowSetup(byHand: true);
+        }
         /// <summary>One step of dragging the recorder, as the pointer would take it: the self-test's check that it
         /// goes right up to a Mac's menu bar and down to Windows' taskbar.</summary>
         public static void DragRecorder(PixelPoint at, PixelPoint pointer)
@@ -236,7 +253,7 @@ public static partial class Shell
         try
         {
             // The exception is in the log already; the student gets what happened, not the stack's words.
-            Toast("Something went wrong", "Egghead Notes carried on. If something looks wrong, quit it and open it again.", null, null);
+            Toast("Something went wrong", "Syft Notes carried on. If something looks wrong, quit it and open it again.", null, null);
         }
         catch (Exception again)
         {
@@ -305,7 +322,7 @@ public static partial class Shell
         return null;
     }
 
-    /// <summary>Quit Egghead Notes, with an exit code (the self-test's pass or fail). Only the first call counts.</summary>
+    /// <summary>Quit Syft Notes, with an exit code (the self-test's pass or fail). Only the first call counts.</summary>
     public static void Quit(int code = 0)
     {
         if (quitting) return;
@@ -381,9 +398,9 @@ public static partial class Shell
 
     // --- the tray ---------------------------------------------------------------------------------------------------
 
-    /// <summary>The icon, as PNG bytes: the egghead mark — black on a Mac (a template image the menu bar tints, or, while
-    /// recording, in the menu bar's own ink so its red dot stays red), black or white on Windows by theme — with a red
-    /// dot while recording.</summary>
+    /// <summary>The icon, as PNG bytes: the pixel s — black on a Mac (a template image the menu bar tints, or, while
+    /// recording, in the menu bar's own ink so its red cell stays red), black or white on Windows by theme — with its
+    /// top-right cell red while recording.</summary>
     static byte[] TrayImageBytes(bool recording)
     {
         if (OperatingSystem.IsMacOS())
@@ -415,7 +432,7 @@ public static partial class Shell
             DispatcherTimer.RunOnce(CheckMenuBarIcon, TimeSpan.FromSeconds(2));
             return;
         }
-        tray = new TrayIcon { Icon = TrayImage(false), ToolTipText = "Egghead Notes", IsVisible = true };
+        tray = new TrayIcon { Icon = TrayImage(false), ToolTipText = "Syft Notes", IsVisible = true };
         tray.Clicked += (_, _) => TogglePanel();
         trayRole = host.Settings.Role;
         tray.Menu = TrayMenu(host.Settings.Role);
@@ -440,10 +457,10 @@ public static partial class Shell
         }
         if (role != AppRole.Library) Item("Record", ToggleRecording);
         Item("Search notes and lectures", ToggleQuick);
-        Item("Open Egghead Notes", ShowLibrary);
+        Item("Open Syft Notes", ShowLibrary);
         Item("Settings…", SettingsFromAnywhere);
         menu.Add(new NativeMenuItemSeparator());
-        Item("Quit Egghead Notes", () => Quit());
+        Item("Quit Syft Notes", () => Quit());
         return menu;
     }
 
@@ -622,6 +639,18 @@ public static partial class Shell
         // Stopped before there was enough to keep: nothing is saved (or, for a note picked up again, added), and it says so.
         if (NoticeWords.NotKept(how) is var (title, text)) Toast(title, text, null, null);
         else if (l is { State: LectureState.Failed }) Toast(l.Error, "Its sound file is damaged, so it can't be written down.", null, null);
+        else if (l is not null && host.Settings.AskNotificationsAtStop && SystemNotifications() is { } system)
+        {
+            // The first Stop after a first run: the Mac asks for its notifications now, with the app's own card saying
+            // why beside its question (it used to ask cold, a second after setup closed).
+            host.Save(s => s.AskNotificationsAtStop = false);
+            Shelf().Show(new Notice
+            {
+                Title = "Recording saved",
+                Text = NoticeWords.Saved(host.Library, OperatingSystem.IsMacOS(), WillHaveNotes(l), NotesOff) + " " + NoticeWords.AllowToHear,
+            });
+            system.Ask();
+        }
         else if (l is not null) Toast("Recording saved", NoticeWords.Saved(host.Library, OperatingSystem.IsMacOS(), WillHaveNotes(l), NotesOff), null, null);
         if (onPage)
         {
@@ -845,7 +874,7 @@ public static partial class Shell
         if (panelWindow is not null && DateTime.UtcNow - panelWindow.LastDeactivateHide < Floating.ToggleDebounce) return;
         if (panelWindow is null)
         {
-            panelWindow = new Floating { Content = PanelView(), CloseOnDeactivate = true, KeepClear = true, Title = "Egghead Notes" };
+            panelWindow = new Floating { Content = PanelView(), CloseOnDeactivate = true, KeepClear = true, Title = "Syft Notes" };
             AppMenu.AddSettingsKey(panelWindow, SettingsFromAnywhere);
         }
         Refresh();
@@ -909,7 +938,7 @@ public static partial class Shell
             pillCard?.Hide();
             return;
         }
-        pillCard ??= new Floating { Content = new PillCard { DataContext = recorder }, OverFullScreen = true, ShowActivated = false, ClickThrough = true, Title = "Egghead Notes recorder card" };
+        pillCard ??= new Floating { Content = new PillCard { DataContext = recorder }, OverFullScreen = true, ShowActivated = false, ClickThrough = true, Title = "Syft Notes recorder card" };
         var (area, scale) = pillCard.WorkArea(pill.Center);
         var size = pillCard.Measured(scale);
         int room = (int)(Floating.ShadowRoom * scale), gap = (int)(10 * scale), width = size.Width - 2 * room;
@@ -921,7 +950,7 @@ public static partial class Shell
     static Floating MakeRecorderWindow()
     {
         var view = Skin.Current == SkinKind.Mac ? (Control)new MacRecorder { DataContext = recorder } : new WinRecorder { DataContext = recorder };
-        var w = new Floating { Content = view, KeepClear = true, SteadySize = true, OverFullScreen = true, ClicksOnPanelOnly = true, Title = "Egghead Notes recorder" };
+        var w = new Floating { Content = view, KeepClear = true, SteadySize = true, OverFullScreen = true, ClicksOnPanelOnly = true, Title = "Syft Notes recorder" };
         // Gone from the screen: its card goes with it.
         w.PropertyChanged += (_, e) =>
         {
@@ -1023,7 +1052,7 @@ public static partial class Shell
         if (quickWindow is null)
         {
             view = Skin.Current == SkinKind.Mac ? new MacQuick { DataContext = quick } : new WinQuick { DataContext = quick };
-            quickWindow = new Floating { Content = view, CloseOnDeactivate = true, KeepClear = true, Title = "Egghead Notes search" };
+            quickWindow = new Floating { Content = view, CloseOnDeactivate = true, KeepClear = true, Title = "Syft Notes search" };
             AppMenu.AddSettingsKey(quickWindow, SettingsFromAnywhere);
         }
         quick.Answering = false;
@@ -1046,7 +1075,7 @@ public static partial class Shell
         if (mainWindow is not null) return mainWindow;
         var w = new Window
         {
-            Title = "Egghead Notes", Width = 1280, Height = 800, MinWidth = 600, MinHeight = 560, WindowStartupLocation = WindowStartupLocation.CenterScreen,
+            Title = "Syft Notes", Width = 1280, Height = 800, MinWidth = 600, MinHeight = 560, WindowStartupLocation = WindowStartupLocation.CenterScreen,
             ExtendClientAreaToDecorationsHint = true, ExtendClientAreaTitleBarHeightHint = Skin.Current == SkinKind.Mac ? WindowHeader.MacHeight : 32,
         };
         Look.Apply(w);
@@ -1061,6 +1090,7 @@ public static partial class Shell
             WinChrome.Apply(w);
         }
         if (!PutWhereLeft(w)) OpenCentred(w, new Size(1280, 800));
+        if (splashAtLaunch) Splash(w);
         AppMenu.Attach(w, ShowLibrary, SettingsFromAnywhere);
         AddLibraryKeys(w);
         // The menu bar, read back once, so the log shows the app menu really has Settings… ⌘, and Quit ⌘Q.
@@ -1180,11 +1210,40 @@ public static partial class Shell
         // The library in front: the small pill goes now, not only once macOS says the app is active (it may not, when
         // another app was in front), and comes back when the library is left.
         if (recorderWindow?.IsVisible == true && !recorder.Expanded) recorderWindow.Hide();
-        _ = LoadLibraryAsync();
+        _ = LoadLibraryAsync().ContinueWith(_ => Dispatcher.UIThread.Post(() =>
+        {
+            if (librarySplash is { } splash) splash.IsReady = true;
+        }), TaskScheduler.Default);
+    }
+
+    /// <summary>
+    /// The splash over the library window opened at launch: Sort In in a dark window, Sieve Drop in a light one
+    /// (Controls/Syft/SyftSplash.cs), played once while the library is read the first time, then faded out and gone; at
+    /// least 1.2 s, at most 4, whether the library has answered or not. The page goes on loading underneath. A drag on it
+    /// moves the window; on Windows the title bar, with its buttons, stays above it, and a Mac's traffic lights are the
+    /// system's, over everything. Opened later (from the menu bar, with the library long read) it has no splash.
+    /// </summary>
+    static void Splash(Window w)
+    {
+        splashAtLaunch = false;
+        if (w.Content is not Control view) return;
+        var splash = new SyftSplash();
+        WindowHeader.SetMovesWindow(splash, true);
+        if (Skin.Current == SkinKind.Win) splash.Margin = new Thickness(0, 32, 0, 0);
+        var layers = new Panel();
+        w.Content = layers;
+        layers.Children.Add(view);
+        layers.Children.Add(splash);
+        librarySplash = splash;
+        splash.Finished += () =>
+        {
+            layers.Children.Remove(splash);
+            librarySplash = null;
+        };
     }
 
     /// <summary>Brings a window the student asked for to the front. On Windows, activating a minimized window leaves it
-    /// in the taskbar: Open Egghead Notes, opening the app again and a click on a lecture seemed to do nothing. So it
+    /// in the taskbar: Open Syft Notes, opening the app again and a click on a lecture seemed to do nothing. So it
     /// comes back up first, as large as it was.</summary>
     static void Raise(Window w)
     {
@@ -1216,6 +1275,13 @@ public static partial class Shell
             Raise(setupWindow);
             return;
         }
+        // A first run on just this computer: one page, one button. Setup by hand (and guided setup from it) stays for
+        // Run setup again, an old library installer, and a laptop already connected to a library elsewhere.
+        if (!byHand && Setup.OneButtonFits(host))
+        {
+            ShowWelcome();
+            return;
+        }
         library.Support = null; // the ask for a tip never shows during setup
         bool again = host.Settings.SetupDone;
         setup = Setup.Make(host);
@@ -1232,7 +1298,7 @@ public static partial class Shell
         var view = byHand ? manualView : guidedView;
         var w = new Window
         {
-            Title = byHand ? setup.HeaderTitle : "Set up Egghead Notes", CanResize = false, CanMaximize = false, Content = view,
+            Title = byHand ? setup.HeaderTitle : "Set up Syft Notes", CanResize = false, CanMaximize = false, Content = view,
             ExtendClientAreaToDecorationsHint = true, ExtendClientAreaTitleBarHeightHint = Skin.Current == SkinKind.Mac ? WindowHeader.MacHeight : 32,
         };
         Look.Apply(w);
@@ -1270,7 +1336,7 @@ public static partial class Shell
             model.GuidedLabel = guided.AiReady ? $"Set up with {guided.Brand} instead" : "Set up with an AI instead";
             if (w.Content == want) return;
             w.Content = want;
-            w.Title = want == manualView ? model.HeaderTitle : "Set up Egghead Notes";
+            w.Title = want == manualView ? model.HeaderTitle : "Set up Syft Notes";
             FitTo(w, want);
         };
         // The AI engines step saves its choice before moving on; if it can't, it says why and stays.
@@ -1326,6 +1392,53 @@ public static partial class Shell
                 guided.Screen = GuidedScreen.Manual;
             }
         }
+    }
+
+    /// <summary>
+    /// A first run's one page (<see cref="SetupStep.Start"/>): Get started makes the library here, asks for the
+    /// microphone, starts the model's download and picks an AI already signed in here for the notes (FirstRun), then
+    /// the window closes on the library's Home, with "Ready when class starts" over it. No guided setup and no setup
+    /// tools' door: there's nothing left to guide.
+    /// </summary>
+    static void ShowWelcome()
+    {
+        library.Support = null; // the ask for a tip never shows during setup
+        var model = setup = Setup.Make(host, AppRole.Both);
+        model.OneButton = true;
+        var view = Skin.Current == SkinKind.Mac ? (Control)new MacWelcome { DataContext = model, DrawChrome = false } : new WinWelcome { DataContext = model, DrawChrome = false };
+        var w = new Window
+        {
+            Title = "Syft Notes", CanResize = false, CanMaximize = false, Content = view,
+            ExtendClientAreaToDecorationsHint = true, ExtendClientAreaTitleBarHeightHint = Skin.Current == SkinKind.Mac ? WindowHeader.MacHeight : 32,
+        };
+        Look.Apply(w);
+        AppMenu.Attach(w, ShowLibrary, SettingsFromAnywhere);
+        if (Skin.Current == SkinKind.Mac) MacTitleBar.Attach(w);
+        WinChrome.Apply(w);
+        // The self-test finds no AI's CLI at all, so it never reaches an account.
+        Func<Core.Ai.AgentCliInfo, AgentFound> find = SelfTest.Dir is not null ? _ => AgentFound.None : cli => AgentInstall.Find(cli);
+        model.OnGetStarted = () => FirstRun.AfterLibraryAsync(model, host, Ai(), () => FirstRun.Detect(find, FirstRun.Status), WriteNotesAsync);
+        model.OnFinish = () =>
+        {
+            Setup.Finish(model, host);
+            w.Close();
+            ShowLibrary();
+            // Home's "Ready when class starts" shows at once.
+            RequestRefresh();
+        };
+        w.Closed += (_, _) =>
+        {
+            // Only this window's own: setup by hand may have opened in its place already.
+            if (setupWindow == w) setupWindow = null;
+            if (setup == model) setup = null;
+            UpdateDock();
+        };
+        FollowView(w, view);
+        setupWindow = w;
+        w.Show();
+        UpdateDock();
+        w.Activate();
+        Desktop.Activate();
     }
 
     /// <summary>Guided setup's model for this window, reaching the app's own installer, sign-in, terminal and pages.
@@ -1536,7 +1649,7 @@ public static partial class Shell
         if (section is not null) model.Section = section;
         var w = new Window
         {
-            Title = "Egghead Notes settings", CanResize = false, CanMaximize = false,
+            Title = "Syft Notes settings", CanResize = false, CanMaximize = false,
             Content = new SettingsView { DataContext = model, DrawChrome = false },
             ExtendClientAreaToDecorationsHint = true, ExtendClientAreaTitleBarHeightHint = Skin.Current == SkinKind.Mac ? WindowHeader.MacHeight : 32,
         };
@@ -1626,12 +1739,12 @@ public static partial class Shell
             if (trayRecording && !trayLogged)
             {
                 trayLogged = true;
-                Program.Log($"[tray] recording: the S. with its red dot, {(trayDark ? "white on a dark" : "black on a light")} menu bar, \"{MacStatusItem.Title()}\" beside it");
+                Program.Log($"[tray] recording: the s with its red cell, {(trayDark ? "white on a dark" : "black on a light")} menu bar, \"{MacStatusItem.Title()}\" beside it");
             }
         }
         else if (tray is not null)
         {
-            tray.ToolTipText = $"Egghead Notes · recording {elapsed}";
+            tray.ToolTipText = $"Syft Notes · recording {elapsed}";
         }
     }
 
@@ -1708,7 +1821,8 @@ public static partial class Shell
         panel.ProblemTitle = problem?.Title;
         panel.ProblemDetail = problem?.Detail;
         panel.ProblemAction = problem is { HasAction: true } p ? p.ActionLabel : null;
-        panel.CanRecord = recording || (host.ModelReady && host.MicAccess() is not (MicAccess.Denied or MicAccess.Restricted));
+        // Record works before the model has arrived (the lecture waits for it), so only a refused microphone stops it.
+        panel.CanRecord = recording || host.MicAccess() is not (MicAccess.Denied or MicAccess.Restricted);
         panel.Hint = recording ? null
             : !panel.CanRecord && problem is not null ? problem.Title
             : RecordClass().Length > 0 ? "Picked by you"
@@ -1747,17 +1861,58 @@ public static partial class Shell
                 {
                     MacStatusItem.ShowElapsed("");
                     trayLogged = false;
-                    Program.Log($"[tray] idle: the S. mark as a template image, \"{MacStatusItem.Title()}\" beside it");
+                    Program.Log($"[tray] idle: the s mark as a template image, \"{MacStatusItem.Title()}\" beside it");
                 }
             }
             else if (tray is not null)
             {
                 tray.Icon = TrayImage(recording);
-                if (!recording) tray.ToolTipText = "Egghead Notes";
+                if (!recording) tray.ToolTipText = "Syft Notes";
             }
         }
         if (OperatingSystem.IsWindows()) UpdateTaskbar(problem);
         if (setup is not null) Setup.Refresh(setup, host);
+        ShowWelcomeCard();
+    }
+
+    /// <summary>Home's "Ready when class starts" after a first run, kept up to date: the Record keys, where the S. is,
+    /// the model's download, the microphone. Gone once put away (Got it, or the first recording), and never for an
+    /// update or a library.</summary>
+    static void ShowWelcomeCard()
+    {
+        if (!host.Settings.WelcomeCard || !host.Settings.SetupDone || host.Settings.Role == AppRole.Library)
+        {
+            if (library.Welcome is not null) library.Welcome = null;
+            return;
+        }
+        bool mac = OperatingSystem.IsMacOS();
+        var card = library.Welcome;
+        if (card is null)
+        {
+            card = new WelcomeCardModel(mac)
+            {
+                OnShowIt = MoveIconIntoView,
+                OnRetry = () => _ = host.DownloadModelAsync(),
+                OnMic = () => Dialogs.OpenUrl(host.MicSettingsUrl),
+                OnGotIt = PutWelcomeCardAway,
+            };
+            library.Welcome = card;
+        }
+        card.RecordKeys = Keybindings.Show(KeyAction.Record, mac);
+        card.IconHidden = mac && MacStatusItem.Check() is { Seen: false };
+        card.ShowModel(host.ModelReady, host.Downloading?.Fraction, host.DownloadProblem, mac ? "Mac" : "PC");
+        bool micRefused = host.MicAccess() is MicAccess.Denied or MicAccess.Restricted;
+        card.MicLine = !micRefused ? ""
+            : mac ? "Syft Notes can't use the microphone yet. Turn it on in System Settings → Privacy & Security → Microphone."
+            : "Windows is keeping the microphone from desktop apps. Turn on Settings → Privacy & security → Microphone → Let desktop apps access your microphone.";
+        card.MicButton = mac ? "Open System Settings" : "Open microphone settings";
+    }
+
+    /// <summary>"Ready when class starts" goes for good (Got it, or the first recording started).</summary>
+    static void PutWelcomeCardAway()
+    {
+        if (host.Settings.WelcomeCard) host.Save(s => s.WelcomeCard = false);
+        library.Welcome = null;
     }
 
     static int lastTaskbarPercent = -1;

@@ -41,7 +41,7 @@ public sealed partial class PhoneGoogleModel : ObservableObject, IDisposable
     public Action<string> OpenUrl { get; set; } = url => StudyStash.Core.Dialogs.OpenUrl(url);
 
     public string Title => "Connect your phone through your Google account";
-    public string Lede => "Your notes go into a private Egghead Notes folder in your Google Drive that only Egghead Notes can see.";
+    public string Lede => "Your notes go into a private Syft Notes folder in your Google Drive that only Syft Notes can see.";
     public string Device => OperatingSystem.IsMacOS() ? "Mac" : "PC";
 
     [ObservableProperty] public partial bool Connected { get; set; }
@@ -67,10 +67,10 @@ public sealed partial class PhoneGoogleModel : ObservableObject, IDisposable
     public bool HasPhones => Phones.Count > 0;
     public bool NoPhones => Connected && Phones.Count == 0;
     public string Account => $"Connected as {Email}";
-    public string StepOne => "On your iPhone, open Egghead Notes and tap Continue with Google, or scan this code with the camera.";
+    public string StepOne => "On your iPhone, open Syft Notes and tap Continue with Google, or scan this code with the camera.";
     public string StepTwo => Email.Length > 0 ? $"Use the same Google account: {Email}." : "Use the same Google account as here.";
     public string HowItWorks => $"Your phone keeps a copy of your notes, so it can read them while this {Device} is off. Recordings, files and questions from your phone reach this {Device} when it's on.";
-    public string ConfirmWords => "Your phone stops getting your notes, and Egghead Notes empties its folder in your Google Drive.";
+    public string ConfirmWords => "Your phone stops getting your notes, and Syft Notes empties its folder in your Google Drive.";
 
     partial void OnConnectedChanged(bool value) => Notify();
     partial void OnConnectingChanged(bool value) => Notify();
@@ -138,7 +138,7 @@ public sealed partial class PhoneGoogleModel : ObservableObject, IDisposable
         try
         {
             await drive.ConnectAsync(OpenUrl);
-            Say = $"Your phone can connect now. Open Egghead Notes on it and tap Continue with Google.";
+            Say = $"Your phone can connect now. Open Syft Notes on it and tap Continue with Google.";
         }
         catch (GoogleException e)
         {
@@ -150,7 +150,7 @@ public sealed partial class PhoneGoogleModel : ObservableObject, IDisposable
         }
         catch (Exception e) when (e is IOException or UnauthorizedAccessException)
         {
-            Say = $"Egghead Notes couldn't keep your Google account on this {Device}: {e.Message}";
+            Say = $"Syft Notes couldn't keep your Google account on this {Device}: {e.Message}";
         }
         Refresh();
     }

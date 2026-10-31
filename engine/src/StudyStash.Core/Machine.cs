@@ -22,7 +22,7 @@ public static partial class Machine
 {
     public static ProcResult? Run(string exe, IReadOnlyList<string> args, TimeSpan timeout) => Run(exe, args, timeout, null);
 
-    /// <summary>The same, with <paramref name="env"/> added to its environment (agy's home of Egghead Notes' own).</summary>
+    /// <summary>The same, with <paramref name="env"/> added to its environment (agy's home of Syft Notes' own).</summary>
     public static ProcResult? Run(string exe, IReadOnlyList<string> args, TimeSpan timeout, IReadOnlyDictionary<string, string>? env)
     {
         try
@@ -52,7 +52,7 @@ public static partial class Machine
     }
 
     /// <summary>Starts a program and leaves it running: not waited for, and what it prints isn't read (a browser, which
-    /// outlives this call and Egghead Notes). Each argument reaches it whole, whatever is in it: no shell reads them.
+    /// outlives this call and Syft Notes). Each argument reaches it whole, whatever is in it: no shell reads them.
     /// False when it couldn't be started.</summary>
     public static bool Start(string exe, IReadOnlyList<string> args)
     {

@@ -5,8 +5,9 @@
 #   sh macos/selftest.sh "<path>/Study Stash.app" [out-dir]
 # STUDYSTASH_WHISPER_MODEL must already be set, to a small model file (the tiny one, so this stays fast and needs no
 # download). STUDYSTASH_ARCH=x86_64 runs the bundle's Intel tree through Rosetta instead of natively.
-# STUDYSTASH_SELFTEST_FLOW=one-computer proves Just this computer instead of a laptop with a library elsewhere: setup
+# STUDYSTASH_SELFTEST_FLOW=one-computer proves a first run as a student has it: the one-button welcome's Get started
 # makes the app's own library, and the lecture is recorded, written down and given its notes all on this computer.
+# Without it, the welcome gives way to setup by hand for a laptop with a library elsewhere (the frozen two-computer setup).
 set -eu
 
 APP=${1:?"usage: sh macos/selftest.sh \"<path>/Study Stash.app\" [out-dir]"}
@@ -36,28 +37,25 @@ run_app() {
     "$@" --home "$HOME_DIR"
 }
 
+# perl's alarm is the time limit: it survives the exec into the app (and through arch), so the clock is the kernel's
+# and nothing here sleeps or polls. SIGALRM ends the app, which is exit status 142 below.
+limit=480
 if [ "${STUDYSTASH_ARCH:-}" = "x86_64" ]; then
-  run_app arch -x86_64 "$BIN" &
+  run_app perl -e 'alarm shift; exec @ARGV' "$limit" arch -x86_64 "$BIN" &
 else
-  run_app "$BIN" &
+  run_app perl -e 'alarm shift; exec @ARGV' "$limit" "$BIN" &
 fi
 pid=$!
 
-seconds=0
-while kill -0 "$pid" 2>/dev/null; do
-  seconds=$((seconds + 1))
-  if [ "$seconds" -ge 480 ]; then
-    kill -9 "$pid" 2>/dev/null || true
-    echo "selftest.sh: Egghead Notes didn't exit within 480 s" >&2
-    exit 1
-  fi
-  sleep 1
-done
 code=0
 wait "$pid" || code=$?
+if [ "$code" = 142 ]; then
+  echo "selftest.sh: Syft Notes didn't exit within $limit s" >&2
+  exit 1
+fi
 
 TXT="$OUT/selftest.txt"
-[ -f "$TXT" ] || { echo "selftest.sh: Egghead Notes exited ($code) without writing selftest.txt" >&2; exit 1; }
+[ -f "$TXT" ] || { echo "selftest.sh: Syft Notes exited ($code) without writing selftest.txt" >&2; exit 1; }
 cat "$TXT"
 
 last=$(tail -n 1 "$TXT")

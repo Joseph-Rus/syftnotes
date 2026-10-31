@@ -28,7 +28,8 @@ public sealed class SleptException(Exception inner) : Exception("the computer sl
 /// </summary>
 public sealed class Pipeline(Config cfg, Store store, SortChatFn? chat = null,
     Func<Meeting, Config, Task<string>>? summarize = null, Action<string>? log = null, Func<string>? notesModel = null,
-    Func<string>? notesEngine = null, SleepClock? sleep = null, Action<string>? filed = null, Func<bool>? notesFast = null)
+    Func<string>? notesEngine = null, SleepClock? sleep = null, Action<string>? filed = null, Func<bool>? notesFast = null,
+    Func<string, DateTime?>? limitUntil = null)
 {
     readonly SleepClock sleep = sleep ?? SleepClock.System;
     readonly Func<Meeting, Config, Task<string>> summarize = summarize ?? ((m, c) => Summarize.SummarizeTranscriptAsync(m, c));
@@ -115,6 +116,10 @@ public sealed class Pipeline(Config cfg, Store store, SortChatFn? chat = null,
                     error = Engines.NotesNeedSignIn(who);
                     unwritten = Engines.RewriteNeedsSignIn(who);
                 }
+                // An AI over its usage limit (Gemini's free allowance used up for the week): the lecture keeps its
+                // transcript and says until when; the library writes its notes once the limit's over.
+                else if (Engines.WhoWrote(model) is { Length: > 0 } limited && limited != "Ollama" && Engines.LooksLikeLimit(e.Message))
+                    error = Engines.NotesWaitForLimit(limited, limitUntil?.Invoke(limited));
                 summary = model = "";
             }
         }

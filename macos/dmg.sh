@@ -1,15 +1,17 @@
 #!/bin/sh
-# stage_dmg, the one place an Egghead Notes DMG is made. Sourced (never run) by macos/build-app.sh, which makes the
+# stage_dmg, the one place a Syft Notes DMG is made. Sourced (never run) by macos/build-app.sh, which makes the
 # first, ad hoc signed DMG, and by macos/sign-release.sh, which makes it again around the Developer ID signed and
 # notarized app. The caller sets OUT (a scratch folder these stage and mount under) and calls
-#   stage_dmg "<path>/Study Stash.app" "Egghead Notes" "<path>/Egghead-Notes.dmg"
+#   stage_dmg "<path>/Study Stash.app" "Syft Notes" "<path>/Syft-Notes.dmg"
 
 # The DMG: a stage folder with the app plus a link to /Applications. The disk shows the app's icon when it opens
 # (.VolumeIcon.icns, flagged on the volume, which only a mounted read-write copy can take), and the .dmg file itself
 # wears it too.
-# hdiutil, tried up to three times. On a busy Mac (CI's, now and then) it fails once and works a few seconds later:
+# hdiutil, tried up to three times. On a busy Mac (CI's, now and then) it fails once and works on a second try:
 # two release rehearsals stopped here, after the app was built and signed, with nothing in the log, because it runs
-# quietly. So the first try is quiet, and a try after a failure says everything it does.
+# quietly. So the first try is quiet, and a try after a failure says everything it does. Between tries `sync` returns
+# once the disk has taken every write still pending (what a busy volume or image is usually still doing), where a fixed
+# wait only guessed at it.
 hdi() {
   hdi_verb=$1
   shift
@@ -24,9 +26,9 @@ hdi() {
       echo "hdiutil $hdi_verb failed three times" >&2
       return 1
     fi
-    echo "hdiutil $hdi_verb didn't work (try $hdi_try of 3); trying again in 5 seconds" >&2
+    echo "hdiutil $hdi_verb didn't work (try $hdi_try of 3); trying again once the disk has caught up" >&2
     hdi_try=$((hdi_try + 1))
-    sleep 5
+    sync
   done
 }
 
@@ -41,6 +43,10 @@ stage_dmg() {
   mkdir -p "$stage" "$mnt"
   ditto "$app_path" "$stage/Study Stash.app"
   ln -s /Applications "$stage/Applications"
+  # How the disk opens (tools/dmg/make_ds_store.py): one small window, the app on the left and the Applications
+  # folder on the right, so the one thing to do is to drag the left one onto the right one. A saved Finder layout
+  # (a .DS_Store), so no Finder scripting runs while the DMG is built.
+  cp "$HERE/dmg-layout.DS_Store" "$stage/.DS_Store" || true
   cp "$app_path/Contents/Resources/AppIcon.icns" "$stage/.VolumeIcon.icns"
   SetFile -c icnC "$stage/.VolumeIcon.icns" 2>/dev/null || true
   hdi create -volname "$volname" -srcfolder "$stage" -ov -format UDRW "$rw"

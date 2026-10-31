@@ -176,8 +176,8 @@ public class SettingsSearchTests
             await Task.Yield();
             yield return new SetupChatEvent("Session", "s-1");
             yield return new SetupChatEvent("Tool") { Tool = "change_setting", Chip = "Mode: dark" };
-            yield return new SetupChatEvent("Text", "Done — Egghead Notes is dark now.");
-            yield return new SetupChatEvent("Final", "Done — Egghead Notes is dark now.");
+            yield return new SetupChatEvent("Text", "Done — Syft Notes is dark now.");
+            yield return new SetupChatEvent("Final", "Done — Syft Notes is dark now.");
         }
     }
 
@@ -214,7 +214,7 @@ public class SettingsSearchTests
         Assert.False(chat.ShowWelcome);
         Assert.IsType<StudentEntry>(chat.Thread[0]);
         var ai = Assert.IsType<AiEntry>(chat.Thread[1]);
-        Assert.Equal("Done — Egghead Notes is dark now.", ai.Text);
+        Assert.Equal("Done — Syft Notes is dark now.", ai.Text);
         Assert.Equal(["Mode: dark"], ai.Chips);
 
         // The next turn carries the conversation on; New chat starts afresh.

@@ -3,7 +3,7 @@ using System.Text.RegularExpressions;
 namespace StudyStash.Core.Canvas;
 
 /// <summary>
-/// What a Canvas course is called in Egghead Notes: its name ("Software Engineering"), cleaned of the school's term
+/// What a Canvas course is called in Syft Notes: its name ("Software Engineering"), cleaned of the school's term
 /// and section codes ("202710.TS.CSCI321.A - Software Engineering (Fall 2026)"), with its short code ("CSCI 321")
 /// only as a label beside it. Classes made from courses take these names, and every list shows them.
 /// </summary>

@@ -240,7 +240,7 @@ public sealed class ExtensionE2ETests(ExtensionRig rig, ITestOutputHelper output
         Note($"a wrong key said library_refused {sw.Elapsed.TotalSeconds:0.0} s after the laptop's Chrome started");
         Assert.Equal("\"!\"", await laptop.EvaluateAsync("chrome.action.getBadgeText({})"));
         string popup = await laptop.EvaluateAsync("new Promise(r => setTimeout(() => r(document.getElementById('s').textContent), 500))", "popup.html");
-        Assert.Equal("This extension's key was refused. Open Egghead Notes and add the extension again.", JsonNode.Parse(popup)!.GetValue<string>());
+        Assert.Equal("This extension's key was refused. Open Syft Notes and add the extension again.", JsonNode.Parse(popup)!.GetValue<string>());
         var s = CanvasSettings.Load(rig.Home);
         Assert.False(s.ExtensionCopies.ContainsKey("another_computer"), "the library wrote down a Chrome whose key it refused");
         Assert.Equal(key, CanvasSettings.ExtensionKey(rig.Home));
@@ -347,7 +347,7 @@ public sealed class ExtensionE2ETests(ExtensionRig rig, ITestOutputHelper output
     [ChromeFact]
     public async Task S9_a_1_3_folder_updates_itself_to_the_new_version()
     {
-        // A student's Chrome still runs the extension as Egghead Notes 0.5.0 left it (1.3: config.js, no config.json,
+        // A student's Chrome still runs the extension as Syft Notes 0.5.0 left it (1.3: config.js, no config.json,
         // asks once a minute). The library brings the folder up to date; the running 1.3 sees the new version on
         // disk and reloads into it by itself.
         var kept = Extension.Connection(rig.Folder)!;
@@ -385,7 +385,7 @@ public sealed class ExtensionE2ETests(ExtensionRig rig, ITestOutputHelper output
     [ChromeFact]
     public async Task S9b_the_chrome_web_store_build_loads_and_waits_for_its_code()
     {
-        // The zip for the Chrome Web Store, unzipped the way Chrome installs it: no folder for Egghead Notes to write,
+        // The zip for the Chrome Web Store, unzipped the way Chrome installs it: no folder for Syft Notes to write,
         // no sites until the student pastes the code and allows them.
         rig.StopChrome();
         string zip = rig.Scratch("store.zip"), store = rig.Scratch("store-extension");

@@ -78,13 +78,13 @@
           <Button Name="Record" Classes="record" Classes.recording="{Binding Running}" Classes.paused="{Binding Paused}" Command="{Binding RecordCommand}"
                   IsVisible="{Binding CanRecord}" AutomationProperties.Name="{Binding RecordTip}" ToolTip.Tip="{Binding RecordTip}">
             <StackPanel Orientation="Horizontal" Spacing="12">
-              <Button Name="StopRecording" Theme="{StaticResource Surface}" Padding="0" CornerRadius="20" Background="Transparent"
+              <Button Name="StopRecording" Theme="{StaticResource Surface}" Padding="0" CornerRadius="10.9" Background="Transparent"
                       Command="{Binding StopCommand}" IsHitTestVisible="{Binding Recording}" Focusable="{Binding Recording}"
                       ToolTip.Tip="{Binding StopTip}" AutomationProperties.Name="Stop recording">
                 <Border Classes="record-dot"><Border /></Border>
               </Button>
               <TextBlock Name="RecordWords" Text="{Binding RecordWords}" VerticalAlignment="Center" />
-              <c:Waveform Bars="3" Height="16" MinBar="5" Levels="{Binding Recorder.Levels, FallbackValue={x:Null}}" Foreground="{DynamicResource Record}"
+              <c:Waveform Bars="3" Height="16" Lively="True" Levels="{Binding Recorder.Levels, FallbackValue={x:Null}}" Foreground="{DynamicResource Record}"
                           VerticalAlignment="Center" IsVisible="{Binding Running}" />
               <TextBlock Text="{Binding Elapsed}" FontWeight="Medium" Foreground="{DynamicResource InkMuted}" VerticalAlignment="Center" IsVisible="{Binding Recording}" />
               <TextBlock Classes="kbd" Text="{Binding RecordKeys}" FontSize="12" VerticalAlignment="Center" Margin="2,0,0,0" IsVisible="{Binding Idle}" />
@@ -96,6 +96,29 @@
       <!-- Home: the one gentle ask for a tip, when it's due, in the page's flow -->
       <Panel IsVisible="{Binding HasAsking}" Margin="0,28,0,0" MaxWidth="560" HorizontalAlignment="Left">
         <c:BySkin Name="SupportAsk" Mac="{x:Type v:MacSupportAsk}" Win="{x:Type v:WinSupportAsk}" DataContext="{Binding Asking}" />
+      </Panel>
+
+      <!-- Home, after a first run: "Ready when class starts". How to record, where the menu bar icon lives, how the model's
+           download is getting on, and why the microphone can't be used yet when it can't. Got it puts it away. -->
+      <Panel IsVisible="{Binding HasWelcome}" Margin="0,28,0,0" MaxWidth="560" HorizontalAlignment="Left">
+      <Border Name="WelcomeCard" Classes="free-ai" DataContext="{Binding Welcome}" x:DataType="vm:WelcomeCardModel">
+        <StackPanel Spacing="10">
+          <TextBlock Name="WelcomeTitle" Classes="free-ai-lead" Text="{x:Static vm:WelcomeCardModel.Title}" />
+          <TextBlock Name="WelcomeLede" Classes="free-ai-more" Text="{Binding Lede}" />
+          <TextBlock Name="WelcomeWhere" Classes="free-ai-more" Text="{Binding WhereLine}" />
+          <Button Name="WelcomeShowIt" Classes="btn sm" HorizontalAlignment="Left" Content="{x:Static vm:WelcomeCardModel.ShowItLabel}" Command="{Binding ShowItCommand}"
+                  IsVisible="{Binding CanShowIt}" />
+          <Grid ColumnDefinitions="*,Auto" IsVisible="{Binding HasMicLine}">
+            <TextBlock Name="WelcomeMic" Classes="free-ai-problem" Text="{Binding MicLine}" VerticalAlignment="Center" />
+            <Button Grid.Column="1" Classes="btn sm" Margin="12,0,0,0" Content="{Binding MicButton}" Command="{Binding MicCommand}" VerticalAlignment="Center" />
+          </Grid>
+          <Grid ColumnDefinitions="*,Auto" IsVisible="{Binding HasModelLine}">
+            <TextBlock Name="WelcomeModel" Classes="free-ai-more" Text="{Binding ModelLine}" VerticalAlignment="Center" />
+            <Button Grid.Column="1" Classes="btn sm" Margin="12,0,0,0" Content="Try again" Command="{Binding RetryCommand}" IsVisible="{Binding ModelFailed}" VerticalAlignment="Center" />
+          </Grid>
+          <Button Name="WelcomeGotIt" Classes="btn sm" HorizontalAlignment="Right" Content="Got it" Command="{Binding GotItCommand}" />
+        </StackPanel>
+      </Border>
       </Panel>
 
       <!-- Home: up next. The rest of today's and tomorrow's events; each row is a button that starts recording it. -->
@@ -170,7 +193,7 @@
           </Button>
         </Grid>
         <StackPanel Orientation="Horizontal" Spacing="18" IsVisible="{Binding NoNotes}">
-          <c:Doodle Art="hello" Size="96" VerticalAlignment="Center" />
+          <c:SyftMark Size="96" VerticalAlignment="Center" />
           <TextBlock Name="NoNotes" Classes="empty" Text="{Binding NotesEmpty}" IsVisible="{Binding NoNotes}" MaxWidth="560" VerticalAlignment="Center" />
         </StackPanel>
         <ItemsControl Name="NoteRows" ItemsSource="{Binding Notes}" ClipToBounds="False">
@@ -189,7 +212,7 @@
         <StackPanel>
           <TextBlock Name="FolderNotes" Classes="h2" Text="{Binding NotesHeading}" Margin="0,0,0,14" />
           <StackPanel Orientation="Horizontal" Spacing="18" IsVisible="{Binding NoNotes}">
-            <c:Doodle Art="chicklet" Size="80" VerticalAlignment="Center" />
+            <c:SyftMark Look="OddOneOut" Size="80" VerticalAlignment="Center" />
             <TextBlock Classes="empty" Text="{Binding NotesEmpty}" IsVisible="{Binding NoNotes}" VerticalAlignment="Center" />
           </StackPanel>
           <ItemsControl ItemsSource="{Binding Groups}" ClipToBounds="False">
@@ -293,7 +316,7 @@
         <v:DueCalendar Name="Calendar" DataContext="{Binding Calendar}" />
       </StackPanel>
 
-      <!-- Home: Egghead Notes is free, and a tip for the two students who build it goes to their Ko-fi page -->
+      <!-- Home: Syft Notes is free, and a tip for the two students who build it goes to their Ko-fi page -->
       <Button Name="Support" Classes="text-link" Content="{x:Static s:SupportAsk.Button}" Command="{Binding SupportCommand}" IsVisible="{Binding CanSupport}"
               ToolTip.Tip="{x:Static s:SupportAsk.HomeTip}" Margin="0,36,0,0" />
     </StackPanel>

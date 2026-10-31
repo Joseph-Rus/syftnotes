@@ -154,8 +154,8 @@ public class SummarizeTests
         var reader = new LibraryReader(cfg, store);
         var tooShort = reader.Lecture("short")!;
         Assert.Equal(Summarize.NoNotesShort, tooShort["no_notes"]!.GetValue<string>());
-        Assert.Equal("This lecture is too short for notes: Egghead Notes writes them from about a minute and a half of speech.", tooShort["no_notes_why"]!.GetValue<string>());
-        Assert.Contains("_(Too short for notes: Egghead Notes writes them from about a minute and a half of speech.)_", Py.ReadText(store.Get("short")!.MdPath!));
+        Assert.Equal("This lecture is too short for notes: Syft Notes writes them from about a minute and a half of speech.", tooShort["no_notes_why"]!.GetValue<string>());
+        Assert.Contains("_(Too short for notes: Syft Notes writes them from about a minute and a half of speech.)_", Py.ReadText(store.Get("short")!.MdPath!));
         // Enough was said and nothing came back: that isn't called too short.
         Assert.Null(reader.Lecture("long")!["no_notes"]);
         Assert.Contains("_(no AI notes returned)_", Py.ReadText(store.Get("long")!.MdPath!));

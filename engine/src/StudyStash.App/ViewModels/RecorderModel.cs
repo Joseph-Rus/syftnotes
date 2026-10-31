@@ -61,6 +61,9 @@ public sealed partial class RecorderModel : ObservableObject
     /// <summary>This lecture is written down after class (Settings → Recording): it only records, so there's no
     /// transcript to show and no chat about it until it stops.</summary>
     [ObservableProperty] public partial bool AfterClass { get; set; }
+    /// <summary>Recorded before the model that writes it down has arrived (right after setup): the live words still show,
+    /// and the transcript is written once the model is here.</summary>
+    [ObservableProperty] public partial bool WaitsForModel { get; set; }
     /// <summary>The live words are on (Cactus Whistle on ARM, a small Whisper on x64, keeping up in this lecture): what's
     /// said shows a second or two after it's said.
     /// Off, the transcript's own lines show, about half a minute after.</summary>
@@ -69,6 +72,7 @@ public sealed partial class RecorderModel : ObservableObject
     public const string LiveWaiting = "What's said shows here a few seconds after it's said.";
     public const string SlowWaiting = "What's said shows here about half a minute after it's said.";
     public const string AfterClassWaiting = "Only recording, to save battery. It's written down after class: the transcript, and asking about it, come once you stop.";
+    public const string ModelWaiting = "Recording. The transcript is written as soon as speech-to-text is ready on this computer.";
 
     public ObservableCollection<HeardLine> Lines { get; } = [];
     /// <summary>Asking about the lecture so far, with any engine (design 16's compact chat).</summary>
@@ -169,11 +173,15 @@ public sealed partial class RecorderModel : ObservableObject
 
     partial void OnAfterClassChanged(bool value)
     {
-        Waiting = value ? AfterClassWaiting : QuickWords ? LiveWaiting : SlowWaiting;
+        Waiting = WaitingWords();
         OnPropertyChanged(nameof(Live));
     }
 
-    partial void OnQuickWordsChanged(bool value) => Waiting = AfterClass ? AfterClassWaiting : value ? LiveWaiting : SlowWaiting;
+    partial void OnQuickWordsChanged(bool value) => Waiting = WaitingWords();
+
+    partial void OnWaitsForModelChanged(bool value) => Waiting = WaitingWords();
+
+    string WaitingWords() => WaitsForModel ? ModelWaiting : AfterClass ? AfterClassWaiting : QuickWords ? LiveWaiting : SlowWaiting;
 
     /// <summary>Written down as it records: the transcript comes in, and the chat asks about it.</summary>
     public bool Live => !AfterClass;

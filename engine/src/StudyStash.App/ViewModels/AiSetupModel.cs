@@ -337,7 +337,7 @@ public sealed partial class AiSetupModel : ObservableObject
         var failed = overview.Pulling is { Why.Length: > 0 } stopped ? stopped : null;
         bool freeNeedsWork = overview.Engines.FirstOrDefault(e => e.Id == "ollama") is { State: "not_installed" or "not_running" or "model_missing" };
         // Claude or ChatGPT, not on this computer or not signed in, or Gemini signed out, where the host gets them ready
-        // with buttons (guided setup's screens: Gemini's sign-in is in Egghead Notes' own home for agy).
+        // with buttons (guided setup's screens: Gemini's sign-in is in Syft Notes' own home for agy).
         bool Buttons(EngineInfo e) => SetUpPaid is not null
             && (e is { Id: "claude" or "codex", State: "not_installed" or "not_signed_in" } || e is { Id: "gemini", State: "not_signed_in" });
         // Gemini, not here at all: its one button is its API key (Google's own app is installed by the student).

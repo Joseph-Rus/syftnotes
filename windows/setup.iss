@@ -1,4 +1,4 @@
-; Egghead-Notes-Setup.exe, the one Windows download (built by windows/build.ps1 with Inno Setup 6). The app has no
+; Syft-Notes-Setup.exe, the one Windows download (built by windows/build.ps1 with Inno Setup 6). The app has no
 ; role of its own: setup asks what this computer is for, and Settings can change it later (docs/one-download.md).
 ; The AppId is the one the old Laptop and Library Setup.exe had, so installing over any earlier copy is an in-place
 ; upgrade: same folder, and its study-stash.ini keeps the role= line an old Setup.exe wrote (Apps.RolePreset reads it
@@ -16,10 +16,10 @@
 
 [Setup]
 AppId={{6F2C9A51-3B7E-4D28-9C41-8E5A0B7D2F63}
-AppName=Egghead Notes
+AppName=Syft Notes
 AppVersion={#AppVersion}
-AppVerName=Egghead Notes {#AppVersion}
-AppPublisher=Egghead Notes
+AppVerName=Syft Notes {#AppVersion}
+AppPublisher=Syft Notes
 AppPublisherURL=https://github.com/Joseph-Rus/study-stash
 AppSupportURL=https://github.com/Joseph-Rus/study-stash/issues
 AppCopyright=MIT License.
@@ -27,12 +27,18 @@ DefaultDirName={localappdata}\Programs\Study Stash
 DisableDirPage=yes
 DisableProgramGroupPage=yes
 DisableReadyPage=yes
+; One double-click, no questions (the way Slack, Discord and Zoom install): no welcome page, no finished page with a
+; checkbox. Setup shows its progress bar, then [Run] below opens the app.
+DisableWelcomePage=yes
+DisableFinishedPage=yes
 PrivilegesRequired=lowest
 ArchitecturesAllowed=x64compatible
-OutputBaseFilename=Egghead-Notes-Setup
+OutputBaseFilename=Syft-Notes-Setup
 SetupIconFile=..\assets\study-stash.ico
 UninstallDisplayIcon={app}\StudyStash.exe
-UninstallDisplayName=Egghead Notes
+UninstallDisplayName=Syft Notes
+; Explorer, the Start menu and the taskbar drop the icons they kept for the old name (Setup tells Windows at the end)
+ChangesAssociations=yes
 Compression=lzma2
 SolidCompression=yes
 WizardStyle=modern
@@ -45,9 +51,6 @@ SignTool=studystash
 SignedUninstaller=yes
 #endif
 
-[Tasks]
-Name: "desktopicon"; Description: "Add a desktop icon"; Flags: unchecked
-
 [Files]
 Source: "{#Source}\win-arm64\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs; Check: IsArm64
 Source: "{#Source}\win-x64\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs; Check: not IsArm64
@@ -57,13 +60,17 @@ Source: "{#Source}\win-x64\*"; DestDir: "{app}"; Flags: ignoreversion recursesub
 Filename: "{app}\study-stash.ini"; Section: "app"; Key: "version"; String: "{#AppVersion}"
 
 [InstallDelete]
-; The shortcuts an install from before the rename to Egghead Notes made, so an update leaves one of each, not two.
+; The shortcuts an install from before the rename to Syft Notes made (named Study Stash, then Egghead Notes), so an
+; update leaves one of each, not two.
 Type: files; Name: "{userprograms}\Study Stash.lnk"
 Type: files; Name: "{userdesktop}\Study Stash.lnk"
+Type: files; Name: "{userprograms}\Egghead Notes.lnk"
+Type: files; Name: "{userdesktop}\Egghead Notes.lnk"
 
 [Icons]
-Name: "{userprograms}\Egghead Notes"; Filename: "{app}\StudyStash.exe"; Comment: "Open Egghead Notes"
-Name: "{userdesktop}\Egghead Notes"; Filename: "{app}\StudyStash.exe"; Tasks: desktopicon
+; Start menu only, no desktop icon and no question about one (Windows 11's own habit, and what Slack and Notion do);
+; a desktop icon an earlier install made stays where it is.
+Name: "{userprograms}\Syft Notes"; Filename: "{app}\StudyStash.exe"; Comment: "Open Syft Notes"
 
 [Registry]
 ; What the app tells Windows about itself the first time it has something to say, so its notifications are Windows'
@@ -72,7 +79,9 @@ Root: HKCU; Subkey: "Software\Classes\AppUserModelId\StudyStash.App"; Flags: don
 Root: HKCU; Subkey: "Software\Classes\studystash"; Flags: dontcreatekey uninsdeletekey
 
 [Run]
-Filename: "{app}\StudyStash.exe"; Description: "Open Egghead Notes"; Flags: nowait postinstall skipifsilent
+; opens by itself when a person ran Setup (no postinstall flag: no checkbox, no finished page); a silent run (the
+; updater's, CI's) never opens it here, the entry below does that when asked
+Filename: "{app}\StudyStash.exe"; Description: "Open Syft Notes"; Flags: nowait skipifsilent
 ; a silent update (/relaunch=1) reopens the app once the new files are in place
 Filename: "{app}\StudyStash.exe"; Parameters: "--background"; Flags: nowait; Check: Relaunch
 
@@ -118,11 +127,48 @@ begin
         if Stop then
         begin
           Pid := Proc.ProcessId;
-          Log('Stopping Egghead Notes (' + IntToStr(Pid) + ')');
+          Log('Stopping Syft Notes (' + IntToStr(Pid) + ')');
           Exec(ExpandConstant('{sys}\taskkill.exe'), '/f /pid ' + IntToStr(Pid), '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
         end;
       end;
     end;
+  end;
+end;
+
+// Waits, for up to TimeoutMs in all, for every process AppCopies counts to end, on Windows' own signal for a process
+// ending (WaitForSingleObject on the process), not on a guessed pause between looks. True when none is left.
+function OpenProcess(Access: Cardinal; Inherit: Boolean; Pid: Cardinal): THandle; external 'OpenProcess@kernel32.dll stdcall';
+function WaitForSingleObject(Handle: THandle; Milliseconds: Cardinal): Cardinal; external 'WaitForSingleObject@kernel32.dll stdcall';
+function CloseHandle(Handle: THandle): Boolean; external 'CloseHandle@kernel32.dll stdcall';
+function GetTickCount: Cardinal; external 'GetTickCount@kernel32.dll stdcall';
+
+function WaitForAppCopies(TimeoutMs: Cardinal): Boolean;
+var
+  Wmi, Found, Proc: Variant;
+  I: Integer;
+  Handle: THandle;
+  Started, Spent: Cardinal;
+begin
+  Result := True;
+  Wmi := CreateOleObject('WbemScripting.SWbemLocator');
+  Wmi := Wmi.ConnectServer('.', 'root\CIMV2');
+  Found := Wmi.ExecQuery('SELECT ProcessId, ExecutablePath FROM Win32_Process WHERE Name = ''StudyStash.exe''');
+  Started := GetTickCount;
+  for I := 0 to Found.Count - 1 do
+  begin
+    Proc := Found.ItemIndex(I);
+    if not VarIsNull(Proc.ExecutablePath) then
+      if CompareText(Proc.ExecutablePath, ExpandConstant('{app}\StudyStash.exe')) = 0 then
+      begin
+        Handle := OpenProcess($00100000, False, Proc.ProcessId); // SYNCHRONIZE
+        if Handle <> 0 then
+        begin
+          Spent := GetTickCount - Started;
+          if Spent > TimeoutMs then Spent := TimeoutMs;
+          if WaitForSingleObject(Handle, TimeoutMs - Spent) <> 0 then Result := False; // 0 = WAIT_OBJECT_0: it ended
+          CloseHandle(Handle);
+        end;
+      end;
   end;
 end;
 
@@ -147,7 +193,7 @@ begin
       if (Pos('Wait-Process', Cmd) > 0) and (Pos('StudyStash.exe', Cmd) > 0) then
       begin
         Pid := Proc.ProcessId;
-        Log('Stopping an older Egghead Notes''s relaunch waiter (' + IntToStr(Pid) + ')');
+        Log('Stopping an older Syft Notes'' relaunch waiter (' + IntToStr(Pid) + ')');
         Exec(ExpandConstant('{sys}\taskkill.exe'), '/f /pid ' + IntToStr(Pid), '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
       end;
     end;
@@ -159,27 +205,19 @@ end;
 // when the new ones go in. Anything that goes wrong here is only logged: Restart Manager (CloseApplications) still
 // closes what it finds.
 function PrepareToInstall(var NeedsRestart: Boolean): String;
-var
-  Tries: Integer;
 begin
   Result := '';
   if not Relaunch then Exit;
   try
     StopOldRelaunchers;
-    Tries := 0;
-    while (Tries < 20) and (AppCopies(False) > 0) do
+    // The copy that started this is quitting by itself: given up to 10 s, then stopped (and given up to 5 s more).
+    if not WaitForAppCopies(10000) then
     begin
-      Sleep(500);
-      Tries := Tries + 1;
-    end;
-    Tries := 0;
-    while (Tries < 5) and (AppCopies(True) > 0) do
-    begin
-      Sleep(500);
-      Tries := Tries + 1;
+      AppCopies(True);
+      if not WaitForAppCopies(5000) then Log('Syft Notes was still running 5 s after it was stopped');
     end;
   except
-    Log('Couldn''t check for a running Egghead Notes: ' + GetExceptionMessage);
+    Log('Couldn''t check for a running Syft Notes: ' + GetExceptionMessage);
   end;
 end;
 
@@ -200,11 +238,11 @@ begin
     Exe := ExpandConstant('{app}\StudyStash.exe');
     if FileExists(Exe) then
     begin
-      Log('The update didn''t finish: opening Egghead Notes again');
+      Log('The update didn''t finish: opening Syft Notes again');
       Exec(Exe, '--background', '', SW_SHOWNORMAL, ewNoWait, ResultCode);
     end;
   except
-    Log('Couldn''t open Egghead Notes again: ' + GetExceptionMessage);
+    Log('Couldn''t open Syft Notes again: ' + GetExceptionMessage);
   end;
 end;
 

@@ -6,7 +6,7 @@ import { useResource } from '../data/resource';
 import { href } from '../router';
 import { classColor } from '../theme/themes';
 import { ChevronRight, Mic, Paperclip, PlusCircle } from '../ui/icons';
-import { Doodle } from '../ui/Doodle';
+import { SyftLoader, SyftMark } from '../ui/Syft';
 import { Dot, Empty, IconButton, Problem, Row, Screen, Section, SkeletonRows } from '../ui/kit';
 import { useClassColors } from './classColors';
 
@@ -44,7 +44,7 @@ export function Home({ api, offline }: { api: Api; offline: boolean }) {
     >
       {writing > 0 && !offline ? (
         <div class="busy-strip" role="status">
-          <Doodle name="writing" size={44} busy />
+          <SyftLoader variant="hoppingBits" size={22} />
           <span>
             Writing notes for {writing} lecture{writing === 1 ? '' : 's'}…
           </span>
@@ -187,8 +187,8 @@ function Classes({
   if (!overview) return null;
   if (overview.classes.length === 0 && overview.unsorted === 0)
     return (
-      <Empty icon={<Doodle name="hello" size={128} />} title="Nothing here yet">
-        Record a lecture with Egghead Notes on your computer, or import a voice memo with +.
+      <Empty icon={<SyftMark size={128} />} title="Nothing here yet">
+        Record a lecture with Syft Notes on your computer, or import a voice memo with +.
       </Empty>
     );
   return (

@@ -1,5 +1,5 @@
 /*
- * Egghead Notes' universal launcher.
+ * Syft Notes' universal launcher.
  *
  * A .NET self-contained publish is per architecture, and the two published trees can't be merged with lipo
  * (System.Private.CoreLib and the R2R framework assemblies differ arm64 vs x64). So the app bundle carries both
@@ -35,7 +35,7 @@ int main(int argc, char *argv[])
     uint32_t n = sizeof exe;
     if (_NSGetExecutablePath(exe, &n) != 0 || !realpath(exe, real))
     {
-        fprintf(stderr, "Egghead Notes can't find its own path\n");
+        fprintf(stderr, "Syft Notes can't find its own path\n");
         return 111;
     }
     strncpy(dir, real, sizeof dir);
@@ -48,13 +48,13 @@ int main(int argc, char *argv[])
     void *h = dlopen(fxr, RTLD_NOW | RTLD_LOCAL);
     if (!h)
     {
-        fprintf(stderr, "Egghead Notes can't start: %s\n", dlerror());
+        fprintf(stderr, "Syft Notes can't start: %s\n", dlerror());
         return 112;
     }
     startupinfo_fn run = (startupinfo_fn)dlsym(h, "hostfxr_main_startupinfo");
     if (!run)
     {
-        fprintf(stderr, "Egghead Notes can't start: hostfxr_main_startupinfo missing from %s\n", fxr);
+        fprintf(stderr, "Syft Notes can't start: hostfxr_main_startupinfo missing from %s\n", fxr);
         return 113;
     }
     return run(argc, (const char **)argv, host, tree, app);

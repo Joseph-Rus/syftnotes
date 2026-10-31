@@ -91,17 +91,17 @@
       <Border Classes="fill" IsVisible="{Binding IsRecording}" CornerRadius="10" Padding="10,8">
         <StackPanel Spacing="6">
           <Grid ColumnDefinitions="Auto,6,*,Auto">
-            <Border Width="7" Height="7" CornerRadius="3.5" Background="{DynamicResource Accent}" VerticalAlignment="Center" />
+            <c:SyftCell Width="7" Height="7" Fill="{DynamicResource Accent}" VerticalAlignment="Center" />
             <TextBlock Grid.Column="2" Text="{Binding RecordingLabel}" FontSize="12" FontWeight="SemiBold" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
             <Button Grid.Column="3" Theme="{StaticResource Surface}" CornerRadius="5" Padding="4,1" Margin="0,-1,-4,-1" Command="{Binding ShowRecorderCommand}">
               <TextBlock Text="Show recorder" FontSize="11" Foreground="{DynamicResource Fg2}" />
             </Button>
           </Grid>
           <Grid ColumnDefinitions="Auto,10,Auto,12,*">
-            <c:Doodle Art="listening" Size="30" Busy="{Binding IsRecording}" VerticalAlignment="Center" />
+            <c:SyftLoader Kind="PathTrace" Size="30" IsActive="{Binding IsRecording}" VerticalAlignment="Center" AutomationProperties.AccessibilityView="Raw" />
             <TextBlock Grid.Column="2" Classes="num" Text="{Binding Elapsed}" FontFamily="{DynamicResource DisplayFont}" FontSize="24" FontWeight="Light"
                        c:Typography.Extra="-0.24" VerticalAlignment="Center" />
-            <c:Waveform Grid.Column="4" Height="20" Bars="20" Levels="{Binding Levels}" Foreground="{DynamicResource Fg2}" VerticalAlignment="Center" />
+            <c:Waveform Grid.Column="4" Height="20" Bars="20" Levels="{Binding Levels}" Foreground="{DynamicResource Record}" VerticalAlignment="Center" />
           </Grid>
           <TextBlock Text="{Binding LastLine}" IsVisible="{Binding HasLastLine}" FontSize="11" LineHeight="15" TextWrapping="Wrap" MaxLines="2"
                      TextTrimming="CharacterEllipsis" Foreground="{DynamicResource Fg2}" />
@@ -182,8 +182,9 @@
           <Button Name="OpenApp" Classes="row" Padding="8,3" Height="26" HorizontalContentAlignment="Stretch" VerticalContentAlignment="Center"
                   Command="{Binding OpenAppCommand}">
             <StackPanel Orientation="Horizontal" Spacing="7">
-              <c:Doodle Art="head" Size="18" VerticalAlignment="Center" />
-              <TextBlock Text="Open Egghead Notes" FontSize="13" VerticalAlignment="Center" />
+              <c:SyftMark Size="18" Bits="False" VerticalAlignment="Center" />
+              <TextBlock Text="Open Syft Notes" FontSize="13" VerticalAlignment="Center" />
+
             </StackPanel>
           </Button>
           <Button Name="Settings" AutomationProperties.Name="Settings" Grid.Column="2" Classes="row" Width="26" Height="26" Padding="0" HorizontalContentAlignment="Center"

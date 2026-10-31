@@ -169,7 +169,50 @@ public static partial class SelfTest
         ScreenShot(w, name);
     }
 
-    static async Task Wait(double seconds) => await Task.Delay(TimeSpan.FromSeconds(seconds));
+    /// <summary>Waits until what's on screen has stopped changing, instead of for a guessed number of seconds: it
+    /// follows the window's own frames (so a slow computer simply takes more of them) and returns once every open
+    /// window has kept the same size and place for 15 frames in a row (about a quarter of a second at 60 a second),
+    /// or after <paramref name="seconds"/> at most, then goes on with whatever is there.</summary>
+    static async Task Settle(double seconds = 10)
+    {
+        var until = DateTime.UtcNow.AddSeconds(seconds);
+        string last = "";
+        int still = 0;
+        while (still < 15 && DateTime.UtcNow < until)
+        {
+            await NextFrame();
+            var now = string.Join(";", OpenWindows().Where(w => w.IsVisible).Select(w => $"{w.GetHashCode()}:{w.Bounds}:{w.Position}"));
+            still = now == last ? still + 1 : 0;
+            last = now;
+        }
+    }
+
+    static IEnumerable<Window> OpenWindows() =>
+        (Application.Current?.ApplicationLifetime as Avalonia.Controls.ApplicationLifetimes.IClassicDesktopStyleApplicationLifetime)?.Windows.ToList() ?? new List<Window>();
+
+    /// <summary>The next frame a visible window draws (the next pass of the UI thread when none is showing).</summary>
+    static async Task NextFrame()
+    {
+        var frame = new TaskCompletionSource();
+        if (OpenWindows().FirstOrDefault(w => w.IsVisible) is { } window) window.RequestAnimationFrame(_ => frame.TrySetResult());
+        else Dispatcher.UIThread.Post(() => frame.TrySetResult(), DispatcherPriority.Render);
+        // A window hidden between asking and drawing never answers; that must not hang the self-test.
+        using var guard = new CancellationTokenSource();
+        if (await Task.WhenAny(frame.Task, Task.Delay(TimeSpan.FromSeconds(2), guard.Token)) == frame.Task) guard.Cancel();
+    }
+
+    /// <summary>Reads the full-screen stand-in's standard output until it says its window is full screen.</summary>
+    static async Task FullScreenReachedAsync(System.Diagnostics.Process helper)
+    {
+        using var limit = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+        try
+        {
+            while (await helper.StandardOutput.ReadLineAsync(limit.Token) is { } line)
+                if (line.Trim() == "fullscreen") return;
+            Say("FAILED recorder over full screen: the full-screen stand-in quit before it was full screen");
+        }
+        catch (OperationCanceledException) { Say("FAILED recorder over full screen: the stand-in wasn't full screen within 30 s"); }
+    }
 
     static async Task<bool> Until(Func<bool> done, double seconds)
     {
@@ -183,7 +226,7 @@ public static partial class SelfTest
     static async Task PanelShot(string name)
     {
         Shell.Windows.OpenPanelViaIcon();
-        await Wait(0.5);
+        await Settle();
         Shot(Shell.Windows.Panel, name);
         Shell.Windows.Panel?.Hide();
     }
@@ -227,11 +270,11 @@ public static partial class SelfTest
 
     // --- setup -------------------------------------------------------------------------------------------------------
 
-    /// <summary>Setup's first page says how Egghead Notes works: seen, then on to the computer's choices.</summary>
+    /// <summary>Setup's first page says how Syft Notes works: seen, then on to the computer's choices.</summary>
     static async Task PastIntroAsync(SetupModel m)
     {
         if (!m.OnIntro) return;
-        await Wait(1);
+        await Settle();
         Shot(Shell.Windows.Setup, "setup-intro");
         await m.NextCommand.ExecuteAsync(null);
         if (!m.OnWelcome) throw new InvalidOperationException($"expected the computer's choices after How it works, got {m.Step}");
@@ -241,14 +284,24 @@ public static partial class SelfTest
     {
         bool opened = await Until(() => Shell.Windows.Setup is not null, 10);
         Say(opened ? "setup opened" : "setup didn't open");
+        var first = Shell.Windows.SetupModel ?? throw new InvalidOperationException("no setup window");
+        // A first run opens the one-button welcome. A laptop connecting to a library elsewhere (the two-computer setup,
+        // frozen and hidden from students, who reach it from Settings → Connection) is setup by hand: the self-test
+        // still proves it works.
+        if (!first.OnStart) throw new InvalidOperationException($"a first run should open on the one-button welcome, got {first.Step}");
+        await Settle();
+        Shot(Shell.Windows.Setup, "setup-welcome");
+        Shell.Windows.SetupByHand();
+        bool byHand = await Until(() => Shell.Windows.SetupModel is { OneButton: false }, 10);
+        Say(byHand ? "set up by hand, for a laptop" : "setup by hand didn't open");
         var m = Shell.Windows.SetupModel ?? throw new InvalidOperationException("no setup window");
-        await ByHandAsync();
         await PastIntroAsync(m);
 
-        // Welcome: three choices, starting on just this computer; the self-test is a laptop with its own library.
+        // Where lectures are kept: three choices, starting on just this computer; the self-test is a laptop with its own
+        // library.
         Say($"welcome: {m.FlowName}, {m.Steps.Count} steps");
-        await Wait(1); // the window lays out its steps first
-        Shot(Shell.Windows.Setup, "setup-welcome");
+        await Settle(); // the window lays out its steps first
+        Shot(Shell.Windows.Setup, "setup-computers");
         m.ChooseLaptopCommand.Execute(null);
         Say($"chose the laptop: {m.FlowName}, {m.Steps.Count} steps");
         m.NextCommand.Execute(null);
@@ -279,7 +332,7 @@ public static partial class SelfTest
         // What it's for: left as it is (school), so Canvas and Classes come next.
         if (m.OnUses)
         {
-            await Wait(1);
+            await Settle();
             Shot(Shell.Windows.Setup, "setup-uses");
             await m.NextCommand.ExecuteAsync(null);
         }
@@ -295,7 +348,7 @@ public static partial class SelfTest
         // Canvas is optional: the self-test skips it (there's no Chrome or Canvas here to connect).
         if (m.OnCanvas)
         {
-            await Wait(1); // the window grows to the step's size first
+            await Settle(); // the window grows to the step's size first
             Shot(Shell.Windows.Setup, "setup-canvas");
             m.SkipCommand.Execute(null);
         }
@@ -311,73 +364,48 @@ public static partial class SelfTest
 
         if (m.OnTaskbar)
         {
-            await Wait(1); // the window lays out the step first
+            await Settle(); // the window lays out the step first
             Shot(Shell.Windows.Setup, "setup-taskbar");
             m.NextCommand.Execute(null);
         }
 
-        // Done: how to record, then Open Egghead Notes. The role stays Laptop; no login item is touched.
+        // Done: how to record, then Open Syft Notes. The role stays Laptop; no login item is touched.
         if (m.OnDone)
         {
-            await Wait(1);
+            await Settle();
             Shot(Shell.Windows.Setup, "setup-done");
         }
         if (Shell.Windows.Setup is not null && m.IsLast) m.NextCommand.Execute(null);
         bool closed = await Until(() => Shell.Windows.Setup is null, 10);
         Say(closed ? $"setup finished: role {host.Settings.Role}, setup done {host.Settings.SetupDone}" : "setup: the window never closed");
-        await Wait(1);
+        await Settle();
         Shot(Shell.Windows.Main, "library-empty");
     }
 
-    /// <summary>A first run opens guided setup on Pick your AI. The self-test finds no AI's CLI (it never installs one
-    /// or reaches an account), so it takes the first screen's picture and goes on by hand, as a student can: by the
-    /// "Set up by hand" link, or with <paramref name="answer"/> (Gemini) picked and Continue, which opens "Get Gemini
-    /// ready" (Google's Antigravity CLI isn't here), whose picture it takes before that link; the notes step then
-    /// opens on that AI.</summary>
-    static async Task ByHandAsync(string answer = "")
-    {
-        if (Shell.Windows.Guided is not { } g) return;
-        await Until(() => g.Screen == ViewModels.GuidedScreen.PickAi && g.Steps.Count > 0, 10);
-        Say($"guided setup: {g.Screen}, Claude here: {g.ClaudeHere}, ChatGPT here: {g.CodexHere}, Gemini here: {g.GeminiHere}");
-        await Wait(1);
-        Shot(Shell.Windows.Setup, "setup-guided-pick");
-        if (answer.Length > 0)
-        {
-            g.PickCommand.Execute(answer);
-            if (g.PickedByHand || g.Steps.Count != 4) throw new InvalidOperationException($"{answer} on the first screen should go the guided way, in four steps");
-            await Wait(1);
-            Shot(Shell.Windows.Setup, $"setup-guided-pick-{answer}");
-            await g.ContinueCommand.ExecuteAsync(null);
-            bool install = await Until(() => g.Screen == ViewModels.GuidedScreen.Install, 5);
-            Say(install ? $"guided setup: {g.InstallTitle} ({g.Cli.Name}, {g.BrandGlyph})" : $"guided setup: expected Install, got {g.Screen}");
-            if (!install || g.Cli.Id != answer) throw new InvalidOperationException($"{answer} on the first screen should open its own install page");
-            await Wait(1);
-            Shot(Shell.Windows.Setup, $"setup-guided-install-{answer}");
-        }
-        g.ByHandCommand.Execute(null);
-        bool swapped = await Until(() => g.Screen == ViewModels.GuidedScreen.Manual, 5);
-        Say(swapped ? $"set up by hand{(answer.Length > 0 ? $", with {answer}" : "")}" : "setup by hand didn't open");
-    }
-
-    /// <summary>Just this computer: the welcome's first choice makes the library here (listening to this computer
-    /// alone), then the microphone (the model downloads meanwhile), who writes the notes, Canvas (skipped), a class, and start at login (left
-    /// off: the self-test never adds a login item).</summary>
+    /// <summary>Just this computer, as every first run starts now: one page, one button. Get started makes the library
+    /// here (listening to this computer alone), asks for the microphone, starts the model and, with no AI here, leaves
+    /// the notes for the first lecture's page; the window closes on Home with "Ready when class starts". Open when you log
+    /// in starts ticked and is unticked first (the self-test never adds a login item).</summary>
     static async Task RunOneComputerSetupAsync(AppHost host)
     {
         bool opened = await Until(() => Shell.Windows.Setup is not null, 10);
         Say(opened ? "setup opened" : "setup didn't open");
         var m = Shell.Windows.SetupModel ?? throw new InvalidOperationException("no setup window");
-        // Gemini, answered on the first screen: its install page (no Antigravity CLI here), then setup by hand from there.
-        await ByHandAsync("gemini");
-        await PastIntroAsync(m);
-
-        m.ChooseOneComputerCommand.Execute(null);
-        Say($"welcome: {m.FlowName}, {m.Steps.Count} steps: {string.Join(", ", m.Steps.Select(x => x.Title))}");
-        await Wait(1); // the sidebar lists the chosen setup's steps first
+        if (!m.OnStart || m.Steps.Count != 1) throw new InvalidOperationException($"a first run should open on the one-button welcome, got {m.Step} in {m.Steps.Count} step(s)");
+        Say($"welcome: \"{SetupModel.StartTitle}\" · {m.ContinueLabel} · open when you log in {(m.StartAtLogin ? "ticked" : "unticked")}");
+        if (!m.StartAtLogin) throw new InvalidOperationException("Open Syft Notes when you log in should start ticked");
+        await Settle();
         Shot(Shell.Windows.Setup, "setup-welcome");
-        await m.NextCommand.ExecuteAsync(null);
-        Say($"library made here: {m.LibraryResult}");
-        if (!m.LibraryOk || host.LocalLibrary is not { } lib) throw new InvalidOperationException("Just this computer didn't make its library");
+        m.StartAtLogin = false;
+        var started = m.NextCommand.ExecuteAsync(null);
+        if (await Until(() => m.Starting || started.IsCompleted, 5) && m.Starting) Shot(Shell.Windows.Setup, "setup-getting-ready");
+        await started;
+        bool closed = await Until(() => Shell.Windows.Setup is null, 30);
+        Say(closed ? $"get started: role {host.Settings.Role}, setup done {host.Settings.SetupDone}, home card {(host.Settings.WelcomeCard ? "on" : "off")}"
+            : $"get started: the window never closed ({m.LibraryResult})");
+        if (!closed || !host.Settings.SetupDone || host.Settings.Role != AppRole.Both) throw new InvalidOperationException("Get started didn't set up just this computer");
+        if (!m.LibraryOk || host.LocalLibrary is not { } lib) throw new InvalidOperationException("Get started didn't make its library");
+        if (host.LoginItems.StartsAtLogin(host.Home)) throw new InvalidOperationException("unticked, Get started still added a login item");
         var cfg = Configs.Load(host.Home);
         Say($"it listens on {cfg.WebHost}:{cfg.WebPort} ({(LibraryHere.OnlyHere(cfg) ? "this computer only" : "the network")}), notes in {cfg.PoolDir}");
         if (!LibraryHere.OnlyHere(cfg)) throw new InvalidOperationException("Just this computer's library listens to the network");
@@ -388,81 +416,32 @@ public static partial class SelfTest
             if (where.Count == 0 || where.Any(a => !System.Net.IPAddress.IsLoopback(a)))
                 throw new InvalidOperationException("Just this computer's library isn't listening on this computer alone");
         }
-        // Its notes engine is the self-test's own (never a real Ollama): the library starts again to use it.
+        // No AI here (the self-test finds none): the library writes no notes until the first lecture's page asks which.
+        Say($"notes after Get started: {(cfg.SummaryEnabled ? "on" : "waiting for the first lecture's page to ask which AI")}");
+        if (cfg.SummaryEnabled) throw new InvalidOperationException("with no AI here, Get started should leave the notes to the first lecture's page");
+        // The self-test's own engine stands in for the AI a student would pick there (never a real Ollama), with a class
+        // to sort into: the library starts again to use them.
         cfg.OllamaHost = Engine!.Url;
         cfg.OllamaModel = "self-test-notes";
         cfg.AutoUpdate = false;
+        cfg.SummaryEnabled = true;
+        cfg.OllamaEnabled = true;
+        cfg.Classes = [new ClassDef("CS 101")];
         Configs.Save(cfg);
         await lib.StopAsync();
         await lib.StartAsync();
         Say($"library restarted on the self-test's notes engine: {lib.State}");
 
-        bool heard = await Until(() => m.MicHeard, 10);
-        Say(heard ? "microphone heard" : "microphone: nothing heard in 10 s");
-        Shot(Shell.Windows.Setup, "setup-microphone");
-        m.NextCommand.Execute(null);
-
-        // The model downloads from the microphone's step on, with no step of its own. Waiting for it here keeps setup on
-        // who writes the notes: pressing Next there would save its choice (no AI) over the self-test's engine.
-        bool ready = await Until(() => m.ModelReady, 60);
-        Say(ready ? "model ready" : $"model: not ready in 60 s ({m.ModelProblem})");
+        bool ready = await Until(() => host.ModelReady, 60);
+        Say(ready ? "model ready" : $"model: not ready in 60 s ({host.DownloadProblem})");
         if (!ready) throw new InvalidOperationException("the model never finished downloading");
-        if (m.Step != SetupStep.Ai) throw new InvalidOperationException($"expected who writes the notes after the microphone, got {m.Step}");
 
-        // Who writes the notes: the engines on this computer, as the library sees them. The self-test's engine stands
-        // in for Ollama (the library's own pick), whatever this computer has installed, so the step is left as it is.
-        bool loaded = await Until(() => m.Ai is { Engines.Count: > 0 }, 15);
-        await Wait(2); // the window grows to the step's size first
-        Shot(Shell.Windows.Setup, "setup-notes");
-        Say(loaded ? $"notes step: {string.Join(", ", m.Ai!.Engines.Select(e => $"{e.Name} ({e.State})"))}; no AI offered: {m.Ai.OffersNoAi}" : "notes step: the engines never loaded");
-        if (!loaded) throw new InvalidOperationException("the notes step never read the library's engines");
-        // Gemini was the answer on the first screen: the step opens on it, its key box showing (no Gemini here).
-        Say($"notes step on Gemini: picked {m.Ai!.SelectedNotes}, key box for {(m.Ai.KeyOpen ? m.Ai.KeyFor : "nothing")}");
-        if (m.Ai.Engines.All(e => e.Id != "gemini")) throw new InvalidOperationException("the notes step doesn't offer Gemini");
-        if (m.Ai.SelectedNotes != "gemini" && m.Ai.KeyFor != "gemini") throw new InvalidOperationException("the notes step didn't open on Gemini, the first screen's answer");
-        m.Go(SetupStep.Canvas);
-
-        if (m.OnCanvas)
-        {
-            await Wait(1);
-            Shot(Shell.Windows.Setup, "setup-canvas");
-            m.SkipCommand.Execute(null);
-        }
-
-        // Classes: CS 101 and what it covers. Record picks no class, so the library sorts the lecture by what was said.
-        m.NewClass = "CS 101";
-        m.NewAbout = "Intro to computer science: recursion, the call stack, the midterm";
-        await m.AddClassCommand.ExecuteAsync(null);
-        Say(m.ClassProblem is null ? "class added: CS 101" : $"class problem: {m.ClassProblem}");
-        Shot(Shell.Windows.Setup, "setup-classes");
-        if (m.ClassProblem is not null) throw new InvalidOperationException(m.ClassProblem);
-        m.NextCommand.Execute(null);
-
-        // Start at login: shown, and left off (the self-test never adds a login item).
-        if (!m.OnStartAtLogin) throw new InvalidOperationException($"expected Start at login, got {m.Step}");
-        m.StartAtLogin = false;
-        await Wait(1); // the window lays out the step first
-        Shot(Shell.Windows.Setup, "setup-start-at-login");
-        m.NextCommand.Execute(null);
-
-        if (m.OnTaskbar)
-        {
-            await Wait(1);
-            Shot(Shell.Windows.Setup, "setup-taskbar");
-            m.NextCommand.Execute(null);
-        }
-
-        if (m.OnDone)
-        {
-            await Wait(1);
-            Shot(Shell.Windows.Setup, "setup-done");
-        }
-        if (Shell.Windows.Setup is not null && m.IsLast) m.NextCommand.Execute(null);
-        bool closed = await Until(() => Shell.Windows.Setup is null, 10);
-        Say(closed ? $"setup finished: role {host.Settings.Role}, setup done {host.Settings.SetupDone}" : "setup: the window never closed");
-        if (host.Settings.Role != AppRole.Both) throw new InvalidOperationException($"just this computer finished as {host.Settings.Role}");
-        await Wait(1);
-        Shot(Shell.Windows.Main, "library-empty");
+        Shell.ShowLibrary();
+        bool card = await Until(() => Shell.Windows.WelcomeCard is not null, 10);
+        await Settle();
+        Shot(Shell.Windows.Main, "home-welcome-card");
+        Say(card ? $"home: \"{WelcomeCardModel.Title}\" · {Shell.Windows.WelcomeCard!.ModelLine}" : "home: no \"Ready when class starts\" card");
+        if (!card) throw new InvalidOperationException("Home didn't show \"Ready when class starts\" after Get started");
     }
 
     /// <summary>The addresses something listens on at <paramref name="port"/>, as the system lists them; null where it
@@ -494,7 +473,7 @@ public static partial class SelfTest
         // Well past the edge, as a quick flick of the pointer would take it.
         var pointer = new PixelPoint(area.X + area.Width / 2, mac ? area.Y + 2 : area.Bottom - 2);
         Shell.Windows.DragRecorder(new PixelPoint(pointer.X - before.Width / 2 - room, mac ? area.Y - 400 : area.Bottom + 400), pointer);
-        await Wait(0.5);
+        await Settle();
         if (w.Panel() is { } after)
         {
             int want = mac ? area.Y : area.Bottom, got = mac ? after.Y : after.Bottom;
@@ -503,7 +482,7 @@ public static partial class SelfTest
                 : $"FAILED recorder drag: its {edge} is at {got}, not {want} ({after} in {area})");
         }
         Shell.Windows.ShowRecorder(expanded: false);
-        await Wait(0.3);
+        await Settle();
     }
 
     /// <summary>A Mac: the library open, then another app brought forward, as a student does once class starts. The pill
@@ -514,7 +493,7 @@ public static partial class SelfTest
         if (!OperatingSystem.IsMacOS()) return;
         bool libraryWasOpen = Shell.Windows.Main?.IsVisible == true;
         Shell.Windows.ShowLibrary();
-        await Wait(1);
+        await Settle();
         Desktop.Deactivate();
         bool seen = await Until(() => Shell.Windows.Recorder is Floating { IsVisible: true } f && f.Native() is { Visible: true, Width: > 20, Height: > 20, OnScreen: true }, 5);
         var w = Shell.Windows.Recorder as Floating;
@@ -528,19 +507,19 @@ public static partial class SelfTest
         ScreenPicture("recorder-away");
         // The pointer on it: Stop in the S's place, and the card with the class, the time and the last lines.
         Shell.Windows.RecorderModel.Hovered = true;
-        await Wait(1);
+        await Settle();
         ScreenPicture("recorder-hover");
         Say($"recorder hover: {Shell.Windows.RecorderModel.HoverTitle}, {(Shell.Windows.RecorderModel.ShowStop ? "Stop" : "no Stop")} in the S's place");
         Shell.Windows.RecorderModel.Hovered = false;
         await CheckRecorderOverFullScreenAsync();
         Shell.Windows.ShowLibrary();
-        await Wait(1);
+        await Settle();
         bool active = Shell.Windows.Main?.IsActive == true;
         Say(Shell.Windows.Recorder?.IsVisible == true ? $"FAILED recorder away: the library is open again ({(active ? "in front" : "macOS didn't bring it forward")}), yet the pill still shows"
             : $"recorder away: hidden again with the library open ({(active ? "in front" : "macOS didn't bring it forward")})");
         if (!libraryWasOpen) Shell.Windows.Main?.Hide();
         Shell.Windows.ShowRecorder(expanded: false);
-        await Wait(0.5);
+        await Settle();
     }
 
     /// <summary>A Mac, given STUDYSTASH_SELFTEST_FULLSCREEN (a program that puts a window of its own in full screen:
@@ -550,11 +529,11 @@ public static partial class SelfTest
     {
         if (Environment.GetEnvironmentVariable("STUDYSTASH_SELFTEST_FULLSCREEN") is not { Length: > 0 } helper || !File.Exists(helper)) return;
         Say(Floating.PanelFits() ? "recorder over full screen: the pill is a panel" : "FAILED recorder over full screen: Avalonia's panel no longer matches its window, so the pill can't be one");
-        using var other = System.Diagnostics.Process.Start(helper);
+        using var other = System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(helper) { RedirectStandardOutput = true, UseShellExecute = false })!;
         try
         {
-            // The full-screen animation, into its own Space.
-            await Wait(4);
+            // The helper says so itself when its window is full screen, in its own Space (after the animation).
+            await FullScreenReachedAsync(other);
             var w = Shell.Windows.Recorder as Floating;
             bool seen = await Until(() => w?.Native() is { Visible: true, Width: > 20, Height: > 20, OnScreen: true }, 3);
             ScreenPicture("recorder-fullscreen");
@@ -564,7 +543,9 @@ public static partial class SelfTest
         finally
         {
             other.Kill();
-            await Wait(2);
+            using var gone = new CancellationTokenSource(TimeSpan.FromSeconds(20));
+            try { await other.WaitForExitAsync(gone.Token); } catch (OperationCanceledException) { Say("FAILED recorder over full screen: the full-screen stand-in didn't quit within 20 s"); }
+            await Settle();
         }
     }
 
@@ -613,7 +594,7 @@ public static partial class SelfTest
         else if (shown) Say($"live words: near the limit here: the recorder showed \"{lines[^1].Text}\" {took:0.0} s after it opened, "
                             + $"once a pass kept up ({speed})");
         else Say($"FAILED live words: no line {took:0} s after the recorder opened, and no verdict ({speed})");
-        await Wait(2);
+        await Settle();
         // The newest line is where the student looks: in view, at the bottom.
         if (Shell.Windows.Recorder?.GetVisualDescendants().OfType<ScrollViewer>().FirstOrDefault(v => v.Name == "Heard") is { } heard
             && lines.Count > 0)
@@ -637,13 +618,13 @@ public static partial class SelfTest
         var live = host.Recorder.Current;
         Say(live is null ? "recording didn't start" : $"recording {live.Id} for {(live.ClassName.Length > 0 ? live.ClassName : "the library to sort")}");
         if (live is null) throw new InvalidOperationException("Record didn't start a lecture");
-        await Wait(1.5);
+        await Settle();
         Shot(Shell.Windows.Recorder, "recorder-pill");
         await CheckRecorderDragAsync();
         await CheckRecorderAwayAsync();
 
         Shell.Windows.TogglePause();
-        await Wait(0.5);
+        await Settle();
         Shot(Shell.Windows.Recorder, "recorder-paused");
         Shell.Windows.TogglePause();
         await CheckLiveWordsAsync(host);
@@ -655,7 +636,7 @@ public static partial class SelfTest
         var l = host.Lectures.Get(live.Id);
         Say(enough ? $"heard {l?.Transcript().Length} characters" : $"only heard {l?.Transcript().Length ?? 0} characters in time");
         Shell.Windows.ShowRecorder(expanded: true);
-        await Wait(1);
+        await Settle();
         Shot(Shell.Windows.Recorder, "recorder-expanded");
 
         Shell.Windows.StopRecording();
@@ -677,18 +658,18 @@ public static partial class SelfTest
         }
 
         Shell.ShowLibrary();
-        await Wait(1.5);
+        await Settle();
         Shell.Windows.OpenLecture(live.Id);
-        await Wait(1);
+        await Settle();
         Shot(Shell.Windows.Main, "library-note");
         await RunRichNotesAsync();
         Shell.Windows.OpenLecture(live.Id, transcript: true);
-        await Wait(1);
+        await Settle();
         Shot(Shell.Windows.Main, "library-transcript");
 
         Shell.Windows.ToggleQuick();
         await Shell.Windows.Search("midterm");
-        await Wait(1);
+        await Settle();
         Shot(Shell.Windows.Quick, "quick-search");
         Say($"quick search 'midterm': {Shell.Windows.QuickModel.Rows.Count} row(s)");
         Shell.Windows.Quick?.Hide();
@@ -722,7 +703,7 @@ public static partial class SelfTest
             if (control.Bounds.Width < 40 || control.Bounds.Height < 16 || ink < least) throw new InvalidOperationException($"the notes' {what} drew nothing");
         }
         chart.BringIntoView();
-        await Wait(1);
+        await Settle();
         Shot(main, "library-note-rich");
 
         chart.Focus();
@@ -731,7 +712,7 @@ public static partial class SelfTest
         var larger = DiagramWindow.Current;
         Say(opened && larger is not null ? $"opened larger: '{larger.Title}', {larger.Bounds.Width:0}×{larger.Bounds.Height:0}" : "the flowchart didn't open larger");
         if (!opened || larger is null) throw new InvalidOperationException("Enter on the flowchart didn't open it larger");
-        await Wait(1);
+        await Settle();
         Shot(larger, "diagram-larger");
         var big = larger.GetVisualDescendants().OfType<DiagramView>().First();
         int bigInk = Ink(big);
@@ -786,9 +767,10 @@ public static partial class SelfTest
         var waiting = host.Recorder.Current;
         if (waiting is not null)
         {
-            await Wait(2); // ~8 s of audio at 4x speed
+            // ~8 s of audio, which the mic file plays at 4x speed
+            if (!await Until(() => host.Recorder.Elapsed >= 8, 30)) Say("FAILED the waiting lecture didn't reach 8 s of audio in 30 s");
             Shell.Windows.StopRecording();
-            await Wait(1);
+            await Settle();
             var wl = host.Lectures.Get(waiting.Id);
             Say($"recorded while the library was down: {wl?.State}");
             await PanelShot("panel-waiting");
@@ -832,20 +814,20 @@ public static partial class SelfTest
     static async Task RunSettingsAsync()
     {
         Shell.ShowSettings();
-        await Wait(1);
+        await Settle();
         Shot(Shell.Windows.Settings, "settings-library");
         if (OneComputer && (Shell.Windows.Settings?.Content as Control)?.DataContext is SettingsModel lib)
         {
             // Your library, on this computer: Add a laptop, for later.
             lib.Section = "Library";
-            await Wait(1.5);
+            await Settle();
             Say($"settings: your library here, laptops can connect: {lib.Lib.LaptopsCanConnect}, add a laptop offered: {lib.Lib.CanChangeLaptops}");
             Shot(Shell.Windows.Settings, "settings-your-library");
         }
         if ((Shell.Windows.Settings?.Content as Control)?.DataContext is SettingsModel sm)
         {
             sm.Section = "Recording";
-            await Wait(1);
+            await Settle();
             Shot(Shell.Windows.Settings, "settings-recording");
         }
         Shell.Windows.Settings?.Close();

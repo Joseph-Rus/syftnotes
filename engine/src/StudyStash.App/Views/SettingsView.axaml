@@ -720,7 +720,7 @@
               <!-- General -->
               <StackPanel IsVisible="{Binding OnGeneral}" Spacing="8">
                 <TextBlock Classes="h" Text="General" />
-                <TextBlock Classes="body" Text="How Egghead Notes starts and updates, its shortcuts, and setup." />
+                <TextBlock Classes="body" Text="How Syft Notes starts and updates, its shortcuts, and setup." />
                 <TextBlock Classes="section" Text="Startup" />
                 <Border Classes="group">
                   <Border Classes="row">
@@ -856,11 +856,11 @@
                       <Grid ColumnDefinitions="*,Auto">
                         <StackPanel Spacing="2" VerticalAlignment="Center">
                           <TextBlock Classes="row-title" Text="Credits" />
-                          <TextBlock Classes="row-sub" Text="The speech models and illustration parts Egghead Notes uses, and their licences" />
+                          <TextBlock Classes="row-sub" Text="The speech models and illustration parts Syft Notes uses, and their licences" />
                         </StackPanel>
                         <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
                           <Button Classes="pill" Command="{Binding ToggleCreditsCommand}"><TextBlock Text="{Binding CreditsButton}" /></Button>
-                          <Button Classes="pill" Command="{Binding QuitCommand}"><TextBlock Text="Quit Egghead Notes" /></Button>
+                          <Button Classes="pill" Command="{Binding QuitCommand}"><TextBlock Text="Quit Syft Notes" /></Button>
                         </StackPanel>
                       </Grid>
                     </Border>
@@ -871,7 +871,7 @@
                     <Border Classes="row">
                       <StackPanel Spacing="2" VerticalAlignment="Center">
                         <TextBlock Classes="row-title" Text="Speech models" />
-                        <TextBlock Classes="row-sub" Text="Whisper by OpenAI (MIT); NVIDIA Parakeet TDT 0.6B v3 and TitaNet small (CC BY 4.0) and pyannote segmentation 3.0 (MIT), converted to ONNX by sherpa-onnx; for the recorder's live words, Cactus Whistle and its needle engine by Cactus Compute (Apache-2.0) on ARM, and Whisper tiny on x64, which come with Egghead Notes. They run on this computer, and the others download only when you pick them." TextWrapping="Wrap" />
+                        <TextBlock Classes="row-sub" Text="Whisper by OpenAI (MIT); NVIDIA Parakeet TDT 0.6B v3 and TitaNet small (CC BY 4.0) and pyannote segmentation 3.0 (MIT), converted to ONNX by sherpa-onnx; for the recorder's live words, Cactus Whistle and its needle engine by Cactus Compute (Apache-2.0) on ARM, and Whisper tiny on x64, which come with Syft Notes. They run on this computer, and the others download only when you pick them." TextWrapping="Wrap" />
                       </StackPanel>
                     </Border>
                     <Border Classes="rowsep" />
@@ -892,7 +892,7 @@
 
               <StackPanel IsVisible="{Binding OnAppearance}" Spacing="8">
                 <TextBlock Classes="h" Text="Appearance" />
-                <TextBlock Classes="body" Text="Pick how Egghead Notes looks." />
+                <TextBlock Classes="body" Text="Pick how Syft Notes looks." />
                 <TextBlock Classes="section" Text="Mode" />
                 <!-- Mac: a three-way segmented pill, System Settings' own way of choosing an appearance. -->
                 <Border Classes="seg" IsVisible="{Binding IsMac}" HorizontalAlignment="Left">
@@ -987,7 +987,7 @@
                     <Button Classes="pill" Command="{Binding StartLibraryCommand}" IsVisible="{Binding CanStartLibrary}"><TextBlock Text="Start" FontSize="13" /></Button>
                     <Button Classes="pill" Command="{Binding StopLibraryCommand}" IsVisible="{Binding CanStopLibrary}"><TextBlock Text="Stop" FontSize="13" /></Button>
                   </StackPanel>
-                  <TextBlock Classes="say" Text="It runs while Egghead Notes is open. Turn on Start at login in General to keep it running; its own settings, and adding a laptop, are under Your library." />
+                  <TextBlock Classes="say" Text="It runs while Syft Notes is open. Turn on Start at login in General to keep it running; its own settings, and adding a laptop, are under Your library." />
                 </StackPanel>
                 <!-- A laptop: the library it sends lectures to -->
                 <StackPanel Spacing="8" IsVisible="{Binding !LibraryHere}">
@@ -1632,7 +1632,7 @@
                 <v:WinPhones DataContext="{Binding Phones}" IsVisible="{Binding $parent[UserControl].((s:SettingsModel)DataContext).IsWin}" />
               </Panel>
 
-              <!-- Granola: sign in to it (on its own page, in the browser), then the lectures there that Egghead Notes doesn't
+              <!-- Granola: sign in to it (on its own page, in the browser), then the lectures there that Syft Notes doesn't
                    have, each with Transfer, and whether a new one is announced. -->
               <Panel IsVisible="{Binding OnGranola}">
                 <StackPanel Name="GranolaPage" DataContext="{Binding Granola}" x:DataType="vm:GranolaSettingsModel" Spacing="8">
@@ -1661,7 +1661,7 @@
                         <Grid ColumnDefinitions="*,16,Auto">
                           <StackPanel Spacing="2" VerticalAlignment="Center">
                             <c:PageText Classes="row-title" Text="{Binding ConnectedLine}" TextTrimming="CharacterEllipsis" />
-                            <TextBlock Classes="row-sub" Text="Egghead Notes looks for new lectures every few minutes." TextWrapping="Wrap" />
+                            <TextBlock Classes="row-sub" Text="Syft Notes looks for new lectures every few minutes." TextWrapping="Wrap" />
                           </StackPanel>
                           <Button Name="GranolaDisconnect" Grid.Column="2" Classes="pill" Command="{Binding DisconnectCommand}" VerticalAlignment="Center">
                             <TextBlock Text="Disconnect" />
@@ -1685,7 +1685,7 @@
                   <!-- What's waiting in Granola -->
                   <StackPanel Spacing="8" IsVisible="{Binding SignedIn}">
                     <Grid ColumnDefinitions="*,Auto" Margin="0,8,0,0">
-                      <TextBlock Classes="section" Text="In Granola, not in Egghead Notes" Margin="0" VerticalAlignment="Center" />
+                      <TextBlock Classes="section" Text="In Granola, not in Syft Notes" Margin="0" VerticalAlignment="Center" />
                       <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8">
                         <Button Name="GranolaLook" Classes="pill" Command="{Binding LookNowCommand}" IsEnabled="{Binding !Looking}">
                           <TextBlock Text="Look now" FontSize="13" />
@@ -1799,7 +1799,7 @@
             <Panel Margin="0,16,0,0">
               <!-- Looking for the student's AI -->
               <StackPanel Orientation="Horizontal" Spacing="8" IsVisible="{Binding IsLooking}" VerticalAlignment="Top">
-                <c:Spinner Width="14" Height="14" Foreground="{DynamicResource Fg2}" />
+                <c:SyftLoader Kind="HoppingBits" Size="20" />
                 <TextBlock Classes="say" Text="Looking for your AI…" Margin="0" />
               </StackPanel>
 
@@ -1814,7 +1814,7 @@
 
               <!-- Before anything's asked: a few things to try -->
               <StackPanel Spacing="10" IsVisible="{Binding ShowWelcome}" VerticalAlignment="Top">
-                <c:Doodle Art="thinking" Size="84" HorizontalAlignment="Left" />
+                <c:SyftMark Size="84" HorizontalAlignment="Left" />
                 <TextBlock Classes="say" Text="Try asking:" Margin="0" />
                 <ItemsControl ItemsSource="{Binding Suggestions}">
                   <ItemsControl.ItemsPanel><ItemsPanelTemplate><WrapPanel /></ItemsPanelTemplate></ItemsControl.ItemsPanel>
@@ -1840,9 +1840,9 @@
                       </Border>
                     </DataTemplate>
                     <DataTemplate DataType="vm:AiEntry">
-                      <!-- The egghead's replies: his face beside each -->
+                      <!-- The replies: the pixel s beside each -->
                       <Grid ColumnDefinitions="Auto,10,*" HorizontalAlignment="Left">
-                      <c:Doodle Art="head" Size="28" VerticalAlignment="Top" />
+                      <c:SyftMark Size="28" Bits="False" VerticalAlignment="Top" />
                       <StackPanel Grid.Column="2" Spacing="6" HorizontalAlignment="Left" MaxWidth="520">
                         <TextBlock Text="{Binding Byline}" FontSize="11" FontWeight="SemiBold" Foreground="{DynamicResource Fg2}" />
                         <c:PageText Text="{Binding Text}" FontSize="13" LineHeight="19" TextWrapping="Wrap" Foreground="{DynamicResource Fg}"
@@ -1867,7 +1867,7 @@
                 </ItemsControl>
               </ScrollViewer>
               <StackPanel Orientation="Horizontal" Spacing="8" IsVisible="{Binding Busy}" VerticalAlignment="Bottom" HorizontalAlignment="Left" Margin="0,0,0,-4">
-                <c:Doodle Art="thinking" Size="34" Busy="{Binding Busy}" />
+                <c:SyftLoader Kind="HoppingBits" Size="22" IsActive="{Binding Busy}" />
               </StackPanel>
             </Panel>
           </DockPanel>

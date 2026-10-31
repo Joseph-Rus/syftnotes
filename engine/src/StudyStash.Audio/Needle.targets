@@ -10,7 +10,7 @@
          libneedle3.*:   Cactus-Compute/needle3 at NeedleRevision, from its engine wheels (python/cactus_needle-<v>-…whl;
                          the wheels are zip files whose needle/libneedle3.* is the shared library), one per processor.
        The engine is binary only (its source isn't published); it reaches no network (it imports no sockets or HTTP),
-       and the telemetry the README speaks of is the Python package's, which Egghead Notes doesn't use.
+       and the telemetry the README speaks of is the Python package's, which Syft Notes doesn't use.
          live-whisper-tiny-q8_0.bin: ggerganov/whisper.cpp at LiveWhisperRevision.
        Output: models/whistle.cact, needle/LICENSE.txt and needle/<rid>/libneedle3.(dylib|dll) for ARM, and
        models/live-whisper-tiny-q8_0.bin with its licence; the app's publish for one processor (the installers) keeps

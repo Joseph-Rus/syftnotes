@@ -7,7 +7,7 @@ using StudyStash.Core;
 
 namespace StudyStash.App.ViewModels;
 
-/// <summary>A lecture in Granola that Egghead Notes could bring over: a row in Settings → Granola.</summary>
+/// <summary>A lecture in Granola that Syft Notes could bring over: a row in Settings → Granola.</summary>
 public sealed partial class GranolaLecture(GranolaTransfer.Waiting waiting) : ObservableObject
 {
     public string Id => waiting.GranolaId;
@@ -20,16 +20,16 @@ public sealed partial class GranolaLecture(GranolaTransfer.Waiting waiting) : Ob
 }
 
 /// <summary>
-/// Settings → Granola: sign in to Granola (on its own page, in the browser), see the lectures there that Egghead Notes
+/// Settings → Granola: sign in to Granola (on its own page, in the browser), see the lectures there that Syft Notes
 /// doesn't have, and bring one over, or all of them, or leave one where it is. And whether a new one is announced.
 /// </summary>
 public sealed partial class GranolaSettingsModel : ObservableObject, IDisposable
 {
     /// <summary>What the page says of itself, and of what a free Granola plan gives.</summary>
-    public const string About = "If you record lectures in Granola, Egghead Notes can bring them over: each one is filed under its class and gets study notes.";
-    public const string PlanNote = "Granola's free plan shares each lecture's notes from the last 30 days, not its transcript, so Egghead Notes writes its notes from Granola's summary. A paid Granola plan shares the transcript too, and the notes are written from that.";
-    public const string SignInNote = "You sign in on Granola's own page in your browser. Egghead Notes never sees your password.";
-    public const string NothingWaitingWords = "Nothing in Granola that Egghead Notes doesn't have.";
+    public const string About = "If you record lectures in Granola, Syft Notes can bring them over: each one is filed under its class and gets study notes.";
+    public const string PlanNote = "Granola's free plan shares each lecture's notes from the last 30 days, not its transcript, so Syft Notes writes its notes from Granola's summary. A paid Granola plan shares the transcript too, and the notes are written from that.";
+    public const string SignInNote = "You sign in on Granola's own page in your browser. Syft Notes never sees your password.";
+    public const string NothingWaitingWords = "Nothing in Granola that Syft Notes doesn't have.";
 
     readonly GranolaImport granola;
     readonly Func<bool> notifies;
@@ -54,11 +54,11 @@ public sealed partial class GranolaSettingsModel : ObservableObject, IDisposable
     public ObservableCollection<GranolaLecture> Lectures { get; } = [];
 
     [ObservableProperty] public partial bool SignedIn { get; set; }
-    /// <summary>The browser is open on Granola's sign-in page and Egghead Notes is waiting for it.</summary>
+    /// <summary>The browser is open on Granola's sign-in page and Syft Notes is waiting for it.</summary>
     [ObservableProperty] public partial bool Connecting { get; set; }
     [ObservableProperty] public partial string ConnectedLine { get; set; } = "";
     [ObservableProperty] public partial string? Problem { get; set; }
-    /// <summary>A notification when Granola has a lecture Egghead Notes doesn't.</summary>
+    /// <summary>A notification when Granola has a lecture Syft Notes doesn't.</summary>
     [ObservableProperty] public partial bool Notify { get; set; }
     [ObservableProperty] public partial bool Looking { get; set; }
 
@@ -128,7 +128,7 @@ public sealed partial class GranolaSettingsModel : ObservableObject, IDisposable
             Problem = e is OAuthException && e.Message.Contains("timed out", StringComparison.Ordinal)
                 ? "Nobody signed in within five minutes. Press Connect to try again."
                 : e is System.Net.Sockets.SocketException or IOException
-                    ? "Egghead Notes couldn't wait for Granola's answer: another app is using the port it comes back on. Close it and try again."
+                    ? "Syft Notes couldn't wait for Granola's answer: another app is using the port it comes back on. Close it and try again."
                     : "Signing in to Granola didn't finish. Press Connect to try again.";
         }
         finally

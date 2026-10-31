@@ -1,6 +1,6 @@
-# Egghead Notes: Canvas
+# Syft Notes: Canvas
 
-Egghead Notes mirrors each class's Canvas course into that class's folder in the library, so the student, the app's
+Syft Notes mirrors each class's Canvas course into that class's folder in the library, so the student, the app's
 Canvas screens and Claude can all read their coursework without opening Canvas. Canvas is read through a small
 Chrome extension with the student's own sign-in (many schools turn off Canvas access tokens). Nothing is ever written
 to Canvas.
@@ -53,7 +53,7 @@ Verified by reading the code. Several came from Marginalia. The last column is t
 Marginalia is Eli's original Python app (`marginalia/{crawl,canvas,canvas_browser,engine,web}.py` and its
 `extension/`). Nothing it did for a student should be missing or wrong here.
 
-| Marginalia | Egghead Notes | Why |
+| Marginalia | Syft Notes | Why |
 |---|---|---|
 | Persisted job queue (crawl.json), six jobs per ask, in-flight jobs back in the queue after 10 minutes | **Kept** | A restart or a closed Chrome loses nothing. |
 | Four listings per course: assignments (with your submission), your submissions (comments, rubric assessment, assignment), modules with items, announcements | **Kept**; announcements now come from `/api/v1/courses/:id/discussion_topics?only_announcements=true` (T1) | The old endpoint stops after 28 days (bug 2); the course's list has the whole term and `read_state`. |
@@ -72,8 +72,8 @@ Marginalia is Eli's original Python app (`marginalia/{crawl,canvas,canvas_browse
 | Course scout (AI explores a course, writes canvas-recipe.md) | **Kept** | T8 tells it what the sync now saves, so it only explores what's outside. |
 | Personal access token mode (`canvas.py`) | **Not ported** | Schools turn tokens off; the extension works at every school. |
 | Headless Playwright browser with its own Chrome profile (`canvas_browser.py`) | **Not ported** | No bundled browser; the extension already has the student's session. |
-| `match_existing`: guessing an assignment's folder from hand-made folder names ("HW 1" ↔ "Homework 1") | **Not ported** | That was for Eli's own hand-kept folders; Egghead Notes makes the folders. A spec.md naming the assignment still claims its folder. |
-| `integrate` (an AI folds new material into course notes) and the semester.md deadlines reconcile | **Not ported** | Egghead Notes has no hand-kept course notes; chat, the scout and the Due list cover it. |
+| `match_existing`: guessing an assignment's folder from hand-made folder names ("HW 1" ↔ "Homework 1") | **Not ported** | That was for Eli's own hand-kept folders; Syft Notes makes the folders. A spec.md naming the assignment still claims its folder. |
+| `integrate` (an AI folds new material into course notes) and the semester.md deadlines reconcile | **Not ported** | Syft Notes has no hand-kept course notes; chat, the scout and the Due list cover it. |
 | Git commits of Canvas content, the `<SEM>/canvas.md` snapshot table | **Not ported** | The library isn't a git repository; the Due page and the API replace the snapshot. |
 
 ## Audit: what neither had (the gaps)
@@ -119,7 +119,7 @@ home/
   canvas_assignments.json             every assignment and where you stand, for the Due list
   canvas_key                          the extension's own key
   chrome-extension/                   the extension's folder, for Chrome's "Load unpacked" (brought up to date when the library starts);
-                                      on a Mac, only one an older Egghead Notes wrote (see below)
+                                      on a Mac, only one an older Syft Notes wrote (see below)
 ~/Study Stash/Chrome extension/       on a Mac, the extension's folder (Chrome's picker hides the dot-folder home)
 ```
 
@@ -145,7 +145,7 @@ home/
   canvas.json  crawl.json  canvas_assignments.json
   canvas/<class>.json (+ .sync.json while syncing)      T3 the per-class index
   canvas_notifications.json                              T7
-  canvas_seen.json                                       T6 announcements opened in Egghead Notes
+  canvas_seen.json                                       T6 announcements opened in Syft Notes
 ```
 
 The sync never deletes anything from disk: an item gone from Canvas disappears from the index and the API after a
@@ -198,13 +198,13 @@ Mozilla's site ([firefox-add-on.md](firefox-add-on.md)), each connected by a pas
 student whose Chrome won't install from the store, load the folder described here. Wherever this page
 says Chrome, any browser of its family does the same. The engine carries it as embedded resources (`extension/<file>` in `StudyStash.Core`), and
 `Extension.Ensure(dir, library, key, canvasUrl)` writes it out as a folder for Chrome's "Load unpacked": the scripts
-(`background.js`, `connection.js`, the popup, the egghead icons that `macos/make_icon.swift out.chrome` draws), a manifest,
+(`background.js`, `connection.js`, the popup, the icons that `tools/syft/make_art.swift` draws), a manifest,
 and `config.json` + `config.js`. The library keeps its own folder (`Extension.Folder(home)`) ready by itself: on start, and whenever the Canvas address changes.
 
 **Where the folder is.** `Extension.Folder(home)` is `<home>/chrome-extension` on Windows and Linux. On a Mac the home
 is `~/.study-stash`, and Chrome's "Load unpacked" window hides dot-folders (and `~/Library`), so the folder is
 `~/Study Stash/Chrome extension` instead: shown by that window without any shortcut, never synced to iCloud (not in
-Desktop or Documents), and only this person's (the folder and the `Egghead Notes` folder Egghead Notes makes for it are
+Desktop or Documents), and only this person's (the folder and the `Syft Notes` folder Syft Notes makes for it are
 `0700`; `config.json` and `config.js` are `0600`). Another hidden home in the same account gets its own
 `Chrome extension (<8 hex>)`; a home outside the person's home folder, or one Chrome already shows, keeps
 `<home>/chrome-extension`. **Migration:** a Chrome that loaded `<home>/chrome-extension` before keeps loading it from
@@ -235,11 +235,11 @@ until it reloads. `connection.js`'s `loadConnection()` reads, in order: `config.
 the Chrome Web Store has no folder to read), then the `STUDY_STASH` global from a legacy config.js (the worker's
 `importScripts('config.js')` is inside a try, so a folder without it still registers). The worker reads it at the
 start of every round, so a new key or library address needs no reload. With an empty `canvas` every job is refused
-with `refused: Egghead Notes has no Canvas address yet`. `files` is the one list of file hosts (`Extension.FileHosts`),
+with `refused: Syft Notes has no Canvas address yet`. `files` is the one list of file hosts (`Extension.FileHosts`),
 shared with the manifest and the library's own check (`Extension.OnFileHost`, which `CanvasSync.CanvasUrl` uses for
 AIs' reads): https only, no port, no user name, the host itself or a subdomain of a `*.` entry. A config.js from before
 1.3 has no `files`, and background.js falls back to the old `*.inscloudgate.net` pattern. `protocol` is the protocol
-the Egghead Notes that wrote the folder speaks; the extension sends its own.
+the Syft Notes that wrote the folder speaks; the extension sends its own.
 
 ### Protocol and handshake
 
@@ -269,7 +269,7 @@ What protocol 3 (1.4) adds:
   (no connection anywhere), `library_refused` (the library answered 401/403: the key changed, say after a reinstall),
   `library_unreachable` (no answer, or an error) or `signed_out` (a Canvas answer said signed out, until one comes back
   fine). Anything but `ok` puts a `!` badge on the toolbar button and the reason in its title; the popup says the same
-  sentence ("This extension's key was refused. Open Egghead Notes and add the extension again.", "Can't reach your
+  sentence ("This extension's key was refused. Open Syft Notes and add the extension again.", "Can't reach your
   library at mini.local:8787.", "Sign in to Canvas in Chrome.") and keeps Sync Canvas now / Open.
 - **Its address.** `a` is the library address from its config; the library records whether that's this computer's
   loopback (`seen_where: this_computer`) or another address (`another_computer`).
@@ -347,12 +347,12 @@ What protocol 2 (1.3) does, answer by answer (all kept in 1.4):
   version is `to`). `extension_latest` is the library's version and
   `extension_outdated` is true while the running one is older, compared as versions (1.10 is newer than 1.9), and
   can't bring itself up to date: only a copy from before protocol 2 (1.3). A later folder's copy reloads itself, and a
-  store's copy (Chrome Web Store, Firefox) is updated by its store, often days after a new Egghead Notes has a newer
+  store's copy (Chrome Web Store, Firefox) is updated by its store, often days after a new Syft Notes has a newer
   folder; neither is ever told to reload by hand.
 
 ### Setting it up, and the folder's life
 
-There is no "Make it" step anywhere: each computer's folder is written and kept by Egghead Notes itself.
+There is no "Make it" step anywhere: each computer's folder is written and kept by Syft Notes itself.
 
 1. **The library** makes its folder (`Extension.Folder(home)`, and keeps an old `<home>/chrome-extension` current) when it starts (`EnsureHere`, even before there's a Canvas address:
    then its manifest has no Canvas host and every job is refused), and writes it again when the Canvas address is
@@ -477,7 +477,7 @@ land: they fill `CourseIndex`, and every builder here reads straight from it.
   {"state":"done|exploring|waiting|failed|never","files","when","report"}}]`. `suggested` (only when a class isn't
   linked) is `CourseMatch.Suggest`'s best guess from the school's course list: a shared number ("CS 101" ~
   "COMP 101") or a shared word, one a prefix of the other ("CALC" ~ "Calculus"); it's shown, never linked, by
-  itself. `announcements_new` is unread-on-Canvas **and** not opened in Egghead Notes: `CanvasSeen`
+  itself. `announcements_new` is unread-on-Canvas **and** not opened in Syft Notes: `CanvasSeen`
   (`home/canvas_seen.json`) narrows Canvas's own `read_state` further, per student, per class.
 - `GET /api/v2/canvas/due` → `{"synced","to_hand_in","next":item|null,"groups":[{"key","label","items":[item]}]}`
   across every class, groups in order **Overdue** (not done, due before now) / **This week** (due before the eighth
@@ -518,7 +518,7 @@ land: they fill `CourseIndex`, and every builder here reads straight from it.
   (`CourseIndex.FilesHidden`).
 - `GET /api/v2/canvas/announcements?class=` → `{"count","new","items":[{"id","title","posted_at","author","new",
   "read_on_canvas","body","files":[file],"url"}]}`, newest first; `new` is unread on Canvas and not marked seen in
-  Egghead Notes. `POST /api/v2/canvas/announcements/seen {"class","ids":[…]}` marks announcements opened here
+  Syft Notes. `POST /api/v2/canvas/announcements/seen {"class","ids":[…]}` marks announcements opened here
   (`Core/Canvas/CanvasSeen.cs`, `home/canvas_seen.json`) so they stop counting as new even before Canvas itself
   shows them read.
 - `GET /api/v2/canvas/pages?class=` → `{"syllabus":path|null,"front_page":page|null,"pages":[page],"quizzes":[…],
@@ -556,9 +556,9 @@ list and all its keys. The extension's door (`/api/v2/canvas/work`, `/results`, 
 
 `Core/ClaudeTools.cs` gives Claude read-only tools over Canvas, on top of `ILibrarySource.CanvasAsync(what, body)`:
 `LocalLibrary` answers straight from `CanvasView` and each class's `CourseIndex` (in the library itself, or a laptop
-running `Egghead Notes mcp` against its own home folder); `RemoteLibrary` calls the §5 endpoints over `/api/v2` (a
+running `Syft Notes mcp` against its own home folder); `RemoteLibrary` calls the §5 endpoints over `/api/v2` (a
 laptop reading a remote library), and a 404 (an older library without an endpoint) becomes "The library runs an
-older Egghead Notes, without this." The `what`s: `courses`, `fetch` (unchanged, for `canvas_api`/`canvas_page`/
+older Syft Notes, without this." The `what`s: `courses`, `fetch` (unchanged, for `canvas_api`/`canvas_page`/
 `canvas_download`), `assignments` (class, days — the flat due list), `assignment` (class, id or name), `modules`
 (class), `files` (class), `announcements` (class, limit).
 
@@ -582,7 +582,7 @@ Tools (all `ReadOnly`, `Idempotent`; only `canvas_download` isn't read-only), re
 by path, ignoring the query like everywhere else here) refuses a roster (`/users`, except the student's own
 `/users/self`), `/enrollments`, `/peer_reviews`, `/search/recipients`, `/conversations`, a discussion's `/entries`,
 `/view` or `/entry_list`, and a course's bare `/students` (its own `/students/submissions` — the student's own grades
-— is fine) with "Egghead Notes doesn't read other people's Canvas data.", before Canvas is ever asked. The sync itself
+— is fine) with "Syft Notes doesn't read other people's Canvas data.", before Canvas is ever asked. The sync itself
 never requests any of these either (§ "What's mirrored, and what's not" below).
 
 The course scout's prompt (`Scout.Prompt`) now lists everything the sync already saves (spec/feedback/submission,

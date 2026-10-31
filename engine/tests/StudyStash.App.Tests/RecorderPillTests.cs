@@ -77,7 +77,7 @@ public class RecorderPillTests
         Assert.Equal(size, pill.Bounds.Size);
     }
 
-    /// <summary>A Mac's pill stands upright and says nothing: the egghead over three level bars. With the pointer on it the egghead
+    /// <summary>A Mac's pill stands upright and says nothing: the pixel s over three level bars. With the pointer on it the s
     /// is Stop, one click, and a card beside it says the class, the time and the last two lines heard.</summary>
     [AvaloniaFact]
     public void A_Macs_pill_is_upright_and_shows_stop_and_a_card_on_hover()
@@ -116,7 +116,7 @@ public class RecorderPillTests
 
         model.IsPaused = true;
         Dispatcher.UIThread.RunJobs();
-        // Paused, without the pointer: the egghead (dimmed) and the resting meter, nothing to click.
+        // Paused, without the pointer: the s (dimmed) and the resting meter, nothing to click.
         Assert.True(Shown(pill.GetVisualDescendants().OfType<Viewbox>().First()));
         Assert.True(Shown(pill.GetVisualDescendants().OfType<StudyStash.App.Controls.Waveform>().First()));
         Assert.Empty(Showing<Button>(pill));

@@ -10,10 +10,10 @@ using Tomlyn.Model;
 namespace StudyStash.App.Services;
 
 /// <summary>One AI app on this computer, as its own settings file has it: whether the app is here at all, whether
-/// Egghead Notes is in its settings (and for this copy of Egghead Notes), when Settings added it, and when the app last
+/// Syft Notes is in its settings (and for this copy of Syft Notes), when Settings added it, and when the app last
 /// started it. <paramref name="Outdated"/>: this copy is in there, but not the way Connect writes it (pasted in by
 /// hand, say), so it never says which app started it and Settings can't tell when it's connected.
-/// <paramref name="CanReopen"/>: it's a desktop app Egghead Notes can quit and open again for the student (a Mac).</summary>
+/// <paramref name="CanReopen"/>: it's a desktop app Syft Notes can quit and open again for the student (a Mac).</summary>
 public sealed record AiAppState(string Id, string Name, bool Installed, bool Added, bool OtherCopy, DateTime? AddedAt, DateTime? Started, string ConfigPath,
     bool Outdated = false, bool CanReopen = false);
 
@@ -24,8 +24,8 @@ public sealed record AiAppChange(bool Ok, string Say, string? File = null, strin
 /// <summary>
 /// Connecting AI apps on this computer to your lectures (Settings → AI tool access). Claude Desktop, Claude Code,
 /// ChatGPT (the ChatGPT app, the Codex CLI and its IDE extension share one settings file, Codex's) and Gemini CLI
-/// each start Egghead Notes' MCP server themselves (<c>StudyStash mcp --client ID</c>), which reads the library with
-/// the password this computer already keeps in Egghead Notes' own settings. So their settings get no password and no
+/// each start Syft Notes' MCP server themselves (<c>StudyStash mcp --client ID</c>), which reads the library with
+/// the password this computer already keeps in Syft Notes' own settings. So their settings get no password and no
 /// address: nothing on the network, no Tailscale. Every change is a merge into the app's own file (its other servers
 /// and settings stay as they were), with the file as it was kept next to it, and a file that can't be read safely
 /// (not valid, or with comments a rewrite would drop) is left alone. Claude and ChatGPT on the web need an internet
@@ -196,7 +196,7 @@ public sealed class ClaudeSetup
 
     static string TomlString(string s) => "\"" + s.Replace("\\", "\\\\").Replace("\"", "\\\"") + "\"";
 
-    /// <summary>Codex's block for Egghead Notes, under its own heading in config.toml.</summary>
+    /// <summary>Codex's block for Syft Notes, under its own heading in config.toml.</summary>
     public string CodexBlock(string id = "codex") => $"""
         [mcp_servers.{ClaudeTools.ServerName}]
         command = {TomlString(Program)}
@@ -267,10 +267,10 @@ public sealed class ClaudeSetup
 
     static DateTime? ToLocal(DateTime? utc) => utc?.ToLocalTime();
 
-    /// <summary>Adds Egghead Notes to this app's settings, or puts this copy of it in place of another.</summary>
+    /// <summary>Adds Syft Notes to this app's settings, or puts this copy of it in place of another.</summary>
     public AiAppChange Connect(string id) => Change(id, add: true);
 
-    /// <summary>Takes Egghead Notes out of this app's settings, leaving everything else in them.</summary>
+    /// <summary>Takes Syft Notes out of this app's settings, leaving everything else in them.</summary>
     public AiAppChange Disconnect(string id) => Change(id, add: false);
 
     AiAppChange Change(string id, bool add)
@@ -316,7 +316,7 @@ public sealed class ClaudeSetup
                 : $"{name}'s settings file isn't valid JSON, so it's left alone. Fix it, or {char.ToLowerInvariant(byHand[0])}{byHand[1..]}", path, null, add ? written : null);
         }
         if (root["mcpServers"] is { } existing && existing is not JsonObject)
-            return new(false, $"{name}'s settings have mcpServers in a shape Egghead Notes doesn't know, so they're left alone.", path, null, add ? written : null);
+            return new(false, $"{name}'s settings have mcpServers in a shape Syft Notes doesn't know, so they're left alone.", path, null, add ? written : null);
         var servers = root["mcpServers"] as JsonObject;
         if (add)
         {
@@ -324,19 +324,19 @@ public sealed class ClaudeSetup
             servers[ClaudeTools.ServerName] = EntryFor(id);
         }
         else if (servers is null || !servers.Remove(ClaudeTools.ServerName))
-            return new(true, $"{name} doesn't have Egghead Notes.", path);
-        else if (servers.Count == 0) root.Remove("mcpServers"); // the file goes back to how it was before Egghead Notes
+            return new(true, $"{name} doesn't have Syft Notes.", path);
+        else if (servers.Count == 0) root.Remove("mcpServers"); // the file goes back to how it was before Syft Notes
 
         string after = root.ToJsonString(Indented);
         if (before is not null && before.Contains("\r\n", StringComparison.Ordinal)) after = after.ReplaceLineEndings("\r\n");
         if (before is null || before.EndsWith('\n')) after += before?.Contains("\r\n", StringComparison.Ordinal) == true ? "\r\n" : "\n";
         string? backup = Save(path, before, after);
         return add
-            ? new(true, $"Added Egghead Notes to {name}.", path, backup, written)
-            : new(true, $"Took Egghead Notes out of {name}. Its other settings are as they were.", path, backup);
+            ? new(true, $"Added Syft Notes to {name}.", path, backup, written)
+            : new(true, $"Took Syft Notes out of {name}. Its other settings are as they were.", path, backup);
     }
 
-    // A heading for Egghead Notes' own table in config.toml, or one of its sub-tables ([mcp_servers.study-stash.env]).
+    // A heading for Syft Notes' own table in config.toml, or one of its sub-tables ([mcp_servers.study-stash.env]).
     static readonly Regex OurHeading = new($@"^\s*\[\s*mcp_servers\s*\.\s*(?:{Regex.Escape(ClaudeTools.ServerName)}|""{Regex.Escape(ClaudeTools.ServerName)}""|'{Regex.Escape(ClaudeTools.ServerName)}')\s*(?:\.[^\]]*)?\]\s*(?:#.*)?$");
     static readonly Regex AnyHeading = new(@"^\s*\[");
 
@@ -350,21 +350,21 @@ public sealed class ClaudeSetup
         var (rest, had) = WithoutOurTables(before, nl);
         var left = TomlOf(rest);
         if (left is null || ServersOf(left)?.ContainsKey(ClaudeTools.ServerName) == true)
-            return new(false, Manual($"{name}'s config.toml has Egghead Notes set up by hand in a way Egghead Notes won't rewrite, so it's left alone."), path, null, add ? written : null);
+            return new(false, Manual($"{name}'s config.toml has Syft Notes set up by hand in a way Syft Notes won't rewrite, so it's left alone."), path, null, add ? written : null);
         string after;
         if (add) after = (rest.Trim().Length > 0 ? rest.TrimEnd('\r', '\n') + nl + nl : "") + written.ReplaceLineEndings(nl) + nl;
-        else if (!had) return new(true, $"{name} doesn't have Egghead Notes.", path);
+        else if (!had) return new(true, $"{name} doesn't have Syft Notes.", path);
         else after = rest;
-        // What ChatGPT and Codex will read has Egghead Notes exactly when it should, or nothing is written.
+        // What ChatGPT and Codex will read has Syft Notes exactly when it should, or nothing is written.
         if (TomlOf(after) is not { } check || (ServersOf(check)?.ContainsKey(ClaudeTools.ServerName) == true) != add)
             return new(false, Manual($"Couldn't make a change to {name}'s config.toml that it would read, so it's left alone."), path, null, add ? written : null);
         string? backup = Save(path, File.Exists(path) ? before : null, after);
         return add
-            ? new(true, $"Added Egghead Notes to {name}.", path, backup, written)
-            : new(true, $"Took Egghead Notes out of {name}. Its other settings are as they were.", path, backup);
+            ? new(true, $"Added Syft Notes to {name}.", path, backup, written)
+            : new(true, $"Took Syft Notes out of {name}. Its other settings are as they were.", path, backup);
     }
 
-    /// <summary>config.toml without Egghead Notes' own tables (and the blank lines that led up to them), and whether it
+    /// <summary>config.toml without Syft Notes' own tables (and the blank lines that led up to them), and whether it
     /// had any. Every other line stays exactly as it was.</summary>
     static (string Kept, bool Had) WithoutOurTables(string text, string nl)
     {
@@ -408,7 +408,7 @@ public sealed class ClaudeSetup
         {
             return TomlSerializer.Deserialize<TomlTable>(text);
         }
-#pragma warning disable CA1031 // whatever the parser throws, the answer is the same: not TOML Egghead Notes can rewrite
+#pragma warning disable CA1031 // whatever the parser throws, the answer is the same: not TOML Syft Notes can rewrite
         catch (Exception)
 #pragma warning restore CA1031
         {

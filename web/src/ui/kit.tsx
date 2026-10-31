@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from 'preact/hooks';
 import { back, href, type Route } from '../router';
 import { ChevronLeft, ChevronRight } from './icons';
 import { PULL_REST, Pull, progress } from './pull';
+import { SyftLoader } from './Syft';
 
 // The pieces every screen is built from: a navigation bar with a large title that shrinks into it, a scrolling body
 // that pulls to refresh, inset grouped lists, a segmented control, and the empty and loading states.
@@ -15,7 +16,7 @@ export interface ScreenProps {
   back?: { label: string; to: Route };
   /** Buttons on the right of the bar. */
   actions?: ComponentChildren;
-  /** Called by pulling down; the spinner stays until it resolves. */
+  /** Called by pulling down; the pixel s deals itself in as you pull and keeps shuffling until it resolves. */
   onRefresh?: () => Promise<unknown>;
   /** A large title (the tab's first screens); detail screens show the title in the bar only. */
   large?: boolean;
@@ -96,7 +97,7 @@ export function Screen(props: ScreenProps) {
       <div class="scroll" ref={scroller} {...touch}>
         {props.onRefresh ? (
           <div class={`pull${refreshing ? ' spinning' : ''}${pull === 0 ? ' idle' : ''}`} style={{ height: `${pull}px` }}>
-            <Spinner turn={refreshing ? 1 : progress(pull)} />
+            <SyftLoader variant="rowShuffle" size={40} progress={refreshing ? undefined : progress(pull)} />
           </div>
         ) : null}
         <div class={`scroll-body${pull === 0 && !refreshing ? ' settle' : ''}`} style={shift}>
@@ -250,17 +251,6 @@ export function Segmented<T extends string>(props: {
         </button>
       ))}
     </div>
-  );
-}
-
-export function Spinner({ turn = 1, size = 22 }: { turn?: number; size?: number }) {
-  const spokes = 8;
-  return (
-    <span class="spinner" style={{ width: `${size}px`, height: `${size}px` }} role="progressbar" aria-label="Loading">
-      {Array.from({ length: spokes }, (_, i) => (
-        <i style={{ transform: `rotate(${i * 45}deg)`, opacity: i / spokes < turn ? 0.25 + (0.75 * i) / spokes : 0 }} />
-      ))}
-    </span>
   );
 }
 

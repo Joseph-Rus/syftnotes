@@ -41,13 +41,13 @@ public sealed class GuidedServices
     /// <summary>How far the model's download has got, while it downloads.</summary>
     public Func<double?> Downloading { get; init; } = () => null;
     public Func<DateTime> Now { get; init; } = () => DateTime.Now;
-    /// <summary>A line in the app's log (a turn Egghead Notes stopped, and why).</summary>
+    /// <summary>A line in the app's log (a turn Syft Notes stopped, and why).</summary>
     public Action<string> Log { get; init; } = _ => { };
     /// <summary>Runs something on the window's thread (a CLI's events come from its own).</summary>
     public Action<Action> Post { get; init; } = a => Dispatcher.UIThread.Post(a);
     /// <summary>The ChatGPT and Claude desktop apps on this computer, as their own settings stand (read only).</summary>
     public Func<IReadOnlyList<AiAppState>> AiApps { get; init; } = () => [];
-    /// <summary>Adds Egghead Notes to one of those apps' settings, as Settings → AI tool access's Connect does.</summary>
+    /// <summary>Adds Syft Notes to one of those apps' settings, as Settings → AI tool access's Connect does.</summary>
     public Func<string, AiAppChange>? ConnectAiApp { get; init; }
 
     public AgentInstall MakeInstaller(AgentCliInfo cli) =>
@@ -65,9 +65,9 @@ public interface IGuidedActions
 
 /// <summary>
 /// Guided setup (the design's Pick your AI → Install → Sign in → chat): the student picks Claude, ChatGPT or Gemini,
-/// Egghead Notes installs its CLI with its maker's installer only when they press Install, they sign in on the
-/// provider's own page, and then their own AI, run headless and locked to Egghead Notes' setup tools, walks them through
-/// the rest in a chat, with a checklist beside it that only Egghead Notes ticks. "I don't have a paid plan" is an answer
+/// Syft Notes installs its CLI with its maker's installer only when they press Install, they sign in on the
+/// provider's own page, and then their own AI, run headless and locked to Syft Notes' setup tools, walks them through
+/// the rest in a chat, with a checklist beside it that only Syft Notes ticks. "I don't have a paid plan" is an answer
 /// too, with no chat (a small free model can't follow the brief): it goes to setup by hand, whose notes step opens on
 /// the free AI (<see cref="NotesPick"/>). "Set up by hand" (today's setup, over the same <see cref="SetupModel"/>, so
 /// nothing done is lost) is one click away throughout.
@@ -111,7 +111,7 @@ public sealed partial class GuidedSetupModel : ObservableObject, IDisposable
     public SetupDoor? Door { get; set; }
     /// <summary>What the student's presses in a card do.</summary>
     public IGuidedActions? Actions { get; set; }
-    /// <summary>Open Egghead Notes: setup is finished (the window saves it and closes).</summary>
+    /// <summary>Open Syft Notes: setup is finished (the window saves it and closes).</summary>
     public Action? OnFinish { get; set; }
 
     [ObservableProperty] public partial GuidedScreen Screen { get; set; } = GuidedScreen.PickAi;
@@ -158,7 +158,7 @@ public sealed partial class GuidedSetupModel : ObservableObject, IDisposable
     [ObservableProperty] public partial bool ReadyToFinish { get; set; }
     [ObservableProperty] public partial CardEntry? OpenCard { get; set; }
 
-    // Facts only Egghead Notes sets (the checklist reads them)
+    // Facts only Syft Notes sets (the checklist reads them)
     [ObservableProperty] public partial bool RoleChosen { get; set; }
     [ObservableProperty] public partial string NotesWriter { get; set; } = "";
     [ObservableProperty] public partial bool TaskbarDone { get; set; }
@@ -200,8 +200,8 @@ public sealed partial class GuidedSetupModel : ObservableObject, IDisposable
 
     // --- the words each screen shows (the design's) ------------------------------------------------------------------
 
-    public string PickTitle => Again ? "Set up Egghead Notes again" : "Welcome to Egghead Notes";
-    public static string PickLede => "An AI sets up Egghead Notes with you, writes your notes and answers your questions. Which do you have?";
+    public string PickTitle => Again ? "Set up Syft Notes again" : "Welcome to Syft Notes";
+    public static string PickLede => "An AI sets up Syft Notes with you, writes your notes and answers your questions. Which do you have?";
     // The answers, in the student's own terms: what they pay for, never the tools underneath (Claude Code, Codex,
     // Antigravity, Ollama), which the next screens name once, where they're installed.
     public static string ClaudeLine => "I have a paid Claude plan (Pro or Max).";
@@ -209,7 +209,7 @@ public sealed partial class GuidedSetupModel : ObservableObject, IDisposable
     /// <summary>Gemini works with a personal Google account, free or paid (a free one has a small weekly allowance).</summary>
     public static string GeminiLine => "I use Gemini with my Google account (free or Google AI Pro).";
     public static string FreeTitle => "I don't have a paid plan";
-    public string FreeLine => $"That's fine: Egghead Notes still records and transcribes. Advanced: a free AI on this {Device} (Ollama), or an API key.";
+    public string FreeLine => $"That's fine: Syft Notes still records and transcribes. Advanced: a free AI on this {Device} (Ollama), or an API key.";
     public string AlreadyHere => $"Already on this {Device}";
     public bool ClaudeHere => ClaudeFound.Works;
     public bool CodexHere => CodexFound.Works;
@@ -242,13 +242,20 @@ public sealed partial class GuidedSetupModel : ObservableObject, IDisposable
 
     public string StepLabel => Screen switch
     {
-        GuidedScreen.Install => $"Step 1 of 3 · {Brand}",
-        GuidedScreen.SignIn => $"Step 2 of 3 · {Brand}",
+        // From a lecture's page there are just the two: get it ready, sign in.
+        GuidedScreen.Install => ForNotes ? $"Step 1 of 2 · {Brand}" : $"Step 1 of 3 · {Brand}",
+        GuidedScreen.SignIn => ForNotes ? $"Step 2 of 2 · {Brand}" : $"Step 2 of 3 · {Brand}",
         _ => "Step 3 of 3",
     };
 
+    /// <summary>The small window's title, getting an AI ready from a lecture's page.</summary>
+    public string ReadyTitle => $"Get {Brand} ready";
+
     public string InstallTitle => $"Get {Brand} ready";
-    public string InstallLede => $"Egghead Notes talks to {Brand} through {Cli.Name}, {Cli.Maker}'s own helper for apps. Egghead Notes will download it and set it up in your account. You won't need an administrator password.";
+    public string InstallLede => ForNotes
+        // From a lecture's page: no tool names, just what happens.
+        ? $"Syft Notes downloads {Cli.Maker}'s own helper for {Brand} and sets it up in your account. You won't need an administrator password."
+        : $"Syft Notes talks to {Brand} through {Cli.Name}, {Cli.Maker}'s own helper for apps. Syft Notes will download it and set it up in your account. You won't need an administrator password.";
     public string InstallButton => "Download and set up";
     public string InstallSource => $"Installs with {Cli.Maker}'s own installer from {Cli.Site}";
     public string InstallLine => (Windows ? Cli.WindowsInstaller : Cli.MacInstaller).Line;
@@ -267,9 +274,12 @@ public sealed partial class GuidedSetupModel : ObservableObject, IDisposable
             _ => "Your browser will open Claude's sign-in page. Sign in with the account that has your Pro or Max plan, then come back here.",
         };
     public string Privacy => Cli.Id == "gemini"
-        ? $"Egghead Notes never sees your password. The sign-in is Google's own, and stays on this {Device}."
-        : $"Egghead Notes never sees your password. The sign-in is {Brand}'s own, and stays on this {Device}.";
-    public string PlanNote => Cli.Id == "gemini" ? "Your chat with Gemini uses a little of your Google account's Gemini allowance." : $"Your chat with {Brand} uses your {Brand} plan.";
+        ? $"Syft Notes never sees your password. The sign-in is Google's own, and stays on this {Device}."
+        : $"Syft Notes never sees your password. The sign-in is {Brand}'s own, and stays on this {Device}.";
+    public string PlanNote => ForNotes
+        ? Cli.Id == "gemini" ? "Each lecture's notes use a little of your Google account's free Gemini allowance. Google's free plan may use what's sent to improve its products."
+            : $"Each lecture's notes use your {Brand} plan."
+        : Cli.Id == "gemini" ? "Your chat with Gemini uses a little of your Google account's Gemini allowance." : $"Your chat with {Brand} uses your {Brand} plan.";
     public string ReadyWords => $"{Brand} is ready.";
     public bool HasAllowance => AllowanceWords.Length > 0 && ShowReady;
     /// <summary>Its maker doesn't offer it in this country (at its sign-in, its check, or a turn).</summary>
@@ -278,16 +288,16 @@ public sealed partial class GuidedSetupModel : ObservableObject, IDisposable
     public string PlanTooSmallTitle => Cli.Id == "gemini" ? "This Google account can't use Gemini from other apps" : $"This {Brand} account is on a plan that other apps can't use";
     public string PlanTooSmallText => Cli.Id switch
     {
-        "codex" => "Egghead Notes needs ChatGPT Plus or higher. Without one, it still records and transcribes your lectures. Have an API key? Carry on, and add it on the notes step.",
-        "gemini" => "A personal Google account works; school and work accounts often don't. Without one, Egghead Notes still records and transcribes your lectures. Have an API key? Carry on, and add it on the notes step.",
-        _ => "Egghead Notes needs Claude Pro or Max. Without one, it still records and transcribes your lectures. Have an API key? Carry on, and add it on the notes step.",
+        "codex" => "Syft Notes needs ChatGPT Plus or higher. Without one, it still records and transcribes your lectures. Have an API key? Carry on, and add it on the notes step.",
+        "gemini" => "A personal Google account works; school and work accounts often don't. Without one, Syft Notes still records and transcribes your lectures. Have an API key? Carry on, and add it on the notes step.",
+        _ => "Syft Notes needs Claude Pro or Max. Without one, it still records and transcribes your lectures. Have an API key? Carry on, and add it on the notes step.",
     };
     public bool ShowOpenSignIn => !WaitingSignIn && !SignedIn && !CheckingSignIn && PlanProblem == ChatProblem.None;
     public bool HasSignInProblem => !string.IsNullOrEmpty(SignInProblem);
     public bool HasPlanProblem => PlanProblem != ChatProblem.None;
     public bool PlanIsPlan => PlanProblem == ChatProblem.Plan;
 
-    public string HeaderTitle => Again ? "Set up Egghead Notes again" : "Let's set up Egghead Notes";
+    public string HeaderTitle => Again ? "Set up Syft Notes again" : "Let's set up Syft Notes";
     public string SidebarTitle => $"Setup with {Brand}";
     public string FieldHint => $"Reply to {Brand}…";
     public string Thinking => $"{Brand} is thinking…";
@@ -319,8 +329,8 @@ public sealed partial class GuidedSetupModel : ObservableObject, IDisposable
         // Without a paid plan there's nothing to install or sign in to here: setup by hand comes next. Nothing picked
         // yet, the steps don't name an AI the student hasn't chosen.
         string ai = PickedClaude || PickedCodex || PickedGemini ? Brand : "";
-        string[] titles = PickedByHand ? ["Pick your AI", "Set up Egghead Notes"]
-            : ["Pick your AI", ai.Length > 0 ? $"Get {ai} ready" : "Get your AI ready", ai.Length > 0 ? $"Sign in to {ai}" : "Sign in", "Set up Egghead Notes"];
+        string[] titles = PickedByHand ? ["Pick your AI", "Set up Syft Notes"]
+            : ["Pick your AI", ai.Length > 0 ? $"Get {ai} ready" : "Get your AI ready", ai.Length > 0 ? $"Sign in to {ai}" : "Sign in", "Set up Syft Notes"];
         if (PickedByHand) at = Math.Min(at, 1);
         if (Steps.Count != titles.Length)
         {
@@ -348,7 +358,7 @@ public sealed partial class GuidedSetupModel : ObservableObject, IDisposable
         Notify(nameof(Cli), nameof(Other), nameof(Brand), nameof(BrandGlyph), nameof(Found), nameof(PickedClaude), nameof(PickedCodex), nameof(PickedGemini), nameof(PickedFree),
             nameof(PickedByHand), nameof(CanContinue), nameof(StepLabel),
             nameof(InstallTitle), nameof(InstallLede), nameof(InstallButton), nameof(InstallSource), nameof(InstallLine), nameof(UseOtherLabel), nameof(SignInTitle),
-            nameof(SignInLede), nameof(Privacy), nameof(PlanNote), nameof(ReadyWords), nameof(PlanTooSmallTitle), nameof(PlanTooSmallText), nameof(SidebarTitle),
+            nameof(SignInLede), nameof(Privacy), nameof(PlanNote), nameof(ReadyWords), nameof(PlanTooSmallTitle), nameof(PlanTooSmallText), nameof(SidebarTitle), nameof(ReadyTitle),
             nameof(FieldHint), nameof(Thinking));
     }
 
@@ -426,7 +436,7 @@ public sealed partial class GuidedSetupModel : ObservableObject, IDisposable
             {
                 SignedIn = true;
                 AiReady = true;
-                StartChat(Again ? "[Egghead Notes] Setup was opened again from Settings." : session.Length > 0 ? "[Egghead Notes] Setup was reopened." : "[Egghead Notes] Setup was opened.");
+                StartChat(Again ? "[Syft Notes] Setup was opened again from Settings." : session.Length > 0 ? "[Syft Notes] Setup was reopened." : "[Syft Notes] Setup was opened.");
                 return;
             }
             Screen = GuidedScreen.SignIn;
@@ -443,7 +453,7 @@ public sealed partial class GuidedSetupModel : ObservableObject, IDisposable
         Refresh();
     }
 
-    /// <summary>Looks again at which of the ChatGPT and Claude apps are here, and whether each has Egghead Notes.</summary>
+    /// <summary>Looks again at which of the ChatGPT and Claude apps are here, and whether each has Syft Notes.</summary>
     public void LoadAiApps()
     {
         aiApps = ReadAiApps();
@@ -466,16 +476,16 @@ public sealed partial class GuidedSetupModel : ObservableObject, IDisposable
     public IReadOnlyList<string> AiAppNames => [.. aiApps.Select(a => ClaudeSetup.DesktopApp(a.Id)?.Name ?? a.Name)];
     public bool AiAppsConnected => aiApps.Count > 0 && aiApps.All(a => a.Added && !a.OtherCopy);
 
-    /// <summary>The AI app card's Connect: Egghead Notes goes into each app's own settings (as Settings → AI tool access
+    /// <summary>The AI app card's Connect: Syft Notes goes into each app's own settings (as Settings → AI tool access
     /// does it, keeping everything else in the file). Null when they're all connected; else why not, for the card.</summary>
     public string? ConnectAiApps()
     {
         const string later = "You can connect it later in Settings → AI apps.";
-        if (services.ConnectAiApp is not { } connect) return "Egghead Notes can't change that app's settings here. " + later;
+        if (services.ConnectAiApp is not { } connect) return "Syft Notes can't change that app's settings here. " + later;
         foreach (var app in aiApps.Where(a => !a.Added || a.OtherCopy || a.Outdated))
             if (!connect(app.Id).Ok) services.Log($"[setup] connecting {app.Name} didn't work");
         LoadAiApps();
-        return AiAppsConnected ? null : "Egghead Notes couldn't change that app's settings. " + later;
+        return AiAppsConnected ? null : "Syft Notes couldn't change that app's settings. " + later;
     }
 
     [RelayCommand]
@@ -529,7 +539,7 @@ public sealed partial class GuidedSetupModel : ObservableObject, IDisposable
         StopWork();
         forNotes = id;
         Picked = id;
-        Notify(nameof(ForNotes), nameof(ByHandLabel));
+        Notify(nameof(ForNotes), nameof(ByHandLabel), nameof(StepLabel), nameof(PlanNote), nameof(ReadyTitle), nameof(InstallLede));
         var found = await Task.Run(() => services.Find(AgentCli.Get(id)));
         SetFound(id, found);
         if (!found.Works)
@@ -581,7 +591,7 @@ public sealed partial class GuidedSetupModel : ObservableObject, IDisposable
         if (!AiReady || !chatStarted)
         {
             Screen = Picked.Length > 0 && AiReady ? GuidedScreen.Chat : GuidedScreen.PickAi;
-            if (Screen == GuidedScreen.Chat) StartChat("[Egghead Notes] Setup was opened.");
+            if (Screen == GuidedScreen.Chat) StartChat("[Syft Notes] Setup was opened.");
             return;
         }
         Screen = GuidedScreen.Chat;
@@ -611,7 +621,7 @@ public sealed partial class GuidedSetupModel : ObservableObject, IDisposable
                 BackToNotes();
                 break;
             case GuidedScreen.SignIn when AiReady:
-                StartChat("[Egghead Notes] Setup was opened.");
+                StartChat("[Syft Notes] Setup was opened.");
                 break;
         }
     }
@@ -652,8 +662,9 @@ public sealed partial class GuidedSetupModel : ObservableObject, IDisposable
         InstallProblem = null;
         InstallFailure = InstallFailure.None;
         InstallOutput = "";
-        Phase = $"Downloading {Cli.Name}…";
-        install.Phase += p => services.Post(() => Phase = p);
+        string helper = ForNotes ? $"{Cli.Maker}'s helper" : Cli.Name;
+        Phase = $"Downloading {helper}…";
+        install.Phase += p => services.Post(() => Phase = p.Replace(Cli.Name, helper));
         install.Printed += _ => services.Post(() => InstallOutput = install.Output);
         var outcome = await install.RunAsync(cts.Token);
         Installing = false;
@@ -663,6 +674,8 @@ public sealed partial class GuidedSetupModel : ObservableObject, IDisposable
             Installed = true;
             InstalledWords = outcome.Words;
             SetFound(Cli.Id, outcome.Found);
+            // From a lecture's page there's nothing to choose here: on to signing in, with no Continue to press.
+            if (ForNotes) await ToSignInOrChatAsync();
             return;
         }
         if (outcome.Failure == InstallFailure.Cancelled) return;
@@ -714,7 +727,7 @@ public sealed partial class GuidedSetupModel : ObservableObject, IDisposable
         await ToSignInAsync();
         if (!AiReady || Screen != GuidedScreen.SignIn) return;
         if (ForNotes) BackToNotes();
-        else StartChat("[Egghead Notes] Setup was opened.");
+        else StartChat("[Syft Notes] Setup was opened.");
     }
 
     /// <summary>The sign-in screen: already signed in goes straight to the plan check.</summary>
@@ -781,7 +794,7 @@ public sealed partial class GuidedSetupModel : ObservableObject, IDisposable
     {
         signIn?.Stop();
         if (Found.Exe is not { } exe) return;
-        // Gemini's sign-in runs in Egghead Notes' own home for agy, in the terminal as well.
+        // Gemini's sign-in runs in Syft Notes' own home for agy, in the terminal as well.
         if (Cli.Id == "gemini")
         {
             var (program, args) = Antigravity.InTerminal(exe, Windows);
@@ -809,6 +822,9 @@ public sealed partial class GuidedSetupModel : ObservableObject, IDisposable
         {
             keepUserConfig = check.KeptConfig;
             AiReady = true;
+            // Got ready from a lecture's page (or setup's notes step): signed in and checked, it goes straight back
+            // there to write the notes, with no Continue to press.
+            if (ForNotes && Screen == GuidedScreen.SignIn) BackToNotes();
             return;
         }
         switch (check.Problem)
@@ -834,7 +850,7 @@ public sealed partial class GuidedSetupModel : ObservableObject, IDisposable
                 PlanProblem = ChatProblem.Limit;
                 break;
             case ChatProblem.Offline:
-                PlanProblemTitle = $"Egghead Notes couldn't reach {Brand}. Check your internet connection.";
+                PlanProblemTitle = $"Syft Notes couldn't reach {Brand}. Check your internet connection.";
                 PlanProblemText = "";
                 PlanProblem = ChatProblem.Offline;
                 break;
@@ -891,17 +907,17 @@ public sealed partial class GuidedSetupModel : ObservableObject, IDisposable
 
     /// <summary>A checklist line clicked: the AI is asked to go there.</summary>
     [RelayCommand]
-    Task ClickItem(ChecklistRow row) => row.Clickable ? SendAsync($"[Egghead Notes] The student clicked {row.Title} in the checklist.") : Task.CompletedTask;
+    Task ClickItem(ChecklistRow row) => row.Clickable ? SendAsync($"[Syft Notes] The student clicked {row.Title} in the checklist.") : Task.CompletedTask;
 
     /// <summary>
-    /// A note from Egghead Notes about what happened (a card's button, a download that finished): a quiet line in the
+    /// A note from Syft Notes about what happened (a card's button, a download that finished): a quiet line in the
     /// thread, and the AI hears it, as a turn now or with the next one.
     /// </summary>
     public void Note(string shown, string forAi, bool good = true)
     {
         Thread.Add(new NoteEntry(shown, good));
         Refresh();
-        _ = SendAsync("[Egghead Notes] " + forAi);
+        _ = SendAsync("[Syft Notes] " + forAi);
     }
 
     readonly List<StudentEntry> queued = [];
@@ -1071,8 +1087,8 @@ public sealed partial class GuidedSetupModel : ObservableObject, IDisposable
             ChatProblem.Region => RegionWords,
             ChatProblem.Limit => $"{Brand} is at its usage limit until {UntilWords(Engines.UntilFrom(said, services.Now()))}. You can finish by hand; what's done stays done.",
             ChatProblem.NoAnswer => $"{Brand} didn't answer.",
-            ChatProblem.Guard => $"Egghead Notes stopped {Brand}: it tried to use a tool it isn't allowed here.",
-            ChatProblem.Tools => $"Egghead Notes couldn't connect {Brand} to setup.",
+            ChatProblem.Guard => $"Syft Notes stopped {Brand}: it tried to use a tool it isn't allowed here.",
+            ChatProblem.Tools => $"Syft Notes couldn't connect {Brand} to setup.",
             _ => $"{Brand} stopped: {Py.Head(said, 160).TrimEnd('.')}.",
         };
     }
@@ -1119,7 +1135,7 @@ public sealed partial class GuidedSetupModel : ObservableObject, IDisposable
     /// <summary>open_manual_setup: setup by hand at that item, the chat kept to come back to.</summary>
     public void OpenManual(string item) => ByHandAt(item);
 
-    /// <summary>Open Egghead Notes (the finish card, or the checklist's own button once everything needed is done).</summary>
+    /// <summary>Open Syft Notes (the finish card, or the checklist's own button once everything needed is done).</summary>
     [RelayCommand]
     void Finish()
     {

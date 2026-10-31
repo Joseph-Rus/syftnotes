@@ -17,7 +17,7 @@
     <!-- Rewriting -->
     <Border Classes="ai-bar working" Padding="16,12,8,12" IsVisible="{Binding IsRewriting}">
       <Grid ColumnDefinitions="Auto,12,*,Auto" VerticalAlignment="Center">
-        <c:Spinner Width="14" Height="14" Foreground="{DynamicResource Accent}" />
+        <c:SyftLoader Kind="HoppingBits" Size="20" />
         <TextBlock Grid.Column="2" FontSize="14" TextWrapping="Wrap">
           <Run FontWeight="SemiBold" Text="{Binding RewritingLead}" />
           <Run Text=" Your current notes stay until the new ones are ready." />

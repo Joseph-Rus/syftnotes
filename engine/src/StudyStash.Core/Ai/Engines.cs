@@ -52,7 +52,7 @@ public sealed record EngineChecks
         DiskFreeGb = () => StudyStash.Core.Machine.DiskFreeGb(),
         OpenSignIn = (home, terminal, id) =>
         {
-            // Gemini signs in to Egghead Notes' own home for agy, the one its notes run in.
+            // Gemini signs in to Syft Notes' own home for agy, the one its notes run in.
             var (exe, args) = id == "gemini" && AiProvider.Which(Antigravity.Binary) is { } agy
                 ? Antigravity.InTerminal(agy, OperatingSystem.IsWindows())
                 : Engines.SignInCommand(id);
@@ -84,8 +84,8 @@ public static class Engines
 {
     public static readonly string[] Order = ["ollama", "claude", "codex", "gemini"];
 
-    /// <summary>An AI's name, as the person using Egghead Notes knows it: who wrote a lecture's notes, who answered, who
-    /// is at its limit. Claude and ChatGPT, not the tools Egghead Notes reaches them through (<see cref="Tool"/>).</summary>
+    /// <summary>An AI's name, as the person using Syft Notes knows it: who wrote a lecture's notes, who answered, who
+    /// is at its limit. Claude and ChatGPT, not the tools Syft Notes reaches them through (<see cref="Tool"/>).</summary>
     public static string Name(string id) => id switch
     {
         "ollama" => "Ollama",
@@ -95,7 +95,7 @@ public static class Engines
         _ => id,
     };
 
-    /// <summary>The tool Egghead Notes reaches an AI through, for the few places that are about the tool itself (what
+    /// <summary>The tool Syft Notes reaches an AI through, for the few places that are about the tool itself (what
     /// is installed, what a terminal runs): Claude Code for Claude, Codex for ChatGPT.</summary>
     public static string Tool(string id) => id switch
     {
@@ -133,7 +133,7 @@ public static class Engines
         notesModel.IndexOf(" · ", StringComparison.Ordinal) is var at and > 0 && WhoWrote(notesModel) is { Length: > 0 } who && who != "Ollama"
             ? notesModel[(at + 3)..] : WhoWrote(notesModel);
 
-    /// <summary>The command a terminal runs to sign in ("claude", "codex login"; Gemini's runs in Egghead Notes' own home
+    /// <summary>The command a terminal runs to sign in ("claude", "codex login"; Gemini's runs in Syft Notes' own home
     /// for agy, <see cref="Antigravity.InTerminal"/>, so "agy" here is only its name).</summary>
     public static (string Exe, string[] Args) SignInCommand(string id) => id switch
     {
@@ -142,7 +142,7 @@ public static class Engines
         _ => ("claude", []),
     };
 
-    /// <summary>The sign-in as words to type: Gemini's in Egghead Notes' own home for agy (<see cref="Antigravity.SignInLine"/>).</summary>
+    /// <summary>The sign-in as words to type: Gemini's in Syft Notes' own home for agy (<see cref="Antigravity.SignInLine"/>).</summary>
     public static string SignInWords(string id)
     {
         if (id == "gemini") return Antigravity.SignInLine(OperatingSystem.IsWindows());
@@ -159,7 +159,9 @@ public static class Engines
     // out says "api key" too, but with its /login.
     static readonly Regex KeyRefused = new(@"api key", RegexOptions.IgnoreCase | RegexOptions.Compiled);
     static readonly Regex LoginLike = new(@"log ?in", RegexOptions.IgnoreCase | RegexOptions.Compiled);
-    static readonly Regex LimitLike = new(@"usage limit|rate limit|quota|limit reached|too many requests|\b429\b|resets? (at|in)",
+    // Google's own words for an allowance that's used up ("RESOURCE_EXHAUSTED", "You have exhausted your capacity"):
+    // matched as a limit too, though no real used-up Gemini account has been seen here yet.
+    static readonly Regex LimitLike = new(@"usage limit|rate limit|quota|limit reached|too many requests|\b429\b|resets? (at|in)|resource.?exhausted|exhausted your|allowance (is |was |has been )?used up",
         RegexOptions.IgnoreCase | RegexOptions.Compiled);
     static readonly Regex InDuration = new(@"in (\d+)\s*(hour|minute)s?", RegexOptions.IgnoreCase | RegexOptions.Compiled);
     static readonly Regex AtTime = new(@"at (\d{1,2})(?::(\d{2}))?\s*([ap]m)?", RegexOptions.IgnoreCase | RegexOptions.Compiled);
@@ -191,6 +193,41 @@ public static class Engines
     /// writes those notes by itself (<see cref="AiJobs.SignedInAgain"/>, <see cref="Store.RequeueSignedIn"/>).</summary>
     public static string NotesNeedSignIn(string name) =>
         $"{NotesBecause}{name}{SignInAgain} Sign in from Settings → Your AI, and they're written then.";
+
+    const string WaitBecause = "Your notes aren't written yet because ";
+    const string WaitThen = " They're written by themselves once it's back.";
+
+    /// <summary>Why a lecture has no notes yet when the AI that writes them hit its usage limit (Gemini's free allowance
+    /// used up for the week, say): kept as the lecture's reason, so every page says it, and the library writes those
+    /// notes by itself once the limit is over (<see cref="Store.RequeueLimited"/>). <paramref name="until"/>, when
+    /// it's known, is said in the student's time.</summary>
+    public static string NotesWaitForLimit(string name, DateTime? until) =>
+        $"{WaitBecause}{name}{(name == "Gemini" ? "'s allowance is used up" : " hit its usage limit")}"
+        + (until is { } t ? $" until {UntilWords(t)}." : " for now.") + WaitThen;
+
+    /// <summary>"Tue 3 Nov, 9:00 am", in this computer's time.</summary>
+    public static string UntilWords(DateTime t) =>
+        (t.Kind == DateTimeKind.Utc ? t.ToLocalTime() : t).ToString("ddd d MMM, h:mm tt", CultureInfo.InvariantCulture).Replace("AM", "am").Replace("PM", "pm");
+
+    /// <summary>The AI a lecture's reason says hit its limit (<see cref="NotesWaitForLimit"/>), or null.</summary>
+    public static string? WaitsForLimit(string why)
+    {
+        if (!why.StartsWith(WaitBecause, StringComparison.Ordinal)) return null;
+        string rest = why[WaitBecause.Length..];
+        int end = rest.IndexOf("'s allowance", StringComparison.Ordinal) is var a and > 0 ? a : rest.IndexOf(" hit its usage limit", StringComparison.Ordinal);
+        return end > 0 ? rest[..end] : null;
+    }
+
+    /// <summary>When the limit in a lecture's reason ends, as it says it ("Tue 3 Nov, 9:00 am"), or "" for "for now".</summary>
+    public static string LimitUntil(string why)
+    {
+        int at = why.IndexOf(" until ", StringComparison.Ordinal);
+        int end = at < 0 ? -1 : why.IndexOf(WaitThen, at, StringComparison.Ordinal);
+        return at > 0 && end > at ? why[(at + 7)..end].TrimEnd('.') : "";
+    }
+
+    /// <summary>The start every <see cref="NotesWaitForLimit"/> reason for <paramref name="name"/> has.</summary>
+    public static string WaitPrefix(string name) => WaitBecause + name;
 
     /// <summary>The same for notes that were to be written again: the ones there stay as they were.</summary>
     public static string RewriteNeedsSignIn(string name) =>
@@ -237,7 +274,7 @@ public static class Engines
     static bool? Hinted(string id, EngineChecks checks) => id switch
     {
         "codex" => checks.FileExists(CodexAuthPath(checks)) || checks.Env("OPENAI_API_KEY") is { Length: > 0 },
-        // Gemini runs through Google's Antigravity (agy), in Egghead Notes' own home for it, where agy 1.4.5 keeps its
+        // Gemini runs through Google's Antigravity (agy), in Syft Notes' own home for it, where agy 1.4.5 keeps its
         // sign-in in a file of its own (only whether it's there is looked at). Its absence proves nothing (another
         // version may keep it elsewhere): without it or a key in the environment, it's unchecked until tried.
         "gemini" => checks.Env("GEMINI_API_KEY") is { Length: > 0 } || checks.FileExists(GeminiCredsPath)

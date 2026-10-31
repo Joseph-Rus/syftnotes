@@ -158,7 +158,7 @@ public sealed partial class CanvasConnectModel : ObservableObject, IDisposable
 
     public const string Title = "Bring in Canvas";
     public const string Intro =
-        "Assignments, due dates and course files, filed next to your lectures. Egghead Notes only reads from Canvas. Nothing there changes.";
+        "Assignments, due dates and course files, filed next to your lectures. Syft Notes only reads from Canvas. Nothing there changes.";
 
     // ---- step 1: school address ----
     [ObservableProperty] public partial string SchoolField { get; set; } = "";
@@ -191,7 +191,7 @@ public sealed partial class CanvasConnectModel : ObservableObject, IDisposable
     /// family always (it keeps nothing else), and Chrome, Edge, Brave, Arc and Vivaldi unless the student chose the
     /// folder. Shows three steps and the code where the folder has its three pictures.</summary>
     public bool FromStore => IsFirefox || !LoadFolder && HasStorePage;
-    /// <summary>The step loads the folder Egghead Notes writes: Opera, Chromium, or a student who chose it.</summary>
+    /// <summary>The step loads the folder Syft Notes writes: Opera, Chromium, or a student who chose it.</summary>
     public bool FromFolder => !FromStore;
     /// <summary>More than one browser here can take the extension: the step offers a quiet way to use another.</summary>
     public bool CanSwitchBrowser => BrowserChoices.Count > 1 && !BrowserConnected;
@@ -205,7 +205,7 @@ public sealed partial class CanvasConnectModel : ObservableObject, IDisposable
     [ObservableProperty]
     public partial string? ExtensionFolder { get; set; }
     /// <summary>The folder's own name, as the browser's picker and Finder/Explorer show it ("Chrome extension" on a
-    /// Mac, in the Egghead Notes folder in your home); "Chrome extension" until Add to Chrome has found it.</summary>
+    /// Mac, in the Syft Notes folder in your home); "Chrome extension" until Add to Chrome has found it.</summary>
     public string FolderName => ExtensionFolder is { Length: > 0 } f ? Path.GetFileName(f.TrimEnd('/', '\\')) : "Chrome extension";
     /// <summary>The third picture's caption: pick the folder, or (with Developer mode on) drag it onto the page.</summary>
     public string PickCaption => $"Pick the {FolderName} folder, or drag it onto the page";
@@ -246,21 +246,21 @@ public sealed partial class CanvasConnectModel : ObservableObject, IDisposable
     /// (once pressed) what's open now.</summary>
     public string BrowserHelp => (FromStore, IsFirefox, AddedToBrowser) switch
     {
-        (false, _, false) => $"Egghead Notes reads Canvas through your own sign-in in {BrowserName}. Add to {BrowserName} shows you the extension’s folder and opens {BrowserName}’s extensions page. There:",
+        (false, _, false) => $"Syft Notes reads Canvas through your own sign-in in {BrowserName}. Add to {BrowserName} shows you the extension’s folder and opens {BrowserName}’s extensions page. There:",
         (false, _, true) => $"{BrowserName}’s extensions page is open, and the folder is showing. In {BrowserName}:",
-        (true, true, false) => $"Egghead Notes reads Canvas through your own sign-in in {BrowserName}. Add to {BrowserName} opens the Egghead Notes add-on’s page there. Then:",
-        (true, true, true) when haveItAlready => $"Egghead Notes reads Canvas through your own sign-in in {BrowserName}. To connect the add-on you have there:",
-        (true, true, true) => $"The Egghead Notes add-on’s page is open in {BrowserName}. There:",
-        (true, false, false) => $"Egghead Notes reads Canvas through your own sign-in in {BrowserName}. Add to {BrowserName} opens Egghead Notes for Canvas on the Chrome Web Store there. Then:",
-        (true, false, true) => $"Egghead Notes for Canvas is open on the Chrome Web Store in {BrowserName}. There:",
+        (true, true, false) => $"Syft Notes reads Canvas through your own sign-in in {BrowserName}. Add to {BrowserName} opens the Syft Notes add-on’s page there. Then:",
+        (true, true, true) when haveItAlready => $"Syft Notes reads Canvas through your own sign-in in {BrowserName}. To connect the add-on you have there:",
+        (true, true, true) => $"The Syft Notes add-on’s page is open in {BrowserName}. There:",
+        (true, false, false) => $"Syft Notes reads Canvas through your own sign-in in {BrowserName}. Add to {BrowserName} opens Syft Notes for Canvas on the Chrome Web Store there. Then:",
+        (true, false, true) => $"Syft Notes for Canvas is open on the Chrome Web Store in {BrowserName}. There:",
     };
     /// <summary>The student's usual browser can't take the extension (Safari; Firefox before its add-on is out), or
-    /// nothing on this computer can: said above the step's help, with the browser Egghead Notes will use instead, until
+    /// nothing on this computer can: said above the step's help, with the browser Syft Notes will use instead, until
     /// the extension has been added to one.</summary>
     public bool ShowAdvice => advice is not null && !AddedToBrowser && !BrowserConnected;
     public string AdviceText => advice?.Say(Browser) ?? "";
-    /// <summary>Their usual browser is Firefox (or one built on it) and Egghead Notes has nowhere to send them for its
-    /// add-on yet. A student who has the add-on there already (Mozilla published it after this Egghead Notes was made,
+    /// <summary>Their usual browser is Firefox (or one built on it) and Syft Notes has nowhere to send them for its
+    /// add-on yet. A student who has the add-on there already (Mozilla published it after this Syft Notes was made,
     /// or they added it from a file) says so, and the step is that browser's: the code to paste, and nothing to add.</summary>
     public bool ShowHaveIt => ShowAdvice && advice!.Usual is { Family: BrowserFamily.Firefox };
     public string HaveItLabel => advice?.Usual is { } usual ? $"I already have it in {usual.Name}" : "";
@@ -283,13 +283,13 @@ public sealed partial class CanvasConnectModel : ObservableObject, IDisposable
     /// whether to allow extensions from other stores, the first time (docs/chrome-web-store.md, "What a student
     /// sees").</summary>
     public string StoreStep1 => haveItAlready
-        ? $"In {BrowserName}, click the Egghead Notes button (it may be under the puzzle-piece Extensions button)."
+        ? $"In {BrowserName}, click the Syft Notes button (it may be under the puzzle-piece Extensions button)."
         : IsFirefox ? $"On the page that opens in {BrowserName}, click the blue Add to Firefox button, then Add when {BrowserName} asks."
         : Browser == Browsers.Edge ? "On the page that opens in Edge, click Get extension. If Edge asks to allow extensions from other stores, click Allow. Then click Add extension."
         : $"On the page that opens in {BrowserName}, click the blue {Browser.StoreButton} button, then Add extension when {BrowserName} asks.";
     public string StoreStep2 => haveItAlready
         ? "Paste this code and click Connect."
-        : "Click the Egghead Notes button (it may be under the puzzle-piece Extensions button), paste this code and click Connect.";
+        : "Click the Syft Notes button (it may be under the puzzle-piece Extensions button), paste this code and click Connect.";
     public string StoreStep3 => $"Click Allow when {BrowserName} asks.";
     /// <summary>The code a store's copy is connected with (<see cref="Extension.ConnectionCode"/>: the library as this
     /// computer reaches it, the extension's key and the Canvas address); "" until the library has said.</summary>
@@ -319,7 +319,7 @@ public sealed partial class CanvasConnectModel : ObservableObject, IDisposable
 
     // ---- step 3: find my courses ----
     [ObservableProperty] public partial bool SignedOut { get; set; }
-    /// <summary>What to do while signed out: "Sign in to Canvas in Edge. Egghead Notes looks again by itself once you have."</summary>
+    /// <summary>What to do while signed out: "Sign in to Canvas in Edge. Syft Notes looks again by itself once you have."</summary>
     [ObservableProperty] public partial string SignInHelp { get; set; } = "";
     [NotifyPropertyChangedFor(nameof(CanFinish))]
     [ObservableProperty]
@@ -479,7 +479,7 @@ public sealed partial class CanvasConnectModel : ObservableObject, IDisposable
     }
 
     /// <summary>"Use another browser": the step is that browser's from here (its button, its words, its pictures or
-    /// its code), and it's the one Egghead Notes opens Canvas in.</summary>
+    /// its code), and it's the one Syft Notes opens Canvas in.</summary>
     void PickBrowser(Browser browser)
     {
         if (browser == Browser) return;
@@ -506,7 +506,7 @@ public sealed partial class CanvasConnectModel : ObservableObject, IDisposable
 
     /// <summary>"I already have it in Firefox": the step becomes that browser's, as it is once Add to Firefox has
     /// been pressed, but with nothing to add: the code to paste into the add-on's own button, and the wait for it to
-    /// connect. It's the browser Egghead Notes opens Canvas in from here.</summary>
+    /// connect. It's the browser Syft Notes opens Canvas in from here.</summary>
     [RelayCommand]
     async Task HaveIt()
     {
@@ -519,7 +519,7 @@ public sealed partial class CanvasConnectModel : ObservableObject, IDisposable
             if (ConnectionCode.Length == 0)
             {
                 BrowserError = info is null
-                    ? "Your library runs an older Egghead Notes: update it to add Canvas."
+                    ? "Your library runs an older Syft Notes: update it to add Canvas."
                     : "The code to connect it isn't ready yet. Try again in a moment.";
                 return;
             }
@@ -576,7 +576,7 @@ public sealed partial class CanvasConnectModel : ObservableObject, IDisposable
 
     async Task EnterCoursesStepAsync(CancellationToken stop)
     {
-        SignInHelp = $"Sign in to Canvas in {ConnectedIn()}. Egghead Notes looks again by itself once you have.";
+        SignInHelp = $"Sign in to Canvas in {ConnectedIn()}. Syft Notes looks again by itself once you have.";
         SignedOut = state.Status == "signed_out";
         CoursesSay = null;
         if (!SignedOut) await FindCoursesInternalAsync(stop);
@@ -690,7 +690,7 @@ public sealed partial class CanvasConnectModel : ObservableObject, IDisposable
                 if (ConnectionCode.Length == 0)
                 {
                     BrowserError = info is null
-                        ? "Your library runs an older Egghead Notes: update it to add Canvas."
+                        ? "Your library runs an older Syft Notes: update it to add Canvas."
                         : "The code to connect it isn't ready yet. Try again in a moment.";
                     return;
                 }
@@ -702,7 +702,7 @@ public sealed partial class CanvasConnectModel : ObservableObject, IDisposable
                 if (status?.Folder is not { } folder)
                 {
                     BrowserError = status is null
-                        ? "Your library runs an older Egghead Notes: update it to add Canvas."
+                        ? "Your library runs an older Syft Notes: update it to add Canvas."
                         : "The extension's folder isn't ready yet. Try again in a moment.";
                     return;
                 }

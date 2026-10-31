@@ -47,11 +47,11 @@
         <Grid ColumnDefinitions="Auto,8,*,Auto,2,Auto">
           <Ellipse Width="6" Height="6" Classes="status" Classes.warn="{Binding !StatusGood}" VerticalAlignment="Center" IsVisible="{Binding ShowStatus}" />
           <TextBlock Grid.Column="2" Text="{Binding Status}" ToolTip.Tip="{Binding Status}" c:Tips.WhenCut="True" IsVisible="{Binding ShowStatus}" FontSize="12" Foreground="{DynamicResource Fg2}" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
-          <!-- "Open", not "Open Egghead Notes": the words beside it ("Library running on this PC · Model ready") are shown whole -->
-          <Button Name="OpenApp" AutomationProperties.Name="Open Egghead Notes" Grid.Column="3" Theme="{StaticResource Surface}" Height="32" CornerRadius="4" Padding="8,0"
+          <!-- "Open", not "Open Syft Notes": the words beside it ("Library running on this PC · Model ready") are shown whole -->
+          <Button Name="OpenApp" AutomationProperties.Name="Open Syft Notes" Grid.Column="3" Theme="{StaticResource Surface}" Height="32" CornerRadius="4" Padding="8,0"
                   Command="{Binding OpenAppCommand}">
             <StackPanel Orientation="Horizontal" Spacing="6">
-              <c:Doodle Art="head" Size="18" VerticalAlignment="Center" />
+              <c:SyftMark Size="18" Bits="False" VerticalAlignment="Center" />
               <TextBlock Text="Open" FontSize="13" VerticalAlignment="Center" />
             </StackPanel>
           </Button>
@@ -118,16 +118,16 @@
                 CornerRadius="8" Padding="12">
           <StackPanel Spacing="8">
             <Grid ColumnDefinitions="Auto,8,*,Auto">
-              <Ellipse Width="8" Height="8" Fill="{DynamicResource Accent}" VerticalAlignment="Center" />
+              <c:SyftCell Width="8" Height="8" Fill="{DynamicResource Accent}" VerticalAlignment="Center" />
               <TextBlock Grid.Column="2" Text="{Binding RecordingLabel}" FontSize="14" FontWeight="SemiBold" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
               <Button Grid.Column="3" Theme="{StaticResource Surface}" CornerRadius="4" Padding="4,1" Margin="0,-1,-4,-1" Command="{Binding ShowRecorderCommand}">
                 <TextBlock Text="Show recorder" FontSize="12" Foreground="{DynamicResource AccentText}" />
               </Button>
             </Grid>
             <Grid ColumnDefinitions="Auto,10,Auto,12,*">
-              <c:Doodle Art="listening" Size="34" Busy="{Binding IsRecording}" VerticalAlignment="Center" />
+              <c:SyftLoader Kind="PathTrace" Size="34" IsActive="{Binding IsRecording}" VerticalAlignment="Center" AutomationProperties.AccessibilityView="Raw" />
               <TextBlock Grid.Column="2" Classes="num" Text="{Binding Elapsed}" FontFamily="{DynamicResource DisplayFont}" FontSize="28" FontWeight="Light" VerticalAlignment="Center" />
-              <c:Waveform Grid.Column="4" Height="22" Bars="20" Levels="{Binding Levels}" Foreground="{DynamicResource Fg2}" VerticalAlignment="Center" />
+              <c:Waveform Grid.Column="4" Height="22" Bars="20" Levels="{Binding Levels}" Foreground="{DynamicResource Record}" VerticalAlignment="Center" />
             </Grid>
             <TextBlock Text="{Binding LastLine}" IsVisible="{Binding HasLastLine}" FontSize="12" LineHeight="16" TextWrapping="Wrap" MaxLines="2"
                        TextTrimming="CharacterEllipsis" Foreground="{DynamicResource Fg2}" />
@@ -170,7 +170,7 @@
                     <StackPanel Grid.Column="2" VerticalAlignment="Center">
                       <TextBlock Text="{Binding Title}" FontSize="14" TextTrimming="CharacterEllipsis" />
                       <StackPanel Orientation="Horizontal" Spacing="6">
-                        <c:Spinner IsVisible="{Binding Busy}" Width="12" Height="12" Foreground="{DynamicResource Accent}" VerticalAlignment="Center" />
+                        <c:SyftLoader Kind="HoppingBits" Size="18" IsVisible="{Binding Busy}" VerticalAlignment="Center" />
                         <TextBlock Text="{Binding Detail}" FontSize="12" Foreground="{DynamicResource Fg2}" TextTrimming="CharacterEllipsis" />
                       </StackPanel>
                       <!-- Fluent's ProgressBar: the accent over a hairline -->

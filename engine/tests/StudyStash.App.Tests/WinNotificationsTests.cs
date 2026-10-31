@@ -68,7 +68,7 @@ public class WinNotificationsTests(ITestOutputHelper output)
         const string app = "StudyStash.Tests.Notifications";
         try
         {
-            var windows = WinNotifications.Make(app, "Egghead Notes tests");
+            var windows = WinNotifications.Make(app, "Syft Notes tests");
             Assert.True(windows is not null, "Windows' notifications couldn't be reached: " + WinNotifications.LastError);
             var state = windows.State;
             output.WriteLine($"setting: {state} ({WinNotifications.LastError ?? "no error"})");

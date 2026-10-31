@@ -66,7 +66,7 @@
               <TextBlock Text="{Binding AddLabel}" />
             </Button>
             <StackPanel Classes="cv-action" IsVisible="{Binding WaitingForBrowser}">
-              <c:Spinner Width="14" Height="14" Thickness="2" Foreground="{DynamicResource Fg2}" />
+              <c:SyftLoader Kind="HoppingBits" Size="20" />
               <TextBlock Classes="cv-value" Text="{Binding WaitingLabel}" />
             </StackPanel>
             <StackPanel Classes="cv-action" IsVisible="{Binding BrowserConnected}">
@@ -80,7 +80,7 @@
           <StackPanel Spacing="4" IsVisible="{Binding ShowAdvice}">
             <TextBlock Classes="cv-step-body cv-advice" Text="{Binding AdviceText}" />
             <Button Classes="cv-quiet" HorizontalAlignment="Left" Command="{Binding GetBrowserCommand}" IsVisible="{Binding ShowGetBrowser}"><TextBlock Classes="cv-link" Text="Get Chrome" /></Button>
-            <!-- Firefox, with the add-on in it already (Egghead Notes has nowhere to send them for it yet): its code -->
+            <!-- Firefox, with the add-on in it already (Syft Notes has nowhere to send them for it yet): its code -->
             <Button Name="HaveIt" Classes="cv-quiet" HorizontalAlignment="Left" Command="{Binding HaveItCommand}" IsVisible="{Binding ShowHaveIt}"><TextBlock Classes="cv-link" Text="{Binding HaveItLabel}" /></Button>
           </StackPanel>
           <TextBlock Classes="cv-step-body" Text="{Binding BrowserHelp}" />
@@ -164,7 +164,7 @@
           <Panel Grid.Column="3" IsVisible="{Binding Step3.IsCurrent}" VerticalAlignment="Center">
             <Button Classes="cv-btn cv-mini cv-primary" IsVisible="{Binding SignedOut}" Command="{Binding OpenCanvasCommand}"><TextBlock Text="Open Canvas" /></Button>
             <StackPanel Classes="cv-action" IsVisible="{Binding ShowFind}">
-              <c:Spinner IsVisible="{Binding FindingCourses}" Width="14" Height="14" Thickness="2" Foreground="{DynamicResource Fg2}" />
+              <c:SyftLoader Kind="HoppingBits" Size="20" IsVisible="{Binding FindingCourses}" />
               <TextBlock Classes="cv-value" Text="Looking…" IsVisible="{Binding FindingCourses}" />
               <Button Classes="cv-btn cv-mini cv-primary" IsVisible="{Binding !FindingCourses}" Command="{Binding FindCoursesCommand}"><TextBlock Text="Find my courses" /></Button>
             </StackPanel>
@@ -247,7 +247,7 @@
             <Panel Grid.Column="3" VerticalAlignment="Center" IsVisible="{Binding Step5.IsCurrent}">
               <Button Classes="cv-btn cv-mini cv-primary" IsVisible="{Binding !Syncing}" Command="{Binding SyncNowCommand}"><TextBlock Text="Sync now" /></Button>
               <StackPanel Classes="cv-action" IsVisible="{Binding Syncing}">
-                <c:Spinner Width="14" Height="14" Thickness="2" Foreground="{DynamicResource Fg2}" />
+                <c:SyftLoader Kind="HoppingBits" Size="20" />
                 <TextBlock Classes="cv-value" Text="Syncing…" />
               </StackPanel>
             </Panel>
@@ -255,16 +255,7 @@
           <StackPanel Classes="cv-body" IsVisible="{Binding Step5.IsCurrent}">
             <StackPanel Spacing="4" IsVisible="{Binding Syncing}">
               <TextBlock Classes="cv-step-body" Text="The first sync takes a few minutes" />
-              <Border Classes="cv-track">
-                <Grid>
-                  <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="{Binding SyncProgress, Converter={x:Static vm:CanvasConverters.FillStar}}" />
-                    <ColumnDefinition Width="{Binding SyncProgress, Converter={x:Static vm:CanvasConverters.RestStar}}" />
-                  </Grid.ColumnDefinitions>
-                  <Border Classes="cv-bar-fill" />
-                  <Border Grid.Column="1" Classes="cv-bar-rest" />
-                </Grid>
-              </Border>
+              <c:SyftLoader Kind="PixelProgress" Size="8" Progress="{Binding SyncProgress, TargetNullValue=0}" IsIndeterminate="False" HorizontalAlignment="Left" Margin="0,6,0,0" />
             </StackPanel>
             <TextBlock Classes="cv-step-body" Text="{Binding SyncedLine}" IsVisible="{Binding SyncedLine, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
           </StackPanel>

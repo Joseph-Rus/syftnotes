@@ -61,7 +61,7 @@ public class ToastShelfTests
         public void Dispose() => Shelf.CloseAll();
     }
 
-    static Notice Say(string title, string text = "Egghead Notes is writing it down.", string? action = null, Action? act = null) =>
+    static Notice Say(string title, string text = "Syft Notes is writing it down.", string? action = null, Action? act = null) =>
         new() { Title = title, Text = text, ActionLabel = action, Act = act };
 
     [AvaloniaFact]

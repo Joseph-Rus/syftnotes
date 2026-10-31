@@ -7,8 +7,8 @@ import { useResource } from '../data/resource';
 import { clock, shortDate, parseWhen } from '../format';
 import { href } from '../router';
 import { ArrowUp, Trash } from '../ui/icons';
-import { Doodle } from '../ui/Doodle';
-import { Dot, Empty, IconButton, Screen, Spinner } from '../ui/kit';
+import { SyftLoader, SyftMark } from '../ui/Syft';
+import { Dot, Empty, IconButton, Screen } from '../ui/kit';
 import { useClassColors } from './classColors';
 
 /** One question and what came back: the answer as it was written, the lectures it drew on, or why there's none. */
@@ -109,12 +109,12 @@ export function AskScreen({ api }: { api: Api }) {
       }
     >
       {noAi ? (
-        <Empty icon={<Doodle name="thinking" />} title="Asking isn't set up yet">
-          Choose an AI in Egghead Notes' Settings → AI engines on your library's computer, then ask here.
+        <Empty icon={<SyftMark size={96} oddOneOut />} title="Asking isn't set up yet">
+          Choose an AI in Syft Notes' Settings → AI engines on your library's computer, then ask here.
         </Empty>
       ) : turns.length === 0 ? (
         <div class="ask-start">
-          <Empty icon={<Doodle name="thinking" />} title="Ask about your notes">
+          <Empty icon={<SyftMark size={112} />} title="Ask about your notes">
             Questions are answered from what's in your library, with the lectures each answer used.
           </Empty>
           <div class="suggestions">
@@ -188,8 +188,10 @@ export function AskScreen({ api }: { api: Api }) {
                 }
               }}
             />
+            {/* While an answer is on its way the thread's hopping bits say so: one loader at a time, so Ask stays
+                still here (only greyed). */}
             <button type="submit" class="send" disabled={!question.trim() || busy} aria-label="Ask">
-              {busy ? <Spinner size={18} /> : <ArrowUp size={20} />}
+              <ArrowUp size={20} />
             </button>
           </div>
         </form>
@@ -206,13 +208,13 @@ function TurnView({ turn, colorOf }: { turn: Turn; colorOf: (c: string | null) =
         {turn.question}
       </div>
       <div class="theirs-row">
-        <Doodle name="head" size={30} />
+        <SyftMark size={30} tile="circle" />
         <div class="bubble theirs">
           {turn.answer ? (
             <div class="answer selectable">{turn.answer}</div>
           ) : turn.state === 'asking' ? (
             <div class="answer thinking">
-              <Doodle name="thinking" size={40} busy /> Reading your notes…
+              <SyftLoader variant="hoppingBits" size={20} /> Reading your notes…
             </div>
           ) : null}
           {turn.state === 'failed' ? <p class="answer-problem">{turn.problem}</p> : null}

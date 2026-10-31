@@ -30,7 +30,7 @@ public class CanvasShots
     {
         foreach (var icon in root.GetLogicalDescendants().OfType<Icon>())
         {
-            if (icon.Glyph.Length == 0) continue; // e.g. the syncing card, which draws a Spinner instead
+            if (icon.Glyph.Length == 0) continue; // e.g. the syncing card, which draws a loader instead
             Assert.True(IconPaths.All.ContainsKey(icon.Glyph), $"Icon glyph '{icon.Glyph}' isn't in IconPaths.All");
         }
     }
@@ -355,7 +355,7 @@ public class CanvasShots
     /// to use, with a quiet way to another; its store step says Get extension), "edge-waiting" (Add to Edge pressed),
     /// "opera" (Opera loads the folder), "firefox" (Firefox's three steps and its code) and "firefox-waiting" (Add to
     /// Firefox pressed). For a student who uses Safari: "safari" (Chrome is here, and is used instead) and "no-browser"
-    /// (nothing here will do: get Chrome). For one who uses Firefox before Egghead Notes knows where its add-on is:
+    /// (nothing here will do: get Chrome). For one who uses Firefox before Syft Notes knows where its add-on is:
     /// "firefox-not-yet" (Chrome is used instead, or they say they have the add-on already) and "firefox-have-it"
     /// (they said so: its code, and nothing to add).</summary>
     internal static async Task<CanvasConnectModel> SetupStepAsync(string at, bool mac = false)
@@ -382,7 +382,7 @@ public class CanvasShots
         if (at is "folder" or "folder-waiting") m.OtherWayCommand.Execute(null);
         if (at is "waiting" or "edge-waiting" or "firefox-waiting" or "folder-waiting") await m.AddToBrowserCommand.ExecuteAsync(null);
         if (at == "firefox-have-it") await m.HaveItCommand.ExecuteAsync(null);
-        if (at == "folder-waiting" && mac) m.ExtensionFolder = Path.Combine("~", "Egghead Notes", "Chrome extension");
+        if (at == "folder-waiting" && mac) m.ExtensionFolder = Path.Combine("~", "Syft Notes", "Chrome extension");
         for (int i = 0; i < 100 && m.FromStore && m.ConnectionCode.Length == 0; i++) await Task.Delay(10); // the code is asked for as the step opens
         m.Dispose(); // a still picture: the watch needn't keep asking
         return m;

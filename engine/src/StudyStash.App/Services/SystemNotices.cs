@@ -6,12 +6,12 @@ using StudyStash.App.ViewModels;
 namespace StudyStash.App.Services;
 
 /// <summary>
-/// Egghead Notes' notifications as the computer's own (<see cref="ISystemNotifications"/>): each <see cref="Notice"/>
+/// Syft Notes' notifications as the computer's own (<see cref="ISystemNotifications"/>): each <see cref="Notice"/>
 /// is handed to the system, which shows it its way; a click on it, or on its button, does what the notice's button
 /// does. The system decides how long one stays and where, so <see cref="Notice.Stay"/> means nothing here; one that
 /// says something is still so (<see cref="Notice.StillTrue"/>: the lecture is paused) is taken down when it no
 /// longer is.
-/// <para>Nothing is lost for want of the system. Where it won't have Egghead Notes' notifications at all, won't take
+/// <para>Nothing is lost for want of the system. Where it won't have Syft Notes' notifications at all, won't take
 /// one, or leaves its question about allowing them unanswered, the notice goes to <c>own</c> (the app's own card)
 /// instead. Where the student has turned them off, the ones that only tell (a lecture filed) aren't shown, as they
 /// asked; one that needs them (<see cref="NeedsTheStudent"/>: the recording paused by itself) still shows, as the
@@ -56,6 +56,9 @@ public sealed class SystemNotices
         system.StateChanged += () => post(StateChanged);
     }
 
+    /// <summary>Asks the system now whether its notifications may be shown (<see cref="ISystemNotifications.Ask"/>).</summary>
+    public void Ask() => system.Ask();
+
     /// <summary>A notice's id with the system: the same notice said twice is one notification, shown afresh.</summary>
     public static string IdOf(Notice notice) => "ss-" + Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(notice.Key)))[..24];
 
@@ -94,7 +97,7 @@ public sealed class SystemNotices
         if (system.Show(id, notice.Title, notice.Text, Buttons(notice))) return;
         // The system wouldn't take this one: it's said all the same.
         live.RemoveAll(l => l.Id == id);
-        log("[notifications] the system didn't take one: Egghead Notes shows it itself");
+        log("[notifications] the system didn't take one: Syft Notes shows it itself");
         own(notice);
     }
 
@@ -116,7 +119,7 @@ public sealed class SystemNotices
         if (acted || what == Later) system.Remove(id);
     }
 
-    /// <summary>The system has said whether it shows Egghead Notes' notifications. It won't have them here: the ones
+    /// <summary>The system has said whether it shows Syft Notes' notifications. It won't have them here: the ones
     /// waiting on its answer are shown as the app's own cards. The student said no: the ones that need them still
     /// are, and the rest are let go.</summary>
     void StateChanged()
@@ -127,8 +130,8 @@ public sealed class SystemNotices
         log(now switch
         {
             NotificationState.Allowed => "[notifications] the system shows them",
-            NotificationState.Denied => "[notifications] turned off for Egghead Notes in the system's settings: only what needs the student is shown, by the app",
-            NotificationState.Unavailable => "[notifications] the system won't have them from this copy of the app: Egghead Notes shows its own",
+            NotificationState.Denied => "[notifications] turned off for Syft Notes in the system's settings: only what needs the student is shown, by the app",
+            NotificationState.Unavailable => "[notifications] the system won't have them from this copy of the app: Syft Notes shows its own",
             _ => "[notifications] waiting for the system",
         });
         if (now == NotificationState.Allowed)

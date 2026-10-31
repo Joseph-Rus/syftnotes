@@ -1,13 +1,13 @@
-# Egghead Notes: one download
+# Syft Notes: one download
 
-Egghead Notes used to ship four installers (Laptop and Library, on Mac and Windows), each baking in what the computer
-was for. Now there's one app and one download per system: `Egghead-Notes.dmg` on Mac, `Egghead-Notes-Setup.exe` on
+Syft Notes used to ship four installers (Laptop and Library, on Mac and Windows), each baking in what the computer
+was for. Now there's one app and one download per system: `Syft-Notes.dmg` on Mac, `Syft-Notes-Setup.exe` on
 Windows. What a computer is for — a laptop that records, a library that keeps and writes up lectures, or both, on
 one computer — is a question setup asks the first time it opens, not a choice made at download time. Any install can
 change its mind later, from Settings, with nothing to reinstall.
 
 ```
-Egghead-Notes.dmg / Egghead-Notes-Setup.exe            first run                     later, any time
+Syft-Notes.dmg / Syft-Notes-Setup.exe            first run                     later, any time
   the same app, no role baked in         ──────▶  setup asks: just this      ──▶  Settings → Connection →
                                                    computer, my laptop, or         This computer: switch
                                                    my library                      laptop ↔ library ↔ both
@@ -15,7 +15,7 @@ Egghead-Notes.dmg / Egghead-Notes-Setup.exe            first run                
 
 ## First run: the role is asked, not downloaded
 
-The build carries no role of its own: `Egghead-Notes.dmg`'s `Info.plist` has no `StudyStashRole` key, and Windows'
+The build carries no role of its own: `Syft-Notes.dmg`'s `Info.plist` has no `StudyStashRole` key, and Windows'
 `study-stash.ini` writes no `role=` line either (CI checks the DMG for exactly this — see `.github/workflows/ci.yml`).
 Setup still offers three starting choices — **Just this Mac** (or PC), and under Advanced **My computer at home** (the library) and **My laptop for class** —
 worked out fresh each time it opens (`Setup.StartingRole`, `engine/src/StudyStash.App/Services/Setup.cs`):
@@ -121,7 +121,7 @@ the old ones; the release step in CI makes the copies and checksums all six toge
   still asks for its old asset name and gets the current app — with no role baked in — same as anyone downloading
   fresh today. Its own `app.json` already has its role, so nothing about what it's for changes when it updates.
 - **An old library's "Connect your laptop" page and setup wizard** (`LibraryWeb.cs`, `SetupWeb.cs`) now link to
-  `Egghead-Notes.dmg` and `Egghead-Notes-Setup.exe` — the one download — rather than the retired Laptop-named ones.
+  `Syft-Notes.dmg` and `Syft-Notes-Setup.exe` — the one download — rather than the retired Laptop-named ones.
 - **`install.sh` and `install.ps1`** fetch the one download too. An old role argument (Mac) or `$env:STUDYSTASH_ROLE`
   (Windows) from an older line of the scripts is simply never read any more, so passing one changes nothing; the
   address an old laptop install used to get from `STUDYSTASH_SERVER` is now just printed, since setup asks for it

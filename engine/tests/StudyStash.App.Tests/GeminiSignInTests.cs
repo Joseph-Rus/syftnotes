@@ -41,7 +41,7 @@ public sealed class GeminiSignInTests
         Assert.Empty(EngineSetupWords.Steps("gemini", "not_signed_in", windows: false));
     }
 
-    /// <summary>Finding Gemini (each time guided setup opens) asks agy its version in Egghead Notes' own home for it.</summary>
+    /// <summary>Finding Gemini (each time guided setup opens) asks agy its version in Syft Notes' own home for it.</summary>
     [Fact]
     public void Finding_agy_asks_its_version_in_study_stashs_own_home()
     {

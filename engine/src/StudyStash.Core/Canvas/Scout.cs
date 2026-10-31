@@ -22,9 +22,9 @@ public sealed class Scout(string home, Func<string, string> classDir, AiJobs ai,
 
     public static string Prompt(string cls, long courseId, bool recipeExists) =>
         $"""
-        AUTO MODE: Egghead Notes is running you unattended; nobody can answer questions.
+        AUTO MODE: Syft Notes is running you unattended; nobody can answer questions.
         You are the Canvas scout for the class "{cls}" (Canvas course id {courseId}). Your working folder is that class's folder in the
-        user's Egghead Notes library. Its lectures are the .md files here; Canvas/ is what Egghead Notes already mirrors on every sync —
+        user's Syft Notes library. Its lectures are the .md files here; Canvas/ is what Syft Notes already mirrors on every sync —
         look at what's there first, and never write over any of it: assignments/*/spec.md, feedback.md, submission/, files/ (instructions,
         your grade and feedback, what you handed in); modules.md and modules/NN Module/ (the outline, and each module's own files and
         pages); syllabus.md; pages/*.md and pages/files/ (the syllabus and pages outside modules); files/<folder>/<file> (the course's

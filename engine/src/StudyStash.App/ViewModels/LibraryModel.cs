@@ -102,19 +102,17 @@ public sealed partial class NoteModel : ObservableObject
         + (transcript ? $" The transcript is in the Transcript tab{(canContinue ? "; Keep recording adds to it." : ".")}" : canContinue ? " Keep recording adds to it." : "");
 
     /// <summary>What the page says where the notes would be while the library writes none (<see cref="Summarize.NotesOn"/>
-    /// is false, as after setup's "No AI for now"): that notes are off, where the words are, and where notes are
-    /// turned on. They need an AI (Settings → Your AI) and both of the library's AI switches (<see cref="Summarize.NotesOn"/>),
-    /// which Settings → Notes and sorting has under these names.</summary>
-    public static string NotesAreOff(string noun, bool transcript) => Summarize.NotesOffWords($"this {noun}")
-        + (transcript ? " The transcript is in the Transcript tab." : "")
-        + " To have notes written, choose an AI in Settings → Your AI, then turn on “Write study notes from each lecture” and “Sort lectures into classes with AI” in Settings → Notes and sorting.";
+    /// is false: a first run found no AI here, or setup's "No AI for now"): that no AI writes them yet, and where the
+    /// words are. The card under it ("Get study notes from this lecture") is how notes get written.</summary>
+    public static string NotesAreOff(string noun, bool transcript) =>
+        $"No AI writes notes for this {noun} yet{(transcript ? "; its transcript is in the Transcript tab" : "")}.";
     public ObservableCollection<HeardLine> Transcript { get; } = [];
     [ObservableProperty] public partial bool ShowTranscript { get; set; }
 
     public bool ShowNotes => !ShowTranscript;
     public bool HasPending => !string.IsNullOrEmpty(Pending);
     /// <summary>Its notes are on their way (written down here, sent, or being written by the library), not just
-    /// missing: the page shows the egghead writing them beside <see cref="Pending"/>.</summary>
+    /// missing: the page shows the Path Trace loader beside <see cref="Pending"/>.</summary>
     public bool Writing { get; init; }
     public bool NoTranscript => Lines.Count == 0;
     /// <summary>What the page was last drawn from: a reload that finds the same leaves the page as it is.</summary>
@@ -379,7 +377,7 @@ public sealed partial class LibraryModel : ObservableObject
         OnPropertyChanged(nameof(HasLectureFiles));
     }
 
-    /// <summary>Notes from an AI Egghead Notes doesn't run, for the open note: the offer over a lecture with none, Copy for
+    /// <summary>Notes from an AI Syft Notes doesn't run, for the open note: the offer over a lecture with none, Copy for
     /// your AI and Paste notes. Null with no note open, or one being recorded.</summary>
     [ObservableProperty] public partial FreeAiModel? FreeAi { get; set; }
 
@@ -482,6 +480,8 @@ public sealed partial class LibraryModel : ObservableObject
             newValue.Narrow = Narrow;
             // The ask for a tip shows on Home, in the page's own flow.
             newValue.Asking = newValue.IsHome ? Support : null;
+            // So does "Ready when class starts", after a first run.
+            newValue.Welcome = newValue.IsHome ? Welcome : null;
             // A page read while the library was still deleting a note lists it: it's shown without it.
             foreach (string id in gone) newValue.Remove(id);
         }
@@ -572,6 +572,14 @@ public sealed partial class LibraryModel : ObservableObject
     {
         OnPropertyChanged(nameof(HasSupport));
         if (Overview is { IsHome: true } home) home.Asking = value;
+    }
+
+    /// <summary>Home's "Ready when class starts", after a first run; null once it's put away (or never, for an update).</summary>
+    [ObservableProperty] public partial WelcomeCardModel? Welcome { get; set; }
+
+    partial void OnWelcomeChanged(WelcomeCardModel? value)
+    {
+        if (Overview is { IsHome: true } home) home.Welcome = value;
     }
 
     /// <summary>Shows the ask (unless it's showing already); <paramref name="last"/> leaves out "Maybe later". Any

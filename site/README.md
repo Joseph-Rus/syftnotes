@@ -1,4 +1,4 @@
-# Egghead Notes' website
+# Syft Notes' website
 
 The public site: a home page with one download per platform, the phone app guide, the privacy policy, the terms and
 a support page. It's plain HTML and CSS with one small script that nothing depends on, and it loads nothing from any
@@ -12,22 +12,35 @@ site/
   terms/index.html    terms of use (MIT, as is)
   support/index.html  support: GitHub issues, private security reports
   404.html            the page for a missing address
-  assets/             site.css, site.js, the app's font, the icon, favicon, social picture, pictures of the app and the
-                      film's paper objects (WebP), and the film
+  assets/             site.css, site.js, the app's font and the wordmark's (Archivo), the icon, favicon, social picture,
+                      the pixel s (img/tile-light.svg, img/mark-dark.svg), pictures of the app, light and dark (WebP),
+                      and the old films (on no page)
   check.mjs           the check CI runs before publishing (not published)
 ```
 
-The look is the promo film's. The page is paper-coloured, set in the app's own typeface (Atkinson Hyperlegible
-Next, served from `assets/fonts/` under its Open Font License, so still nothing loads from another site), and each
-thing the app does gets a band of one bold colour with a big word, a sentence, a picture of the app as a card and a
-cut-paper object: Record, Notes, Formulas, Graphs, Diagrams, Due dates, Ask, Connect. The bands keep their colours
-in the dark; only the paper and its ink follow the system.
+The look is the app's. The page is the app's grey canvas with white pages on it, a hairline round each, set in the
+app's own typeface (Atkinson Hyperlegible Next, served from `assets/fonts/` under its Open Font License, so still
+nothing loads from another site), with the app's ink pill buttons. The brand is Joey's pixel s: the wordmark in Archivo
+beside the logo board's lockup in the header, the s on its tile in the opening (S2 Sieve Drop played once in the light,
+S1 Sort In in the dark, copied from his motion reference; the still mark for anyone who asked for less motion), and its
+four colours (lilac, sky, coral, mustard) as the accents: every dot, bullet and step number is a cell of the s on its
+8-unit grid. Each thing the app does is a row of one white sheet, like the app's page: Record, Notes, Formulas,
+Graphs, Diagrams, Due dates, Ask, Connect, each with a big word, a sentence and a picture of the app as a card. Light
+and dark follow the visitor's system. No gradients anywhere.
 
-**The pictures** are the real app (0.16.2) on a made-up library, never redrawn: `home.webp` is its whole window, and
-each card is a piece of the window at twice the size it's shown. The film in the opening is
-`assets/study-stash-promo.mp4` (its poster is `img/promo-poster.webp`), and the paper objects (`img/paper-*.webp`)
-are the film's own. `assets/study-stash-demo.mp4`, the older 50-second demo, is no longer on a page but stays
-published: the repository's README links to it.
+**The pictures** are the real app, never redrawn: drawn off-screen by its own views from its demo lectures, light and
+dark, at twice the size they're shown (`engine/tests/StudyStash.App.Tests/SiteShots.cs`), standing on the site's
+page colour so the sidebar's glass takes the page's tint. `home.webp` is its whole window, cut to its rounded edge;
+each card is a piece of it. To draw them again:
+
+```sh
+STUDYSTASH_SITE=/tmp/site-shots dotnet test engine/tests/StudyStash.App.Tests --filter SiteShots
+python3 tools/site_pictures.py /tmp/site-shots     # rounds the window's corners, writes img/<name>(-dark).webp
+```
+
+The old films (`assets/study-stash-promo.mp4`, its poster `img/promo-poster.webp`, and the 50-second
+`assets/study-stash-demo.mp4`) show the old name and logo, so they're on no page and the README no longer links to
+them; they stay published until a new film replaces them.
 
 ## Preview
 
@@ -36,15 +49,16 @@ python3 -m http.server 8000 --directory site     # then open http://localhost:80
 node site/check.mjs                              # the same check CI runs
 ```
 
-Every link is relative, so the site works at `https://study-stash-app.web.app/`, on its own domain, and under a
-folder such as `<user>.github.io/study-stash/` alike.
+Every link is relative, so the site works at `https://syftnotes.com/`, at `https://study-stash-app.web.app/`, and under a
+folder such as `<user>.github.io/study-stash/` alike. Only the link-preview tags (`og:url`, `og:image`) and each page's
+`canonical` address name `https://syftnotes.com/`.
 `check.mjs` fails if one starts with `/`. Pages are folders (`privacy/index.html`), so addresses are
 `/privacy/`, `/phone/` and so on.
 
 **The check** serves `site/` the way a static host does and fails when a page doesn't load or is missing `lang`, a
 viewport, a `<title>`, a description or an `<h1>`; when an image has no `alt`; when any link, image, script or
 stylesheet on the site doesn't resolve, or a `#fragment` names no id on its page; when a page loads anything from
-another site; or when a download link isn't `Egghead-Notes.dmg` or `Egghead-Notes-Setup.exe` from
+another site; or when a download link isn't `Syft-Notes.dmg` or `Syft-Notes-Setup.exe` from
 `releases/latest/download/` (and the home page must offer both). It doesn't fetch outside links, so it passes
 before a release with those assets exists.
 
@@ -52,8 +66,9 @@ before a release with those assets exists.
 
 The site is hosted by **Firebase Hosting** in the `study-stash-app` Google Cloud project (the same project as the
 Google Calendar sign-in), set up by `firebase.json` and `.firebaserc` at the repository's root: `site/` as it is,
-without `check.mjs` and this README, with clean addresses (`/privacy/`). It's free at
-`https://study-stash-app.web.app/` (and `study-stash-app.firebaseapp.com`).
+without `check.mjs` and this README, with clean addresses (`/privacy/`). Its address is `https://syftnotes.com/`
+once the domain is connected (below); it's also always at `https://study-stash-app.web.app/` (and
+`study-stash-app.firebaseapp.com`).
 
 By hand, from the repository's root, with the Firebase CLI signed in to an owner of the project:
 
@@ -68,15 +83,14 @@ secret, it only checks.
 
 ## The domain
 
-The site is built for its own domain, which isn't bought yet. When it is:
+The domain is **syftnotes.com**, bought on Cloudflare. To connect it:
 
-1. Firebase console → **Hosting → Add custom domain**, type it (the bare domain, and `www` redirecting to it).
-2. At the domain's DNS, add the `TXT` and `A` records Firebase shows; it issues the HTTPS certificate itself (up to a
-   day).
-3. Make `og:image` in `index.html` absolute (`https://<domain>/assets/social.png`): link previews need a full
-   address.
+1. Firebase console → **Hosting → Add custom domain**, type `syftnotes.com` (and `www.syftnotes.com`, redirecting to
+   it).
+2. In Cloudflare's DNS for the domain, add the `TXT` and `A` records Firebase shows, set to **DNS only** (the grey
+   cloud, not proxied) so Firebase can see them and issue the HTTPS certificate itself (up to a day).
 
-Nothing else changes: every link is relative.
+Nothing else changes: every link is relative, and the pages' link-preview tags already name `https://syftnotes.com/`.
 
 ## What Google and Microsoft need from this site
 
@@ -85,16 +99,16 @@ policy on a domain the publisher controls.
 
 | | Address (with the domain) |
 |---|---|
-| Homepage | `https://<domain>/` |
-| Privacy policy | `https://<domain>/privacy/` |
-| Terms of service | `https://<domain>/terms/` |
-| Support | `https://<domain>/support/` |
+| Homepage | `https://syftnotes.com/` |
+| Privacy policy | `https://syftnotes.com/privacy/` |
+| Terms of service | `https://syftnotes.com/terms/` |
+| Support | `https://syftnotes.com/support/` |
 
 ### Google (OAuth consent screen, then verification)
 
 In Google Cloud console, **Google Auth Platform → Branding**:
 
-- **App name** Egghead Notes, the **logo** (the repository's `assets/icon.png`, resized to 120 × 120), a **support email**.
+- **App name** Syft Notes, the **logo** (the repository's `assets/icon.png`, resized to 120 × 120), a **support email**.
 - **Application home page**, **privacy policy link** and **terms of service link**: the three addresses above.
 - **Authorised domains**: the domain. It must be verified as yours in
   [Google Search Console](https://search.google.com/search-console): add it as a **Domain** property, and Search
@@ -108,7 +122,7 @@ In Google Cloud console, **Google Auth Platform → Branding**:
 What reviewers check on the site, and where it is:
 
 - The homepage says what the app does and links to the privacy policy (the footer, and the privacy section).
-- The homepage isn't just a sign-in page, and the app's name matches the consent screen: **Egghead Notes**.
+- The homepage isn't just a sign-in page, and the app's name matches the consent screen: **Syft Notes**.
 - The privacy policy says what Google data is used and why, where it's stored, that it's not shared, how to revoke
   it, and includes the **Limited Use** statement in the exact words Google asks for (`privacy/#google`).
 
@@ -118,7 +132,7 @@ What reviewers check on the site, and where it is:
   **Terms of service URL** and **Privacy statement URL**, the addresses above. The home page's domain should be the
   publisher domain.
 - **Publisher domain**: verify the domain (**Branding & properties → Publisher domain → Verify**). Entra gives a
-  JSON file to publish at `https://<domain>/.well-known/microsoft-identity-association.json`. Put it at
+  JSON file to publish at `https://syftnotes.com/.well-known/microsoft-identity-association.json`. Put it at
   `site/.well-known/microsoft-identity-association.json`; Firebase Hosting publishes dot-folders (`firebase.json`
   ignores only the check and this README) and serves the file as it is. (Adding a DNS `TXT` record instead also works for a verified domain in
   the tenant.)

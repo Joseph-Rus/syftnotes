@@ -80,7 +80,7 @@ public sealed class ChromeRunner : IDisposable
     }
 
     /// <summary>
-    /// Evaluate <paramref name="expression"/> (JavaScript; a promise is awaited) in the Egghead Notes extension: in its
+    /// Evaluate <paramref name="expression"/> (JavaScript; a promise is awaited) in the Syft Notes extension: in its
     /// service worker, or with <paramref name="page"/> (e.g. "popup.html") in that page opened as a tab. Returns the
     /// result as JSON text ("null" when the extension isn't running yet). Other extensions Chrome runs itself are
     /// told apart by the manifest's name.
@@ -94,7 +94,7 @@ public sealed class ChromeRunner : IDisposable
         foreach (var worker in workers)
         {
             string url = (string)worker!["url"]!, ws = (string)worker["webSocketDebuggerUrl"]!;
-            if (await RunAsync(ws, "chrome.runtime.getManifest().name") != "\"Egghead Notes for Canvas\"") continue;
+            if (await RunAsync(ws, "chrome.runtime.getManifest().name") != "\"Syft Notes for Canvas\"") continue;
             if (page is null) return await RunAsync(ws, expression);
             string at = url[..^"background.js".Length] + page;
             using var opened = new HttpRequestMessage(HttpMethod.Put, devtools + "/json/new?" + at);

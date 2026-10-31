@@ -4,7 +4,7 @@
 //   swift macos/fullscreen-app.swift
 import AppKit
 
-final class Delegate: NSObject, NSApplicationDelegate {
+final class Delegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     var window: NSWindow!
     func applicationDidFinishLaunching(_ note: Notification) {
         window = NSWindow(contentRect: NSRect(x: 200, y: 200, width: 800, height: 500),
@@ -12,9 +12,17 @@ final class Delegate: NSObject, NSApplicationDelegate {
         window.title = "Full-screen stand-in"
         window.backgroundColor = NSColor(calibratedRed: 0.15, green: 0.35, blue: 0.6, alpha: 1)
         window.collectionBehavior = [.fullScreenPrimary]
+        window.delegate = self
         window.makeKeyAndOrderFront(nil)
         NSApp.activate(ignoringOtherApps: true)
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { self.window.toggleFullScreen(nil) }
+        // On the next turn of the run loop, once the window is on screen; no timer.
+        DispatchQueue.main.async { self.window.toggleFullScreen(nil) }
+    }
+
+    // The self-test reads this line from our standard output: the animation into its Space is over.
+    func windowDidEnterFullScreen(_ notification: Notification) {
+        print("fullscreen")
+        fflush(stdout)
     }
 }
 

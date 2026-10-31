@@ -5,7 +5,7 @@ using StudyStash.App.ViewModels;
 
 namespace StudyStash.App.Tests;
 
-/// <summary>Egghead Notes' notifications as the computer's own: what's handed to the system, what a click on one does,
+/// <summary>Syft Notes' notifications as the computer's own: what's handed to the system, what a click on one does,
 /// and what happens where the system won't show them. The system here is a stand-in: the real one (a Mac's
 /// Notification Center) only answers a signed app in an Applications folder.</summary>
 public class SystemNoticesTests
@@ -80,7 +80,7 @@ public class SystemNoticesTests
 
         // One with no button only says something: a click on it does nothing more than bring the app forward.
         int ran = 0;
-        var saved = new Notice { Title = "Recording saved", Text = "Egghead Notes is writing it down.", Act = () => ran++ };
+        var saved = new Notice { Title = "Recording saved", Text = "Syft Notes is writing it down.", Act = () => ran++ };
         rig.Notices.Show(saved);
         Assert.Empty(rig.System.Shown[^1].Buttons);
         rig.System.Respond(SystemNotices.IdOf(saved), NotificationResponse.Clicked);
@@ -144,7 +144,7 @@ public class SystemNoticesTests
         Assert.Empty(refused.System.Shown);
         Assert.Equal([notice], refused.Own);
 
-        // Turned off for Egghead Notes in the system's settings: what only tells isn't shown, as the student asked. A
+        // Turned off for Syft Notes in the system's settings: what only tells isn't shown, as the student asked. A
         // lecture that stopped recording still is, as the app's own card: that can't wait for them to look.
         var declined = new Rig(NotificationState.Denied);
         declined.Notices.Show(notice);

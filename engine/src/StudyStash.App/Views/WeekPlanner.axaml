@@ -1,6 +1,6 @@
 <!-- A week as a planner (both looks): what's late in a column of its own (only when something is), then Monday to
      Sunday, today lifted out of the grid. Each day has its class meetings (the time, the class by its short name beside
-     its swatch, "Recorded" with a red dot where a lecture was) over a hairline, then what's due, the name in its
+     its swatch, "Recorded" with a red cell where a lecture was) over a hairline, then what's due, the name in its
      class's highlighter with when under it. Where there's too little room for eight columns it keeps its width and
      scrolls sideways. -->
 <UserControl xmlns="https://github.com/avaloniaui"
@@ -30,7 +30,7 @@
                     <TextBlock Grid.Column="1" Classes="day-num" Text="{Binding Number}" />
                   </Grid>
                   <!-- Class meetings: the time, then the class by its short name beside its swatch; one that was
-                       recorded says so, with a red dot -->
+                       recorded says so, with a red cell -->
                   <ItemsControl ItemsSource="{Binding Meetings}" IsVisible="{Binding HasMeetings}">
                     <ItemsControl.ItemsPanel>
                       <ItemsPanelTemplate><StackPanel Spacing="8" /></ItemsPanelTemplate>
@@ -40,7 +40,7 @@
                         <StackPanel>
                           <StackPanel Orientation="Horizontal">
                             <TextBlock Classes="micro" Text="{Binding Time}" />
-                            <Ellipse Width="6" Height="6" Fill="{DynamicResource Record}" Margin="9,0,5,0" VerticalAlignment="Center" IsVisible="{Binding Recorded}" />
+                            <c:SyftCell Width="6" Height="6" Fill="{DynamicResource Record}" Margin="9,0,5,0" VerticalAlignment="Center" IsVisible="{Binding Recorded}" />
                             <TextBlock Classes="micro" Text="Recorded" IsVisible="{Binding Recorded}" />
                           </StackPanel>
                           <Grid ColumnDefinitions="Auto,6,*">

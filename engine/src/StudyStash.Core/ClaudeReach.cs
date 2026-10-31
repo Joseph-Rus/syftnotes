@@ -251,7 +251,7 @@ public sealed class ReachCheck
             .OfType<IPAddress>()];
     }
 
-    /// <summary>Whether Egghead Notes answers at <paramref name="publicUrl"/> from the internet, in words. Never more than
+    /// <summary>Whether Syft Notes answers at <paramref name="publicUrl"/> from the internet, in words. Never more than
     /// <see cref="Wait"/>.</summary>
     public async Task<(bool Reachable, string Words)> RunAsync(string publicUrl, CancellationToken ct = default)
     {
@@ -259,7 +259,7 @@ public sealed class ReachCheck
         if (!Uri.TryCreate(root, UriKind.Absolute, out var url) || url.Scheme != Uri.UriSchemeHttps)
             return (false, "Couldn't check from here: the address isn't https.");
         string host = url.IdnHost;
-        string notUs = $"{host} answers, but not with Egghead Notes. Is Funnel pointing at another app?";
+        string notUs = $"{host} answers, but not with Syft Notes. Is Funnel pointing at another app?";
         using var cts = CancellationTokenSource.CreateLinkedTokenSource(ct);
         cts.CancelAfter(Wait);
         try

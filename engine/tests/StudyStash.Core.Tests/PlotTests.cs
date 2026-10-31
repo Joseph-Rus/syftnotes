@@ -64,9 +64,9 @@ public class PlotTests
     [Fact]
     public void Any_order_of_lines_reads_and_comments_are_kept_for_the_moment_they_mark()
     {
-        var plot = Plot.Parse("%% Egghead Notes diagram, from 12:34\nplot\npoint (2, f(2)) \"here\"\nf(x) = x^2\nparam a = 1 from 0 to 2\ny = a x");
+        var plot = Plot.Parse("%% Syft Notes diagram, from 12:34\nplot\npoint (2, f(2)) \"here\"\nf(x) = x^2\nparam a = 1 from 0 to 2\ny = a x");
         Assert.Equal(12 * 60 + 34, DiagramMoment.From(plot.ToSource()));
-        Assert.StartsWith("%% Egghead Notes diagram, from 12:34\nparam a = 1 from 0 to 2\npoint (2, f(2)) \"here\"", plot.ToSource());
+        Assert.StartsWith("%% Syft Notes diagram, from 12:34\nparam a = 1 from 0 to 2\npoint (2, f(2)) \"here\"", plot.ToSource());
         var state = new PlotState(plot);
         Assert.Equal(4, state.Eval(plot.Items.OfType<PlotPoint>().Single().Y));
     }

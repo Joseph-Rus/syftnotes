@@ -30,7 +30,7 @@ public class ExtensionFolderTests
     {
         using var user = new TempDir();
         string other = Extension.Folder(user[".granola-share"], user.Path, mac: true);
-        string library = Extension.Folder(Path.Combine(user.Path, "Library", "Application Support", "Egghead Notes"), user.Path, mac: true);
+        string library = Extension.Folder(Path.Combine(user.Path, "Library", "Application Support", "Syft Notes"), user.Path, mac: true);
         Assert.Matches(@"Chrome extension \([0-9a-f]{8}\)$", other);
         Assert.Matches(@"Chrome extension \([0-9a-f]{8}\)$", library);
         Assert.NotEqual(other, library);

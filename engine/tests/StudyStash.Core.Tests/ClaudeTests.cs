@@ -366,7 +366,7 @@ public class ClaudeTests
             var result = await mcp.CallToolAsync("search_notes", new Dictionary<string, object?> { ["query"] = "osmosis" });
             Assert.Contains("Membranes and osmosis", ((TextContentBlock)result.Content[0]).Text);
             Assert.Equal(["quiz_me", "study_guide"], (await mcp.ListPromptsAsync()).Select(p => p.Name).Order());
-            Assert.Contains("Egghead Notes", mcp.ServerInstructions);
+            Assert.Contains("Syft Notes", mcp.ServerInstructions);
         }
 
         // Refresh gives a new pair and retires the old access token (the old refresh token has a minute's grace:
@@ -618,7 +618,7 @@ public class ClaudeTests
         await using var mcp = await Connect(site, token);
         var refused = await mcp.CallToolAsync("get_lecture", new Dictionary<string, object?> { ["lecture_id"] = "rec-1" });
         Assert.Equal(true, refused.IsError);
-        Assert.Equal("Egghead Notes' settings don't let AI tools read study notes right now (Settings → AI apps → Study notes).", ((TextContentBlock)refused.Content[0]).Text);
+        Assert.Equal("Syft Notes' settings don't let AI tools read study notes right now (Settings → AI apps → Study notes).", ((TextContentBlock)refused.Content[0]).Text);
 
         var ok = await mcp.CallToolAsync("search_notes", new Dictionary<string, object?> { ["query"] = "osmosis" });
         Assert.True(ok.IsError is null or false);

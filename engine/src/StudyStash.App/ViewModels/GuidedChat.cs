@@ -5,7 +5,7 @@ using StudyStash.Core.Setup;
 
 namespace StudyStash.App.ViewModels;
 
-/// <summary>One thing in guided setup's chat: the AI's words, the student's, a quiet note from Egghead Notes, or a
+/// <summary>One thing in guided setup's chat: the AI's words, the student's, a quiet note from Syft Notes, or a
 /// card the student acts in.</summary>
 public abstract class ChatEntry : ObservableObject;
 
@@ -31,7 +31,7 @@ public sealed partial class StudentEntry(string text) : ChatEntry
     [ObservableProperty] public partial bool Queued { get; set; }
 }
 
-/// <summary>A quiet line from Egghead Notes: "Microphone allowed · Egghead Notes hears you". <see cref="Good"/> shows a
+/// <summary>A quiet line from Syft Notes: "Microphone allowed · Syft Notes hears you". <see cref="Good"/> shows a
 /// check, else a warning.</summary>
 public sealed class NoteEntry(string text, bool good) : ChatEntry
 {
@@ -102,13 +102,13 @@ public sealed partial class CardEntry : ChatEntry
         "computer_setup" => "Where should your lectures be kept?",
         "library_password" => "Name your library and give it a password",
         "library_connection" => "Connect to your library",
-        "microphone_check" => "Let Egghead Notes hear your lectures",
+        "microphone_check" => "Let Syft Notes hear your lectures",
         "model_download" => ModelTitle,
-        "chrome_helper" => $"Add Egghead Notes' helper to {Canvas?.BrowserName ?? "your browser"}",
+        "chrome_helper" => $"Add Syft Notes' helper to {Canvas?.BrowserName ?? "your browser"}",
         "course_picker" => "Pick your courses",
         "ai_app" => $"Let {Arg} read your lectures?",
-        "start_at_login" => "Open Egghead Notes when you log in?",
-        "taskbar_tip" => "Keep Egghead Notes on the taskbar",
+        "start_at_login" => "Open Syft Notes when you log in?",
+        "taskbar_tip" => "Keep Syft Notes on the taskbar",
         _ => "You're set up",
     };
     public string FoldedLine => Outcome.Length > 0 ? Outcome : Title;
@@ -116,10 +116,10 @@ public sealed partial class CardEntry : ChatEntry
     public string PasswordNote => $"Your laptop asks for this password once, to connect. It stays on your computers; {owner.Brand} never sees it.";
     public string StartAtLoginBody => Setup.IsLibrary
         ? "Your library then starts by itself, so your laptop can always reach it and notes get written."
-        : "Recommended: Egghead Notes then starts by itself, so your notes get written and Record is always one click away.";
+        : "Recommended: Syft Notes then starts by itself, so your notes get written and Record is always one click away.";
     /// <summary>The AI app card: <see cref="Arg"/> is the app, or both ("ChatGPT and Claude").</summary>
     public string AiAppBody => $"Then you can ask {Arg} about your classes, and it answers from your own lectures and notes. It can only read them: nothing is changed or deleted.";
-    public string TaskbarBody => "Windows tucks new icons away under ^. Select ^ in the taskbar corner, then drag the Egghead Notes icon down beside the clock.";
+    public string TaskbarBody => "Windows tucks new icons away under ^. Select ^ in the taskbar corner, then drag the Syft Notes icon down beside the clock.";
     /// <summary>The browser helper card's Canvas connection (made when the AI offered it).</summary>
     public CanvasConnectModel? Canvas => Setup.Canvas;
     public bool HasOutcome => Outcome.Length > 0;

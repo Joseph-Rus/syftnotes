@@ -32,6 +32,7 @@ public static unsafe class MacStatusItem
     [DllImport(ObjC, EntryPoint = "objc_msgSend")] static extern IntPtr SendDouble(IntPtr r, IntPtr sel, double a);
     [DllImport(ObjC, EntryPoint = "objc_msgSend")] static extern IntPtr SendDoubleDouble(IntPtr r, IntPtr sel, double a, double b);
     [DllImport(ObjC, EntryPoint = "objc_msgSend")] static extern void SendSize(IntPtr r, IntPtr sel, CGSize a);
+    [DllImport(ObjC, EntryPoint = "objc_msgSend")] static extern IntPtr SendInitSize(IntPtr r, IntPtr sel, CGSize a);
     [DllImport(ObjC, EntryPoint = "objc_msgSend")] static extern bool SendPopUp(IntPtr r, IntPtr sel, IntPtr item, CGPoint at, IntPtr view);
     [DllImport(ObjC, EntryPoint = "objc_msgSend")] static extern IntPtr SendData(IntPtr r, IntPtr sel, byte* bytes, nuint len);
     [DllImport(ObjC, EntryPoint = "objc_msgSend", CharSet = CharSet.Ansi)]
@@ -102,10 +103,10 @@ public static unsafe class MacStatusItem
         // A library-only computer doesn't record: no Record in its menu.
         if (record is not null) MenuItem("Record", 0);
         MenuItem("Search notes and lectures", 1);
-        MenuItem("Open Egghead Notes", 2);
+        MenuItem("Open Syft Notes", 2);
         MenuItem("Settings…", 3);
         SendVoidId(menu, sel_registerName("addItem:"), Send(objc_getClass("NSMenuItem"), sel_registerName("separatorItem")));
-        MenuItem("Quit Egghead Notes", 4);
+        MenuItem("Quit Syft Notes", 4);
     }
 
     /// <summary>The name the menu bar files the icon's place under: where the student ⌘-drags it (or
@@ -184,20 +185,36 @@ public static unsafe class MacStatusItem
         SendVoidLong(item, sel_registerName("setTag:"), tag);
     }
 
-    /// <summary>The icon at 18×18 pt: the egghead as a template image (the menu bar tints it), or — while recording, when
-    /// its red dot must stay red — an ordinary one drawn in the menu bar's own ink (see <see cref="DarkMenuBar"/>).</summary>
+    /// <summary>The icon at 18×18 pt: the pixel s as a template image (the menu bar tints it), or — while recording,
+    /// when its red cell must stay red — an ordinary one drawn in the menu bar's own ink (see <see cref="DarkMenuBar"/>).
+    /// <paramref name="png"/> is the 2× picture (36 px); the image also carries the s drawn again for a 1× screen (18 px,
+    /// <see cref="TrayMark.OneX"/>), so neither screen scales its cells to a blur.</summary>
     public static void SetIcon(byte[] png, bool template = true)
     {
         if (button == IntPtr.Zero) return;
-        fixed (byte* p = png)
+        var size = new CGSize { Width = 18, Height = 18 };
+        IntPtr image = SendInitSize(Send(objc_getClass("NSImage"), sel_registerName("alloc")), sel_registerName("initWithSize:"), size);
+        if (image == IntPtr.Zero) return;
+        int reps = 0;
+        foreach (var picture in new[] { png, TrayMark.OneX(png) })
         {
-            IntPtr data = SendData(objc_getClass("NSData"), sel_registerName("dataWithBytes:length:"), p, (nuint)png.Length);
-            IntPtr image = SendId(Send(objc_getClass("NSImage"), sel_registerName("alloc")), sel_registerName("initWithData:"), data);
-            if (image == IntPtr.Zero) return;
+            if (picture is null) continue;
+            fixed (byte* p = picture)
+            {
+                IntPtr data = SendData(objc_getClass("NSData"), sel_registerName("dataWithBytes:length:"), p, (nuint)picture.Length);
+                IntPtr rep = SendId(objc_getClass("NSBitmapImageRep"), sel_registerName("imageRepWithData:"), data);
+                if (rep == IntPtr.Zero) continue;
+                SendSize(rep, sel_registerName("setSize:"), size);
+                SendVoidId(image, sel_registerName("addRepresentation:"), rep);
+                reps++;
+            }
+        }
+        if (reps > 0)
+        {
             SendVoidBool(image, sel_registerName("setTemplate:"), template);
-            SendSize(image, sel_registerName("setSize:"), new CGSize { Width = 18, Height = 18 });
             SendVoidId(button, sel_registerName("setImage:"), image);
         }
+        Send(image, sel_registerName("release")); // the button keeps its own hold on it
     }
 
     static string shownTitle = "";

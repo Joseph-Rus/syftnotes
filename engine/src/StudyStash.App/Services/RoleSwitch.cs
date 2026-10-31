@@ -150,7 +150,7 @@ public static class RoleSwitch
             said.Add(r.Missed == 1 ? $"1 file couldn't come: it isn't on {who} any more."
                 : $"{r.Missed.ToString(CultureInfo.InvariantCulture)} files couldn't come: they aren't on {who} any more.");
         if (r.Partial)
-            said.Add($"{Capital(who)} runs an older Egghead Notes, so its attached files, other notes and chats can't come yet: update it, then press Try again.");
+            said.Add($"{Capital(who)} runs an older Syft Notes, so its attached files, other notes and chats can't come yet: update it, then press Try again.");
         if (r.Filed > 0 || r.Skipped > 0 || also.Length > 0) said.Add("It keeps its own copy.");
         return string.Join(" ", said);
     }
@@ -201,7 +201,7 @@ public static class RoleSwitch
         using var to = http(url);
         var result = await LibraryMove.CopyAsync(from, cc.PoolKey, to, password.Trim(), progress, ct);
         if (result.Partial)
-            throw new InvalidOperationException(SentWords(result) + $" That library runs an older Egghead Notes, so attached files, other notes and chats can't go yet: update it, then press Switch again. This {Device} stays your library until then.");
+            throw new InvalidOperationException(SentWords(result) + $" That library runs an older Syft Notes, so attached files, other notes and chats can't go yet: update it, then press Switch again. This {Device} stays your library until then.");
         return SentWords(result);
     }
 

@@ -209,7 +209,7 @@ public class WindowsCommandTests
     static readonly string[] Tricky =
     [
         "plain", "two words", "line one\nline two", "50% of %PATH% and %USERPROFILE%", "A & B | C > D < E ^ F",
-        "say \"hi\" (twice) !bang!", "trailing backslash\\", @"C:\Program Files (x86)\Egghead Notes\", "",
+        "say \"hi\" (twice) !bang!", "trailing backslash\\", @"C:\Program Files (x86)\Syft Notes\", "",
         "café — ✓ CO₂ α", "semi;colon,comma=equals", "tab\there", "R&D \"lab\" 100%",
     ];
 

@@ -403,7 +403,7 @@ public class LibrarySettingsApiTests
         await using (var alone = await Site(cfg, store))
         {
             string why = await Refused(await alone.Client.SendAsync(Req(HttpMethod.Post, "/api/v2/settings", new { start_at_login = true })), HttpStatusCode.Conflict);
-            Assert.Contains("without the Egghead Notes app", why);
+            Assert.Contains("without the Syft Notes app", why);
         }
     }
 
@@ -469,5 +469,11 @@ public class LibrarySettingsApiTests
         Assert.False(Configs.Load(cfg.Home).SummaryEnabled);
         var wrong = new RemoteLibrary("http://localhost", "nope", new HttpClient(site.App.GetTestServer().CreateHandler()));
         Assert.Equal(401, (await Assert.ThrowsAsync<LibraryRefusedException>(() => wrong.SettingsAsync(HttpMethod.Get))).Status);
+        // A first AI chosen on a lecture's page: every lecture filed without notes is queued for them.
+        store.Enqueue(new Meeting("lec-1") { Title = "Recursion", Date = "2026-10-14T09:00:00", Transcript = "So recursion is a function calling itself." });
+        store.Finish(store.ClaimNext()!, store.Meeting(store.Get("lec-1")!), new Classification("Unsorted", 0, "none", "Recursion", []), "", "", "");
+        var queued = await lib.SettingsAsync(HttpMethod.Post, "/write-missing");
+        Assert.Equal(1, queued!["queued"]!.GetValue<int>());
+        Assert.Equal(Store.Queued, store.Get("lec-1")!.Status);
     }
 }

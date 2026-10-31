@@ -73,8 +73,9 @@
     <Style Selector="Button.crumb-link:pointerover TextBlock">
       <Setter Property="TextDecorations" Value="Underline" />
     </Style>
-    <!-- The recording's dot breathes while it records (not while paused, and not for someone who asked for less motion). -->
-    <Style Selector="Ellipse.pulse">
+    <!-- The recording's dot, one of the s's cells, breathes while it records (not while paused, and not for someone who
+         asked for less motion). -->
+    <Style Selector="c|SyftCell.pulse">
       <Style.Animations>
         <Animation Duration="0:0:1.6" IterationCount="INFINITE">
           <KeyFrame Cue="0%"><Setter Property="Opacity" Value="1" /></KeyFrame>
@@ -104,20 +105,15 @@
                   AutomationProperties.LiveSetting="Polite">
             <Grid ColumnDefinitions="Auto,10,Auto,10,Auto,12,Auto,*,Auto,8,Auto">
               <StackPanel Orientation="Horizontal" Spacing="12">
-                <!-- The egghead listening, in his light drawing on a white tile (the app icon's) on a dark page too: the
-                     dark drawing's grey egg and pale lines read as a skull at this size, and his dark headphones
-                     vanish into a dark page without the tile. -->
-                <ThemeVariantScope RequestedThemeVariant="Light" VerticalAlignment="Center">
-                  <Border Width="38" Height="38" CornerRadius="19" Background="#FFFFFF" BoxShadow="{DynamicResource LineRing}">
-                    <c:Doodle Art="listening" Size="30" Busy="{Binding Recorder.IsRunning, FallbackValue=False}" HorizontalAlignment="Center" VerticalAlignment="Center" />
-                  </Border>
-                </ThemeVariantScope>
-                <Ellipse Width="10" Height="10" Fill="{DynamicResource Record}" Classes.pulse="{Binding Pulses}" VerticalAlignment="Center" />
+                <!-- Listening: the Path Trace loader on its own dark tile, its trail running while it records and the
+                     whole s lit while it's paused. -->
+                <c:SyftLoader Kind="PathTrace" Size="38" IsActive="{Binding Recorder.IsRunning, FallbackValue=False}" VerticalAlignment="Center" AutomationProperties.AccessibilityView="Raw" />
+                <c:SyftCell Width="10" Height="10" Fill="{DynamicResource Record}" Classes.pulse="{Binding Pulses}" VerticalAlignment="Center" />
               </StackPanel>
               <TextBlock Grid.Column="2" Text="{Binding RecordingWord}" FontSize="15" FontWeight="SemiBold" VerticalAlignment="Center" />
               <TextBlock Grid.Column="4" Classes="num" Text="{Binding Recorder.Elapsed, FallbackValue=''}" FontSize="15" FontWeight="Medium" Foreground="{DynamicResource InkMuted}"
                          VerticalAlignment="Center" />
-              <c:Waveform Grid.Column="6" Bars="3" Height="14" MinBar="4" Levels="{Binding Recorder.Levels, FallbackValue={x:Null}}" Foreground="{DynamicResource Record}"
+              <c:Waveform Grid.Column="6" Bars="5" Height="16" Lively="True" Levels="{Binding Recorder.Levels, FallbackValue={x:Null}}" Foreground="{DynamicResource Record}"
                           VerticalAlignment="Center" IsVisible="{Binding Recorder.IsRunning, FallbackValue=False}" />
               <Button Name="Pause" Grid.Column="8" Classes="btn sm" Command="{Binding Recorder.PauseCommand, FallbackValue={x:Null}}" AutomationProperties.Name="{Binding PauseWord}">
                 <StackPanel Orientation="Horizontal" Spacing="6">
@@ -138,11 +134,11 @@
           <!-- Planned for a calendar event: when it starts, and Start now -->
           <Border Name="PlanBar" Classes="recbar" IsVisible="{Binding Planned}" Margin="0,2,0,26">
             <Grid ColumnDefinitions="Auto,14,*,14,Auto">
-              <Ellipse Width="12" Height="12" Stroke="{DynamicResource Record}" StrokeThickness="2" VerticalAlignment="Center" />
+              <c:SyftCell Width="12" Height="12" Stroke="{DynamicResource Record}" StrokeThickness="2" VerticalAlignment="Center" />
               <TextBlock Grid.Column="2" Text="{Binding PlanWords}" FontSize="15" FontWeight="SemiBold" VerticalAlignment="Center" TextWrapping="Wrap" />
               <Button Name="StartNow" Grid.Column="4" Classes="btn sm ink" Command="{Binding StartNowCommand}" AutomationProperties.Name="Start recording now">
                 <StackPanel Orientation="Horizontal" Spacing="8">
-                  <Ellipse Width="10" Height="10" Fill="{DynamicResource Record}" VerticalAlignment="Center" />
+                  <c:SyftCell Width="10" Height="10" Fill="{DynamicResource Record}" VerticalAlignment="Center" />
                   <TextBlock Text="Start now" VerticalAlignment="Center" />
                 </StackPanel>
               </Button>
@@ -231,17 +227,75 @@
             </StackPanel>
             <StackPanel IsVisible="{Binding Saved}" Spacing="14">
               <Grid ColumnDefinitions="Auto,*" IsVisible="{Binding HasPending}">
-                <c:Doodle Art="writing" Busy="{Binding Writing}" Size="64" IsVisible="{Binding Writing}" Margin="0,0,18,0" VerticalAlignment="Center" />
+                <c:SyftLoader Kind="PathTrace" Size="56" IsActive="{Binding Writing}" IsVisible="{Binding Writing}" Margin="0,0,18,0" VerticalAlignment="Center" />
                 <c:PageText Grid.Column="1" Name="Pending" IsVisible="{Binding HasPending}" Text="{Binding Pending}" FontSize="14.5" LineHeight="22" Foreground="{DynamicResource InkMuted}" TextWrapping="Wrap"
                             VerticalAlignment="Center" />
               </Grid>
               <!-- A rewrite the library couldn't do: why, over the notes it left as they were -->
               <c:PageText Name="NotRewritten" IsVisible="{Binding WasNotRewritten}" Text="{Binding NotRewritten}" FontSize="14.5" LineHeight="22" Foreground="{DynamicResource InkMuted}" TextWrapping="Wrap" />
-              <!-- Notes from an AI Egghead Notes doesn't run: over a lecture with none, that the Claude app (or any free
+              <!-- Notes from an AI Syft Notes doesn't run: over a lecture with none, that the Claude app (or any free
                    chat) can write them, with Copy for your AI and Paste notes; a long lecture's copy a part at a time;
                    and the box a chat's notes are pasted into (from here, or the notes' ⋯ menu). -->
               <StackPanel Name="FreeAi" Spacing="12" DataContext="{Binding $parent[UserControl].((vm:LibraryModel)DataContext).FreeAi}" x:DataType="vm:FreeAiModel"
                           IsVisible="{Binding $parent[UserControl].((vm:LibraryModel)DataContext).FreeAi, Converter={x:Static ObjectConverters.IsNotNull}}">
+                <!-- No AI writes notes yet: which, asked once, here. Continue with Google (free with a personal Google
+                     account) first, Claude and ChatGPT for a paid plan, and copy and paste as the quiet other free way. -->
+                <Border Name="GetNotes" Classes="free-ai" IsVisible="{Binding ShowChoose}">
+                  <StackPanel Spacing="8">
+                    <TextBlock Name="GetNotesTitle" Classes="free-ai-lead" Text="{Binding ChooseTitle}" />
+                    <TextBlock Classes="free-ai-more" Text="{x:Static vm:FreeAiModel.ChooseText}" />
+                    <Button Name="ContinueWithGoogle" Classes="btn ink" HorizontalAlignment="Left" Margin="0,8,0,0" Command="{Binding ContinueWithGoogleCommand}"
+                            Content="{x:Static vm:FreeAiModel.GoogleButton}" AutomationProperties.Name="{x:Static vm:FreeAiModel.GoogleButton}" />
+                    <TextBlock Classes="free-ai-more" FontSize="12.5" Text="{x:Static vm:FreeAiModel.GoogleLine}" />
+                    <WrapPanel Margin="0,8,0,0" ItemSpacing="8" LineSpacing="8">
+                      <Button Name="UseClaude" Classes="btn sm" Command="{Binding UseClaudeCommand}" AutomationProperties.Name="Claude">
+                        <StackPanel Orientation="Horizontal" Spacing="8">
+                          <c:Icon Glyph="brand:claude" Size="15" VerticalAlignment="Center" />
+                          <TextBlock Text="Claude" VerticalAlignment="Center" />
+                        </StackPanel>
+                      </Button>
+                      <Button Name="UseChatGpt" Classes="btn sm" Command="{Binding UseChatGptCommand}" AutomationProperties.Name="ChatGPT">
+                        <StackPanel Orientation="Horizontal" Spacing="8">
+                          <c:Icon Glyph="brand:chatgpt" Size="15" VerticalAlignment="Center" />
+                          <TextBlock Text="ChatGPT" VerticalAlignment="Center" />
+                        </StackPanel>
+                      </Button>
+                    </WrapPanel>
+                    <TextBlock Classes="free-ai-more" FontSize="12.5" Text="{x:Static vm:FreeAiModel.PaidLine}" />
+                    <Button Name="OtherFreeWay" Classes="text-link small" HorizontalAlignment="Left" Margin="0,4,0,0" Command="{Binding ToggleCopyWayCommand}"
+                            Content="{Binding OtherWayLabel}" />
+                  </StackPanel>
+                </Border>
+                <!-- What stops the AIs being offered as they are: Google turned the account down (a school or work one),
+                     or the AI is over its usage limit (its notes come by themselves once it's back). Copy and paste opens. -->
+                <Border Name="NotesFallback" Classes="free-ai" IsVisible="{Binding ShowFallback}">
+                  <StackPanel Spacing="8">
+                    <TextBlock Name="FallbackTitle" Classes="free-ai-lead" Text="{Binding FallbackTitle}" />
+                    <TextBlock Name="FallbackText" Classes="free-ai-more" Text="{Binding FallbackText}" />
+                    <Button Name="GoogleAgain" Classes="btn sm ink" HorizontalAlignment="Left" Margin="0,6,0,0" Command="{Binding ContinueWithGoogleCommand}"
+                            Content="{x:Static vm:FreeAiModel.GoogleButton}" IsVisible="{Binding ShowGoogleAgain}" />
+                  </StackPanel>
+                </Border>
+                <!-- The other free way: copy this lecture for any free chat, and paste back what it writes. -->
+                <Border Name="CopyWay" Classes="free-ai" IsVisible="{Binding ShowCopyWay}">
+                  <StackPanel Spacing="8">
+                    <TextBlock Classes="free-ai-more" Text="{x:Static vm:FreeAiModel.CopyWayText}" />
+                    <WrapPanel Margin="0,4,0,0">
+                      <Button Name="CopyWayCopy" Classes="btn sm" Margin="0,0,8,8" Command="{Binding CopyForAiCommand}" AutomationProperties.Name="Copy for your AI">
+                        <StackPanel Orientation="Horizontal" Spacing="8">
+                          <c:Icon Glyph="content_copy" Size="15" VerticalAlignment="Center" />
+                          <TextBlock Text="Copy for your AI" VerticalAlignment="Center" />
+                        </StackPanel>
+                      </Button>
+                      <Button Name="CopyWayPaste" Classes="btn sm" Margin="0,0,8,8" Command="{Binding PasteCommand}" AutomationProperties.Name="Paste notes">
+                        <StackPanel Orientation="Horizontal" Spacing="8">
+                          <c:Icon Glyph="content_paste" Size="15" VerticalAlignment="Center" />
+                          <TextBlock Text="Paste notes" VerticalAlignment="Center" />
+                        </StackPanel>
+                      </Button>
+                    </WrapPanel>
+                  </StackPanel>
+                </Border>
                 <Border Name="FreeAiOffer" Classes="free-ai" IsVisible="{Binding ShowOffer}">
                   <StackPanel Spacing="8">
                     <c:PageText Name="OfferLine" Classes="free-ai-lead" Text="{Binding OfferLine}" />
@@ -355,7 +409,7 @@
               <Button Classes="tab" Classes.on="{Binding ShowTranscript}" Content="{Binding TranscriptTab}" Command="{Binding TranscriptsCommand}" Click="OnPinnedTab" />
             </StackPanel>
             <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center" Margin="0,0,0,6" IsVisible="{Binding Live}">
-              <Ellipse Width="8" Height="8" Fill="{DynamicResource Record}" VerticalAlignment="Center" />
+              <c:SyftCell Width="8" Height="8" Fill="{DynamicResource Record}" VerticalAlignment="Center" />
               <TextBlock Text="{Binding Recorder.Elapsed, FallbackValue=''}" FontSize="13" FontWeight="Medium" Foreground="{DynamicResource InkMuted}" VerticalAlignment="Center" />
             </StackPanel>
           </Grid>
