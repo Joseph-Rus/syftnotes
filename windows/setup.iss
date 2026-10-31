@@ -27,6 +27,10 @@ DefaultDirName={localappdata}\Programs\Study Stash
 DisableDirPage=yes
 DisableProgramGroupPage=yes
 DisableReadyPage=yes
+; One double-click, no questions (the way Slack, Discord and Zoom install): no welcome page, no finished page with a
+; checkbox. Setup shows its progress bar, then [Run] below opens the app.
+DisableWelcomePage=yes
+DisableFinishedPage=yes
 PrivilegesRequired=lowest
 ArchitecturesAllowed=x64compatible
 OutputBaseFilename=Syft-Notes-Setup
@@ -47,9 +51,6 @@ SignTool=studystash
 SignedUninstaller=yes
 #endif
 
-[Tasks]
-Name: "desktopicon"; Description: "Add a desktop icon"; Flags: unchecked
-
 [Files]
 Source: "{#Source}\win-arm64\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs; Check: IsArm64
 Source: "{#Source}\win-x64\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs; Check: not IsArm64
@@ -67,8 +68,9 @@ Type: files; Name: "{userprograms}\Egghead Notes.lnk"
 Type: files; Name: "{userdesktop}\Egghead Notes.lnk"
 
 [Icons]
+; Start menu only, no desktop icon and no question about one (Windows 11's own habit, and what Slack and Notion do);
+; a desktop icon an earlier install made stays where it is.
 Name: "{userprograms}\Syft Notes"; Filename: "{app}\StudyStash.exe"; Comment: "Open Syft Notes"
-Name: "{userdesktop}\Syft Notes"; Filename: "{app}\StudyStash.exe"; Tasks: desktopicon
 
 [Registry]
 ; What the app tells Windows about itself the first time it has something to say, so its notifications are Windows'
@@ -77,7 +79,9 @@ Root: HKCU; Subkey: "Software\Classes\AppUserModelId\StudyStash.App"; Flags: don
 Root: HKCU; Subkey: "Software\Classes\studystash"; Flags: dontcreatekey uninsdeletekey
 
 [Run]
-Filename: "{app}\StudyStash.exe"; Description: "Open Syft Notes"; Flags: nowait postinstall skipifsilent
+; opens by itself when a person ran Setup (no postinstall flag: no checkbox, no finished page); a silent run (the
+; updater's, CI's) never opens it here, the entry below does that when asked
+Filename: "{app}\StudyStash.exe"; Description: "Open Syft Notes"; Flags: nowait skipifsilent
 ; a silent update (/relaunch=1) reopens the app once the new files are in place
 Filename: "{app}\StudyStash.exe"; Parameters: "--background"; Flags: nowait; Check: Relaunch
 

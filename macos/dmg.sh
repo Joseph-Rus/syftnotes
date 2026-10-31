@@ -41,6 +41,10 @@ stage_dmg() {
   mkdir -p "$stage" "$mnt"
   ditto "$app_path" "$stage/Study Stash.app"
   ln -s /Applications "$stage/Applications"
+  # How the disk opens (tools/dmg/make_ds_store.py): one small window, the app on the left and the Applications
+  # folder on the right, so the one thing to do is to drag the left one onto the right one. A saved Finder layout
+  # (a .DS_Store), so no Finder scripting runs while the DMG is built.
+  cp "$HERE/dmg-layout.DS_Store" "$stage/.DS_Store" || true
   cp "$app_path/Contents/Resources/AppIcon.icns" "$stage/.VolumeIcon.icns"
   SetFile -c icnC "$stage/.VolumeIcon.icns" 2>/dev/null || true
   hdi create -volname "$volname" -srcfolder "$stage" -ov -format UDRW "$rw"
