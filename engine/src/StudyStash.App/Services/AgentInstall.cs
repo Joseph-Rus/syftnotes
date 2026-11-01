@@ -107,6 +107,9 @@ public sealed class AgentInstall
         foreach (string a in installer.Args) psi.ArgumentList.Add(a);
         psi.Environment["PATH"] = AiProvider.SearchPath();
         psi.Environment.Remove("CLAUDECODE");
+        // Windows PowerShell finds its own modules: Syft Notes started from PowerShell 7 hands it PowerShell 7's module
+        // path, where its own Get-FileHash isn't (Claude Code's installer stopped on that on CI's Windows runner).
+        if (OperatingSystem.IsWindows()) psi.Environment.Remove("PSModulePath");
         foreach (var (k, v) in installer.Env) psi.Environment[k] = v;
 
         Process? p;

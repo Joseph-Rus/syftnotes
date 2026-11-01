@@ -44,7 +44,11 @@ public sealed class AgentSignIn : IDisposable
     public TimeSpan QuickFail { get; init; } = TimeSpan.FromSeconds(20);
     /// <summary>Hands the sign-in page to the system's browser opener: the one place its address goes. A test (and CI,
     /// with the real CLIs) gives one that opens nothing.</summary>
-    public Func<string, bool> OpenPage { get; init; } = SystemBrowser;
+    public Func<string, bool> OpenPage { get; init; } = page => Browser(page);
+
+    /// <summary>The system's browser opener every sign-in starts with: the tests make it one that opens nothing, so no
+    /// test can open a browser on the computer it runs on.</summary>
+    internal static Func<string, bool> Browser { get; set; } = SystemBrowser;
     /// <summary>Each line the sign-in showed, plain: for CI's record of the real CLIs, which takes the addresses out
     /// before keeping anything. Nothing in the app listens.</summary>
     internal Action<string>? Shown { get; init; }
@@ -95,6 +99,9 @@ public sealed class AgentSignIn : IDisposable
         var env = HiddenTerminal.Environment([
             new("PATH", AiProvider.SearchPath()),
             new("CLAUDECODE", null), // started from inside Claude Code, claude would refuse to nest
+            // Windows PowerShell, which a sign-in may run to open the browser, finds its own modules (PowerShell 7's
+            // module path, handed down when Syft Notes was started from it, leaves it without Start-Process).
+            .. OperatingSystem.IsWindows() ? [new KeyValuePair<string, string?>("PSModulePath", null)] : Array.Empty<KeyValuePair<string, string?>>(),
             .. cli.Env().Select(e => new KeyValuePair<string, string?>(e.Key, e.Value)),
         ]);
         var s = new SignInScreen();
