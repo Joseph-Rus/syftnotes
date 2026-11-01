@@ -58,10 +58,26 @@ public sealed class AiProblemsModel
     readonly SignInWatch watch;
     string shown = "";
 
+    /// <summary>Opens a page in the browser (Get help); null in tests.</summary>
+    public Action<string>? OpenUrl { get; set; }
+
     public AiProblemsModel(IAiLibrary library)
     {
         this.library = library;
         watch = new SignInWatch(library, SignInMovedAsync);
+    }
+
+    /// <summary>Said whenever these cards learn the AIs' state from the library (a sign-in's progress among it), so the
+    /// rows on the same page show it too; <see cref="Adopt"/> is the other direction.</summary>
+    public event Action<AiOverview>? Heard;
+
+    /// <summary>Takes the state the AI rows learned, so a sign-in started from a row shows on its card at once.</summary>
+    public void Adopt(AiOverview overview)
+    {
+        if (SignInWatch.Signature(overview) == shown) return;
+        shown = SignInWatch.Signature(overview);
+        Apply(overview.Problems);
+        watch.Begin(overview);
     }
 
     /// <summary>How often a sign-in that's going is looked at; a test sets it small.</summary>
@@ -70,6 +86,10 @@ public sealed class AiProblemsModel
         get => watch.Every;
         set => watch.Every = value;
     }
+
+    /// <summary>Whether the library is on this computer (one computer does everything): its cards say "this computer"
+    /// rather than "your library".</summary>
+    public bool Here { get; init; }
 
     public ObservableCollection<AiProblem> Problems { get; } = [];
 
@@ -80,6 +100,7 @@ public sealed class AiProblemsModel
         if (SignInWatch.Signature(now) == shown) return Task.CompletedTask;
         shown = SignInWatch.Signature(now);
         Apply(now.Problems);
+        Heard?.Invoke(now);
         return Task.CompletedTask;
     }
 
@@ -98,6 +119,7 @@ public sealed class AiProblemsModel
         shown = SignInWatch.Signature(overview);
         Apply(overview.Problems);
         watch.Begin(overview);
+        Heard?.Invoke(overview);
     }
 
     void Apply(List<AiProblemInfo> infos)
@@ -118,11 +140,11 @@ public sealed class AiProblemsModel
             Id = p.Id,
             Kind = p.Kind,
             Caption = AiWords.ProblemCaption(p.Kind),
-            Title = signIn.Length > 0 ? AiWords.SignInTitle(p.EngineName, signIn) : AiWords.ProblemTitle(p.Kind, p.EngineName, fallbackName),
+            Title = signIn.Length > 0 ? AiWords.SignInTitle(p.EngineName, signIn) : AiWords.ProblemTitle(p.Kind, p.EngineName, fallbackName, Here),
             // A sign-in with no stand-in says so, rather than naming Ollama, which isn't used.
             Message = signIn.Length > 0 ? AiWords.SignInAbout(p.EngineName, signIn)
                 : AiWords.ProblemMessage(p.Kind, p.EngineName, p.Kind == "not_signed_in" && p.FallbackTo.Length == 0 ? "" : fallbackName,
-                    p.Until, p.SizeGb, ""),
+                    p.Until, p.SizeGb, "", Here),
             Icon = AiWords.ProblemIcon(p.Kind),
             ColorKey = AiWords.ProblemColorKey(p.Kind),
             Severity = AiWords.ProblemSeverity(p.Kind),
@@ -136,13 +158,18 @@ public sealed class AiProblemsModel
         return problem;
     }
 
-    /// <summary>The small link on a sign-in that's going: the page again, or (only once the hidden sign-in couldn't start
-    /// or stopped at once) the terminal.</summary>
+    /// <summary>The small link on a sign-in: the page again while it waits, or Syft Notes' help page once it couldn't
+    /// start.</summary>
     async Task ActOnLink(AiProblemInfo p, string signIn)
     {
+        if (signIn == SignInPhase.Stuck)
+        {
+            OpenUrl?.Invoke(AiWords.HelpPage);
+            return;
+        }
         try
         {
-            var said = signIn == SignInPhase.Stuck ? await library.SignInInTerminalAsync(p.Engine) : await library.SignInAgainAsync(p.Engine);
+            var said = await library.SignInAgainAsync(p.Engine);
             if (said?.Overview is not null) Take(said.Overview);
         }
         catch
@@ -157,6 +184,7 @@ public sealed class AiProblemsModel
         shown = SignInWatch.Signature(overview);
         Apply(overview.Problems);
         watch.Begin(overview);
+        Heard?.Invoke(overview);
     }
 
     async Task Act(AiProblemInfo p)
@@ -239,7 +267,7 @@ public sealed class AiProblemsModel
     public void AddLibraryOffline(Func<Task> retry, string id = "library-offline") => AddLocal(new AiProblem
     {
         Id = id, Kind = "library_offline", Caption = AiWords.ProblemCaption("library_offline"),
-        Title = AiWords.ProblemTitle("library_offline", "", ""), Message = AiWords.ProblemMessage("library_offline", "", "", "", 0, ""),
+        Title = AiWords.ProblemTitle("library_offline", "", ""), Message = AiWords.ProblemMessage("library_offline", "", "", "", 0, "", Here),
         Icon = AiWords.ProblemIcon("library_offline"), ColorKey = AiWords.ProblemColorKey("library_offline"), Severity = AiWords.ProblemSeverity("library_offline"),
         PrimaryWords = AiWords.ProblemAction("library_offline"),
     }.Also(p => p.PrimaryCommand = new AsyncRelayCommand(retry)));

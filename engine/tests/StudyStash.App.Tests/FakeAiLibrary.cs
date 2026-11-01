@@ -23,7 +23,6 @@ public sealed class FakeAiLibrary : IAiLibrary
     public Func<string, AiSaid?>? OnSignIn { get; set; }
     /// <summary>"Open the page again", and the terminal as a last resort (a library from before them says null).</summary>
     public Func<string, AiSaid?>? OnSignInAgain { get; set; }
-    public Func<string, AiSaid?>? OnSignInTerminal { get; set; }
     public Func<string, string, AiSaid?>? OnCheck { get; set; }
     /// <summary>(engine, key): what the library says to a key. Without it, a key works at once.</summary>
     public Func<string, string, AiSaid?>? OnKey { get; set; }
@@ -133,12 +132,6 @@ public sealed class FakeAiLibrary : IAiLibrary
     {
         Calls.Add($"sign-in-again:{engine}");
         return Task.FromResult(OnSignInAgain?.Invoke(engine));
-    }
-
-    public Task<AiSaid?> SignInInTerminalAsync(string engine)
-    {
-        Calls.Add($"sign-in-terminal:{engine}");
-        return Task.FromResult(OnSignInTerminal?.Invoke(engine));
     }
 
     public Task<AiSaid?> CheckAsync(string engine, string model = "")

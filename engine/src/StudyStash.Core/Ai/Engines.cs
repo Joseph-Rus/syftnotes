@@ -194,6 +194,10 @@ public static class Engines
     public static string NotesNeedSignIn(string name) =>
         $"{NotesBecause}{name}{SignInAgain} Sign in from Settings → Your AI, and they're written then.";
 
+    /// <summary>Why a lecture has no notes yet when no AI is chosen to write them: its reason on every page, until a first
+    /// AI is chosen (<see cref="Store.RequeueNoAi"/> then writes them).</summary>
+    public const string NotesNeedAnAi = "Your notes aren't written yet because no AI writes them. Choose one in Settings → Your AI, and they're written then.";
+
     const string WaitBecause = "Your notes aren't written yet because ";
     const string WaitThen = " They're written by themselves once it's back.";
 
@@ -294,7 +298,7 @@ public static class Engines
     /// </summary>
     public static string? KnownUnusableWhy(string id, AiSettings settings, EngineChecks checks)
     {
-        if (id == "ollama") return null;
+        if (id is "ollama" or "") return null;
         var (state, _) = CliState(id, settings, checks);
         return state switch
         {
@@ -389,7 +393,9 @@ public static class Engines
         var problems = new List<AiProblemInfo>();
         bool Dismissed(string id) => settings.Dismissed.Contains(id);
         var ollama = engines[0];
-        bool ollamaMatters = settings.For("notes").Provider == "ollama" || settings.For("ask").Provider == "ollama" || settings.Fallback;
+        // Nobody chosen yet (a fresh library): an Ollama that isn't running is no problem to report.
+        bool ollamaMatters = (settings.Picked("notes") || settings.Picked("ask"))
+            && (settings.For("notes").Provider == "ollama" || settings.For("ask").Provider == "ollama" || settings.Fallback);
         if (ollamaMatters && ollama.State == "not_running" && !Dismissed("engine_offline:ollama"))
             problems.Add(new AiProblemInfo("engine_offline:ollama", "engine_offline", "ollama", ollama.Name));
         if (ollamaMatters && ollama.State == "model_missing" && !Dismissed("model_missing:ollama"))
@@ -398,7 +404,7 @@ public static class Engines
         foreach (string job in new[] { "notes", "ask" })
         {
             string id = settings.For(job).Provider;
-            if (id == "ollama") continue;
+            if (id is "ollama" or "") continue;
             string pid = $"not_signed_in:{id}";
             if (Dismissed(pid) || problems.Any(p => p.Id == pid)) continue;
             var row = engines.First(e => e.Id == id);
@@ -417,11 +423,11 @@ public static class Engines
         // Who draws the diagrams now: nobody when they're off, the designer the pick comes to, else the notes engine
         // itself (as it writes), the one the notes really go to once a fallback is counted.
         string notesNow = settings.For("notes").Provider;
-        if (notesNow != "ollama" && settings.Fallback && KnownUnusableWhy(notesNow, settings, checks) is not null) notesNow = "ollama";
+        if (notesNow.Length > 0 && notesNow != "ollama" && settings.Fallback && KnownUnusableWhy(notesNow, settings, checks) is not null) notesNow = "ollama";
         string diagrams = DiagramEngines.Normal(settings.Diagrams);
-        string by = settings.Kinds() == RichKinds.None ? ""
+        string by = settings.Kinds() == RichKinds.None || !settings.NotesChosen ? ""
             : (await DiagramEngines.PickAsync(settings, cfg, checks, notesNow))?.Engine ?? notesNow;
-        return new AiOverview(engines, settings.For("notes").Provider, settings.For("ask").Provider, settings.Fallback, problems)
+        return new AiOverview(engines, settings.For("notes").Provider, settings.Picked("ask") ? settings.For("ask").Provider : "", settings.Fallback, problems)
         {
             Diagrams = diagrams, DiagramsBy = by,
             Rich = new RichNotesInfo(settings.RichNotes && diagrams != DiagramEngines.Off, settings.RichDiagrams, settings.RichPlots, settings.RichDrawings),

@@ -37,6 +37,8 @@
 
   <ItemGroup>
     <InternalsVisibleTo Include="StudyStash.Core.Tests" />
+    <!-- CI's check of the real AI sign-ins (RealCliSignInTests) reads what AgentSignIn's hidden terminal showed. -->
+    <InternalsVisibleTo Include="StudyStash.App.Tests" />
   </ItemGroup>
 
 </Project>

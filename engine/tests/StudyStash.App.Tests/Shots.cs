@@ -586,13 +586,12 @@ public class SurfaceShots
             foreach (var t in Themes)
                 Shot.Take($"{look}-05-setup-library-password-existing", skin, t, () => skin == SkinKind.Mac ? new MacSetup { DataContext = again, DrawChrome = true } : new WinSetup { DataContext = again, DrawChrome = true },
                     size: new Size(888, 708));
-            // Just this computer's notes step with an engine's setup steps open: Claude Code not installed yet, and
-            // Codex installed but not signed in.
+            // Just this computer's notes step with an AI not ready: Claude Code not installed yet, and Codex installed
+            // but not signed in (one button each, nothing to type).
             foreach (var (engine, state) in new[] { ("claude", "not_installed"), ("codex", "not_signed_in") })
             {
                 var help = await SetupPage(skin, AppRole.Both, SetupStep.Ai);
                 help.Ai = AiDemo.SetupWith(skin == SkinKind.Win, engine, state);
-                help.Ai.Engines.Single(r => r.Id == engine).ToggleHelpCommand.Execute(null);
                 foreach (var t in Themes)
                     Shot.Take($"{look}-05-setup-one-computer-ai-{engine}-help", skin, t, () => skin == SkinKind.Mac ? new MacSetup { DataContext = help, DrawChrome = true } : new WinSetup { DataContext = help, DrawChrome = true },
                         size: new Size(1100, 1048));

@@ -24,8 +24,8 @@ public enum GuidedScreen
 /// <summary>The setup tools' door for this window: its address, its token, and a way to start counting a new turn.</summary>
 public sealed record SetupDoor(string Url, string Token, Action NewTurn);
 
-/// <summary>Where guided setup reaches beyond itself: finding, installing and signing in to a CLI, the plan check,
-/// running a chat turn, opening pages and a terminal. The app's own by default; tests give fakes.</summary>
+/// <summary>Where guided setup reaches beyond itself: finding, installing and signing in to a CLI (in a terminal nobody
+/// sees), the plan check, running a chat turn, opening pages. The app's own by default; tests give fakes.</summary>
 public sealed class GuidedServices
 {
     public required string Home { get; init; }
@@ -36,8 +36,6 @@ public sealed class GuidedServices
     public Func<string, string, Version?, CancellationToken, Task<PlanCheck>>? CheckPlan { get; init; }
     public Func<SetupTurn, CancellationToken, IAsyncEnumerable<SetupChatEvent>> Turn { get; init; } = SetupChat.RunAsync;
     public Action<string> OpenUrl { get; init; } = url => Dialogs.OpenUrl(url);
-    /// <summary>Runs a command in a terminal window for the student (the sign-in, when it needs one).</summary>
-    public Action<string, IReadOnlyList<string>>? OpenTerminal { get; init; }
     /// <summary>How far the model's download has got, while it downloads.</summary>
     public Func<double?> Downloading { get; init; } = () => null;
     public Func<DateTime> Now { get; init; } = () => DateTime.Now;
@@ -134,7 +132,8 @@ public sealed partial class GuidedSetupModel : ObservableObject, IDisposable
 
     // Sign in
     [ObservableProperty] public partial bool WaitingSignIn { get; set; }
-    [ObservableProperty] public partial bool OfferTerminal { get; set; }
+    /// <summary>Syft Notes couldn't start the AI's sign-in (or it stopped at once): the problem offers Get help too.</summary>
+    [ObservableProperty] public partial bool SignInStuck { get; set; }
     [ObservableProperty] public partial bool SignedIn { get; set; }
     [ObservableProperty] public partial bool CheckingPlan { get; set; }
     /// <summary>Asking the CLI whether it's signed in (Gemini's agy takes a second or two): no sign-in button meanwhile,
@@ -497,8 +496,10 @@ public sealed partial class GuidedSetupModel : ObservableObject, IDisposable
     [RelayCommand]
     void OpenPlans(string id) => services.OpenUrl(AgentCli.Get(id.Length > 0 ? id : Picked).PlansUrl);
 
+    /// <summary>An install that stopped for no reason Syft Notes knows: its help page (never the maker's install docs,
+    /// which say to paste a line into a terminal).</summary>
     [RelayCommand]
-    void OpenDocs() => services.OpenUrl((Windows ? Cli.WindowsInstaller : Cli.MacInstaller).DocUrl);
+    void OpenDocs() => services.OpenUrl(AiWords.HelpPage);
 
     /// <summary>"No subscription?": today's setup by hand, with the free model on this computer picked for notes.</summary>
     [RelayCommand]
@@ -704,7 +705,7 @@ public sealed partial class GuidedSetupModel : ObservableObject, IDisposable
         SignedIn = false;
         AiReady = false;
         WaitingSignIn = false;
-        OfferTerminal = false;
+        SignInStuck = false;
         CheckingPlan = false;
         SignInProblem = null;
         PlanProblem = ChatProblem.None;
@@ -764,44 +765,35 @@ public sealed partial class GuidedSetupModel : ObservableObject, IDisposable
         PlanProblem = ChatProblem.None;
         signIn ??= services.SignIn(Cli, exe);
         var s = signIn;
-        if (!s.Start()) OfferTerminal = true;
+        SignInStuck = false;
+        s.Start();
         WaitingSignIn = true;
         var cts = Fresh();
-        bool done = await s.WaitAsync(cts.Token, _ => services.Post(() => OfferTerminal |= s.NeedsTerminal));
+        bool done = await s.WaitAsync(cts.Token);
         WaitingSignIn = false;
         // Its sign-in waits a while for the browser, then stops by itself (Gemini's, after a minute); or its maker
-        // turned the country away.
+        // turned the country away; or it couldn't start at all. There's no terminal to try instead: Try again, or Get help.
         if (!done && s.Region && !cts.IsCancellationRequested) SignInProblem = RegionWords;
+        else if (!done && s.Stuck && !cts.IsCancellationRequested)
+        {
+            SignInStuck = true;
+            SignInProblem = AiWords.SignInStuckWords(Brand);
+        }
         else if (!done && s.GaveUp && !cts.IsCancellationRequested) SignInProblem = "The sign-in stopped waiting before you'd finished. Try again.";
         if (!done) return;
         SignedIn = true;
         await CheckPlanAsync();
     }
 
-    /// <summary>"Didn't open? Open it again": Codex's printed page finishes signing in by itself, so that page opens
-    /// again; Claude Code's ends on a code to paste (there's no field for it here), so its sign-in runs once more and
-    /// opens the page that finishes by itself.</summary>
+    /// <summary>"Didn't open? Open it again": a page that finishes signing in by itself (Codex's) opens again; Claude
+    /// Code's ends on a code to paste (there's no field for it here), so its sign-in runs once more and opens the page
+    /// that finishes by itself. The page's address never leaves the sign-in (<see cref="AgentSignIn.OpenAgain"/>).</summary>
     [RelayCommand]
-    void OpenAgain()
-    {
-        if (Cli.Id == "codex" && signIn?.Url is { } url) services.OpenUrl(url);
-        else signIn?.Restart();
-    }
+    void OpenAgain() => signIn?.OpenAgain();
 
-    /// <summary>"Sign in in Terminal instead": the same sign-in in a terminal window; the checks carry on.</summary>
+    /// <summary>"Get help": Syft Notes' own help page, for a sign-in it couldn't start.</summary>
     [RelayCommand]
-    void SignInInTerminal()
-    {
-        signIn?.Stop();
-        if (Found.Exe is not { } exe) return;
-        // Gemini's sign-in runs in Syft Notes' own home for agy, in the terminal as well.
-        if (Cli.Id == "gemini")
-        {
-            var (program, args) = Antigravity.InTerminal(exe, Windows);
-            services.OpenTerminal?.Invoke(program, args);
-        }
-        else services.OpenTerminal?.Invoke(exe, Cli.SignInArgs);
-    }
+    void GetHelp() => services.OpenUrl(AiWords.HelpPage);
 
     [RelayCommand]
     Task CheckAgain() => CheckPlanAsync();

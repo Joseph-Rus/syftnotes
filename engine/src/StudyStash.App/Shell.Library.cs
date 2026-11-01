@@ -310,7 +310,7 @@ public static partial class Shell
         string error = S(l["error"]);
         ShowFreeAi(note, has: notes.Length > 0 && !mine, offer: !writing && notes.Length == 0 && heard && S(l["no_notes"]) != Summarize.NoNotesShort,
             // No AI writes notes yet: the card asks which. Over its usage limit: it says until when.
-            choose: S(l["no_notes"]) == Summarize.NoNotesOff, limitedBy: notes.Length == 0 ? Core.Ai.Engines.WaitsForLimit(error) : null,
+            choose: FreeAiModel.AsksWhichAi(S(l["no_notes"]), error), limitedBy: notes.Length == 0 ? Core.Ai.Engines.WaitsForLimit(error) : null,
             limitedUntil: Core.Ai.Engines.LimitUntil(error));
         // Notes to read that nothing is writing now (with none written, what the student typed) can be edited and rewritten.
         ShowLectureAi(l, note, written: !writing && (notes.Length > 0 || (mine && S(l["error"]).Length == 0)));
@@ -343,7 +343,12 @@ public static partial class Shell
         free.HasNotes = has;
         free.Offer = offer && !has;
         free.Choose = choose;
-        free.OnGetReady = engine => GetNotesWith(engine, note.Id);
+        // Ollama is set up in Settings → Your AI (its download is big, and it's for the comfortable with it).
+        free.OnGetReady = engine =>
+        {
+            if (engine == "ollama") ShowSettings("AI");
+            else GetNotesWith(engine, note.Id);
+        };
         // Over its usage limit says so (and until when); a school account Google turned down stays said until the page
         // is left.
         if (limitedBy is not null)

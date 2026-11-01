@@ -71,13 +71,19 @@ public static partial class SelfTest
         return new PixelRect(left, top, screen.Bounds.Right - left, screen.Bounds.Bottom - top);
     }
 
-    /// <summary>The cards checked once they've settled, and again after each settle while they're wrong, up to three
-    /// looks: on Linux a window manager can hand a card an older move after the windows went still, and the shelf then
-    /// puts it back, so only cards still wrong at the third look are reported FAILED.</summary>
+    /// <summary>The cards checked once they've settled, and again after each short settle while they're wrong, for up to
+    /// 20 seconds: on Linux a window manager can hand a card an older move after the windows went still, or make the
+    /// shelf's move late (three quick looks weren't always enough on CI's x64 runner), and the shelf then puts it back, so
+    /// only cards still wrong at the end are reported FAILED.</summary>
     static async Task CheckNotificationsAsync(ToastShelf shelf, string what, IReadOnlyList<PixelRect> keepClear)
     {
-        for (int look = 1; !CheckNotifications(shelf, what, keepClear, last: look == 3); look++)
-            await Settle();
+        var until = DateTime.UtcNow.AddSeconds(20);
+        while (true)
+        {
+            bool last = DateTime.UtcNow >= until;
+            if (CheckNotifications(shelf, what, keepClear, last) || last) return;
+            await Settle(1);
+        }
     }
 
     /// <summary>Where each card is, said; and FAILED for any off its display, under the menu bar or taskbar, over another

@@ -141,6 +141,7 @@ public static partial class SelfTest
         };
         Directory.CreateDirectory(cfg.PoolDir);
         Configs.Save(cfg);
+        new StudyStash.Core.Ai.AiSettings { Provider = "ollama" }.Save(libHome); // a fresh library has no AI chosen: this one picked the stand-in engine
         Library = new LibraryService(libHome, cfg);
         await Library.StartAsync();
         if (Library.State is not (LibraryServiceState.Running or LibraryServiceState.Elsewhere))
@@ -437,6 +438,7 @@ public static partial class SelfTest
         cfg.OllamaEnabled = true;
         cfg.Classes = [new ClassDef("CS 101")];
         Configs.Save(cfg);
+        new StudyStash.Core.Ai.AiSettings { Provider = "ollama" }.Save(cfg.Home); // picking the stand-in engine, as the lecture page's card would
         await lib.StopAsync();
         await lib.StartAsync();
         Say($"library restarted on the self-test's notes engine: {lib.State}");

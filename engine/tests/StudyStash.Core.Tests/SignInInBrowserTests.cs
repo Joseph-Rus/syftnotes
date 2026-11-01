@@ -59,15 +59,18 @@ public class SignInInBrowserTests
 
         public async Task<EngineInfo> RowAsync(string id) => (await Remote.EnginesAsync())!.Engines.Single(e => e.Id == id);
 
-        /// <summary>Waits on the real condition (the library's own look at the sign-in), never for a fixed time.</summary>
+        /// <summary>Waits on the real condition (the library's own look at the sign-in), never for a fixed time; a wait
+        /// that ends unmet says where the sign-in was.</summary>
         public async Task<EngineInfo> UntilAsync(string id, Func<EngineInfo, bool> condition)
         {
-            using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+            var until = DateTime.UtcNow.AddSeconds(30);
             while (true)
             {
                 var row = await RowAsync(id);
                 if (condition(row)) return row;
-                await Task.Delay(50, cts.Token);
+                if (DateTime.UtcNow > until)
+                    throw new TimeoutException($"{id}'s row stayed {row.State}, sign-in \"{row.SignIn}\", {FakeAgents.Logins(Bin)} sign-in(s) started");
+                await Task.Delay(50);
             }
         }
 
@@ -127,22 +130,21 @@ public class SignInInBrowserTests
     }
 
     [Fact]
-    public async Task A_sign_in_that_stops_at_once_offers_the_terminal_as_the_last_resort_and_only_then()
+    public async Task A_sign_in_that_stops_at_once_is_stuck_with_no_terminal_and_Try_again_starts_it_afresh()
     {
         await using var rig = await Rig.StartAsync(["claude"], bin => File.WriteAllText(Path.Combine(bin, "login-fails"), ""));
 
         await rig.Remote.SignInAsync("claude");
         var stuck = await rig.UntilAsync("claude", e => e.SignIn == SignInPhase.Stuck);
         Assert.Equal("not_signed_in", stuck.State);
-        Assert.Equal(0, rig.Fake.SignInCalls); // offered, not opened
 
-        var said = await rig.Remote.SignInInTerminalAsync("claude");
-
-        Assert.Equal(1, rig.Fake.SignInCalls);
-        Assert.Contains("fake terminal", said!.Said);
-        // Signing in there is noticed too: the row goes ready by itself.
-        File.WriteAllText(Path.Combine(rig.Bin, "signed-in"), "");
-        await rig.UntilAsync("claude", e => e.State == "ready");
+        // Try again: another hidden sign-in, which waits this time. No terminal at any point.
+        File.Delete(Path.Combine(rig.Bin, "login-fails"));
+        File.WriteAllText(Path.Combine(rig.Bin, "login-delay"), "120");
+        await rig.Remote.SignInAsync("claude");
+        await rig.UntilAsync("claude", e => e.SignIn == SignInPhase.Waiting && FakeAgents.Logins(rig.Bin) == 2);
+        Assert.Equal(SignInPhase.Waiting, (await rig.RowAsync("claude")).SignIn);
+        Assert.Equal(0, rig.Fake.SignInCalls);
     }
 
     [Fact]
@@ -179,6 +181,21 @@ public class SignInInBrowserTests
         // Pressed again, it's a new sign-in that waits.
         signIns.Start("claude");
         Assert.Equal(SignInPhase.Waiting, signIns.State("claude"));
+    }
+
+    [Fact]
+    public void An_AI_just_installed_and_never_tried_reads_as_signing_in_while_its_sign_in_waits()
+    {
+        using var dir = new TempDir();
+        var fake = new FakeChecks().InstalledAt("claude", FakeAgents.WriteCli(dir["bin"], "claude"));
+        File.WriteAllText(dir["bin/login-delay"], "120");
+        using var signIns = new AiSignIns(fake.Build(), _ => { });
+        var fresh = new AiOverview([new EngineInfo("claude", "Claude", "unchecked") { Installed = true }], "claude", "claude", false, []);
+        Assert.Equal("unchecked", signIns.Annotate(fresh).Engines.Single().State);
+
+        signIns.Start("claude");
+        var row = signIns.Annotate(fresh).Engines.Single();
+        Assert.Equal(("not_signed_in", SignInPhase.Waiting), (row.State, row.SignIn));
     }
 
     [Fact]

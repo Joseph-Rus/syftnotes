@@ -108,7 +108,9 @@ public class AiEnginesTests
         var checks = new FakeChecks().Ollama();
         var idle = new AiSettings { Provider = "claude", Fallback = false };
         Assert.Empty((await Engines.StatusAsync(idle, cfg, checks.Build())).Problems);
-        var used = new AiSettings(); // the default for everything, and the fallback
+        // Nobody chosen yet (a fresh library): an Ollama that isn't running is nobody's problem.
+        Assert.Empty((await Engines.StatusAsync(new AiSettings(), cfg, checks.Build())).Problems);
+        var used = new AiSettings { Provider = "ollama" }; // the pick for everything, and the fallback
         var overview = await Engines.StatusAsync(used, cfg, checks.Build());
         var problem = Assert.Single(overview.Problems);
         Assert.Equal(("engine_offline", "ollama"), (problem.Kind, problem.Engine));
@@ -118,7 +120,7 @@ public class AiEnginesTests
     public async Task A_missing_ollama_model_is_a_problem_too_naming_the_model()
     {
         var cfg = Cfg("/lib");
-        var overview = await Engines.StatusAsync(new AiSettings(), cfg, new FakeChecks().Ollama(models: [("llama3", 4.7)]).Build());
+        var overview = await Engines.StatusAsync(new AiSettings { Provider = "ollama" }, cfg, new FakeChecks().Ollama(models: [("llama3", 4.7)]).Build());
         var problem = Assert.Single(overview.Problems);
         Assert.Equal(("model_missing", "qwen3:8b"), (problem.Kind, problem.Model));
     }

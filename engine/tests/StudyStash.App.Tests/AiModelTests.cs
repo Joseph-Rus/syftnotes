@@ -15,7 +15,7 @@ public class AiWordsTests
     [InlineData("not_running", "Not running", "Start")]
     [InlineData("model_missing", "Needs its model", "Download")]
     [InlineData("limited", "Limit reached", "Options")]
-    [InlineData("not_installed", "Not installed", "Get it")]
+    [InlineData("not_installed", "Not installed", "Set up")]
     [InlineData("failed", "Didn't work", "Options")]
     public void Every_state_has_its_word_and_its_row_action(string state, string words, string action)
     {
@@ -127,7 +127,9 @@ public class AiEnginesModelTests
 
         await model.Load();
 
-        Assert.Equal(["Ollama (free, advanced)", "Claude", "ChatGPT"], model.Engines.Select(r => r.Name));
+        // A library on another computer: its installed AIs, Claude, ChatGPT, then Ollama, and the one not there yet in the
+        // Add menu (it's installed on that computer).
+        Assert.Equal(["Claude", "ChatGPT", "Ollama (free, advanced)"], model.Engines.Select(r => r.Name));
         Assert.Single(model.AddChoices);
         Assert.Equal("Gemini", model.AddChoices[0].Name);
         Assert.Equal("ollama", model.SelectedNotes);
@@ -142,6 +144,87 @@ public class AiEnginesModelTests
         Assert.True(codex.Warn);
         Assert.Equal("Sign in", codex.ActionWords);
         Assert.True(codex.IsPrimary);
+    }
+
+    [AvaloniaFact]
+    public async Task A_fresh_library_says_no_AI_writes_the_notes_yet_and_offers_the_choice_without_posting_anything()
+    {
+        var lib = new FakeAiLibrary { Overview = AiTestData.MixedOverview() with { Notes = "", Ask = "" } };
+        var model = new AiEnginesModel(lib);
+
+        await model.Load();
+
+        Assert.True(model.NoNotesAi);
+        Assert.Equal("", model.SelectedNotes);
+        Assert.Equal("No AI writes your notes yet. Choose one.", model.NotesRowAbout);
+        Assert.Equal("Choose an AI", model.SelectedNotesName);
+        Assert.Equal("Choose an AI", model.SelectedAskName);
+        Assert.Contains("Ollama (free, advanced)", model.NotesChoices.Select(c => c.Name)); // Ollama is one to pick, not the pick
+        Assert.DoesNotContain(model.NotesChoices, c => c.Current);
+        Assert.DoesNotContain("defaults", lib.Calls);
+
+        // Once one is picked, the row says where the notes are written again.
+        model.NotesChoices.First(c => c.Id == "claude").Pick!.Execute(null);
+        Assert.False(model.NoNotesAi);
+        Assert.Equal("After each lecture, on your library", model.NotesRowAbout);
+        Assert.Equal("Claude", model.SelectedNotesName);
+    }
+
+    [AvaloniaFact]
+    public async Task On_this_computer_every_AI_is_a_row_in_order_and_Set_up_installs_it_then_signs_in_hidden()
+    {
+        var lib = new FakeAiLibrary { Overview = AiTestData.MixedOverview() };
+        var go = new TaskCompletionSource();
+        var model = new AiEnginesModel(lib)
+        {
+            Here = true, SignInEvery = TimeSpan.FromHours(1),
+            Install = async (id, phase) =>
+            {
+                phase("Downloading Antigravity CLI…");
+                await go.Task;
+                lib.Overview = lib.Overview! with { Engines = [.. lib.Overview.Engines.Select(e => e.Id == id ? e with { State = "not_signed_in", Installed = true } : e)] };
+                return new InstallOutcome(true, InstallFailure.None, "Antigravity CLI 1.4.5 is installed.", AgentFound.None);
+            },
+        };
+        await model.Load();
+
+        // All four, always, in this order, and none in an Add menu.
+        Assert.Equal(["Claude", "ChatGPT", "Gemini", "Ollama (free, advanced)"], model.Engines.Select(r => r.Name));
+        Assert.Equal(["claude", "codex", "gemini", "ollama"], model.NotesChoices.Select(c => c.Id));
+        Assert.Empty(model.AddChoices);
+        var gemini = model.Engines.Single(r => r.Id == "gemini");
+        Assert.Equal(("Set up", "Free with a Google account. Set up gets it ready on this computer."), (gemini.ActionWords, gemini.About));
+
+        // Set up: the installer's words on the row, no button meanwhile, then its own sign-in, hidden.
+        var pressing = gemini.ActCommand.ExecuteAsync(null);
+        var setting = model.Engines.Single(r => r.Id == "gemini");
+        Assert.Equal(("Downloading Antigravity CLI…", "Setting up", false), (setting.About, setting.StateWords, setting.ShowPill));
+        go.SetResult();
+        await pressing;
+        Assert.Contains("sign-in:gemini", lib.Calls);
+        Assert.Equal("ready", model.Engines.Single(r => r.Id == "gemini").State);
+    }
+
+    [AvaloniaFact]
+    public async Task A_Set_up_that_couldnt_install_says_why_and_offers_Get_help_when_nothing_else_will_do()
+    {
+        var lib = new FakeAiLibrary { Overview = AiTestData.MixedOverview() };
+        var outcome = new InstallOutcome(false, InstallFailure.Offline, "Syft Notes couldn't reach antigravity.google. Check your internet connection, then try again.", AgentFound.None);
+        var pages = new List<string>();
+        var model = new AiEnginesModel(lib) { Here = true, OpenUrl = pages.Add, Install = (_, _) => Task.FromResult(outcome) };
+        await model.Load();
+
+        await model.Engines.Single(r => r.Id == "gemini").ActCommand.ExecuteAsync(null);
+        Assert.Equal(outcome.Words, model.Say);
+        Assert.Equal(("Set up", false), (model.Engines.Single(r => r.Id == "gemini").ActionWords, model.Engines.Single(r => r.Id == "gemini").HasLink));
+        Assert.DoesNotContain(lib.Calls, c => c.StartsWith("sign-in", StringComparison.Ordinal));
+
+        outcome = new InstallOutcome(false, InstallFailure.Other, "The installer stopped: Checksum verification failed.", AgentFound.None);
+        await model.Engines.Single(r => r.Id == "gemini").ActCommand.ExecuteAsync(null);
+        var row = model.Engines.Single(r => r.Id == "gemini");
+        Assert.Equal(("Set up", "Get help"), (row.ActionWords, row.LinkWords));
+        await row.LinkCommand.ExecuteAsync(null);
+        Assert.Equal([AiWords.HelpPage], pages);
     }
 
     [AvaloniaFact]
@@ -322,13 +405,13 @@ public class AiSetupModelTests
 
         await model.Load();
 
-        // Every AI is listed, Gemini too (it can run on an API key with nothing installed).
-        Assert.Equal(["ollama", "claude", "codex", "gemini"], model.Engines.Select(r => r.Id));
+        // Every AI is listed, in the order a student meets them everywhere: Claude, ChatGPT, Gemini, the free one.
+        Assert.Equal(["claude", "codex", "gemini", "ollama"], model.Engines.Select(r => r.Id));
         var ollama = model.Engines.Single(r => r.Id == "ollama");
         Assert.True(ollama.Advanced);
         Assert.True(ollama.Selected);
         var codex = model.Engines.Single(r => r.Id == "codex");
-        Assert.True(codex.HasHelp); // how to sign in, under the row
+        Assert.True(codex.ShowSignIn); // its own sign-in, hidden, from the row
         Assert.False(codex.CanWrite);
         Assert.Equal("With your paid ChatGPT plan, through Codex. Installed. Sign in to use it.", codex.About);
         // ask == notes on the library: the select starts on "Same as notes".
@@ -440,80 +523,36 @@ public class AiSetupModelTests
     }
 
     [AvaloniaFact]
-    public async Task Claude_Code_and_Codex_show_the_makers_commands_to_install_and_sign_in()
+    public async Task No_AI_on_the_step_is_ever_a_command_to_type_or_a_terminal_to_open()
     {
-        var lib = new FakeAiLibrary { Overview = With(("claude", "not_installed"), ("codex", "not_signed_in")) };
-        var mac = new AiSetupModel(lib) { Windows = false };
-        await mac.Load();
+        foreach (bool windows in new[] { false, true })
+        {
+            var lib = new FakeAiLibrary { Overview = With(("claude", "not_installed"), ("codex", "not_signed_in"), ("gemini", "not_installed")) };
+            var gotReady = new List<string>();
+            var buttons = new AiSetupModel(lib) { Windows = windows, TakesKeys = true, SetUpPaid = id => { gotReady.Add(id); return Task.CompletedTask; } };
+            await buttons.Load();
+            // Where setup's window gets them ready: one button each, Gemini's too (installed for the student).
+            Assert.Equal(("Set it up", "Sign in", "Set it up"), (buttons.Engines.Single(r => r.Id == "claude").OpenLabel,
+                buttons.Engines.Single(r => r.Id == "codex").OpenLabel, buttons.Engines.Single(r => r.Id == "gemini").OpenLabel));
+            Assert.All(buttons.Engines.Where(r => r.Id != "ollama"), r => Assert.True(r.ShowOneButton));
+            await buttons.Engines.Single(r => r.Id == "gemini").OpenCommand.ExecuteAsync(null);
+            Assert.Equal(["gemini"], gotReady);
 
-        // Every AI shows, ready or not.
-        Assert.Equal(["ollama", "claude", "codex", "gemini"], mac.Engines.Select(r => r.Id));
-        var claude = mac.Engines.Single(r => r.Id == "claude");
-        Assert.False(claude.CanWrite);
-        Assert.Equal("With your paid Claude plan, through Claude Code. Not on this Mac yet.", claude.About);
-        Assert.Equal(["curl -fsSL https://claude.ai/install.sh | bash", "claude"], claude.Help.Select(h => h.Command));
-        Assert.Equal([1, 2], claude.Help.Select(h => h.Number));
-        Assert.Contains("paste this into Terminal", claude.Help[0].Title, StringComparison.Ordinal);
-        Assert.Equal("Or with npm: npm install -g @anthropic-ai/claude-code", claude.Help[0].Note);
-        Assert.Contains("Pro or Max", claude.Help[1].Note, StringComparison.Ordinal);
-        Assert.Equal("Open Terminal", claude.OpenLabel);
-        var codex = mac.Engines.Single(r => r.Id == "codex");
-        Assert.Equal(["codex login"], codex.Help.Select(h => h.Command));
-        Assert.Contains("Sign in with ChatGPT", codex.Help[0].Title, StringComparison.Ordinal);
-        Assert.Equal("Sign in", codex.OpenLabel);
-
-        var win = new AiSetupModel(new FakeAiLibrary { Overview = With(("claude", "not_installed"), ("codex", "not_installed")) }) { Windows = true };
-        await win.Load();
-        Assert.Equal("irm https://claude.ai/install.ps1 | iex", win.Engines.Single(r => r.Id == "claude").Help[0].Command);
-        Assert.Equal("powershell -ExecutionPolicy ByPass -c \"irm https://chatgpt.com/codex/install.ps1 | iex\"", win.Engines.Single(r => r.Id == "codex").Help[0].Command);
-        Assert.Equal("Or with npm: npm install -g @openai/codex", win.Engines.Single(r => r.Id == "codex").Help[0].Note);
-        Assert.Equal("Open PowerShell", win.Engines.Single(r => r.Id == "claude").OpenLabel);
-        Assert.Contains("PowerShell", win.Engines.Single(r => r.Id == "claude").Help[0].Title, StringComparison.Ordinal);
-    }
-
-    [AvaloniaFact]
-    public async Task Copy_copies_the_command_and_the_first_button_opens_Terminal_or_signs_in_there()
-    {
-        var copied = new List<string>();
-        int terminals = 0;
-        var lib = new FakeAiLibrary { Overview = With(("claude", "not_installed"), ("codex", "not_signed_in")) };
-        var model = new AiSetupModel(lib) { Windows = false, Copy = copied.Add, OpenTerminal = () => terminals++ };
-        await model.Load();
-        var claude = model.Engines.Single(r => r.Id == "claude");
-
-        claude.Help[0].CopyCommand.Execute(null);
-        claude.Help[1].CopyCommand.Execute(null);
-        await claude.OpenCommand.ExecuteAsync(null);
-
-        Assert.Equal(["curl -fsSL https://claude.ai/install.sh | bash", "claude"], copied);
-        Assert.Equal(1, terminals);
-        Assert.DoesNotContain(lib.Calls, c => c.StartsWith("sign-in", StringComparison.Ordinal));
-
-        await model.Engines.Single(r => r.Id == "codex").OpenCommand.ExecuteAsync(null);
-        Assert.Contains("sign-in:codex", lib.Calls);
-        Assert.Equal(1, terminals);
-    }
-
-    [AvaloniaFact]
-    public async Task Picking_an_engine_that_cant_write_yet_shows_its_steps_one_at_a_time()
-    {
-        var model = new AiSetupModel(new FakeAiLibrary { Overview = With(("claude", "not_installed"), ("codex", "not_signed_in")) });
-        await model.Load();
-        var claude = model.Engines.Single(r => r.Id == "claude");
-
-        claude.SelectCommand.Execute(null);
-
-        Assert.Equal("ollama", model.SelectedNotes);
-        Assert.True(claude.ShowHelp);
-        Assert.Equal("Hide", claude.HelpLabel);
-        Assert.True(model.HelpOpen);
-
-        model.Engines.Single(r => r.Id == "codex").ToggleHelpCommand.Execute(null);
-        Assert.False(claude.ShowHelp);
-        Assert.True(model.Engines.Single(r => r.Id == "codex").ShowHelp);
-        model.Engines.Single(r => r.Id == "codex").ToggleHelpCommand.Execute(null);
-        Assert.False(model.HelpOpen);
-        Assert.False(model.Engines.Single(r => r.Id == "ollama").HasHelp);
+            // A host without those screens: Sign in where it's installed, an API key otherwise, and nothing to type.
+            var plain = new AiSetupModel(new FakeAiLibrary { Overview = lib.Overview }) { Windows = windows, TakesKeys = true };
+            await plain.Load();
+            Assert.False(plain.Engines.Single(r => r.Id == "claude").ShowOneButton);
+            Assert.True(plain.Engines.Single(r => r.Id == "claude").ShowKeyLink);
+            Assert.True(plain.Engines.Single(r => r.Id == "codex").ShowSignIn);
+            Assert.Equal("Add a key", plain.Engines.Single(r => r.Id == "gemini").OpenLabel);
+            foreach (var m in new[] { buttons, plain })
+                foreach (var r in m.Engines)
+                {
+                    r.SelectCommand.Execute(null);
+                    foreach (string words in new[] { r.Name, r.About, r.OpenLabel, m.Say ?? "", m.KeyAlternative })
+                        Assert.DoesNotMatch("Terminal|PowerShell|paste this|run this", words);
+                }
+        }
     }
 
     [AvaloniaFact]
@@ -523,13 +562,11 @@ public class AiSetupModelTests
         var model = new AiSetupModel(lib);
         await model.Load();
         var row = model.Engines.Single(r => r.Id == "claude");
-        row.ToggleHelpCommand.Execute(null);
 
         // Not installed yet: it says so, and asks nothing of the engine.
         await row.CheckAgainCommand.ExecuteAsync(null);
         Assert.DoesNotContain("check:claude", lib.Calls);
-        Assert.Contains("isn't installed yet", model.Say, StringComparison.Ordinal);
-        Assert.True(model.Engines.Single(r => r.Id == "claude").ShowHelp); // still showing the steps
+        Assert.Contains("isn't on this", model.Say, StringComparison.Ordinal);
 
         // Installed now (Claude keeps its sign-in in the Keychain, so it's "unchecked" until tried).
         lib.Overview = With(("claude", "unchecked"));
@@ -539,7 +576,6 @@ public class AiSetupModelTests
         var ready = model.Engines.Single(r => r.Id == "claude");
         Assert.True(ready.CanWrite);
         Assert.True(ready.Selected);
-        Assert.False(ready.ShowHelp);
         Assert.Equal("claude", model.SelectedNotes);
         Assert.Equal("Claude is ready. It writes your notes.", model.Say);
     }
@@ -598,7 +634,6 @@ public class AiSetupModelTests
         var free = model.Engines.Single(r => r.Id == "ollama");
         Assert.Equal(("Free AI on this Mac", "Set it up"), (free.Name, free.OpenLabel));
         Assert.True(free.ShowOneButton);
-        Assert.False(free.HasHelp); // no steps to follow
 
         // The library does it in one go, and says where it is each time it's asked.
         AiOverview At(string state, PullInfo? pulling) => Nothing(state) with { Pulling = pulling };
@@ -656,10 +691,9 @@ public class AiSetupModelTests
 
         var claude = model.Engines.Single(r => r.Id == "claude");
         var chatgpt = model.Engines.Single(r => r.Id == "codex");
-        Assert.Equal(("Claude", "Set it up", true, false), (claude.Name, claude.OpenLabel, claude.ShowOneButton, claude.HasHelp));
-        Assert.Equal(("ChatGPT", "Sign in", true, false), (chatgpt.Name, chatgpt.OpenLabel, chatgpt.ShowOneButton, chatgpt.HasHelp));
-        Assert.False(chatgpt.ShowSignIn); // not the sign-in that opens a terminal
-        Assert.Empty(claude.Help);
+        Assert.Equal(("Claude", "Set it up", true), (claude.Name, claude.OpenLabel, claude.ShowOneButton));
+        Assert.Equal(("ChatGPT", "Sign in", true), (chatgpt.Name, chatgpt.OpenLabel, chatgpt.ShowOneButton));
+        Assert.False(chatgpt.ShowSignIn); // its one button is guided setup's sign-in screen
 
         await claude.OpenCommand.ExecuteAsync(null);
         await chatgpt.OpenCommand.ExecuteAsync(null);
@@ -669,7 +703,6 @@ public class AiSetupModelTests
         // Clicking the row itself (it can't write notes yet) is never dead: there are no steps to open, so it does
         // what its button does.
         claude.SelectCommand.Execute(null);
-        Assert.False(claude.ShowHelp);
         Assert.Equal(["claude", "codex", "claude"], asked);
         Assert.NotEqual("claude", model.SelectedNotes);
     }
