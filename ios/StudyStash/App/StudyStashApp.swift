@@ -116,8 +116,9 @@ struct MainTabs: View {
         let notebook = app.incoming?.isNotebook == true ? app.incoming : nil
         TabView(selection: $app.tab) { tabs }
         .tabViewStyle(.sidebarAdaptable)
-        // An iPad opens on the sidebar, as the desktop always has it (the tabs along the top stay a tap away).
-        .defaultAdaptableTabBarPlacement(.sidebar)
+        // An iPad opens on the sidebar, as the desktop always has it (the tabs along the top stay a tap away). In a debug
+        // build `-tab-bar` opens on the tabs instead: an upright iPad's pictures, where the sidebar would cover the page.
+        .defaultAdaptableTabBarPlacement(DebugLaunch.flag("-tab-bar") ? .tabBar : .sidebar)
         .tabViewSidebarBottomBar { SidebarFooter() }
         .tabBarMinimizeBehavior(.onScrollDown)
         .modifier(RecordBar(enabled: app.tab != .ask && !app.recordBarHidden))

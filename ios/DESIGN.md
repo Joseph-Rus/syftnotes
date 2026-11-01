@@ -403,7 +403,8 @@ one) and `-quiet` (no notification prompt):
   it); `-laptop-away` (with `-demo`: the laptop asleep or off, last here two hours ago, so the
   banner on Home, Due and Search and Ask's first screen show) and `-laptop-back [seconds]` (the same, then "Your laptop
   is back" after that long, 4 by default); `-as-paired` (with `-demo`: pictured as a library on a computer, without
-  Home's "These are sample classes." line or Settings' sample box, for the App Store's pictures);
+  Home's "These are sample classes." line or Settings' sample box, for the App Store's pictures); `-tab-bar` (an iPad
+  opens on the tabs along the top, not the sidebar, which upright covers the page);
   `-unpaired` (setup, no `-demo`), with `-pair-code` its second step, or
   `-pair-page others|laptop|connect|finding|connecting|camera-off|address|cant-reach|code|typing|wrong|uses|done` any
   page of it (`others` is Other ways, `laptop` is "Now connect your laptop" after Continue with Google);
