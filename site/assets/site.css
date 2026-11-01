@@ -399,13 +399,14 @@ section { padding: clamp(4rem, 9vw, 6.5rem) 0; }
 .table th { color: var(--ink); font-weight: 700; width: 32%; }
 .table-scroll { overflow-x: auto; }
 
-.contact { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1rem; margin: 2rem 0; }
+.contact { display: grid; grid-template-columns: repeat(2, 1fr); gap: 1rem; margin: 2rem 0; }
 .contact a { position: relative; display: block; text-decoration: none; background: var(--surface); box-shadow: 0 0 0 1px var(--line); border-radius: var(--radius); padding: 1.3rem 1.3rem 1.4rem; color: var(--ink); transition: box-shadow 0.2s; }
 .contact a:hover { box-shadow: 0 0 0 1px var(--ink-3); }
 .contact strong { display: flex; align-items: center; gap: 0.55rem; font: 800 1.2rem/1.25 var(--font); letter-spacing: -0.02em; margin-bottom: 0.4rem; }
 .contact strong::before { content: ""; width: var(--cell); height: var(--cell); border-radius: var(--cell-r); background: var(--c, var(--lilac)); flex: none; }
 .contact a:nth-child(2) { --c: var(--sky); }
 .contact a:nth-child(3) { --c: var(--coral); }
+.contact a:nth-child(4) { --c: var(--mustard); }
 .contact span { display: block; color: var(--ink-2); font-size: 0.975rem; }
 @media (max-width: 760px) { .contact { grid-template-columns: 1fr; } }
 
