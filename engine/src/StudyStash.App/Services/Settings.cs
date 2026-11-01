@@ -418,6 +418,8 @@ public sealed partial class SettingsModel : ObservableObject, IDisposable
                 : $"It runs on this {device}, as part of your library."),
         };
         AiProblems = new AiProblemsModel(ai);
+        // A sign-in started from a problem card shows on its AI's row below, and the other way round.
+        Engines.ShareWith(AiProblems);
         Access = MakeAccess(ai, host);
         Canvas = new CanvasSettingsModel(canvas ?? CanvasContext.For(host), watch) { OnSetUpExtension = () => Shell.ShowCanvasConnect(), OnChooseBrowser = Shell.ChooseBrowser };
         Calendars = new CalendarSettingsModel(host.Home, wake: () => host.Calendars.Wake());

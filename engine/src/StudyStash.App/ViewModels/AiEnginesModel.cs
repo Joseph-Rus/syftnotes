@@ -129,6 +129,33 @@ public sealed partial class AiEnginesModel : ObservableObject
     readonly SignInWatch watch;
     string shown = "";
 
+    /// <summary>Said whenever this pane learns the AIs' state from the library (a sign-in's progress among it), so the
+    /// problem cards on the same page show it too; <see cref="Adopt"/> is the other direction.</summary>
+    public event Action<AiOverview>? Heard;
+    bool adopting;
+
+    /// <summary>Settings' page shows both this pane and the problem cards: each shows what the other learned.</summary>
+    public void ShareWith(AiProblemsModel cards)
+    {
+        Heard += cards.Adopt;
+        cards.Heard += Adopt;
+    }
+
+    /// <summary>Takes the state the problem cards learned, so a sign-in started from a card shows here at once.</summary>
+    public void Adopt(AiOverview overview)
+    {
+        if (SignInWatch.Signature(overview) == shown) return;
+        adopting = true;
+        try
+        {
+            Apply(overview);
+        }
+        finally
+        {
+            adopting = false;
+        }
+    }
+
     /// <summary>How often a sign-in that's going is looked at; a test sets it small.</summary>
     public TimeSpan SignInEvery
     {
@@ -396,6 +423,7 @@ public sealed partial class AiEnginesModel : ObservableObject
             OnPropertyChanged(nameof(HasKeys));
             shown = SignInWatch.Signature(overview);
             watch.Begin(overview);
+            if (!adopting) Heard?.Invoke(overview);
         }
         finally
         {

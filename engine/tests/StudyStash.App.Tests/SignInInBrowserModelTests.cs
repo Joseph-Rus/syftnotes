@@ -148,4 +148,33 @@ public class SignInInBrowserModelTests
         await stuck.Load();
         Assert.Equal(("Try again", "Sign in in Terminal instead"), (stuck.Problems.Single().PrimaryWords, stuck.Problems.Single().SecondaryWords));
     }
+
+    [AvaloniaFact]
+    public async Task A_sign_in_started_from_the_card_shows_on_the_row_below_and_the_other_way_round()
+    {
+        // Settings shows the problem cards and the AI rows on one page: whichever started the sign-in, both follow it.
+        var lib = new FakeAiLibrary { Overview = Claude("not_signed_in") };
+        lib.OnSignIn = _ => new AiSaid("Finish signing in to Claude in the browser page that just opened.", lib.Overview = Claude("not_signed_in", SignInPhase.Waiting));
+        var rows = new AiEnginesModel(lib) { SignInEvery = TimeSpan.FromMilliseconds(20) };
+        var card = new AiProblemsModel(lib) { SignInEvery = TimeSpan.FromMilliseconds(20) };
+        rows.ShareWith(card);
+        await rows.Load();
+        await card.Load();
+        AiEngineRow Row() => rows.Engines.Single(r => r.Id == "claude");
+
+        // From the card: the row says it waits too, then turns ready with the card gone, nothing pressed.
+        await card.Problems.Single().PrimaryCommand!.ExecuteAsync(null);
+        Assert.Equal(AiWords.SignInWaiting, Row().About);
+        lib.Overview = Claude("ready");
+        await Until(() => card.Problems.Count == 0 && Row().State == "ready");
+
+        // From the row: the card follows.
+        lib.Overview = Claude("not_signed_in");
+        await rows.Load();
+        await card.Load();
+        await Row().ActCommand.ExecuteAsync(null);
+        Assert.Equal("Finish signing in to Claude", card.Problems.Single().Title);
+        lib.Overview = Claude("ready");
+        await Until(() => card.Problems.Count == 0 && Row().State == "ready");
+    }
 }
