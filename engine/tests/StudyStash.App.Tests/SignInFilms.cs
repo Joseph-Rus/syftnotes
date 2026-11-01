@@ -286,7 +286,7 @@ public sealed class SignInFilms
         var (model, view) = await SettingsAsync(host, lib);
         desk.Show(view);
         desk.Hold(1.6);
-        desk.ScrollTo(Desk.Words(view, "AIs on your library"));
+        desk.ScrollTo(Desk.Words(view, "AIs on this computer"));
         desk.Hold(1.6);
         await SignInRowAsync(desk, model, view, "claude", "Claude");
         await SignInRowAsync(desk, model, view, "codex", "ChatGPT");
@@ -354,10 +354,9 @@ public sealed class SignInFilms
         await desk.UntilAsync(() => settings.AiProblems.Problems.All(p => p.Kind != "not_signed_in"), "the card gone by itself", TimeSpan.FromSeconds(40));
         desk.Caption("");
         desk.Hold(1.2);
-        // The card's gone, but Your AI's own Claude row below it was read when Settings opened, and nothing tells it:
-        // it still says Not signed in, with Sign in (found while filming; shown as it is).
-        desk.ScrollTo(Desk.Words(settingsView!, "AIs on your library"));
-        desk.Caption("Not clean: Claude's own row below still says Not signed in (until Your AI is opened again)");
+        // The card's gone, and Your AI's own Claude row below it was told by the card's sign-in: it says ready too.
+        desk.ScrollTo(Desk.Words(settingsView!, "AIs on this computer"));
+        desk.Caption("Claude's own row below says it is signed in too, with no need to reopen Your AI");
         desk.Hold(3.6);
         desk.Caption("");
         await desk.UntilAsync(() => lib.Store.Get(Lecture) is { SummaryMd.Length: > 0 }, "the missed notes written", TimeSpan.FromSeconds(40));
@@ -392,7 +391,7 @@ public sealed class SignInFilms
         var (model, view) = await SettingsAsync(host, lib);
         desk.Show(view);
         desk.Hold(1.2);
-        desk.ScrollTo(Desk.Words(view, "AIs on your library"));
+        desk.ScrollTo(Desk.Words(view, "AIs on this computer"));
         desk.Hold(1.2);
         AiEngineRow Row(string id) => model.Engines.Engines.Single(r => r.Id == id);
         var claude = Row("claude");
@@ -440,7 +439,7 @@ public sealed class SignInFilms
             ("01-onboarding-claude", 110, "1 · The first lecture: Get study notes"),
             ("01-onboarding-claude", 160, "1 · Get Claude ready (the stand-in's installer)"),
             ("01-onboarding-claude", 225, "1 · Sign in to Claude"),
-            ("01-onboarding-claude", 270, "1 · Waiting: hidden sign-in (note the Terminal link)"),
+            ("01-onboarding-claude", 270, "1 · Waiting: hidden sign-in (no Terminal link)"),
             ("01-onboarding-claude", 298, "1 · Signed in by itself, checking the plan"),
             ("01-onboarding-claude", 390, "1 · Claude's notes, written by themselves"),
             ("02-onboarding-google", 150, "2 · Continue with Google: waiting"),
@@ -449,7 +448,7 @@ public sealed class SignInFilms
             ("03-settings-claude-chatgpt-gemini", 300, "3 · All three ready by themselves"),
             ("04-claude-login-ran-out", 30, "4 · Login ran out: the lecture and its notification"),
             ("04-claude-login-ran-out", 115, "4 · The card, waiting for the browser"),
-            ("04-claude-login-ran-out", 180, "4 · Not clean: Claude's row still says signed out"),
+            ("04-claude-login-ran-out", 180, "4 · The card is gone and Claude's row below is ready too"),
             ("04-claude-login-ran-out", 235, "4 · The missed notes, written"),
             ("05-fallbacks", 90, "5 · It gave up: Try again"),
             ("05-fallbacks", 245, "5 · Stuck: the last-resort link (not pressed)"),
@@ -502,7 +501,7 @@ public sealed class SignInFilms
         var (model, view) = await SettingsAsync(host, lib);
         desk.Show(view);
         desk.Hold(1.4);
-        desk.ScrollTo(Desk.Words(view, "AIs on your library"));
+        desk.ScrollTo(Desk.Words(view, "AIs on this computer"));
         desk.Hold(1.2);
         await SignInRowAsync(desk, model, view, "claude", "Claude");
         desk.NoPointer();
