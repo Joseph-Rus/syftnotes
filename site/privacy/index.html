@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Privacy policy · Syft Notes</title>
-<meta name="description" content="Syft Notes' privacy policy: everything stays on your own computers. What the app reads from Google Calendar, Microsoft calendars and Canvas, what it does with it, and how to take it back.">
+<meta name="description" content="Syft Notes' privacy policy: everything stays on your own computers. What the app reads from calendar links and Canvas, what it does with it, and how to take it back.">
 <meta name="theme-color" content="#f4f4f1">
 <meta property="og:type" content="article">
 <meta property="og:url" content="https://syftnotes.com/privacy/">
@@ -44,7 +44,7 @@
       <p class="lede">Syft Notes is an app you run yourself, not a service. There's no Syft Notes account, no Syft
         Notes server and no tracking: only one anonymous count a day (below). This page says exactly what the app reads, where it keeps it, and how to take it
         back.</p>
-      <p class="updated">Last updated 25 October 2026</p>
+      <p class="updated">Last updated 1 November 2026</p>
       <ul class="toc" aria-label="On this page">
         <li><a href="#short">In short</a></li>
         <li><a href="#stays">What stays on your computers</a></li>
@@ -67,10 +67,10 @@
         <li><strong>The audio never leaves the computer that recorded it.</strong> It's transcribed on that computer,
           by Whisper, NVIDIA Parakeet or Cactus Whistle, depending on the computer and the model you choose.</li>
         <li><strong>No tracking, advertising or crash reporting.</strong> The app has no code that reports what you do, what you record or what's in your notes. The one thing it sends is a daily count, described under <a href="#network">What the app contacts</a>, which you can turn off.</li>
-        <li><strong>Calendars and Canvas are read-only</strong> and reached with your own sign-in. What Syft Notes reads
-          goes only to your own library, and you can revoke it at any time.</li>
+        <li><strong>Calendars and Canvas are read-only.</strong> A calendar is a link you paste in, and Canvas is reached
+          with your own sign-in. What Syft Notes reads goes only to your own library, and you can stop it at any time.</li>
         <li><strong>The AI that writes your notes is the one you choose.</strong> With Ollama, nothing leaves your
-          computer. With Claude Code, Codex or Gemini, your transcripts go to that company under your own account.</li>
+          computer. With Claude, ChatGPT or Gemini, your transcripts go to that company under your own account.</li>
       </ul>
       <p>Syft Notes is free, open-source software under the MIT licence. Everything on this page can be checked in its
         <a href="https://github.com/Joseph-Rus/study-stash">source code</a>.</p>
@@ -86,7 +86,7 @@
         <li>your study notes, as plain Markdown files in a folder per class, and the lecture database;</li>
         <li>your classes, settings, and the questions you've asked and their answers;</li>
         <li>what Syft Notes has copied from Canvas and your calendars (below);</li>
-        <li>the sign-ins it needs: your library's password, the tokens that let it read your calendars, your Granola
+        <li>the sign-ins it needs: your library's password, the addresses of the calendar links you pasted, your Granola
           sign-in if you connect Granola, and an API key for Claude, ChatGPT or Gemini if you give Syft Notes one.
           Files holding secrets are written so only your own user account can read them.</li>
       </ul>
@@ -103,7 +103,8 @@
         in <strong>your own Google Drive</strong>. You connect it on both, each time with Google's own sign-in, and you
         can stop at any time (Settings → Phone → Disconnect on the computer, or Sign out on the phone).</p>
       <ul>
-        <li><strong>The folder.</strong> Syft Notes asks Google for one permission only: its own hidden app folder
+        <li><strong>The folder.</strong> Syft Notes asks Google for your email address, to show which account is
+          connected, and for one Drive permission only: its own hidden app folder
           in your Drive (Google calls it the application data folder). Only Syft Notes can see it, not you in Drive,
           not other apps, and not us. It's in your Google account and counts towards your Drive storage.</li>
         <li><strong>What's in it.</strong> A copy of what the phone shows (your classes, lectures and their notes,
@@ -117,6 +118,10 @@
         <li><strong>Without Google.</strong> Under Other ways, a phone can instead reach your computer over
           Tailscale, as described above, or try the app with sample classes that never leave the phone.</li>
       </ul>
+      <p><strong>Ask on the phone.</strong> Before your first question, the app asks your permission. A question goes
+        from your phone, through your own Google Drive folder, to Syft Notes on your laptop. The AI you chose there
+        (Claude, ChatGPT, Gemini or Ollama) answers it under your own account, and the answer comes back the same way.
+        Nothing goes to the people who make Syft Notes.</p>
       <p>Google's own <a href="https://myaccount.google.com/connections">Third-party connections</a> page shows
         Syft Notes and lets you remove its access, which also lets Google delete its folder.</p>
       <p><strong>Deleting it.</strong> Delete a lecture, a class or a phone in the app. To remove everything, delete
@@ -124,30 +129,19 @@
         folder, <code>~/Study Stash/Chrome extension</code>). Uninstalling the app leaves them in place, so your notes
         aren't lost by accident.</p>
 
-      <h2 id="calendars">Calendars (Google, Microsoft, Apple and calendar links)</h2>
-      <p>If you connect a calendar, Syft Notes uses it to show your upcoming classes and events, and to work out which
-        class a recording belongs to and what to call it. Connecting one is optional, and everything else works
+      <h2 id="calendars">Calendars (calendar links)</h2>
+      <p>If you add a calendar, Syft Notes uses it to show your upcoming classes and events, and to work out which
+        class a recording belongs to and what to call it. Adding one is optional, and everything else works
         without it.</p>
       <h3>What it reads</h3>
-      <p>Syft Notes asks only for <strong>read-only</strong> access. It can't create, change or delete anything in
-        your calendars.</p>
-      <div class="table-scroll">
-        <table class="table">
-          <tr><th scope="row">Google Calendar</th><td>Read-only access to your calendars and their events (Google's
-            read-only calendar permission), and your account's email address so Settings can show which account is
-            connected.</td></tr>
-          <tr><th scope="row">Microsoft (Outlook, Microsoft 365)</th><td>Read-only access to your calendars
-            (<code>Calendars.Read</code>), your basic profile's name and email address (<code>User.Read</code>) to
-            show which account is connected, and <code>offline_access</code> so it can keep reading without asking you
-            to sign in each time.</td></tr>
-          <tr><th scope="row">Apple Calendar, calendar links</th><td>On a Mac, the calendars macOS lets it read once you
-            allow it; or a calendar link (.ics) you paste in.</td></tr>
-        </table>
-      </div>
-      <p>From those, Syft Notes reads <strong>your list of calendars</strong> (their names and colours) and
-        <strong>the events in the calendars you choose</strong>: each event's title, start and end, whether it's all
-        day, its location, its attendees, its link and whether it's cancelled. It reads events from around now to a few
-        days ahead, not your whole history.</p>
+      <p>You add a calendar by pasting its link (a <code>webcal://</code> or <code>.ics</code> address) in Settings.
+        Google, iCloud and many school timetables give you one. Syft Notes doesn't sign in to your Google, Apple or
+        Microsoft calendar, and it asks none of them for permission. A link can only be read, so Syft Notes can't
+        create, change or delete anything in your calendar. Some links are secret addresses, so Syft Notes keeps them
+        in a file only your own user account can read.</p>
+      <p>From the link, Syft Notes reads <strong>the events in that calendar</strong>: each event's title, start and
+        end, whether it's all day, its location, its attendees, its link and whether it's cancelled. It reads events
+        from around now to a few days ahead, not your whole history.</p>
       <h3>What it does with it</h3>
       <ul>
         <li>Shows your upcoming classes and events in the app, on your library's pages and in your phone app.</li>
@@ -156,24 +150,20 @@
       </ul>
       <h3>Where it goes</h3>
       <ul>
-        <li>Calendars are read by the laptop that records. It keeps what it read on that computer and sends the next
+        <li>The laptop that records downloads the link. It keeps what it read on that computer and sends the next
           seven days of events (title, times, location, and the class it matched) to <strong>your own</strong>
           library, which, with one computer, is the same computer.</li>
         <li>Your calendar data is <strong>never sent to the developers of Syft Notes</strong> or to anyone else. It
           isn't sold, used for advertising, or used to train AI models. Syft Notes doesn't give it to the AI engine
           that writes your notes; only the name of the class it matched is used.</li>
-        <li>The sign-in tokens for Google and Microsoft are stored on your laptop, readable only by your user account,
-          and are sent only to Google or Microsoft.</li>
+        <li>The link is sent only to the address it points to, to download the calendar.</li>
       </ul>
       <h3>Taking it back</h3>
       <ul>
-        <li>In Syft Notes, remove the account from Settings. It deletes the account's token and the events it copied
-          from that computer.</li>
-        <li>You can also revoke access from your account at any time: for Google at
-          <a href="https://myaccount.google.com/connections">myaccount.google.com/connections</a>; for a Microsoft
-          personal account at <a href="https://account.live.com/consent/Manage">account.live.com/consent/Manage</a>,
-          and for a work or school account at <a href="https://myapps.microsoft.com">myapps.microsoft.com</a>. Once
-          access is revoked, Syft Notes can't read anything more.</li>
+        <li>In Syft Notes, remove the calendar from Settings. It forgets the link and the events it copied from that
+          computer.</li>
+        <li>If the link is a secret address, you can also make it stop working in the calendar's own settings (for
+          Google, by resetting the secret address).</li>
       </ul>
 
       <h2 id="google">Google API data: Limited Use</h2>
@@ -182,7 +172,10 @@
           <a href="https://developers.google.com/terms/api-services-user-data-policy">Google API Services User Data
           Policy</a>, including the Limited Use requirements.</p>
       </div>
-      <p>In particular, data Syft Notes receives from Google Calendar and Google Drive is:</p>
+      <p>Syft Notes asks Google for three permissions, all for the iPhone and iPad app's link to your computer: to know
+        who you are (<code>openid</code>), your email address (<code>email</code>) so it can show which account is
+        connected, and the app's own hidden folder in your Drive (<code>drive.appdata</code>). It asks for no
+        calendar, email, contacts or other Drive files. In particular, data Syft Notes receives from Google is:</p>
       <ul>
         <li>used only to provide the features described above, which you can see in the app;</li>
         <li>transferred only to your own Syft Notes library (a computer you control) and your own phone or iPad, and
@@ -194,8 +187,7 @@
         <li>never sold, and never used to determine creditworthiness or for lending;</li>
         <li>never read by a person. The developers have no access to it at all: it exists only on your computers.</li>
       </ul>
-      <p>The same promises apply to what Syft Notes reads from Microsoft.</p>
-
+      
       <h2 id="canvas">Canvas</h2>
       <p>Syft Notes copies your Canvas courses (what's due, assignments and rubrics, your submissions and feedback,
         modules, files, pages, announcements, quizzes and discussions) into your library, so they sit next to your
@@ -218,8 +210,8 @@
         library's computer:</p>
       <ul>
         <li><strong>Ollama</strong> runs entirely on your computer. Nothing leaves it.</li>
-        <li><strong>Claude Code, Codex or Gemini</strong> are programs from Anthropic, OpenAI and Google that you install
-          and sign in to with your own account and plan. When you choose one, Syft Notes gives it the lecture's
+        <li><strong>Claude, ChatGPT or Gemini</strong> run through programs from Anthropic, OpenAI and Google (Claude
+          Code, Codex and Gemini) that you install and sign in to with your own account and plan. When you choose one, Syft Notes gives it the lecture's
           transcript (or the notes and passages a question needs, and your whiteboard photos when it writes a lecture's
           notes) and the company's service writes the answer. That
           company handles it under its terms and privacy policy, with your account. Syft Notes' developers never
@@ -239,7 +231,7 @@
       <p>Without an engine, lectures are still transcribed and filed.</p>
 
       <h2 id="network">What the app contacts</h2>
-      <p>Apart from your own computers and the services you connect (your calendars, Canvas, Granola, and the AI
+      <p>Apart from your own computers and the services you connect (your calendar links, Canvas, Granola, and the AI
         engine you choose), Syft Notes contacts:</p>
       <ul>
         <li><strong>GitHub</strong>, to check for and download updates from Syft Notes' own
@@ -257,7 +249,8 @@
           day, the computer app sends one record with a random code made for this copy of the app (not linked to you,
           your accounts or your computer's name), the day, the app's version and whether it's a Mac or a PC. That's
           all it holds, and nothing outside the project can read it. It tells us how many copies are in use. Turn it
-          off in <strong>Settings → General → Count this copy</strong>.</li>
+          off in <strong>Settings → General → Count this copy</strong>. The iPhone and iPad app sends no count at
+          all.</li>
       </ul>
       <p>None of these requests include your notes, recordings, calendar or Canvas data, and none identify you beyond
         what any web request does (your IP address). The daily count doesn't keep your IP address.</p>
@@ -278,7 +271,7 @@
       <h2 id="rights">Your choices</h2>
       <p>Because your data is on your own computers, you're in control of all of it: you can open, copy, export
         (every lecture's notes download as Markdown) or delete it at any time, without asking anyone. We hold no data
-        about you, so there's nothing for us to hand over, correct or delete. Revoking calendar or Canvas access is
+        about you, so there's nothing for us to hand over, correct or delete. Stopping a calendar or Canvas is
         described above.</p>
       <p>Syft Notes is made for students and isn't directed at children under 13.</p>
 
@@ -288,7 +281,7 @@
         GitHub</a>. If Syft Notes ever needs to read something new, it will ask you first.</p>
 
       <h2 id="contact">Contact</h2>
-      <p>Questions about privacy: open an issue on
+      <p>Questions about privacy: email <a href="mailto:support@syftnotes.com">support@syftnotes.com</a>, or open an issue on
         <a href="https://github.com/Joseph-Rus/study-stash/issues">GitHub</a>. To report a security problem privately,
         use the repository's <a href="https://github.com/Joseph-Rus/study-stash/security/advisories/new">Report a
         vulnerability</a> form. See <a href="../support/">Support</a> for more.</p>
