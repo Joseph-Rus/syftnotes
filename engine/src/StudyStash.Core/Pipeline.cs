@@ -6,6 +6,10 @@ namespace StudyStash.Core;
 
 /// <summary>The notes engine didn't answer at all (not running, or not reachable): the lecture waits for it instead of
 /// being filed without notes.</summary>
+/// <summary>No AI is chosen to write the notes yet (a fresh library): the lecture is filed with its transcript and says so,
+/// and its notes are written once the student chooses one.</summary>
+public sealed class NoNotesAiException() : Exception(Engines.NotesNeedAnAi);
+
 public sealed class EngineOfflineException(string engine, Exception inner)
     : Exception($"{engine} isn't answering: {inner.Message}", inner)
 {
@@ -92,6 +96,13 @@ public sealed class Pipeline(Config cfg, Store store, SortChatFn? chat = null,
                     log("[pipeline] the notes engine is answering again");
                 }
                 log($"[pipeline] summarized '{m.Title}' with {model}{how} in {watch.Elapsed.TotalSeconds:0}s");
+            }
+            catch (NoNotesAiException)
+            {
+                error = Engines.NotesNeedAnAi;
+                unwritten = "The notes weren't written: no AI writes them yet. Choose one in Settings → Your AI.";
+                log($"[pipeline] '{m.Title}' has no notes yet: no AI is chosen to write them");
+                summary = model = "";
             }
             catch (Exception e) when (IsOffline(e))
             {

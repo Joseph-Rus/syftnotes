@@ -27,18 +27,16 @@ public sealed class GeminiSignInTests
         await notes.Load();
         var row = notes.Engines.Single(r => r.Id == "gemini");
         Assert.Equal(("Sign in", true), (row.OpenLabel, row.OneButton));
-        Assert.Empty(row.Help);
         await row.OpenCommand.ExecuteAsync(null);
         Assert.Equal(["gemini"], asked);
         Assert.Equal("", notes.KeyFor); // not the key box: that's for a Gemini that isn't here at all
 
-        // Settings → Your AI (no guided screens): the library's own sign-in, which opens a terminal in that home.
+        // A host with no guided screens: the library's own sign-in, hidden, in that home; nothing to type.
         var settings = new AiSetupModel(SignedOut()) { Windows = false, TakesKeys = true };
         await settings.Load();
         var signedOut = settings.Engines.Single(r => r.Id == "gemini");
         Assert.True(signedOut.ShowSignIn);
-        Assert.DoesNotContain(signedOut.Help, h => h.Command.Contains("agy", StringComparison.Ordinal));
-        Assert.Empty(EngineSetupWords.Steps("gemini", "not_signed_in", windows: false));
+        Assert.DoesNotContain("agy", signedOut.About, StringComparison.Ordinal);
     }
 
     /// <summary>Finding Gemini (each time guided setup opens) asks agy its version in Syft Notes' own home for it.</summary>

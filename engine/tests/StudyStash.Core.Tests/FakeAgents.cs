@@ -132,6 +132,7 @@ public static class FakeAgents
             echo "Error: User location is not supported for the API use." >&2; exit 1
           fi
           if [ ! -f "$D/signed-in" ]; then
+            [ -t 0 ] || { echo "Error: authentication required. Run 'agy' to log in, then retry." >&2; exit 1; }
             echo "Authentication required. Please visit the URL to log in:" >&2
             echo "  https://accounts.google.com/o/oauth2/auth?fake=1" >&2
             [ -f "$D/login-fails" ] && { echo "Error: authentication required. Run 'agy' to log in, then retry." >&2; exit 1; }
@@ -143,8 +144,22 @@ public static class FakeAgents
         fi
         if { [ "{{id}}" = claude ] && [ "$1" = auth ] && [ "$2" = login ]; } || { [ "{{id}}" = codex ] && [ "$1" = login ]; }; then
           echo x >> "$D/logins"
-          echo "Opening your browser to sign in: https://example.com/fake-sign-in?code=abc"
-          [ -f "$D/login-fails" ] && { echo "Raw mode is not supported on the current process.stdin" >&2; exit 1; }
+          # As Claude Code does, it stops at once without a terminal.
+          { [ -t 0 ] && [ ! -f "$D/login-fails" ]; } || { echo "Raw mode is not supported on the current process.stdin" >&2; exit 1; }
+          if [ "{{id}}" = claude ]; then
+            printf ' Select login method:\n\n \342\235\257 1. Claude account with subscription \302\267 Pro, Max, Team, or Enterprise\n   2. Anthropic Console account \302\267 API usage billing\n'
+            read -r choice || exit 1
+            echo yes > "$D/login-method"
+            printf 'Opening browser to sign in\342\200\246\n'
+            echo "Browser didn't open? Use the url below to sign in:"
+            echo "https://claude.example.com/oauth/authorize?code=true&redirect_uri=https%3A%2F%2Fplatform.example.com%2Foauth%2Fcode%2Fcallback&state=fake"
+            printf 'Paste code here if prompted > '
+          else
+            echo "Starting local login server on http://localhost:1455."
+            [ -f "$D/no-browser" ] && echo "Couldn't open the browser."
+            echo "If your browser did not open, navigate to this URL to authenticate:"
+            echo "https://auth.example.com/oauth/authorize?response_type=code&redirect_uri=http%3A%2F%2Flocalhost%3A1455%2Fauth%2Fcallback&state=fake"
+          fi
           sleep "$(cat "$D/login-delay" 2>/dev/null || echo 1)"
           touch "$D/signed-in"; echo "Signed in."; exit 0
         fi
@@ -225,6 +240,7 @@ public static class FakeAgents
             [Console]::Error.WriteLine('Error: User location is not supported for the API use.'); exit 1
           }
           if (-not (Test-Path "$D\signed-in")) {
+            if ([Console]::IsInputRedirected) { [Console]::Error.WriteLine("Error: authentication required. Run 'agy' to log in, then retry."); exit 1 }
             [Console]::Error.WriteLine('Authentication required. Please visit the URL to log in:')
             [Console]::Error.WriteLine('  https://accounts.google.com/o/oauth2/auth?fake=1')
             if (Test-Path "$D\login-fails") { [Console]::Error.WriteLine("Error: authentication required. Run 'agy' to log in, then retry."); exit 1 }
@@ -237,8 +253,24 @@ public static class FakeAgents
         }
         if (($ID -eq 'claude' -and $argv[0] -eq 'auth' -and $argv[1] -eq 'login') -or ($ID -eq 'codex' -and $argv[0] -eq 'login')) {
           Add-Content "$D\logins" 'x'
-          'Opening your browser to sign in: https://example.com/fake-sign-in?code=abc'
-          if (Test-Path "$D\login-fails") { [Console]::Error.WriteLine('Raw mode is not supported'); exit 1 }
+          # As Claude Code does, it stops at once without a terminal.
+          if ([Console]::IsInputRedirected -or (Test-Path "$D\login-fails")) { [Console]::Error.WriteLine('Raw mode is not supported'); exit 1 }
+          if ($ID -eq 'claude') {
+            ' Select login method:'; ''
+            " $([char]0x276F) 1. Claude account with subscription $([char]0xB7) Pro, Max, Team, or Enterprise"
+            "   2. Anthropic Console account $([char]0xB7) API usage billing"
+            $choice = [Console]::ReadLine()
+            Set-Content "$D\login-method" 'yes'
+            'Opening browser to sign in...'
+            "Browser didn't open? Use the url below to sign in:"
+            'https://claude.example.com/oauth/authorize?code=true&redirect_uri=https%3A%2F%2Fplatform.example.com%2Foauth%2Fcode%2Fcallback&state=fake'
+            [Console]::Out.Write('Paste code here if prompted > ')
+          } else {
+            'Starting local login server on http://localhost:1455.'
+            if (Test-Path "$D\no-browser") { "Couldn't open the browser." }
+            'If your browser did not open, navigate to this URL to authenticate:'
+            'https://auth.example.com/oauth/authorize?response_type=code&redirect_uri=http%3A%2F%2Flocalhost%3A1455%2Fauth%2Fcallback&state=fake'
+          }
           $delay = 1; if (Test-Path "$D\login-delay") { $delay = [int](Get-Content "$D\login-delay") }
           Start-Sleep -Seconds $delay
           New-Item -ItemType File -Force "$D\signed-in" | Out-Null; 'Signed in.'; exit 0

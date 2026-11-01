@@ -44,15 +44,25 @@ public static partial class AiWords
     public static bool StateIsMuted(string state) => state is "unchecked" or "not_installed";
 
     /// <summary>The row's button: ready → Options · unchecked → Check · not_signed_in → Sign in (tinted) ·
-    /// not_running → Start · model_missing → Download · not_installed → Get it · limited/failed → Options.</summary>
+    /// not_running → Start · model_missing → Download · not_installed → Set up · limited/failed → Options.</summary>
     public static string RowActionWords(string state) => state switch
     {
         "unchecked" => "Check",
         "not_signed_in" => "Sign in",
         "not_running" => "Start",
         "model_missing" => "Download",
-        "not_installed" => "Get it",
+        "not_installed" => "Set up",
         _ => "Options",
+    };
+
+    /// <summary>The line on Settings' row for an AI not on this computer yet: what it's for, plainly, and that Set up gets
+    /// it ready (Syft Notes installs it and signs in; nothing to type).</summary>
+    public static string NotSetUpAbout(string id) => id switch
+    {
+        "claude" => "For a Claude Pro or Max plan. Set up gets it ready on this computer.",
+        "codex" => "For a ChatGPT Plus plan or higher. Set up gets it ready on this computer.",
+        "gemini" => "Free with a Google account. Set up gets it ready on this computer.",
+        _ => "Set up gets it ready on this computer.",
     };
 
     /// <summary>Only "Sign in" is the tinted, accent-coloured button; every other row action is a plain pill.</summary>
@@ -64,9 +74,13 @@ public static partial class AiWords
 
     /// <summary>The AI engines pane's row subtitle: Ollama always says nothing leaves it; a ready CLI says it's
     /// signed in; every other CLI just says where it runs.</summary>
-    public static string EngineAbout(string id, string state) =>
-        id == "ollama" ? "Runs on your library. Nothing leaves it."
-        : Through(id) + (state == "ready" ? "Runs on your library. Signed in." : "Runs on your library.");
+    public static string EngineAbout(string id, string state, bool here = false) =>
+        id == "ollama" ? $"Runs on {Where(here)}. Nothing leaves it."
+        : Through(id) + (state == "ready" ? $"Runs on {Where(here)}. Signed in." : $"Runs on {Where(here)}.");
+
+    /// <summary>Where the AI runs, in the student's words: "this computer" when the library is on it (one computer
+    /// does everything), "your library" when the library is on another.</summary>
+    public static string Where(bool here) => here ? "this computer" : "your library";
 
     /// <summary>The tool Syft Notes reaches an AI through, said once on its row: "Through Claude Code. ".</summary>
     static string Through(string id) => id switch
@@ -131,6 +145,17 @@ public static partial class AiWords
         "codex" => "ChatGPT",
         _ => name,
     };
+
+    /// <summary>The AIs in the order a student meets them everywhere they're listed: Claude, ChatGPT, Gemini, then the
+    /// free one on this computer (Ollama, for the comfortable with it).</summary>
+    public static readonly string[] ShownOrder = ["claude", "codex", "gemini", "ollama"];
+
+    /// <summary><paramref name="engines"/> in <see cref="ShownOrder"/> (an AI it doesn't know goes last).</summary>
+    public static IEnumerable<EngineInfo> InShownOrder(IEnumerable<EngineInfo> engines) => InShownOrder(engines, e => e.Id);
+
+    /// <summary>The same, for anything that says which AI it is.</summary>
+    public static IEnumerable<T> InShownOrder<T>(IEnumerable<T> items, Func<T, string> id) =>
+        items.OrderBy(x => Array.IndexOf(ShownOrder, id(x)) is var i and >= 0 ? i : ShownOrder.Length);
 
     static string Simpler(bool small, string device) => small ? $" A small one fits this {device}'s memory, so its notes are simpler than Claude's or ChatGPT's." : "";
 
@@ -220,6 +245,10 @@ public static partial class AiWords
     public static DateTime? ParseUntil(string iso) =>
         DateTime.TryParse(iso, CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind, out var t) ? t : null;
 
+    /// <summary>The Who does what row's line while nobody is chosen to write the notes (a fresh library).</summary>
+    public const string NoNotesAi = "No AI writes your notes yet. Choose one.";
+    /// <summary>What a Who does what choice says while nothing is chosen for it.</summary>
+    public const string ChooseAnAi = "Choose an AI";
     public const string OlderLibraryWords = "Your library runs an older Syft Notes: update it to choose your AI here.";
 
     /// <summary>Whether an engine is worth offering to ask or write with: ready, or installed but never checked. A
@@ -458,10 +487,10 @@ public static partial class AiWords
         _ => "info",
     };
 
-    public static string ProblemTitle(string kind, string engineName, string fallbackName) => kind switch
+    public static string ProblemTitle(string kind, string engineName, string fallbackName, bool here = false) => kind switch
     {
-        "engine_offline" => $"{engineName} isn't running on your library",
-        "not_signed_in" => $"Sign in to {engineName} on your library",
+        "engine_offline" => $"{engineName} isn't running on {Where(here)}",
+        "not_signed_in" => here ? $"Sign in to {engineName}" : $"Sign in to {engineName} on your library",
         "model_missing" => $"{engineName} needs its notes model",
         "usage_limit" => $"{engineName} hit its usage limit",
         "fell_back" => $"This answer came from {engineName}",
@@ -471,18 +500,18 @@ public static partial class AiWords
         _ => engineName,
     };
 
-    public static string ProblemMessage(string kind, string engineName, string fallbackName, string until, double sizeGb, string detail) => kind switch
+    public static string ProblemMessage(string kind, string engineName, string fallbackName, string until, double sizeGb, string detail, bool here = false) => kind switch
     {
         "engine_offline" => "New lectures wait and get their notes when it's back.",
         // No stand-in (fallbackName empty): nothing writes the notes until it's signed in. The library writes the ones it
         // missed once it is.
         "not_signed_in" => fallbackName.Length > 0 ? $"Until then, questions go to {fallbackName}."
             : "Until then, lectures are filed without notes. They're written once you've signed in.",
-        "model_missing" => sizeGb > 0 ? $"About {sizeGb:0} GB, downloaded once on your library." : "Downloaded once on your library.",
+        "model_missing" => sizeGb > 0 ? $"About {sizeGb:0} GB, downloaded once on {Where(here)}." : $"Downloaded once on {Where(here)}.",
         "usage_limit" => ParseUntil(until) is { } t ? $"Questions go to {fallbackName} until {UntilClock(t)}." : $"Questions go to {fallbackName}.",
         "fell_back" => detail,
         "access_request" => $"From {detail}. It can read, not change.",
-        "library_offline" => "Your AI runs on your library. Check it's on and connected.",
+        "library_offline" => $"Your AI runs on {Where(here)}. Check it's on and connected.",
         "rewrite_failed" => $"{detail} Your current notes are unchanged.",
         _ => detail,
     };
@@ -499,7 +528,24 @@ public static partial class AiWords
         SignInPhase.Waiting => SignInWaiting,
         SignInPhase.GaveUp => "It stopped waiting before you'd finished. Try again.",
         SignInPhase.Region => $"{engineName} isn't offered in your country yet.",
-        SignInPhase.Stuck => "Syft Notes couldn't open the sign-in page by itself. Try again.",
+        SignInPhase.Stuck => SignInStuckWords(engineName),
+        _ => "",
+    };
+
+    /// <summary>Syft Notes' own help page: where Get help goes when it couldn't start an AI's sign-in, or install it.</summary>
+    public const string HelpPage = "https://syftnotes.com/support/";
+
+    /// <summary>A sign-in Syft Notes couldn't start (or that stopped at once): said plainly, with Try again and Get help
+    /// beside it, and never a terminal to do it in instead.</summary>
+    public static string SignInStuckWords(string engineName) => $"Syft Notes couldn't start {engineName}'s sign-in.";
+
+    /// <summary>The line under the list of AIs once a sign-in has stopped, so it says what the row says rather than the
+    /// "Finish signing in…" the press answered with.</summary>
+    public static string SignInSaid(string engineName, string phase) => phase switch
+    {
+        SignInPhase.GaveUp => $"Signing in to {engineName} stopped before you'd finished. Try again.",
+        SignInPhase.Region => $"{engineName} isn't offered in your country yet.",
+        SignInPhase.Stuck => SignInStuckWords(engineName),
         _ => "",
     };
 
@@ -513,12 +559,12 @@ public static partial class AiWords
         _ => "",
     };
 
-    /// <summary>The small link beside a sign-in that's going: the page again while it waits, a terminal only when the
-    /// hidden sign-in couldn't start or stopped at once.</summary>
+    /// <summary>The small link beside a sign-in: the page again while it waits, Syft Notes' help page when it couldn't
+    /// start.</summary>
     public static string SignInLink(string phase) => phase switch
     {
         SignInPhase.Waiting => "Open the page again",
-        SignInPhase.Stuck => "Sign in in Terminal instead",
+        SignInPhase.Stuck => "Get help",
         _ => "",
     };
 

@@ -1447,7 +1447,7 @@ public static partial class Shell
         Desktop.Activate();
     }
 
-    /// <summary>Guided setup's model for this window, reaching the app's own installer, sign-in, terminal and pages.
+    /// <summary>Guided setup's model for this window, reaching the app's own installer, hidden sign-in and pages.
     /// The self-test finds no AI's CLI at all, so it never installs one or reaches an account.</summary>
     static GuidedSetupModel MakeGuided(SetupModel model)
     {
@@ -1460,17 +1460,6 @@ public static partial class Shell
             Find = SelfTest.Dir is not null ? _ => AgentFound.None : cli => AgentInstall.Find(cli),
             AiApps = aiApps.DesktopStates,
             ConnectAiApp = aiApps.Connect,
-            OpenTerminal = (exe, args) =>
-            {
-                try
-                {
-                    Core.Ai.Terminal.RunCommand(host.Home, OperatingSystem.IsMacOS() ? "terminal" : "", exe, args);
-                }
-                catch (InvalidOperationException e)
-                {
-                    host.Log($"[setup] couldn't open a terminal to sign in: {e.Message}");
-                }
-            },
             Downloading = () => host.Downloading?.Fraction,
             Log = host.Log,
         };
@@ -1523,8 +1512,6 @@ public static partial class Shell
                             ? $"They run on this {model.DeviceWord}, as part of your library. You can change this later in Settings → Your AI."
                             : "This computer is your library, so the AI runs here. You can change this later from any of your computers, in Settings → Your AI.",
                         Windows = Skin.Current == SkinKind.Win,
-                        Copy = text => model.OnCopy?.Invoke(text),
-                        OpenTerminal = TerminalApp.Open,
                         OpenUrl = url => Dialogs.OpenUrl(url),
                         WriteNotes = WriteNotesAsync,
                         NotesOn = NotesOnAsync,
@@ -1537,8 +1524,8 @@ public static partial class Shell
                         // on from a plan other apps can't use, that AI's key box is open.
                         TakesKeys = true,
                         OpenKeyFor = guidedSetup?.NotesKeyFor ?? "",
-                        // Claude and ChatGPT are got ready by guided setup's own two screens, with buttons, where
-                        // setup's window has them.
+                        // Claude, ChatGPT and Gemini are got ready by guided setup's own two screens, with buttons
+                        // (installed and signed in, hidden), where setup's window has them.
                         SetUpPaid = guidedSetup is { } withButtons ? withButtons.GetReadyForNotesAsync : null,
                     };
                     if (guidedSetup is { } guided)

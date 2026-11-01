@@ -251,12 +251,10 @@ public interface IAiLibrary
     /// <summary>Starts the AI's own sign-in on the library's computer, hidden: it opens the student's browser itself, and the
     /// engine's <see cref="EngineInfo.SignIn"/> says where it is until it turns ready by itself.</summary>
     Task<AiSaid?> SignInAsync(string engine);
-    /// <summary>"Open the page again": the sign-in run once more, so the browser opens at a page that finishes by itself.
-    /// Null from a library too old to.</summary>
+    /// <summary>"Open the page again": the page opened once more, or the sign-in run once more, so the browser opens at a
+    /// page that finishes by itself. Null from a library too old to. (The library still opens a terminal for an app
+    /// from before every sign-in was hidden; this app never asks it to.)</summary>
     Task<AiSaid?> SignInAgainAsync(string engine) => Task.FromResult<AiSaid?>(null);
-    /// <summary>The last resort, once the hidden sign-in couldn't start or stopped at once: the same sign-in in a terminal
-    /// window on the library's computer. Null from a library too old to tell it from <see cref="SignInAsync"/>.</summary>
-    Task<AiSaid?> SignInInTerminalAsync(string engine) => Task.FromResult<AiSaid?>(null);
     Task<AiSaid?> CheckAsync(string engine, string model = "");
     Task<AiOverview?> ModelAsync(string engine, string model);
     Task<AiOverview?> DismissAsync(string problemId);
@@ -418,9 +416,6 @@ public sealed class AiRemote(string serverUrl, Func<string> key, HttpClient? htt
 
     public async Task<AiSaid?> SignInAgainAsync(string engine) =>
         As<AiSaid>(await SendAsync(HttpMethod.Post, $"/engines/{Seg(engine)}/sign-in", new JsonObject { ["again"] = true }));
-
-    public async Task<AiSaid?> SignInInTerminalAsync(string engine) =>
-        As<AiSaid>(await SendAsync(HttpMethod.Post, $"/engines/{Seg(engine)}/sign-in", new JsonObject { ["terminal"] = true }));
 
     public async Task<AiSaid?> CheckAsync(string engine, string model = "") => As<AiSaid>(await SendAsync(HttpMethod.Post,
         $"/engines/{Seg(engine)}/check", model.Length > 0 ? new JsonObject { ["model"] = model } : null));

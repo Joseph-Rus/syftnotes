@@ -29,7 +29,7 @@
           <c:Icon Glyph="edit_note" Size="20" />
           <StackPanel Classes="ai-row-text" Grid.Column="2" VerticalAlignment="Center">
             <TextBlock Classes="ai-row-title" Text="Writes your notes" />
-            <TextBlock Classes="ai-row-sub" Text="After each lecture, on your library" />
+            <TextBlock Classes="ai-row-sub" Text="{Binding NotesRowAbout}" />
           </StackPanel>
           <Button AutomationProperties.Name="Writes your notes" Grid.Column="3" Classes="ai-select-btn" VerticalAlignment="Center">
             <Border Classes="ai-select">
@@ -173,7 +173,7 @@
 
       <!-- Engines -->
       <Grid ColumnDefinitions="*,Auto" Margin="0,18,0,8">
-        <TextBlock Classes="ai-section" Text="AIs on your library" />
+        <TextBlock Classes="ai-section" Text="{Binding ListTitle}" />
         <Button Grid.Column="1" Classes="ai-textbtn" IsVisible="{Binding HasAddChoices}">
           <TextBlock Classes="ai-link" Text="Add another AI" />
           <Button.Flyout>
@@ -199,7 +199,7 @@
                 <StackPanel Classes="ai-row-text" Grid.Column="2" VerticalAlignment="Center" Margin="0,0,12,0">
                   <TextBlock Classes="ai-row-title" Text="{Binding Name}" />
                   <TextBlock Classes="ai-row-sub" Text="{Binding About}" TextWrapping="Wrap" />
-                  <!-- What else to try (Open the page again, Sign in in Terminal instead): a link under the row's words, so the
+                  <!-- What else to try (Open the page again, or Get help): a link under the row's words, so the
                        words keep their room beside the state and its button. -->
                   <Button Classes="ai-textbtn" Name="SignInLink" Command="{Binding LinkCommand}" IsVisible="{Binding HasLink}" HorizontalAlignment="Left" Margin="0,6,0,2">
                     <Border Classes="ai-pill-plain"><TextBlock Text="{Binding LinkWords}" /></Border>

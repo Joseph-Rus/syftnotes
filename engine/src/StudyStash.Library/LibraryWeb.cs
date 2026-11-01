@@ -288,6 +288,12 @@ public sealed partial class LibraryWeb
     static string Plural(int n, string one, string many) => n != 1 ? many : one;
 
     /// <summary>What writes the notes: the Ollama model, or the AI picked in Settings.</summary>
+    /// <summary>A first AI was just chosen to write the notes: the lectures that were waiting for one are written now.</summary>
+    void WriteWaitingNotes()
+    {
+        if (store.RequeueNoAi() > 0) pipeline.Wake();
+    }
+
     string NotesWriter => options.Ai?.Describe("notes", cfg) ?? cfg.EffectiveSummaryModel;
 
     string QueuePanel(bool adminView)
@@ -804,7 +810,7 @@ public sealed partial class LibraryWeb
             string opts = string.Concat(AiSpeed.Choices.Select(c => $"<option value=\"{c}\"{(c == AiSpeed.Normal(picked.Speed) ? " selected" : "")}>{Ui.Esc(Label(c))}</option>"));
             return $"<div class=\"row\"><label class=\"grow\" for=\"ai_speed\">How fast Claude works</label><select id=\"ai_speed\" name=\"ai_speed\">{opts}</select></div>";
         }
-        var main = providers.First(p => p.Id == picked.Provider);
+        var main = providers.FirstOrDefault(p => p.Id == picked.Provider) ?? providers.First(p => p.Id == "ollama"); // nobody chosen yet: none
         string modelOpts = string.Concat(main.Models.Select(m =>
             $"<option value=\"{Ui.Esc(m.Id)}\"{(m.Id == picked.Models.GetValueOrDefault(main.Id, "") ? " selected" : "")}>{Ui.Esc(m.Label)}</option>"));
         string tested = picked.Tests.GetValueOrDefault(main.Id, "") switch
@@ -814,8 +820,8 @@ public sealed partial class LibraryWeb
             string why => $"<span class=\"value\" title=\"{Ui.Esc(why)}\">Didn't answer</span>",
         };
         string brain = "<div class=\"group-head\">AI</div><div class=\"group\">"
-            + $"<div class=\"row\"><label class=\"grow\" for=\"ai_provider\">Does the work</label>{tested}{ProviderSelect("ai_provider", picked.Provider, null)}</div>"
-            + (main.Id == "ollama" ? "" : $"<div class=\"row\"><label class=\"grow\" for=\"ai_model\">Model</label><select id=\"ai_model\" name=\"ai_model\">{modelOpts}</select></div>")
+            + $"<div class=\"row\"><label class=\"grow\" for=\"ai_provider\">Does the work</label>{tested}{ProviderSelect("ai_provider", picked.Provider, picked.Provider.Length == 0 ? "Nobody chosen yet" : null)}</div>"
+            + (main.Id == "ollama" || picked.Provider.Length == 0 ? "" : $"<div class=\"row\"><label class=\"grow\" for=\"ai_model\">Model</label><select id=\"ai_model\" name=\"ai_model\">{modelOpts}</select></div>")
             + JobRow("notes", "Writes study notes") + DiagramsRow() + SpeedRow() + JobRow("sort", "Sorts lectures") + JobRow("ask", "Answers questions")
             + (Terminal.Available() is { Count: > 0 } terms
                 ? "<div class=\"row\"><label class=\"grow\" for=\"terminal\">Open in… uses</label><select id=\"terminal\" name=\"terminal\">"

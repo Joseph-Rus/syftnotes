@@ -392,6 +392,28 @@ public sealed partial class Store : IDisposable
                 Queued, Now(), Done, Ai.Engines.WaitPrefix(engineName).Replace("%", "").Replace("_", "") + "%");
     }
 
+    /// <summary>Lectures filed with no notes because no AI was chosen to write them yet
+    /// (<see cref="Ai.Engines.NotesNeedAnAi"/>), queued to be written now one is: how many.</summary>
+    public int RequeueNoAi()
+    {
+        lock (gate)
+            return Exec("UPDATE notes SET status=?, updated_at=? WHERE status=? AND COALESCE(summary_md, '')='' AND error=?",
+                Queued, Now(), Done, Ai.Engines.NotesNeedAnAi);
+    }
+
+    /// <summary>Whether any lecture has notes that Ollama wrote, or that nobody can say who wrote (no writer recorded):
+    /// what keeps an old library's Ollama pick when it is migrated (<see cref="Ai.AiSettings.Migrated"/>).</summary>
+    public bool HasNotesFromOllamaOrUnknown()
+    {
+        lock (gate)
+        {
+            using var cmd = Command("SELECT 1 FROM notes WHERE COALESCE(summary_md, '')<>'' AND COALESCE(summary_model, '') NOT LIKE 'Claude%' "
+                + "AND COALESCE(summary_model, '') NOT LIKE 'ChatGPT%' AND COALESCE(summary_model, '') NOT LIKE 'Codex%' "
+                + "AND COALESCE(summary_model, '') NOT LIKE 'Gemini%' AND COALESCE(summary_model, '') NOT LIKE 'your AI%' LIMIT 1");
+            return cmd.ExecuteScalar() is not null;
+        }
+    }
+
     /// <summary>Every lecture filed with no notes (notes were off, or nothing wrote them), queued to have them written:
     /// a first AI was just chosen on a lecture's page. How many.</summary>
     public int RequeueMissing()

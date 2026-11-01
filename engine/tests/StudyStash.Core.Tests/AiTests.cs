@@ -7,11 +7,15 @@ namespace StudyStash.Core.Tests;
 public class AiTests
 {
     [Fact]
-    public void Without_ai_json_everything_stays_on_ollama()
+    public void Without_ai_json_nobody_writes_the_notes_and_sorting_and_ask_keep_to_ollama()
     {
         using var dir = new TempDir();
         var s = AiSettings.Load(dir.Path);
-        foreach (string job in AiSettings.Jobs) Assert.True(s.Local(job));
+        Assert.False(s.NotesChosen);
+        Assert.Equal("", s.For("notes").Provider);
+        Assert.False(s.Local("notes"));
+        foreach (string job in new[] { "sort", "ask", "agent" }) Assert.True(s.Local(job));
+        Assert.False(s.Picked("ask"));
     }
 
     [Fact]

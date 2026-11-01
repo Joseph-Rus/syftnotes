@@ -1,6 +1,8 @@
+using Avalonia.Controls;
 using System.Diagnostics;
 using System.Text.Json.Nodes;
 using Avalonia.Headless.XUnit;
+using Avalonia.LogicalTree;
 using Avalonia.Threading;
 using ModelContextProtocol.Client;
 using ModelContextProtocol.Protocol;
@@ -71,7 +73,6 @@ public sealed class GuidedSetupTests
         public CountingLoginItems Login { get; } = new();
         public Mirror Models { get; } = new();
         public List<string> Opened { get; } = [];
-        public List<string> Terminals { get; } = [];
         public List<string> Writers { get; } = [];
         public string InstallMode { get; set; } = "ok";
         /// <summary>The ChatGPT and Claude desktop apps this computer has, and the ones a card connected.</summary>
@@ -110,7 +111,6 @@ public sealed class GuidedSetupTests
                     FakeAgents.Installer(Home["installer"], c.Id, InstallMode, Home["staged"], Bin), FakeAgents.Which(Bin)) { Elevated = () => false },
                 SignIn = (c, exe) => new AgentSignIn(c, exe) { Every = TimeSpan.FromMilliseconds(200) },
                 OpenUrl = Opened.Add,
-                OpenTerminal = (exe, args) => Terminals.Add(string.Join(' ', [Path.GetFileNameWithoutExtension(exe), .. args])),
                 Downloading = () => Host.Downloading?.Fraction,
                 AiApps = () => [.. AiApps],
                 ConnectAiApp = id =>
@@ -459,7 +459,6 @@ public sealed class GuidedSetupTests
         await Until(() => g.Screen == GuidedScreen.Manual, "Claude signed in, its plan checked, and back on the step");
         Assert.Equal((GuidedScreen.Manual, step, "claude"), (g.Screen, rig.Setup.Step, ready));
         Assert.False(g.ForNotes);
-        Assert.Empty(rig.Terminals); // nothing was opened to paste a command into
         Assert.Empty(g.Thread); // and no chat was started: this is setup by hand
 
         // Already here and signed in (the Claude app's own, say): straight back, with nothing to press.
@@ -469,23 +468,7 @@ public sealed class GuidedSetupTests
     }
 
     [AvaloniaFact]
-    public async Task The_terminal_is_offered_for_signing_in_only_once_the_hidden_sign_in_stopped_at_once()
-    {
-        // The sign-in runs hidden and opens the browser itself: while it waits there's no terminal on offer.
-        await using var rig = await new Rig(cli: "codex", installed: true).OpenAsync();
-        File.WriteAllText(Path.Combine(rig.Bin, "login-delay"), "120");
-        var g = rig.Guided;
-        g.PickCommand.Execute("codex");
-        await g.ContinueCommand.ExecuteAsync(null);
-        Assert.Equal(GuidedScreen.SignIn, g.Screen);
-        _ = g.OpenSignInCommand.ExecuteAsync(null);
-        await Until(() => g.WaitingSignIn, "waiting for the browser");
-        Assert.False(g.OfferTerminal);
-        Assert.Empty(rig.Terminals);
-    }
-
-    [AvaloniaFact]
-    public async Task A_sign_in_that_stops_at_once_offers_the_terminal_as_a_small_link_and_opens_nothing_by_itself()
+    public async Task A_sign_in_that_stops_at_once_says_Syft_Notes_couldnt_start_it_with_Try_again_and_Get_help()
     {
         await using var rig = await new Rig(cli: "codex", installed: true).OpenAsync();
         File.WriteAllText(Path.Combine(rig.Bin, "login-fails"), "");
@@ -493,11 +476,74 @@ public sealed class GuidedSetupTests
         g.PickCommand.Execute("codex");
         await g.ContinueCommand.ExecuteAsync(null);
         _ = g.OpenSignInCommand.ExecuteAsync(null);
-        await Until(() => g.OfferTerminal, "the terminal offered, the hidden sign-in having stopped at once");
-        Assert.Empty(rig.Terminals);
-        g.SignInInTerminalCommand.Execute(null);
-        Assert.Single(rig.Terminals);
+        await Until(() => g.HasSignInProblem, "the hidden sign-in having stopped at once");
+        Assert.Equal(("Syft Notes couldn't start ChatGPT's sign-in.", true, false), (g.SignInProblem, g.SignInStuck, g.WaitingSignIn));
+        g.GetHelpCommand.Execute(null);
+        Assert.Equal([AiWords.HelpPage], rig.Opened);
+
+        // Try again, and this time it starts: waiting for the browser, the problem gone.
+        File.Delete(Path.Combine(rig.Bin, "login-fails"));
+        File.WriteAllText(Path.Combine(rig.Bin, "login-delay"), "120");
+        _ = g.OpenSignInCommand.ExecuteAsync(null);
+        await Until(() => g.WaitingSignIn, "waiting for the browser");
+        Assert.False(g.HasSignInProblem);
+        Assert.False(g.SignInStuck);
     }
+
+    [AvaloniaFact]
+    public async Task A_lectures_Get_ready_window_offers_Get_help_and_never_a_terminal_in_both_skins()
+    {
+        // The window a lecture's Get study notes opens: while the sign-in waits, Open it again; once it couldn't start,
+        // Try again and Get help. Nothing on it, at any point, says Terminal or PowerShell.
+        foreach (bool stuck in new[] { false, true })
+            foreach (UserControl view in new UserControl[] { new Views.MacGetReady(), new Views.WinGetReady() })
+            {
+                await using var rig = await new Rig(cli: "codex", installed: true).OpenAsync();
+                File.WriteAllText(Path.Combine(rig.Bin, stuck ? "login-fails" : "login-delay"), stuck ? "" : "120");
+                var g = rig.Guided;
+                view.DataContext = g;
+                var window = new Window { Content = view, Width = 900, Height = 700 };
+                window.Show();
+                await g.GetReadyForNotesAsync("codex");
+                _ = g.OpenSignInCommand.ExecuteAsync(null);
+                await Until(() => stuck ? g.SignInStuck : g.WaitingSignIn, stuck ? "the hidden sign-in having stopped at once" : "waiting for the browser");
+                Avalonia.Threading.Dispatcher.UIThread.RunJobs();
+                Assert.Equal(stuck, view.Part<Button>("SignInHelp").IsEffectivelyVisible);
+                NoTerminal(view);
+                window.Close();
+            }
+    }
+
+    /// <summary>No words on <paramref name="view"/> (shown or not) say Terminal or PowerShell.</summary>
+    internal static void NoTerminal(Control view)
+    {
+        foreach (var t in view.GetLogicalDescendants().OfType<TextBlock>())
+            Assert.DoesNotMatch("Terminal|PowerShell", t.Text ?? "");
+        foreach (var b in view.GetLogicalDescendants().OfType<Button>())
+            Assert.DoesNotMatch("Terminal|PowerShell", b.Content as string ?? "");
+    }
+
+    /// <summary>Nothing a student can reach offers a terminal to sign in or to install with: no "Sign in in Terminal",
+    /// "Open Terminal", "Open PowerShell" or command to paste or run in one, in any view or words the app has. (The one
+    /// terminal left, "Open in Claude Code" for a class, is a feature for the comfortable with it, not a sign-in.)</summary>
+    [Fact]
+    public void No_view_or_words_in_the_app_offer_a_terminal_to_sign_in_or_install_with()
+    {
+        string src = Source();
+        var offers = new System.Text.RegularExpressions.Regex(
+            @"in (Terminal|PowerShell) instead|Open (Terminal|PowerShell)|Sign in in (Terminal|PowerShell)|(paste|type|run) (this|it|the command)( line)? (in|into) (Terminal|PowerShell|a terminal)|Install it yourself");
+        var found = Directory.EnumerateFiles(src, "*.*", SearchOption.AllDirectories)
+            .Where(f => f.EndsWith(".axaml", StringComparison.Ordinal) || f.EndsWith(".cs", StringComparison.Ordinal))
+            .Where(f => !f.Contains($"{Path.DirectorySeparatorChar}obj{Path.DirectorySeparatorChar}", StringComparison.Ordinal))
+            .SelectMany(f => File.ReadLines(f).Select((line, i) => (File: Path.GetRelativePath(src, f), Line: i + 1, Text: line)))
+            .Where(l => offers.IsMatch(l.Text))
+            .Select(l => $"{l.File}:{l.Line}: {l.Text.Trim()}")
+            .ToList();
+        Assert.Empty(found);
+    }
+
+    static string Source([System.Runtime.CompilerServices.CallerFilePath] string here = "") =>
+        Path.GetFullPath(Path.Combine(Path.GetDirectoryName(here)!, "..", "..", "src", "StudyStash.App"));
 
     [AvaloniaFact]
     public async Task An_install_offline_or_a_plan_without_the_cli_says_so_with_a_way_on()
