@@ -635,6 +635,16 @@ public class AiShots
             Shot.Take("mac-13-ai-engines", SkinKind.Mac, t, () => SettingsFrame(SkinKind.Mac, "Your AI", new MacAiEngines { DataContext = AiDemo.Engines() }));
     }
 
+    /// <summary>Settings → Your AI on a fresh library: nobody writes the notes yet, and nothing is installed.</summary>
+    [AvaloniaFact]
+    public void Ai_engines_on_a_fresh_library()
+    {
+        foreach (var skin in new[] { SkinKind.Mac, SkinKind.Win })
+            foreach (var t in Themes)
+                Shot.Take($"{(skin == SkinKind.Mac ? "mac" : "win")}-13-ai-engines-fresh-library", skin, t, () => SettingsFrame(skin, "Your AI",
+                    skin == SkinKind.Mac ? new MacAiEngines { DataContext = AiDemo.FreshEngines() } : new WinAiEngines { DataContext = AiDemo.FreshEngines() }));
+    }
+
     [AvaloniaFact]
     public void Win_ai_engines()
     {

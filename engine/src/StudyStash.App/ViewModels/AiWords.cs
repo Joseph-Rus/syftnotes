@@ -246,7 +246,7 @@ public static partial class AiWords
         DateTime.TryParse(iso, CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind, out var t) ? t : null;
 
     /// <summary>The Who does what row's line while nobody is chosen to write the notes (a fresh library).</summary>
-    public const string NoNotesAi = "No AI writes your notes yet. Choose one here, or set one up below.";
+    public const string NoNotesAi = "No AI writes your notes yet. Choose one.";
     /// <summary>What a Who does what choice says while nothing is chosen for it.</summary>
     public const string ChooseAnAi = "Choose an AI";
     public const string OlderLibraryWords = "Your library runs an older Syft Notes: update it to choose your AI here.";

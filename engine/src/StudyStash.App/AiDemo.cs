@@ -275,6 +275,19 @@ public static class AiDemo
     }
 
     /// <summary>The Your AI rows with Claude's sign-in at <paramref name="phase"/> (waiting for the browser, gave up, ...).</summary>
+    /// <summary>A fresh library on a computer with none of the AIs installed and nobody chosen yet: Your AI says no AI writes
+    /// the notes, and offers Set up on each.</summary>
+    public static AiEnginesModel FreshEngines()
+    {
+        var none = new AiOverview(Engines_.Select(e => e with { State = "not_installed", Installed = false, Model = "", Models = [] }).ToList(), Notes: "", Ask: "", Fallback: true, Problems: [])
+        {
+            Diagrams = "auto", DiagramsBy = "", Rich = new RichNotesInfo(true, true, true, true), Speed = "standard",
+        };
+        var m = new AiEnginesModel(new Library(none)) { Here = true };
+        m.Load().GetAwaiter().GetResult();
+        return m;
+    }
+
     public static AiEnginesModel EnginesSigningIn(string phase)
     {
         var m = new AiEnginesModel(new Library(SigningIn(phase))) { SignInEvery = TimeSpan.FromHours(1) };

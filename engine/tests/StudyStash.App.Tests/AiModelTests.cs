@@ -156,7 +156,7 @@ public class AiEnginesModelTests
 
         Assert.True(model.NoNotesAi);
         Assert.Equal("", model.SelectedNotes);
-        Assert.Equal("No AI writes your notes yet. Choose one here, or set one up below.", model.NotesRowAbout);
+        Assert.Equal("No AI writes your notes yet. Choose one.", model.NotesRowAbout);
         Assert.Equal("Choose an AI", model.SelectedNotesName);
         Assert.Equal("Choose an AI", model.SelectedAskName);
         Assert.Contains("Ollama (free, advanced)", model.NotesChoices.Select(c => c.Name)); // Ollama is one to pick, not the pick
