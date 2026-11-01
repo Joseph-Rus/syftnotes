@@ -19,9 +19,7 @@ The app's name in App Store Connect (App Information → Name) is set by hand th
    `PrivacyInfo.xcprivacy` says the same. The AI that writes notes and answers questions runs from that library, under
    the student's own account (or on the computer with Ollama), and the privacy policy says so.
 5. **TestFlight → Test Information** (needed before external testers, not for internal ones):
-   - **Beta App Description**: "Syft Notes keeps your lectures. Record a class on your phone, and your computer
-     writes study notes from it; read them, study with flashcards and quizzes, ask questions about your lectures,
-     see what's due, and write notes by hand in notebooks. This beta has the new look and handwritten notebooks."
+   - **Beta App Description**: kept outside this public repository by the maintainer.
    - **Feedback Email**: an address you read.
    - **Privacy Policy URL**: as above. **Marketing URL**: `https://syftnotes.com/`.
    - **Beta App Review Information**: contact name, phone (international format, +1…) and email; **Sign-in
