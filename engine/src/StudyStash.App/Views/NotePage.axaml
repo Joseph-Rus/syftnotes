@@ -375,14 +375,22 @@
                    and the box a chat's notes are pasted into (from here, or the notes' ⋯ menu). -->
               <StackPanel Name="FreeAi" Spacing="12" DataContext="{Binding $parent[UserControl].((vm:LibraryModel)DataContext).FreeAi}" x:DataType="vm:FreeAiModel"
                           IsVisible="{Binding $parent[UserControl].((vm:LibraryModel)DataContext).FreeAi, Converter={x:Static ObjectConverters.IsNotNull}}">
-                <!-- No AI writes notes yet: which, asked once, here. Continue with Google (free with a personal Google
-                     account) first, Claude and ChatGPT for a paid plan, and copy and paste as the quiet other free way. -->
+                <!-- No AI writes notes yet: which, asked once, here. Continue with Google (Gemini, free with a personal
+                     Google account) first; then all four AIs by name, Claude and ChatGPT for a paid plan, Gemini, and
+                     Ollama (advanced, set up in Settings); and copy and paste as the quiet other free way. -->
                 <Border Name="GetNotes" Classes="free-ai" IsVisible="{Binding ShowChoose}">
                   <StackPanel Spacing="8">
                     <TextBlock Name="GetNotesTitle" Classes="free-ai-lead" Text="{Binding ChooseTitle}" />
                     <TextBlock Classes="free-ai-more" Text="{x:Static vm:FreeAiModel.ChooseText}" />
-                    <Button Name="ContinueWithGoogle" Classes="btn ink" HorizontalAlignment="Left" Margin="0,8,0,0" Command="{Binding ContinueWithGoogleCommand}"
-                            Content="{x:Static vm:FreeAiModel.GoogleButton}" AutomationProperties.Name="{x:Static vm:FreeAiModel.GoogleButton}" />
+                    <WrapPanel Margin="0,8,0,0" ItemSpacing="12" LineSpacing="6">
+                      <Button Name="ContinueWithGoogle" Classes="btn ink" VerticalAlignment="Center" Command="{Binding ContinueWithGoogleCommand}"
+                              Content="{x:Static vm:FreeAiModel.GoogleButton}" AutomationProperties.Name="{x:Static vm:FreeAiModel.GoogleButton}"
+                              AutomationProperties.HelpText="{x:Static vm:FreeAiModel.GoogleBeside}" />
+                      <StackPanel Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
+                        <c:Icon Glyph="brand:gemini" Size="15" VerticalAlignment="Center" />
+                        <TextBlock Name="GoogleBeside" Classes="free-ai-more" VerticalAlignment="Center" Text="{x:Static vm:FreeAiModel.GoogleBeside}" />
+                      </StackPanel>
+                    </WrapPanel>
                     <TextBlock Classes="free-ai-more" FontSize="12.5" Text="{x:Static vm:FreeAiModel.GoogleLine}" />
                     <WrapPanel Margin="0,8,0,0" ItemSpacing="8" LineSpacing="8">
                       <Button Name="UseClaude" Classes="btn sm" Command="{Binding UseClaudeCommand}" AutomationProperties.Name="Claude">
@@ -395,6 +403,18 @@
                         <StackPanel Orientation="Horizontal" Spacing="8">
                           <c:Icon Glyph="brand:chatgpt" Size="15" VerticalAlignment="Center" />
                           <TextBlock Text="ChatGPT" VerticalAlignment="Center" />
+                        </StackPanel>
+                      </Button>
+                      <Button Name="UseGemini" Classes="btn sm" Command="{Binding UseGeminiCommand}" AutomationProperties.Name="Gemini">
+                        <StackPanel Orientation="Horizontal" Spacing="8">
+                          <c:Icon Glyph="brand:gemini" Size="15" VerticalAlignment="Center" />
+                          <TextBlock Text="Gemini" VerticalAlignment="Center" />
+                        </StackPanel>
+                      </Button>
+                      <Button Name="UseOllama" Classes="btn sm" Command="{Binding UseOllamaCommand}" AutomationProperties.Name="Ollama (advanced)">
+                        <StackPanel Orientation="Horizontal" Spacing="8">
+                          <c:Icon Glyph="brand:ollama" Size="15" VerticalAlignment="Center" />
+                          <TextBlock Text="Ollama" VerticalAlignment="Center" />
                         </StackPanel>
                       </Button>
                     </WrapPanel>

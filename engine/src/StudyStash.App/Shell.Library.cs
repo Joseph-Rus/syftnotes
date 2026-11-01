@@ -343,7 +343,12 @@ public static partial class Shell
         free.HasNotes = has;
         free.Offer = offer && !has;
         free.Choose = choose;
-        free.OnGetReady = engine => GetNotesWith(engine, note.Id);
+        // Ollama is set up in Settings → Your AI (its download is big, and it's for the comfortable with it).
+        free.OnGetReady = engine =>
+        {
+            if (engine == "ollama") ShowSettings("AI");
+            else GetNotesWith(engine, note.Id);
+        };
         // Over its usage limit says so (and until when); a school account Google turned down stays said until the page
         // is left.
         if (limitedBy is not null)

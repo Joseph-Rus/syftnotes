@@ -128,8 +128,11 @@ public sealed partial class FreeAiModel : ObservableObject
     public string ChooseTitle => $"Get study notes from this {Noun}";
     public const string ChooseText = "An AI reads the transcript and writes a summary, the key points, definitions and questions to review.";
     public const string GoogleButton = "Continue with Google";
-    public const string GoogleLine = "Free with a personal Google account, through Gemini. After this, notes are written after every class. Google's free plan may use what's sent to improve its products.";
-    public const string PaidLine = "Have a paid Claude or ChatGPT plan? Notes then write themselves after every class too.";
+    /// <summary>Beside the Google button: which AI it is, and that it's free.</summary>
+    public const string GoogleBeside = "Gemini, free with your Google account";
+    public const string GoogleLine = "After this, notes are written after every class. Google's free plan may use what's sent to improve its products.";
+    /// <summary>Under the four AIs: what the others need. Ollama is for the comfortable with it.</summary>
+    public const string PaidLine = "Claude and ChatGPT work with a paid plan. Ollama is free and runs on this computer (advanced).";
     public string OtherWayLabel => CopyWayOpen ? "Hide the other free way" : "Other free way: copy and paste";
     public const string CopyWayText = "Copy for your AI, paste it into ChatGPT, Claude or Gemini in your browser, then bring back what it writes with Paste notes.";
 
@@ -150,13 +153,16 @@ public sealed partial class FreeAiModel : ObservableObject
         _ => "",
     };
 
-    /// <summary>Continue with Google, Claude or ChatGPT: the host gets that AI ready ("gemini", "claude", "codex"), in
-    /// its own small window, and it writes this lecture's notes (and every one after).</summary>
+    /// <summary>Continue with Google (Gemini), Claude or ChatGPT: the host gets that AI ready ("gemini", "claude",
+    /// "codex"), in its own small window, and it writes this lecture's notes (and every one after). Ollama ("ollama"):
+    /// Settings → Your AI, where it's set up (a big download, for the comfortable with it).</summary>
     public Action<string>? OnGetReady { get; set; }
 
     [RelayCommand] void ContinueWithGoogle() => OnGetReady?.Invoke("gemini");
     [RelayCommand] void UseClaude() => OnGetReady?.Invoke("claude");
     [RelayCommand] void UseChatGpt() => OnGetReady?.Invoke("codex");
+    [RelayCommand] void UseGemini() => OnGetReady?.Invoke("gemini");
+    [RelayCommand] void UseOllama() => OnGetReady?.Invoke("ollama");
     [RelayCommand] void ToggleCopyWay() => CopyWayOpen = !CopyWayOpen;
 
     /// <summary>The one line a student with no paid AI is told, over a lecture with no notes.</summary>
