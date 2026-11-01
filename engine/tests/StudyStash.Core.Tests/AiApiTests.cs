@@ -443,7 +443,8 @@ public class AiApiTests
         using var dir = new TempDir();
         var cfg = Cfg(dir);
         using var store = new Store(cfg.DbPath, cfg.PoolDir);
-        var ai = new AiJobs(cfg.Home) { Checks = new FakeChecks().Ollama().Build() }; // not running, and it's the default: a problem
+        new AiSettings { Provider = "ollama" }.Save(cfg.Home);
+        var ai = new AiJobs(cfg.Home) { Checks = new FakeChecks().Ollama().Build() }; // not running, and it's the pick: a problem
         await using var site = await Site(cfg, store, ai);
         var remote = new AiRemote("http://localhost", "pw", site.Client);
 
