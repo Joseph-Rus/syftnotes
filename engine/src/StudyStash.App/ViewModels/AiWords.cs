@@ -136,6 +136,17 @@ public static partial class AiWords
         _ => name,
     };
 
+    /// <summary>The AIs in the order a student meets them everywhere they're listed: Claude, ChatGPT, Gemini, then the
+    /// free one on this computer (Ollama, for the comfortable with it).</summary>
+    public static readonly string[] ShownOrder = ["claude", "codex", "gemini", "ollama"];
+
+    /// <summary><paramref name="engines"/> in <see cref="ShownOrder"/> (an AI it doesn't know goes last).</summary>
+    public static IEnumerable<EngineInfo> InShownOrder(IEnumerable<EngineInfo> engines) => InShownOrder(engines, e => e.Id);
+
+    /// <summary>The same, for anything that says which AI it is.</summary>
+    public static IEnumerable<T> InShownOrder<T>(IEnumerable<T> items, Func<T, string> id) =>
+        items.OrderBy(x => Array.IndexOf(ShownOrder, id(x)) is var i and >= 0 ? i : ShownOrder.Length);
+
     static string Simpler(bool small, string device) => small ? $" A small one fits this {device}'s memory, so its notes are simpler than Claude's or ChatGPT's." : "";
 
     /// <summary>An engine's name in setup's "who writes your notes" list, in a student's terms: what they'd say they
@@ -503,9 +514,16 @@ public static partial class AiWords
         SignInPhase.Waiting => SignInWaiting,
         SignInPhase.GaveUp => "It stopped waiting before you'd finished. Try again.",
         SignInPhase.Region => $"{engineName} isn't offered in your country yet.",
-        SignInPhase.Stuck => "Syft Notes couldn't open the sign-in page by itself. Try again.",
+        SignInPhase.Stuck => SignInStuckWords(engineName),
         _ => "",
     };
+
+    /// <summary>Syft Notes' own help page: where Get help goes when it couldn't start an AI's sign-in, or install it.</summary>
+    public const string HelpPage = "https://syftnotes.com/support/";
+
+    /// <summary>A sign-in Syft Notes couldn't start (or that stopped at once): said plainly, with Try again and Get help
+    /// beside it, and never a terminal to do it in instead.</summary>
+    public static string SignInStuckWords(string engineName) => $"Syft Notes couldn't start {engineName}'s sign-in.";
 
     /// <summary>The line under the list of AIs once a sign-in has stopped, so it says what the row says rather than the
     /// "Finish signing in…" the press answered with.</summary>
@@ -513,7 +531,7 @@ public static partial class AiWords
     {
         SignInPhase.GaveUp => $"Signing in to {engineName} stopped before you'd finished. Try again.",
         SignInPhase.Region => $"{engineName} isn't offered in your country yet.",
-        SignInPhase.Stuck => $"Syft Notes couldn't open the sign-in page for {engineName}. Try again.",
+        SignInPhase.Stuck => SignInStuckWords(engineName),
         _ => "",
     };
 
@@ -527,12 +545,12 @@ public static partial class AiWords
         _ => "",
     };
 
-    /// <summary>The small link beside a sign-in that's going: the page again while it waits, a terminal only when the
-    /// hidden sign-in couldn't start or stopped at once.</summary>
+    /// <summary>The small link beside a sign-in: the page again while it waits, Syft Notes' help page when it couldn't
+    /// start.</summary>
     public static string SignInLink(string phase) => phase switch
     {
         SignInPhase.Waiting => "Open the page again",
-        SignInPhase.Stuck => "Sign in in Terminal instead",
+        SignInPhase.Stuck => "Get help",
         _ => "",
     };
 

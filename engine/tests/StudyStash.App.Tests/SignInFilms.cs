@@ -78,7 +78,6 @@ public sealed class SignInFilms
                 Installer = c => pc.Installer(c, Path.Combine(host.Home, "logs", "setup-install.log")),
                 SignIn = (c, exe) => new AgentSignIn(c, exe),
                 OpenUrl = pc.Pages.Add,
-                OpenTerminal = (_, _) => Interlocked.Increment(ref pc.TerminalDoors),
                 Downloading = () => host.Downloading?.Fraction,
                 AiApps = () => [],
             };

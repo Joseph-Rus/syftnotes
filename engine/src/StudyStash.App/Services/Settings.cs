@@ -420,7 +420,7 @@ public sealed partial class SettingsModel : ObservableObject, IDisposable
                 ? "It runs on your library, and you can set it up there or from this laptop."
                 : $"It runs on this {device}, as part of your library."),
         };
-        AiProblems = new AiProblemsModel(ai) { Here = libraryHere };
+        AiProblems = new AiProblemsModel(ai) { Here = libraryHere, OpenUrl = url => Dialogs.OpenUrl(url) };
         // A sign-in started from a problem card shows on its AI's row below, and the other way round.
         Engines.ShareWith(AiProblems);
         Access = MakeAccess(ai, host);

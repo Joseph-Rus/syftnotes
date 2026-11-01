@@ -53,8 +53,8 @@ public sealed partial class AiEngineRow : ObservableObject
     public string SignIn { get; init; } = "";
     /// <summary>The row's pill: not while it has no words (a sign-in that waits for the browser has no button to press).</summary>
     public bool ShowPill => !NeedsOptions && ActionWords.Length > 0;
-    /// <summary>A small link beside a sign-in that's going: "Open the page again", or, only once the hidden sign-in couldn't
-    /// start or stopped at once, "Sign in in Terminal instead".</summary>
+    /// <summary>A small link beside a sign-in: "Open the page again" while it waits, or "Get help" once Syft Notes couldn't
+    /// start it.</summary>
     public string LinkWords { get; init; } = "";
     public bool HasLink => LinkWords.Length > 0;
     public IAsyncRelayCommand LinkCommand { get; internal set; } = null!;
@@ -565,15 +565,19 @@ public sealed partial class AiEnginesModel : ObservableObject
         return said;
     }
 
-    /// <summary>The small link on a row whose sign-in is going: the page again (the sign-in run once more, so the browser
-    /// opens at a page that finishes by itself), or the terminal once the hidden sign-in couldn't start.</summary>
+    /// <summary>The small link on a row's sign-in: the page again (it opens once more, or the sign-in runs once more and
+    /// opens it), or Syft Notes' help page once it couldn't start.</summary>
     async Task SignInLinkAsync(AiEngineRow row)
     {
+        if (row.SignIn == SignInPhase.Stuck)
+        {
+            OpenUrl?.Invoke(AiWords.HelpPage);
+            return;
+        }
         Busy = true;
         try
         {
-            var said = row.SignIn == SignInPhase.Stuck ? await library.SignInInTerminalAsync(row.Id) : await library.SignInAgainAsync(row.Id);
-            await AfterAction(said);
+            await AfterAction(await library.SignInAgainAsync(row.Id));
         }
         catch (LibraryRefusedException ex)
         {

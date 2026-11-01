@@ -58,6 +58,9 @@ public sealed class AiProblemsModel
     readonly SignInWatch watch;
     string shown = "";
 
+    /// <summary>Opens a page in the browser (Get help); null in tests.</summary>
+    public Action<string>? OpenUrl { get; set; }
+
     public AiProblemsModel(IAiLibrary library)
     {
         this.library = library;
@@ -155,13 +158,18 @@ public sealed class AiProblemsModel
         return problem;
     }
 
-    /// <summary>The small link on a sign-in that's going: the page again, or (only once the hidden sign-in couldn't start
-    /// or stopped at once) the terminal.</summary>
+    /// <summary>The small link on a sign-in: the page again while it waits, or Syft Notes' help page once it couldn't
+    /// start.</summary>
     async Task ActOnLink(AiProblemInfo p, string signIn)
     {
+        if (signIn == SignInPhase.Stuck)
+        {
+            OpenUrl?.Invoke(AiWords.HelpPage);
+            return;
+        }
         try
         {
-            var said = signIn == SignInPhase.Stuck ? await library.SignInInTerminalAsync(p.Engine) : await library.SignInAgainAsync(p.Engine);
+            var said = await library.SignInAgainAsync(p.Engine);
             if (said?.Overview is not null) Take(said.Overview);
         }
         catch
