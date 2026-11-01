@@ -310,7 +310,7 @@ public static partial class Shell
         string error = S(l["error"]);
         ShowFreeAi(note, has: notes.Length > 0 && !mine, offer: !writing && notes.Length == 0 && heard && S(l["no_notes"]) != Summarize.NoNotesShort,
             // No AI writes notes yet: the card asks which. Over its usage limit: it says until when.
-            choose: S(l["no_notes"]) == Summarize.NoNotesOff, limitedBy: notes.Length == 0 ? Core.Ai.Engines.WaitsForLimit(error) : null,
+            choose: S(l["no_notes"]) == Summarize.NoNotesOff || error == Core.Ai.Engines.NotesNeedAnAi, limitedBy: notes.Length == 0 ? Core.Ai.Engines.WaitsForLimit(error) : null,
             limitedUntil: Core.Ai.Engines.LimitUntil(error));
         // Notes to read that nothing is writing now (with none written, what the student typed) can be edited and rewritten.
         ShowLectureAi(l, note, written: !writing && (notes.Length > 0 || (mine && S(l["error"]).Length == 0)));

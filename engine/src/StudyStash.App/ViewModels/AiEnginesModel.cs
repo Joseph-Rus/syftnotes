@@ -252,8 +252,13 @@ public sealed partial class AiEnginesModel : ObservableObject
     [ObservableProperty] public partial bool OlderLibrary { get; set; }
     [ObservableProperty] public partial bool Offline { get; set; }
 
-    public string SelectedNotesName => NotesChoices.FirstOrDefault(c => c.Id == SelectedNotes)?.Name ?? SelectedNotes;
-    public string SelectedAskName => AskChoices.FirstOrDefault(c => c.Id == SelectedAsk)?.Name ?? SelectedAsk;
+    public string SelectedNotesName => SelectedNotes.Length == 0 ? AiWords.ChooseAnAi : NotesChoices.FirstOrDefault(c => c.Id == SelectedNotes)?.Name ?? SelectedNotes;
+    public string SelectedAskName => SelectedAsk.Length == 0 ? AiWords.ChooseAnAi : AskChoices.FirstOrDefault(c => c.Id == SelectedAsk)?.Name ?? SelectedAsk;
+    /// <summary>Nobody writes the notes yet (a fresh library, nothing chosen): the row says so and offers the choice, rather
+    /// than naming an AI that may not even be here.</summary>
+    public bool NoNotesAi => last is not null && SelectedNotes.Length == 0;
+    /// <summary>The notes row's line: where the notes are written, or that no AI writes them yet.</summary>
+    public string NotesRowAbout => NoNotesAi ? AiWords.NoNotesAi : "After each lecture, on your library";
     public string SelectedDiagramsName => DiagramsChoices.FirstOrDefault(c => c.Id == SelectedDiagrams)?.Name ?? SelectedDiagrams;
     /// <summary>The diagrams row's line: who reads each transcript to draw them, or that nobody does.</summary>
     public string DiagramsAbout => AiWords.DiagramsAbout(SelectedDiagrams, DiagramsBy);
@@ -286,6 +291,8 @@ public sealed partial class AiEnginesModel : ObservableObject
     {
         EngineChoice.Mark(NotesChoices, value);
         OnPropertyChanged(nameof(SelectedNotesName));
+        OnPropertyChanged(nameof(NoNotesAi));
+        OnPropertyChanged(nameof(NotesRowAbout));
         if (!loading) _ = PostDefaultsAsync(notes: value);
     }
 
@@ -416,6 +423,9 @@ public sealed partial class AiEnginesModel : ObservableObject
             OnPropertyChanged(nameof(SelectedDiagramsName));
             OnPropertyChanged(nameof(SelectedSpeedName));
             Fallback = overview.Fallback;
+            OnPropertyChanged(nameof(NoNotesAi));
+            OnPropertyChanged(nameof(NotesRowAbout));
+            OnPropertyChanged(nameof(SelectedAskName));
             // A sign-in the press said was going that has stopped since (or never started): the line says so, as its row does.
             if (Say?.StartsWith("Finish signing in to ", StringComparison.Ordinal) == true
                 && overview.Engines.FirstOrDefault(e => e.State == "not_signed_in" && e.SignIn is SignInPhase.GaveUp or SignInPhase.Region or SignInPhase.Stuck) is { } stopped)
