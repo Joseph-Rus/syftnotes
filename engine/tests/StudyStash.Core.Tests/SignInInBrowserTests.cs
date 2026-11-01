@@ -181,6 +181,21 @@ public class SignInInBrowserTests
     }
 
     [Fact]
+    public void An_AI_just_installed_and_never_tried_reads_as_signing_in_while_its_sign_in_waits()
+    {
+        using var dir = new TempDir();
+        var fake = new FakeChecks().InstalledAt("claude", FakeAgents.WriteCli(dir["bin"], "claude"));
+        File.WriteAllText(dir["bin/login-delay"], "120");
+        using var signIns = new AiSignIns(fake.Build(), _ => { });
+        var fresh = new AiOverview([new EngineInfo("claude", "Claude", "unchecked") { Installed = true }], "claude", "claude", false, []);
+        Assert.Equal("unchecked", signIns.Annotate(fresh).Engines.Single().State);
+
+        signIns.Start("claude");
+        var row = signIns.Annotate(fresh).Engines.Single();
+        Assert.Equal(("not_signed_in", SignInPhase.Waiting), (row.State, row.SignIn));
+    }
+
+    [Fact]
     public async Task An_AI_that_isnt_installed_says_so_and_opens_nothing()
     {
         await using var rig = await Rig.StartAsync(["claude"]);
