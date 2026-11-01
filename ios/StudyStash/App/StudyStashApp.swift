@@ -11,6 +11,9 @@ struct StudyStashApp: App {
     init() {
         UNUserNotificationCenter.current().delegate = NotificationRouter.shared
         SystemLook.apply()
+        #if DEBUG
+        AskConsent.applyDebugLaunch()
+        #endif
         // Pull to refresh shows the pixel s's Row Shuffle (syftRefreshable), not the system's spinner.
         UIRefreshControl.appearance().tintColor = .clear
         // Pause and Stop on the lock screen: wired as the app starts, not when its first screen appears, so a tap that
@@ -290,7 +293,8 @@ extension View {
 /// - `-laptop-away` (with `-demo`) shows the laptop asleep or off, two hours since it was last there (the banner, Ask's
 ///   first screen); `-laptop-back [seconds]` starts the same and has it come back after that long (4 s).
 /// - `-record` records (in the simulator, made-up lines stand in for what's heard), `-ask "<question>"` asks it on
-///   the Ask tab, `-quiet` never asks to send notifications.
+///   the Ask tab, `-quiet` never asks to send notifications; `-ask-agreed yes` has the student already agreed to
+///   where questions go (AskConsent), `-ask-agreed no` shows that sheet again before the next one.
 /// A screen's own file can read a flag of its own with `DebugLaunch.flag("-x")` or `DebugLaunch.value("-x")`.
 enum DebugLaunch {
     /// What follows `flag` (`offset` places on).

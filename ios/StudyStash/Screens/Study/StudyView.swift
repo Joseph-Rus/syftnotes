@@ -66,6 +66,9 @@ struct StudyView: View {
     @State private var toast: String?
     /// Bumped when a new deck arrives, so both halves start afresh.
     @State private var round = 0
+    /// Where the request goes, shown before the first deck is asked for (AskConsent); `waiting` once it's been put off.
+    @State private var consenting = false
+    @State private var waiting = false
 
     /// A lecture's flashcards and quiz (Study, on a lecture's page).
     init(lectureID: String, title: String, onReadNotes: (() -> Void)? = nil) {
@@ -104,7 +107,7 @@ struct StudyView: View {
                 if deck != nil {
                     ToolbarItem(placement: .primaryAction) {
                         Menu {
-                            Button { Task { await make() } } label: { Label("Make new flashcards and a quiz", icon: "refresh") }
+                            Button { makeWhenAgreed() } label: { Label("Make new flashcards and a quiz", icon: "refresh") }
                                 .disabled(making)
                         } label: {
                             Label("More", icon: "more_horiz")
@@ -113,9 +116,12 @@ struct StudyView: View {
                 }
             }
             .toast($toast, seconds: 4)
+            .sheet(isPresented: $consenting) {
+                AskConsentSheet(purpose: .study) { Task { await make() } }
+            }
         }
         .task {
-            if let saved = ResponseCache.shared.read(cacheKey, as: StudyDeck.self) { deck = saved } else { await make() }
+            if let saved = ResponseCache.shared.read(cacheKey, as: StudyDeck.self) { deck = saved } else { makeWhenAgreed() }
         }
         .task { await findClass() }
     }
@@ -181,10 +187,19 @@ struct StudyView: View {
             }
         } else if making {
             makingNote(over: false)
+        } else if waiting && !AskConsent.agreed {
+            ScrollView {
+                EmptyState(title: "Flashcards come from your AI",
+                           detail: "Syft Notes asks the AI on your \(app.isDrive || app.isDemo ? "laptop" : "computer") to write them from your notes.",
+                           actionTitle: "See where they go", action: { consenting = true }, mark: .oddOneOut)
+                    .padding(.horizontal, Space.pageCompact)
+                    .frame(maxWidth: 640)
+                    .frame(maxWidth: .infinity)
+            }
         } else {
             ScrollView {
                 EmptyState(title: "Couldn't make flashcards", detail: problem, actionTitle: "Try again",
-                           action: { Task { await make() } }, mark: .oddOneOut)
+                           action: { makeWhenAgreed() }, mark: .oddOneOut)
                     .padding(.horizontal, Space.pageCompact)
                     .frame(maxWidth: 640)
                     .frame(maxWidth: .infinity)
@@ -231,6 +246,16 @@ struct StudyView: View {
             lectureClass = l.class ?? ""
         } else if let api = app.api, let l = try? await api.lecture(id) {
             lectureClass = l.class ?? ""
+        }
+    }
+
+    /// A deck asked for now if the student has agreed to where it's sent; else the sheet that says so first.
+    private func makeWhenAgreed() {
+        if AskConsent.agreed {
+            Task { await make() }
+        } else {
+            waiting = true
+            consenting = true
         }
     }
 

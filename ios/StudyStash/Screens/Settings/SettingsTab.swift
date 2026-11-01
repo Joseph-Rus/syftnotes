@@ -3,7 +3,8 @@ import SwiftUI
 /// Settings, pushed from Home's toolbar (`Route.settings`), in the desktop's settings look: a heading over each
 /// grouped box of rows, a row's words on the left (its title in ink, a line under it muted) and its control on the
 /// right. Your library (this phone and the computer it reads, joined while the library answers), Appearance, Reminders,
-/// What it's for, This phone, About. It has no stack of its own: it's a page on Home's.
+/// What it's for, Your AI (whether questions may go to it), This phone, About (help and the privacy policy). It has no
+/// stack of its own: it's a page on Home's.
 struct SettingsTab: View {
     @Environment(AppModel.self) private var app
     @Environment(\.horizontalSizeClass) private var sizeClass
@@ -13,6 +14,8 @@ struct SettingsTab: View {
     @AppStorage("remind.class") private var remindClass = true
     @AppStorage("remind.due") private var remindDue = true
     @AppStorage("remind.notes") private var remindNotes = true
+    /// Whether questions may go to the student's AI (AskConsent): off, the next one shows where it goes first.
+    @AppStorage(AskConsent.key) private var askAgreed = false
 
     @State private var me: Me?
     @State private var reach: Reach = .checking
@@ -36,6 +39,7 @@ struct SettingsTab: View {
                     appearanceSection.id(Part.appearance)
                     reminders.id(Part.reminders)
                     uses.id(Part.uses)
+                    yourAI.id(Part.ai)
                     if !demo && !app.isDrive { thisPhone.id(Part.phone) }
                     about.id(Part.about)
                 }
@@ -321,6 +325,25 @@ struct SettingsTab: View {
         app.forSchool ? "Classes, Canvas and what’s due" : "Folders, and notes written for meetings and talks"
     }
 
+    // MARK: - Your AI
+
+    /// Whether Ask, flashcards and quizzes may send questions on to the AI the student chose on their laptop: what
+    /// they agreed to before the first question, taken back here.
+    private var yourAI: some View {
+        Group {
+            Heading("Your AI")
+            SettingsBox {
+                Toggle("Send questions to your AI", isOn: $askAgreed)
+                    .toggleStyle(SettingsSwitchStyle())
+                    .accessibilityIdentifier("settings.askAgreed")
+            }
+            Say("Ask, flashcards and quizzes send your question to Syft Notes on your \(computerWord), and the AI you chose there (Claude, ChatGPT or Gemini) answers from your notes, under your own account with it. Turned off, nothing is asked until you agree again.")
+        }
+    }
+
+    /// Over Google Drive (and in the sample classes) the library is on the laptop; over Tailscale, on a computer.
+    private var computerWord: String { app.isDrive || app.isDemo ? "laptop" : "computer" }
+
     // MARK: - This phone
 
     private var thisPhone: some View {
@@ -356,13 +379,28 @@ struct SettingsTab: View {
                     }
                     .accessibilityElement(children: .combine)
                     Spacer(minLength: 8)
-                    Button("Help") { openURL(URL(string: "https://studystash.app")!) }
-                        .buttonStyle(.textLink)
-                        .accessibilityHint("Opens studystash.app")
                 }
                 .padding(16)
+                SettingsRowRule()
+                link("Help", detail: "Questions, problems and how-tos", url: Self.help)
+                SettingsRowRule()
+                link("Privacy policy", detail: "What Syft Notes reads, where it's kept, and how to remove it", url: AskConsentSheet.privacy)
             }
         }
+    }
+
+    static let help = URL(string: "https://syftnotes.com/support/")!
+
+    /// A row that opens a page of syftnotes.com in the browser.
+    private func link(_ title: String, detail: String, url: URL) -> some View {
+        Button { openURL(url) } label: {
+            SettingsRow(title: title, detail: detail) {
+                Icon("open_in_new", size: 16).foregroundStyle(.inkSubtle)
+            }
+        }
+        .buttonStyle(SettingsRowButtonStyle())
+        .accessibilityLabel(title)
+        .accessibilityHint("Opens \(url.host() ?? "")\(url.path())")
     }
 
     private var versionLine: String {
@@ -372,7 +410,7 @@ struct SettingsTab: View {
     }
 
     /// The page's parts, for `-scroll <part>` (a debug build's pictures).
-    private enum Part: String { case library, appearance, reminders, uses, phone, about }
+    private enum Part: String { case library, appearance, reminders, uses, ai, phone, about }
 }
 
 // MARK: - The settings look (the desktop's SettingsView: section, group, row, row-title, row-sub, say, switch)

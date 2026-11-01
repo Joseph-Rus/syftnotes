@@ -130,7 +130,7 @@ private struct LibraryHome: View {
     // MARK: the page
 
     @ViewBuilder private func page(now: Date) -> some View {
-        if app.isDemo { demoBanner.padding(.bottom, 20) }
+        if showsDemoBanner { demoBanner.padding(.bottom, 20) }
         header(now: now)
         if let n = library.value?.recordingNow {
             RecordingNowBanner(info: n, now: now) { shooting = RecordingNowBanner.target(n) }.padding(.top, 20)
@@ -179,6 +179,15 @@ private struct LibraryHome: View {
     private var canvas: Bool {
         guard app.forSchool, let d = due.value else { return false }
         return d.synced != nil || d.groups.contains { !$0.items.isEmpty }
+    }
+
+    /// The demo library says so, except in a debug build's pictures of it as a library on a computer (`-as-paired`,
+    /// as Settings has it: the App Store's pictures).
+    private var showsDemoBanner: Bool {
+        #if DEBUG
+        if DebugLaunch.flag("-as-paired") { return false }
+        #endif
+        return app.isDemo
     }
 
     /// The demo library: a slim line saying so, and the way out.
