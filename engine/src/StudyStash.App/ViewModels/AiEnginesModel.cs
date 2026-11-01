@@ -274,7 +274,7 @@ public sealed partial class AiEnginesModel : ObservableObject
 
     /// <summary>Installs an AI's own helper on this computer with its maker's installer (<see cref="AgentInstall"/>), saying
     /// where it's got to: Set up on a row. Null where the library is on another computer (it's installed there).</summary>
-    public Func<string, Action<string>, Task<InstallOutcome>>? Install { get; init; }
+    public Func<string, Action<string>, Task<InstallOutcome>>? Install { get; set; }
 
     /// <summary>The AIs being set up from a row now, and where each has got to ("Downloading Claude Code…").</summary>
     readonly Dictionary<string, string> settingUp = [];
@@ -420,6 +420,9 @@ public sealed partial class AiEnginesModel : ObservableObject
             if (Say?.StartsWith("Finish signing in to ", StringComparison.Ordinal) == true
                 && overview.Engines.FirstOrDefault(e => e.State == "not_signed_in" && e.SignIn is SignInPhase.GaveUp or SignInPhase.Region or SignInPhase.Stuck) is { } stopped)
                 Say = AiWords.SignInSaid(AiWords.PlainName(stopped.Id, stopped.Name), stopped.SignIn);
+            // Or it worked (learned here, or from the problem card on the same page): the line says so, not "Finish…".
+            else if (Say is { } said && overview.Engines.FirstOrDefault(e => said == AiSignIns.StartedWords(e.Id)) is { State: not "not_signed_in" } done)
+                Say = $"{AiWords.PlainName(done.Id, done.Name)} is signed in.";
 
             Engines.Clear();
             AddChoices.Clear();

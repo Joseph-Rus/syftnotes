@@ -182,6 +182,8 @@ public class SignInInBrowserModelTests
         Assert.Equal("Finish signing in to Claude", card.Problems.Single().Title);
         lib.Overview = Claude("ready");
         await Until(() => card.Problems.Count == 0 && Row().State == "ready");
+        // The line under the list, which said "Finish signing in…", says it's done, whichever of the two heard first.
+        await Until(() => rows.Say == "Claude is signed in.");
     }
 
     [AvaloniaFact]

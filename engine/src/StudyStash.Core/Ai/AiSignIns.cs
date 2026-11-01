@@ -69,10 +69,11 @@ public sealed class AiSignIns(EngineChecks checks, Action<string> signedIn) : ID
     {
         lock (gate)
         {
-            if (entries.TryGetValue(id, out var live) && !live.Over)
+            // One still going: pressing again starts nothing more ("again" opens its page once more). One that has
+            // stopped (it couldn't start, gave up, or was refused), even before its watch has said so, is replaced.
+            if (entries.TryGetValue(id, out var live) && !live.Over && live.SignIn.Running)
             {
                 if (again) live.SignIn.OpenAgain();
-                else if (!live.SignIn.Running) live.SignIn.Start();
                 return StartedWords(id);
             }
             var signIn = Make(id) ?? throw new InvalidOperationException($"{Engines.Tool(id)} isn't installed on this computer.");
@@ -126,10 +127,13 @@ public sealed class AiSignIns(EngineChecks checks, Action<string> signedIn) : ID
         }
     }
 
-    /// <summary>The overview with each AI's sign-in state put on its row and on its "not signed in" card.</summary>
+    /// <summary>The overview with each AI's sign-in state put on its row and on its "not signed in" card. An AI just
+    /// installed, never tried (Claude Code keeps its sign-in where only it looks), is not signed in while its sign-in goes:
+    /// its row says so, and waits with it, rather than "Installed".</summary>
     public AiOverview Annotate(AiOverview overview) => overview with
     {
-        Engines = [.. overview.Engines.Select(e => State(e.Id) is { Length: > 0 } s ? e with { SignIn = s } : e)],
+        Engines = [.. overview.Engines.Select(e => State(e.Id) is { Length: > 0 } s
+            ? e with { SignIn = s, State = e.State == "unchecked" ? "not_signed_in" : e.State } : e)],
         Problems = [.. overview.Problems.Select(p => p.Kind == "not_signed_in" && State(p.Engine) is { Length: > 0 } s ? p with { SignIn = s } : p)],
     };
 
