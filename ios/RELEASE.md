@@ -14,7 +14,7 @@ The app's name in App Store Connect (App Information → Name) is set by hand th
    distribution log says `missingApp`).
 3. **TestFlight → Internal Testing → +**: a group (say *Team*) with **automatic distribution** on, and yourself in it.
    Every build uploaded after that shows in the TestFlight app on your phone by itself.
-4. **App Privacy**: the privacy policy URL is `https://syftnotes.com/privacy/` (the site also still answers at `https://study-stash-app.web.app/privacy/`). Data: "Data Not Collected".
+4. **App Privacy**: the privacy policy URL is `https://syftnotes.com/privacy/` (the site also still answers at `https://study-stash-app.web.app/privacy/`). Data: "Data Not Collected" (`APPSTORE.md` says why).
    The app sends what it records and asks only to the student's own library, on their own computer, never to us;
    `PrivacyInfo.xcprivacy` says the same. The AI that writes notes and answers questions runs from that library, under
    the student's own account (or on the computer with Ollama), and the privacy policy says so.
@@ -25,24 +25,8 @@ The app's name in App Store Connect (App Information → Name) is set by hand th
    - **Feedback Email**: an address you read.
    - **Privacy Policy URL**: as above. **Marketing URL**: `https://syftnotes.com/`.
    - **Beta App Review Information**: contact name, phone (international format, +1…) and email; **Sign-in
-     required: off**; and these notes:
-
-     > Syft Notes is the phone half of a free, open-source app: it reads a lecture library that runs on the user's
-     > own computer (Mac or Windows), reached over their private Tailscale network. There are no accounts.
-     >
-     > To review it without a computer, tap **Try it with sample classes** on the first screen. It opens a sample
-     > library built into the app, with classes, lectures with notes, a transcript, assignments and a calendar, Ask,
-     > Study (flashcards and a quiz), Search and Settings, and recording works in it.
-     >
-     > Recording: the student taps Record; the microphone is asked for then. While recording, the app shows a red
-     > recording bar and a Live Activity, and keeps recording in the background (audio background mode) so a lecture
-     > isn't cut off when the screen locks. The recording goes only to the user's own computer.
-     >
-     > AI: notes and answers are written on the user's own computer by the AI they chose there (Claude, ChatGPT,
-     > Gemini or a local model through their own account or Ollama). Nothing is sent to us; we run no servers.
-     >
-     > Plain http (NSAllowsArbitraryLoads): the library is on the user's own computer, reached at its Tailscale IP
-     > address when Tailscale's https isn't set up; Tailscale encrypts that traffic end to end itself.
+     required: off**; and the App Review notes in `APPSTORE.md` (the sample classes, Continue with Google, the AI
+     sheet, recording, plain http over Tailscale).
 
 ## Each build
 
@@ -86,8 +70,10 @@ with the build, then **Submit for Review**.
 
 ## The App Store
 
-Submit a TestFlight build for review with the same notes as above, and:
+Everything the listing needs is in `APPSTORE.md`, ready to paste: name, subtitle, promotional text, description,
+keywords, URLs, categories, the age rating and App Privacy answers, export compliance and the App Review notes. Submit
+a TestFlight build for review with those.
 
-- **Screenshots**: run the app in the iPhone 17 Pro Max and iPad Pro 13" simulators with the launch argument
-  `-demo -quiet` (Xcode → Scheme → Run → Arguments) and take them with ⌘S.
-- **Category**: Education. **Age rating**: answer the questionnaire; Ask answers only from the student's own notes.
+- **Screenshots**: `tools/app-store-shots.sh` (APPSTORE.md, Screenshots), from headless simulators, never the Mac's
+  screen. Apple wants at least one iPhone size with a Dynamic Island (medium display: iPhone 17 Pro, 1206 × 2622) and
+  the iPad 13-inch (2064 × 2752); the iPhone 17 Pro Max's 1320 × 2868 fills the large slot.
