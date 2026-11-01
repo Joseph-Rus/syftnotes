@@ -6,22 +6,9 @@ using StudyStash.Core.Ai;
 
 namespace StudyStash.App.ViewModels;
 
-/// <summary>One step in a setup row's help: its number, what to do, the command to paste (with Copy) and a line under
-/// it.</summary>
-public sealed class AiSetupStep
-{
-    public int Number { get; init; }
-    public string Title { get; init; } = "";
-    public string Command { get; init; } = "";
-    public string Note { get; init; } = "";
-    public bool HasCommand => Command.Length > 0;
-    public bool HasNote => Note.Length > 0;
-    public IRelayCommand CopyCommand { get; internal set; } = null!;
-}
-
 /// <summary>One engine in setup's "Choose who writes your notes" list: a radio row, the free AI (Ollama) marked Advanced. An
-/// engine that can't write notes yet (not installed, not signed in) offers "Set up": the steps to get it going, with
-/// the commands to copy, a button to open Terminal (or sign in there), and Check again.</summary>
+/// engine that can't write notes yet (not installed, not signed in) has one button that gets it ready (Syft Notes
+/// installs it and signs in, with nothing to type and no terminal), or Sign in, or an API key.</summary>
 public sealed partial class AiSetupRow : ObservableObject
 {
     public string Id { get; init; } = "";
@@ -40,13 +27,7 @@ public sealed partial class AiSetupRow : ObservableObject
     /// <summary>The first row in the list shows no separator above it.</summary>
     public bool First { get; internal set; }
     [ObservableProperty] public partial bool Selected { get; set; }
-    /// <summary>The steps to get it going show under the row.</summary>
-    [ObservableProperty] public partial bool ShowHelp { get; set; }
-    public IReadOnlyList<AiSetupStep> Help { get; init; } = [];
-    public bool HasHelp => Help.Count > 0;
-    public string HelpLabel => ShowHelp ? "Hide" : "Set up";
-    /// <summary>The help's first button ("Open Terminal" to install, or "Sign in in Terminal"); for the free AI, the
-    /// row's own one button ("Set it up").</summary>
+    /// <summary>The row's one button: "Set it up", "Sign in", "Add a key", "Try again".</summary>
     public string OpenLabel { get; init; } = "";
     /// <summary>The free AI, not ready yet: one button on the row gets it ready (its app, starting it, its model), and
     /// nothing is left for the student to do in a browser or a terminal.</summary>
@@ -58,18 +39,10 @@ public sealed partial class AiSetupRow : ObservableObject
     public double Fraction { get; init; }
     public bool Steady { get; init; }
     public bool ShowOneButton => OneButton && !Working;
-    internal Action? HelpChanged { get; set; }
-
-    partial void OnShowHelpChanged(bool value)
-    {
-        OnPropertyChanged(nameof(HelpLabel));
-        HelpChanged?.Invoke();
-    }
 
     public IRelayCommand SelectCommand { get; internal set; } = null!;
     public IRelayCommand KeyCommand { get; internal set; } = null!;
     public IAsyncRelayCommand SignInCommand { get; internal set; } = null!;
-    public IRelayCommand ToggleHelpCommand { get; internal set; } = null!;
     public IAsyncRelayCommand OpenCommand { get; internal set; } = null!;
     public IAsyncRelayCommand CheckAgainCommand { get; internal set; } = null!;
 }
@@ -131,14 +104,10 @@ public sealed partial class AiSetupModel : ObservableObject
     public string Lede { get; init; } = "This computer is your library, so the AI runs here. You can change this later from any of your computers, in Settings → Your AI.";
     /// <summary>Windows words (PowerShell, not Terminal) and commands.</summary>
     public bool Windows { get; init; } = OperatingSystem.IsWindows();
-    /// <summary>Puts a command on the clipboard.</summary>
-    public Action<string>? Copy { get; init; }
-    /// <summary>Opens Terminal (PowerShell on Windows) for a command to be pasted into.</summary>
-    public Action? OpenTerminal { get; init; }
     public Action<string>? OpenUrl { get; init; }
-    /// <summary>Gets Claude or ChatGPT ready on this computer with buttons (its maker's installer, then its own
-    /// sign-in page), for a host that can: setup's window, which has guided setup's screens for it. Their rows then
-    /// have one button each, and no commands to paste into a terminal. Null: the steps and commands, as before.</summary>
+    /// <summary>Gets Claude, ChatGPT or Gemini ready on this computer with buttons (its maker's installer, then its own
+    /// sign-in, hidden), for a host that can: setup's window, which has guided setup's screens for it. Their rows then
+    /// have one button each. Null: a row signs in from here, or takes an API key, and is never given commands to type.</summary>
     public Func<string, Task>? SetUpPaid { get; init; }
     /// <summary>Turns the library's note writing (and sorting with AI) on or off; true when it did. Null in a host
     /// that can't, which then doesn't offer "No AI for now".</summary>
@@ -168,7 +137,7 @@ public sealed partial class AiSetupModel : ObservableObject
     [ObservableProperty] public partial bool Busy { get; set; }
     [ObservableProperty] public partial bool OlderLibrary { get; set; }
     [ObservableProperty] public partial bool Offline { get; set; }
-    /// <summary>A row's steps are showing (the setup window grows to fit them).</summary>
+    /// <summary>The API key panel is open under the list (the setup window grows to fit it).</summary>
     [ObservableProperty] public partial bool HelpOpen { get; set; }
     /// <summary>The API key panel under the list is open for this AI ("claude", "codex", "gemini"), or "" when shut.
     /// It lives under the list, not in a row: the rows are made afresh each time the library answers, and a box in one
@@ -196,7 +165,7 @@ public sealed partial class AiSetupModel : ObservableObject
         foreach (string n in new[] { nameof(KeyOpen), nameof(KeyTitle), nameof(KeyLede), nameof(KeyWhere), nameof(KeyAlternative), nameof(HasKeyAlternative),
                      nameof(KeyPrivacy), nameof(HasKeyPrivacy) })
             OnPropertyChanged(n);
-        HelpOpen = Engines.Any(r => r.ShowHelp) || KeyOpen;
+        HelpOpen = KeyOpen;
     }
 
     // --- the API key panel ------------------------------------------------------------------------------------------
@@ -220,9 +189,10 @@ public sealed partial class AiSetupModel : ObservableObject
         "codex" => "https://platform.openai.com/api-keys",
         _ => "https://aistudio.google.com/apikey",
     };
-    /// <summary>Gemini's other way, where it isn't on this computer at all: Google's own app, signed in.</summary>
-    public string KeyAlternative => KeyFor == "gemini" && Engines.FirstOrDefault(r => r.Id == "gemini") is { State: "not_installed" }
-        ? "Or install Google's Antigravity app and sign in to it, then press Check again." : "";
+    /// <summary>Gemini's other way, where it isn't on this computer at all: Set it up on its row, which installs Google's
+    /// Antigravity and signs in to it, with nothing to type.</summary>
+    public string KeyAlternative => KeyFor == "gemini" && SetUpPaid is not null && Engines.FirstOrDefault(r => r.Id == "gemini") is { State: "not_installed" }
+        ? "Or press Set it up on Gemini's row, and sign in with your Google account." : "";
     public bool HasKeyAlternative => KeyAlternative.Length > 0;
     /// <summary>Under Gemini's key box: what Google's free tier does with what's sent, and who can have a free key.</summary>
     public string KeyPrivacy => KeyFor == "gemini" ? string.Join("\n", ApiKeys.GeminiKeyNotes(Device)) : "";
@@ -232,7 +202,6 @@ public sealed partial class AiSetupModel : ObservableObject
     void OpenKey(string id)
     {
         Say = null;
-        foreach (var r in Engines) r.ShowHelp = false;
         KeyDraft = "";
         KeyFor = id;
     }
@@ -362,27 +331,24 @@ public sealed partial class AiSetupModel : ObservableObject
         OnPropertyChanged(nameof(AskChoices));
         OnPropertyChanged(nameof(SelectedAskName));
 
-        var open = Engines.Where(r => r.ShowHelp).Select(r => r.Id).ToHashSet();
         // The free AI being got ready (its app, starting it, its model), and whether there's still something to get.
         var working = overview.Pulling is { Why.Length: 0 } at ? at : null;
         var failed = overview.Pulling is { Why.Length: > 0 } stopped ? stopped : null;
         bool freeNeedsWork = overview.Engines.FirstOrDefault(e => e.Id == "ollama") is { State: "not_installed" or "not_running" or "model_missing" };
-        // Claude or ChatGPT, not on this computer or not signed in, or Gemini signed out, where the host gets them ready
-        // with buttons (guided setup's screens: Gemini's sign-in is in Syft Notes' own home for agy).
-        bool Buttons(EngineInfo e) => SetUpPaid is not null
-            && (e is { Id: "claude" or "codex", State: "not_installed" or "not_signed_in" } || e is { Id: "gemini", State: "not_signed_in" });
-        // Gemini, not here at all: its one button is its API key (Google's own app is installed by the student).
-        bool GeminiKey(EngineInfo e) => TakesKeys && e is { Id: "gemini", State: "not_installed" };
+        // Claude, ChatGPT or Gemini, not on this computer or not signed in, where the host gets them ready with buttons
+        // (guided setup's screens: Syft Notes installs it and signs in, hidden; Gemini's sign-in is in Syft Notes' own
+        // home for agy).
+        bool Buttons(EngineInfo e) => SetUpPaid is not null && e is { Id: "claude" or "codex" or "gemini", State: "not_installed" or "not_signed_in" };
+        // Gemini, not here at all, where the host has no such screens: its one button is its API key.
+        bool GeminiKey(EngineInfo e) => TakesKeys && SetUpPaid is null && e is { Id: "gemini", State: "not_installed" };
         // Not a working pick: not here, signed out, or its last try failed (a plan other apps can't use, say).
         bool NotReady(EngineInfo e) => e.State is "not_installed" or "not_signed_in" or "failed";
         // A sign-in going from a row (the AI's own, hidden, in the student's browser): the row says it's waiting.
         static bool SigningIn(EngineInfo e) => e is { State: "not_signed_in", SignIn: SignInPhase.Waiting };
         Engines.Clear();
-        // Every AI shows, each with what gets it going: the free AI, Claude, ChatGPT and Gemini.
-        foreach (var e in overview.Engines)
+        // Every AI shows, each with what gets it going: Claude, ChatGPT, Gemini and the free AI.
+        foreach (var e in AiWords.InShownOrder(overview.Engines))
         {
-            var steps = Buttons(e) ? [] : EngineSetupWords.Steps(e.Id, e.State, Windows);
-            string terminal = EngineSetupWords.TerminalName(Windows);
             var row = new AiSetupRow
             {
                 Id = e.Id,
@@ -395,45 +361,37 @@ public sealed partial class AiSetupModel : ObservableObject
                 Progress = e.Id == "ollama" && working is not null ? AiWords.FreeAiProgress(working) : SigningIn(e) ? AiWords.SignInWaiting : "",
                 Fraction = working?.Fraction ?? 0,
                 Steady = working is { Step: "start" } || SigningIn(e),
-                ShowSignIn = e.State == "not_signed_in" && steps.Count == 0 && !Buttons(e),
+                ShowSignIn = e.State == "not_signed_in" && !Buttons(e),
                 ShowKeyLink = TakesKeys && e.Id is ("claude" or "codex" or "gemini") && NotReady(e) && !GeminiKey(e),
                 CanWrite = CanWrite(e),
                 Selected = e.Id == SelectedNotes,
                 First = Engines.Count == 0,
-                Help = [.. steps.Select((h, i) => new AiSetupStep
-                {
-                    Number = i + 1, Title = h.Title, Command = h.Command, Note = h.Note,
-                    CopyCommand = new RelayCommand(() => Copy?.Invoke(h.Command)),
-                })],
                 OpenLabel = (e.Id, e.State) switch
                 {
                     ("ollama", _) => failed is null ? "Set it up" : "Try again",
                     _ when GeminiKey(e) => "Add a key",
-                    (_, "not_signed_in") when Buttons(e) => "Sign in",
-                    _ when Buttons(e) => "Set it up",
                     (_, "not_signed_in") => "Sign in",
-                    _ => $"Open {terminal}",
+                    _ when Buttons(e) => "Set it up",
+                    _ => "",
                 },
-                ShowHelp = open.Contains(e.Id) && steps.Count > 0,
-                HelpChanged = () => HelpOpen = Engines.Any(r => r.ShowHelp) || KeyOpen,
             };
             row.SelectCommand = new RelayCommand(() => Pick(row));
             row.KeyCommand = new RelayCommand(() => OpenKey(row.Id));
             row.SignInCommand = new AsyncRelayCommand(() => SignInAsync(row.Id));
-            row.ToggleHelpCommand = new RelayCommand(() => ShowHelpOf(row, !row.ShowHelp));
             row.OpenCommand = new AsyncRelayCommand(() => OpenAsync(row));
             row.CheckAgainCommand = new AsyncRelayCommand(() => CheckAgainAsync(row.Id));
             Engines.Add(row);
         }
-        // The AI answered with on the first screen, not ready yet: it opens on what it needs, once (Gemini's key, or
-        // its sign-in steps).
+        // The AI answered with on the first screen, not ready yet: it opens on what it needs, once (Gemini's key, where
+        // that's its one button), or the step says which button gets it ready.
         if (!preferShown && Prefer.Length > 0 && !ChosenBefore && SelectedNotes != Prefer && Engines.FirstOrDefault(r => r.Id == Prefer) is { } wanted)
         {
             preferShown = true;
-            if (wanted is { Id: "gemini", ShowOneButton: true }) KeyFor = "gemini";
-            // The free AI's button starts a big download, so it isn't pressed for the student: the step says where it is.
-            else if (wanted is { Id: "ollama", ShowOneButton: true }) Say = $"To have the free AI write your notes, press “{wanted.OpenLabel}” on its row.";
-            else if (!wanted.CanWrite && wanted.HasHelp) wanted.ShowHelp = true;
+            if (wanted is { Id: "gemini", ShowOneButton: true, OpenLabel: "Add a key" }) KeyFor = "gemini";
+            // A button that downloads (the free AI's is big) isn't pressed for the student: the step says where it is.
+            else if (wanted is { ShowOneButton: true }) Say = wanted.Id == "ollama"
+                ? $"To have the free AI write your notes, press “{wanted.OpenLabel}” on its row."
+                : $"To have {wanted.Name} write your notes, press “{wanted.OpenLabel}” on its row.";
         }
         if (!keyShown && TakesKeys && OpenKeyFor is "claude" or "codex" or "gemini" && SelectedNotes != OpenKeyFor && Engines.Any(r => r.Id == OpenKeyFor))
         {
@@ -441,7 +399,7 @@ public sealed partial class AiSetupModel : ObservableObject
             KeyFor = OpenKeyFor;
         }
         if (KeyFor.Length > 0 && Engines.All(r => r.Id != KeyFor)) KeyFor = "";
-        HelpOpen = Engines.Any(r => r.ShowHelp) || KeyOpen;
+        HelpOpen = KeyOpen;
         OnPropertyChanged(nameof(ChoiceWords));
         OnPropertyChanged(nameof(KeyAlternative));
         OnPropertyChanged(nameof(HasKeyAlternative));
@@ -454,23 +412,14 @@ public sealed partial class AiSetupModel : ObservableObject
     static string Words(LibraryRefusedException ex) =>
         ex.Status == 401 ? "The library's password changed. Type the new one in Settings." : ex.Message;
 
-    /// <summary>A row's help opens alone (the list stays short enough to see).</summary>
-    void ShowHelpOf(AiSetupRow row, bool show)
-    {
-        if (show && row.HasHelp) KeyFor = "";
-        foreach (var r in Engines) r.ShowHelp = r == row && show && r.HasHelp;
-    }
-
-    /// <summary>Picking a row: an engine that can write notes becomes the pick; one that can't yet shows how to get it
-    /// going instead. Where a row has one button and no steps, the row is never dead: Claude's and ChatGPT's do what
-    /// their button does (it only opens the screens that get them ready). The free AI's button starts a long
-    /// download at once, so its row says to press it and stays unpicked: a click never leaves notes switched on
-    /// with an AI that has nothing to write them with.</summary>
+    /// <summary>Picking a row: an engine that can write notes becomes the pick; one that can't yet gets ready instead.
+    /// The row is never dead: Claude's, ChatGPT's and Gemini's do what their button does (it only opens the screens
+    /// that get them ready). The free AI's button starts a long download at once, so its row says to press it and
+    /// stays unpicked: a click never leaves notes switched on with an AI that has nothing to write them with.</summary>
     void Pick(AiSetupRow row)
     {
         if (row.CanWrite && !row.ShowOneButton) SelectedNotes = row.Id;
-        else if (row.HasHelp) ShowHelpOf(row, true);
-        else if (row.ShowOneButton && row.Id == "gemini") OpenKey("gemini");
+        else if (row is { ShowOneButton: true, OpenLabel: "Add a key" }) OpenKey(row.Id);
         else if (row.ShowOneButton && row.Id != "ollama") _ = row.OpenCommand.ExecuteAsync(null);
         else if (row.ShowOneButton || row.ShowSignIn) Say = $"{row.Name} isn't ready to write notes yet. Press “{(row.ShowSignIn ? "Sign in" : row.OpenLabel)}” on its row to get it ready.";
     }
@@ -562,9 +511,9 @@ public sealed partial class AiSetupModel : ObservableObject
             await SetUpFreeAsync();
             return;
         }
-        if (row is { Id: "gemini", OneButton: true, State: "not_installed" })
+        if (row is { OneButton: true, OpenLabel: "Add a key" })
         {
-            OpenKey("gemini");
+            OpenKey(row.Id);
             return;
         }
         if (row.OneButton && SetUpPaid is { } withButtons)
@@ -573,12 +522,7 @@ public sealed partial class AiSetupModel : ObservableObject
             await withButtons(row.Id);
             return;
         }
-        if (row.State == "not_signed_in")
-        {
-            await SignInAsync(row.Id);
-            return;
-        }
-        OpenTerminal?.Invoke();
+        if (row.State == "not_signed_in") await SignInAsync(row.Id);
     }
 
     /// <summary>Check again: looks at the engine afresh (after installing it, or signing in) and, when it can write
@@ -614,22 +558,13 @@ public sealed partial class AiSetupModel : ObservableObject
             {
                 SelectedNotes = id;
                 if (KeyFor == id) KeyFor = "";
-                if (row.HasHelp)
-                {
-                    // Ollama's here, but still needs starting or its model: the next step shows.
-                    Say = $"{name} is here. {row.About}";
-                }
-                else
-                {
-                    ShowHelpOf(row, false);
-                    Say = $"{name} is ready. It writes your notes.";
-                }
+                Say = $"{name} is ready. It writes your notes.";
             }
             else
             {
                 Say = said ?? (row?.State == "not_installed"
-                    ? $"{name} isn't installed yet. Run the first step, then Check again."
-                    : $"{name} isn't signed in yet. Run the sign-in step, then Check again.");
+                    ? $"{name} isn't on this {Device} yet."
+                    : $"{name} isn't signed in yet. Press Sign in on its row.");
             }
         }
         catch (LibraryRefusedException ex)

@@ -138,7 +138,6 @@ sealed class SetupFilmRig : IAsyncDisposable
             // Never a real installer: an AI that isn't here stops the film at its install screen.
             Installer = cli => throw new InvalidOperationException($"the film never installs {cli.Name}"),
             OpenUrl = url => Log($"(would open {url})"),
-            OpenTerminal = (exe, args) => Log($"(would open a terminal: {exe} {string.Join(' ', args)})"),
             Downloading = () => host.Downloading?.Fraction,
             Log = s => Log("app " + s),
             // No ChatGPT or Claude app to connect: the card that would change their settings never shows.
@@ -238,8 +237,6 @@ sealed class SetupFilmRig : IAsyncDisposable
                     {
                         Lede = $"They run on this {setup.DeviceWord}, as part of your library. You can change this later in Settings → Your AI.",
                         Windows = false,
-                        Copy = _ => { },
-                        OpenTerminal = () => Log("(would open Terminal)"),
                         OpenUrl = url => Log($"(would open {url})"),
                         WriteNotes = WriteNotesAsync,
                         NotesOn = NotesOnAsync,

@@ -74,7 +74,6 @@ public class SignInInBrowserModelTests
         await model.Engines.Single(r => r.Id == "claude").LinkCommand.ExecuteAsync(null);
 
         Assert.Contains("sign-in-again:claude", lib.Calls);
-        Assert.DoesNotContain("sign-in-terminal:claude", lib.Calls);
     }
 
     [AvaloniaFact]
@@ -85,7 +84,7 @@ public class SignInInBrowserModelTests
         var row = gaveUp.Engines.Single(r => r.Id == "claude");
         Assert.Equal("It stopped waiting before you'd finished. Try again.", row.About);
         Assert.Equal("Try again", row.ActionWords);
-        Assert.False(row.HasLink); // no terminal: the hidden sign-in worked, it just wasn't finished
+        Assert.False(row.HasLink); // the hidden sign-in worked, it just wasn't finished
 
         var region = new AiEnginesModel(new FakeAiLibrary { Overview = Claude("not_signed_in", SignInPhase.Region) });
         await region.Load();
@@ -95,23 +94,30 @@ public class SignInInBrowserModelTests
     }
 
     [AvaloniaFact]
-    public async Task The_terminal_is_a_small_link_only_when_the_hidden_sign_in_couldnt_start()
+    public async Task A_sign_in_Syft_Notes_couldnt_start_says_so_with_Try_again_and_Get_help_and_never_a_terminal()
     {
         var lib = new FakeAiLibrary { Overview = Claude("not_signed_in", SignInPhase.Stuck) };
-        lib.OnSignInTerminal = _ => new AiSaid("Opened Terminal to sign in to Claude.", lib.Overview!);
-        var model = new AiEnginesModel(lib) { SignInEvery = TimeSpan.FromHours(1) };
+        var pages = new List<string>();
+        var model = new AiEnginesModel(lib) { SignInEvery = TimeSpan.FromHours(1), OpenUrl = pages.Add };
+        var cards = new AiProblemsModel(lib) { SignInEvery = TimeSpan.FromHours(1), OpenUrl = pages.Add };
         await model.Load();
+        await cards.Load();
         var row = model.Engines.Single(r => r.Id == "claude");
-        Assert.Equal("Try again", row.ActionWords);
-        Assert.Equal("Sign in in Terminal instead", row.LinkWords);
+        Assert.Equal(("Syft Notes couldn't start Claude's sign-in.", "Try again", "Get help"), (row.About, row.ActionWords, row.LinkWords));
+        var card = cards.Problems.Single();
+        Assert.Equal(("Syft Notes couldn't start Claude's sign-in.", "Try again", "Get help"), (card.Message, card.PrimaryWords, card.SecondaryWords));
 
         await row.LinkCommand.ExecuteAsync(null);
+        await card.SecondaryCommand!.ExecuteAsync(null);
+        Assert.Equal([AiWords.HelpPage, AiWords.HelpPage], pages);
+        Assert.DoesNotContain(lib.Calls, c => c.StartsWith("sign-in", StringComparison.Ordinal));
 
-        Assert.Contains("sign-in-terminal:claude", lib.Calls);
-        // While it waits there's no terminal on offer anywhere.
-        var waiting = new AiEnginesModel(new FakeAiLibrary { Overview = Claude("not_signed_in", SignInPhase.Waiting) }) { SignInEvery = TimeSpan.FromHours(1) };
-        await waiting.Load();
-        Assert.DoesNotContain("Terminal", waiting.Engines.Single(r => r.Id == "claude").LinkWords, StringComparison.Ordinal);
+        // Try again: the hidden sign-in once more.
+        await row.ActCommand.ExecuteAsync(null);
+        Assert.Contains("sign-in:claude", lib.Calls);
+        foreach (string phase in new[] { SignInPhase.Waiting, SignInPhase.GaveUp, SignInPhase.Region, SignInPhase.Stuck })
+            foreach (string words in new[] { AiWords.SignInAbout("Claude", phase), AiWords.SignInSaid("Claude", phase), AiWords.SignInTitle("Claude", phase), AiWords.SignInLink(phase), AiWords.SignInButton(phase) })
+                Assert.DoesNotMatch("Terminal|PowerShell", words);
     }
 
     [AvaloniaFact]
@@ -146,7 +152,7 @@ public class SignInInBrowserModelTests
 
         var stuck = new AiProblemsModel(new FakeAiLibrary { Overview = Claude("not_signed_in", SignInPhase.Stuck) }) { SignInEvery = TimeSpan.FromHours(1) };
         await stuck.Load();
-        Assert.Equal(("Try again", "Sign in in Terminal instead"), (stuck.Problems.Single().PrimaryWords, stuck.Problems.Single().SecondaryWords));
+        Assert.Equal(("Try again", "Get help"), (stuck.Problems.Single().PrimaryWords, stuck.Problems.Single().SecondaryWords));
     }
 
     [AvaloniaFact]
@@ -184,7 +190,7 @@ public class SignInInBrowserModelTests
         // Pressing Sign in answers "Finish signing in…"; when the sign-in then couldn't start, or gave up, the line says so.
         foreach (var (phase, said) in new[]
         {
-            (SignInPhase.Stuck, "Syft Notes couldn't open the sign-in page for Claude. Try again."),
+            (SignInPhase.Stuck, "Syft Notes couldn't start Claude's sign-in."),
             (SignInPhase.GaveUp, "Signing in to Claude stopped before you'd finished. Try again."),
             (SignInPhase.Region, "Claude isn't offered in your country yet."),
         })

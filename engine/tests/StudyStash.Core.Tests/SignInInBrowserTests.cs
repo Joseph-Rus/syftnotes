@@ -127,22 +127,21 @@ public class SignInInBrowserTests
     }
 
     [Fact]
-    public async Task A_sign_in_that_stops_at_once_offers_the_terminal_as_the_last_resort_and_only_then()
+    public async Task A_sign_in_that_stops_at_once_is_stuck_with_no_terminal_and_Try_again_starts_it_afresh()
     {
         await using var rig = await Rig.StartAsync(["claude"], bin => File.WriteAllText(Path.Combine(bin, "login-fails"), ""));
 
         await rig.Remote.SignInAsync("claude");
         var stuck = await rig.UntilAsync("claude", e => e.SignIn == SignInPhase.Stuck);
         Assert.Equal("not_signed_in", stuck.State);
-        Assert.Equal(0, rig.Fake.SignInCalls); // offered, not opened
 
-        var said = await rig.Remote.SignInInTerminalAsync("claude");
-
-        Assert.Equal(1, rig.Fake.SignInCalls);
-        Assert.Contains("fake terminal", said!.Said);
-        // Signing in there is noticed too: the row goes ready by itself.
-        File.WriteAllText(Path.Combine(rig.Bin, "signed-in"), "");
-        await rig.UntilAsync("claude", e => e.State == "ready");
+        // Try again: another hidden sign-in, which waits this time. No terminal at any point.
+        File.Delete(Path.Combine(rig.Bin, "login-fails"));
+        File.WriteAllText(Path.Combine(rig.Bin, "login-delay"), "120");
+        await rig.Remote.SignInAsync("claude");
+        await rig.UntilAsync("claude", e => e.SignIn == SignInPhase.Waiting && FakeAgents.Logins(rig.Bin) == 2);
+        Assert.Equal(SignInPhase.Waiting, (await rig.RowAsync("claude")).SignIn);
+        Assert.Equal(0, rig.Fake.SignInCalls);
     }
 
     [Fact]
