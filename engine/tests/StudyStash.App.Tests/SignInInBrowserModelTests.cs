@@ -177,4 +177,32 @@ public class SignInInBrowserModelTests
         lib.Overview = Claude("ready");
         await Until(() => card.Problems.Count == 0 && Row().State == "ready");
     }
+
+    [AvaloniaFact]
+    public async Task The_line_under_the_list_matches_the_row_once_a_sign_in_stopped()
+    {
+        // Pressing Sign in answers "Finish signing in…"; when the sign-in then couldn't start, or gave up, the line says so.
+        foreach (var (phase, said) in new[]
+        {
+            (SignInPhase.Stuck, "Syft Notes couldn't open the sign-in page for Claude. Try again."),
+            (SignInPhase.GaveUp, "Signing in to Claude stopped before you'd finished. Try again."),
+            (SignInPhase.Region, "Claude isn't offered in your country yet."),
+        })
+        {
+            var lib = new FakeAiLibrary { Overview = Claude("not_signed_in") };
+            lib.OnSignIn = _ => new AiSaid("Finish signing in to Claude in the browser page that just opened.", lib.Overview = Claude("not_signed_in", phase));
+            var model = new AiEnginesModel(lib) { SignInEvery = TimeSpan.FromHours(1) };
+            await model.Load();
+            await model.Engines.Single(r => r.Id == "claude").ActCommand.ExecuteAsync(null);
+            Assert.Equal(said, model.Say);
+        }
+
+        // Still waiting: the press's own words stand.
+        var waiting = new FakeAiLibrary { Overview = Claude("not_signed_in") };
+        waiting.OnSignIn = _ => new AiSaid("Finish signing in to Claude in the browser page that just opened.", waiting.Overview = Claude("not_signed_in", SignInPhase.Waiting));
+        var m = new AiEnginesModel(waiting) { SignInEvery = TimeSpan.FromHours(1) };
+        await m.Load();
+        await m.Engines.Single(r => r.Id == "claude").ActCommand.ExecuteAsync(null);
+        Assert.Equal("Finish signing in to Claude in the browser page that just opened.", m.Say);
+    }
 }

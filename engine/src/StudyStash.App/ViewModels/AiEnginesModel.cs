@@ -395,6 +395,10 @@ public sealed partial class AiEnginesModel : ObservableObject
             OnPropertyChanged(nameof(SelectedDiagramsName));
             OnPropertyChanged(nameof(SelectedSpeedName));
             Fallback = overview.Fallback;
+            // A sign-in the press said was going that has stopped since (or never started): the line says so, as its row does.
+            if (Say?.StartsWith("Finish signing in to ", StringComparison.Ordinal) == true
+                && overview.Engines.FirstOrDefault(e => e.State == "not_signed_in" && e.SignIn is SignInPhase.GaveUp or SignInPhase.Region or SignInPhase.Stuck) is { } stopped)
+                Say = AiWords.SignInSaid(AiWords.PlainName(stopped.Id, stopped.Name), stopped.SignIn);
 
             Engines.Clear();
             AddChoices.Clear();
