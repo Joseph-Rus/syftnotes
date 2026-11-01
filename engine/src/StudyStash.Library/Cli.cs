@@ -188,12 +188,21 @@ public static class Cli
             // filed as soon as its notes are written; their diagrams follow, one lecture at a time, never holding up notes,
             // and the diagram pass says in the log what it drew, or why nothing.
             var ai = new AiJobs(home, () => cfg.OllamaHost) { Log = Console.WriteLine, GeminiBack = Antigravity.Back };
+            // A library from before "nobody chosen yet" whose Ollama was only the old default says so now (before anything saves ai.json).
+            if (ai.MigrateAiSettings(store.HasNotesFromOllamaOrUnknown)) Console.WriteLine("[ai] Ollama was only the old default and isn't here: no AI is chosen to write the notes yet");
             Pipeline? writer = null; // the pipeline, below: the diagrams wait while it writes notes
             var diagrams = new DiagramJobs(cfg, store, ai) { NotesBusy = () => writer?.Writing == true };
             var pipeline = writer = new Pipeline(cfg, store, ai.SortAsync, ai.SummarizeAsync, notesModel: () => ai.Describe("notes", cfg), notesFast: ai.NotesInFastMode,
                 filed: id => diagrams.AfterFiled(id, ai.TakeDiagramsFollow(id)), limitUntil: ai.LimitUntil);
             // An AI that needed signing in again answers once more: the lectures it couldn't write notes for meanwhile
             // get them now, without the student asking for each.
+            ai.NotesAiChosen += () =>
+            {
+                int n = store.RequeueNoAi();
+                if (n == 0) return;
+                Console.WriteLine($"[pipeline] an AI is chosen: writing the notes of {n} lecture(s) that were waiting for one");
+                pipeline.Wake();
+            };
             ai.SignedInAgain += id =>
             {
                 int n = store.RequeueSignedIn(Engines.Name(id));

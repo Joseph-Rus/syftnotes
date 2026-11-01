@@ -190,6 +190,7 @@ public sealed partial class LibraryWeb
                 Configs.Save(cfg);
             }
             var settings = AiSettings.Load(cfg.Home);
+            bool hadNotesAi = settings.NotesChosen;
             if (notes is not null) settings.ByJob["notes"] = new AiChoice(notes);
             if (ask is not null)
             {
@@ -201,6 +202,7 @@ public sealed partial class LibraryWeb
             settings.SetRich(rich, richDiagrams, richPlots, richDrawings);
             if (speed is not null) settings.Speed = speed;
             settings.Save(cfg.Home);
+            if (!hadNotesAi && settings.NotesChosen) WriteWaitingNotes();
             return AiJson(await AiOverviewAsync());
         })));
 
