@@ -300,9 +300,12 @@ public class UpdaterTests
             return exe == "ditto" ? Machine.Run(exe, args, t) : new ProcResult(0, "");
         };
         var spawned = new List<IReadOnlyList<string>>();
+        // Syft Notes in the background, running this copy's program: stopped before the swap, started again after it.
+        var background = new Background(calls, [(dir["home"], [Path.Combine(oldApp, "Contents", "MacOS", "StudyStash"), "--home", dir["home"], "helper"]),
+            (dir["other"], ["/elsewhere/StudyStash", "--home", dir["other"], "helper"])]);
         var host = new UpdateHost
         {
-            System = "Darwin", AppDir = oldApp, Http = downloads.Client(), Run = run, Places = places,
+            System = "Darwin", AppDir = oldApp, Http = downloads.Client(), Run = run, Places = places, Background = background,
             VersionOf = Updates.VersionOf, RelaunchPid = Environment.ProcessId, RelaunchArgs = ["--background"], SpawnDetached = spawned.Add,
         };
         var said = new List<string>();
@@ -319,6 +322,9 @@ public class UpdaterTests
         Assert.Contains(calls, c => c is ["hdiutil", "attach", ..]);
         Assert.Contains(calls, c => c is ["hdiutil", "detach", ..]);
         Assert.Contains(calls, c => c[0] == "codesign");
+        int signed = calls.FindIndex(c => c[0] == "codesign"), stopped = calls.FindIndex(c => c is ["background", "stop", ..]);
+        Assert.True(signed < stopped && stopped < calls.FindIndex(c => c is ["background", "start", ..]), string.Join(" | ", calls.Select(c => string.Join(' ', c))));
+        Assert.Equal([["background", "stop", dir["home"]], ["background", "start", dir["home"]]], calls.Where(c => c[0] == "background"));
         var waiter = Assert.Single(spawned);
         Assert.Equal("/bin/sh", waiter[0]);
         Assert.Equal("-c", waiter[1]);
@@ -482,5 +488,23 @@ public class UpdaterTests
         Assert.True(ok, string.Join("; ", said));
         Assert.Equal(Engine.Version, Updates.VersionOf(Path.Combine(standIn, "Contents", "MacOS", "StudyStash")));
         Console.WriteLine($"[live dmg update] took {clock.Elapsed}: {string.Join(" / ", said)}");
+    }
+
+    /// <summary>The background library's registrations, with what's asked of them noted beside the update's commands.</summary>
+    sealed class Background(List<List<string>> calls, List<(string Home, IReadOnlyList<string> Args)> all) : IBackgroundLibrary
+    {
+        public bool IsRegistered(string home) => all.Any(r => r.Home == home);
+        public IReadOnlyList<string>? Registered(string home) => all.FirstOrDefault(r => r.Home == home).Args;
+        public void Register(string home, string program, IReadOnlyList<string>? extra = null) => Note("register", home);
+        public void Unregister(string home) => Note("unregister", home);
+        public List<(string Home, IReadOnlyList<string> Args)> All() => all;
+        public void Stop(string home) => Note("stop", home);
+        public void Start(string home) => Note("start", home);
+        public void Restart(string home) => Note("restart", home);
+
+        void Note(string what, string home)
+        {
+            lock (calls) calls.Add(["background", what, home]);
+        }
     }
 }

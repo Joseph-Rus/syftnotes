@@ -99,6 +99,21 @@
             </ItemsControl>
           </StackPanel>
         </Border>
+        <!-- With Syft Notes closed too: the library runs in the background, started by the computer at login
+             (BackgroundLibrary), so the phone is still answered after the app quits -->
+        <Border Classes="group" IsVisible="{Binding ShowWhenClosed}">
+          <Border Classes="row">
+            <Grid ColumnDefinitions="*,12,Auto">
+              <StackPanel Spacing="2" VerticalAlignment="Center">
+                <TextBlock Classes="row-title" Text="{Binding WhenClosedTitle}" TextWrapping="Wrap" />
+                <TextBlock Classes="row-sub" Text="{Binding WhenClosedSub}" TextWrapping="Wrap" />
+                <TextBlock Classes="row-sub" Text="{Binding WhenClosedProblem}" IsVisible="{Binding WhenClosedProblem, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" TextWrapping="Wrap" Margin="0,4,0,0" />
+              </StackPanel>
+              <ToggleButton Name="AnswerWhenClosed" Grid.Column="2" Classes="switch" AutomationProperties.Name="{Binding WhenClosedTitle}"
+                            IsChecked="{Binding AnswerWhenClosed}" IsEnabled="{Binding !Busy}" VerticalAlignment="Center" />
+            </Grid>
+          </Border>
+        </Border>
         <c:PageText Classes="say" Text="{Binding Say}" IsVisible="{Binding Say, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" TextWrapping="Wrap" />
       </StackPanel>
     </Panel>

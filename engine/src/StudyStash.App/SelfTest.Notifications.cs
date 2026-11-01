@@ -17,7 +17,7 @@ public static partial class SelfTest
         Shell.Toast("Recording saved", "Syft Notes is writing it down; the library files it and writes your notes.", null, null, TimeSpan.FromMinutes(1));
         Shell.Toast("Syncing Canvas", "On your browser's next check, within a minute.", null, null, TimeSpan.FromMinutes(1));
         await Settle();
-        CheckNotifications(shelf, "notifications", []);
+        await CheckNotificationsAsync(shelf, "notifications", []);
         if (OperatingSystem.IsWindows() && Stack(shelf) is { } stack && shelf.Screen is { } display)
             AreaShot(Around(stack, display), "notifications");
 
@@ -26,12 +26,12 @@ public static partial class SelfTest
         if (Shell.Windows.Panel is Floating { IsVisible: true } dropdown && dropdown.Panel() is { } panel)
         {
             CheckDropdown(panel, shelf.Screen);
-            CheckNotifications(shelf, "notifications, dropdown open", [panel]);
+            await CheckNotificationsAsync(shelf, "notifications, dropdown open", [panel]);
             if (OperatingSystem.IsWindows() && shelf.Screen is { } flyoutDisplay)
                 AreaShot(Around(Stack(shelf) is { } s ? s.Union(panel) : panel, flyoutDisplay), "notifications-flyout");
             dropdown.Hide();
             await Settle();
-            CheckNotifications(shelf, "notifications, dropdown closed again", []);
+            await CheckNotificationsAsync(shelf, "notifications, dropdown closed again", []);
         }
         else
         {
@@ -71,21 +71,31 @@ public static partial class SelfTest
         return new PixelRect(left, top, screen.Bounds.Right - left, screen.Bounds.Bottom - top);
     }
 
+    /// <summary>The cards checked once they've settled, and again after each settle while they're wrong, up to three
+    /// looks: on Linux a window manager can hand a card an older move after the windows went still, and the shelf then
+    /// puts it back, so only cards still wrong at the third look are reported FAILED.</summary>
+    static async Task CheckNotificationsAsync(ToastShelf shelf, string what, IReadOnlyList<PixelRect> keepClear)
+    {
+        for (int look = 1; !CheckNotifications(shelf, what, keepClear, last: look == 3); look++)
+            await Settle();
+    }
+
     /// <summary>Where each card is, said; and FAILED for any off its display, under the menu bar or taskbar, over another
-    /// card or over <paramref name="keepClear"/>, or not where the placement puts it.</summary>
-    static void CheckNotifications(ToastShelf shelf, string what, IReadOnlyList<PixelRect> keepClear)
+    /// card or over <paramref name="keepClear"/>, or not where the placement puts it. True when all are right; wrong and
+    /// not the <paramref name="last"/> look, nothing is said.</summary>
+    static bool CheckNotifications(ToastShelf shelf, string what, IReadOnlyList<PixelRect> keepClear, bool last)
     {
         var cards = shelf.Cards.ToList();
         if (shelf.Screen is not { } screen || cards.Count == 0)
         {
-            Say($"FAILED {what}: none showing");
-            return;
+            if (last) Say($"FAILED {what}: none showing");
+            return false;
         }
         bool mac = OperatingSystem.IsMacOS();
         int room = (int)(Floating.ShadowRoom * screen.Scaling);
         var rects = cards.Select(c => c.Window.IsVisible ? c.Window.Panel() : null).ToList();
-        Say($"{what}: on {screen.Bounds} (usable {screen.WorkingArea}, scale {screen.Scaling:0.##}): "
-            + string.Join("; ", cards.Select((c, i) => $"{c.Notice.Title} {(rects[i] is { } r ? r.ToString() : "waiting")}")));
+        string where = $"{what}: on {screen.Bounds} (usable {screen.WorkingArea}, scale {screen.Scaling:0.##}): "
+            + string.Join("; ", cards.Select((c, i) => $"{c.Notice.Title} {(rects[i] is { } r ? r.ToString() : "waiting")}"));
         var problems = new List<string>();
         var sizes = cards.Select(c =>
         {
@@ -109,7 +119,10 @@ public static partial class SelfTest
             if (expected[i] is { } at && (Math.Abs(at.X + room - r.X) > 1 || Math.Abs(at.Y + room - r.Y) > 1))
                 problems.Add($"{cards[i].Notice.Title} is at {r.X},{r.Y}, not {at.X + room},{at.Y + room}");
         }
+        if (problems.Count > 0 && !last) return false;
+        Say(where);
         Say(problems.Count == 0 ? $"{what}: in the corner, newest nearest the {(mac ? "menu bar" : "taskbar")}, clear of each other"
             : $"FAILED {what}: {string.Join("; ", problems)}");
+        return problems.Count == 0;
     }
 }

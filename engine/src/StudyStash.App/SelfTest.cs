@@ -32,6 +32,12 @@ public static partial class SelfTest
     /// <summary>Setup chooses Just this computer: the app runs its own library, and nothing else is a library.</summary>
     internal static bool OneComputer => Environment.GetEnvironmentVariable("STUDYSTASH_SELFTEST_FLOW") == "one-computer";
 
+    /// <summary>STUDYSTASH_SELFTEST_BACKGROUND=1 (CI's throwaway computers only): Just this computer's run ends by
+    /// turning on "Answer your phone when Syft Notes is closed" for real, with a stand-in for Google Drive, so the
+    /// script that started it can check, once the app has quit, that the library still answers the phone. Never set
+    /// on a real computer: it registers a LaunchAgent, a Run key value or a systemd unit.</summary>
+    internal static bool BackgroundOn => Dir is not null && OneComputer && Environment.GetEnvironmentVariable("STUDYSTASH_SELFTEST_BACKGROUND") == "1";
+
     /// <summary>The self-test's own library, once <see cref="Prepare"/> has started it.</summary>
     internal static LibraryService? Library { get; private set; }
     internal static SelfTestEngine? Engine { get; private set; }
@@ -113,6 +119,8 @@ public static partial class SelfTest
             // Setup makes the library itself: its notes in this run's own folder, on a port far from a real 8787.
             Environment.SetEnvironmentVariable("STUDYSTASH_NOTES_DIR", Path.Combine(home, "Study Stash"));
             Environment.SetEnvironmentVariable("STUDYSTASH_LIBRARY_PORT", SelfTestPorts.FreePair().ToString());
+            // The background run's stand-in for the Google Drive folder, which the library it registers is given.
+            if (BackgroundOn) Environment.SetEnvironmentVariable("STUDYSTASH_DRIVE_FOLDER", DriveFolder(home));
             return;
         }
         string libHome = Path.Combine(home, "selftest-library");
@@ -266,6 +274,7 @@ public static partial class SelfTest
         await RunNotificationsAsync();
         await RunSettingsAsync();
         await RunLooksAsync();
+        if (BackgroundOn) await RunBackgroundAsync(host);
     }
 
     // --- setup -------------------------------------------------------------------------------------------------------

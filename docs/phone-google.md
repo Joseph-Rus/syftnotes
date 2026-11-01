@@ -40,9 +40,22 @@ phone (iPhone app)                     Google Drive, appDataFolder              
 - `engine/src/StudyStash.Core/PhoneDrive/` — `Google.cs` (the Desktop client, the secret, sign-in, refresh, revoke,
   google.json, the student's words for each trouble), `Drive.cs` (`IDrive`, the Drive REST API over plain
   `HttpClient`: retries and the token), `PhoneCalls.cs` (the only calls a phone may make), `LibraryCalls.cs` (this
-  computer's library over `/api/v2`), `DriveLink*.cs` (the copy, the boxes, the answers, laptop.json).
-- `engine/src/StudyStash.App/Services/PhoneDrive.cs` — Connect, Disconnect, Remove, the link's start and stop
-  (`AppHost.Drive`, started by `AppHost.Start` when the role is Both and google.json is there; stopped on quit).
+  computer's library over `/api/v2`), `DriveLink*.cs` (the copy, the boxes, the answers, laptop.json),
+  `PhoneLink.cs` (the link as the library runs it: started when google.json is there, waiting while app.json's role
+  isn't Both), `FolderDrive.cs` (a folder standing in for Drive: the self-test's `--drive-folder`).
+- The link runs **in the library's process**, never the app's: exactly one per computer. The library is either the
+  app's own child (it stops when the app quits) or, with Settings → Phone's "Answer your phone when Syft Notes is
+  closed" on (the default, once a phone is linked), the **background library**: `StudyStash --home H helper`, which
+  the computer starts at login and keeps going (`engine/src/StudyStash.Core/BackgroundLibrary.cs`: a LaunchAgent on a
+  Mac, a Run key value on Windows, a systemd --user unit on Linux or an autostart entry without one). The app steps
+  aside for it (`LibraryService.Background`), and quitting the app leaves it running. Off, Disconnect, or leaving just
+  this computer takes it away and the app's own child takes over. An update stops it before the files are replaced and
+  starts it on the new ones (`Updater.cs`; Windows' Setup.exe stops it too); the app restarts one still on an older
+  version. Recording stays in the app.
+- `engine/src/StudyStash.Library/LibraryWeb.PhoneGoogle.cs` — `/api/v2/phone/google` (state, start, disconnect, remove
+  a phone, copy now): the app on this computer only (the library's password, from 127.0.0.1, never a phone).
+- `engine/src/StudyStash.App/Services/PhoneDrive.cs` — Connect with Google (the browser and the sign-in stay in the
+  app; the account goes in google.json and the library is told to start), and the rest through the library's API.
 - `engine/src/StudyStash.App/ViewModels/PhoneGoogleModel.cs`, `Views/MacPhones.axaml`, `Views/WinPhones.axaml` —
   Settings → Phone (`PhonesModel.Google` is set only when the role is Both).
 

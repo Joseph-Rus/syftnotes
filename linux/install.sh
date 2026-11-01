@@ -26,6 +26,17 @@ VERSION=$("$SRC/StudyStash" version 2>/dev/null) || fail "this copy doesn't run 
 command -v pactl >/dev/null 2>&1 || command -v pw-cli >/dev/null 2>&1 \
   || say "Note: recording needs PipeWire or PulseAudio (most desktops have one running)."
 
+# Syft Notes in the background ("Answer your phone when Syft Notes is closed") runs the copy in $DEST: it stops before
+# the files are replaced, and starts again on the new ones. One without a systemd of its own (an autostart entry) is
+# started again by the app when it opens, or at the next login.
+CONFIG=${XDG_CONFIG_HOME:-"$HOME/.config"}
+units=""
+for f in "$CONFIG"/systemd/user/syft-notes-background*.service; do
+  [ -e "$f" ] && grep -qF "$DEST/StudyStash" "$f" && units="$units $(basename "$f")"
+done
+for u in $units; do systemctl --user stop "$u" 2>/dev/null || true; done
+pkill -f "$DEST/StudyStash .*helper" 2>/dev/null || true
+
 if [ "$SRC" != "$DEST" ]; then
   mkdir -p "$(dirname "$DEST")"
   NEW="$DEST.new.$$"
@@ -43,6 +54,7 @@ mkdir -p "$DATA/applications" "$DATA/icons/hicolor/256x256/apps" "$BIN"
 cp "$DEST/syft-notes.png" "$DATA/icons/hicolor/256x256/apps/syft-notes.png"
 sed "s|^Exec=StudyStash|Exec=\"$DEST/StudyStash\"|" "$DEST/syft-notes.desktop" > "$DATA/applications/syft-notes.desktop"
 ln -sf "$DEST/StudyStash" "$BIN/syft-notes"
+for u in $units; do systemctl --user start "$u" 2>/dev/null || true; done
 command -v update-desktop-database >/dev/null 2>&1 && update-desktop-database -q "$DATA/applications" 2>/dev/null || true
 command -v gtk-update-icon-cache >/dev/null 2>&1 && gtk-update-icon-cache -q -t "$DATA/icons/hicolor" 2>/dev/null || true
 

@@ -47,6 +47,10 @@ public sealed class AppSettings
     public bool ParakeetFailed { get; set; }
     /// <summary>Tell the voices in a lecture apart once it's written down, and say who's speaking in the transcript.</summary>
     public bool Speakers { get; set; }
+    /// <summary>Settings → Phone's "Answer your phone when Syft Notes is closed": on just this computer, once a phone is
+    /// linked through Google, the library runs in the background (<see cref="BackgroundLibrary"/>) and keeps answering
+    /// after the app quits. On until it's switched off.</summary>
+    public bool AnswerPhoneWhenClosed { get; set; } = true;
     /// <summary>Write a lecture down as it records (the recorder shows the transcript and can be asked about it); off,
     /// after class: it only records, and is written down once it stops, which saves battery during the lecture. A
     /// change applies from the next lecture.</summary>
@@ -255,7 +259,8 @@ public sealed partial class AppHost : IDisposable, IProblemSource
     public AppHost(string home, Func<IAudioSource>? microphone = null, Func<ITranscriber>? whisper = null, LaptopHost? laptop = null,
         Action<string>? log = null, ILoginItems? loginItems = null, ModelSetting? models = null, HttpClient? http = null,
         Func<LibraryService>? localLibrary = null, IMicPermissions? micPermissions = null, IHardwareProbe? hardware = null,
-        Func<ISpeakerLabeler>? voices = null, Func<GranolaOAuth, ILectureSource>? granola = null, Func<AppHost, PhoneDrive>? phoneDrive = null)
+        Func<ISpeakerLabeler>? voices = null, Func<GranolaOAuth, ILectureSource>? granola = null, Func<AppHost, PhoneDrive>? phoneDrive = null,
+        IBackgroundLibrary? background = null)
     {
         this.voices = voices;
         var probe = hardware ?? HardwareProbe.System;
@@ -302,7 +307,9 @@ public sealed partial class AppHost : IDisposable, IProblemSource
         Memos.Imported += _ => Changed?.Invoke();
         Granola = new GranolaImport(Path.Combine(Home, "granola-tokens.json"), Path.Combine(Home, "granola-client.json"),
             new GranolaLedger(Path.Combine(Home, "granola.json")), Client, net, granola, this.log);
-        Drive = phoneDrive?.Invoke(this) ?? new PhoneDrive(Home, LocalLibraryAddress, () => Settings.Role == AppRole.Both, this.log);
+        Background = background ?? (Desktop.SystemChangesOff && !SelfTest.BackgroundOn ? NoBackground.Instance : BackgroundLibrary.ThisComputer());
+        Drive = phoneDrive?.Invoke(this) ?? new PhoneDrive(Home, LocalLibraryAddress, this.log);
+        Drive.AccountChanged += () => _ = SyncBackgroundAsync();
         Recorder.Changed += () => Changed?.Invoke();
         Recorder.Problem += why =>
         {
@@ -404,6 +411,47 @@ public sealed partial class AppHost : IDisposable, IProblemSource
     /// <summary>The student's Granola, once they've signed in to it in Settings: looked at for lectures Syft Notes
     /// doesn't have (<see cref="Start"/> runs it), which Transfer brings over.</summary>
     public GranolaImport Granola { get; }
+
+    /// <summary>The library run in the background by the computer itself, so the phone is answered with the app closed
+    /// (a test's own, or nothing at all in tests and the self-test unless it's the self-test's background run).</summary>
+    public IBackgroundLibrary Background { get; }
+
+    /// <summary>Whether the library should run in the background now: just this computer, set up, a phone linked
+    /// through Google, and Settings → Phone's switch on.</summary>
+    public bool BackgroundWanted => Background is not NoBackground && Settings.Role == AppRole.Both && Settings.SetupDone
+                                    && Settings.AnswerPhoneWhenClosed && Drive.Account is not null;
+
+    /// <summary>Why the background library couldn't be used just now, for Settings → Phone; null while all's well.</summary>
+    public string? BackgroundProblem => LocalLibrary?.BackgroundProblem;
+
+    /// <summary>The library answering is the background one.</summary>
+    public bool LibraryInBackground => LocalLibrary?.InBackground == true;
+
+    BackgroundPlan MakeBackgroundPlan()
+    {
+        // The self-test's stand-in for Google Drive goes along, so its phone is answered with the app closed too.
+        IReadOnlyList<string>? extra = SelfTest.Dir is not null && Environment.GetEnvironmentVariable("STUDYSTASH_DRIVE_FOLDER") is { Length: > 0 } folder
+            ? ["--drive-folder", folder] : null;
+        return new BackgroundPlan(Background, () => BackgroundWanted, Desktop.Program, extra);
+    }
+
+    /// <summary>The library moves to the background or back, as <see cref="BackgroundWanted"/> now says (Settings →
+    /// Phone's switch, Google connected or disconnected, this computer's role changed). With no library of the app's
+    /// own here (a laptop), a background one left registered is only taken away.</summary>
+    public async Task SyncBackgroundAsync()
+    {
+        try
+        {
+            if (LocalLibrary is { } lib && Settings.Role != AppRole.Laptop) await lib.SwitchAsync();
+            else if (Background.IsRegistered(Home)) await Task.Run(() => Background.Unregister(Home));
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException or InvalidOperationException or PlatformNotSupportedException)
+        {
+            log($"[library] {e.Message}");
+        }
+        Changed?.Invoke();
+        await CheckLibraryAsync();
+    }
 
     /// <summary>The phone over Google Drive, on just this computer (Settings → Phone's Connect with Google):
     /// <see cref="Start"/> starts its link when an account is connected.</summary>
@@ -674,8 +722,9 @@ public sealed partial class AppHost : IDisposable, IProblemSource
         if (Settings.SetupDone && Settings.Role != AppRole.Library && !ModelReady) _ = DownloadModelAsync();
         else EnsureSpeakerModel();
         if (Settings.Role != AppRole.Laptop && Settings.SetupDone) _ = RefreshLocalLibraryAsync();
-        // The phone over Google Drive: only on just this computer, once Settings → Phone has connected an account.
-        if (Settings.Role == AppRole.Both) Drive.Start();
+        // The phone over Google Drive runs in the library (its link, and in the background when that's on); a laptop
+        // that was once just this computer takes a background library left behind away.
+        if (Settings.Role == AppRole.Laptop && Background.IsRegistered(Home)) _ = SyncBackgroundAsync();
         // The daily count, in every role: one anonymous post a day unless Settings → General switched it off.
         var count = Counter = new DailyCount(Home, () => Settings.CountThisCopy, countHttp, Core.Engine.Version, log: log);
         running.Add(Task.Run(() => count.RunAsync(stop.Token)));
@@ -719,6 +768,7 @@ public sealed partial class AppHost : IDisposable, IProblemSource
     {
         if (LocalLibrary is not null) return;
         LocalLibrary = svc;
+        svc.Background ??= MakeBackgroundPlan();
         svc.Changed += () => Changed?.Invoke();
     }
 
@@ -922,7 +972,10 @@ public sealed partial class AppHost : IDisposable, IProblemSource
     /// thrown: the change still holds until the app quits.</summary>
     public void Save(Action<AppSettings> change)
     {
+        var role = Settings.Role;
         change(Settings);
+        // Just this computer no more (or again): the background library goes, or may come back.
+        if (Settings.Role != role && (Background.IsRegistered(Home) || BackgroundWanted)) _ = SyncBackgroundAsync();
         try
         {
             Settings.Save(Home);
@@ -1352,7 +1405,6 @@ public sealed partial class AppHost : IDisposable, IProblemSource
         }
         awake?.Dispose();
         awake = null;
-        // Before the library stops, so nothing the phone asked is cut off by it.
         Drive.Dispose();
         if (LocalLibrary is { } lib)
         {

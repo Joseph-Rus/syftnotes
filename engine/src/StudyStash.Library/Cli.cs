@@ -14,10 +14,11 @@ namespace StudyStash.Library;
 public static class Cli
 {
     /// <summary>The words that make the app the engine instead of opening its windows.</summary>
-    public static readonly string[] Commands = ["run", "serve", "setup", "init", "doctor", "update", "autostart", "version", "mcp", "ai", "extension-zip"];
+    public static readonly string[] Commands = ["run", "serve", "helper", "setup", "init", "doctor", "update", "autostart", "version", "mcp", "ai", "extension-zip"];
 
     /// <summary>What a command the engine doesn't know prints: every command there is.</summary>
     public const string Usage = "usage: studystash run | serve | setup --page [--no-browser] | init\n"
+        + "       | helper [--keep-alive] | helper remove | helper status   (the library in the background, answering the phone)\n"
         + "       | doctor [--role server|client] | update [--check] [--force]\n"
         + "       | autostart install|uninstall|status --role server | version\n"
         + "       | mcp [--client claude-desktop|claude-code|codex|gemini]   (the MCP server for AI apps, over stdin and stdout)\n"
@@ -60,7 +61,7 @@ public static class Cli
     /// <summary>True when these arguments name a command (options may come first: <c>--home DIR run</c>).</summary>
     public static bool IsCommand(IReadOnlyList<string> args)
     {
-        string[] valued = ["--home", "--role", McpClients.Option];
+        string[] valued = ["--home", "--role", "--drive-folder", McpClients.Option];
         for (int i = 0; i < args.Count; i++)
         {
             if (valued.Contains(args[i])) { i++; continue; }
@@ -77,7 +78,7 @@ public static class Cli
         //   Claude and AI: mcp | ai
         //   Both:          doctor | update | autostart | version
         //   Publishing:    extension-zip
-        string[] valued = ["--home", "--role", McpClients.Option];
+        string[] valued = ["--home", "--role", "--drive-folder", McpClients.Option];
         string? Option(string name) => Array.IndexOf(args, name) is int i and >= 0 && i + 1 < args.Length ? args[i + 1] : null;
         bool Flag(string name) => args.Contains(name);
         // The command and its words, wherever the options are: a service runs `studystash --home DIR run`.
@@ -102,17 +103,22 @@ public static class Cli
         });
 
         string command = words.FirstOrDefault() ?? "";
+        // Run as another program's child, which stops it by ending its input: the app's own library, or the background
+        // library kept going by its own `helper --keep-alive`.
+        bool tied = false;
         if (Env(StopWhenInputEndsEnv) == "1")
         {
             // Not passed on: an AI this library starts may start `mcp`, which talks over its own input.
             Environment.SetEnvironmentVariable(StopWhenInputEndsEnv, null);
-            if (command is "serve" or "run") StopWhenInputEnds(stop);
+            tied = command is "serve" or "run" or "helper";
+            if (tied) StopWhenInputEnds(stop);
         }
         if (command is not ("version" or "extension-zip" or "")) Directory.CreateDirectory(home);
         return command switch
         {
             "run" => await Library(updates: true),
             "serve" => await Library(updates: false),
+            "helper" => await Helper(),
             "setup" when Flag("--page") => await Setup(),
             "init" => Print($"Config: {Configs.WriteExample(home)}\nEdit it, or run `studystash setup --page` for the guided version."),
             "mcp" => await Mcp(),
@@ -164,7 +170,7 @@ public static class Cli
         // --- the library ----------------------------------------------------------------------------------------------
 
         // Its pages, the laptop API, the pipeline, Claude's door, and (for `run`) updates.
-        async Task<int> Library(bool updates)
+        async Task<int> Library(bool updates, bool background = false)
         {
             if (UnderWindowsKeepAlive("server")) return 0;
             var cfg = Configs.Load(home);
@@ -244,14 +250,23 @@ public static class Cli
                 if (ai.AgentReady().Ok)
                     scout.Queue(classes.Where(c => !s.Scouts.ContainsKey(c) && !File.Exists(Path.Combine(store.ClassDir(c), "Canvas", "canvas-recipe.md"))).ToArray());
             };
+            // The phone over Google Drive (docs/phone-google.md): its link runs here, in the library, so the phone is
+            // answered whenever the library runs, the app open or not. It starts once the app has connected an account.
+            string? driveFolder = Option("--drive-folder") is { Length: > 0 } df ? Path.GetFullPath(df) : null;
+            using var phone = new StudyStash.Core.PhoneDrive.PhoneLink(home, () => ($"http://127.0.0.1:{cfg.WebPort}", cfg.PoolPassword),
+                log: Console.WriteLine, folder: driveFolder);
             var app = LibraryWeb.Build(builder, cfg, store, pipeline, new LibraryWebOptions
             {
-                Apply = (rel, h) => Updates.ApplyAsync(rel, h, UpdateHost.ThisComputer()), Claude = access, Reach = ClaudeReach.ThisComputer(), WebCheck = ReachCheck.ThisComputer(),
+                Phone = phone, Background = background,
+                // The background library never installs one itself: an update stops it first, which would cut it short. The
+                // app installs updates, and starts it again on the new version.
+                Apply = background ? null : (rel, h) => Updates.ApplyAsync(rel, h, UpdateHost.ThisComputer()), Claude = access, Reach = ClaudeReach.ThisComputer(), WebCheck = ReachCheck.ThisComputer(),
                 AskChat = ai.Ask(() => cfg), Ai = ai, Diagrams = diagrams, Canvas = canvas, Scout = scout, Files = fileIndex,
                 Inbox = new Inbox(cfg.PoolDir, () => cfg.ClassNames(), c => store.ClassDir(c), ai, new History(cfg.PoolDir)),
                 StartAtLogin = LoginItems?.Invoke(home), Tries = tries,
             });
             await app.StartAsync(stop.Token);
+            phone.Start();
             // Claude's door: MCP and its sign-in, on this computer only; Tailscale Serve or Funnel passes it on when that's on.
             var claudeBuilder = WebApplication.CreateSlimBuilder();
             claudeBuilder.Logging.ClearProviders();
@@ -268,10 +283,148 @@ public static class Cli
             // Under launchd or systemd, a new version is installed and this copy stops: the service manager starts the new one.
             if (updates) updating = Updates.StartAutoUpdate(home, () => Configs.Load(home).AutoUpdate, _ => stop.Cancel(), Console.WriteLine, stop.Token);
             await Until(stop.Token);
+            // Before the library stops, so nothing the phone asked is cut off by it.
+            phone.Stop();
             await app.StopAsync(CancellationToken.None);
             await claude.StopAsync(CancellationToken.None);
             await Task.WhenAll(working, designing, updating, indexing);
             return 0;
+        }
+
+        // --- the library in the background -------------------------------------------------------------------------------
+
+        // `helper`: what the computer runs at login so the phone is answered with the app closed (BackgroundLibrary).
+        // Under launchd or systemd it's the library itself, in this process; with --keep-alive (Windows' Run key, and
+        // Linux's autostart where there's no user systemd) it keeps a library of its own going instead, as a child that
+        // stops when this ends. `helper remove` takes the registration away (uninstall.sh, the self-test).
+        async Task<int> Helper()
+        {
+            string? action = words.ElementAtOrDefault(1);
+            if (action == "remove")
+            {
+                BackgroundLibrary.ThisComputer().Unregister(home);
+                return Print("Removed.");
+            }
+            if (action == "status") return Print(BackgroundLibrary.ThisComputer().IsRegistered(home) ? "registered" : "not registered");
+            if (action is not null) return Print("usage: studystash [--home DIR] helper [--keep-alive] | helper remove | helper status", 2);
+            if (Flag("--keep-alive")) return await KeepLibraryAlive();
+            if (!tied)
+            {
+                // Nobody reads what it prints: it goes to the library's log, as the app's own library's does.
+                var log = LogWriter(Path.Combine(home, "logs", "library.log"));
+                Console.SetOut(log);
+                Console.SetError(log);
+                BackgroundLibrary.WritePids(home, Environment.ProcessId);
+            }
+            Console.WriteLine($"[background] Syft Notes {Engine.Version} answers the phone with the app closed (process {Environment.ProcessId})");
+            return await Library(updates: false, background: true);
+        }
+
+        // The library as a child that's started again whenever it stops (a growing pause if it keeps failing as it
+        // starts), its output in the library's log. Asked to stop, its input ends and it stops cleanly; ended outright
+        // (Task Manager, an uninstall), its input ends all the same.
+        async Task<int> KeepLibraryAlive()
+        {
+            // One at a time: login and the app may both start one (the app finding it not yet up); the second goes.
+            FileStream claim;
+            try
+            {
+                claim = new FileStream(Path.Combine(home, "background.lock"), FileMode.OpenOrCreate, FileAccess.ReadWrite, FileShare.None);
+            }
+            catch (IOException)
+            {
+                return 0;
+            }
+            using var _claim = claim;
+            string logPath = Path.Combine(home, "logs", "library.log");
+            int[] pauses = [2, 5, 15, 60];
+            int quick = 0;
+            while (!stop.IsCancellationRequested)
+            {
+                using var log = LogWriter(logPath);
+                var command = Autostart.EngineCommand();
+                var psi = new System.Diagnostics.ProcessStartInfo(command[0])
+                {
+                    UseShellExecute = false, CreateNoWindow = true, WorkingDirectory = home,
+                    RedirectStandardInput = true, RedirectStandardOutput = true, RedirectStandardError = true,
+                };
+                foreach (string a in command.Skip(1).Concat(["--home", home, "helper"])) psi.ArgumentList.Add(a);
+                if (Option("--drive-folder") is { Length: > 0 } df)
+                {
+                    // The self-test's stand-in for Google Drive.
+                    psi.ArgumentList.Add("--drive-folder");
+                    psi.ArgumentList.Add(Path.GetFullPath(df));
+                }
+                psi.Environment[StopWhenInputEndsEnv] = "1";
+                var began = System.Diagnostics.Stopwatch.StartNew();
+                System.Diagnostics.Process? p;
+                try
+                {
+                    p = System.Diagnostics.Process.Start(psi);
+                }
+                catch (Exception e) when (e is System.ComponentModel.Win32Exception or IOException)
+                {
+                    log.WriteLine($"[background] couldn't start the library: {e.Message}");
+                    p = null;
+                }
+                if (p is not null)
+                {
+                    using var _ = p;
+                    var gate = new Lock();
+                    p.OutputDataReceived += (_, e) => { if (e.Data is not null) lock (gate) log.WriteLine(e.Data); };
+                    p.ErrorDataReceived += (_, e) => { if (e.Data is not null) lock (gate) log.WriteLine(e.Data); };
+                    p.BeginOutputReadLine();
+                    p.BeginErrorReadLine();
+                    BackgroundLibrary.WritePids(home, Environment.ProcessId, p.Id);
+                    try
+                    {
+                        await p.WaitForExitAsync(stop.Token);
+                    }
+                    catch (OperationCanceledException)
+                    {
+                        try
+                        {
+                            p.StandardInput.Close();
+                        }
+                        catch (Exception e) when (e is IOException or InvalidOperationException)
+                        {
+                        }
+                        if (!p.WaitForExit(TimeSpan.FromSeconds(10))) p.Kill(entireProcessTree: true);
+                        break;
+                    }
+                    quick = began.Elapsed > TimeSpan.FromMinutes(1) ? 0 : quick + 1;
+                    lock (gate) log.WriteLine($"[background] the library stopped (exit {p.ExitCode})");
+                }
+                else
+                {
+                    quick++;
+                }
+                int pause = pauses[Math.Min(Math.Max(quick - 1, 0), pauses.Length - 1)];
+                log.WriteLine($"[background] starting it again in {pause} s");
+                try
+                {
+                    await Task.Delay(TimeSpan.FromSeconds(pause), stop.Token);
+                }
+                catch (OperationCanceledException)
+                {
+                    break;
+                }
+            }
+            return 0;
+        }
+
+        // A log file to append to, started over (keeping one old copy) past 5 MB when it's opened; others may write it too.
+        static StreamWriter LogWriter(string path)
+        {
+            Directory.CreateDirectory(Path.GetDirectoryName(path)!);
+            try
+            {
+                if (new FileInfo(path) is { Exists: true, Length: > Autostart.LogLimit }) File.Move(path, path + ".1", overwrite: true);
+            }
+            catch (Exception e) when (e is IOException or UnauthorizedAccessException)
+            {
+            }
+            return new StreamWriter(new FileStream(path, FileMode.Append, FileAccess.Write, FileShare.ReadWrite | FileShare.Delete), new System.Text.UTF8Encoding(false)) { AutoFlush = true };
         }
 
         // --- Claude -------------------------------------------------------------------------------------------------------
