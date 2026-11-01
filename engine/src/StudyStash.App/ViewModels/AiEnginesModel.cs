@@ -186,6 +186,9 @@ public sealed partial class AiEnginesModel : ObservableObject
     /// rather than "your library".</summary>
     public bool Here { get; init; }
 
+    /// <summary>The heading over the list of AIs.</summary>
+    public string ListTitle => $"AIs on {AiWords.Where(Here)}";
+
     public ObservableCollection<AiEngineRow> Engines { get; } = [];
     /// <summary>API keys for Claude, ChatGPT and Gemini (shown once the library says it takes them).</summary>
     public ObservableCollection<ApiKeyRow> Keys { get; } = [];
