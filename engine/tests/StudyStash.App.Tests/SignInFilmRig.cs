@@ -30,8 +30,8 @@ namespace StudyStash.App.Tests;
 
 /// <summary>
 /// The computer the sign-in films run on, as far as the AIs go: stand-ins for Claude Code, Codex and agy (FakeAgents),
-/// each behind a small shim that writes down how it was started (what it was asked, and whether its output went to a
-/// terminal or was read by Syft Notes) before handing over to the stand-in. They start signed out and installed nowhere
+/// each behind a small shim that writes down how it was started (what it was asked, and whether it ran in Syft Notes'
+/// hidden terminal, with no window, or piped to Syft Notes) before handing over to the stand-in. They start signed out and installed nowhere
 /// the app looks until the film says (<see cref="Install"/>), and they're found only through <see cref="Which"/>, never
 /// the PATH, so nothing here can reach the real Claude Code, Codex or agy on this Mac, an account or a browser. `open` and
 /// `osascript` on the PATH are refusers that write down any try: on a Mac that's how a Terminal window would come up.
@@ -99,7 +99,7 @@ sealed class StandIns : IDisposable
               *) what="$1";;
             esac
             for a in "$@"; do [ "$a" = -p ] && what="-p (a turn)"; done
-            out=piped; [ -t 1 ] && out=terminal
+            out=piped; [ -t 1 ] && out=hidden
             printf '%s\t%s\t%s\n' '{{name}}' "$what" "$out" >> '{{Launches}}'
             {{signedOut}}
             exec '{{real}}' "$@"
@@ -148,7 +148,7 @@ sealed class StandIns : IDisposable
             string command = $"{f[0]} {f[1]}";
             int at = rows.FindIndex(r => r.Command == command);
             if (at < 0) rows.Add((command, 1, f[2]));
-            else rows[at] = (command, rows[at].Times + 1, rows[at].Output == "terminal" || f[2] == "terminal" ? "terminal" : "piped");
+            else rows[at] = (command, rows[at].Times + 1, rows[at].Output == "hidden" || f[2] == "hidden" ? "hidden" : "piped");
         }
         return rows;
     }
@@ -381,7 +381,7 @@ sealed class Desk : IDisposable
                             new TextBlock { Text = "What Syft Notes started", FontSize = 17, FontWeight = FontWeight.SemiBold, Foreground = Brushes.White },
                             new TextBlock
                             {
-                                Text = "Each stand-in writes down how it was started: what it was asked, and whether its output went to a terminal or was read by Syft Notes (piped).",
+                                Text = "Each stand-in writes down how it was started: what it was asked, and whether it ran in Syft Notes' hidden terminal (no window) or piped to Syft Notes.",
                                 FontSize = 11, TextWrapping = TextWrapping.Wrap, Foreground = new SolidColorBrush(Color.Parse("#9AA0AA")),
                             },
                             new TextBlock
@@ -493,14 +493,15 @@ sealed class Desk : IDisposable
             });
             line.Children.Add(new TextBlock
             {
-                Text = (output == "terminal" ? "IN A TERMINAL" : "piped to Syft Notes · no terminal")
+                Text = (output == "hidden" ? "in Syft Notes' hidden terminal · no window" : "piped to Syft Notes · no terminal")
                     + (usage ? (times > 1 ? " · the sign-in, then the allowance check" : " · the sign-in") : signIn ? " · the sign-in" : ""), FontSize = 10.5,
                 TextWrapping = TextWrapping.Wrap,
-                Foreground = new SolidColorBrush(Color.Parse(output == "terminal" ? "#FF6B6B" : "#7FD18B")),
+                Foreground = new SolidColorBrush(Color.Parse("#7FD18B")),
             });
             record.Children.Add(line);
         }
-        int any = refused + door + rows.Count(r => r.Output == "terminal");
+        // A Terminal window would come up only through `open` or `osascript`, or Syft Notes' old terminal door.
+        int any = refused + door;
         terminals.Text = $"Terminal windows opened: {any}";
         terminals.Foreground = new SolidColorBrush(Color.Parse(any == 0 ? "#7FD18B" : "#FF6B6B"));
         doors.Text = $"open / osascript tried: {refused} · Syft Notes' terminal door called: {door}";

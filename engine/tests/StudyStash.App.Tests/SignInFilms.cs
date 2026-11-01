@@ -163,7 +163,8 @@ public sealed class SignInFilms
             await desk.UntilAsync(() => lib.Store.Get(Lecture)?.Status == Store.Done, "the lecture filed");
             var ready = new GetReady(desk, pc, host, lib, page);
             await FilmParts.ShowLectureAsync(page, lib, Lecture, ready.Open);
-            desk.Hold(3.4);
+            desk.Caption("Which AI: Continue with Google is Gemini, free · or Claude, ChatGPT, Gemini, Ollama");
+            desk.Hold(3.8);
             desk.Caption("");
             desk.Press(view.Part<Button>("UseClaude"));
             await desk.UntilAsync(() => ready.Guided?.Screen == GuidedScreen.Install, "Get Claude ready");
@@ -217,7 +218,9 @@ public sealed class SignInFilms
         await desk.UntilAsync(() => lib.Store.Get(Lecture)?.Status == Store.Done, "the lecture filed");
         var ready = new GetReady(desk, pc, host, lib, page);
         await FilmParts.ShowLectureAsync(page, lib, Lecture, ready.Open);
-        desk.Hold(2.0);
+        desk.Caption("Continue with Google: Gemini, free with your Google account");
+        desk.Hold(3.0);
+        desk.Caption("");
         desk.Press(view.Part<Button>("ContinueWithGoogle"));
         await desk.UntilAsync(() => ready.Guided?.Screen == GuidedScreen.Install, "Get Gemini ready");
         desk.Hold(1.6);
@@ -268,32 +271,63 @@ public sealed class SignInFilms
         desk.Hold(1.4);
     }
 
+    /// <summary>Set up on <paramref name="id"/>'s row, pressed: the stand-in's installer (as AgentInstall runs the maker's),
+    /// then its own sign-in, hidden, until it's ready by itself.</summary>
+    static async Task SetUpRowAsync(Desk desk, SettingsModel model, Control view, StandIns pc, AppHost host, string id, string brand)
+    {
+        // The stand-in's installer takes no time: it starts once the film has shown the row setting up.
+        var go = new TaskCompletionSource();
+        model.Engines.Install = async (engine, phase) =>
+        {
+            var install = pc.Installer(AgentCli.Get(engine), Path.Combine(host.Home, "logs", "setup-install.log"));
+            install.Phase += phase;
+            await go.Task;
+            return await install.RunAsync();
+        };
+        var row = model.Engines.Engines.Single(r => r.Id == id);
+        desk.Pointer();
+        desk.Press(Desk.ButtonIn(view, b => b.DataContext == row && b.Command == row.ActCommand));
+        await desk.UntilAsync(() => model.Engines.Engines.Single(r => r.Id == id).StateWords == "Setting up", $"{brand} setting up");
+        desk.NoPointer();
+        desk.Caption($"Set up: Syft Notes installs {brand} for you (the stand-in's installer) · nothing to type");
+        desk.Hold(2.2);
+        go.SetResult();
+        await desk.UntilAsync(() => model.Engines.Engines.Single(r => r.Id == id).SignIn == SignInPhase.Waiting, $"{brand} waiting");
+        desk.Caption($"Then {brand}'s own sign-in opens your browser · no terminal (a stand-in signs in after 5 s)");
+        desk.Hold(1.6);
+        await desk.UntilAsync(() => model.Engines.Engines.Single(r => r.Id == id).State == "ready", $"{brand} ready", TimeSpan.FromSeconds(40));
+        desk.Caption("");
+        desk.Hold(1.4);
+    }
+
     [AvaloniaFact]
     public async Task Signing_in_from_Settings()
     {
         Assert.SkipUnless(FilmParts.On, Skip);
         Look(SkinKind.Mac);
         using var pc = new StandIns();
-        foreach (string id in new[] { "claude", "codex", "gemini" }) pc.Install(id);
+        foreach (string id in new[] { "claude", "codex" }) pc.Install(id);
         using var host = FilmParts.Host(pc["app"]);
         await using var lib = await FilmLibrary.StartAsync(pc, s =>
         {
             foreach (string id in new[] { "claude", "codex", "gemini" }) s.Tests[id] = "Not logged in · Please run /login";
         });
         FilmParts.Connect(host, lib);
-        using var desk = new Desk("03-settings-claude-chatgpt-gemini", pc, ThemeVariant.Light, "Settings → Your AI · stand-in Claude, ChatGPT and Gemini · throwaway library · waits sped up");
+        using var desk = new Desk("03-settings-all-four", pc, ThemeVariant.Light, "Settings → Your AI · stand-in Claude, ChatGPT and Gemini · throwaway library · waits sped up");
         var (model, view) = await SettingsAsync(host, lib);
         desk.Show(view);
         desk.Hold(1.6);
         desk.ScrollTo(Desk.Words(view, "AIs on this computer"));
-        desk.Hold(1.6);
+        desk.Caption("All four, always: Claude, ChatGPT, Gemini, Ollama (advanced)");
+        desk.Hold(3.0);
+        desk.Caption("");
         await SignInRowAsync(desk, model, view, "claude", "Claude");
         await SignInRowAsync(desk, model, view, "codex", "ChatGPT");
-        await SignInRowAsync(desk, model, view, "gemini", "Google");
+        await SetUpRowAsync(desk, model, view, pc, host, "gemini", "Gemini");
         desk.NoPointer();
-        desk.Caption("All three signed in · nothing to press after Sign in");
+        desk.Caption("Claude, ChatGPT and Gemini ready · nothing to type, no terminal");
         desk.Hold(3.0);
-        Assert.Equal((1, 1), (pc.Logins("claude"), pc.Logins("codex")));
+        Assert.Equal((1, 1, true), (pc.Logins("claude"), pc.Logins("codex"), pc.SignedIn("gemini")));
         Assert.Equal(0, pc.TerminalDoors + pc.RefusedTries);
         model.Dispose();
     }
@@ -368,7 +402,7 @@ public sealed class SignInFilms
         settings.Dispose();
     }
 
-    // --- 5 · the fallbacks: it gave up, Try again; and the stuck case's last-resort link -------------------------------------
+    // --- 5 · the fallbacks: it gave up, Try again; it couldn't start, Get help and Try again ------------------------------------
 
     [AvaloniaFact]
     public async Task The_fallbacks()
@@ -386,8 +420,9 @@ public sealed class SignInFilms
             foreach (string id in new[] { "claude", "codex" }) s.Tests[id] = "Not logged in · Please run /login";
         }, patience: TimeSpan.FromSeconds(8));
         FilmParts.Connect(host, lib);
-        using var desk = new Desk("05-fallbacks", pc, ThemeVariant.Light, "Settings → Your AI · the library waits 8 s here (10 minutes really) · stand-ins · waits sped up");
+        using var desk = new Desk("05-fallbacks-gave-up-and-stuck", pc, ThemeVariant.Light, "Settings → Your AI · the library waits 8 s here (10 minutes really) · stand-ins · waits sped up");
         var (model, view) = await SettingsAsync(host, lib);
+        model.Engines.OpenUrl = pc.Pages.Add; // Get help, written down: no browser opens
         desk.Show(view);
         desk.Hold(1.2);
         desk.ScrollTo(Desk.Words(view, "AIs on this computer"));
@@ -416,9 +451,22 @@ public sealed class SignInFilms
         desk.Press(Desk.ButtonIn(view, b => b.DataContext == codex && b.Command == codex.ActCommand));
         await desk.UntilAsync(() => Row("codex").SignIn == SignInPhase.Stuck, "ChatGPT stuck", TimeSpan.FromSeconds(40));
         var stuck = Row("codex");
-        desk.Caption("Only when the hidden sign-in couldn't start: the last resort, a small link (not pressed here)");
-        desk.Glide(Desk.ButtonIn(view, b => b.DataContext == stuck && b.Name == "SignInLink"), 1.25, 0.5);
-        desk.Hold(4.0);
+        desk.Caption("It couldn't start: Try again, or Get help · never a terminal");
+        desk.Hold(2.4);
+        desk.Press(Desk.ButtonIn(view, b => b.DataContext == stuck && b.Name == "SignInLink"));
+        desk.Caption("Get help opens syftnotes.com/support (written down here: no browser opens)");
+        desk.Hold(2.6);
+        pc.LoginFails("codex", false);
+        pc.Delay("codex", 4);
+        var again = Row("codex");
+        desk.Caption("");
+        desk.Press(Desk.ButtonIn(view, b => b.DataContext == again && b.Command == again.ActCommand));
+        await desk.UntilAsync(() => Row("codex").SignIn == SignInPhase.Waiting, "ChatGPT waiting");
+        desk.NoPointer();
+        await desk.UntilAsync(() => Row("codex").State == "ready", "ChatGPT ready", TimeSpan.FromSeconds(40));
+        desk.Caption("Try again worked");
+        desk.Hold(2.4);
+        Assert.Equal([AiWords.HelpPage], pc.Pages);
         Assert.Equal(0, pc.TerminalDoors + pc.RefusedTries);
         model.Dispose();
     }
@@ -435,24 +483,22 @@ public sealed class SignInFilms
         [
             ("01-onboarding-claude", 20, "1 · First launch: one button"),
             ("01-onboarding-claude", 70, "1 · Home after Get started"),
-            ("01-onboarding-claude", 110, "1 · The first lecture: Get study notes"),
-            ("01-onboarding-claude", 160, "1 · Get Claude ready (the stand-in's installer)"),
-            ("01-onboarding-claude", 225, "1 · Sign in to Claude"),
-            ("01-onboarding-claude", 270, "1 · Waiting: hidden sign-in (no Terminal link)"),
-            ("01-onboarding-claude", 298, "1 · Signed in by itself, checking the plan"),
+            ("01-onboarding-claude", 120, "1 · The first lecture: Gemini named, all four AIs"),
+            ("01-onboarding-claude", 165, "1 · Get Claude ready (the stand-in's installer)"),
+            ("01-onboarding-claude", 275, "1 · Waiting: hidden terminal, no window"),
             ("01-onboarding-claude", 390, "1 · Claude's notes, written by themselves"),
-            ("02-onboarding-google", 150, "2 · Continue with Google: waiting"),
+            ("02-onboarding-google", 30, "2 · Continue with Google: Gemini, free"),
+            ("02-onboarding-google", 150, "2 · Sign in to Gemini: waiting"),
             ("02-onboarding-google", 250, "2 · Gemini's notes"),
-            ("03-settings-claude-chatgpt-gemini", 95, "3 · Settings → Your AI: Claude signing in"),
-            ("03-settings-claude-chatgpt-gemini", 300, "3 · All three ready by themselves"),
-            ("04-claude-login-ran-out", 30, "4 · Login ran out: the lecture and its notification"),
-            ("04-claude-login-ran-out", 115, "4 · The card, waiting for the browser"),
-            ("04-claude-login-ran-out", 180, "4 · The card is gone and Claude's row below is ready too"),
-            ("04-claude-login-ran-out", 235, "4 · The missed notes, written"),
-            ("05-fallbacks", 90, "5 · It gave up: Try again"),
-            ("05-fallbacks", 245, "5 · Stuck: the last-resort link (not pressed)"),
-            ("06-windows-dark-claude", 72, "6 · Windows look, dark: waiting"),
-            ("06-windows-dark-claude", 138, "6 · Windows look, dark: ready"),
+            ("03-settings-all-four", 60, "3 · Settings → Your AI: all four, always"),
+            ("03-settings-all-four", 240, "3 · Set up Gemini: installs, then signs in"),
+            ("03-settings-all-four", 330, "3 · Claude, ChatGPT, Gemini ready"),
+            ("04-claude-login-ran-out", 115, "4 · Login ran out: the card, waiting"),
+            ("04-claude-login-ran-out", 230, "4 · The missed notes, written"),
+            ("05-fallbacks-gave-up-and-stuck", 90, "5 · It gave up: Try again"),
+            ("05-fallbacks-gave-up-and-stuck", 215, "5 · Couldn't start: Try again, Get help, no terminal"),
+            ("06-windows-dark-all-four", 60, "6 · Windows look, dark: all four"),
+            ("06-windows-dark-all-four", 190, "6 · Windows look, dark: Gemini set up, waiting"),
         ];
         const double W = 600;
         var grid = new Avalonia.Controls.Primitives.UniformGrid { Columns = 3, Background = Avalonia.Media.Brushes.White };
@@ -483,7 +529,7 @@ public sealed class SignInFilms
         window.Close();
     }
 
-    // --- 6 · Windows, dark: Claude from Settings → Your AI ------------------------------------------------------------------
+    // --- 6 · Windows, dark: all four AIs in Settings → Your AI, Claude signed in and Gemini set up -------------------------------
 
     [AvaloniaFact]
     public async Task Signing_in_on_Windows_in_dark()
@@ -492,17 +538,26 @@ public sealed class SignInFilms
         Look(SkinKind.Win);
         using var pc = new StandIns();
         pc.Install("claude");
+        pc.Install("codex");
+        File.WriteAllText(Path.Combine(pc.State("codex"), "signed-in"), "");
         using var host = FilmParts.Host(pc["app"]);
-        await using var lib = await FilmLibrary.StartAsync(pc, s => s.Tests["claude"] = "Not logged in · Please run /login");
+        await using var lib = await FilmLibrary.StartAsync(pc, s =>
+        {
+            s.Tests["claude"] = "Not logged in · Please run /login";
+            s.Tests["codex"] = "works";
+        });
         FilmParts.Connect(host, lib);
-        using var desk = new Desk("06-windows-dark-claude", pc, ThemeVariant.Dark, "the Windows look, dark, drawn on a Mac · stand-in Claude · throwaway library · waits sped up",
-            note: "The Windows look, drawn on a Mac: these are the Mac's processes. A real PC's console windows can't be seen from here.");
+        using var desk = new Desk("06-windows-dark-all-four", pc, ThemeVariant.Dark, "the Windows look, dark, drawn on a Mac · stand-ins · throwaway library · waits sped up",
+            note: "The Windows look, drawn on a Mac: these are the Mac's processes. CI's Windows runner checks the real CLIs for windows of their own.");
         var (model, view) = await SettingsAsync(host, lib);
         desk.Show(view);
         desk.Hold(1.4);
         desk.ScrollTo(Desk.Words(view, "AIs on this computer"));
-        desk.Hold(1.2);
+        desk.Caption("All four, always: Claude, ChatGPT, Gemini, Ollama (advanced)");
+        desk.Hold(2.6);
+        desk.Caption("");
         await SignInRowAsync(desk, model, view, "claude", "Claude");
+        await SetUpRowAsync(desk, model, view, pc, host, "gemini", "Gemini");
         desk.NoPointer();
         desk.Hold(2.4);
         Assert.Equal(0, pc.TerminalDoors + pc.RefusedTries);
