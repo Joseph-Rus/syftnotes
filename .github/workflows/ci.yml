@@ -278,7 +278,9 @@ jobs:
         continue-on-error: true
         with:
           name: real-sign-in-${{ matrix.os }}
-          path: ${{ runner.temp }}/real-sign-in/transcripts
+          path: |
+            ${{ runner.temp }}/real-sign-in/transcripts
+            ${{ runner.temp }}/real-sign-in/install-*.log
           retention-days: 1
           if-no-files-found: ignore
 

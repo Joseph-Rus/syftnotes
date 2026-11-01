@@ -86,7 +86,7 @@ public sealed partial class RealCliSignInTests
         if (!outcome.Ok)
             return outcome.Failure == InstallFailure.Offline
                 ? new Result(cli.Brand, "download failed (network), skipped")
-                : new Result(cli.Brand, $"install failed ({outcome.Failure})") { Failed = true };
+                : new Result(cli.Brand, $"install failed ({outcome.Failure}: {Redact(outcome.LastLine)})") { Failed = true };
         string exe = outcome.Found.Exe!;
         if (File.Exists(opened)) File.Delete(opened);
 
@@ -106,8 +106,9 @@ public sealed partial class RealCliSignInTests
             },
         };
         var windows = new HashSet<string>();
+        var browsers = new HashSet<string>();
         using var watching = new CancellationTokenSource();
-        var watcher = OperatingSystem.IsWindows() ? Task.Run(() => WatchWindows(signIn, windows, watching.Token)) : Task.CompletedTask;
+        var watcher = OperatingSystem.IsWindows() ? Task.Run(() => WatchWindows(signIn, windows, browsers, watching.Token)) : Task.CompletedTask;
         var at = Stopwatch.StartNew();
         bool started = signIn.Start();
         bool listens = false;
@@ -120,29 +121,37 @@ public sealed partial class RealCliSignInTests
         }
         // A little longer, for a window that comes late.
         if (OperatingSystem.IsWindows()) await Task.Delay(2000);
-        bool alive = signIn.Running;
+        // Everything read before it's stopped (stopping it forgets what it showed).
+        bool alive = signIn.Running, shown = signIn.Waiting, wanted = signIn.WantedTerminal, stuck = signIn.Stuck, region = signIn.Region;
+        bool finishes = signIn.PageFinishesByItself;
+        var answered = signIn.Answered;
         await watching.CancelAsync();
         await watcher;
         signIn.Dispose();
 
-        bool waiting = started && signIn.Waiting && alive && (listens || Volatile.Read(ref pages) > 0 || File.Exists(opened));
+        bool waiting = started && shown && alive && (listens || Volatile.Read(ref pages) > 0 || File.Exists(opened));
         if (records is not null)
         {
             lock (transcript) File.WriteAllLines(Path.Combine(records, $"{cli.Id}.txt"), transcript);
         }
         var parts = new List<string>
         {
-            $"needed a terminal: {Yes(signIn.WantedTerminal || signIn.Stuck)}",
-            $"prompts answered: {(signIn.Answered.Count == 0 ? "none" : string.Join(", ", signIn.Answered))}",
+            $"needed a terminal: {Yes(wanted || stuck)}",
+            $"prompts answered: {(answered.Count == 0 ? "none" : string.Join(", ", answered))}",
             $"waiting for the browser: {Yes(waiting)}",
             $"its callback listening: {Yes(listens)}",
-            $"page finishes by itself: {Yes(signIn.PageFinishesByItself)}",
+            $"page finishes by itself: {Yes(finishes)}",
             $"Syft Notes opened the page: {Yes(Volatile.Read(ref pages) > 0)}",
             $"system opener called: {Yes(File.Exists(opened))}",
         };
-        if (OperatingSystem.IsWindows()) parts.Add($"window: {(windows.Count == 0 ? "none" : string.Join(", ", windows))}");
-        if (signIn.Region) parts.Add("refused for the country");
-        return new Result(cli.Brand, string.Join("; ", parts)) { Failed = !waiting || signIn.WantedTerminal || signIn.Stuck || windows.Count > 0 };
+        if (OperatingSystem.IsWindows())
+        {
+            parts.Add($"window: {(windows.Count == 0 ? "none" : string.Join(", ", windows))}");
+            // The CLI opening the runner's browser itself is the sign-in working, not a window of its own.
+            if (browsers.Count > 0) parts.Add($"browser it opened: {string.Join(", ", browsers)}");
+        }
+        if (region) parts.Add("refused for the country");
+        return new Result(cli.Brand, string.Join("; ", parts)) { Failed = !waiting || wanted || stuck || windows.Count > 0 };
     }
 
     static string Yes(bool b) => b ? "yes" : "no";
@@ -196,7 +205,7 @@ public sealed partial class RealCliSignInTests
 
     /// <summary>Every visible window on the screen, looked at ten times a second while the sign-in runs: one that belongs
     /// to it (or to the console host of its hidden console) is named by its program and window class.</summary>
-    static void WatchWindows(AgentSignIn signIn, HashSet<string> seen, CancellationToken ct)
+    static void WatchWindows(AgentSignIn signIn, HashSet<string> seen, HashSet<string> browsers, CancellationToken ct)
     {
         if (!OperatingSystem.IsWindows()) return;
         var already = VisibleWindows().Select(w => w.Handle).ToHashSet();
@@ -217,11 +226,15 @@ public sealed partial class RealCliSignInTests
                 {
                     program = "?";
                 }
-                lock (seen) seen.Add($"{program} ({w.Class})");
+                if (Browsers.Contains(program, StringComparer.OrdinalIgnoreCase)) lock (browsers) browsers.Add(program);
+                else lock (seen) seen.Add($"{program} ({w.Class})");
             }
             ct.WaitHandle.WaitOne(100);
         }
     }
+
+    /// <summary>Web browsers: a sign-in opens one, which is the point.</summary>
+    static readonly string[] Browsers = ["msedge", "chrome", "firefox", "brave", "opera", "iexplore", "MicrosoftEdge"];
 
     static List<(IntPtr Handle, int Pid, string Class)> VisibleWindows()
     {
