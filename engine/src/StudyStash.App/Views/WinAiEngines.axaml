@@ -173,7 +173,7 @@
 
       <!-- Engines -->
       <Grid ColumnDefinitions="*,Auto" Margin="0,18,0,8">
-        <TextBlock Classes="ai-section" Text="AIs on your library" />
+        <TextBlock Classes="ai-section" Text="{Binding ListTitle}" />
         <Button Grid.Column="1" Classes="ai-textbtn" IsVisible="{Binding HasAddChoices}">
           <TextBlock Classes="ai-link" Text="Add another AI" />
           <Button.Flyout>
