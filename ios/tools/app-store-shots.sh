@@ -8,7 +8,7 @@
 # a full battery, and the app's own clock says 9:32 that day (tools/fakeclock.c, loaded into the app's process for the
 # pictures only), so Up next's "Calculus II, in 9 minutes" is at 9:41 too. Each screen is kept once it has settled
 # (three frames alike) or after its time limit, without an alpha channel (App Store Connect refuses one).
-# APPSTORE.md says which simulator fills which of App Store Connect's slots.
+# The listing, kept outside the repo, says which simulator fills which of App Store Connect's slots.
 set -euo pipefail
 
 here="$(cd "$(dirname "$0")" && pwd)"
