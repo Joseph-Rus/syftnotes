@@ -64,9 +64,13 @@ public static partial class AiWords
 
     /// <summary>The AI engines pane's row subtitle: Ollama always says nothing leaves it; a ready CLI says it's
     /// signed in; every other CLI just says where it runs.</summary>
-    public static string EngineAbout(string id, string state) =>
-        id == "ollama" ? "Runs on your library. Nothing leaves it."
-        : Through(id) + (state == "ready" ? "Runs on your library. Signed in." : "Runs on your library.");
+    public static string EngineAbout(string id, string state, bool here = false) =>
+        id == "ollama" ? $"Runs on {Where(here)}. Nothing leaves it."
+        : Through(id) + (state == "ready" ? $"Runs on {Where(here)}. Signed in." : $"Runs on {Where(here)}.");
+
+    /// <summary>Where the AI runs, in the student's words: "this computer" when the library is on it (one computer
+    /// does everything), "your library" when the library is on another.</summary>
+    public static string Where(bool here) => here ? "this computer" : "your library";
 
     /// <summary>The tool Syft Notes reaches an AI through, said once on its row: "Through Claude Code. ".</summary>
     static string Through(string id) => id switch
@@ -458,10 +462,10 @@ public static partial class AiWords
         _ => "info",
     };
 
-    public static string ProblemTitle(string kind, string engineName, string fallbackName) => kind switch
+    public static string ProblemTitle(string kind, string engineName, string fallbackName, bool here = false) => kind switch
     {
-        "engine_offline" => $"{engineName} isn't running on your library",
-        "not_signed_in" => $"Sign in to {engineName} on your library",
+        "engine_offline" => $"{engineName} isn't running on {Where(here)}",
+        "not_signed_in" => here ? $"Sign in to {engineName}" : $"Sign in to {engineName} on your library",
         "model_missing" => $"{engineName} needs its notes model",
         "usage_limit" => $"{engineName} hit its usage limit",
         "fell_back" => $"This answer came from {engineName}",
@@ -471,18 +475,18 @@ public static partial class AiWords
         _ => engineName,
     };
 
-    public static string ProblemMessage(string kind, string engineName, string fallbackName, string until, double sizeGb, string detail) => kind switch
+    public static string ProblemMessage(string kind, string engineName, string fallbackName, string until, double sizeGb, string detail, bool here = false) => kind switch
     {
         "engine_offline" => "New lectures wait and get their notes when it's back.",
         // No stand-in (fallbackName empty): nothing writes the notes until it's signed in. The library writes the ones it
         // missed once it is.
         "not_signed_in" => fallbackName.Length > 0 ? $"Until then, questions go to {fallbackName}."
             : "Until then, lectures are filed without notes. They're written once you've signed in.",
-        "model_missing" => sizeGb > 0 ? $"About {sizeGb:0} GB, downloaded once on your library." : "Downloaded once on your library.",
+        "model_missing" => sizeGb > 0 ? $"About {sizeGb:0} GB, downloaded once on {Where(here)}." : $"Downloaded once on {Where(here)}.",
         "usage_limit" => ParseUntil(until) is { } t ? $"Questions go to {fallbackName} until {UntilClock(t)}." : $"Questions go to {fallbackName}.",
         "fell_back" => detail,
         "access_request" => $"From {detail}. It can read, not change.",
-        "library_offline" => "Your AI runs on your library. Check it's on and connected.",
+        "library_offline" => $"Your AI runs on {Where(here)}. Check it's on and connected.",
         "rewrite_failed" => $"{detail} Your current notes are unchanged.",
         _ => detail,
     };

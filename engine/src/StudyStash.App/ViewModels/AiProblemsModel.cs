@@ -84,6 +84,10 @@ public sealed class AiProblemsModel
         set => watch.Every = value;
     }
 
+    /// <summary>Whether the library is on this computer (one computer does everything): its cards say "this computer"
+    /// rather than "your library".</summary>
+    public bool Here { get; init; }
+
     public ObservableCollection<AiProblem> Problems { get; } = [];
 
     /// <summary>A sign-in going from a card: its card turns into "Finish signing in…", and goes by itself once the AI
@@ -133,11 +137,11 @@ public sealed class AiProblemsModel
             Id = p.Id,
             Kind = p.Kind,
             Caption = AiWords.ProblemCaption(p.Kind),
-            Title = signIn.Length > 0 ? AiWords.SignInTitle(p.EngineName, signIn) : AiWords.ProblemTitle(p.Kind, p.EngineName, fallbackName),
+            Title = signIn.Length > 0 ? AiWords.SignInTitle(p.EngineName, signIn) : AiWords.ProblemTitle(p.Kind, p.EngineName, fallbackName, Here),
             // A sign-in with no stand-in says so, rather than naming Ollama, which isn't used.
             Message = signIn.Length > 0 ? AiWords.SignInAbout(p.EngineName, signIn)
                 : AiWords.ProblemMessage(p.Kind, p.EngineName, p.Kind == "not_signed_in" && p.FallbackTo.Length == 0 ? "" : fallbackName,
-                    p.Until, p.SizeGb, ""),
+                    p.Until, p.SizeGb, "", Here),
             Icon = AiWords.ProblemIcon(p.Kind),
             ColorKey = AiWords.ProblemColorKey(p.Kind),
             Severity = AiWords.ProblemSeverity(p.Kind),
@@ -255,7 +259,7 @@ public sealed class AiProblemsModel
     public void AddLibraryOffline(Func<Task> retry, string id = "library-offline") => AddLocal(new AiProblem
     {
         Id = id, Kind = "library_offline", Caption = AiWords.ProblemCaption("library_offline"),
-        Title = AiWords.ProblemTitle("library_offline", "", ""), Message = AiWords.ProblemMessage("library_offline", "", "", "", 0, ""),
+        Title = AiWords.ProblemTitle("library_offline", "", ""), Message = AiWords.ProblemMessage("library_offline", "", "", "", 0, "", Here),
         Icon = AiWords.ProblemIcon("library_offline"), ColorKey = AiWords.ProblemColorKey("library_offline"), Severity = AiWords.ProblemSeverity("library_offline"),
         PrimaryWords = AiWords.ProblemAction("library_offline"),
     }.Also(p => p.PrimaryCommand = new AsyncRelayCommand(retry)));
