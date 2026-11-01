@@ -119,7 +119,8 @@ public sealed partial class AiTurn : ObservableObject
     internal void Rematch(NoteHighlights notes, List<string> found)
     {
         Shown = found;
-        Chips = [.. found.Select((_, i) => new QuoteChip(notes, found, i))];
+        // A chip for each quote that reads as words; one that's only a formula keeps its highlight in the notes, and its place in the list.
+        Chips = [.. found.Select((q, i) => (q, i)).Where(x => QuoteChip.Readable(x.q)).Select(x => new QuoteChip(notes, found, x.i))];
     }
     /// <summary>The engine that answered (the one asked, until the answer says otherwise): whether the chat above has
     /// been to an AI before goes by it.</summary>

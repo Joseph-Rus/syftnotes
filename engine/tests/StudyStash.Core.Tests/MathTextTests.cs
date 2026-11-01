@@ -112,6 +112,24 @@ public class MathTextTests
     public void FenceFormulas_puts_each_dollar_fence_on_its_own_line(string markdown, string fenced) =>
         Assert.Equal(fenced, MathText.FenceFormulas(markdown));
 
+    [Theory]
+    [InlineData("Then:\n$$\nx = 1\n$$.\nSo x is one.", "Then:\n\n$$\nx = 1.\n$$\n\nSo x is one.")]
+    [InlineData("- Then:\n  $$a\n  = b$$,\n\n- Next", "- Then:\n\n  $$\n  a\n  = b,\n  $$\n\n- Next")]
+    [InlineData("Then:\n$$\nx = 1\n$$\nSo x is one.", "Then:\n\n$$\nx = 1\n$$\n\nSo x is one.")]
+    [InlineData("Then $x = 1$. And $$y = 2$$. Done.", "Then $x = 1$. And $$y = 2$$. Done.")]
+    public void FenceFormulas_keeps_a_full_stop_after_the_closing_dollars_inside_the_formula(string markdown, string fenced) =>
+        Assert.Equal(fenced, MathText.FenceFormulas(markdown));
+
+    [Theory]
+    [InlineData(". Attention on its own", ".")]
+    [InlineData(", so that", ",")]
+    [InlineData(": the", "{:}")]
+    [InlineData(".5 of it", null)]
+    [InlineData("... and on", null)]
+    [InlineData(" and so on", null)]
+    public void TrailingPunctuation_takes_the_mark_that_follows_a_formula(string after, string? mark) =>
+        Assert.Equal(mark, MathText.TrailingPunctuation(after));
+
     [Fact]
     public void Prepare_drops_bracket_sizes_and_keeps_the_brackets() =>
         Assert.Equal(@"\hat{D}(\hat{D}(A,x),y)\{a\}", MathText.Prepare(@"\hat{D}\bigl(\hat{D}(A,x),y\bigr)\Bigl\{a\Bigr\}"));
