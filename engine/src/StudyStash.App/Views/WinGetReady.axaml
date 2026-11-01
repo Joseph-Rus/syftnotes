@@ -94,8 +94,9 @@
                         <StackPanel Orientation="Horizontal" Spacing="8" Margin="24,0,0,0">
                           <TextBlock Classes="hint" Text="Didn't open?" VerticalAlignment="Center" />
                           <Button Classes="text-link small" VerticalAlignment="Center" Command="{Binding OpenAgainCommand}" Content="Open it again" />
-                          <TextBlock Text="·" FontSize="13" Foreground="{DynamicResource InkSubtle}" VerticalAlignment="Center" />
-                          <Button Classes="text-link small" VerticalAlignment="Center" Command="{Binding SignInInTerminalCommand}" Content="Sign in in Terminal instead" />
+                          <!-- Only once the hidden sign-in couldn't start or stopped at once (OfferTerminal): never while it works. -->
+                          <TextBlock Text="·" FontSize="13" Foreground="{DynamicResource InkSubtle}" VerticalAlignment="Center" IsVisible="{Binding OfferTerminal}" />
+                          <Button Name="SignInInTerminal" Classes="text-link small" VerticalAlignment="Center" Command="{Binding SignInInTerminalCommand}" Content="Sign in in Terminal instead" IsVisible="{Binding OfferTerminal}" />
                         </StackPanel>
                       </StackPanel>
                       <StackPanel Orientation="Horizontal" Spacing="8" Margin="0,24,0,0" IsVisible="{Binding ShowCheckingPlan}">

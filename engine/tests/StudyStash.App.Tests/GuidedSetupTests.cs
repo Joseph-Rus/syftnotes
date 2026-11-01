@@ -1,3 +1,4 @@
+using Avalonia.Controls;
 using System.Diagnostics;
 using System.Text.Json.Nodes;
 using Avalonia.Headless.XUnit;
@@ -497,6 +498,32 @@ public sealed class GuidedSetupTests
         Assert.Empty(rig.Terminals);
         g.SignInInTerminalCommand.Execute(null);
         Assert.Single(rig.Terminals);
+    }
+
+    [AvaloniaFact]
+    public async Task A_lectures_Get_ready_window_shows_the_terminal_link_only_when_the_hidden_sign_in_is_stuck()
+    {
+        // The same rule on the window a lecture's Get study notes opens, in both skins: it used to show the link all the
+        // while the sign-in waited.
+        foreach (UserControl view in new UserControl[] { new Views.MacGetReady(), new Views.WinGetReady() })
+        {
+            await using var rig = await new Rig(cli: "codex", installed: true).OpenAsync();
+            File.WriteAllText(Path.Combine(rig.Bin, "login-delay"), "120");
+            var g = rig.Guided;
+            view.DataContext = g;
+            var window = new Window { Content = view, Width = 900, Height = 700 };
+            window.Show();
+            await g.GetReadyForNotesAsync("codex");
+            _ = g.OpenSignInCommand.ExecuteAsync(null);
+            await Until(() => g.WaitingSignIn, "waiting for the browser");
+            Avalonia.Threading.Dispatcher.UIThread.RunJobs();
+            Assert.False(view.Part<Button>("SignInInTerminal").IsEffectivelyVisible);
+            g.OfferTerminal = true;
+            Avalonia.Threading.Dispatcher.UIThread.RunJobs();
+            Assert.True(view.Part<Button>("SignInInTerminal").IsEffectivelyVisible);
+            Assert.Empty(rig.Terminals);
+            window.Close();
+        }
     }
 
     [AvaloniaFact]
