@@ -119,6 +119,11 @@ public sealed partial class FreeAiModel : ObservableObject
     [NotifyPropertyChangedFor(nameof(ShowCopyWay), nameof(OtherWayLabel))]
     public partial bool CopyWayOpen { get; set; }
 
+    /// <summary>Whether a lecture with no notes shows the card that asks which AI: the library writes none because no AI is
+    /// chosen (<paramref name="noNotes"/> says notes are off, or its reason <paramref name="error"/> is
+    /// <see cref="Engines.NotesNeedAnAi"/>, a fresh library's).</summary>
+    public static bool AsksWhichAi(string noNotes, string error) => noNotes == Summarize.NoNotesOff || error == Engines.NotesNeedAnAi;
+
     public bool ShowChoose => Offer && Choose && !Pasting && Fallback == NotesFallback.None;
     public bool ShowFallback => Offer && Fallback != NotesFallback.None && !Pasting;
     /// <summary>Copy for your AI and Paste notes, under the card: opened from it, or with a fallback, which offers them.</summary>

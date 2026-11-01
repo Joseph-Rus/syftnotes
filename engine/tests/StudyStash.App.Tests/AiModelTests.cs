@@ -147,6 +147,30 @@ public class AiEnginesModelTests
     }
 
     [AvaloniaFact]
+    public async Task A_fresh_library_says_no_AI_writes_the_notes_yet_and_offers_the_choice_without_posting_anything()
+    {
+        var lib = new FakeAiLibrary { Overview = AiTestData.MixedOverview() with { Notes = "", Ask = "" } };
+        var model = new AiEnginesModel(lib);
+
+        await model.Load();
+
+        Assert.True(model.NoNotesAi);
+        Assert.Equal("", model.SelectedNotes);
+        Assert.Equal("No AI writes your notes yet. Choose one here, or set one up below.", model.NotesRowAbout);
+        Assert.Equal("Choose an AI", model.SelectedNotesName);
+        Assert.Equal("Choose an AI", model.SelectedAskName);
+        Assert.Contains("Ollama (free, advanced)", model.NotesChoices.Select(c => c.Name)); // Ollama is one to pick, not the pick
+        Assert.DoesNotContain(model.NotesChoices, c => c.Current);
+        Assert.DoesNotContain("defaults", lib.Calls);
+
+        // Once one is picked, the row says where the notes are written again.
+        model.NotesChoices.First(c => c.Id == "claude").Pick!.Execute(null);
+        Assert.False(model.NoNotesAi);
+        Assert.Equal("After each lecture, on your library", model.NotesRowAbout);
+        Assert.Equal("Claude", model.SelectedNotesName);
+    }
+
+    [AvaloniaFact]
     public async Task On_this_computer_every_AI_is_a_row_in_order_and_Set_up_installs_it_then_signs_in_hidden()
     {
         var lib = new FakeAiLibrary { Overview = AiTestData.MixedOverview() };

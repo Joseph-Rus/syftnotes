@@ -286,6 +286,17 @@ public sealed class FirstRunTests
     }
 
     [Fact]
+    public void A_lecture_filed_because_no_AI_is_chosen_asks_which_one_like_one_with_notes_switched_off()
+    {
+        Assert.True(FreeAiModel.AsksWhichAi("", Engines.NotesNeedAnAi));
+        Assert.True(FreeAiModel.AsksWhichAi(Summarize.NoNotesOff, ""));
+        Assert.False(FreeAiModel.AsksWhichAi("", ""));
+        Assert.False(FreeAiModel.AsksWhichAi(Summarize.NoNotesShort, Engines.NotesNeedSignIn("Claude")));
+        Assert.Contains("no AI writes them", Engines.NotesNeedAnAi, StringComparison.Ordinal);
+        Assert.Contains("Choose one in Settings", Engines.NotesNeedAnAi, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void A_school_account_or_a_used_up_allowance_is_said_plainly_with_copy_and_paste_meanwhile()
     {
         var free = new FreeAiModel(new FakeAiLibrary(), "lec-1") { Offer = true, Choose = true, Fallback = NotesFallback.GoogleAccount };
