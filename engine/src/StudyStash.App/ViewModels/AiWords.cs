@@ -503,6 +503,16 @@ public static partial class AiWords
         _ => "",
     };
 
+    /// <summary>The line under the list of AIs once a sign-in has stopped, so it says what the row says rather than the
+    /// "Finish signing in…" the press answered with.</summary>
+    public static string SignInSaid(string engineName, string phase) => phase switch
+    {
+        SignInPhase.GaveUp => $"Signing in to {engineName} stopped before you'd finished. Try again.",
+        SignInPhase.Region => $"{engineName} isn't offered in your country yet.",
+        SignInPhase.Stuck => $"Syft Notes couldn't open the sign-in page for {engineName}. Try again.",
+        _ => "",
+    };
+
     /// <summary>A card's title for each place a sign-in can be at; "" when none is going.</summary>
     public static string SignInTitle(string engineName, string phase) => phase switch
     {
