@@ -410,14 +410,17 @@ public sealed partial class SettingsModel : ObservableObject, IDisposable
         var cc = host.Client();
         // The password as it is at each request: it can change while Settings is open (Add a laptop, Password → Change).
         ai ??= new AiRemote(cc.ServerUrl, () => host.Client().PoolKey);
+        // One computer (Both) has the library on it: the AI's words say this computer, not "your library".
+        bool libraryHere = host.Settings.Role != AppRole.Laptop;
         Engines = new AiEnginesModel(ai)
         {
+            Here = libraryHere,
             OpenUrl = url => Dialogs.OpenUrl(url),
             Lede = "Choose which AI writes your notes and answers your questions. You can change it here any time. " + (host.Settings.Role == AppRole.Laptop
                 ? "It runs on your library, and you can set it up there or from this laptop."
                 : $"It runs on this {device}, as part of your library."),
         };
-        AiProblems = new AiProblemsModel(ai);
+        AiProblems = new AiProblemsModel(ai) { Here = libraryHere };
         // A sign-in started from a problem card shows on its AI's row below, and the other way round.
         Engines.ShareWith(AiProblems);
         Access = MakeAccess(ai, host);

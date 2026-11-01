@@ -182,6 +182,10 @@ public sealed partial class AiEnginesModel : ObservableObject
     /// <summary>The line under the pane's title: where the engines run (the library elsewhere, or this computer).</summary>
     public string Lede { get; init; } = "Choose which AI writes your notes and answers your questions. You can change it here any time. It runs on your library, and you can set it up there or from this laptop.";
 
+    /// <summary>Whether the library is on this computer (one computer does everything): its rows say "this computer"
+    /// rather than "your library".</summary>
+    public bool Here { get; init; }
+
     public ObservableCollection<AiEngineRow> Engines { get; } = [];
     /// <summary>API keys for Claude, ChatGPT and Gemini (shown once the library says it takes them).</summary>
     public ObservableCollection<ApiKeyRow> Keys { get; } = [];
@@ -479,7 +483,7 @@ public sealed partial class AiEnginesModel : ObservableObject
             Name = name,
             Icon = AiWords.EngineIcon(e.Id),
             About = signIn.Length > 0 ? AiWords.SignInAbout(name, signIn)
-                : e.Installed || e.Id == "ollama" ? AiWords.EngineAbout(e.Id, e.State) : "Install it on your library's computer.",
+                : e.Installed || e.Id == "ollama" ? AiWords.EngineAbout(e.Id, e.State, Here) : Here ? "Install it on this computer." : "Install it on your library's computer.",
             State = e.State,
             StateWords = signIn == SignInPhase.Waiting ? "Signing in" : AiWords.EngineStateWords(e.State),
             Good = AiWords.StateIsGood(e.State),
@@ -503,7 +507,7 @@ public sealed partial class AiEnginesModel : ObservableObject
         row.AddCommand = new RelayCommand(() =>
         {
             if (row.Site.Length > 0) OpenUrl?.Invoke(row.Site);
-            Say = $"Install {row.Name} on your library's computer.";
+            Say = Here ? $"Install {row.Name} on this computer." : $"Install {row.Name} on your library's computer.";
         });
         return row;
     }

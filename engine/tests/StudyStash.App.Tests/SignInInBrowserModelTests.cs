@@ -205,4 +205,24 @@ public class SignInInBrowserModelTests
         await m.Engines.Single(r => r.Id == "claude").ActCommand.ExecuteAsync(null);
         Assert.Equal("Finish signing in to Claude in the browser page that just opened.", m.Say);
     }
+
+    [AvaloniaFact]
+    public async Task One_computer_says_this_computer_and_a_library_elsewhere_still_says_your_library()
+    {
+        var lib = new FakeAiLibrary { Overview = Claude("not_signed_in") };
+        var here = new AiProblemsModel(lib) { Here = true };
+        await here.Load();
+        Assert.Equal("Sign in to Claude", here.Problems.Single().Title);
+        var away = new AiProblemsModel(lib);
+        await away.Load();
+        Assert.Equal("Sign in to Claude on your library", away.Problems.Single().Title);
+
+        var rows = new AiEnginesModel(lib) { Here = true };
+        await rows.Load();
+        Assert.Equal("Through Claude Code. Runs on this computer.", rows.Engines.Single(r => r.Id == "claude").About);
+        Assert.Equal("Runs on this computer. Nothing leaves it.", rows.Engines.Single(r => r.Id == "ollama").About);
+        var elsewhere = new AiEnginesModel(lib);
+        await elsewhere.Load();
+        Assert.Equal("Through Claude Code. Runs on your library.", elsewhere.Engines.Single(r => r.Id == "claude").About);
+    }
 }
