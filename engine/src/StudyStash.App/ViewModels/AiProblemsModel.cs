@@ -64,6 +64,19 @@ public sealed class AiProblemsModel
         watch = new SignInWatch(library, SignInMovedAsync);
     }
 
+    /// <summary>Said whenever these cards learn the AIs' state from the library (a sign-in's progress among it), so the
+    /// rows on the same page show it too; <see cref="Adopt"/> is the other direction.</summary>
+    public event Action<AiOverview>? Heard;
+
+    /// <summary>Takes the state the AI rows learned, so a sign-in started from a row shows on its card at once.</summary>
+    public void Adopt(AiOverview overview)
+    {
+        if (SignInWatch.Signature(overview) == shown) return;
+        shown = SignInWatch.Signature(overview);
+        Apply(overview.Problems);
+        watch.Begin(overview);
+    }
+
     /// <summary>How often a sign-in that's going is looked at; a test sets it small.</summary>
     public TimeSpan SignInEvery
     {
@@ -80,6 +93,7 @@ public sealed class AiProblemsModel
         if (SignInWatch.Signature(now) == shown) return Task.CompletedTask;
         shown = SignInWatch.Signature(now);
         Apply(now.Problems);
+        Heard?.Invoke(now);
         return Task.CompletedTask;
     }
 
@@ -98,6 +112,7 @@ public sealed class AiProblemsModel
         shown = SignInWatch.Signature(overview);
         Apply(overview.Problems);
         watch.Begin(overview);
+        Heard?.Invoke(overview);
     }
 
     void Apply(List<AiProblemInfo> infos)
@@ -157,6 +172,7 @@ public sealed class AiProblemsModel
         shown = SignInWatch.Signature(overview);
         Apply(overview.Problems);
         watch.Begin(overview);
+        Heard?.Invoke(overview);
     }
 
     async Task Act(AiProblemInfo p)
