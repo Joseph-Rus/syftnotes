@@ -15,7 +15,7 @@ public class AiWordsTests
     [InlineData("not_running", "Not running", "Start")]
     [InlineData("model_missing", "Needs its model", "Download")]
     [InlineData("limited", "Limit reached", "Options")]
-    [InlineData("not_installed", "Not installed", "Get it")]
+    [InlineData("not_installed", "Not installed", "Set up")]
     [InlineData("failed", "Didn't work", "Options")]
     public void Every_state_has_its_word_and_its_row_action(string state, string words, string action)
     {
@@ -127,7 +127,9 @@ public class AiEnginesModelTests
 
         await model.Load();
 
-        Assert.Equal(["Ollama (free, advanced)", "Claude", "ChatGPT"], model.Engines.Select(r => r.Name));
+        // A library on another computer: its installed AIs, Claude, ChatGPT, then Ollama, and the one not there yet in the
+        // Add menu (it's installed on that computer).
+        Assert.Equal(["Claude", "ChatGPT", "Ollama (free, advanced)"], model.Engines.Select(r => r.Name));
         Assert.Single(model.AddChoices);
         Assert.Equal("Gemini", model.AddChoices[0].Name);
         Assert.Equal("ollama", model.SelectedNotes);
@@ -142,6 +144,63 @@ public class AiEnginesModelTests
         Assert.True(codex.Warn);
         Assert.Equal("Sign in", codex.ActionWords);
         Assert.True(codex.IsPrimary);
+    }
+
+    [AvaloniaFact]
+    public async Task On_this_computer_every_AI_is_a_row_in_order_and_Set_up_installs_it_then_signs_in_hidden()
+    {
+        var lib = new FakeAiLibrary { Overview = AiTestData.MixedOverview() };
+        var go = new TaskCompletionSource();
+        var model = new AiEnginesModel(lib)
+        {
+            Here = true, SignInEvery = TimeSpan.FromHours(1),
+            Install = async (id, phase) =>
+            {
+                phase("Downloading Antigravity CLI…");
+                await go.Task;
+                lib.Overview = lib.Overview! with { Engines = [.. lib.Overview.Engines.Select(e => e.Id == id ? e with { State = "not_signed_in", Installed = true } : e)] };
+                return new InstallOutcome(true, InstallFailure.None, "Antigravity CLI 1.4.5 is installed.", AgentFound.None);
+            },
+        };
+        await model.Load();
+
+        // All four, always, in this order, and none in an Add menu.
+        Assert.Equal(["Claude", "ChatGPT", "Gemini", "Ollama (free, advanced)"], model.Engines.Select(r => r.Name));
+        Assert.Equal(["claude", "codex", "gemini", "ollama"], model.NotesChoices.Select(c => c.Id));
+        Assert.Empty(model.AddChoices);
+        var gemini = model.Engines.Single(r => r.Id == "gemini");
+        Assert.Equal(("Set up", "Free with a Google account. Set up gets it ready on this computer."), (gemini.ActionWords, gemini.About));
+
+        // Set up: the installer's words on the row, no button meanwhile, then its own sign-in, hidden.
+        var pressing = gemini.ActCommand.ExecuteAsync(null);
+        var setting = model.Engines.Single(r => r.Id == "gemini");
+        Assert.Equal(("Downloading Antigravity CLI…", "Setting up", false), (setting.About, setting.StateWords, setting.ShowPill));
+        go.SetResult();
+        await pressing;
+        Assert.Contains("sign-in:gemini", lib.Calls);
+        Assert.Equal("ready", model.Engines.Single(r => r.Id == "gemini").State);
+    }
+
+    [AvaloniaFact]
+    public async Task A_Set_up_that_couldnt_install_says_why_and_offers_Get_help_when_nothing_else_will_do()
+    {
+        var lib = new FakeAiLibrary { Overview = AiTestData.MixedOverview() };
+        var outcome = new InstallOutcome(false, InstallFailure.Offline, "Syft Notes couldn't reach antigravity.google. Check your internet connection, then try again.", AgentFound.None);
+        var pages = new List<string>();
+        var model = new AiEnginesModel(lib) { Here = true, OpenUrl = pages.Add, Install = (_, _) => Task.FromResult(outcome) };
+        await model.Load();
+
+        await model.Engines.Single(r => r.Id == "gemini").ActCommand.ExecuteAsync(null);
+        Assert.Equal(outcome.Words, model.Say);
+        Assert.Equal(("Set up", false), (model.Engines.Single(r => r.Id == "gemini").ActionWords, model.Engines.Single(r => r.Id == "gemini").HasLink));
+        Assert.DoesNotContain(lib.Calls, c => c.StartsWith("sign-in", StringComparison.Ordinal));
+
+        outcome = new InstallOutcome(false, InstallFailure.Other, "The installer stopped: Checksum verification failed.", AgentFound.None);
+        await model.Engines.Single(r => r.Id == "gemini").ActCommand.ExecuteAsync(null);
+        var row = model.Engines.Single(r => r.Id == "gemini");
+        Assert.Equal(("Set up", "Get help"), (row.ActionWords, row.LinkWords));
+        await row.LinkCommand.ExecuteAsync(null);
+        Assert.Equal([AiWords.HelpPage], pages);
     }
 
     [AvaloniaFact]

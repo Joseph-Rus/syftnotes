@@ -261,7 +261,7 @@ public sealed class FirstRunTests
     // --- the lecture page's card -----------------------------------------------------------------------------------
 
     [Fact]
-    public void With_no_AI_the_lecture_page_offers_Google_first_then_Claude_and_ChatGPT_and_copy_and_paste_quietly()
+    public void With_no_AI_the_lecture_page_offers_Google_as_Gemini_first_then_all_four_AIs_and_copy_and_paste_quietly()
     {
         var free = new FreeAiModel(new FakeAiLibrary(), "lec-1") { Offer = true, Choose = true };
         var asked = new List<string>();
@@ -270,13 +270,17 @@ public sealed class FirstRunTests
         Assert.False(free.ShowOffer); // the old offer gives way to the card
         Assert.False(free.ShowCopyWay); // the other free way is folded until asked for
         Assert.Equal("Get study notes from this lecture", free.ChooseTitle);
+        // The Google button says it's Gemini, beside it.
         Assert.Equal("Continue with Google", FreeAiModel.GoogleButton);
-        Assert.Contains("Free with a personal Google account", FreeAiModel.GoogleLine, StringComparison.Ordinal);
+        Assert.Equal("Gemini, free with your Google account", FreeAiModel.GoogleBeside);
         Assert.Contains("Google's free plan may use what's sent to improve its products", FreeAiModel.GoogleLine, StringComparison.Ordinal);
+        Assert.Contains("Ollama is free and runs on this computer (advanced)", FreeAiModel.PaidLine, StringComparison.Ordinal);
         free.ContinueWithGoogleCommand.Execute(null);
         free.UseClaudeCommand.Execute(null);
         free.UseChatGptCommand.Execute(null);
-        Assert.Equal(["gemini", "claude", "codex"], asked);
+        free.UseGeminiCommand.Execute(null);
+        free.UseOllamaCommand.Execute(null);
+        Assert.Equal(["gemini", "claude", "codex", "gemini", "ollama"], asked);
         free.ToggleCopyWayCommand.Execute(null);
         Assert.True(free.ShowCopyWay);
     }

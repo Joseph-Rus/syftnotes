@@ -416,6 +416,13 @@ public sealed partial class SettingsModel : ObservableObject, IDisposable
         {
             Here = libraryHere,
             OpenUrl = url => Dialogs.OpenUrl(url),
+            // Set up on an AI not here yet: its maker's installer, for this account, as guided setup's Install runs it.
+            Install = libraryHere ? (id, phase) =>
+            {
+                var install = new AgentInstall(Core.Ai.AgentCli.Get(id), OperatingSystem.IsWindows(), Path.Combine(host.Home, "logs", "setup-install.log"));
+                install.Phase += phase;
+                return install.RunAsync();
+            } : null,
             Lede = "Choose which AI writes your notes and answers your questions. You can change it here any time. " + (host.Settings.Role == AppRole.Laptop
                 ? "It runs on your library, and you can set it up there or from this laptop."
                 : $"It runs on this {device}, as part of your library."),

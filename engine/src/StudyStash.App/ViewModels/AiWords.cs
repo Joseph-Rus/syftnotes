@@ -44,15 +44,25 @@ public static partial class AiWords
     public static bool StateIsMuted(string state) => state is "unchecked" or "not_installed";
 
     /// <summary>The row's button: ready → Options · unchecked → Check · not_signed_in → Sign in (tinted) ·
-    /// not_running → Start · model_missing → Download · not_installed → Get it · limited/failed → Options.</summary>
+    /// not_running → Start · model_missing → Download · not_installed → Set up · limited/failed → Options.</summary>
     public static string RowActionWords(string state) => state switch
     {
         "unchecked" => "Check",
         "not_signed_in" => "Sign in",
         "not_running" => "Start",
         "model_missing" => "Download",
-        "not_installed" => "Get it",
+        "not_installed" => "Set up",
         _ => "Options",
+    };
+
+    /// <summary>The line on Settings' row for an AI not on this computer yet: what it's for, plainly, and that Set up gets
+    /// it ready (Syft Notes installs it and signs in; nothing to type).</summary>
+    public static string NotSetUpAbout(string id) => id switch
+    {
+        "claude" => "For a Claude Pro or Max plan. Set up gets it ready on this computer.",
+        "codex" => "For a ChatGPT Plus plan or higher. Set up gets it ready on this computer.",
+        "gemini" => "Free with a Google account. Set up gets it ready on this computer.",
+        _ => "Set up gets it ready on this computer.",
     };
 
     /// <summary>Only "Sign in" is the tinted, accent-coloured button; every other row action is a plain pill.</summary>
