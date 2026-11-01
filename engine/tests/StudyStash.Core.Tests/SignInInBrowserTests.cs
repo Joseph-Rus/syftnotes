@@ -59,12 +59,11 @@ public class SignInInBrowserTests
 
         public async Task<EngineInfo> RowAsync(string id) => (await Remote.EnginesAsync())!.Engines.Single(e => e.Id == id);
 
-        /// <summary>Waits on the real condition (the library's own look at the sign-in), never for a fixed time. The bound
-        /// only stops a hang: a stand-in's first PowerShell in a new hidden console on a busy Windows runner took over 30 s
-        /// once. A wait that ends unmet says where the sign-in was.</summary>
+        /// <summary>Waits on the real condition (the library's own look at the sign-in), never for a fixed time; a wait
+        /// that ends unmet says where the sign-in was.</summary>
         public async Task<EngineInfo> UntilAsync(string id, Func<EngineInfo, bool> condition)
         {
-            var until = DateTime.UtcNow.AddSeconds(90);
+            var until = DateTime.UtcNow.AddSeconds(30);
             while (true)
             {
                 var row = await RowAsync(id);

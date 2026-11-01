@@ -86,12 +86,15 @@ public sealed class HiddenTerminal : IDisposable
             var chars = new char[8192 + 4];
             try
             {
-                while (!disposed)
+                // Read to the very end, even once it's been let go (only nothing is handed on then): Windows' console
+                // host won't close until what it last drew has been read, and a close that waits for it would hold a
+                // thread for good.
+                while (true)
                 {
                     int n = backend.Read(bytes, () => disposed);
                     if (n <= 0) break;
                     int c = decoder.GetChars(bytes, 0, n, chars, 0, flush: false);
-                    if (c > 0) shown(new string(chars, 0, c));
+                    if (c > 0 && !disposed) shown(new string(chars, 0, c));
                 }
             }
             catch (Exception e) when (e is IOException or ObjectDisposedException or InvalidOperationException)
@@ -130,7 +133,7 @@ public sealed class HiddenTerminal : IDisposable
         if (disposed) return;
         disposed = true;
         Stop();
-        backend.Close(exit.Task);
+        backend.Close(exit.Task, ended.Task);
     }
 
     interface IBackend
@@ -141,7 +144,10 @@ public sealed class HiddenTerminal : IDisposable
         int Read(byte[] into, Func<bool> stop);
         void Write(byte[] bytes);
         void Kill();
-        void Close(Task<int> exited);
+        /// <summary>Lets go of the terminal once the program has gone (or a while after being told to stop), and once
+        /// everything it showed has been read (<paramref name="read"/>), on a thread of its own: never one of .NET's
+        /// shared ones, which a slow close would hold up.</summary>
+        void Close(Task<int> exited, Task read);
     }
 
     /// <summary>Ends a process and every process it started (as <see cref="Process.Kill(bool)"/> does for the ones .NET
@@ -337,16 +343,16 @@ public sealed class HiddenTerminal : IDisposable
             KillTree(Pid);
         }
 
-        public void Close(Task<int> exited)
+        public void Close(Task<int> exited, Task read)
         {
             if (Interlocked.Exchange(ref closed, 1) == 1) return;
             // The reader looks at the end every quarter second: the descriptor is closed only after it's let go.
-            _ = Task.Run(async () =>
+            new Thread(() =>
             {
-                await Task.WhenAny(exited, Task.Delay(TimeSpan.FromSeconds(5)));
-                await Task.Delay(500);
+                exited.Wait(TimeSpan.FromSeconds(5));
+                read.Wait(TimeSpan.FromSeconds(5));
                 close(master);
-            });
+            }) { IsBackground = true, Name = "hidden terminal: close" }.Start();
         }
 
         [StructLayout(LayoutKind.Sequential)]
@@ -484,14 +490,17 @@ public sealed class HiddenTerminal : IDisposable
             int code = GetExitCodeProcess(process, out uint c) ? unchecked((int)c) : -1;
             // Its console is closed once it's gone (while its output is still read: closing waits for that), and
             // the reader then comes to the end.
-            _ = Task.Run(() => CloseConsole());
+            new Thread(CloseConsole) { IsBackground = true, Name = "hidden console: close" }.Start();
             return code;
         }
+
+        readonly ManualResetEventSlim consoleClosed = new();
 
         void CloseConsole()
         {
             if (Interlocked.Exchange(ref closed, 1) == 1) return;
             ClosePseudoConsole(console);
+            consoleClosed.Set();
         }
 
         public int Read(byte[] into, Func<bool> stop) => output.Read(into, 0, into.Length);
@@ -504,17 +513,20 @@ public sealed class HiddenTerminal : IDisposable
 
         public void Kill() => KillTree(Pid);
 
-        public void Close(Task<int> exited)
+        public void Close(Task<int> exited, Task read)
         {
-            _ = Task.Run(async () =>
+            new Thread(() =>
             {
-                await Task.WhenAny(exited, Task.Delay(TimeSpan.FromSeconds(5)));
+                exited.Wait(TimeSpan.FromSeconds(5));
                 CloseConsole();
-                await Task.Delay(500);
+                // Closed (the reader drained its last drawing), or still closing after a while: the pipes go either way,
+                // which ends a close still waiting.
+                consoleClosed.Wait(TimeSpan.FromSeconds(10));
+                read.Wait(TimeSpan.FromSeconds(5));
                 input.Dispose();
                 output.Dispose();
                 CloseHandle(process);
-            });
+            }) { IsBackground = true, Name = "hidden console: let go" }.Start();
         }
 
         [StructLayout(LayoutKind.Sequential)]
