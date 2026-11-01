@@ -71,6 +71,10 @@ on:
         description: "Rehearse a release's fast path: the id of an earlier run by hand on exactly this code, whose installers are reused, not rebuilt."
         type: string
         default: ""
+      real_sign_in_only:
+        description: "Only the real AI sign-ins (Claude Code, Codex, Antigravity in the hidden terminal), and keep what each showed with every address taken out, for a day. Nothing else runs, so the run proves nothing else, and a merge never counts it as tested."
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -97,8 +101,9 @@ jobs:
     outputs:
       version: ${{ steps.plan.outputs.version }}
       new: ${{ steps.plan.outputs.new }}
-      installers: ${{ steps.plan.outputs.installers }}
-      tested: ${{ steps.plan.outputs.tested }}
+      # A run of the real sign-ins alone skips everything else (as code already tested would), and builds no installers.
+      installers: ${{ inputs.real_sign_in_only && 'false' || steps.plan.outputs.installers }}
+      tested: ${{ inputs.real_sign_in_only && 'true' || steps.plan.outputs.tested }}
       reuse_run: ${{ steps.plan.outputs.reuse_run }}
       mac_signing: ${{ steps.signing.outputs.mac_signing }}
       mac_notarize: ${{ steps.signing.outputs.mac_notarize }}
@@ -107,9 +112,10 @@ jobs:
       - uses: actions/checkout@v4
       # A run by hand keeps the exact tree it tests, so that merging that branch into main with the very same code
       # (main hadn't moved meanwhile) is known to have passed already (plan.sh).
-      - if: github.event_name != 'push'
+      # (Not a run of the real sign-ins alone, which tests nothing else.)
+      - if: github.event_name != 'push' && !inputs.real_sign_in_only
         run: git rev-parse 'HEAD^{tree}' > tested-tree.txt
-      - if: github.event_name != 'push'
+      - if: github.event_name != 'push' && !inputs.real_sign_in_only
         uses: actions/upload-artifact@v4
         continue-on-error: true
         with:
@@ -227,6 +233,54 @@ jobs:
             ${{ runner.temp }}\shots\win-12-notify-*
             ${{ runner.temp }}\shots\win-12-toast-*
           if-no-files-found: error
+
+  # Every AI sign-in with no terminal, proved with the real CLIs: Claude Code, Codex and Antigravity CLI (Gemini), each
+  # installed the way the app installs it (its maker's installer) in a home of the run's own, then signed in with the
+  # app's own hidden sign-in (a pseudo-terminal nobody sees; ConPTY on Windows) until it waits for the browser, and
+  # stopped (RealCliSignInTests). No account is used and nothing finishes; the app's browser opener is replaced and the
+  # system's are stand-ins, so nothing opens from the app; on Windows no window of the sign-in's own may show. The log
+  # says only yes or no for each (needed a terminal, prompts answered, waiting for the browser, a window), never an
+  # address, a code or a token. A CLI whose download fails for the network is skipped and said so. It's the makers'
+  # CLIs as they are today, so it isn't one a release waits for.
+  real-sign-in:
+    name: Real sign-ins, hidden (${{ matrix.os }})
+    needs: [version]
+    if: needs.version.outputs.tested != 'true' || inputs.real_sign_in_only
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-latest, windows-latest, ubuntu-latest]
+    # About 6 to 9 minutes, most of it building; 15 only bounds a hang.
+    timeout-minutes: 15
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "10.0.x"
+      - name: Build the app's tests
+        run: dotnet build engine/tests/StudyStash.App.Tests
+      - name: Each real AI's sign-in, in the hidden terminal
+        run: dotnet test engine/tests/StudyStash.App.Tests --no-build --filter "FullyQualifiedName~RealCliSignInTests"
+        env:
+          STUDYSTASH_REAL_CLIS: "1"
+          STUDYSTASH_REAL_CLIS_DIR: ${{ runner.temp }}/real-sign-in
+          STUDYSTASH_REAL_CLIS_RECORD: ${{ inputs.real_sign_in_only && '1' || '' }}
+      - name: What each did
+        if: always()
+        shell: bash
+        run: cat "$RUNNER_TEMP/real-sign-in/summary.txt" 2>/dev/null || echo "no summary was written"
+      # Only for a run of the real sign-ins alone: what each showed, every address, email and anything like a code or a
+      # key already taken out by the test, kept for a day to write the tests' recordings from.
+      - name: What each showed, addresses taken out
+        if: always() && inputs.real_sign_in_only
+        uses: actions/upload-artifact@v4
+        continue-on-error: true
+        with:
+          name: real-sign-in-${{ matrix.os }}
+          path: ${{ runner.temp }}/real-sign-in/transcripts
+          retention-days: 1
+          if-no-files-found: ignore
 
   # The Mac app: one universal bundle for Apple silicon and Intel, started by its own launcher (D1); ad hoc signed with
   # the microphone entitlement; the DMG (D2). Proved with the real self-test (D5): real windows open, the pretend
