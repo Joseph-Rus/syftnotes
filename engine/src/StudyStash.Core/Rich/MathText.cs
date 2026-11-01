@@ -387,6 +387,16 @@ public static class MathText
         return sb.ToString();
     }
 
+    /// <summary>The full stop, comma, semicolon or colon that starts <paramref name="after"/> (the words after a formula),
+    /// as LaTeX that sits just after the formula: a colon is braced so it keeps no relation's gaps. Null when the words
+    /// don't start with one, or it opens a number or ellipsis (<c>.5</c>, <c>...</c>).</summary>
+    public static string? TrailingPunctuation(string after)
+    {
+        if (after.Length == 0 || !".,;:".Contains(after[0])) return null;
+        if (after.Length > 1 && (char.IsDigit(after[1]) || after[1] == after[0])) return null;
+        return after[0] == ':' ? "{:}" : after[0].ToString();
+    }
+
     /// <summary>
     /// A <c>$$</c> formula over several lines with its LaTeX on the same line as an opening or closing <c>$$</c>
     /// (<c>$$\hat{x}</c> … <c>y.$$</c>, often inside a bullet) with each <c>$$</c> on a line of its own: Markdig only

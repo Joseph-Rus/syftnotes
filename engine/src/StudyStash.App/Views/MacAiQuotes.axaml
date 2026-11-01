@@ -32,7 +32,7 @@
       <ItemsControl.ItemTemplate>
         <DataTemplate x:DataType="vm:QuoteChip">
           <Button Classes="quote-chip" Theme="{StaticResource Surface}" Margin="0,0,6,6" Click="OnChip" PointerEntered="OnChipEnter"
-                  PointerExited="OnChipLeave" ToolTip.Tip="{Binding Quote}" AutomationProperties.Name="{Binding Quote}">
+                  PointerExited="OnChipLeave" ToolTip.Tip="{Binding Full}" AutomationProperties.Name="{Binding Full}">
             <Border><TextBlock Text="{Binding Text}" TextTrimming="CharacterEllipsis" MaxWidth="260" /></Border>
           </Button>
         </DataTemplate>
