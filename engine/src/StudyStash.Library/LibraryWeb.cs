@@ -60,6 +60,12 @@ public sealed class LibraryWebOptions
     public StudyStash.Core.Study.ISpeech? Speech { get; init; }
     /// <summary>The time now, for Review's schedule and exam prep. Null: the clock's.</summary>
     public Func<DateTimeOffset>? Now { get; init; }
+    /// <summary>The phone's Google Drive link, run in this library (<see cref="StudyStash.Core.PhoneDrive.PhoneLink"/>).
+    /// Null: there's none here (tests, and a library that isn't on a student's own computer).</summary>
+    public StudyStash.Core.PhoneDrive.PhoneLink? Phone { get; init; }
+    /// <summary>This library runs in the background, kept going by the computer itself so the phone is answered with
+    /// the app closed (`helper`): /api/health and /api/v2/phone/google say so.</summary>
+    public bool Background { get; init; }
 }
 
 /// <summary>Small pieces of HTTP the Python engine got from its web framework.</summary>
@@ -404,7 +410,7 @@ public sealed partial class LibraryWeb
         {
             ["ok"] = true, ["pool_name"] = cfg.PoolName,
             ["classes"] = new JsonArray(cfg.ClassNames().Select(n => (JsonNode?)n).ToArray()),
-            ["version"] = Engine.Version, ["notes"] = store.ClassesSummary().Sum(c => c.Count),
+            ["version"] = Engine.Version, ["notes"] = store.ClassesSummary().Sum(c => c.Count), ["background"] = options.Background,
         }));
         app.MapPost("/api/ingest", Http.Handle(Ingest));
         app.MapGet("/api/notes/{noteId}/status", (HttpContext ctx, string noteId) =>
@@ -445,6 +451,7 @@ public sealed partial class LibraryWeb
         MapSettings(app);
         MapCalendar(app);
         MapPhone(app);
+        MapPhoneGoogle(app);
         MapStudy(app);
         app.MapFallback(() => Http.Detail(404, "Not Found"));
     }

@@ -375,8 +375,9 @@ public class PhoneDriveTests
         new GoogleAccount("joey@example.com", "refresh-1", DateTimeOffset.UtcNow).Save(home.Path);
         var google = new PretendGoogle();
         var drive = new FakeDrive();
-        using var phoneDrive = new PhoneDrive(home.Path, () => (rig.Url, LibraryRig.Password), () => true, secret: () => "test-secret",
-            drive: (_, _) => drive, google: new HttpClient(google), space: "")
+        // The link as the library runs it.
+        using var phoneDrive = new PhoneLink(home.Path, () => (rig.Url, LibraryRig.Password), () => true, secret: () => "test-secret",
+            drive: _ => drive, google: new HttpClient(google), space: "")
         {
             Times = Quick,
         };
@@ -407,14 +408,17 @@ public class PhoneDriveTests
     [Fact]
     public async Task Connect_keeps_the_account_for_the_owner_only_and_says_why_google_said_no()
     {
-        using var home = new TempDir();
         var google = new PretendGoogle();
         var drive = new FakeDrive();
-        using var phoneDrive = new PhoneDrive(home.Path, () => null, () => true, secret: () => "test-secret", drive: (_, _) => drive,
-            google: new HttpClient(google), space: "")
+        // The app signs in; the library runs the link.
+        await using var rig = await LibraryRig.StartAsync(phone: r => new PhoneLink(r.Home, () => (r.Url, LibraryRig.Password), () => true,
+            secret: () => "test-secret", drive: _ => drive, google: new HttpClient(google), space: "")
         {
             Times = Quick,
-        };
+        });
+        var home = new { Path = rig.Home };
+        using var phoneDrive = new PhoneDrive(rig.Home, () => (rig.Url, LibraryRig.Password), secret: () => "test-secret",
+            google: new HttpClient(google), space: "");
         using var browser = new HttpClient();
         string? page = null;
         // The browser: Google's page, then back to the loopback address with what Google says.
@@ -437,7 +441,7 @@ public class PhoneDriveTests
         Assert.Equal("refresh-from-google", GoogleAccount.Load(home.Path)!.RefreshToken);
         if (!OperatingSystem.IsWindows())
             Assert.Equal(UnixFileMode.UserRead | UnixFileMode.UserWrite, File.GetUnixFileMode(GoogleAccount.PathIn(home.Path)));
-        // The link started: laptop.json is in the folder for the phone to find.
+        // The library started the link: laptop.json is in the folder for the phone to find.
         await Until(() => drive.IdOf(new DriveNames().Laptop) is not null, "laptop.json");
 
         // A school account turned away, and Google Drive unticked: each in words, and nothing kept.

@@ -36,6 +36,8 @@ static class Program
         // Gemini's agy (setup's sign-in, its check) runs in the same home of Syft Notes' own as the library's notes.
         StudyStash.Core.Ai.Antigravity.Home = () => StudyStash.Core.Ai.Antigravity.For(Home);
         Background = args.Contains("--background");
+        // CI's self-test, once the app it ran has quit: does the library still answer the phone? (No window.)
+        if (SelfTest.Dir is not null && Environment.GetEnvironmentVariable("STUDYSTASH_SELFTEST_AFTER_QUIT") == "1") return SelfTest.AfterQuit(Home);
         // STUDYSTASH_SELFTEST: before anything touches --home (even making its logs folder, which would fail the
         // "new, empty folder" check), refuse a bad setup or start the self-test's own library and AI engine, so the
         // run that follows never reaches the real network.

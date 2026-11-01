@@ -28,6 +28,9 @@ public sealed class UpdateHost
     public HttpClient? Http { get; init; }
     public Runner Run { get; init; } = (_, _, _) => throw Off("Running commands");
     public ServicePlaces Places { get; init; } = ServicePlaces.Default;
+    /// <summary>The background library (the phone answered with the app closed): stopped before this copy's files
+    /// are replaced, and started again on the new ones. Null: none here.</summary>
+    public IBackgroundLibrary? Background { get; init; }
     /// <summary>What running this exact program with `version` prints, or null when it doesn't run here.</summary>
     public Func<string, string?> VersionOf { get; init; } = _ => throw Off("Running the new app");
     /// <summary>Start a program detached from this one, so it outlives it: Windows' Setup.exe, or the Mac relaunch
@@ -74,7 +77,7 @@ public sealed class UpdateHost
         return new UpdateHost
         {
             System = system, AppDir = appDir, NotInstalledReason = reason, CantReplace = cantReplace,
-            Run = Machine.Run, Places = ServicePlaces.Default, VersionOf = Updates.VersionOf, SpawnDetached = Updates.SpawnDetached,
+            Run = Machine.Run, Places = ServicePlaces.Default, Background = BackgroundLibrary.ThisComputer(), VersionOf = Updates.VersionOf, SpawnDetached = Updates.SpawnDetached,
         };
     }
 }
@@ -152,6 +155,16 @@ public static partial class Updates
             }
         }).ToList();
 
+    /// <summary>The background libraries running <paramref name="exe"/>, by their folders: they stop before its files
+    /// are replaced (nothing is left running the old copy's code, or holding its files on Windows) and start again on
+    /// the new ones.</summary>
+    static List<string> BackgroundRunning(string exe, UpdateHost host)
+    {
+        if (host.Background is not { } b) return [];
+        var same = host.System == "Windows" ? StringComparer.OrdinalIgnoreCase : StringComparer.Ordinal;
+        return [.. b.All().Where(r => same.Equals(Path.GetFullPath(r.Args[0]), Path.GetFullPath(exe))).Select(r => r.Home)];
+    }
+
     static string MacExe(string appDir) => Path.Combine(appDir, "Contents", "MacOS", "StudyStash");
 
     /// <summary>Mac path of D4: mount the DMG, copy its app next to this one, check it's really the release before
@@ -221,6 +234,8 @@ public static partial class Updates
                 return false;
             }
             List<string> roles = restartServices ? ServicesRunning(MacExe(host.AppDir), host) : [];
+            var background = BackgroundRunning(MacExe(host.AppDir), host);
+            foreach (string h in background) host.Background!.Stop(h);
             try
             {
                 Apps.SwapMacBundle(host.AppDir, fresh, host.Run);
@@ -230,6 +245,11 @@ public static partial class Updates
                 Apps.TryDeleteFolder(fresh);
                 log($"Install failed: {e.Message}");
                 return false;
+            }
+            finally
+            {
+                // On the new copy, or the old one if the swap didn't happen.
+                foreach (string h in background) host.Background!.Start(h);
             }
             log($"Installed {release.Tag}.");
             foreach (string role in roles)
@@ -300,6 +320,8 @@ public static partial class Updates
                 return false;
             }
             List<string> roles = restartServices ? ServicesRunning(LinuxProgram(host.AppDir), host) : [];
+            var background = BackgroundRunning(LinuxProgram(host.AppDir), host);
+            foreach (string h in background) host.Background!.Stop(h);
             try
             {
                 Apps.SwapMacBundle(host.AppDir, fresh, host.Run);
@@ -308,6 +330,11 @@ public static partial class Updates
             {
                 log($"Install failed: {e.Message}");
                 return false;
+            }
+            finally
+            {
+                // On the new copy, or the old one if the swap didn't happen.
+                foreach (string h in background) host.Background!.Start(h);
             }
             log($"Installed {release.Tag}.");
             foreach (string role in roles)
@@ -360,6 +387,9 @@ public static partial class Updates
             return false;
         }
         string logPath = Path.Combine(home, "logs", "update.log");
+        // The background library holds this install's files open: it stops first, so Setup has nothing to wait for or
+        // end by force. The app opens again once Setup's done, and starts it again on the new version.
+        foreach (string h in BackgroundRunning(Path.Combine(host.AppDir, "StudyStash.exe"), host)) host.Background!.Stop(h);
         host.SpawnDetached([setup, "/VERYSILENT", "/SUPPRESSMSGBOXES", "/NORESTART", "/CLOSEAPPLICATIONS", "/relaunch=1", $"/LOG={logPath}"]);
         log($"Installing {release.Tag} in the background (log: {logPath}).");
         return true;

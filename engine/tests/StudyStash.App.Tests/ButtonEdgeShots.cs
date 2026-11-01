@@ -54,7 +54,8 @@ public class ButtonEdgeShots
         string home = Path.Combine(Path.GetTempPath(), "studystash-edges-" + Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(home);
         new AppSettings { SetupDone = true, Role = AppRole.Both }.Save(home);
-        var (drive, driveHome) = await PhonesViewTests.GoogleDrive(account: false);
+        var google = await PhonesViewTests.GoogleDrive(account: false);
+        var drive = google.Drive;
         var host = new AppHost(home, phoneDrive: _ => drive);
         ViewModels.LibrarySettingsModel.Call call = (method, path, _) => Task.FromResult<JsonObject?>((method.Method, path) switch
         {
@@ -87,7 +88,7 @@ public class ButtonEdgeShots
         {
             model.Dispose();
             host.Dispose();
-            driveHome.Dispose();
+            await google.DisposeAsync();
             if (Directory.Exists(home)) Directory.Delete(home, recursive: true);
         }
     }

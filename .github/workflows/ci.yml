@@ -161,8 +161,8 @@ jobs:
       matrix:
         os: [ubuntu-latest, macos-latest, windows-latest]
         suite: [Core, App]
-    # A leg takes 2 to 9 minutes; the App tests on a slow Windows runner the most. 15 and 20 only bound a hang.
-    timeout-minutes: ${{ matrix.suite == 'Core' && 15 || 20 }}
+    # A leg takes 2 to 20 minutes; the App tests on a slow Windows runner the most. 15 and 30 only bound a hang.
+    timeout-minutes: ${{ matrix.suite == 'Core' && 15 || 30 }}
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
@@ -389,10 +389,17 @@ jobs:
           cache-dependency-path: web/package-lock.json
       - name: Build Study Stash.app
         run: sh macos/build-app.sh dist/mac
-      - name: Self-test, just this computer - setup makes the app's own library, and the notes are written here
+      # Then "Answer your phone when Syft Notes is closed" goes on with a stand-in phone (a real LaunchAgent, on this
+      # throwaway Mac only), the app quits, and the library must still answer the phone, and leave nothing once removed.
+      - name: Self-test, just this computer - setup makes the app's own library, the notes are written here, and the phone is answered with the app closed
         env:
           STUDYSTASH_SELFTEST_FLOW: one-computer
-        run: sh macos/selftest.sh "dist/mac/Study Stash.app" "$RUNNER_TEMP/selftest/one-computer"
+          STUDYSTASH_SELFTEST_BACKGROUND: "1"
+        run: |
+          sh macos/selftest.sh "dist/mac/Study Stash.app" "$RUNNER_TEMP/selftest/one-computer"
+          grep -q "^background library registered" "$RUNNER_TEMP/selftest/one-computer/selftest.txt" || { echo "the self-test didn't turn on answering with the app closed"; exit 1; }
+          grep -q "^the phone got its answer with the app closed" "$RUNNER_TEMP/selftest/one-computer/background.txt" || { echo "the phone wasn't answered with the app closed"; exit 1; }
+          [ ! -e "$HOME/Library/LaunchAgents/"com.study-stash.background.*.plist ] || { echo "a LaunchAgent was left behind"; ls "$HOME/Library/LaunchAgents"; exit 1; }
       - uses: actions/upload-artifact@v4
         continue-on-error: true
         if: always()
@@ -591,16 +598,32 @@ jobs:
           New-Item -ItemType Directory -Force -Path $selftestHome, $out | Out-Null
           $env:STUDYSTASH_SELFTEST = $out
           $env:STUDYSTASH_SELFTEST_FLOW = "one-computer"
+          # Ends with "Answer your phone when Syft Notes is closed" on (a real Run key value, on this throwaway PC only).
+          $env:STUDYSTASH_SELFTEST_BACKGROUND = "1"
           $env:STUDYSTASH_MIC_FILE = (Resolve-Path "engine\tests\StudyStash.Core.Tests\Fixtures\speech.wav").Path
           $env:STUDYSTASH_MIC_SPEED = "4"
           $env:STUDYSTASH_MODEL_FILE = $env:STUDYSTASH_WHISPER_MODEL
           $exe = (Resolve-Path "dist\windows\win-x64\StudyStash.exe").Path
           $p = Start-Process -FilePath $exe -ArgumentList "--home", $selftestHome -PassThru
           if (-not $p.WaitForExit(480000)) { $p.Kill(); throw "Syft Notes didn't exit within 480 s" }
+          # The app has quit: its library must still answer the phone in the background, then go cleanly once removed.
+          # Run whatever happened above, so the Run key value it made is always taken away again.
+          $env:STUDYSTASH_SELFTEST_AFTER_QUIT = "1"
+          $b = Start-Process -FilePath $exe -ArgumentList "--home", $selftestHome -PassThru
+          if (-not $b.WaitForExit(300000)) { $b.Kill(); throw "the after-quit check didn't finish within 300 s" }
+          Remove-Item Env:STUDYSTASH_SELFTEST_AFTER_QUIT
           $lines = Get-Content "$out\selftest.txt"
           $lines | Write-Host
+          Write-Host "--- background.txt"
+          $background = Get-Content "$out\background.txt"
+          $background | Write-Host
           if (Test-Path "$selftestHome\logs\library.log") { Write-Host "--- library.log"; Get-Content "$selftestHome\logs\library.log" -Tail 40 | Write-Host }
           if ($p.ExitCode -ne 0) { throw "exit code $($p.ExitCode)" }
+          if ($b.ExitCode -ne 0 -or $background[-1] -ne "ok") { throw "the phone wasn't answered with the app closed, or something was left behind" }
+          if (-not ($lines -match "^background library registered")) { throw "the self-test didn't turn on answering with the app closed" }
+          if (-not ($background -match "^the phone got its answer with the app closed")) { throw "the phone wasn't answered with the app closed" }
+          $run = Get-ItemProperty "HKCU:\Software\Microsoft\Windows\CurrentVersion\Run" -ErrorAction SilentlyContinue
+          if ($run -and ($run.PSObject.Properties.Name -like "Syft Notes background*")) { throw "a Run key value was left behind" }
           if ($lines[-1] -ne "ok") { throw "last line was not ok" }
           if ($lines -match "heard nothing|no model|recording didn't start|FAILED") { throw "the self-test reported a problem" }
           if (-not ($lines -match "just this computer")) { throw "the self-test didn't run Just this computer" }
@@ -821,18 +844,29 @@ jobs:
           [ -z "$(find "$app" -name '*.pdb')" ] || { echo "$RID carries debug symbols"; exit 1; }
           [ -z "$(find "$app" -name '*.bin' -size +1M ! -name 'live-whisper-*.bin')" ] || { echo "a model file is bundled"; exit 1; }
           [ ! -e "$app/needle" ] && [ ! -e "$app/models/whistle.cact" ] || { echo "$RID carries Cactus Whistle, which has no Linux engine"; exit 1; }
-      - name: Self-test, just this computer - setup makes the app's own library, the notes are written here, and quitting stops it
+      # It ends with "Answer your phone when Syft Notes is closed" on (a real systemd --user unit on this throwaway
+      # runner, or an autostart entry where the account has no systemd of its own), checked once the app has quit.
+      - name: Self-test, just this computer - setup makes the app's own library, the notes are written here, quitting stops it, and the phone is answered with the app closed
         if: needs.version.outputs.tested != 'true'
-        timeout-minutes: 12
+        timeout-minutes: 14
         env:
           STUDYSTASH_SELFTEST_FLOW: one-computer
+          STUDYSTASH_SELFTEST_BACKGROUND: "1"
           RID: ${{ matrix.rid }}
         run: |
+          # A systemd of the runner's own account, as a desktop login has (started and waited for by systemctl itself).
+          if sudo loginctl enable-linger "$(id -un)" && sudo systemctl start "user@$(id -u).service"; then
+            export XDG_RUNTIME_DIR="/run/user/$(id -u)" DBUS_SESSION_BUS_ADDRESS="unix:path=/run/user/$(id -u)/bus"
+          fi
           out="$RUNNER_TEMP/selftest/one-computer"
           sh linux/selftest.sh "dist/linux/$RID/syft-notes" "$out"
           grep -q "just this computer" "$out/selftest.txt" || { echo "the self-test didn't run Just this computer"; exit 1; }
           grep -q "notes written on this computer by its own library" "$out/selftest.txt" || { echo "the notes weren't written by this computer's own library"; exit 1; }
-          # The library ran as the app's own child (StudyStash serve): quitting the app stops it too.
+          grep -q "^background library registered" "$out/selftest.txt" || { echo "the self-test didn't turn on answering with the app closed"; exit 1; }
+          grep -q "^the phone got its answer with the app closed" "$out/background.txt" || { echo "the phone wasn't answered with the app closed"; exit 1; }
+          ! ls "${XDG_CONFIG_HOME:-$HOME/.config}"/systemd/user/syft-notes-background*.service "${XDG_CONFIG_HOME:-$HOME/.config}"/autostart/syft-notes-background*.desktop 2>/dev/null || { echo "a registration was left behind"; exit 1; }
+          # The library ran as the app's own child (StudyStash serve): quitting the app stops it too, and the background one
+          # is gone once the self-test took it away.
           for i in $(seq 20); do pgrep -f "dist/linux/$RID/syft-notes/StudyStash" >/dev/null || break; sleep 1; done
           if pgrep -fa "dist/linux/$RID/syft-notes/StudyStash"; then echo "the app's library was still running 20 s after the app quit"; exit 1; fi
       - name: install.sh puts Syft Notes on an account of its own (the app, its menu entry, its icon, syft-notes on the PATH), the installed copy self-tests as a laptop, and uninstall.sh takes it off again

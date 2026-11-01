@@ -1,59 +1,55 @@
+using System.Net.Http.Headers;
+using System.Text.Json.Nodes;
 using StudyStash.Core;
 using StudyStash.Core.PhoneDrive;
 
 namespace StudyStash.App.Services;
 
 /// <summary>
-/// The phone over Google Drive, on a computer that's just this computer (docs/phone-google.md): Settings → Phone's
-/// Connect with Google, the Google account it's connected to (google.json), the link that keeps the phone's copy and
-/// answers its requests (<see cref="DriveLink"/>), and Disconnect. The link runs only while this computer is its own
-/// library and the account is there; <see cref="AppHost.Start"/> starts it, quitting stops it.
+/// The phone over Google Drive, on a computer that's just this computer (docs/phone-google.md), as the app sees it:
+/// Settings → Phone's Connect with Google (the browser opens Google's page; the account is kept in google.json), and
+/// then everything else through the library on this computer, which runs the link itself (<see cref="PhoneLink"/>, at
+/// /api/v2/phone/google): what it's doing, the phones that use it, Remove, and Disconnect. The link lives in the
+/// library, not here, so the phone is answered whenever the library runs, with the app closed too when the library
+/// runs in the background (<see cref="BackgroundLibrary"/>).
 /// </summary>
 public sealed class PhoneDrive : IDisposable
 {
     readonly string home;
     readonly Func<(string Url, string Key)?> library;
-    readonly Func<bool> active;
     readonly Action<string> log;
     readonly Func<string?> secret;
-    readonly Func<GoogleAccount, GoogleSignIn, IDrive> makeDrive;
     readonly HttpClient? googleHttp;
-    readonly HttpClient? libraryHttp;
+    readonly HttpClient http;
     readonly Lock gate = new();
-    CancellationTokenSource? running;
-    Task linkTask = Task.CompletedTask;
     CancellationTokenSource? connecting;
+    Timer? watch;
+    Action? changed;
+    string seen = "";
 
     /// <summary>The test prefix of every file name in the folder (STUDYSTASH_DRIVE_SPACE); "" in real use.</summary>
     public string Space { get; }
-    public DriveTimes Times { get; init; } = new();
+
+    /// <summary>How often Settings → Phone asks the library again while it's open.</summary>
+    public TimeSpan WatchEvery { get; init; } = TimeSpan.FromSeconds(3);
 
     /// <param name="library">This computer's library: its address and password (null while there's none).</param>
-    /// <param name="active">Whether this computer is just this computer (its own library), so the link may run.</param>
     /// <param name="secret">The Desktop client's secret (<see cref="GoogleClient.Secret"/> unless a test gives one).</param>
-    /// <param name="drive">The folder for an account (the real Google Drive unless a test keeps one in memory).</param>
     /// <param name="google">How Google's sign-in and revoke are reached (a test's pretend Google).</param>
-    public PhoneDrive(string home, Func<(string Url, string Key)?> library, Func<bool> active, Action<string>? log = null,
-        Func<string?>? secret = null, Func<GoogleAccount, GoogleSignIn, IDrive>? drive = null, HttpClient? google = null,
-        HttpClient? libraryHttp = null, string? space = null)
+    public PhoneDrive(string home, Func<(string Url, string Key)?> library, Action<string>? log = null, Func<string?>? secret = null,
+        HttpClient? google = null, HttpClient? libraryHttp = null, string? space = null)
     {
         this.home = home;
         this.library = library;
-        this.active = active;
         this.log = log ?? (_ => { });
         this.secret = secret ?? (() => GoogleClient.Secret);
         googleHttp = google;
-        this.libraryHttp = libraryHttp;
-        makeDrive = drive ?? ((account, signIn) =>
-        {
-            var tokens = new GoogleTokens(signIn, account.RefreshToken);
-            return new GoogleDrive(tokens.GetAsync, log: this.log);
-        });
+        http = libraryHttp ?? new HttpClient { Timeout = TimeSpan.FromSeconds(90) };
         Space = space ?? Environment.GetEnvironmentVariable("STUDYSTASH_DRIVE_SPACE") ?? "";
         Account = GoogleAccount.Load(home);
     }
 
-    /// <summary>The account this laptop is connected to; null when it isn't.</summary>
+    /// <summary>The account this computer is connected to; null when it isn't.</summary>
     public GoogleAccount? Account { get; private set; }
 
     /// <summary>This copy of Syft Notes can sign in to Google (it was built with the Desktop client's secret).</summary>
@@ -62,23 +58,51 @@ public sealed class PhoneDrive : IDisposable
     /// <summary>The browser is open on Google's page, waiting for the student.</summary>
     public bool Connecting { get; private set; }
 
-    /// <summary>The link while it runs.</summary>
-    public DriveLink? Link { get; private set; }
+    /// <summary>The phones that use the folder, as the library last said.</summary>
+    public IReadOnlyList<DrivePhone> Phones { get; private set; } = [];
 
-    /// <summary>The phones that use the folder.</summary>
-    /// <summary>The phone's copy of the library looks again straight away (a recording started or stopped here).</summary>
-    public void RefreshCopy() => Link?.CopyNow();
+    /// <summary>What the link is doing or what's wrong (Google signed this computer out), in the student's words.</summary>
+    public string? Status { get; private set; }
 
-    public IReadOnlyList<DrivePhone> Phones => Link?.Phones ?? [];
+    /// <summary>Google no longer takes this computer's sign-in: Settings offers to connect again.</summary>
+    public bool SignedOut { get; private set; }
 
-    /// <summary>What the link is doing or what's wrong (Google signed this laptop out), in the student's words.</summary>
-    public string? Status => Link?.Status;
+    /// <summary>The library that runs the link is the background one (it answers with the app closed).</summary>
+    public bool InBackground { get; private set; }
 
-    /// <summary>Google no longer takes this laptop's sign-in: Settings offers to connect again.</summary>
-    public bool SignedOut => Link?.Trouble is GoogleTrouble.SignedOut;
+    /// <summary>Anything Settings shows changed (on a worker thread). While anything listens, the library is asked
+    /// again every few seconds.</summary>
+    public event Action? Changed
+    {
+        add
+        {
+            lock (gate)
+            {
+                changed += value;
+                watch ??= new Timer(_ => _ = RefreshAsync(), null, TimeSpan.Zero, WatchEvery);
+            }
+        }
+        remove
+        {
+            lock (gate)
+            {
+                changed -= value;
+                if (changed is not null) return;
+                watch?.Dispose();
+                watch = null;
+            }
+        }
+    }
 
-    /// <summary>Anything Settings shows changed (on a worker thread).</summary>
-    public event Action? Changed;
+    void Say()
+    {
+        Action? listeners;
+        lock (gate) listeners = changed;
+        listeners?.Invoke();
+    }
+
+    /// <summary>An account was connected or forgotten: the app moves its library to the background or back.</summary>
+    public event Action? AccountChanged;
 
     /// <summary>The QR code's link: the phone app opens with this account picked. The test prefix rides along in a
     /// test run only.</summary>
@@ -87,65 +111,67 @@ public sealed class PhoneDrive : IDisposable
 
     GoogleSignIn SignIn(string key) => new(key, googleHttp);
 
-    /// <summary>The link, when this computer is its own library and an account is connected. Nothing if it runs.</summary>
-    public void Start()
+    /// <summary>A call to the link in this computer's library; null when there's no library here or it didn't answer.</summary>
+    async Task<JsonObject?> CallAsync(HttpMethod method, string path, CancellationToken ct = default)
     {
-        lock (gate)
-        {
-            if (running is not null || Account is not { } account || !active() || secret() is not { Length: > 0 } key) return;
-            var signIn = SignIn(key);
-            var link = new DriveLink(makeDrive(account, signIn), new LibraryCalls(library, libraryHttp), Me, active, new DriveNames(Space), log)
-            {
-                Times = Times,
-            };
-            link.Changed += () => Changed?.Invoke();
-            var cts = new CancellationTokenSource();
-            running = cts;
-            Link = link;
-            linkTask = Task.Run(() => link.RunAsync(cts.Token));
-        }
-        log("[drive] the phone link is on");
-        Changed?.Invoke();
+        if (library() is not { } where) return null;
+        var (url, key) = where;
+        using var request = new HttpRequestMessage(method, url.TrimEnd('/') + "/api/v2/phone/google" + path);
+        if (key.Length > 0) request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", key);
+        if (method == HttpMethod.Post) request.Content = new StringContent("{}", System.Text.Encoding.UTF8, "application/json");
+        using var r = await http.SendAsync(request, ct);
+        if (r.StatusCode == System.Net.HttpStatusCode.BadGateway) throw new DriveException(502, "Can't reach Google Drive right now.");
+        if (!r.IsSuccessStatusCode) return null;
+        return JsonNode.Parse(await r.Content.ReadAsStringAsync(ct)) as JsonObject;
     }
 
-    /// <summary>Who this laptop is in laptop.json: its install's id, the computer's own name, and the version.</summary>
-    (string Id, string Name, string Version) Me() => (GoogleAccount.LaptopId(home), ComputerName.Value, Engine.Version);
-
-    static readonly Lazy<string> ComputerName = new(() =>
+    /// <summary>Asks the library what the link is doing, and says so if anything changed.</summary>
+    public async Task RefreshAsync()
     {
-        // "Joey's MacBook Air" on a Mac (its Sharing name), the PC's name on Windows.
-        if (OperatingSystem.IsMacOS() && Machine.Run("/usr/sbin/scutil", ["--get", "ComputerName"], TimeSpan.FromSeconds(3)) is { ExitCode: 0 } r
-            && r.Stdout.Trim() is { Length: > 0 } name)
-            return name;
-        return Environment.MachineName is { Length: > 0 } m ? m : Machine.HostName();
-    });
-
-    /// <summary>Stops the link (quitting, or Disconnect), waiting a moment for what it's doing.</summary>
-    void StopLink()
-    {
-        CancellationTokenSource? cts;
-        Task task;
-        lock (gate)
-        {
-            cts = running;
-            task = linkTask;
-            running = null;
-        }
-        if (cts is null) return;
-        cts.Cancel();
+        JsonObject? o;
         try
         {
-            task.Wait(TimeSpan.FromSeconds(5));
+            o = await CallAsync(HttpMethod.Get, "");
         }
-        catch (AggregateException)
+        catch (Exception e) when (e is HttpRequestException or TaskCanceledException or System.Text.Json.JsonException or DriveException)
+        {
+            o = null;
+        }
+        Take(o);
+    }
+
+    void Take(JsonObject? o)
+    {
+        string json = o?.ToJsonString() ?? "";
+        var account = GoogleAccount.Load(home);
+        if (json == seen && account?.Email == Account?.Email) return;
+        seen = json;
+        Account = account;
+        Status = (string?)o?["status"];
+        SignedOut = o?["signed_out"]?.GetValue<bool>() == true;
+        InBackground = o?["background"]?.GetValue<bool>() == true;
+        Phones = [.. (o?["phones"] as JsonArray ?? []).OfType<JsonObject>().Select(p => new DrivePhone(
+            (string?)p["id"] ?? "", (string?)p["name"] ?? "Phone", (string?)p["model"] ?? "",
+            DateTimeOffset.TryParse((string?)p["open_until"], out var u) ? u : null,
+            DateTimeOffset.TryParse((string?)p["changed"], out var c) ? c : DateTimeOffset.MinValue))];
+        Say();
+    }
+
+    /// <summary>The phone's copy of the library looks again straight away (a recording started or stopped here).</summary>
+    public void RefreshCopy() => _ = Task.Run(async () =>
+    {
+        try
+        {
+            await CallAsync(HttpMethod.Post, "/copy");
+        }
+        catch (Exception e) when (e is HttpRequestException or TaskCanceledException or DriveException)
         {
         }
-        cts.Dispose();
-    }
+    });
 
     /// <summary>
     /// Connect with Google: the browser opens Google's page (<paramref name="openBrowser"/>), the student picks an
-    /// account and presses Allow, and the account is kept (owner-only) and the link starts. Throws
+    /// account and presses Allow, the account is kept (owner-only), and the library starts the link with it. Throws
     /// <see cref="GoogleException"/> with the student's words when it doesn't work; cancelled by <see cref="CancelConnect"/>.
     /// </summary>
     public async Task ConnectAsync(Action<string> openBrowser)
@@ -158,15 +184,23 @@ public sealed class PhoneDrive : IDisposable
             connecting = cts;
         }
         Connecting = true;
-        Changed?.Invoke();
+        Say();
         try
         {
             var account = await SignIn(key).SignInAsync(openBrowser, cts.Token);
-            await Task.Run(StopLink);
             account.Save(home);
             Account = account;
             log("[drive] connected to a Google account");
-            Start();
+            try
+            {
+                Take(await CallAsync(HttpMethod.Post, "/start"));
+            }
+            catch (Exception e) when (e is HttpRequestException or TaskCanceledException or System.Text.Json.JsonException or DriveException)
+            {
+                // The library isn't answering right now: it starts the link with this account when it next starts.
+                log($"[drive] the library didn't hear about the account ({e.GetType().Name}); it starts the link when it starts");
+            }
+            AccountChanged?.Invoke();
         }
         finally
         {
@@ -174,7 +208,7 @@ public sealed class PhoneDrive : IDisposable
                 if (connecting == cts) connecting = null;
             cts.Dispose();
             Connecting = false;
-            Changed?.Invoke();
+            Say();
         }
     }
 
@@ -185,45 +219,52 @@ public sealed class PhoneDrive : IDisposable
     }
 
     /// <summary>
-    /// Disconnect: the link stops, everything this laptop put in the folder is deleted (while Google still takes its
-    /// sign-in), Google is told to forget it, and google.json goes. Whatever Google says, the laptop forgets the account.
+    /// Disconnect: the library stops the link, deletes everything this computer put in the folder, tells Google to
+    /// forget it and forgets the account. With no library answering, the app forgets the account itself (Google is
+    /// still told), and the folder's files wait for the phone's next look to find no laptop.
     /// </summary>
     public async Task DisconnectAsync()
     {
-        var link = Link;
-        await Task.Run(StopLink);
-        var account = Account;
-        if (account is not null && secret() is { Length: > 0 } key)
+        bool done = false;
+        try
         {
-            var signIn = SignIn(key);
-            try
-            {
-                var cleaner = link is not null && link.Trouble is null ? link
-                    : new DriveLink(makeDrive(account, signIn), new LibraryCalls(library, libraryHttp), Me, active, new DriveNames(Space), log);
-                await cleaner.DeleteOwnFilesAsync().WaitAsync(TimeSpan.FromSeconds(60));
-            }
-            catch (Exception e) when (e is DriveException or GoogleException or HttpRequestException or TimeoutException or TaskCanceledException)
-            {
-                log($"[drive] couldn't empty the folder before disconnecting ({e.GetType().Name})");
-            }
-            await signIn.RevokeAsync(account.RefreshToken);
+            done = await CallAsync(HttpMethod.Post, "/disconnect") is not null;
         }
-        GoogleAccount.Forget(home);
+        catch (Exception e) when (e is HttpRequestException or TaskCanceledException or System.Text.Json.JsonException or DriveException)
+        {
+            log($"[drive] the library didn't answer Disconnect ({e.GetType().Name}): forgetting the account here");
+        }
+        if (!done && GoogleAccount.Load(home) is { } account)
+        {
+            if (secret() is { Length: > 0 } key) await SignIn(key).RevokeAsync(account.RefreshToken);
+            GoogleAccount.Forget(home);
+        }
         Account = null;
-        Link = null;
+        Phones = [];
+        Status = null;
+        SignedOut = false;
+        seen = "";
         log("[drive] disconnected from Google");
-        Changed?.Invoke();
+        AccountChanged?.Invoke();
+        Say();
     }
 
-    /// <summary>Settings' Remove on a phone that uses the folder.</summary>
+    /// <summary>Settings' Remove on a phone that uses the folder. Throws when Google Drive or the library can't be
+    /// reached, so the phone is still there.</summary>
     public async Task RemovePhoneAsync(string phoneId)
     {
-        if (Link is { } link) await link.RemovePhoneAsync(phoneId);
+        var o = await CallAsync(HttpMethod.Post, "/phones/" + Uri.EscapeDataString(phoneId) + "/remove")
+            ?? throw new HttpRequestException("the library didn't remove the phone");
+        Take(o);
     }
 
     public void Dispose()
     {
         CancelConnect();
-        StopLink();
+        lock (gate)
+        {
+            watch?.Dispose();
+            watch = null;
+        }
     }
 }

@@ -424,7 +424,12 @@ public sealed partial class SettingsModel : ObservableObject, IDisposable
         Granola = new ViewModels.GranolaSettingsModel(host.Granola, () => host.Settings.GranolaNotify, on => host.Save(x => x.GranolaNotify = on));
         Phones = new PhonesModel(() => host.Remote() is { } phonesLib ? (m, path, body) => phonesLib.DevicesAsync(m, path, body) : null);
         // Just this computer: the phone connects through the student's Google account (docs/phone-google.md).
-        if (host.Settings.Role == AppRole.Both) Phones.Google = new PhoneGoogleModel(host.Drive);
+        if (host.Settings.Role == AppRole.Both)
+            Phones.Google = new PhoneGoogleModel(host.Drive, background: new PhoneBackgroundSwitch(() => host.Settings.AnswerPhoneWhenClosed, async on =>
+            {
+                host.Save(s => s.AnswerPhoneWhenClosed = on);
+                await host.SyncBackgroundAsync();
+            }, () => host.BackgroundProblem));
         Keys = new ShortcutsModel(() => host.Settings.Keys, change => host.Save(s => change(s.Keys)), Skin.Current == SkinKind.Mac, records);
         Phones.Ticking = Phones.UiTicking();
         Assistant = new SettingsChatModel(new SettingsChatServices
@@ -521,7 +526,7 @@ public sealed partial class SettingsModel : ObservableObject, IDisposable
     void Refresh()
     {
         var cc = host.Client();
-        bool runsHere = host.Settings.Role != AppRole.Laptop && host.LocalLibrary?.State == LibraryServiceState.Running;
+        bool runsHere = host.Settings.Role != AppRole.Laptop && (host.LocalLibrary?.State == LibraryServiceState.Running || host.LibraryInBackground);
         LibraryLine = host.Library switch
         {
             LibraryState.Connected when runsHere && !host.OlderLibrary =>
@@ -540,6 +545,7 @@ public sealed partial class SettingsModel : ObservableObject, IDisposable
             LibraryServiceState.Running when host.Library == LibraryState.Connected => "",
             LibraryServiceState.Running => $"Your library runs on this {device}, on port {host.LocalLibrary.Cfg.WebPort}.",
             LibraryServiceState.Starting => "Starting your library…",
+            LibraryServiceState.Elsewhere when host.LibraryInBackground => "It runs in the background, so your phone is answered when Syft Notes is closed.",
             LibraryServiceState.Elsewhere => $"A library is already running on this {device}.",
             LibraryServiceState.PortTaken => host.LocalLibrary.Failure ?? "Its port is taken by another program.",
             LibraryServiceState.Failed => $"It stopped: {host.LocalLibrary.Failure}",

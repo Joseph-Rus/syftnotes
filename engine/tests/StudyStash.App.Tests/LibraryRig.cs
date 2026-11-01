@@ -70,11 +70,18 @@ public sealed class LibraryRig : IAsyncDisposable
     /// <summary>The app's client for this library, with the library password.</summary>
     public CanvasClient Client() => new(Url, Password, http);
 
+    /// <summary>The phone's Google Drive link running in this library, when the test gave one.</summary>
+    public StudyStash.Core.PhoneDrive.PhoneLink? Phone { get; private set; }
+
     /// <param name="ai">The library's AIs (a scripted one, for Ask): none by default.</param>
-    public static async Task<LibraryRig> StartAsync(StudyStash.Core.Ai.AiJobs? ai = null)
+    /// <param name="phone">The phone's Google Drive link it runs, made for this library (its home and address): none
+    /// by default.</param>
+    public static async Task<LibraryRig> StartAsync(StudyStash.Core.Ai.AiJobs? ai = null, Func<LibraryRig, StudyStash.Core.PhoneDrive.PhoneLink>? phone = null)
     {
         var rig = new LibraryRig();
+        rig.Phone = phone?.Invoke(rig);
         await rig.StartLibraryAsync(ai);
+        rig.Phone?.Start();
         return rig;
     }
 
@@ -92,6 +99,7 @@ public sealed class LibraryRig : IAsyncDisposable
         {
             Canvas = Sync, ListModels = _ => Task.FromResult<List<(string, double)>?>(null), Tailscale = () => new TailscaleInfo(),
             Latest = _ => Task.FromResult<Release?>(null), RamGb = () => 16, HostName = () => "library-pc", Nonce = () => "NONCE", Ai = ai,
+            Phone = Phone,
         };
         var builder = WebApplication.CreateSlimBuilder();
         builder.Logging.ClearProviders();
@@ -177,6 +185,7 @@ public sealed class LibraryRig : IAsyncDisposable
 
     public async ValueTask DisposeAsync()
     {
+        Phone?.Dispose();
         if (app is not null)
         {
             await app.StopAsync();

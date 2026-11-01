@@ -8,6 +8,10 @@
 # STUDYSTASH_SELFTEST_FLOW=one-computer proves a first run as a student has it: the one-button welcome's Get started
 # makes the app's own library, and the lecture is recorded, written down and given its notes all on this computer.
 # Without it, the welcome gives way to setup by hand for a laptop with a library elsewhere (the frozen two-computer setup).
+# STUDYSTASH_SELFTEST_BACKGROUND=1 (with one-computer; CI's throwaway Macs only, as it registers a real LaunchAgent) ends
+# the run by linking a stand-in phone and turning on "Answer your phone when Syft Notes is closed"; once the app has
+# quit, the program runs once more (STUDYSTASH_SELFTEST_AFTER_QUIT=1) to check the library still answers the phone,
+# then takes the LaunchAgent away and checks nothing is left (background.txt).
 set -eu
 
 APP=${1:?"usage: sh macos/selftest.sh \"<path>/Study Stash.app\" [out-dir]"}
@@ -54,6 +58,14 @@ if [ "$code" = 142 ]; then
   exit 1
 fi
 
+# The app has quit: the background library, if this run made one, must still answer the phone, and then go cleanly.
+# It runs even when the app's own run failed, so a LaunchAgent it registered is always taken away again.
+bcode=0
+if [ "${STUDYSTASH_SELFTEST_BACKGROUND:-}" = 1 ]; then
+  env -u DOTNET_ROOT STUDYSTASH_SELFTEST="$OUT" STUDYSTASH_SELFTEST_AFTER_QUIT=1 \
+    perl -e 'alarm shift; exec @ARGV' 300 "$BIN" --home "$HOME_DIR" || bcode=$?
+fi
+
 TXT="$OUT/selftest.txt"
 [ -f "$TXT" ] || { echo "selftest.sh: Syft Notes exited ($code) without writing selftest.txt" >&2; exit 1; }
 cat "$TXT"
@@ -63,6 +75,11 @@ ok=true
 [ "$code" = 0 ] || ok=false
 [ "$last" = "ok" ] || ok=false
 grep -qiE "heard nothing|no model|recording didn't start|FAILED" "$TXT" && ok=false
+if [ "${STUDYSTASH_SELFTEST_BACKGROUND:-}" = 1 ]; then
+  echo "--- background.txt"
+  cat "$OUT/background.txt" 2>/dev/null || echo "(none)"
+  [ "$bcode" = 0 ] && [ "$(tail -n 1 "$OUT/background.txt" 2>/dev/null)" = "ok" ] || ok=false
+fi
 
 if [ "$ok" = true ]; then
   echo "selftest.sh: passed ($OUT)"
