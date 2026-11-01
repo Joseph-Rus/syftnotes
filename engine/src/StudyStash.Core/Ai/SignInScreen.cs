@@ -32,6 +32,8 @@ public sealed partial class SignInScreen
     readonly List<string> answered = [];
     readonly StringBuilder escape = new();
     EscapeState state;
+    /// <summary>The line being shown was answered already (it's looked at again as more of it comes).</summary>
+    bool lineAnswered;
 
     /// <summary>Whether the terminal answers the program's questions about itself (where the cursor is, what it is, its
     /// colours), as a terminal does: on a Mac and Linux. On Windows the console host answers them itself.</summary>
@@ -172,8 +174,13 @@ public sealed partial class SignInScreen
         if (line.Length == 0) return;
         string done = line.ToString().TrimEnd();
         line.Clear();
-        if (done.Trim().Length == 0) return;
+        if (done.Trim().Length == 0)
+        {
+            lineAnswered = false;
+            return;
+        }
         Look(done, finished: true, reply);
+        lineAnswered = false;
         recent.Enqueue(done);
         while (recent.Count > 40) recent.Dequeue();
         Line?.Invoke(done);
@@ -181,14 +188,18 @@ public sealed partial class SignInScreen
 
     void Look(string text, bool finished, StringBuilder reply)
     {
+        // An address on a line still coming may not be whole yet: only one with more after it counts before the line ends.
         if (Page is null && text.Contains("https://", StringComparison.Ordinal))
-            foreach (Match m in AddressIn().Matches(text)) Address(m.Value);
+            foreach (Match m in AddressIn().Matches(text))
+                if (finished || m.Index + m.Length < text.Length) Address(m.Value);
         if (Page is not null || WaitingWords().IsMatch(text)) Waiting = true;
         if (NoBrowserWords().IsMatch(text)) NoBrowser = true;
         if (TerminalWords().IsMatch(text)) WantsTerminal = true;
         if (AgentCli.LooksLikeRegion(text)) Region = true;
         if (SignedInWords().IsMatch(text)) SaysSignedIn = true;
 
+        // Each line is answered once at most, however many times it's looked at as it comes.
+        if (lineAnswered) return;
         // Claude Code's "Select login method": Enter only while the Claude subscription is the highlighted choice.
         if (Highlighted().IsMatch(text) && SubscriptionChoice().IsMatch(text) && recent.Any(r => LoginMethodWords().IsMatch(r)))
             Answer("which kind of account: Claude subscription", "\r", reply);
@@ -203,6 +214,7 @@ public sealed partial class SignInScreen
         int n = answers.GetValueOrDefault(what);
         if (n >= times) return;
         answers[what] = n + 1;
+        lineAnswered = true;
         if (n == 0) answered.Add(what);
         reply.Append(keys);
     }
@@ -272,6 +284,6 @@ public sealed partial class SignInScreen
     private static partial Regex PressEnterWords();
 
     // Only a question whose default is yes ("(Y/n)"): Enter takes the default, and nothing is typed for any other.
-    [GeneratedRegex(@"open (the |your |a )?(default )?(web )?browser.*\(Y/n\)")]
+    [GeneratedRegex(@"(?i:open (the |your |a )?(default )?(web )?browser).*\(Y/n\)")]
     private static partial Regex OpenBrowserQuestion();
 }
