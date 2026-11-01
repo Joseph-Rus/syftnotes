@@ -159,6 +159,9 @@ final class Recorder {
 
     #if targetEnvironment(simulator)
     private func startSimulated(_ r: Recording) {
+        var r = r
+        // `-record-typed "<lines>"`: notes already typed, for pictures of a recording with the student's own lines.
+        if let typed = DebugLaunch.value("-record-typed") { r.notes = typed }
         recording = r
         store.save(r)
         before = 0

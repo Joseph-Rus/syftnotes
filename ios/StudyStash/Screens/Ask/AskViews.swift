@@ -110,6 +110,11 @@ private struct AskThread: View {
     /// The page follows the answer as it's written, unless the student has scrolled up to read.
     @State private var following = true
     @State private var toast: String?
+    /// Where a question goes, shown before the first one (AskConsent); `held` is sent once the student agrees, and
+    /// `heldWords` (the bar empties itself on Send) go back in the bar if they don't, yet.
+    @State private var consenting = false
+    @State private var held: (() -> Void)?
+    @State private var heldWords: String?
     private var engines = AskEngineWatch.shared
 
     init(conversation: AskConversation, scope: Binding<AskScope>, base: AskScope, isTab: Bool, firstQuestion: String? = nil,
@@ -210,10 +215,17 @@ private struct AskThread: View {
                            if id == conversation.chatID { conversation.startOver() }
                        })
         }
+        .sheet(isPresented: $consenting, onDismiss: {
+            if !AskConsent.agreed, let words = heldWords, question.isEmpty { question = words }
+            held = nil
+            heldWords = nil
+        }) {
+            AskConsentSheet { held?() }
+        }
         .toast($toast)
         .task {
             guard let api = app.api else { return }
-            // A question it was opened with goes at once ("How should I start this?").
+            // A question it was opened with goes at once ("How should I start this?"), once the student has agreed.
             if let q = firstQuestion, conversation.turns.isEmpty { send(q) }
             #if DEBUG
             if let typing = DebugLaunch.value("-ask-typing"), isTab { question = typing }
@@ -369,8 +381,9 @@ private struct AskThread: View {
             .accessibilityElement(children: .contain)
         }
         .onChange(of: question) { old, new in
-            // The AI that will answer gets ready once a question's begun, as on the computer.
-            if old.isEmpty, !new.isEmpty, !warmed, let api = app.api { warmed = true; Task { await api.warm() } }
+            // The AI that will answer gets ready once a question's begun, as on the computer (once the student has
+            // agreed to asking it).
+            if old.isEmpty, !new.isEmpty, !warmed, AskConsent.agreed, let api = app.api { warmed = true; Task { await api.warm() } }
         }
         .padding(.horizontal, sizeClass == .regular ? pad : 12)
         .padding(.top, 8)
@@ -404,21 +417,33 @@ private struct AskThread: View {
 
     private func send(_ text: String) {
         guard let api = app.api, !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty, !conversation.busy else { return }
+        // Not yet agreed to where it goes: the sheet says, and the question is back in the bar if they don't, yet.
+        guard whenAgreed({ send(text) }, words: text) else { return }
         question = ""
         warmed = false
         conversation.send(text, scope: scope, label: scope.label(noun: noun), api: api)
     }
 
     private func retry(_ turn: AskTurn) {
-        guard let api = app.api else { return }
+        guard let api = app.api, whenAgreed({ retry(turn) }) else { return }
         conversation.retry(turn, scope: scope, label: scope.label(noun: noun), api: api)
     }
 
     /// The same question again, as a follow-up at the end of the chat.
     private func askAgain(_ turn: AskTurn) {
-        guard let api = app.api, !conversation.busy else { return }
+        guard let api = app.api, !conversation.busy, whenAgreed({ askAgain(turn) }) else { return }
         let s = turn.asked ?? scope
         conversation.send(turn.question, scope: s, label: turn.scope ?? s.label(noun: noun), api: api)
+    }
+
+    /// Whether the student has agreed to where questions go; if not, the sheet that says so, with `ask` run once they
+    /// agree.
+    private func whenAgreed(_ ask: @escaping () -> Void, words: String? = nil) -> Bool {
+        if AskConsent.agreed { return true }
+        held = ask
+        heldWords = words
+        consenting = true
+        return false
     }
 }
 

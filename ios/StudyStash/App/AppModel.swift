@@ -483,8 +483,10 @@ final class AppModel {
     }
 
     /// Connect your computer, from the sample classes (Home's banner, Settings): the demo ends, on setup's first
-    /// screen (Continue with Google first).
+    /// screen (Continue with Google first). Agreeing to where questions go was about made-up answers on the phone:
+    /// the first question to the student's own laptop asks again.
     func endDemo() async {
+        AskConsent.forget()
         await forget()
     }
 

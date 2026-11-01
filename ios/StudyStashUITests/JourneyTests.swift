@@ -232,7 +232,7 @@ final class JourneyTests: XCTestCase {
 
     private func launch(_ extra: [String] = []) -> XCUIApplication {
         let app = XCUIApplication()
-        app.launchArguments = ["-demo", "-quiet", "-fake-mic", "-ask-new"] + extra
+        app.launchArguments = ["-demo", "-quiet", "-fake-mic", "-ask-new", "-ask-agreed", "yes"] + extra
         app.launch()
         return app
     }

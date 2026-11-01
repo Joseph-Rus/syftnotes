@@ -387,7 +387,8 @@ one) and `-quiet` (no notification prompt):
   `demo-unsorted-study-group`), `-open class:<name>` (`Calculus II`, `Intro to Psychology`, `Organic Chemistry`),
   `-open assignment:<class>:<id>` (`Calculus II:1`; `5` is Missing, `4` due tonight, `6` handed in),
   `-open search:<words>`, `-open recording:<id>`, `-open settings`; `-pane notes|transcript|files` for a lecture
-- `-show record` (records made-up lines; `-stop-after 3` for the sent screen), `ask`, `ask:lecture:<id>`,
+- `-show record` (records made-up lines; `-stop-after 3` for the sent screen; `-record-typed "<lines>"` with notes
+  already typed), `ask`, `ask:lecture:<id>`,
   `ask:class:<name>`, `add-files`, `import-audio`, `goodnotes`, `handwriting` (a new notebook each time), `notebook`,
   `study:<id>`, `quiz:<id>`, `uses`, `widgets` (`WidgetGallery`, in `Shared/WidgetGallery.swift`), `components:1…4`
   (every shared piece)
@@ -397,9 +398,13 @@ one) and `-quiet` (no notification prompt):
   again), `-ask-chats` (Chats open; `-ask-undo` with it, one deleted with Undo), `-ask-open <chat id>` (a kept chat
   open: the demo's `demo-chat-chem`, `demo-chat-ibp`…), `-ask-typing "<text>"` (typed in the bar, the keyboard up),
   `-ask-engine claude|codex|gemini|ollama` (which AI the demo says answers), `-ask-chips` (the alternative with three
-  short questions over the bar); `-laptop-away` (with `-demo`: the laptop asleep or off, last here two hours ago, so the
+  short questions over the bar), `-ask-agreed yes|no` (the student has agreed to where questions go, or the sheet that
+  says so, `AskConsentSheet`, shows before the next one: `-tab ask -ask-new -ask-agreed no -ask "<question>"` pictures
+  it); `-laptop-away` (with `-demo`: the laptop asleep or off, last here two hours ago, so the
   banner on Home, Due and Search and Ask's first screen show) and `-laptop-back [seconds]` (the same, then "Your laptop
-  is back" after that long, 4 by default);
+  is back" after that long, 4 by default); `-as-paired` (with `-demo`: pictured as a library on a computer, without
+  Home's "These are sample classes." line or Settings' sample box, for the App Store's pictures); `-tab-bar` (an iPad
+  opens on the tabs along the top, not the sidebar, which upright covers the page);
   `-unpaired` (setup, no `-demo`), with `-pair-code` its second step, or
   `-pair-page others|laptop|connect|finding|connecting|camera-off|address|cant-reach|code|typing|wrong|uses|done` any
   page of it (`others` is Other ways, `laptop` is "Now connect your laptop" after Continue with Google);
