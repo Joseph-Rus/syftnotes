@@ -344,7 +344,7 @@ public static class LibraryMove
     {
         if (!File.Exists(AiSettings.PathIn(home))) return true;
         var ai = AiSettings.Load(home);
-        return ai.Provider == "ollama" && ai.ByJob.Count == 0 && ai.Models.Count == 0;
+        return (ai.Provider.Length == 0 || ai.Provider == "ollama" && ai.Version < AiSettings.CurrentVersion) && ai.ByJob.Count == 0 && ai.Models.Count == 0;
     }
 
     /// <summary>How the old library wrote and sorted notes, and which AI did it, taken as this library's own.</summary>

@@ -209,6 +209,7 @@ public sealed partial class LibraryWeb
         {
             var body = await Http.JsonBodyAsync(ctx.Request);
             var ai = AiSettings.Load(cfg.Home);
+            bool hadNotesAi = ai.NotesChosen;
             var known = AiProviders.All().Select(p => p.Id).ToHashSet();
             string? provider = Str(body, "provider"), job = Str(body, "job"), model = body?["model"] is JsonValue mv && mv.TryGetValue(out string? m) ? m.Trim() : null;
             if (provider is not null && provider != "default" && !known.Contains(provider)) return Http.Detail(400, $"there's no AI called {provider}");
@@ -225,6 +226,7 @@ public sealed partial class LibraryWeb
                 ai.ByJob[job] = new AiChoice(provider ?? was.Provider, model ?? (provider is null ? was.Model : ""));
             }
             ai.Save(cfg.Home);
+            if (!hadNotesAi && ai.NotesChosen) WriteWaitingNotes();
             return Http.Json(ai.ToJson());
         })));
         app.MapPost("/api/v2/ai/test", Http.Handle(ctx => ApiAsync(ctx, async () =>
