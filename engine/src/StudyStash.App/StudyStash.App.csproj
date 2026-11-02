@@ -39,6 +39,13 @@
     <InternalsVisibleTo Include="StudyStash.App.Tests" />
   </ItemGroup>
 
+  <!-- A student's copy (TestHelpers=false, see engine/Directory.Build.props) leaves out the self-test and the demo
+       libraries the tests and the README pictures draw; SelfTest.Off.cs stands in for the self-test. -->
+  <ItemGroup Condition="'$(TestHelpers)' != 'true'">
+    <Compile Remove="SelfTest.cs;SelfTest.*.cs;Demo.cs;AiDemo.cs;RichDemo.cs" />
+    <Compile Include="SelfTest.Off.cs" />
+  </ItemGroup>
+
   <!-- StudyStash.Audio carries both live words' models (see Needle.targets): Cactus Whistle with its engine for ARM
        (needle/<rid>/), and the small Whisper for x64. A publish for one processor (the installers) keeps its own: on
        ARM (osx-arm64, win-arm64) Whistle, its own engine and its licence; on x64 (osx-x64, win-x64, linux-x64) and on

@@ -11,7 +11,7 @@ static class MoveSheet
     public static bool Run(string home, bool background)
     {
         if (!OperatingSystem.IsMacOS() || background || SelfTest.Dir is not null) return false;
-        if (Environment.GetEnvironmentVariable("STUDYSTASH_NO_MOVE") is { Length: > 0 }) return false;
+        if (StudyStash.Core.TestSwitches.Get("STUDYSTASH_NO_MOVE") is { Length: > 0 }) return false;
         try
         {
             return MoveToApplications.Offer(AppContext.BaseDirectory, home, Py.UserHome(), Ask, Machine.Run,

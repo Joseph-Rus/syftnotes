@@ -104,7 +104,7 @@ public sealed class ClaudeAccess
 
     /// <summary>Reads a CIMD client's document. Tests always pass a fake: the real one reaches the internet.</summary>
     public Func<Uri, CancellationToken, Task<string?>> FetchClientDocument { get; init; } = (url, ct) =>
-        Environment.GetEnvironmentVariable("STUDYSTASH_TESTS") == "1"
+        TestSwitches.Get("STUDYSTASH_TESTS") == "1"
             ? throw new InvalidOperationException("A test tried to fetch a client document from the internet; give ClaudeAccess a fake.")
             : ClientDocuments.Shared.FetchAsync(url, ct);
 

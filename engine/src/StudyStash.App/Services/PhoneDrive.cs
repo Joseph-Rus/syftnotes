@@ -45,7 +45,7 @@ public sealed class PhoneDrive : IDisposable
         this.secret = secret ?? (() => GoogleClient.Secret);
         googleHttp = google;
         http = libraryHttp ?? new HttpClient { Timeout = TimeSpan.FromSeconds(90) };
-        Space = space ?? Environment.GetEnvironmentVariable("STUDYSTASH_DRIVE_SPACE") ?? "";
+        Space = space ?? StudyStash.Core.TestSwitches.Get("STUDYSTASH_DRIVE_SPACE") ?? "";
         Account = GoogleAccount.Load(home);
     }
 

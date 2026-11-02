@@ -21,8 +21,8 @@ public sealed class LibraryHere
     /// away from the real ones: STUDYSTASH_NOTES_DIR and STUDYSTASH_LIBRARY_PORT say where.</summary>
     public static LibraryHere ThisComputer() => new()
     {
-        Folder = Environment.GetEnvironmentVariable("STUDYSTASH_NOTES_DIR") is { Length: > 0 } dir ? dir : null,
-        FirstPort = Environment.GetEnvironmentVariable("STUDYSTASH_LIBRARY_PORT") is { Length: > 0 } p && int.TryParse(p, out int port) ? port : 8787,
+        Folder = StudyStash.Core.TestSwitches.Get("STUDYSTASH_NOTES_DIR") is { Length: > 0 } dir ? dir : null,
+        FirstPort = StudyStash.Core.TestSwitches.Get("STUDYSTASH_LIBRARY_PORT") is { Length: > 0 } p && int.TryParse(p, out int port) ? port : 8787,
     };
 
     /// <summary>The folder a new library keeps its notes in: Documents/Study Stash (Documents\Study Stash on Windows,

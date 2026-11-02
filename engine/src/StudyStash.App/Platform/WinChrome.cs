@@ -52,7 +52,7 @@ public static class WinChrome
     public static Ground Wanted()
     {
         if (!OperatingSystem.IsWindowsVersionAtLeast(10, 0, BackdropBuild)) return Ground.Solid;
-        if (Environment.GetEnvironmentVariable("STUDYSTASH_BACKDROP") is { } forced && forced.Equals("solid", StringComparison.OrdinalIgnoreCase)) return Ground.Solid;
+        if (StudyStash.Core.TestSwitches.Get("STUDYSTASH_BACKDROP") is { } forced && forced.Equals("solid", StringComparison.OrdinalIgnoreCase)) return Ground.Solid;
         return TransparencyEffectsOn() ? Ground.Mica : Ground.Solid;
     }
 

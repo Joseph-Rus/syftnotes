@@ -22,7 +22,7 @@ namespace StudyStash.App.Controls;
 public static class GlassBackdrop
 {
     static bool Enabled => OperatingSystem.IsMacOS() && Skin.Current == SkinKind.Mac &&
-        Environment.GetEnvironmentVariable("STUDYSTASH_GLASS") != "solid";
+        StudyStash.Core.TestSwitches.Get("STUDYSTASH_GLASS") != "solid";
 
     /// <summary>The system material under the glass: a popover's, which follows light and dark.</summary>
     const long MaterialPopover = 6;

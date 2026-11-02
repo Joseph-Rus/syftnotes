@@ -525,13 +525,15 @@ jobs:
           name: mac-intel-selftest
           path: ${{ runner.temp }}/selftest
 
-  # The Windows app: one Setup.exe with no role of its own (setup asks). Both trees are built and checked, then
-  # self-tested (D5) as just this computer and as a laptop. A merge stops there (the build leaves Setup.exe out). A
-  # release also builds Setup.exe, installs it, self-tests as a laptop from the installed copy (so what Setup.exe put
-  # there, native code and all, is what runs), updates it in place with a silent Setup.exe, and uninstalls it without
-  # touching lectures or settings outside the install folder. With the signing secrets (docs/signing.md) the build leaves
-  # Setup.exe out, and a step after it signs the app's exe and dlls and makes Setup.exe again, signed with its uninstaller;
-  # everything after that, self-tests included, runs the signed files.
+  # The Windows app: one Setup.exe with no role of its own (setup asks). What ships is a student's copy, with no
+  # self-test, demo libraries or test switches in it (windows\build.ps1 stops if they are); the self-tests (D5), as just
+  # this computer and as a laptop, run a copy of the same code built with them (-TestHelpers), which is never shipped.
+  # Both trees are built and checked. A merge stops there (the build leaves Setup.exe out). A release also builds
+  # Setup.exe, installs it, checks the installed copy is the student's tree file for file, updates it in place with a
+  # silent Setup.exe, and uninstalls it without touching lectures or settings outside the install folder. With the
+  # signing secrets (docs/signing.md) the student's build leaves Setup.exe out, and a step after it signs the app's exe
+  # and dlls and makes Setup.exe again, signed with its uninstaller; everything after that which runs the student's
+  # copy (installing, updating, uninstalling) runs the signed files.
   windows-app:
     name: Windows app (self-test, Setup.exe)
     needs: [version]
@@ -578,7 +580,12 @@ jobs:
           node-version: 22
           cache: npm
           cache-dependency-path: web/package-lock.json
-      - name: Build win-x64 and win-arm64, and Syft-Notes-Setup.exe
+      - name: Build the copy the self-tests run (win-x64, with the test helpers; never shipped)
+        shell: pwsh
+        env:
+          GOOGLE_DESKTOP_CLIENT_SECRET: ${{ secrets.GOOGLE_DESKTOP_CLIENT_SECRET }}
+        run: .\windows\build.ps1 -Out dist\windows-test -TestHelpers -NoInstaller -Rids win-x64
+      - name: Build win-x64 and win-arm64, and Syft-Notes-Setup.exe - the student's copy, with no test helpers
         shell: pwsh
         # The laptop's Google sign-in secret, built into the app as on the Mac.
         env:
@@ -683,7 +690,7 @@ jobs:
           $env:STUDYSTASH_MIC_FILE = (Resolve-Path "engine\tests\StudyStash.Core.Tests\Fixtures\speech.wav").Path
           $env:STUDYSTASH_MIC_SPEED = "4"
           $env:STUDYSTASH_MODEL_FILE = $env:STUDYSTASH_WHISPER_MODEL
-          $exe = (Resolve-Path "dist\windows\win-x64\StudyStash.exe").Path
+          $exe = (Resolve-Path "dist\windows-test\win-x64\StudyStash.exe").Path
           $p = Start-Process -FilePath $exe -ArgumentList "--home", $selftestHome -PassThru
           if (-not $p.WaitForExit(480000)) { $p.Kill(); throw "Syft Notes didn't exit within 480 s" }
           # The app has quit: its library must still answer the phone in the background, then go cleanly once removed.
@@ -726,6 +733,20 @@ jobs:
           if (Select-String -Path "$app\study-stash.ini" -Pattern "^\s*role\s*=" -Quiet) { throw "the one download wrote a role" }
           $printed = (& "$app\StudyStash.exe" version | Out-String).Trim()
           if ($printed -ne $env:V) { throw "installed version '$printed', expected '$env:V'" }
+      - name: The installed copy is the student's win-x64 tree, file for file (native code and all), with no self-test in it
+        if: needs.version.outputs.installers == 'true'
+        shell: pwsh
+        run: |
+          $app = "$env:LOCALAPPDATA\Programs\Study Stash"
+          $tree = (Resolve-Path "dist\windows\win-x64").Path
+          $missing = @(Get-ChildItem $tree -Recurse -File | ForEach-Object {
+            $rel = $_.FullName.Substring($tree.Length + 1)
+            $there = Join-Path $app $rel
+            if (-not (Test-Path $there) -or (Get-Item $there).Length -ne $_.Length) { $rel }
+          })
+          if ($missing.Count -gt 0) { throw "the installed copy lacks or differs in $($missing.Count) file(s): $($missing[0..9] -join ', ')" }
+          $marker = [BitConverter]::ToString([Text.Encoding]::Unicode.GetBytes("selftest.txt"))
+          if ([BitConverter]::ToString([IO.File]::ReadAllBytes("$app\StudyStash.dll")).Contains($marker)) { throw "the installed copy has the self-test in it" }
       - name: What the installer put there is signed too, and so is the uninstaller it wrote
         if: needs.version.outputs.win_signing != 'off'
         shell: pwsh
@@ -736,8 +757,8 @@ jobs:
           $check = @{}
           if ($env:HOW -eq "rehearsal") { $check.Rehearsal = $true }
           .\windows\verify-signing.ps1 @check "$app\StudyStash.exe" "$app\unins000.exe" "$app\libSkiaSharp.dll"
-      # A release runs this from the copy the installer put there; a merge, which has no installer, from the build.
-      - name: Self-test (D5), as a laptop - its native code came with the installer, and a lecture's formulas and flowchart draw
+      # The copy built with the test helpers: the installed one is a student's, with no self-test to run.
+      - name: Self-test (D5), as a laptop - a lecture's formulas and flowchart draw
         if: needs.version.outputs.tested != 'true' || needs.version.outputs.installers == 'true'
         shell: pwsh
         run: |
@@ -748,7 +769,7 @@ jobs:
           $env:STUDYSTASH_MIC_FILE = (Resolve-Path "engine\tests\StudyStash.Core.Tests\Fixtures\speech.wav").Path
           $env:STUDYSTASH_MIC_SPEED = "4"
           $env:STUDYSTASH_MODEL_FILE = $env:STUDYSTASH_WHISPER_MODEL
-          $exe = if ("${{ needs.version.outputs.installers }}" -eq "true") { "$env:LOCALAPPDATA\Programs\Study Stash\StudyStash.exe" } else { (Resolve-Path "dist\windows\win-x64\StudyStash.exe").Path }
+          $exe = (Resolve-Path "dist\windows-test\win-x64\StudyStash.exe").Path
           Write-Host "Self-testing $exe"
           $p = Start-Process -FilePath $exe -ArgumentList "--home", $selftestHome -PassThru
           if (-not $p.WaitForExit(480000)) { $p.Kill(); throw "Syft Notes didn't exit within 480 s" }
