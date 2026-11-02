@@ -44,7 +44,7 @@
       <p class="lede">Syft Notes is an app you run yourself, not a service. There's no Syft Notes account, no Syft
         Notes server and no tracking: only one anonymous count a day (below). This page says exactly what the app reads, where it keeps it, and how to take it
         back.</p>
-      <p class="updated">Last updated 1 November 2026</p>
+      <p class="updated">Last updated 2 November 2026</p>
       <ul class="toc" aria-label="On this page">
         <li><a href="#short">In short</a></li>
         <li><a href="#stays">What stays on your computers</a></li>
@@ -193,14 +193,16 @@
         modules, files, pages, announcements, quizzes and discussions) into your library, so they sit next to your
         lectures. It does this through the <strong>Syft Notes for Canvas</strong> browser extension, in Chrome, Firefox
         or a browser built on one of them, using your own Canvas sign-in in that browser. Syft Notes never sees your
-        Canvas password, and the extension never reads your cookies: the browser sends them to Canvas as it would for
-        any page you open.</p>
+        Canvas password. To find your school without asking you to type its address, the extension looks at which
+        instructure.com sites your browser is signed in to Canvas on: the Canvas sign-in cookie's name and the site it
+        belongs to, never what's in it. It then asks that Canvas who's signed in. The browser sends your sign-in to
+        Canvas as it would for any page you open; the extension never copies it or sends it anywhere.</p>
       <ul>
         <li>It only reads. Nothing on Canvas is changed or submitted.</li>
         <li>What it reads goes only to your own library, on a computer you control. Not to the developers, not to
           anyone else.</li>
-        <li>The extension can reach only your school's Canvas, Canvas's file storage and your library: the sites you
-          give it.</li>
+        <li>The extension can reach only Canvas (instructure.com, or your school's own Canvas address), Canvas's file
+          storage and your library: the sites you allow when your browser asks.</li>
         <li>To stop, remove the extension from your browser. To delete what was copied, delete the class's Canvas
           folder in your library.</li>
       </ul>
