@@ -10,7 +10,11 @@ namespace StudyStash.Core;
 /// </summary>
 public static class McpClients
 {
-    public static readonly IReadOnlyList<string> Ids = ["claude-desktop", "claude-code", "codex", "gemini"];
+    public static readonly IReadOnlyList<string> Ids = ["claude-desktop", "claude-code", "codex", "gemini", "antigravity"];
+
+    /// <summary>Set by Connect's own check that the server starts and lists its tools: that start isn't an app loading
+    /// Syft Notes, so it leaves no note.</summary>
+    public const string ProbeEnv = "STUDYSTASH_MCP_PROBE";
 
     /// <summary>The option that names which app started the server.</summary>
     public const string Option = "--client";
@@ -36,7 +40,7 @@ public static class McpClients
     /// Never fails the server: a note that can't be written only leaves Settings saying "restart it".</summary>
     public static void Started(string home, string? id)
     {
-        if (id is null || !Ids.Contains(id)) return;
+        if (id is null || !Ids.Contains(id) || Environment.GetEnvironmentVariable(ProbeEnv) == "1") return;
         try
         {
             Touch(StartedFile(home, id));
@@ -59,6 +63,7 @@ public static class McpClients
             "claude-code" => "Claude Code",
             "codex" => "ChatGPT (Codex)",
             "gemini" => "Gemini CLI",
+            "antigravity" => "Gemini (Antigravity)",
             _ => null,
         };
         if (known is not null) return known;
