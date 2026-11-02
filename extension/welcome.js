@@ -32,7 +32,7 @@ async function start() {
   where = await whichBrowser() || 'your browser';
   conn = await loadConnection() || await adoptLibrary();
   if (!conn) {
-    say('Open Syft Notes', 'Open Syft Notes on this computer and press Add Syft Notes to ' + where + ' there. This page carries on by itself.');
+    say('Open Syft Notes', 'Open Syft Notes on this computer and press Add Syft Notes to ' + where + ' there, then press Allow when Syft Notes asks. This page carries on by itself.');
     show();
     setTimeout(start, 3000);
     return;

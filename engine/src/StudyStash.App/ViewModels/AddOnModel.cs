@@ -35,7 +35,7 @@ public sealed partial class AddOnModel : ObservableObject, IDisposable
     /// student's own first.</summary>
     public ObservableCollection<BrowserChoice> BrowserChoices { get; } = [];
 
-    [NotifyPropertyChangedFor(nameof(AddLabel), nameof(BrowserName), nameof(StoreSteps), nameof(AllowStep), nameof(AddedLine), nameof(CanvasLine), nameof(CanvasWaitLine))]
+    [NotifyPropertyChangedFor(nameof(AddLabel), nameof(BrowserName), nameof(StoreSteps), nameof(AllowStep), nameof(AddedLine), nameof(CanvasLine), nameof(CanvasWaitLine), nameof(AskingLine))]
     [ObservableProperty]
     public partial Browser Browser { get; set; } = Browsers.Chrome;
 
@@ -50,15 +50,27 @@ public sealed partial class AddOnModel : ObservableObject, IDisposable
     public bool HasAdvice => Advice.Length > 0 && !Added;
 
     /// <summary>Add was pressed: the store's page is open in the browser.</summary>
-    [NotifyPropertyChangedFor(nameof(HasAdvice), nameof(ShowAdd), nameof(Waiting), nameof(AddedLine))]
+    [NotifyPropertyChangedFor(nameof(HasAdvice), nameof(ShowAdd), nameof(Waiting), nameof(AddedLine), nameof(ShowStoreSteps))]
     [ObservableProperty]
     public partial bool Added { get; set; }
 
     [ObservableProperty] public partial bool Adding { get; set; }
 
+    /// <summary>An add-on has asked the library to connect and waits for the student's answer (<see cref="Follow"/>
+    /// from the library's state): "firefox" or "chrome" by its kind of browser; "" when none is waiting.</summary>
+    [NotifyPropertyChangedFor(nameof(IsAsking), nameof(AskingLine), nameof(ShowAdd), nameof(ShowStoreSteps))]
+    [ObservableProperty]
+    public partial string Asking { get; set; } = "";
+    public bool IsAsking => Asking.Length > 0 && !Connected;
+
+    /// <summary>"Your browser is asking to connect to Syft Notes." In Firefox's name when it's Firefox asking, so a
+    /// student who is adding it to Chrome sees at once that it isn't theirs.</summary>
+    public string AskingLine => Asking == "firefox" ? "Firefox is asking to connect to Syft Notes."
+        : Browser.Family == BrowserFamily.Chromium ? $"{BrowserName} is asking to connect to Syft Notes." : "Your browser is asking to connect to Syft Notes.";
+
     /// <summary>The add-on checked in with the library.</summary>
     [NotifyPropertyChangedFor(nameof(ShowAdd), nameof(Waiting), nameof(AddedLine), nameof(CanSwitchBrowser), nameof(LookingForCanvas), nameof(CanvasLine),
-        nameof(CanvasWaitLine), nameof(IsDone))]
+        nameof(CanvasWaitLine), nameof(IsDone), nameof(IsAsking), nameof(ShowStoreSteps))]
     [ObservableProperty]
     public partial bool Connected { get; set; }
 
@@ -73,7 +85,9 @@ public sealed partial class AddOnModel : ObservableObject, IDisposable
     public partial string? Problem { get; set; }
     public bool HasProblem => !string.IsNullOrEmpty(Problem);
 
-    public bool ShowAdd => !Added && !Connected;
+    public bool ShowAdd => !Added && !Connected && !IsAsking;
+    /// <summary>What to do in the store, while the add-on isn't asking yet.</summary>
+    public bool ShowStoreSteps => Waiting && !IsAsking;
     /// <summary>Waiting for the add-on to be added and check in.</summary>
     public bool Waiting => Added && !Connected;
     public bool Found => CanvasUrl.Length > 0;
@@ -128,6 +142,7 @@ public sealed partial class AddOnModel : ObservableObject, IDisposable
     /// <summary>What the library says now: the add-on checking in (with this library's key), and the Canvas it found.</summary>
     public void Follow(CanvasApi.State s)
     {
+        Asking = s.Extension?.Asking ?? "";
         if (s.Extension?.Connected == true) Connected = true;
         if (s.Url.Length > 0) CanvasUrl = s.Url;
         if (IsDone && !told)
@@ -162,6 +177,32 @@ public sealed partial class AddOnModel : ObservableObject, IDisposable
         finally
         {
             Adding = false;
+        }
+    }
+
+    /// <summary>Allow: the add-on that is asking gets the library's key, and checks in by itself a moment later.</summary>
+    [RelayCommand]
+    Task Allow() => AnswerAsync(true);
+
+    /// <summary>"That wasn't me": nothing is handed over, and the door stays shut until Add is pressed again.</summary>
+    [RelayCommand]
+    async Task NotMe()
+    {
+        await AnswerAsync(false);
+        Added = false;
+    }
+
+    async Task AnswerAsync(bool allow)
+    {
+        if (context.Client is not { } client) return;
+        try
+        {
+            await client.AnswerPairAsync(allow);
+            Asking = "";
+        }
+        catch (Exception e) when (e is CanvasLibraryException or HttpRequestException or TaskCanceledException or System.Text.Json.JsonException)
+        {
+            Problem = "Your library didn't answer. Try again in a moment.";
         }
     }
 

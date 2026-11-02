@@ -221,6 +221,9 @@ public static class CanvasApi
         public DateTimeOffset? LastSeen { get; init; }
         public DateTimeOffset? RefusedAt { get; init; }
         public string Browser { get; init; } = "";
+        /// <summary>An add-on is asking to connect and waits for the student's Allow ("firefox" or "chrome", by the
+        /// kind of browser it's in); null when none is, and from a library older than the question.</summary>
+        public string? Asking { get; init; }
         public string Version { get; init; } = "";
         public string? Latest { get; init; }
         public bool Outdated { get; init; }

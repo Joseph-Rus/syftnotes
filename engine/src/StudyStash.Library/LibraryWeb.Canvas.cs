@@ -47,6 +47,36 @@ public sealed partial class LibraryWeb
     /// open for <see cref="PairWindow"/> after the app's Add Syft Notes to your browser; null when it never was.</summary>
     DateTimeOffset? pairUntil;
 
+    /// <summary>An add-on that asked for the library's key (<c>canvas/hello</c>) in the window: its address, and whether the
+    /// student has pressed Allow in the app. The key goes to it only once they have.</summary>
+    sealed record PairAsk(string Origin, bool Allowed);
+
+    readonly object pairGate = new();
+
+    /// <summary>The add-on waiting for the student's answer, or the one they allowed; null when none, or when the
+    /// window closed (the ask goes with it).</summary>
+    PairAsk? pairAsk;
+
+    /// <summary>The ask still standing: dropped once its window has closed.</summary>
+    PairAsk? Asking()
+    {
+        lock (pairGate)
+        {
+            if (pairAsk is not null && !(pairUntil is { } open && Canvas.Clock() <= open)) pairAsk = null;
+            return pairAsk;
+        }
+    }
+
+    /// <summary>Canvas's state for the app, with whether an add-on is asking to connect and which browser it's in
+    /// (<c>extension.asking</c>: "firefox" or "chrome"; null when none, and once it's been allowed).</summary>
+    JsonObject StateNow()
+    {
+        var state = CanvasView.State(Canvas, Canvas.Clock(), refusedAt);
+        if (state["extension"] is JsonObject ext)
+            ext["asking"] = Asking() is { Allowed: false } ask ? (ask.Origin.StartsWith("moz-extension://", StringComparison.Ordinal) ? "firefox" : "chrome") : null;
+        return state;
+    }
+
     /// <summary>How long the app's Add Syft Notes to your browser keeps the door open for the add-on to find this library.</summary>
     static readonly TimeSpan PairWindow = TimeSpan.FromMinutes(20);
 
@@ -99,22 +129,56 @@ public sealed partial class LibraryWeb
             return Http.Json(new JsonObject { ["ok"] = true });
         }));
         // Connecting the add-on with nothing to type (1.8 on): the app opens a short window when the student presses Add
-        // Syft Notes to Chrome; the add-on, just installed from its store and knowing nothing yet, finds this library on
-        // this computer and is handed where it is and its key (only to the store copy's own origin, and only while the
-        // window's open); then it finds the student's Canvas by itself and says where it is.
+        // Syft Notes to Chrome; the add-on, just installed from its store and knowing nothing yet, asks this library on
+        // this computer for where it is and its key. Asking isn't enough: the app shows "Your browser is asking to
+        // connect" and the key goes to that add-on only after the student presses Allow there (a Firefox add-on's page
+        // can't be told from another's by its address, and any could ask while the window is open). Then the add-on
+        // finds the student's Canvas by itself and says where it is.
         app.MapPost("/api/v2/canvas/pair", (HttpContext ctx) => Api(ctx, () =>
         {
-            pairUntil = Canvas.Clock() + PairWindow;
+            lock (pairGate)
+            {
+                pairUntil = Canvas.Clock() + PairWindow;
+                pairAsk = null; // a new Add starts afresh
+            }
             return Http.Json(new JsonObject { ["until"] = pairUntil.Value.ToString("o", CultureInfo.InvariantCulture) });
         }));
+        app.MapPost("/api/v2/canvas/pair/answer", Http.Handle(ctx => ApiAsync(ctx, async () =>
+        {
+            var body = await Http.JsonBodyAsync(ctx.Request);
+            bool allow = body?["allow"] is JsonValue v && v.TryGetValue(out bool yes) && yes;
+            lock (pairGate)
+            {
+                if (Asking() is not { } ask) return Http.Detail(409, "Nothing is asking to connect just now.");
+                if (allow) pairAsk = ask with { Allowed = true };
+                else
+                {
+                    // "That wasn't me": the asker gets nothing, and nothing else may ask until the student presses Add again.
+                    pairAsk = null;
+                    pairUntil = null;
+                }
+            }
+            return Http.Json(new JsonObject { ["ok"] = true });
+        })));
         app.MapGet("/api/v2/canvas/hello", (HttpContext ctx) =>
         {
             string origin = ctx.Request.Headers.Origin.ToString();
             if (!Extension.MayPair(origin)) return Http.Detail(403, "Only Syft Notes for Canvas may ask.");
             ctx.Response.Headers.AccessControlAllowOrigin = origin;
             ctx.Response.Headers.Vary = "Origin";
-            if (pairUntil is not { } until || Canvas.Clock() > until)
-                return Http.Detail(403, "Open Syft Notes and press Add Syft Notes to your browser there.");
+            lock (pairGate)
+            {
+                if (Asking() is null && !(pairUntil is { } open && Canvas.Clock() <= open))
+                    return Http.Detail(403, "Open Syft Notes and press Add Syft Notes to your browser there.");
+                if (pairAsk is null)
+                {
+                    pairAsk = new PairAsk(origin, false);
+                    return Http.Json(new JsonObject { ["asking"] = true }, 202);
+                }
+                // One asker at a time: a second add-on is turned away until the student has answered the first.
+                if (pairAsk.Origin != origin) return Http.Detail(409, "Another add-on is asking to connect. Answer it in Syft Notes first.");
+                if (!pairAsk.Allowed) return Http.Json(new JsonObject { ["asking"] = true }, 202);
+            }
             return Http.Json(Extension.Hello($"http://127.0.0.1:{cfg.WebPort}", CanvasSettings.ExtensionKey(cfg.Home), Canvas.Settings.Url));
         });
         app.MapPost("/api/v2/canvas/found", Http.Handle(async ctx =>
@@ -178,7 +242,7 @@ public sealed partial class LibraryWeb
             if (body?["sync"] is not null) Canvas.Nudge();
             return Http.Json(CanvasJson());
         })));
-        app.MapGet("/api/v2/canvas/state", (HttpContext ctx) => Api(ctx, () => Http.Json(CanvasView.State(Canvas, Canvas.Clock(), refusedAt))));
+        app.MapGet("/api/v2/canvas/state", (HttpContext ctx) => Api(ctx, () => Http.Json(StateNow())));
         app.MapGet("/api/v2/canvas/classes", (HttpContext ctx) => Api(ctx, () =>
             Http.Json(CanvasView.Classes(cfg.ClassNames(), Canvas.Settings, cfg.Home, ScoutOf, Canvas.Clock()))));
         app.MapGet("/api/v2/canvas/due", (HttpContext ctx) => Api(ctx, () => Http.Json(DueList())));
@@ -222,7 +286,7 @@ public sealed partial class LibraryWeb
         {
             var body = await Http.JsonBodyAsync(ctx.Request);
             if (Canvas.ChooseBrowser(S(body?["where"]), S(body?["browser"])) is { } refused) return Http.Detail(400, refused);
-            return Http.Json(CanvasView.State(Canvas, Canvas.Clock(), refusedAt));
+            return Http.Json(StateNow());
         })));
         app.MapGet("/api/v2/canvas/notifications", (HttpContext ctx, long? after) => Api(ctx, () =>
         {
@@ -492,7 +556,7 @@ public sealed partial class LibraryWeb
             ["needs_login"] = s.NeedsLogin, ["extension_seen"] = W(s.ExtensionSeen), ["extension_version"] = s.ExtensionVersion,
             ["extension_latest"] = Extension.Version(), ["extension_outdated"] = s.ExtensionOutdated,
             ["extension_update"] = s.ExtensionUpdate is { Dismissed: false } up ? new JsonObject { ["from"] = up.From, ["to"] = up.To, ["at"] = W(up.At) } : null,
-            ["state"] = CanvasView.State(Canvas, Canvas.Clock(), refusedAt), ["course_info"] = courseInfo,
+            ["state"] = StateNow(), ["course_info"] = courseInfo,
             ["syncing"] = Canvas.Crawl.Active, ["left"] = waiting + inflight, ["extension"] = ExtensionJson(),
             ["exploring"] = options.Scout?.Running, ["scouts"] = new JsonObject(s.Scouts.Select(kv => KeyValuePair.Create(kv.Key, (JsonNode?)new JsonObject
             {

@@ -135,6 +135,17 @@ public class FunnelTests
         Assert.True(addOn.Waiting);
         Assert.Equal("Waiting for Syft Notes to be added to Chrome", addOn.AddedLine);
 
+        // The add-on asks to connect: the step says so with Allow, and nothing is handed over until it's pressed.
+        handler.Json(HttpMethod.Get, "/api/v2/canvas/state", """{"state": "not_set_up", "url": "", "extension": {"connected": false, "asking": "chrome"}}""")
+            .Json(HttpMethod.Post, "/api/v2/canvas/pair/answer", """{"ok":true}""");
+        await watch.RefreshAsync();
+        Assert.True(addOn.IsAsking);
+        Assert.Equal("Chrome is asking to connect to Syft Notes.", addOn.AskingLine);
+        Assert.False(addOn.ShowStoreSteps);
+        await addOn.AllowCommand.ExecuteAsync(null);
+        Assert.Contains(handler.Requests, r => r.Path == "/api/v2/canvas/pair/answer" && r.Body!.Contains("true"));
+        Assert.False(addOn.IsAsking);
+
         // The add-on checks in, then finds the student's Canvas from their sign-in: the sync screen follows by itself.
         handler.Json(HttpMethod.Get, "/api/v2/canvas/state", """{"state": "not_set_up", "url": "", "extension": {"connected": true, "browser": "Chrome"}}""");
         await watch.RefreshAsync();
@@ -146,6 +157,26 @@ public class FunnelTests
         Assert.True(f.OnSync);
         Assert.DoesNotContain(handler.Requests, r => r.Path == "/api/v2/canvas" && r.Method == "POST"); // no school typed, ever
         f.Dispose();
+    }
+
+    [AvaloniaFact]
+    public async Task That_wasn_t_me_tells_the_library_no_and_puts_Add_back()
+    {
+        var handler = new FakeLibrary()
+            .Json(HttpMethod.Post, "/api/v2/canvas/pair", """{"until":"2025-09-25T17:44:00Z"}""")
+            .Json(HttpMethod.Post, "/api/v2/canvas/pair/answer", """{"ok":true}""")
+            .Json(HttpMethod.Get, "/api/v2/canvas/state", """{"state": "not_set_up", "url": "", "extension": {"connected": false, "asking": "firefox"}}""");
+        var context = CanvasFixtures.Context(handler);
+        var watch = new CanvasWatch(context);
+        using var addOn = new AddOnModel(context, watch);
+        await addOn.AddCommand.ExecuteAsync(null);
+        await watch.RefreshAsync();
+        Assert.True(addOn.IsAsking);
+        Assert.Equal("Firefox is asking to connect to Syft Notes.", addOn.AskingLine); // not the Chrome they chose
+        await addOn.NotMeCommand.ExecuteAsync(null);
+        Assert.Contains(handler.Requests, r => r.Path == "/api/v2/canvas/pair/answer" && r.Body!.Contains("false"));
+        Assert.True(addOn.ShowAdd);
+        Assert.False(addOn.IsAsking);
     }
 
     [AvaloniaFact]
