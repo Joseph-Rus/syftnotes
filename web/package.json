@@ -1,7 +1,7 @@
 {
   "name": "syft-notes-phone",
   "private": true,
-  "version": "0.9.0",
+  "version": "0.9.1",
   "description": "Syft Notes on a phone: the library's own web app, served at /app/.",
   "type": "module",
   "scripts": {
