@@ -165,7 +165,10 @@ public sealed partial class AddOnModel : ObservableObject, IDisposable
         if (s.Extension?.Connected == true) Connected = true;
         if (s.Url.Length > 0) CanvasUrl = s.Url;
         // An add-on that says its version and it's older than 1.8 can't find Canvas: the typing way, at once.
-        if (!told && !IsDone && (Added || Connected) && s.Extension?.Version is { Length: > 0 } v && Extension.IsOlder(v, StoreVersions.FindsCanvasFrom))
+        // Only a check-in after the store's page opened counts: a version the library kept from an earlier install says
+        // nothing about the add-on being added now.
+        if (!told && !IsDone && addedAt is { } opened && s.Extension is { LastSeen: { } heard, Version: { Length: > 0 } v } && heard >= opened
+            && Extension.IsOlder(v, StoreVersions.FindsCanvasFrom))
         {
             told = true;
             OnTypeInstead?.Invoke();
