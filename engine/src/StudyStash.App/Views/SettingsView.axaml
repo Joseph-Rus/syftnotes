@@ -1346,6 +1346,33 @@
                       </Border>
                     </Border>
                     <TextBlock Classes="say" Text="Useful after switching models. It can take a while." />
+
+                    <!-- Listen: Kokoro's voices, downloaded into the library (one press; how far it's got; Remove) -->
+                    <StackPanel Name="ListenVoices" IsVisible="{Binding Voices.Available}" Spacing="8">
+                      <TextBlock Classes="section gap" Text="Listen" />
+                      <Border Classes="group">
+                        <Border Classes="row">
+                          <Grid ColumnDefinitions="*,Auto">
+                            <StackPanel Spacing="2" VerticalAlignment="Center">
+                              <TextBlock Classes="row-title" Text="{Binding Voices.Title}" />
+                              <TextBlock Classes="row-sub" Text="{Binding Voices.Facts}" />
+                              <TextBlock Classes="row-sub" Text="{Binding Voices.Line}" TextWrapping="Wrap" />
+                              <Grid ColumnDefinitions="220,10,Auto" Margin="0,6,0,0" IsVisible="{Binding Voices.Downloading}">
+                                <ProgressBar Minimum="0" Maximum="1" Value="{Binding Voices.Fraction}" VerticalAlignment="Center" />
+                                <TextBlock Grid.Column="2" Classes="row-sub" Text="{Binding Voices.ProgressSaid}" VerticalAlignment="Center" />
+                              </Grid>
+                            </StackPanel>
+                            <Button Grid.Column="1" Classes="btn sm ink act" Command="{Binding Voices.DownloadCommand}" IsVisible="{Binding Voices.CanDownload}">
+                              <TextBlock Text="{Binding Voices.DownloadSaid}" />
+                            </Button>
+                            <Button Grid.Column="1" Classes="btn sm act" Command="{Binding Voices.RemoveCommand}" IsVisible="{Binding Voices.Here}">
+                              <TextBlock Text="{Binding Voices.RemoveSaid}" />
+                            </Button>
+                          </Grid>
+                        </Border>
+                      </Border>
+                      <c:PageText Classes="say" Text="{Binding Voices.Problem}" IsVisible="{Binding Voices.HasProblem}" />
+                    </StackPanel>
                   </StackPanel>
 
                   <!-- Folders it may read -->

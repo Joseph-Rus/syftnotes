@@ -226,6 +226,8 @@ public sealed partial class SettingsModel : ObservableObject, IDisposable
     public ViewModels.GranolaSettingsModel Granola { get; }
     /// <summary>The library's own settings (Library, Classes, Notes and sorting, Folders).</summary>
     public LibrarySettingsModel Lib { get; }
+    /// <summary>Settings → Notes → Listen: Kokoro's voices, downloaded into the library.</summary>
+    public ListenVoicesModel Voices { get; }
     /// <summary>Adding a phone to the library, and the phones already added.</summary>
     public PhonesModel Phones { get; private set; }
     /// <summary>Settings → Shortcuts: the keys for search, Record, Ask and Settings.</summary>
@@ -381,6 +383,7 @@ public sealed partial class SettingsModel : ObservableObject, IDisposable
             ]),
         ];
         ComputerNav = [.. NavGroups.SelectMany(g => g.Items).Where(n => !LibraryPages.Contains(n.Id))];
+        Voices = new ListenVoicesModel(() => host.Remote() is null ? null : new StudyStash.Core.Study.StudyRemote(host.Client().ServerUrl, host.Client().PoolKey));
         Lib = new LibrarySettingsModel(library ?? (() => host.Remote() is { } lib ? (m, path, body) => lib.SettingsAsync(m, path, body) : null))
         {
             IsHere = host.Settings.LibraryHere,
@@ -529,6 +532,7 @@ public sealed partial class SettingsModel : ObservableObject, IDisposable
                 break;
             case "Library" or "Classes" or "Notes" or "Folders" or "General":
                 _ = Lib.Load();
+                if (section == "Notes") _ = Voices.LoadAsync();
                 break;
             case "Phone":
                 _ = Phones.Load();

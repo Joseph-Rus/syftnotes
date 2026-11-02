@@ -46,6 +46,12 @@ public interface IStudyLibrary
     Task<ListenInfo?> MakeListenAsync(string lecture) => Task.FromResult<ListenInfo?>(null);
     /// <summary>Its sound, saved to <paramref name="path"/>; false when there's none yet.</summary>
     Task<bool> ListenAudioAsync(string lecture, string path) => Task.FromResult(false);
+    /// <summary>The voices Listen can download (Kokoro): here, coming or not. Null from a library too old to have them.</summary>
+    Task<VoicesInfo?> VoicesAsync() => Task.FromResult<VoicesInfo?>(null);
+    /// <summary>Starts their download on the library. Throws <see cref="LibraryRefusedException"/> with why when it can't.</summary>
+    Task<VoicesInfo?> DownloadVoicesAsync() => Task.FromResult<VoicesInfo?>(null);
+    /// <summary>Removes them from the library.</summary>
+    Task<VoicesInfo?> DeleteVoicesAsync() => Task.FromResult<VoicesInfo?>(null);
 }
 
 /// <summary>The study tools over the library's API (/api/v2/review and the rest), the way the Syft Notes app reads them.
@@ -174,6 +180,12 @@ public sealed partial class StudyRemote(string serverUrl, Func<string> key, Http
         File.Move(path + ".part", path, overwrite: true);
         return true;
     }
+
+    public async Task<VoicesInfo?> VoicesAsync() => As<VoicesInfo>(await SendAsync(HttpMethod.Get, "/api/v2/listen/voices"));
+
+    public async Task<VoicesInfo?> DownloadVoicesAsync() => As<VoicesInfo>(await SendAsync(HttpMethod.Post, "/api/v2/listen/voices"));
+
+    public async Task<VoicesInfo?> DeleteVoicesAsync() => As<VoicesInfo>(await SendAsync(HttpMethod.Delete, "/api/v2/listen/voices"));
 
     public async Task<List<ExamHint>?> ExamFlagsAsync(string lecture) =>
         As<List<ExamHint>>(await SendAsync(HttpMethod.Get, $"/api/v2/lectures/{Seg(lecture)}/exam-flags"));

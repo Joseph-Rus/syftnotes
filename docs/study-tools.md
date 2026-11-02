@@ -81,7 +81,39 @@ the choices) are left out. Kept in `exam-prep/<id>.json`, with each go at the te
 
 `engine/src/StudyStash.Core/Study/Listen.cs`. The AI writes a script for two voices from the lecture's
 notes and exam flags, about five minutes read aloud: a tutor (A) who explains and a classmate (B) who
-asks. The library's computer reads it with its own voices, so only the script's request leaves it:
+asks. The library's computer reads it, so only the script's request leaves it: with Kokoro once its
+voices are downloaded, with its own voices until then.
+
+### Kokoro
+
+`engine/src/StudyStash.Audio/Kokoro.cs`. [Kokoro-82M](https://huggingface.co/hexgrad/Kokoro-82M) v1.0
+(Apache-2.0) through sherpa-onnx (Apache-2.0), the same package Parakeet already runs on, so it works on
+the Mac, Windows and Linux builds. A is `af_heart` (speaker 3), B is `am_michael` (16). The download is
+sherpa-onnx's 8-bit conversion at a pinned Hugging Face revision, only what English needs: the model
+(114 MB), the voices (28 MB), the US lexicon (6 MB), `tokens.txt`, its `LICENSE` and seven of
+espeak-ng's files for words the lexicon hasn't got: 149 MB, each file checked against its SHA-256 by
+`ModelDownload` (which picks up a stopped download), into `models/kokoro-82m-v1.0-int8`. On an M3 Max
+it reads a line in about half the line's length; the full-precision model is twice as quick but 325
+MB. It's loaded on the first line of a listen and let go two minutes after the last. Kokoro gives 24 kHz,
+resampled to Listen's 22 kHz.
+
+Why not Piper: its voices sound flatter than Kokoro's; the maintained code moved to a GPL-3.0 repo
+(`OHF-Voice/piper1-gpl`; the MIT `rhasspy/piper` is archived), and each voice has its own licence,
+some only for research. Kokoro is one Apache-2.0 model with both voices in it.
+
+The app hands the library its voices (`Cli.VoicePack`, `KokoroVoices`); a library run by the
+`studystash` engine on its own has none to offer and says so. `ListenVoices` (Core) picks the voices a
+listen is read with: Kokoro once every file is here, else the computer's; a listen keeps the voices it
+started with. The app's `ListenVoicesModel` shows them in Settings → Notes → Listen (title, size,
+licence, Download, how far it's got, Remove) and as one line under Listen until they're here.
+
+| | |
+|---|---|
+| `GET /api/v2/listen/voices` | `{name, state: none, downloading, ready, failed or unavailable, license, about, bytes, done, error, in_use}` |
+| `POST /api/v2/listen/voices` | starts the download in the background (409 when the library has none) |
+| `DELETE /api/v2/listen/voices` | removes them (409 while they download) |
+
+### The computer's own voices
 
 - **Mac**: `say`, Samantha (or another US or British woman's voice) for A and Daniel (or another man's)
   for B, else its own voice at two speeds.
@@ -104,6 +136,9 @@ transcript's moments. Kept in `listen/<lecture>.wav` and `.json` (the script and
 
 `RecipesTests`, `ExamHintsTests`, `ReviewTests`, `ExamPrepTests` and `ListenTests` in the Core tests
 run the library for real with a scripted AI (`StudyLibrary`); `ListenTests` also has this computer's
-own voices speak a line. The app's are `AskRecipesTests`, `ExamFlagsTests`, `ReviewPageTests`,
+own voices speak a line. `ListenVoicesTests` downloads stand-in voices (`FakeVoicePack`) through the
+library and checks which voices read each listen, fetches a small stand-in Kokoro from a pretend Hugging
+Face, and has Kokoro itself speak when its files are on this computer (in `STUDYSTASH_KOKORO`, or the
+default home's models folder). The app's are `AskRecipesTests`, `ExamFlagsTests`, `ReviewPageTests`,
 `ExamPrepPageTests` and `ListenPageTests`, and `StudyShots` draws each of them, light and dark, in both
 looks, into `STUDYSTASH_SHOTS`.

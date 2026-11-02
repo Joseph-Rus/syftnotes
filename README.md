@@ -47,7 +47,7 @@ choose, including a free one that runs on your machine.
 - **Recipes**: the questions you ask of every lecture (a study guide, what's likely on the exam, key terms) are one `/` away.
 - **Hears what's on the exam**: "this will be on the midterm", "make sure you know", flagged on the lecture's page with the moment.
 - **Helps you study**: flashcards from your lectures in Review, brought back just before you'd forget them, and exam prep with a study guide and a practice test.
-- **Reads a lecture to you**: Listen turns it into a five-minute conversation for a walk, read by your computer's own voices.
+- **Reads a lecture to you**: Listen turns it into a five-minute conversation for a walk, read by Kokoro's natural open-source voices (a one-time 149 MB download) or your computer's own.
 - **Never loses a version of your notes**: Undo after any change, and History to put back any earlier one.
 - **Files every lecture by class**, next to your Canvas assignments, due dates, rubrics, files and announcements.
 - **Works without a paid AI**: a free AI on your computer, a free Gemini key, the free Claude app, or copy and paste with any chat.
@@ -139,8 +139,10 @@ the lecturer said would be on it. The test marks each answer, keeps your score, 
 missed into Review.
 
 **Listen.** Listen on a lecture's page turns it into a five-minute conversation, a tutor and a
-classmate going over what was taught, read by your computer's own voices (on Linux, install
-`espeak-ng`). It plays on the page, so you can go over a lecture on a walk.
+classmate going over what was taught. It plays on the page, so you can go over a lecture on a walk.
+Download Kokoro's voices once (Settings → Notes → Listen, or the line under Listen: 149 MB,
+open source under Apache-2.0) and it's read by two natural voices made on the library's computer;
+until then your computer's own voices read it (on Linux, install `espeak-ng`).
 
 See [docs/study-tools.md](docs/study-tools.md) for how each works and its API.
 
