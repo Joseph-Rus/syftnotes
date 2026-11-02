@@ -235,11 +235,27 @@ public sealed partial class LibraryWeb
         })));
     }
 
+    ListenVoices? listenVoices;
+    /// <summary>Kokoro once it's downloaded, this computer's own voices until then.</summary>
+    ListenVoices ListenVoicesHere => listenVoices ??= new ListenVoices(options.VoicePack, options.Speech ?? Voices.ForThisComputer());
     Listen? listening;
-    Listen Listening => listening ??= new Listen(cfg.Home, options.Speech);
+    Listen Listening => listening ??= new Listen(cfg.Home, ListenVoicesHere);
 
     void MapListen(WebApplication app)
     {
+        // The voices Listen can download (Kokoro): what they are, how big, their licence, and how far a download has got.
+        app.MapGet("/api/v2/listen/voices", (HttpContext ctx) => Api(ctx, () => StudyJson(ListenVoicesHere.Info())));
+
+        // Fetches them into the library's models folder, in the background; listens made after read with them.
+        app.MapPost("/api/v2/listen/voices", (HttpContext ctx) => Api(ctx, () =>
+            ListenVoicesHere.Pack is null ? Http.Detail(409, "This library has no voices to download: it isn't run by the Syft Notes app.")
+                : StudyJson(ListenVoicesHere.Download(Console.WriteLine))));
+
+        // Removes them: listens are read by the computer's own voices again (the ones made already keep theirs).
+        app.MapDelete("/api/v2/listen/voices", (HttpContext ctx) => Api(ctx, () =>
+            ListenVoicesHere.Info().State == VoicesInfo.Downloading ? Http.Detail(409, "The voices are still downloading.")
+                : ListenVoicesHere.Delete() ? StudyJson(ListenVoicesHere.Info()) : Http.Detail(404, "there are no voices to remove")));
+
         // A lecture to listen to: whether it's made (or being made), its script and how long it is.
         app.MapGet("/api/v2/listen/{id}", (HttpContext ctx, string id) => Api(ctx, () =>
             store.Get(id) is null ? Http.Detail(404, "no such lecture") : StudyJson(Listening.Info(id))));

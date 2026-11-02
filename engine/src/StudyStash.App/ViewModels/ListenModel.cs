@@ -30,7 +30,8 @@ public sealed class ScriptRow(ScriptLine line)
 
 /// <summary>
 /// Listen, on a lecture's page: the lecture as a short two-voice conversation. Not made yet, a button makes it (the
-/// library's AI writes the script and the computer's voices read it, a few minutes); while it's made, the page says so
+/// library's AI writes the script and Kokoro or the computer's own voices read it, a few minutes; Kokoro's voices are
+/// offered under the button until they're downloaded, <see cref="ListenVoicesModel"/>); while it's made, the page says so
 /// and looks again every few seconds; made, it plays here, pauses, goes back fifteen seconds, and shows its script.
 /// </summary>
 public sealed partial class ListenModel : ObservableObject, IDisposable
@@ -48,7 +49,18 @@ public sealed partial class ListenModel : ObservableObject, IDisposable
         LectureId = lectureId;
         this.player = player ?? new AppPlayer();
         cache = Path.Combine(cacheDir ?? Path.Combine(Path.GetTempPath(), "syft-notes-listen"), Safe(lectureId) + ".wav");
+        Voices = new ListenVoicesModel(library);
+        // Downloaded, Kokoro speaks on a computer that had no voice of its own (a Linux without espeak).
+        Voices.PropertyChanged += (_, e) =>
+        {
+            if (e.PropertyName == nameof(ListenVoicesModel.Here) && Voices.Here) CanSpeak = true;
+            if (e.PropertyName is nameof(ListenVoicesModel.CanDownload) or nameof(ListenVoicesModel.Downloading)) OnPropertyChanged(nameof(ShowVoicesOffer));
+        };
     }
+
+    /// <summary>Kokoro's voices, offered under the button until they're on the library.</summary>
+    public ListenVoicesModel Voices { get; }
+    public bool ShowVoicesOffer => Available && (Voices.CanDownload || Voices.Downloading);
 
     static string Safe(string id) => string.Concat(id.Select(c => char.IsLetterOrDigit(c) || c is '-' or '_' ? c : '_'));
 
@@ -69,7 +81,9 @@ public sealed partial class ListenModel : ObservableObject, IDisposable
     public bool Ready => State == ListenInfo.Ready;
     public bool HasProblem => !string.IsNullOrEmpty(Problem);
     public string MakeSaid => State == ListenInfo.Failed ? "Try Listen again" : "Listen";
-    public string MakeTip => "A five-minute conversation going over this lecture, read by your computer's voices. Good on a walk.";
+    public string MakeTip => Voices.Here
+        ? "A five-minute conversation going over this lecture, read by Kokoro's voices. Good on a walk."
+        : "A five-minute conversation going over this lecture, read by your computer's voices. Good on a walk.";
     public string MakingSaid => "Making your listen: your AI is writing it and your computer is reading it out. It takes a few minutes.";
     public string Time => $"{TimedText.Clock(Position)} / {TimedText.Clock(Seconds)}";
     public string PlaySaid => Playing ? "Pause" : Position > 0 && Position < Seconds ? "Play on" : "Play";
@@ -77,7 +91,9 @@ public sealed partial class ListenModel : ObservableObject, IDisposable
     /// <summary>How far through, 0 to 1.</summary>
     public double Progress => Seconds > 0 ? Math.Clamp(Position / Seconds, 0, 1) : 0;
     /// <summary>Why this computer can't make one (no voices), when it can't.</summary>
-    public string CantSpeak => "Your library's computer has no voice to read a listen with. On Linux, install espeak-ng.";
+    public string CantSpeak => Voices.Available
+        ? "Your library's computer has no voice to read a listen with. Download Kokoro's voices below, or on Linux install espeak-ng."
+        : "Your library's computer has no voice to read a listen with. On Linux, install espeak-ng.";
     public bool ShowCantSpeak => Available && !CanSpeak && !Ready;
 
     partial void OnStateChanged(string value) => Shown();
@@ -96,6 +112,8 @@ public sealed partial class ListenModel : ObservableObject, IDisposable
         OnPropertyChanged(nameof(Ready));
         OnPropertyChanged(nameof(MakeSaid));
         OnPropertyChanged(nameof(ShowCantSpeak));
+        OnPropertyChanged(nameof(ShowVoicesOffer));
+        OnPropertyChanged(nameof(CantSpeak));
         MakeCommand.NotifyCanExecuteChanged();
     }
 
@@ -121,6 +139,7 @@ public sealed partial class ListenModel : ObservableObject, IDisposable
             return;
         }
         if (info is null) return; // a library too old to make them: nothing shows
+        await Voices.LoadAsync();
         Show(info);
         if (info.State == ListenInfo.Making) Watch();
     }
@@ -284,6 +303,7 @@ public sealed partial class ListenModel : ObservableObject, IDisposable
     public void Dispose()
     {
         watching?.Cancel();
+        Voices.Dispose();
         if (Playing) Pause();
     }
 }

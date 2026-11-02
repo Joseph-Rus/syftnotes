@@ -58,6 +58,9 @@ public sealed class LibraryWebOptions
     public PasswordTries? Tries { get; init; }
     /// <summary>The voices Listen speaks with. Null: this computer's own (say, Windows' speech, espeak).</summary>
     public StudyStash.Core.Study.ISpeech? Speech { get; init; }
+    /// <summary>The open-source voices Listen can download (Kokoro, in the app), read with in place of
+    /// <see cref="Speech"/> once they're here. Null: there are none to download (the engine on its own, and tests).</summary>
+    public StudyStash.Core.Study.IVoicePack? VoicePack { get; init; }
     /// <summary>The time now, for Review's schedule and exam prep. Null: the clock's.</summary>
     public Func<DateTimeOffset>? Now { get; init; }
     /// <summary>The phone's Google Drive link, run in this library (<see cref="StudyStash.Core.PhoneDrive.PhoneLink"/>).

@@ -29,6 +29,8 @@ static class Program
         {
             // The library this app runs starts at login the way the app does: its login item, only when asked.
             StudyStash.Library.Cli.LoginItems = home => new(() => Desktop.StartsAtLogin(home), on => Desktop.StartAtLogin(on, home));
+            // Listen's downloadable voices: Kokoro, through the sherpa-onnx the app already carries for Parakeet.
+            StudyStash.Library.Cli.VoicePack = home => new StudyStash.Audio.KokoroVoices(home);
             return StudyStash.Library.Cli.RunAsync(args).GetAwaiter().GetResult();
         }
         int at = Array.IndexOf(args, "--home");

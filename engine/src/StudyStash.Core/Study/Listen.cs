@@ -34,9 +34,10 @@ public interface ISpeech
 /// <summary>
 /// Listen: a lecture as a short conversation to listen to (on a walk, on the bus), two voices going over what was
 /// taught, the way NotebookLM's audio overviews do. The library's AI writes the script from the notes and what the
-/// lecturer flagged for the exam; the computer's own voices read it (say on a Mac, Windows' speech, espeak on Linux),
-/// so nothing about it leaves the computer but the script's request to the AI. Kept in the library's listen folder,
-/// a WAV and its script for each lecture.
+/// lecturer flagged for the exam; Kokoro reads it once its voices are downloaded (<see cref="ListenVoices"/>), the
+/// computer's own voices until then (say on a Mac, Windows' speech, espeak on Linux), so nothing about it leaves the
+/// computer but the script's request to the AI. Kept in the library's listen folder, a WAV and its script for each
+/// lecture.
 /// </summary>
 public sealed partial class Listen(string home, ISpeech? speech = null)
 {
@@ -103,7 +104,9 @@ public sealed partial class Listen(string home, ISpeech? speech = null)
     /// <summary>The script, then each line spoken and the lines joined with a breath between them.</summary>
     public async Task<ListenInfo> MakeAsync(StudyLecture lecture, StudyMaterial.Planner plan, DateTimeOffset now, CancellationToken ct)
     {
-        var (ok, why) = Speech.Ready();
+        // One set of voices for the whole listen, even if downloaded ones arrive while it's read.
+        var speech = Speech is ListenVoices voices ? voices.Now : Speech;
+        var (ok, why) = speech.Ready();
         if (!ok) throw new InvalidOperationException(why);
         var script = ReadScript(await plan(ScriptPrompt(lecture), ScriptSchema));
         if (script.Count == 0) throw new InvalidDataException("the AI's script had no lines");
@@ -116,7 +119,7 @@ public sealed partial class Listen(string home, ISpeech? speech = null)
             for (int i = 0; i < script.Count; i++)
             {
                 string wav = Path.Combine(parts, $"{i:000}.wav");
-                await Speech.SayAsync(script[i].Text, script[i].Who, wav, ct);
+                await speech.SayAsync(script[i].Text, script[i].Who, wav, ct);
                 files.Add(wav);
             }
             string audio = AudioPath(lecture.Id), fresh = audio + ".new";
@@ -269,7 +272,15 @@ public static class Wav
             }
             mono[f] = sum / channels;
         }
-        if (rate == Rate) return [.. mono.Select(v => (short)Math.Clamp(v, short.MinValue, short.MaxValue))];
+        return At(mono, rate);
+    }
+
+    /// <summary>16-bit samples at <see cref="Rate"/> from mono ones (on the 16-bit scale) at <paramref name="rate"/>, by
+    /// straight-line steps between them.</summary>
+    public static short[] At(float[] mono, int rate)
+    {
+        int frames = mono.Length;
+        if (rate == Rate || frames == 0) return [.. mono.Select(v => (short)Math.Clamp(v, short.MinValue, short.MaxValue))];
         int outFrames = (int)((long)frames * Rate / rate);
         var result = new short[outFrames];
         for (int i = 0; i < outFrames; i++)

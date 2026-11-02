@@ -359,6 +359,19 @@
                 </Border>
                 <c:PageText Classes="free-ai-problem" Text="{Binding Problem}" IsVisible="{Binding HasProblem}" />
                 <c:PageText Classes="free-ai-more" Text="{Binding CantSpeak}" IsVisible="{Binding ShowCantSpeak}" />
+                <!-- Kokoro's voices, offered until they're on the library: one press, then how far the download has got -->
+                <StackPanel Name="ListenVoices" DataContext="{Binding Voices}" x:DataType="vm:ListenVoicesModel" Spacing="6"
+                            IsVisible="{Binding $parent[StackPanel].((vm:ListenModel)DataContext).ShowVoicesOffer, FallbackValue=False}">
+                  <Button Name="DownloadVoices" Classes="link-btn" HorizontalAlignment="Left" Command="{Binding DownloadCommand}" IsVisible="{Binding CanDownload}"
+                          Content="{Binding OfferSaid}" ToolTip.Tip="{Binding Line}" />
+                  <Grid ColumnDefinitions="200,10,Auto" IsVisible="{Binding Downloading}">
+                    <ProgressBar Minimum="0" Maximum="1" Value="{Binding Fraction}" VerticalAlignment="Center" Height="4" MinHeight="4"
+                                 Foreground="{DynamicResource Ink}" Background="{DynamicResource Line}" CornerRadius="2" />
+                    <TextBlock Grid.Column="2" FontSize="12" Classes="num" Foreground="{DynamicResource InkSubtle}" VerticalAlignment="Center"
+                               Text="{Binding ProgressSaid, StringFormat='Downloading Kokoro: {0}'}" />
+                  </Grid>
+                  <c:PageText Classes="free-ai-problem" Text="{Binding Problem}" IsVisible="{Binding HasProblem}" />
+                </StackPanel>
               </StackPanel>
             </Panel>
             <!-- While it records: the student's own, kept as they type, in Markdown that shows formatted. A line that

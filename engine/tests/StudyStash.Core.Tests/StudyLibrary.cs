@@ -23,6 +23,8 @@ public sealed class StudyLibrary : IAsyncDisposable
     public StudyRemote Study => new("http://localhost", "pw", Site.Client);
     /// <summary>The voices Listen speaks with; null for this computer's own.</summary>
     public ISpeech? Speech { get; set; }
+    /// <summary>The voices Listen can download; null for none.</summary>
+    public IVoicePack? VoicePack { get; set; }
 
     /// <summary>Waits while a lecture's listen is being made, and says what it came to.</summary>
     public async Task<ListenInfo> ListenedAsync(string lecture)
@@ -91,7 +93,7 @@ public sealed class StudyLibrary : IAsyncDisposable
         Site = await TestSite.StartAsync(b => LibraryWeb.Build(b, Cfg, Store, new Pipeline(Cfg, Store, log: _ => { }), new LibraryWebOptions
         {
             ListModels = _ => Task.FromResult<List<(string, double)>?>(null), Tailscale = () => new TailscaleInfo(),
-            Latest = _ => Task.FromResult<Release?>(null), Ai = Ai, Now = () => Now, Speech = Speech,
+            Latest = _ => Task.FromResult<Release?>(null), Ai = Ai, Now = () => Now, Speech = Speech, VoicePack = VoicePack,
         }));
     }
 

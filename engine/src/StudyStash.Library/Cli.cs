@@ -29,6 +29,10 @@ public static class Cli
     /// lets Settings (on this computer or a laptop) turn starting at login on and off. Null: `serve` offers none.</summary>
     public static Func<string, LoginSwitch>? LoginItems { get; set; }
 
+    /// <summary>The voices Listen can download for a settings folder (Kokoro), handed in by the app's own Main, which
+    /// carries sherpa-onnx to speak with them. Null: `serve` reads listens with the computer's own voices only.</summary>
+    public static Func<string, StudyStash.Core.Study.IVoicePack>? VoicePack { get; set; }
+
     /// <summary>Set to "1" by the app for the library it runs as its child: the library stops cleanly once its input
     /// ends, which is how the app asks it to on Windows (there's no SIGTERM there), and what happens by itself when the
     /// app is gone for good (ended in Task Manager, or crashed), so no library is ever left running without it.</summary>
@@ -272,7 +276,7 @@ public static class Cli
                 Apply = background ? null : (rel, h) => Updates.ApplyAsync(rel, h, UpdateHost.ThisComputer()), Claude = access, Reach = ClaudeReach.ThisComputer(), WebCheck = ReachCheck.ThisComputer(),
                 AskChat = ai.Ask(() => cfg), Ai = ai, Diagrams = diagrams, Canvas = canvas, Scout = scout, Files = fileIndex,
                 Inbox = new Inbox(cfg.PoolDir, () => cfg.ClassNames(), c => store.ClassDir(c), ai, new History(cfg.PoolDir)),
-                StartAtLogin = LoginItems?.Invoke(home), Tries = tries,
+                StartAtLogin = LoginItems?.Invoke(home), Tries = tries, VoicePack = VoicePack?.Invoke(home),
             });
             await app.StartAsync(stop.Token);
             phone.Start();

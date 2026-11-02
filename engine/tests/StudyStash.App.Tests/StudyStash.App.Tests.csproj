@@ -40,6 +40,7 @@
     <Compile Include="..\StudyStash.Core.Tests\FakeAgents.cs" Link="Library\FakeAgents.cs" />
     <Compile Include="..\StudyStash.Core.Tests\TestSite.cs" Link="Library\TestSite.cs" />
     <Compile Include="..\StudyStash.Core.Tests\StudyLibrary.cs" Link="Library\StudyLibrary.cs" />
+    <Compile Include="..\StudyStash.Core.Tests\FakeVoicePack.cs" Link="Library\FakeVoicePack.cs" />
     <Compile Include="..\StudyStash.Core.Tests\E2E\FakeCanvasHttp.cs" Link="Library\FakeCanvasHttp.cs" />
     <Compile Include="..\StudyStash.Core.Tests\E2E\CanvasServer.cs" Link="Library\CanvasServer.cs" />
     <Compile Include="..\StudyStash.Core.Tests\E2E\ChromeRunner.cs" Link="Library\ChromeRunner.cs" />

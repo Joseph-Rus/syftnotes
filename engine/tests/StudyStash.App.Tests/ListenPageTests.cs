@@ -126,6 +126,54 @@ public class ListenPageTests
         }
     }
 
+    /// <summary>Kokoro offered under Listen: one press downloads it into the library, the line says how far it's got,
+    /// and once it's here the offer goes and Settings' Remove (asked twice) takes it away again.</summary>
+    [AvaloniaFact]
+    public async Task Listen_offers_Kokoros_voices_until_theyre_downloaded()
+    {
+        var pack = new FakeVoicePack(new Voices()) { Let = new TaskCompletionSource() };
+        await using var lib = await StudyLibrary.StartAsync(l => (l.Speech, l.VoicePack) = (new Voices(), pack));
+        var note = new NoteModel { Id = "v1", Title = "Blood vessels", Markdown = "## Vessels" };
+        var listen = new ListenModel(lib.Study, "v1", new FakePlayer());
+        listen.Voices.LookEvery = TimeSpan.FromMilliseconds(30);
+        var study = new LectureStudyModel(lib.Study, "v1") { Listen = listen };
+        await study.LoadAsync();
+        await listen.LoadAsync();
+        var page = new NotePage { DataContext = new LibraryModel { Note = note, LectureStudy = study } };
+        var w = MenuPickTests.Host(page, SkinKind.Mac);
+        try
+        {
+            var offer = page.GetVisualDescendants().OfType<Button>().Single(b => b.Name == "DownloadVoices");
+            Assert.True(offer.IsEffectivelyVisible);
+            Assert.Equal("Better voices: download Kokoro (1 MB, open source)", listen.Voices.OfferSaid);
+            Assert.Equal("1 MB · Apache-2.0 licence · open source", listen.Voices.Facts);
+
+            await listen.Voices.DownloadCommand.ExecuteAsync(null);
+            Assert.True(listen.Voices.Downloading);
+            await Until(() => listen.Voices.Fraction > 0);
+            Assert.Equal(0.4, listen.Voices.Fraction, 2);
+            Dispatcher.UIThread.RunJobs();
+            Assert.False(offer.IsEffectivelyVisible);
+            pack.Let.SetResult();
+            await Until(() => listen.Voices.Here);
+            Dispatcher.UIThread.RunJobs();
+            Assert.False(listen.ShowVoicesOffer);
+
+            var settings = new ListenVoicesModel(lib.Study);
+            await settings.LoadAsync();
+            Assert.True(settings.Here);
+            await settings.RemoveCommand.ExecuteAsync(null);
+            Assert.Equal(("Remove them", true), (settings.RemoveSaid, settings.Here));
+            await settings.RemoveCommand.ExecuteAsync(null);
+            Assert.True(settings.CanDownload);
+            Assert.False(pack.Here);
+        }
+        finally
+        {
+            w.Close();
+        }
+    }
+
     static async Task Until(Func<bool> done)
     {
         for (int i = 0; i < 500 && !done(); i++)
