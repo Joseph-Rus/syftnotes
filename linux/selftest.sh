@@ -34,8 +34,9 @@ if [ -z "${DISPLAY:-}${WAYLAND_DISPLAY:-}" ]; then
 fi
 
 # A clean environment: no DOTNET_ROOT, so the run proves the self-contained folder needs no .NET install. timeout is the
-# time limit: it ends the app with SIGTERM (exit status 124) if it hasn't finished.
-limit=480
+# time limit: it ends the app with SIGTERM (exit status 124) if it hasn't finished. 900 s leaves room for a runner
+# whose CPU Whisper is slow to finish the lecture (the self-test waits while it's still getting further).
+limit=900
 code=0
 env -u DOTNET_ROOT \
   STUDYSTASH_SELFTEST="$OUT" \
