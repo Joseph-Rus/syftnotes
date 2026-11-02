@@ -52,7 +52,7 @@ public static class ClassRename
         // A folder is free when nothing's there, or it's this class's own (a change of case), or another class's
         // that is itself being renamed away.
         var leaving = steps.Select(st => st.From).ToHashSet();
-        string Folder(string name) => Path.Combine(cfg.PoolDir, Notes.Slugify(name, 60));
+        string Folder(string name) => Path.Combine(cfg.PoolDir, Notes.FolderName(name));
         return [.. steps.Where(st =>
             Py.SamePath(Folder(st.From), Folder(st.To))
             || !Directory.Exists(Folder(st.To)) || !Directory.EnumerateFileSystemEntries(Folder(st.To)).Any()
@@ -122,7 +122,7 @@ public static class ClassRename
         if (all.Any(a => a.ClassName == from)) Assignments.Save(home, all.Select(a => a.ClassName == from ? a with { ClassName = to } : a));
         CanvasSeen.Rename(home, from, to);
         CanvasNotifications.Rename(home, from, to);
-        (crawl ?? new Crawl(home, name => Path.Combine(cfg.PoolDir, Notes.Slugify(name, 60)), () => DateTimeOffset.UtcNow, () => TimeZoneInfo.Local))
+        (crawl ?? new Crawl(home, name => Path.Combine(cfg.PoolDir, Notes.FolderName(name)), () => DateTimeOffset.UtcNow, () => TimeZoneInfo.Local))
             .RenameClass(from, to);
         RenameInChats(home, from, to);
         FollowHere(home, from, to);

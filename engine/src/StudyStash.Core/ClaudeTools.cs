@@ -83,7 +83,7 @@ public sealed class LocalLibrary(LibraryReader reader, Canvas.CanvasSync? canvas
         path = path.Trim();
         // "<class>/<path in its folder>": how class_files and get_assignment name what Syft Notes saved.
         if (!Path.IsPathFullyQualified(path) && path.IndexOf('/') is > 0 and var slash)
-            path = Path.GetFullPath(Path.Combine(reader.Store.PoolDir, Notes.Slugify(path[..slash], 60), path[(slash + 1)..]));
+            path = Path.GetFullPath(Path.Combine(reader.Store.PoolDir, Notes.FolderName(path[..slash]), path[(slash + 1)..]));
         if (path.Length == 0 || !Path.IsPathFullyQualified(path)) return NotHere;
         if (files.RootOf(path) is not { } root) return NotHere;
         if (root.Private) return "That file is in a private folder: AI tools see its name only.";
