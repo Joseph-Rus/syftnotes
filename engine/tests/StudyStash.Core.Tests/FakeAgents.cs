@@ -90,7 +90,13 @@ public static class FakeAgents
         return Directory.Exists(dir) ? Directory.GetFiles(dir).Length : 0;
     }
 
-    public static int Turns(string bin) => File.Exists(Path.Combine(bin, "turns")) ? int.Parse(File.ReadAllText(Path.Combine(bin, "turns")).Trim(), System.Globalization.CultureInfo.InvariantCulture) : 0;
+    /// <summary>How many turns the fake has taken: an empty file of its own in <c>turns</c> for each, counted, never read,
+    /// for the reason <see cref="Logins"/> gives (a count read from one file failed on Windows with the file in use).</summary>
+    public static int Turns(string bin)
+    {
+        string dir = Path.Combine(bin, "turns");
+        return Directory.Exists(dir) ? Directory.GetFiles(dir).Length : 0;
+    }
 
     static string ShCli(string id, string version) => $$"""
         #!/bin/sh
@@ -150,7 +156,7 @@ public static class FakeAgents
           sleep "$(cat "$D/login-delay" 2>/dev/null || echo 1)"
           touch "$D/signed-in"; echo "Signed in."; exit 0
         fi
-        n=$(( $(cat "$D/turns" 2>/dev/null || echo 0) + 1 )); echo "$n" > "$D/turns"; echo $$ > "$D/pid-$n"
+        mkdir -p "$D/turns"; n=$(( $(ls "$D/turns" | wc -l) + 1 )); : > "$D/turns/$n"; echo $$ > "$D/pid-$n"
         for a in "$@"; do printf '%s\n' "$a"; done > "$D/argv-$n.txt"
         env | cut -d= -f1 | sort > "$D/env-$n.txt"
         echo "$HOME" > "$D/home-$n.txt"; pwd > "$D/cwd-$n.txt"
@@ -262,8 +268,8 @@ public static class FakeAgents
           Start-Sleep -Seconds $delay
           New-Item -ItemType File -Force "$D\signed-in" | Out-Null; 'Signed in.'; exit 0
         }
-        $n = 1 + [int](Get-Content "$D\turns" -ErrorAction SilentlyContinue)
-        Set-Content "$D\turns" $n
+        $n = 1 + @(Get-ChildItem "$D\turns" -File -ErrorAction SilentlyContinue).Count
+        New-Item -ItemType File -Force -Path "$D\turns\$n" | Out-Null
         Set-Content "$D\pid-$n" $PID
         $argv | Set-Content "$D\argv-$n.txt"
         Get-ChildItem env: | ForEach-Object { $_.Name } | Sort-Object | Set-Content "$D\env-$n.txt"
