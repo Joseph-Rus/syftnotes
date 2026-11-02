@@ -10,13 +10,14 @@ namespace StudyStash.App.Controls;
 /// <summary>
 /// The recording's loudness as columns of the pixel s's cells, so it's all in order: each column four cells on the
 /// mark's grid (pitch 8, cell 6.6, corners 1.8), scaled to its height and laid on whole pixels so the gaps stay
-/// crisp, lit from the bottom by the level a whole cell at a time in <see cref="Foreground"/> (the recording colour),
-/// the rest the mesh's quiet fill. The pills' three, the note page's bar's five, the dropdown's and setup's microphone
+/// crisp, lit from the bottom by the level in <see cref="Foreground"/> (the recording colour), the top one only as far
+/// as the level reaches into it, the rest the mesh's quiet fill. The pills' three, the note page's bar's five, the dropdown's and setup's microphone
 /// check's longer rows. <see cref="Levels"/> is 0 to 1, oldest first; the newest columns are drawn. While one is bound
 /// to a recording and on screen, it reads the newest levels itself (<see cref="Live"/>) twenty times a second, one
 /// column's worth of sound (50 ms) at a time, so it moves with the voice: the app's own tick, four times a second, made
-/// it jump. A cell lights or goes out by its opacity alone, quickly (<see cref="Fade"/>), moved by the render thread
-/// (<see cref="Clocked"/>) and only while a cell is changing; with less motion asked for it just switches. Off screen
+/// it jump. A cell lights or goes out by its opacity alone, rising quickly (<see cref="Fade"/>) and falling slower
+/// (<see cref="Release"/>), so the columns glide rather than flicker a whole cell every 50 ms, moved by the render
+/// thread (<see cref="Clocked"/>) and only while a cell is changing; with less motion asked for it just switches. Off screen
 /// it doesn't wake the app at all.
 /// </summary>
 public sealed class Waveform : Clocked
@@ -29,8 +30,11 @@ public sealed class Waveform : Clocked
     /// <summary>Cells in a column.</summary>
     public const int Rows = 4;
 
-    /// <summary>How long a cell takes to light or go out, in seconds.</summary>
+    /// <summary>How long a cell takes to light, in seconds.</summary>
     public const double Fade = 0.08;
+
+    /// <summary>How long a cell takes to go out, in seconds: longer than it takes to light, as a meter falls.</summary>
+    public const double Release = 0.3;
 
     readonly DispatcherTimer timer = new(DispatcherPriority.Normal) { Interval = Step };
     IReadOnlyList<double>? live;
@@ -134,8 +138,8 @@ public sealed class Waveform : Clocked
 
     double Elapsed() => Stopwatch.GetElapsedTime(started).TotalSeconds;
 
-    /// <summary>Which cells the levels light, column by column, the bottom first: the loudness on four steps, a whole
-    /// cell each (a lively one at least the bottom cell); none at all while nothing records.</summary>
+    /// <summary>How much of each cell the levels light, column by column, the bottom first: the loudness on four cells,
+    /// the top one partly (a lively one at least the bottom cell); none at all while nothing records.</summary>
     internal static float[] Lit(IReadOnlyList<double>? levels, int columns, bool lively)
     {
         var lit = new float[Math.Max(0, columns) * Rows];
@@ -146,8 +150,8 @@ public sealed class Waveform : Clocked
         {
             double level = levels.Count > 0 ? levels[Math.Max(0, levels.Count - columns + col)] : 0;
             if (span > 0) level = Math.Clamp((level - Hush) / span, 0, 1);
-            int cells = Math.Clamp((int)Math.Round(level * Rows, MidpointRounding.AwayFromZero), lively ? 1 : 0, Rows);
-            for (int row = 0; row < cells; row++) lit[col * Rows + row] = 1;
+            double cells = Math.Clamp(level * Rows, lively ? 1 : 0, Rows);
+            for (int row = 0; row < Rows; row++) lit[col * Rows + row] = (float)Math.Clamp(cells - row, 0, 1);
         }
         return lit;
     }
@@ -159,7 +163,7 @@ public sealed class Waveform : Clocked
         var lit = Lit(Levels is null ? null : live ?? Levels, Bars, Lively);
         if (lit.AsSpan().SequenceEqual(to))
         {
-            if (fading && Elapsed() >= changed + Fade)
+            if (fading && Elapsed() >= changed + Release)
             {
                 fading = false;
                 Sync();
@@ -171,7 +175,7 @@ public sealed class Waveform : Clocked
         if (fade)
         {
             // Each cell from what it shows this moment, mid-fade or not.
-            double now = Turning ? Elapsed() : changed + Fade;
+            double now = Turning ? Elapsed() : changed + Release;
             was = new float[lit.Length];
             for (int i = 0; i < lit.Length; i++) was[i] = Shown(from[i], to[i], now - changed);
         }
@@ -181,8 +185,13 @@ public sealed class Waveform : Clocked
         InvalidateVisual();
     }
 
-    /// <summary>A cell <paramref name="seconds"/> into a change from <paramref name="was"/> to <paramref name="now"/>.</summary>
-    static float Shown(float was, float now, double seconds) => was + (now - was) * (float)Math.Clamp(seconds / Fade, 0, 1);
+    /// <summary>A cell <paramref name="seconds"/> into a change from <paramref name="was"/> to <paramref name="now"/>,
+    /// eased out.</summary>
+    static float Shown(float was, float now, double seconds)
+    {
+        double t = Math.Clamp(seconds / (now > was ? Fade : Release), 0, 1);
+        return was + (now - was) * (float)(1 - (1 - t) * (1 - t));
+    }
 
     /// <summary>The pitch and the cell in a column <paramref name="height"/> tall, on whole pixels at
     /// <paramref name="scale"/>: the mark's 8 to 6.6, as near as whole pixels go, with a pixel at least between.</summary>
