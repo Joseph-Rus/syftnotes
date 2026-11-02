@@ -1329,27 +1329,6 @@
                     </Border>
                     <c:PageText Classes="say" Text="{Binding Lib.OllamaLine}" />
 
-                    <TextBlock Classes="section gap" Text="Open in a terminal" IsVisible="{Binding Lib.HasTerminals}" />
-                    <Border Classes="group" IsVisible="{Binding Lib.HasTerminals}">
-                      <Border Classes="row">
-                        <Grid ColumnDefinitions="*,Auto">
-                          <StackPanel Spacing="2" VerticalAlignment="Center">
-                            <TextBlock Classes="row-title" Text="Opens a class with Claude Code, Codex or Gemini in" />
-                            <TextBlock Classes="row-sub" Text="On the library's computer" />
-                          </StackPanel>
-                          <Button Grid.Column="1" Classes="select act">
-                            <Grid ColumnDefinitions="*,6,Auto">
-                              <TextBlock Text="{Binding Lib.TerminalLabel}" VerticalAlignment="Center" />
-                              <c:Icon Grid.Column="2" Glyph="unfold_more" Size="15" Foreground="{DynamicResource Fg2}" />
-                            </Grid>
-                            <Button.Flyout>
-                              <MenuFlyout Placement="BottomEdgeAlignedRight" FlyoutPresenterTheme="{StaticResource SettingsMenu}" ItemsSource="{Binding Lib.TerminalChoices}" ItemContainerTheme="{StaticResource PickItem}" />
-                            </Button.Flyout>
-                          </Button>
-                        </Grid>
-                      </Border>
-                    </Border>
-
                     <TextBlock Classes="section gap" Text="Rewrite every summary" />
                     <Border Classes="group">
                       <Border Classes="row">
@@ -1540,22 +1519,51 @@
             </StackPanel>
           </ScrollViewer>
 
-          <!-- AI engines (design 13), with whatever's wrong with an engine above them (design 18), and AI tool
-               access (design 14): these panes pad and scroll themselves. -->
+          <!-- Your AI: whatever's wrong with an AI above (design 18), then a card per AI with its one Connect (design 13), and
+               under Advanced settings the power options, the AI apps' own switches (design 14) and opening a class in
+               Claude Code. One page, one scroll. -->
           <DockPanel IsVisible="{Binding OnAi}">
             <Panel DockPanel.Dock="Top" IsVisible="{Binding AiProblems.Problems.Count, Converter={x:Static c:Converters.Some}}">
               <v:MacAiProblems Classes="problems" DataContext="{Binding AiProblems}" IsVisible="{Binding $parent[UserControl].((s:SettingsModel)DataContext).IsMac}" />
               <v:WinAiProblems Classes="problems" DataContext="{Binding AiProblems}" IsVisible="{Binding $parent[UserControl].((s:SettingsModel)DataContext).IsWin}" />
             </Panel>
-            <Panel>
-              <v:MacAiEngines DataContext="{Binding Engines}" IsVisible="{Binding $parent[UserControl].((s:SettingsModel)DataContext).IsMac}" />
-              <v:WinAiEngines DataContext="{Binding Engines}" IsVisible="{Binding $parent[UserControl].((s:SettingsModel)DataContext).IsWin}" />
-            </Panel>
+            <ScrollViewer Name="AiPage" VerticalScrollBarVisibility="Auto">
+              <StackPanel Margin="40,30,40,40" MaxWidth="{Binding AiPageWidth}">
+                <Panel>
+                  <v:MacAiEngines DataContext="{Binding Engines}" IsVisible="{Binding $parent[UserControl].((s:SettingsModel)DataContext).IsMac}" />
+                  <v:WinAiEngines DataContext="{Binding Engines}" IsVisible="{Binding $parent[UserControl].((s:SettingsModel)DataContext).IsWin}" />
+                </Panel>
+                <StackPanel Spacing="24" Margin="0,24,0,0" IsVisible="{Binding Engines.AdvancedOpen}">
+                  <Panel>
+                    <v:MacAiAccess DataContext="{Binding Access}" IsVisible="{Binding $parent[UserControl].((s:SettingsModel)DataContext).IsMac}" />
+                    <v:WinAiAccess DataContext="{Binding Access}" IsVisible="{Binding $parent[UserControl].((s:SettingsModel)DataContext).IsWin}" />
+                  </Panel>
+                  <StackPanel>
+                    <TextBlock Classes="section gap" Text="Open a class in Claude Code" IsVisible="{Binding Lib.HasTerminals}" />
+                    <Border Classes="group" IsVisible="{Binding Lib.HasTerminals}">
+                      <Border Classes="row">
+                        <Grid ColumnDefinitions="*,Auto">
+                          <StackPanel Spacing="2" VerticalAlignment="Center">
+                            <TextBlock Classes="row-title" Text="Claude Code, Codex or Gemini opens in" />
+                            <TextBlock Classes="row-sub" Text="On the library's computer" />
+                          </StackPanel>
+                          <Button Grid.Column="1" Classes="select act">
+                            <Grid ColumnDefinitions="*,6,Auto">
+                              <TextBlock Text="{Binding Lib.TerminalLabel}" VerticalAlignment="Center" />
+                              <c:Icon Grid.Column="2" Glyph="unfold_more" Size="15" Foreground="{DynamicResource Fg2}" />
+                            </Grid>
+                            <Button.Flyout>
+                              <MenuFlyout Placement="BottomEdgeAlignedRight" FlyoutPresenterTheme="{StaticResource SettingsMenu}" ItemsSource="{Binding Lib.TerminalChoices}" ItemContainerTheme="{StaticResource PickItem}" />
+                            </Button.Flyout>
+                          </Button>
+                        </Grid>
+                      </Border>
+                    </Border>
+                  </StackPanel>
+                </StackPanel>
+              </StackPanel>
+            </ScrollViewer>
           </DockPanel>
-          <Panel IsVisible="{Binding OnAccess}">
-            <v:MacAiAccess DataContext="{Binding Access}" IsVisible="{Binding $parent[UserControl].((s:SettingsModel)DataContext).IsMac}" />
-            <v:WinAiAccess DataContext="{Binding Access}" IsVisible="{Binding $parent[UserControl].((s:SettingsModel)DataContext).IsWin}" />
-          </Panel>
 
           <!-- Ask your AI: the student's own AI, finding and changing settings (it pads and scrolls itself, with the
                field at the bottom) -->

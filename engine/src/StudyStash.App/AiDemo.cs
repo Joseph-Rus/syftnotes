@@ -288,6 +288,34 @@ public static class AiDemo
         return m;
     }
 
+    /// <summary>Your AI as a student sees it once Connect has been pressed: Claude connected and writing the notes, in
+    /// the Claude app and Claude Code, ChatGPT in the ChatGPT app with the app still to be opened again, and Gemini not
+    /// set up yet, with its Connect.</summary>
+    public static AiEnginesModel ConnectedEngines(bool windows = false)
+    {
+        var engines = new List<EngineInfo>
+        {
+            new("claude", "Claude", "ready") { Installed = true },
+            new("codex", "ChatGPT", "ready") { Installed = true },
+            new("gemini", "Gemini", "not_installed") { Site = "https://antigravity.google" },
+            new("ollama", "Ollama", "not_installed") { SetUpGb = 5.2 },
+        };
+        var overview = new AiOverview(engines, Notes: "claude", Ask: "claude", Fallback: false, Problems: [])
+        {
+            Diagrams = "auto", DiagramsBy = "claude", Rich = new RichNotesInfo(true, true, true, true), Speed = "standard",
+        };
+        var m = new AiEnginesModel(new Library(overview)) { Here = true };
+        m.Load().GetAwaiter().GetResult();
+        var at = new DateTime(2026, 11, 1, 9, 0, 0);
+        m.UseApps(
+        [
+            new("claude-desktop", "Claude Desktop", true, true, false, at, at.AddMinutes(2), "") { Words = "Claude app" },
+            new("claude-code", "Claude Code", true, true, false, at, null, "") { Words = "Claude Code" },
+            new("codex", "ChatGPT", true, true, false, at, null, "", CanReopen: !windows) { Words = "ChatGPT app", Running = true },
+        ], windows);
+        return m;
+    }
+
     public static AiEnginesModel EnginesSigningIn(string phase)
     {
         var m = new AiEnginesModel(new Library(SigningIn(phase))) { SignInEvery = TimeSpan.FromHours(1) };

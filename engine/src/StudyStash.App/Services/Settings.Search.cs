@@ -60,9 +60,14 @@ public sealed partial class SettingsModel
     /// <summary>Goes to <paramref name="entry"/>'s page and picks the setting out.</summary>
     public void Show(SettingEntry entry)
     {
+        // Your AI's power options are folded under Advanced settings: one that's asked for is unfolded first.
+        if (entry.Section == "AI" && !entry.IsPage && !AiShownAlways.Contains(entry.Title)) Engines.AdvancedOpen = true;
         Section = entry.Section;
         if (!entry.IsPage) Spotlit?.Invoke(entry);
     }
+
+    /// <summary>Your AI's rows that show without Advanced settings opened.</summary>
+    static readonly HashSet<string> AiShownAlways = ["AIs on this computer", "AIs on your library", "Writes your notes", "Answers your questions", "Rich notes"];
 
     [RelayCommand]
     void OpenHit(SettingsHit hit) => Show(hit.Entry);

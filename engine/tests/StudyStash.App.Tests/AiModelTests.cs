@@ -139,10 +139,11 @@ public class AiEnginesModelTests
         Assert.False(model.Offline);
         Assert.DoesNotContain("defaults", lib.Calls);
 
+        // Signed out is something wrong on ChatGPT's card: Fix (which runs its Connect).
         var codex = model.Engines.Single(r => r.Id == "codex");
-        Assert.Equal("Not signed in", codex.StateWords);
+        Assert.Equal("Needs attention", codex.StateWords);
         Assert.True(codex.Warn);
-        Assert.Equal("Sign in", codex.ActionWords);
+        Assert.Equal("Fix", codex.ActionWords);
         Assert.True(codex.IsPrimary);
     }
 
@@ -171,7 +172,7 @@ public class AiEnginesModelTests
     }
 
     [AvaloniaFact]
-    public async Task On_this_computer_every_AI_is_a_row_in_order_and_Set_up_installs_it_then_signs_in_hidden()
+    public async Task On_this_computer_every_AI_is_a_card_in_order_and_Connect_installs_it_then_signs_in_hidden()
     {
         var lib = new FakeAiLibrary { Overview = AiTestData.MixedOverview() };
         var go = new TaskCompletionSource();
@@ -193,12 +194,12 @@ public class AiEnginesModelTests
         Assert.Equal(["claude", "codex", "gemini", "ollama"], model.NotesChoices.Select(c => c.Id));
         Assert.Empty(model.AddChoices);
         var gemini = model.Engines.Single(r => r.Id == "gemini");
-        Assert.Equal(("Set up", "Free with a Google account. Set up gets it ready on this computer."), (gemini.ActionWords, gemini.About));
+        Assert.Equal(("Connect", "Not set up", "Free with a Google account. Connect sets it up and signs you in."), (gemini.ActionWords, gemini.StateWords, gemini.About));
 
-        // Set up: the installer's words on the row, no button meanwhile, then its own sign-in, hidden.
+        // Connect: where it's got to on the card, no button meanwhile, then its own sign-in, hidden.
         var pressing = gemini.ActCommand.ExecuteAsync(null);
         var setting = model.Engines.Single(r => r.Id == "gemini");
-        Assert.Equal(("Downloading Antigravity CLI…", "Setting up", false), (setting.About, setting.StateWords, setting.ShowPill));
+        Assert.Equal(("Installing Gemini…", "Connecting", false), (setting.About, setting.StateWords, setting.ShowPill));
         go.SetResult();
         await pressing;
         Assert.Contains("sign-in:gemini", lib.Calls);
@@ -206,7 +207,7 @@ public class AiEnginesModelTests
     }
 
     [AvaloniaFact]
-    public async Task A_Set_up_that_couldnt_install_says_why_and_offers_Get_help_when_nothing_else_will_do()
+    public async Task A_Connect_that_couldnt_install_says_why_on_the_card_and_offers_Get_help_when_nothing_else_will_do()
     {
         var lib = new FakeAiLibrary { Overview = AiTestData.MixedOverview() };
         var outcome = new InstallOutcome(false, InstallFailure.Offline, "Syft Notes couldn't reach antigravity.google. Check your internet connection, then try again.", AgentFound.None);
@@ -215,14 +216,14 @@ public class AiEnginesModelTests
         await model.Load();
 
         await model.Engines.Single(r => r.Id == "gemini").ActCommand.ExecuteAsync(null);
-        Assert.Equal(outcome.Words, model.Say);
-        Assert.Equal(("Set up", false), (model.Engines.Single(r => r.Id == "gemini").ActionWords, model.Engines.Single(r => r.Id == "gemini").HasLink));
+        var stopped = model.Engines.Single(r => r.Id == "gemini");
+        Assert.Equal(("Needs attention", outcome.Words, "Fix", false), (stopped.StateWords, stopped.About, stopped.ActionWords, stopped.HasLink));
         Assert.DoesNotContain(lib.Calls, c => c.StartsWith("sign-in", StringComparison.Ordinal));
 
         outcome = new InstallOutcome(false, InstallFailure.Other, "The installer stopped: Checksum verification failed.", AgentFound.None);
         await model.Engines.Single(r => r.Id == "gemini").ActCommand.ExecuteAsync(null);
         var row = model.Engines.Single(r => r.Id == "gemini");
-        Assert.Equal(("Set up", "Get help"), (row.ActionWords, row.LinkWords));
+        Assert.Equal(("Fix", "Get help"), (row.ActionWords, row.LinkWords));
         await row.LinkCommand.ExecuteAsync(null);
         Assert.Equal([AiWords.HelpPage], pages);
     }
@@ -332,8 +333,8 @@ public class AiEnginesModelTests
         await codex.ActCommand.ExecuteAsync(null);
 
         Assert.Contains("sign-in:codex", lib.Calls);
-        Assert.Equal("Ready", model.Engines.Single(r => r.Id == "codex").StateWords);
-        Assert.NotNull(model.Say);
+        Assert.Equal("Connected", model.Engines.Single(r => r.Id == "codex").StateWords);
+        Assert.Equal("ChatGPT is connected.", model.Say);
     }
 
     [AvaloniaFact]
@@ -344,11 +345,12 @@ public class AiEnginesModelTests
         var model = new AiEnginesModel(lib);
         await model.Load();
         var codex = model.Engines.Single(r => r.Id == "codex");
-        Assert.Equal("Check", codex.ActionWords);
+        Assert.Equal(("Not checked yet", "Connect"), (codex.StateWords, codex.ActionWords));
 
         await codex.ActCommand.ExecuteAsync(null);
 
         Assert.Contains("check:codex", lib.Calls);
+        Assert.DoesNotContain("sign-in:codex", lib.Calls); // the check found it signed in
     }
 
     [AvaloniaFact]
@@ -483,11 +485,12 @@ public class AiSetupModelTests
         };
     }
 
-    /// <summary>Sign in opens a terminal, and nothing tells the app when the student has signed in there: the button
-    /// becomes Check, which finds Claude ready (and the library writes the notes it missed); still signed out, Sign in
-    /// comes back. The same on Settings' card.</summary>
+    /// <summary>A library from before sign-ins were hidden opens a terminal, and nothing tells the app when the student has
+    /// signed in there: Claude's card says what the library said, and its next Fix checks first, which finds Claude ready
+    /// (and the library writes the notes it missed); still signed out, it signs in again. Settings' problem card: Sign in
+    /// becomes Check.</summary>
     [AvaloniaFact]
-    public async Task Sign_in_becomes_Check_until_Claude_is_signed_in()
+    public async Task After_a_sign_in_somewhere_else_the_next_Fix_checks_first()
     {
         var signedOut = With(("claude", "not_signed_in")) with { Problems = [new AiProblemInfo("not_signed_in:claude", "not_signed_in", "claude", "Claude")] };
         var ready = With(("claude", "ready")) with { Problems = [] };
@@ -501,13 +504,14 @@ public class AiSetupModelTests
         var model = new AiEnginesModel(lib);
         await model.Load();
         AiEngineRow Claude() => model.Engines.Single(r => r.Id == "claude");
-        Assert.Equal("Sign in", Claude().ActionWords);
+        Assert.Equal("Fix", Claude().ActionWords);
 
         await Claude().ActCommand.ExecuteAsync(null);
-        Assert.Equal("Check", Claude().ActionWords);
-        await Claude().ActCommand.ExecuteAsync(null); // not signed in yet: Sign in again
-        Assert.Equal("Sign in", Claude().ActionWords);
-        await Claude().ActCommand.ExecuteAsync(null);
+        Assert.Equal(("Fix", "Opened Terminal to sign in to Claude."), (Claude().ActionWords, Claude().About));
+        Assert.Equal(0, lib.Calls.Count(c => c.StartsWith("check", StringComparison.Ordinal)));
+        await Claude().ActCommand.ExecuteAsync(null); // not signed in yet: checked, then signed in again
+        Assert.Equal(1, lib.Calls.Count(c => c.StartsWith("check", StringComparison.Ordinal)));
+        Assert.Equal(2, lib.Calls.Count(c => c == "sign-in:claude"));
         signedIn = true;
         await Claude().ActCommand.ExecuteAsync(null);
         Assert.Equal("ready", Claude().State);
@@ -1613,90 +1617,6 @@ public class AiAccessModelTests
         Assert.Single(lib.Calls, c => c == "set-access");
         Assert.False(lib.Access!.Reading.Notes);
         Assert.True(lib.Access.Reading.Lectures); // the rest of the set travels with it
-    }
-
-    [AvaloniaFact]
-    public async Task Connecting_an_app_takes_one_click_then_reopen_and_the_row_turns_connected_by_itself()
-    {
-        var (model, _) = Loaded();
-        bool added = false;
-        DateTime? started = null;
-        var loaded = new TaskCompletionSource();
-        var reopened = new List<string>();
-        model.Delay = _ => loaded.Task;
-        // This computer has Claude and nothing else: one row, and the rest named in a line.
-        model.ReadApps = () =>
-        [
-            new AiAppState("claude-desktop", "Claude Desktop", true, added, false, added ? Now : null, started, "/c.json", CanReopen: true),
-            new AiAppState("codex", "ChatGPT", false, false, false, null, null, ""),
-            new AiAppState("gemini", "Gemini CLI", false, false, false, null, null, ""),
-        ];
-        model.ConnectApp = id =>
-        {
-            added = id == "claude-desktop";
-            return new AiAppChange(true, "Added Syft Notes to Claude Desktop.", "/c.json", "/c.json.study-stash-backup", "{\"mcpServers\":{}}");
-        };
-        model.ReopenApp = id =>
-        {
-            reopened.Add(id);
-            return Task.FromResult(new AiAppChange(true, ""));
-        };
-        await model.Load();
-        var row = Assert.Single(model.Apps);
-        Assert.Equal("Not connected yet", row.Status);
-        Assert.Equal("Not found on this computer: ChatGPT, Gemini CLI.", model.MissingApps);
-        Assert.True(model.ShowMissingApps);
-        Assert.False(model.NoApps);
-        Assert.False(model.ShowTry);
-        Assert.DoesNotContain(model.Connected, c => c.Name == "Claude Desktop"); // the apps here aren't library connections
-
-        await row.Connect!.ExecuteAsync(null);
-
-        Assert.Same(row, Assert.Single(model.Apps));
-        Assert.Equal("Almost done. Reopen Claude so it loads Syft Notes.", row.Status);
-        Assert.True(row.CanReopen);
-        Assert.True(row.CanDisconnect);
-        Assert.Equal("Added Syft Notes to Claude Desktop.", model.Say);
-        // What was written is there for whoever wants it, folded away.
-        Assert.True(model.HasWritten);
-        Assert.False(model.ShowWritten);
-        model.ToggleDetails();
-        Assert.True(model.ShowWritten);
-        Assert.Equal("/c.json", model.WrittenFile);
-        Assert.Contains("/c.json.study-stash-backup", model.WrittenBackupWords);
-
-        await row.Reopen!.ExecuteAsync(null);
-
-        Assert.Equal(["claude-desktop"], reopened);
-        Assert.Equal("Claude is opening. This turns to Connected in a moment.", row.Status);
-
-        // The app starts Syft Notes: the row says so by itself, with Settings still open, and there's a question to try.
-        started = Now.AddMinutes(1);
-        loaded.SetResult();
-        var deadline = DateTime.UtcNow.AddSeconds(5);
-        while (!row.Ok && DateTime.UtcNow < deadline) await Task.Delay(5, TestContext.Current.CancellationToken);
-        Assert.StartsWith("Connected", row.Status);
-        Assert.False(row.CanReopen);
-        Assert.True(model.ShowTry);
-        Assert.Equal("Try it. In Claude, ask:", model.TryLead);
-    }
-
-    [AvaloniaFact]
-    public async Task With_no_ai_app_on_this_computer_the_page_says_where_to_get_one()
-    {
-        var (model, _) = Loaded();
-        var opened = new List<string>();
-        model.OpenUrl = opened.Add;
-        model.ReadApps = () => [new AiAppState("claude-desktop", "Claude Desktop", false, false, false, null, null, ""), new AiAppState("codex", "ChatGPT", false, false, false, null, null, "")];
-
-        await model.Load();
-
-        Assert.Empty(model.Apps);
-        Assert.True(model.NoApps);
-        Assert.False(model.ShowMissingApps); // the empty state says it; no list of absences under it
-        model.GetChatGpt();
-        model.GetClaude();
-        Assert.Equal([AiAccessModel.ChatGptDownload, AiAccessModel.ClaudeDownload], opened);
     }
 
     [AvaloniaFact]
