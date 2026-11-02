@@ -930,7 +930,7 @@ public class ConnectorTests
         Assert.False(init.Headers.Contains("Mcp-Session-Id"));
         string body = await init.Content.ReadAsStringAsync();
         Assert.Contains($"\"protocolVersion\":\"{version}\"", body);
-        Assert.Contains("\"name\":\"study-stash\"", body);
+        Assert.Contains("\"name\":\"syft-notes\"", body);
 
         var note = await c.SendAsync(Rpc(token, new { jsonrpc = "2.0", method = "notifications/initialized" }, headers: ("MCP-Protocol-Version", version)));
         Assert.Equal(HttpStatusCode.Accepted, note.StatusCode);
@@ -1299,7 +1299,7 @@ public class ConnectorTests
             Endpoint = new Uri(Ts + "/mcp"), TransportMode = HttpTransportMode.StreamableHttp,
             AdditionalHeaders = new Dictionary<string, string> { ["Authorization"] = "Bearer " + token },
         }, door.Internet(), ownsHttpClient: true));
-        Assert.Equal("study-stash", mcp.ServerInfo.Name);
+        Assert.Equal("syft-notes", mcp.ServerInfo.Name);
         Assert.Contains("search_notes", (await mcp.ListToolsAsync()).Select(t => t.Name));
         var result = await mcp.CallToolAsync("search_notes", new Dictionary<string, object?> { ["query"] = "recursion" });
         Assert.True(result.IsError is null or false, Text(result));

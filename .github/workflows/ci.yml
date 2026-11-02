@@ -238,20 +238,25 @@ jobs:
   # installed the way the app installs it (its maker's installer) in a home of the run's own, then signed in with the
   # app's own hidden sign-in (a pseudo-terminal nobody sees; ConPTY on Windows) until it waits for the browser, and
   # stopped (RealCliSignInTests). No account is used and nothing finishes; the app's browser opener is replaced and the
-  # system's are stand-ins, so nothing opens from the app; on Windows no window of the sign-in's own may show. The log
-  # says only yes or no for each (needed a terminal, prompts answered, waiting for the browser, a window), never an
-  # address, a code or a token. A CLI whose download fails for the network is skipped and said so. It's the makers'
-  # CLIs as they are today, so it isn't one a release waits for.
+  # system's are stand-ins, so nothing opens from the app; on Windows no window of the sign-in's own may show. Then
+  # Connect's own step adds Syft Notes to that AI's apps in the run's home, the real CLI is asked what it sees
+  # (claude mcp list, codex mcp list, agy mcp list where it has one), and the server each app's settings name is started
+  # exactly as written there and lists its tools (RealCliConnect.cs); the Claude app's settings are a copy of each
+  # computer's real layout (on Windows the Store build after it moved its data). On Windows, Git for Windows is out of
+  # reach for all of it, as on a student's PC. The log says only yes or no for each (needed a terminal, prompts
+  # answered, waiting for the browser, a window, connected, listed), never an address, a code or a token. A CLI whose
+  # download fails for the network is skipped and said so. It's the makers' CLIs as they are today, so it isn't one a
+  # release waits for.
   real-sign-in:
-    name: Real sign-ins, hidden (${{ matrix.os }})
+    name: Real sign-ins, hidden, and Connect (${{ matrix.os }})
     needs: [version]
     if: needs.version.outputs.tested != 'true' || inputs.real_sign_in_only
     strategy:
       fail-fast: false
       matrix:
         os: [macos-latest, windows-latest, ubuntu-latest]
-    # About 6 to 9 minutes, most of it building; 15 only bounds a hang.
-    timeout-minutes: 15
+    # About 7 to 11 minutes, most of it building; 20 only bounds a hang.
+    timeout-minutes: 20
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
@@ -260,12 +265,31 @@ jobs:
           dotnet-version: "10.0.x"
       - name: Build the app's tests
         run: dotnet build engine/tests/StudyStash.App.Tests
-      - name: Each real AI's sign-in, in the hidden terminal
+      # A student's PC has no Git for Windows: its folder is moved aside and it's taken off the PATH for the sign-ins and
+      # Connect, then put back (the steps after it, and the checkout's own clean-up, use it).
+      - name: Windows - Git for Windows out of reach
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          "GIT_KEPT_PATH=$env:PATH" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          $git = Join-Path $env:ProgramFiles 'Git'
+          if (Test-Path $git) { Rename-Item $git 'Git-out-of-reach' }
+          $path = ($env:PATH -split ';' | Where-Object { $_ -notmatch '\\Git\\' }) -join ';'
+          "PATH=$path" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+      - name: Each real AI's sign-in, in the hidden terminal, then Connect against what each reads
+        shell: pwsh
         run: dotnet test engine/tests/StudyStash.App.Tests --no-build --filter "FullyQualifiedName~RealCliSignInTests"
         env:
           STUDYSTASH_REAL_CLIS: "1"
           STUDYSTASH_REAL_CLIS_DIR: ${{ runner.temp }}/real-sign-in
           STUDYSTASH_REAL_CLIS_RECORD: ${{ inputs.real_sign_in_only && '1' || '' }}
+      - name: Windows - Git for Windows back
+        if: always() && runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $kept = Join-Path $env:ProgramFiles 'Git-out-of-reach'
+          if (Test-Path $kept) { Rename-Item $kept 'Git' }
+          if ($env:GIT_KEPT_PATH) { "PATH=$env:GIT_KEPT_PATH" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append }
       - name: What each did
         if: always()
         shell: bash

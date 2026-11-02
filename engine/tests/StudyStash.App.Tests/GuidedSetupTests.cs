@@ -78,6 +78,8 @@ public sealed class GuidedSetupTests
         /// <summary>The ChatGPT and Claude desktop apps this computer has, and the ones a card connected.</summary>
         public List<AiAppState> AiApps { get; } = [];
         public List<string> Connected { get; } = [];
+        /// <summary>The AIs whose apps were connected as they got ready.</summary>
+        public List<string> AppsOf { get; } = [];
 
         public Rig(string cli = "claude", bool installed = false, bool signedIn = false, AppRole? role = null, bool again = false, Action<AppSettings>? saved = null,
             Func<IAudioSource>? mic = null, TempHome? home = null)
@@ -119,6 +121,11 @@ public sealed class GuidedSetupTests
                     int at = AiApps.FindIndex(a => a.Id == id);
                     AiApps[at] = AiApps[at] with { Added = true };
                     return new AiAppChange(true, "");
+                },
+                ConnectAppsOf = id =>
+                {
+                    AppsOf.Add(id);
+                    return Task.CompletedTask;
                 },
             };
             Guided = new GuidedSetupModel(Setup, services, () => Host.Settings, Host.Save);
@@ -458,6 +465,7 @@ public sealed class GuidedSetupTests
         await g.OpenSignInCommand.ExecuteAsync(null);
         await Until(() => g.Screen == GuidedScreen.Manual, "Claude signed in, its plan checked, and back on the step");
         Assert.Equal((GuidedScreen.Manual, step, "claude"), (g.Screen, rig.Setup.Step, ready));
+        Assert.Equal(["claude"], rig.AppsOf); // the Claude app and Claude Code get Syft Notes too, as Connect in Settings does
         Assert.False(g.ForNotes);
         Assert.Empty(g.Thread); // and no chat was started: this is setup by hand
 
