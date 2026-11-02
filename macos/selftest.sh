@@ -42,8 +42,9 @@ run_app() {
 }
 
 # perl's alarm is the time limit: it survives the exec into the app (and through arch), so the clock is the kernel's
-# and nothing here sleeps or polls. SIGALRM ends the app, which is exit status 142 below.
-limit=480
+# and nothing here sleeps or polls. SIGALRM ends the app, which is exit status 142 below. 900 s leaves room for a
+# runner whose CPU Whisper is slow to finish the lecture (the self-test waits while it's still getting further).
+limit=900
 if [ "${STUDYSTASH_ARCH:-}" = "x86_64" ]; then
   run_app perl -e 'alarm shift; exec @ARGV' "$limit" arch -x86_64 "$BIN" &
 else
