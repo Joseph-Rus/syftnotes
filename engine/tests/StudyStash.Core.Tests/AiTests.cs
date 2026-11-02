@@ -65,9 +65,9 @@ public class AiTests
         Assert.Contains("Edit(/" + ClaudeProvider.ClaudePath(Path.GetFullPath("/lib")) + "/**)", rw);
         Assert.Equal("/c/Users/sam/lib", ClaudeProvider.ClaudePath(@"C:\Users\sam\lib"));
         Assert.Equal("/lib", ClaudeProvider.ClaudePath("/lib"));
-        Assert.Contains("mcp__study-stash", rw);
+        Assert.Contains("mcp__syft-notes", rw);
         Assert.Equal("sonnet", rw[rw.IndexOf("--model") + 1]);
-        Assert.Contains("\"study-stash\"", rw[rw.IndexOf("--mcp-config") + 1]);
+        Assert.Contains("\"syft-notes\"", rw[rw.IndexOf("--mcp-config") + 1]);
     }
 
     [Fact]

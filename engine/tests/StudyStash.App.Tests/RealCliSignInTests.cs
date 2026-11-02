@@ -19,7 +19,8 @@ namespace StudyStash.App.Tests;
 /// BROWSER) are stand-ins that only count. On Windows every window on the screen is looked at while it runs, and none
 /// may belong to the sign-in. What's said is only yes or no, never an address, a code or a token; a copy of what each
 /// showed, with every address and anything like a code taken out, is kept only when STUDYSTASH_REAL_CLIS_RECORD=1.
-/// A CLI whose download fails for the network is skipped, and said so.
+/// A CLI whose download fails for the network is skipped, and said so. Then Connect's own step for each AI's apps runs
+/// against what the real CLIs read (RealCliConnect.cs).
 /// <para>Never on a computer of our own: the real CLIs would find its own sign-ins.</para>
 /// </summary>
 [Collection(nameof(EnvironmentTests))]
@@ -54,6 +55,10 @@ public sealed partial class RealCliSignInTests
         }
         Set("HOME", home);
         if (OperatingSystem.IsWindows()) Set("USERPROFILE", home);
+        // Codex on Windows finds its home from the system's own idea of the profile, not USERPROFILE: it's told this one.
+        // (It must be there already.)
+        Directory.CreateDirectory(Path.Combine(home, ".codex"));
+        Set("CODEX_HOME", Path.Combine(home, ".codex"));
         Set("PATH", openers + Path.PathSeparator + Environment.GetEnvironmentVariable("PATH"));
         Set("BROWSER", Path.Combine(openers, OperatingSystem.IsWindows() ? "xdg-open.cmd" : "xdg-open"));
         var agyHome = Antigravity.Use(Path.Combine(home, "syft-gemini"));
@@ -62,7 +67,16 @@ public sealed partial class RealCliSignInTests
         var results = new List<Result>();
         try
         {
-            foreach (var cli in AgentCli.All) results.Add(await TryAsync(cli, root, opened, record ? records : null));
+            // Claude Code on Windows without Git for Windows: CI hides it (off the PATH, its folder renamed) for this run.
+            if (OperatingSystem.IsWindows())
+                results.Add(new Result("Git for Windows", $"on the PATH: {Yes(AiProvider.Which("git") is not null)}; Git Bash where it installs: "
+                    + Yes(File.Exists(Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles), "Git", "bin", "bash.exe")))));
+            foreach (var cli in AgentCli.All)
+            {
+                results.Add(await TryAsync(cli, root, opened, record ? records : null));
+                // Then Connect's own step for that AI's apps, against what the real CLI reads.
+                results.Add(await ConnectAppsAsync(cli, root, home));
+            }
         }
         finally
         {

@@ -36,7 +36,7 @@ public class LibrarySettingsModelTests
         Assert.Equal(["Syft Notes", "Your library", "Connect and import", "Advanced"], model.NavGroups.Select(g => g.Title));
         Assert.Equal(["General", "Appearance", "Recording", "Calendars", "Phone"], model.NavGroups[0].Items.Select(n => n.Label));
         Assert.Equal(["Classes", "Notes", "Your AI", "Canvas"], model.NavGroups[1].Items.Select(n => n.Label));
-        Assert.Equal(["AI apps", "Granola", "Your files"], model.NavGroups[2].Items.Select(n => n.Label));
+        Assert.Equal(["Granola", "Your files"], model.NavGroups[2].Items.Select(n => n.Label)); // AI apps is part of Your AI
         Assert.Equal(["Library", "Connection"], model.NavGroups[3].Items.Select(n => n.Label));
         // Settings opens on General (not Connection), and General reads the library.
         Assert.Equal("General", model.Section);
