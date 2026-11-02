@@ -216,12 +216,12 @@
 
           <!-- The notes: 68 characters wide (704), 16 on 26 -->
           <StackPanel Name="NotesBody" IsVisible="{Binding ShowNotes}" MaxWidth="704" HorizontalAlignment="Left" Margin="0,18,0,0">
-            <!-- What the lecturer said is on the exam (and isn't), found in the transcript: each moment opens it there. -->
+            <!-- What's important to remember (and what they said to skip), found in the transcript and named by the library's AI: each moment opens it there. -->
             <Panel IsVisible="{Binding !Typing}">
               <Border Name="ExamFlags" Classes="study-card" IsVisible="{Binding HasExamFlags}" Margin="0,0,0,22">
                 <StackPanel Spacing="10">
                   <Grid ColumnDefinitions="Auto,8,*,Auto">
-                    <c:Icon Glyph="school" Size="18" Foreground="{DynamicResource Ink}" VerticalAlignment="Center" />
+                    <c:Icon Glyph="bookmark" Size="18" Foreground="{DynamicResource Ink}" VerticalAlignment="Center" />
                     <TextBlock Grid.Column="2" Classes="free-ai-lead" Text="{Binding ExamFlagsTitle}" VerticalAlignment="Center" />
                     <Button Grid.Column="3" Classes="icon-btn sm" Command="{Binding ToggleExamFlagsCommand}" AutomationProperties.Name="{Binding ExamFlagsToggleSaid}"
                             ToolTip.Tip="{Binding ExamFlagsToggleSaid}">
@@ -241,13 +241,17 @@
                           <Grid ColumnDefinitions="Auto,*">
                             <Button Classes="heard-time num" Content="{Binding Moment}" IsVisible="{Binding HasMoment}" Command="{Binding Open}"
                                     AutomationProperties.Name="{Binding MomentSaid}" ToolTip.Tip="{Binding MomentSaid}" />
-                            <c:PageText Grid.Column="1" Text="{Binding Said}" FontSize="14.5" LineHeight="22" TextWrapping="Wrap" Foreground="{DynamicResource Ink}" />
+                            <StackPanel Grid.Column="1" Spacing="2" ToolTip.Tip="{Binding Quote}">
+                            <c:PageText Text="{Binding Said}" FontSize="14.5" LineHeight="22" TextWrapping="Wrap" Foreground="{DynamicResource Ink}"
+                                        FontWeight="{Binding Weight}" />
+                            <c:PageText Text="{Binding Detail}" IsVisible="{Binding HasDetail}" FontSize="13.5" LineHeight="20" TextWrapping="Wrap" Foreground="{DynamicResource InkMuted}" />
+                          </StackPanel>
                           </Grid>
                         </DataTemplate>
                       </ItemsControl.ItemTemplate>
                     </ItemsControl>
                     <StackPanel Spacing="6" IsVisible="{Binding HasNotOnExam}">
-                      <TextBlock Text="Said not to be on it" FontSize="12" FontWeight="Medium" Foreground="{DynamicResource InkSubtle}" Margin="0,4,0,0" />
+                      <TextBlock Text="Said you can skip" FontSize="12" FontWeight="Medium" Foreground="{DynamicResource InkSubtle}" Margin="0,4,0,0" />
                       <ItemsControl Name="NotOnExamLines" ItemsSource="{Binding NotOnExam}">
                         <ItemsControl.ItemsPanel>
                           <ItemsPanelTemplate><StackPanel Spacing="6" /></ItemsPanelTemplate>
@@ -257,7 +261,11 @@
                             <Grid ColumnDefinitions="Auto,*">
                               <Button Classes="heard-time num" Content="{Binding Moment}" IsVisible="{Binding HasMoment}" Command="{Binding Open}"
                                       AutomationProperties.Name="{Binding MomentSaid}" ToolTip.Tip="{Binding MomentSaid}" />
-                              <c:PageText Grid.Column="1" Text="{Binding Said}" FontSize="14.5" LineHeight="22" TextWrapping="Wrap" Foreground="{DynamicResource InkMuted}" />
+                              <StackPanel Grid.Column="1" Spacing="2" ToolTip.Tip="{Binding Quote}">
+                            <c:PageText Text="{Binding Said}" FontSize="14.5" LineHeight="22" TextWrapping="Wrap" Foreground="{DynamicResource InkMuted}"
+                                        FontWeight="{Binding Weight}" />
+                            <c:PageText Text="{Binding Detail}" IsVisible="{Binding HasDetail}" FontSize="13.5" LineHeight="20" TextWrapping="Wrap" Foreground="{DynamicResource InkMuted}" />
+                          </StackPanel>
                             </Grid>
                           </DataTemplate>
                         </ItemsControl.ItemTemplate>

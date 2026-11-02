@@ -1,17 +1,27 @@
 using System.Collections.ObjectModel;
+using Avalonia.Media;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using StudyStash.Core;
+using StudyStash.Core.Study;
 
 namespace StudyStash.App.ViewModels;
 
-/// <summary>One moment the lecturer said what's on the exam, as a lecture's page lists it: the moment (pressed, the
-/// transcript opens there) and the sentence it was said in.</summary>
-public sealed class ExamFlagRow(ExamHint hint, NoteModel note)
+/// <summary>One thing the lecturer flagged, as a lecture's page lists it: the moment (pressed, the transcript opens
+/// there) and the idea it was about with what to know, once the library's AI has named it; until then (or with no AI)
+/// the sentence it was said in.</summary>
+public sealed class ExamFlagRow(ExamHint hint, NoteModel note, KeyIdea? named = null)
 {
     public string Moment => hint.Moment;
     public bool HasMoment => hint.At is not null;
-    public string Said => hint.Said;
+    /// <summary>The idea, or the sentence while it has no name.</summary>
+    public string Said => named?.Concept ?? hint.Said;
+    public bool Named => named is not null;
+    public FontWeight Weight => named is null ? FontWeight.Normal : FontWeight.SemiBold;
+    public string Detail => named?.Detail ?? "";
+    public bool HasDetail => Detail.Length > 0;
+    /// <summary>What the lecturer said, word for word, behind a named one.</summary>
+    public string? Quote => named is null ? null : $"\u201c{hint.Said}\u201d";
     public string MomentSaid => $"Open the transcript at {hint.Moment}";
     public IRelayCommand Open { get; } = new RelayCommand(() => { if (hint.At is { } at) note.ShowAt(at); });
 }
@@ -24,11 +34,11 @@ public sealed partial class NoteModel
     public ObservableCollection<ExamFlagRow> NotOnExam { get; } = [];
     public bool HasExamFlags => ExamFlags.Count > 0 || NotOnExam.Count > 0;
     public bool HasNotOnExam => NotOnExam.Count > 0;
-    /// <summary>"Said to know for the exam · 3".</summary>
-    public string ExamFlagsTitle => ExamFlags.Count == 0 ? "Nothing flagged for the exam" : $"Flagged for the exam · {ExamFlags.Count}";
+    /// <summary>"Important to remember · 3": not every recording has an exam, or is even a class.</summary>
+    public string ExamFlagsTitle => ExamFlags.Count == 0 ? "Nothing flagged as important" : $"Important to remember · {ExamFlags.Count}";
     /// <summary>Shut, it's one line with its count; open, every moment.</summary>
     [ObservableProperty] public partial bool ExamFlagsOpen { get; set; } = true;
-    public string ExamFlagsToggleSaid => ExamFlagsOpen ? "Hide the exam flags" : "Show the exam flags";
+    public string ExamFlagsToggleSaid => ExamFlagsOpen ? "Hide what's important" : "Show what's important";
 
     partial void OnExamFlagsOpenChanged(bool value) => OnPropertyChanged(nameof(ExamFlagsToggleSaid));
 
@@ -45,5 +55,17 @@ public sealed partial class NoteModel
         OnPropertyChanged(nameof(HasNotOnExam));
         OnPropertyChanged(nameof(ExamFlagsTitle));
         return this;
+    }
+
+    /// <summary>The flags as the library's AI named them: the ideas they were about, the ones that weren't about
+    /// anything gone.</summary>
+    public void NameFlags(IReadOnlyList<KeyIdea> named)
+    {
+        ExamFlags.Clear();
+        NotOnExam.Clear();
+        foreach (var r in named) (r.Not ? NotOnExam : ExamFlags).Add(new ExamFlagRow(new ExamHint(r.At, r.Said, r.Not), this, r));
+        OnPropertyChanged(nameof(HasExamFlags));
+        OnPropertyChanged(nameof(HasNotOnExam));
+        OnPropertyChanged(nameof(ExamFlagsTitle));
     }
 }

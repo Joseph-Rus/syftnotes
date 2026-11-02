@@ -32,13 +32,26 @@ public class ExamFlagsTests
 
         Assert.Equal(["02:30", "06:40"], note.ExamFlags.Select(f => f.Moment));
         Assert.Equal("05:15", note.NotOnExam.Single().Moment);
-        Assert.Equal("Flagged for the exam · 2", note.ExamFlagsTitle);
+        Assert.Equal("Important to remember · 2", note.ExamFlagsTitle);
         Assert.True(note.HasExamFlags);
 
         note.ExamFlags[0].Open.Execute(null);
         Assert.True(note.ShowTranscript);
         Assert.True(note.Transcript[2].Here);
         Assert.True(note.CanGoBack);
+    }
+
+    [AvaloniaFact]
+    public void Named_by_the_AI_each_shows_the_idea_not_the_sentence()
+    {
+        var note = Lecture(StudyLibrary.BloodTranscript);
+        note.NameFlags([new Core.Study.KeyIdea(150, "Three layers of an artery wall", "Intima, media and adventitia.", "Make sure you know the three layers.")]);
+
+        var row = Assert.Single(note.ExamFlags);
+        Assert.Equal(("02:30", "Three layers of an artery wall", "Intima, media and adventitia."), (row.Moment, row.Said, row.Detail));
+        Assert.Equal("\u201cMake sure you know the three layers.\u201d", row.Quote);
+        Assert.Empty(note.NotOnExam);
+        Assert.Equal("Important to remember · 1", note.ExamFlagsTitle);
     }
 
     [AvaloniaFact]
@@ -64,12 +77,12 @@ public class ExamFlagsTests
             string shown = string.Join("\n", card.GetVisualDescendants().OfType<PageText>().Where(t => t.IsEffectivelyVisible).Select(t => t.Text));
             Assert.Contains("make sure you know the three layers of an artery wall", shown);
             Assert.Contains("won't be on the exam", shown);
-            Assert.Contains(card.GetVisualDescendants().OfType<TextBlock>(), t => t.Text == "Said not to be on it" && t.IsEffectivelyVisible);
+            Assert.Contains(card.GetVisualDescendants().OfType<TextBlock>(), t => t.Text == "Said you can skip" && t.IsEffectivelyVisible);
 
             note.ToggleExamFlagsCommand.Execute(null);
             Dispatcher.UIThread.RunJobs();
             Assert.DoesNotContain(card.GetVisualDescendants().OfType<PageText>(), t => t.IsEffectivelyVisible);
-            Assert.Contains(card.GetVisualDescendants().OfType<TextBlock>(), t => t.Text == "Flagged for the exam · 2" && t.IsEffectivelyVisible);
+            Assert.Contains(card.GetVisualDescendants().OfType<TextBlock>(), t => t.Text == "Important to remember · 2" && t.IsEffectivelyVisible);
 
             // While it records, the page is the student's own typing: no card.
             var live = new NoteModel { Id = "rec", Title = "Now", Live = true };

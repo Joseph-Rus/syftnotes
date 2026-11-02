@@ -26,6 +26,9 @@ public interface IStudyLibrary
     Task<ReviewCard?> EditCardAsync(string card, string front, string back);
     Task<bool> DeleteCardAsync(string card);
     Task<List<ExamHint>?> ExamFlagsAsync(string lecture);
+    /// <summary>What a lecture's flags were about, named by the library's AI. Null from a library too old to name them;
+    /// throws <see cref="LibraryRefusedException"/> with why when it can't.</summary>
+    Task<List<KeyIdea>?> ImportantAsync(string lecture) => Task.FromResult<List<KeyIdea>?>(null);
     /// <summary>The exams coming up and the prep made; null from a library too old for exam prep.</summary>
     Task<ExamsNow?> ExamsAsync() => Task.FromResult<ExamsNow?>(null);
     Task<ExamPrepDoc?> PrepAsync(string id) => Task.FromResult<ExamPrepDoc?>(null);
@@ -174,4 +177,7 @@ public sealed partial class StudyRemote(string serverUrl, Func<string> key, Http
 
     public async Task<List<ExamHint>?> ExamFlagsAsync(string lecture) =>
         As<List<ExamHint>>(await SendAsync(HttpMethod.Get, $"/api/v2/lectures/{Seg(lecture)}/exam-flags"));
+
+    public async Task<List<KeyIdea>?> ImportantAsync(string lecture) =>
+        As<List<KeyIdea>>(await SendAsync(HttpMethod.Post, $"/api/v2/lectures/{Seg(lecture)}/important"));
 }

@@ -61,6 +61,7 @@ public static partial class Shell
             library.LectureStudy = null;
             return;
         }
+        _ = NameFlagsAsync(note);
         if (library.LectureStudy is { } kept && kept.LectureId == note.Id) return;
         var study = new LectureStudyModel(Study(), note.Id, note.Noun)
         {
@@ -75,5 +76,27 @@ public static partial class Shell
         library.LectureStudy = study;
         _ = study.LoadAsync();
         _ = study.Listen.LoadAsync();
+    }
+
+    static readonly Dictionary<string, List<KeyIdea>> namedFlags = [];
+
+    /// <summary>What the lecture's flags were about, from the library's AI: until it answers (or with no AI to ask)
+    /// the card shows the sentences they were said in.</summary>
+    static async Task NameFlagsAsync(NoteModel note)
+    {
+        if (!note.HasExamFlags) return;
+        // Named already this run: straight away, so the page coming back doesn't show the sentences first.
+        if (namedFlags.TryGetValue(note.Id, out var had)) note.NameFlags(had);
+        try
+        {
+            if (await Study().ImportantAsync(note.Id) is { } named)
+            {
+                namedFlags[note.Id] = named;
+                if (ReferenceEquals(library.Note, note)) note.NameFlags(named);
+            }
+        }
+        catch
+        {
+        }
     }
 }
