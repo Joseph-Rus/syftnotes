@@ -107,13 +107,30 @@
       <!-- Home, after a first run: "Ready when class starts". How to record, where the menu bar icon lives, how the model's
            download is getting on, and why the microphone can't be used yet when it can't. Got it puts it away. -->
       <Panel IsVisible="{Binding HasWelcome}" Margin="0,28,0,0" MaxWidth="560" HorizontalAlignment="Left">
-      <Border Name="WelcomeCard" Classes="free-ai" DataContext="{Binding Welcome}" x:DataType="vm:WelcomeCardModel">
+      <StackPanel Spacing="14" DataContext="{Binding Welcome}" x:DataType="vm:WelcomeCardModel">
+      <!-- A first run that ended with no AI ("Later"): Continue with Google, until an AI writes the notes. -->
+      <Border Name="NeedsAiCard" Classes="free-ai" IsVisible="{Binding NeedsAi}">
+        <StackPanel Spacing="8">
+          <TextBlock Classes="free-ai-lead" Text="{x:Static vm:WelcomeCardModel.AiTitle}" />
+          <TextBlock Classes="free-ai-more" Text="{x:Static vm:WelcomeCardModel.AiLine}" />
+          <WrapPanel Margin="0,6,0,0" ItemSpacing="14" LineSpacing="6">
+            <Button Name="HomeGoogle" Classes="btn ink" VerticalAlignment="Center" Command="{Binding ContinueWithGoogleCommand}" Content="{x:Static vm:WelcomeCardModel.GoogleButton}" />
+            <Button Name="HomeOtherAi" Classes="text-link small" VerticalAlignment="Center" Command="{Binding OtherAiCommand}" Content="{x:Static vm:WelcomeCardModel.OtherAiLabel}" />
+          </WrapPanel>
+        </StackPanel>
+      </Border>
+      <Border Name="WelcomeCard" Classes="free-ai" IsVisible="{Binding Intro}">
         <StackPanel Spacing="10">
           <TextBlock Name="WelcomeTitle" Classes="free-ai-lead" Text="{x:Static vm:WelcomeCardModel.Title}" />
           <TextBlock Name="WelcomeLede" Classes="free-ai-more" Text="{Binding Lede}" />
           <TextBlock Name="WelcomeWhere" Classes="free-ai-more" Text="{Binding WhereLine}" />
           <Button Name="WelcomeShowIt" Classes="btn sm" HorizontalAlignment="Left" Content="{x:Static vm:WelcomeCardModel.ShowItLabel}" Command="{Binding ShowItCommand}"
                   IsVisible="{Binding CanShowIt}" />
+          <!-- A first run that ended with no Canvas: classes are added by hand. -->
+          <Grid ColumnDefinitions="*,Auto" IsVisible="{Binding AddClasses}">
+            <TextBlock Name="WelcomeClasses" Classes="free-ai-more" Text="{x:Static vm:WelcomeCardModel.ClassesLine}" VerticalAlignment="Center" />
+            <Button Name="WelcomeAddClass" Grid.Column="1" Classes="btn sm" Margin="12,0,0,0" Content="Add a class" Command="{Binding AddClassCommand}" VerticalAlignment="Center" />
+          </Grid>
           <Grid ColumnDefinitions="*,Auto" IsVisible="{Binding HasMicLine}">
             <TextBlock Name="WelcomeMic" Classes="free-ai-problem" Text="{Binding MicLine}" VerticalAlignment="Center" />
             <Button Grid.Column="1" Classes="btn sm" Margin="12,0,0,0" Content="{Binding MicButton}" Command="{Binding MicCommand}" VerticalAlignment="Center" />
@@ -125,6 +142,7 @@
           <Button Name="WelcomeGotIt" Classes="btn sm" HorizontalAlignment="Right" Content="Got it" Command="{Binding GotItCommand}" />
         </StackPanel>
       </Border>
+      </StackPanel>
       </Panel>
 
       <!-- Home: up next. The rest of today's and tomorrow's events; each row is a button that starts recording it. -->

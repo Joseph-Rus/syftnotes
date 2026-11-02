@@ -1,0 +1,164 @@
+<!-- The first run's funnel (MacFunnel, WinFunnel), over setup's own look (SetupStyles): the step indicator's dots, a
+     step's numbered lines with their marker (a number, the loader, a tick), the sync's thin bars, the three AIs as
+     equal buttons and Continue with Google's card ringed in ink as the default. Flat colours only. -->
+<Styles xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:c="using:StudyStash.App.Controls">
+
+  <!-- The step indicator: a short pill for the step showing, a dot for the others (ink once passed). -->
+  <Style Selector="Border.dot">
+    <Setter Property="Width" Value="7" />
+    <Setter Property="Height" Value="7" />
+    <Setter Property="CornerRadius" Value="4" />
+    <Setter Property="Background" Value="{DynamicResource Line}" />
+    <Setter Property="VerticalAlignment" Value="Center" />
+  </Style>
+  <Style Selector="Border.dot.passed">
+    <Setter Property="Background" Value="{DynamicResource InkSubtle}" />
+  </Style>
+  <Style Selector="Border.dot.current">
+    <Setter Property="Width" Value="22" />
+    <Setter Property="Background" Value="{DynamicResource Ink}" />
+  </Style>
+
+  <!-- The page under the indicator: setup's margins, a little less at the top. -->
+  <Style Selector="StackPanel.funnel-page">
+    <Setter Property="Margin" Value="40,18,40,16" />
+  </Style>
+
+  <!-- A problem, or what's found already, as wide as the page's lines (setup's own stop at 480). -->
+  <Style Selector="StackPanel.funnel-page Border.problem">
+    <Setter Property="MaxWidth" Value="Infinity" />
+  </Style>
+
+  <!-- A step's lines: one white panel with a hairline, the lines parted by hairlines. -->
+  <Style Selector="Border.lines">
+    <Setter Property="Background" Value="{DynamicResource Surface}" />
+    <Setter Property="CornerRadius" Value="{DynamicResource RadiusPanel}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource Line}" />
+    <Setter Property="BorderThickness" Value="1" />
+    <Setter Property="Padding" Value="16,4" />
+  </Style>
+  <Style Selector="Border.lines Border.sep">
+    <Setter Property="Height" Value="1" />
+    <Setter Property="Background" Value="{DynamicResource Line}" />
+    <Setter Property="Margin" Value="32,0,0,0" />
+  </Style>
+  <Style Selector="Grid.line">
+    <Setter Property="MinHeight" Value="48" />
+  </Style>
+  <Style Selector="Grid.line TextBlock.line-title">
+    <Setter Property="FontSize" Value="15" />
+    <Setter Property="FontWeight" Value="SemiBold" />
+    <Setter Property="LineHeight" Value="20" />
+    <Setter Property="VerticalAlignment" Value="Center" />
+    <Setter Property="TextWrapping" Value="Wrap" />
+  </Style>
+  <Style Selector="Grid.line TextBlock.line-title.todo">
+    <Setter Property="Foreground" Value="{DynamicResource InkSubtle}" />
+    <Setter Property="FontWeight" Value="Medium" />
+  </Style>
+  <Style Selector="Grid.line TextBlock.line-detail">
+    <Setter Property="FontSize" Value="14" />
+    <Setter Property="Foreground" Value="{DynamicResource InkMuted}" />
+    <Setter Property="VerticalAlignment" Value="Center" />
+    <Setter Property="TextWrapping" Value="Wrap" />
+  </Style>
+  <!-- What to do under a line that's waiting on the student. -->
+  <Style Selector="StackPanel.line-body">
+    <Setter Property="Margin" Value="32,0,0,14" />
+    <Setter Property="Spacing" Value="10" />
+  </Style>
+  <!-- A line's marker: its number in a grey ring (ink while it's the one under way), a tick once done. -->
+  <Style Selector="Border.mark">
+    <Setter Property="Width" Value="20" />
+    <Setter Property="Height" Value="20" />
+    <Setter Property="CornerRadius" Value="10" />
+    <Setter Property="BorderThickness" Value="1.5" />
+    <Setter Property="BorderBrush" Value="{DynamicResource InkSubtle}" />
+    <Setter Property="VerticalAlignment" Value="Center" />
+  </Style>
+  <Style Selector="Border.mark TextBlock">
+    <Setter Property="FontSize" Value="11" />
+    <Setter Property="FontWeight" Value="Bold" />
+    <Setter Property="Foreground" Value="{DynamicResource InkSubtle}" />
+    <Setter Property="HorizontalAlignment" Value="Center" />
+    <Setter Property="VerticalAlignment" Value="Center" />
+  </Style>
+  <Style Selector="c|Icon.tick">
+    <Setter Property="Glyph" Value="check_circle" />
+    <Setter Property="Filled" Value="True" />
+    <Setter Property="Size" Value="20" />
+    <Setter Property="Foreground" Value="{DynamicResource Ink}" />
+    <Setter Property="VerticalAlignment" Value="Center" />
+  </Style>
+  <Style Selector="c|Icon.part">
+    <Setter Property="Glyph" Value="error" />
+    <Setter Property="Filled" Value="True" />
+    <Setter Property="Size" Value="20" />
+    <Setter Property="Foreground" Value="{DynamicResource Warn}" />
+    <Setter Property="VerticalAlignment" Value="Center" />
+  </Style>
+  <!-- How much of a line is done: a thin grey track, filled in ink. -->
+  <Style Selector="Border.thin">
+    <Setter Property="Height" Value="4" />
+    <Setter Property="Width" Value="360" />
+    <Setter Property="CornerRadius" Value="2" />
+    <Setter Property="Background" Value="{DynamicResource Line}" />
+    <Setter Property="HorizontalAlignment" Value="Left" />
+  </Style>
+  <Style Selector="Border.thin Border">
+    <Setter Property="CornerRadius" Value="2" />
+    <Setter Property="Background" Value="{DynamicResource Ink}" />
+    <Setter Property="HorizontalAlignment" Value="Left" />
+  </Style>
+
+  <!-- "Are you a student?": two tall choices. -->
+  <Style Selector="Button.choice.big">
+    <Setter Property="MinHeight" Value="76" />
+  </Style>
+
+  <!-- The three AIs: one row of equal buttons, each its maker's mark over its name. -->
+  <Style Selector="Button.ai">
+    <Setter Property="Theme" Value="{StaticResource Surface}" />
+    <Setter Property="Height" Value="74" />
+    <Setter Property="CornerRadius" Value="{DynamicResource RadiusPanel}" />
+    <Setter Property="Background" Value="{DynamicResource Surface}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource Line}" />
+    <Setter Property="BorderThickness" Value="1" />
+    <Setter Property="HorizontalAlignment" Value="Stretch" />
+    <Setter Property="HorizontalContentAlignment" Value="Center" />
+    <Setter Property="VerticalContentAlignment" Value="Center" />
+  </Style>
+  <Style Selector="Button.ai:pointerover">
+    <Setter Property="BorderBrush" Value="{DynamicResource InkSubtle}" />
+  </Style>
+  <Style Selector="Button.ai /template/ Border#PART_Wash">
+    <Setter Property="IsVisible" Value="False" />
+  </Style>
+  <Style Selector="Button.ai TextBlock">
+    <Setter Property="FontSize" Value="14" />
+    <Setter Property="FontWeight" Value="SemiBold" />
+    <Setter Property="HorizontalAlignment" Value="Center" />
+  </Style>
+  <!-- Continue with Google: the default, ringed in ink. -->
+  <Style Selector="Border.google">
+    <Setter Property="Background" Value="{DynamicResource Surface}" />
+    <Setter Property="CornerRadius" Value="{DynamicResource RadiusPanel}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource Ink}" />
+    <Setter Property="BorderThickness" Value="2" />
+    <Setter Property="Padding" Value="18,16" />
+  </Style>
+  <!-- "No plan?" between the AIs and the card: a hairline each side of a few quiet words. -->
+  <Style Selector="Grid.or Border">
+    <Setter Property="Height" Value="1" />
+    <Setter Property="Background" Value="{DynamicResource Line}" />
+    <Setter Property="VerticalAlignment" Value="Center" />
+  </Style>
+  <Style Selector="Grid.or TextBlock">
+    <Setter Property="FontSize" Value="13" />
+    <Setter Property="FontWeight" Value="SemiBold" />
+    <Setter Property="Foreground" Value="{DynamicResource InkSubtle}" />
+    <Setter Property="Margin" Value="12,0" />
+  </Style>
+</Styles>

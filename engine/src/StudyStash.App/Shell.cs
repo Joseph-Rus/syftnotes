@@ -163,6 +163,8 @@ public static partial class Shell
         public static ViewModels.SetupModel? SetupModel => setup;
         /// <summary>Guided setup's model, while setup's window is open.</summary>
         public static ViewModels.GuidedSetupModel? Guided => guidedSetup;
+        /// <summary>The first run's funnel, while its window is open.</summary>
+        public static ViewModels.FunnelModel? Funnel => funnel;
         /// <summary>Home's "Ready when class starts", while it shows.</summary>
         public static ViewModels.WelcomeCardModel? WelcomeCard => library.Welcome;
         public static void TogglePanel() => Shell.TogglePanel();
@@ -1401,17 +1403,22 @@ public static partial class Shell
     }
 
     /// <summary>
-    /// A first run's one page (<see cref="SetupStep.Start"/>): Get started makes the library here, asks for the
-    /// microphone, starts the model's download and picks an AI already signed in here for the notes (FirstRun), then
-    /// the window closes on the library's Home, with "Ready when class starts" over it. No guided setup and no setup
-    /// tools' door: there's nothing left to guide.
+    /// A first run (<see cref="FunnelModel"/>): the welcome's Get started makes the library here, asks for the
+    /// microphone, starts the model's download and picks an AI already signed in here for the notes (FirstRun); then
+    /// "Are you a student?", connect your classes (Syft Notes added to the browser, Canvas found by itself), the first
+    /// sync, and connect your AI, each in this one window; then it closes on the library's Home. No guided setup chat and
+    /// no setup tools' door: there's nothing left to guide.
     /// </summary>
     static void ShowWelcome()
     {
         library.Support = null; // the ask for a tip never shows during setup
         var model = setup = Setup.Make(host, AppRole.Both);
         model.OneButton = true;
-        var view = Skin.Current == SkinKind.Mac ? (Control)new MacWelcome { DataContext = model, DrawChrome = false } : new WinWelcome { DataContext = model, DrawChrome = false };
+        // The self-test finds no AI's CLI at all, so it never reaches an account.
+        Func<Core.Ai.AgentCliInfo, AgentFound> find = SelfTest.Dir is not null ? _ => AgentFound.None : cli => AgentInstall.Find(cli);
+        model.OnGetStarted = () => FirstRun.AfterLibraryAsync(model, host, Ai(), () => FirstRun.Detect(find, FirstRun.Status), WriteNotesAsync);
+        var funnelModel = funnel = new FunnelModel(model, FunnelServices());
+        var view = Skin.Current == SkinKind.Mac ? (Control)new MacFunnel { DataContext = funnelModel, DrawChrome = false } : new WinFunnel { DataContext = funnelModel, DrawChrome = false };
         var w = new Window
         {
             Title = "Syft Notes", CanResize = false, CanMaximize = false, Content = view,
@@ -1421,15 +1428,20 @@ public static partial class Shell
         AppMenu.Attach(w, ShowLibrary, SettingsFromAnywhere);
         if (Skin.Current == SkinKind.Mac) MacTitleBar.Attach(w);
         WinChrome.Apply(w);
-        // The self-test finds no AI's CLI at all, so it never reaches an account.
-        Func<Core.Ai.AgentCliInfo, AgentFound> find = SelfTest.Dir is not null ? _ => AgentFound.None : cli => AgentInstall.Find(cli);
-        model.OnGetStarted = () => FirstRun.AfterLibraryAsync(model, host, Ai(), () => FirstRun.Detect(find, FirstRun.Status), WriteNotesAsync);
-        model.OnFinish = () =>
+        funnelModel.OnFinish = end =>
         {
             Setup.Finish(model, host);
+            // Home says what's still to do: an AI to connect (Later), classes to add by hand (no Canvas).
+            host.Save(s =>
+            {
+                s.SetupAi = end.Ai.Length > 0 ? end.Ai : "later";
+                s.AddClassesOnHome = !end.Canvas;
+            });
+            host.Log($"[setup] done: {(end.Student ? "a student" : "not a student")}, {(end.Canvas ? "classes from Canvas" : "no Canvas")}, "
+                + (end.Ai.Length > 0 ? $"{Core.Ai.Engines.Name(end.Ai)} writes the notes" : "no AI yet (Later)"));
             w.Close();
             ShowLibrary();
-            // Home's "Ready when class starts" shows at once.
+            // Home's "Ready when class starts", and the classes Canvas brought in, show at once.
             RequestRefresh();
         };
         w.Closed += (_, _) =>
@@ -1437,6 +1449,8 @@ public static partial class Shell
             // Only this window's own: setup by hand may have opened in its place already.
             if (setupWindow == w) setupWindow = null;
             if (setup == model) setup = null;
+            if (funnel == funnelModel) funnel = null;
+            funnelModel.Dispose();
             UpdateDock();
         };
         FollowView(w, view);
@@ -1446,6 +1460,50 @@ public static partial class Shell
         w.Activate();
         Desktop.Activate();
     }
+
+    /// <summary>The first run's funnel, while its window is open.</summary>
+    static FunnelModel? funnel;
+
+    /// <summary>What the first run reaches: Canvas through the app's one context and watch, guided setup's own screens
+    /// for getting an AI ready, and the library's AI choice. Nothing here is real in a self-test (no CLI is found).</summary>
+    static FunnelServices FunnelServices() => new()
+    {
+        // The add-on from the stores finds the library and Canvas by itself (1.8 on): nothing to type. Until it's live,
+        // or with no browser here that gets it from a store, the step asks for the school's address and gives a code.
+        MakeAddOn = () => host.Remote() is not null && Core.Canvas.Extension.FindsCanvas && AddOnModel.AnyFromStore(Canvas()) ? new AddOnModel(Canvas(), CanvasPoll()) : null,
+        MakeCanvas = () =>
+        {
+            if (host.Remote() is null) return Task.FromResult<CanvasConnectModel?>(null);
+            var watch = CanvasPoll();
+            var connect = new CanvasConnectModel(Canvas(), watch, forSetup: true) { ShowFooter = false };
+            // Started, not waited for: finding the courses can take a while, and the sync screen shows it as it goes.
+            _ = StartConnectAsync(connect, watch);
+            return Task.FromResult<CanvasConnectModel?>(connect);
+        },
+        MakeSync = connect => new FirstSyncModel(connect, Canvas(), CanvasPoll())
+        {
+            ClassesChanged = async () =>
+            {
+                await host.CheckLibraryAsync();
+                LibraryClassesChanged();
+            },
+        },
+        MakeReady = () => MakeGuided(SetupModel.For(Skin.Current, AppRole.Both)),
+        UseAi = UseAiAsync,
+        SetUses = async uses =>
+        {
+            if (host.Remote() is not { } lib) return;
+            try
+            {
+                await lib.SetUsesAsync(uses);
+            }
+            catch (Exception e) when (e is HttpRequestException or TaskCanceledException or LibraryRefusedException)
+            {
+                host.Log($"[setup] what it's for: {e.Message}");
+            }
+        },
+        AlreadyHere = () => host.Settings.SetupAi is "claude" or "codex" or "gemini" ? host.Settings.SetupAi : "",
+    };
 
     /// <summary>Guided setup's model for this window, reaching the app's own installer, hidden sign-in and pages.
     /// The self-test finds no AI's CLI at all, so it never installs one or reaches an account.</summary>
@@ -1873,7 +1931,9 @@ public static partial class Shell
     /// update or a library.</summary>
     static void ShowWelcomeCard()
     {
-        if (!host.Settings.WelcomeCard || !host.Settings.SetupDone || host.Settings.Role == AppRole.Library)
+        // A first run that ended with "Later" leaves "Notes need an AI" on Home until an AI writes the notes.
+        bool needsAi = host.Settings.SetupAi == "later" && (host.Overview is null || NotesOff);
+        if (!(host.Settings.WelcomeCard || needsAi) || !host.Settings.SetupDone || host.Settings.Role == AppRole.Library)
         {
             if (library.Welcome is not null) library.Welcome = null;
             return;
@@ -1888,9 +1948,15 @@ public static partial class Shell
                 OnRetry = () => _ = host.DownloadModelAsync(),
                 OnMic = () => Dialogs.OpenUrl(host.MicSettingsUrl),
                 OnGotIt = PutWelcomeCardAway,
+                OnGoogle = () => GetNotesWith("gemini", null),
+                OnOtherAi = () => ShowSettings("AI"),
+                OnAddClass = () => library.OnAddClass?.Invoke(),
             };
             library.Welcome = card;
         }
+        card.Intro = host.Settings.WelcomeCard;
+        card.NeedsAi = needsAi;
+        card.AddClasses = host.Settings.AddClassesOnHome;
         card.RecordKeys = Keybindings.Show(KeyAction.Record, mac);
         card.IconHidden = mac && MacStatusItem.Check() is { Seen: false };
         card.ShowModel(host.ModelReady, host.Downloading?.Fraction, host.DownloadProblem, Machine.DeviceForLook(mac));
@@ -1904,8 +1970,10 @@ public static partial class Shell
     /// <summary>"Ready when class starts" goes for good (Got it, or the first recording started).</summary>
     static void PutWelcomeCardAway()
     {
-        if (host.Settings.WelcomeCard) host.Save(s => s.WelcomeCard = false);
-        library.Welcome = null;
+        if (host.Settings.WelcomeCard || host.Settings.AddClassesOnHome) host.Save(s => (s.WelcomeCard, s.AddClassesOnHome) = (false, false));
+        // "Notes need an AI" stays until an AI writes the notes.
+        if (library.Welcome is { NeedsAi: true } card) card.Intro = card.AddClasses = false;
+        else library.Welcome = null;
     }
 
     static int lastTaskbarPercent = -1;
