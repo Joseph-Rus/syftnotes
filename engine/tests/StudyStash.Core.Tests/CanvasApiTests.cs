@@ -323,11 +323,29 @@ public class CanvasApiTests
         var left = state["syncing"]!["classes"]!.AsArray().Select(c => c!.GetValue<string>()).ToList();
         Assert.Contains("CS 101", left);
         Assert.Contains("BIO 110", left);
+        // Nothing read yet: each listing has none of its two classes finished.
+        Assert.Equal(2, state["progress"]!["classes"]!.GetValue<int>());
+        Assert.Equal(0, state["progress"]!["listings"]!["assignments"]!["done"]!.GetValue<int>());
 
-        // Answer what's already out, then let the rest of the sync run to completion: "syncing" is gone.
+        // Answer what's already out, then let the rest of the sync run to completion: "syncing" is gone, and the
+        // progress says every listing of both classes was read (BIO 110's quizzes given up on: Canvas kept failing).
+        canvas.Json("/api/v1/courses/4202/quizzes", """{"errors":[{"message":"Internal error"}]}""", status: 500);
         sync.Results(initial.Select(canvas.Answer).ToList());
         Assert.True(canvas.Run(sync, force: false));
-        Assert.Null(CanvasView.State(sync, now)["syncing"]);
+        var after = CanvasView.State(sync, now);
+        Assert.Null(after["syncing"]);
+        Assert.Equal(2, after["progress"]!["listings"]!["assignments"]!["done"]!.GetValue<int>());
+        Assert.Equal(0, after["progress"]!["listings"]!["assignments"]!["failed"]!.GetValue<int>());
+        Assert.Equal(2, after["progress"]!["listings"]!["quizzes"]!["done"]!.GetValue<int>());
+        Assert.Equal(1, after["progress"]!["listings"]!["quizzes"]!["failed"]!.GetValue<int>());
+    }
+
+    [Fact]
+    public void State_has_no_progress_before_the_first_sync()
+    {
+        var dir = new TempDir();
+        var sync = FakeCanvas.Library(dir, () => FakeCanvas.DesignNow, ("CS 101", 4201L));
+        Assert.Null(CanvasView.State(sync, FakeCanvas.DesignNow)["progress"]);
     }
 
     [Fact]

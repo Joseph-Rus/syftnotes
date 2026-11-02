@@ -42,6 +42,28 @@ public static class CanvasView
         return courses.Keys.Where(cls => !Done(cls)).ToList();
     }
 
+    /// <summary>How far this sync (or, once it's over, the last one) has read each listing: for each, how many of its
+    /// classes are finished with it (read, hidden by the course, or given up on) and how many of those were given up
+    /// on; null before any sync. The app's first-run sync screen counts its stages from these ("Getting assignments
+    /// and due dates… 3 of 6"), and a finished sync with listings given up on is said as mostly done.</summary>
+    static JsonObject? Progress(IReadOnlyDictionary<string, Dictionary<string, string>> sections)
+    {
+        if (sections.Count == 0) return null;
+        var listings = new JsonObject();
+        foreach (string listing in Crawl.Listings)
+        {
+            int done = 0, failed = 0;
+            foreach (var mine in sections.Values)
+            {
+                if (!mine.TryGetValue(listing, out var state) || state is not ("ok" or "hidden" or "failed")) continue;
+                done++;
+                if (state == "failed") failed++;
+            }
+            listings[listing] = new JsonObject { ["done"] = done, ["failed"] = failed };
+        }
+        return new JsonObject { ["classes"] = sections.Count, ["listings"] = listings };
+    }
+
     static JsonObject? Choice((string Where, IReadOnlyList<string> Browsers)? choice) => choice is { } c
         ? new JsonObject { ["where"] = c.Where, ["browsers"] = new JsonArray(c.Browsers.Select(b => (JsonNode)b).ToArray()) } : null;
 
@@ -81,6 +103,7 @@ public static class CanvasView
                 ? done.AddMinutes(s.PollMinutes).ToString("o", CultureInfo.InvariantCulture) : null,
             ["poll_minutes"] = s.PollMinutes,
             ["syncing"] = active ? new JsonObject { ["left"] = left.Count, ["total"] = s.Synced.Count, ["classes"] = new JsonArray(left.Select(c => (JsonNode)c).ToArray()) } : null,
+            ["progress"] = Progress(sync.Crawl.Sections),
             ["paused_until"] = sync.Crawl.PausedUntil?.ToString("o", CultureInfo.InvariantCulture),
             ["error"] = s.Error.Length > 0 ? new JsonObject { ["text"] = s.Error, ["at"] = When(s.ErrorAt) } : null,
             ["warnings"] = warnings,
