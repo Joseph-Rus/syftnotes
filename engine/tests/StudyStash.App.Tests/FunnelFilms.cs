@@ -307,6 +307,7 @@ public sealed class FunnelFilms
         public async Task<Control> HomeAsync()
         {
             var page = FilmParts.Library();
+            page.Status = Skin == SkinKind.Mac ? "Library on this Mac" : "Library on this PC";
             var classes = Context?.Client is { } client ? await client.ClassesAsync() ?? [] : [];
             int i = 0;
             foreach (var c in classes) page.Classes.Add(new ClassItem { Name = c.Class, Dot = StudyStash.App.Skin.ClassDot(i++) });
@@ -538,7 +539,27 @@ public sealed class FunnelFilms
 
     static readonly (string Film, int Frame, string Label)[] Tiles =
     [
-        ("01-funnel-canvas-gemini", 20, "1 · Welcome: one button"),
+        ("01-funnel-canvas-gemini", 15, "1 · Welcome: one button"),
+        ("01-funnel-canvas-gemini", 55, "1 · Are you a student?"),
+        ("01-funnel-canvas-gemini", 100, "1 · Connect your classes: nothing to type"),
+        ("01-funnel-canvas-gemini", 128, "1 · The store's page is open: waiting for Chrome"),
+        ("01-funnel-canvas-gemini", 140, "1 · Added; your Canvas found by itself next"),
+        ("01-funnel-canvas-gemini", 175, "1 · The sync: a line per stage, Continue open"),
+        ("01-funnel-canvas-gemini", 220, "1 · Done. Your classes are in."),
+        ("01-funnel-canvas-gemini", 270, "1 · Connect your AI: Continue with Google ringed"),
+        ("01-funnel-canvas-gemini", 405, "1 · Google's own sign-in, hidden: waiting"),
+        ("01-funnel-canvas-gemini", 440, "1 · Home: the classes from Canvas"),
+        ("02-funnel-claude", 290, "2 · I pay for Claude: get it ready, same window"),
+        ("02-funnel-claude", 410, "2 · Home: Claude writes the notes"),
+        ("03-not-a-student", 100, "3 · Not a student: straight to the AI"),
+        ("03-not-a-student", 145, "3 · Skip: Notes need an AI, Gemini once more"),
+        ("03-not-a-student", 210, "3 · Later: Home keeps Continue with Google"),
+        ("04-sync-error-try-again", 230, "4 · Canvas sent nothing: said plainly, Try again"),
+        ("04-sync-error-try-again", 330, "4 · Tried again: done"),
+        ("05-windows-dark", 100, "5 · Windows, dark: Add Syft Notes to Edge"),
+        ("05-windows-dark", 180, "5 · Windows, dark: the sync"),
+        ("05-windows-dark", 250, "5 · Windows, dark: Connect your AI"),
+        ("05-windows-dark", 420, "5 · Windows, dark: Home"),
     ];
 
     // --- 5 · Windows, dark ---------------------------------------------------------------------------------------------
