@@ -197,7 +197,7 @@ Listing it is less to run.
 
 1.8 connects itself and finds the student's Canvas, in Firefox as in Chrome ([chrome-web-store.md](chrome-web-store.md#finding-canvas-by-itself-18)).
 Firefox gives each install an origin of its own (`moz-extension://<uuid>`), so the library answers any Firefox
-add-on's page, and only while the app's Add has its window open. Submit 1.8 here too before `StoreFindsCanvas` goes on.
+add-on's page, and only while the app's Add has its window open. Once Firefox Add-ons serves 1.8 the app's Firefox students get this step by themselves: it asks Mozilla's API at setup, so no app release is needed (docs/chrome-web-store.md).
 
 ## Other browsers
 
