@@ -163,7 +163,9 @@ Firefox shows this before the student adds it. The manifest declares `websiteCon
 files) and `personalCommunications` (announcements and instructor feedback are messages), as the Chrome Web Store
 listing does ([chrome-web-store.md](chrome-web-store.md#4-privacy-practices-the-dashboards-privacy-tab)). They go only
 to the student's own library. Mozilla counts anything that leaves the browser, so it's declared rather than left out.
-It reads no passwords and no cookies: Firefox sends the student's own Canvas session with each request.
+It reads no passwords. From 1.8 it looks at which instructure.com sites hold a Canvas session cookie (the cookie's name
+and site, never its value) to find the student's school; Firefox sends the student's own Canvas session with each
+request.
 
 ### 5. Review, then one line in the engine
 
