@@ -271,7 +271,7 @@ public sealed class SignInFilms
         desk.Hold(1.4);
     }
 
-    /// <summary>Set up on <paramref name="id"/>'s row, pressed: the stand-in's installer (as AgentInstall runs the maker's),
+    /// <summary>Connect on <paramref name="id"/>'s card, pressed: the stand-in's installer (as AgentInstall runs the maker's),
     /// then its own sign-in, hidden, until it's ready by itself.</summary>
     static async Task SetUpRowAsync(Desk desk, SettingsModel model, Control view, StandIns pc, AppHost host, string id, string brand)
     {
@@ -287,9 +287,9 @@ public sealed class SignInFilms
         var row = model.Engines.Engines.Single(r => r.Id == id);
         desk.Pointer();
         desk.Press(Desk.ButtonIn(view, b => b.DataContext == row && b.Command == row.ActCommand));
-        await desk.UntilAsync(() => model.Engines.Engines.Single(r => r.Id == id).StateWords == "Setting up", $"{brand} setting up");
+        await desk.UntilAsync(() => model.Engines.Engines.Single(r => r.Id == id).StateWords == "Connecting", $"{brand} connecting");
         desk.NoPointer();
-        desk.Caption($"Set up: Syft Notes installs {brand} for you (the stand-in's installer) · nothing to type");
+        desk.Caption($"Connect: Syft Notes installs {brand} for you (the stand-in's installer) · nothing to type");
         desk.Hold(2.2);
         go.SetResult();
         await desk.UntilAsync(() => model.Engines.Engines.Single(r => r.Id == id).SignIn == SignInPhase.Waiting, $"{brand} waiting");
@@ -491,7 +491,7 @@ public sealed class SignInFilms
             ("02-onboarding-google", 150, "2 · Sign in to Gemini: waiting"),
             ("02-onboarding-google", 250, "2 · Gemini's notes"),
             ("03-settings-all-four", 60, "3 · Settings → Your AI: all four, always"),
-            ("03-settings-all-four", 240, "3 · Set up Gemini: installs, then signs in"),
+            ("03-settings-all-four", 240, "3 · Connect Gemini: installs, then signs in"),
             ("03-settings-all-four", 330, "3 · Claude, ChatGPT, Gemini ready"),
             ("04-claude-login-ran-out", 115, "4 · Login ran out: the card, waiting"),
             ("04-claude-login-ran-out", 230, "4 · The missed notes, written"),
@@ -499,6 +499,12 @@ public sealed class SignInFilms
             ("05-fallbacks-gave-up-and-stuck", 215, "5 · Couldn't start: Try again, Get help, no terminal"),
             ("06-windows-dark-all-four", 60, "6 · Windows look, dark: all four"),
             ("06-windows-dark-all-four", 190, "6 · Windows look, dark: Gemini set up, waiting"),
+            ("07-connect-everything", 90, "7 · One Connect: installing Claude"),
+            ("07-connect-everything", 200, "7 · Claude app and Claude Code connected; quit Claude once"),
+            ("07-connect-everything", 300, "7 · Everything else under Advanced settings"),
+            ("08-windows-dark-connect", 170, "8 · Windows, dark: quit Claude from the tray"),
+            ("08-windows-dark-connect", 200, "8 · Windows, dark: connected"),
+            ("08-windows-dark-connect", 330, "8 · Windows, dark: AI apps under Advanced"),
         ];
         const double W = 600;
         var grid = new Avalonia.Controls.Primitives.UniformGrid { Columns = 3, Background = Avalonia.Media.Brushes.White };
