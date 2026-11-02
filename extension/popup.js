@@ -6,6 +6,13 @@ const $ = id => document.getElementById(id);
 const s = $('s'), connect = $('connect'), allowRow = $('allow-row'), main = $('main'), code = $('code'), go = $('go'), useRow = $('use-row'), use = $('use');
 let conn = null;
 
+// The status line, with its colour: 'ok' (synced), 'busy' (working on it), 'ask' (waiting on the student) or
+// 'problem'.
+function say(text, tone) {
+  s.textContent = text;
+  s.dataset.tone = tone;
+}
+
 function ago(iso) {
   if (!iso) return 'never';
   const m = Math.round((Date.now() - new Date(iso).getTime()) / 60000);
@@ -37,52 +44,60 @@ async function canvasHere() {
   }
 }
 
+// Signed out of Canvas, the way on is Canvas itself: Open Canvas leads, and Sync steps back.
+function signedOut(yes) {
+  $('canvas').hidden = !yes;
+  $('sync').className = yes ? '' : 'p';
+}
+
 async function show() {
   const where = await whichBrowser();
   // Just added from a store (1.8): Syft Notes on this computer may be waiting for it, with nothing to paste.
   conn = await loadConnection() || await adoptLibrary();
   if (!conn) {
     only(connect);
-    s.textContent = 'Connect this extension to your library: Syft Notes shows the code when you add the extension to ' + (where || 'your browser') + '.';
+    say('Connect this extension to Syft Notes: Syft Notes shows the code when you add the extension to ' + (where || 'your browser') + '.', 'ask');
     return;
   }
   if (!(await hasAccess(conn))) {
     only(allowRow);
-    s.textContent = statusWords({state: 'no_access'});
+    say((where || 'This browser') + ' needs your OK before this extension can read Canvas and reach Syft Notes.', 'ask');
     return;
   }
   if (!conn.canvas) {
     // No Canvas found yet (1.8): a school with Canvas at its own address is found here, on its page.
     const here = await canvasHere();
     only(here ? useRow : null);
-    s.textContent = here ? 'Read Canvas at ' + libraryHost(here) + '?'
-      : 'Sign in to Canvas in ' + (where || 'this browser') + '. Syft Notes finds it by itself; if it doesn\'t, open Canvas and click this button there.';
+    say(here ? 'Read Canvas at ' + libraryHost(here) + '?'
+      : 'Sign in to Canvas in ' + (where || 'this browser') + '. Syft Notes finds it by itself; if it doesn\'t, open Canvas and click this button there.', 'ask');
     use.onclick = () => chrome.permissions.request({origins: [originPattern(here)]}).then(granted => {
       if (!granted) return show();
-      return tellCanvas(conn, here).then(() => { wake(); return show(); }, () => { s.textContent = statusWords({state: 'library_unreachable', library: conn.app}); });
+      return tellCanvas(conn, here).then(() => { wake(); return show(); }, () => say(statusWords({state: 'library_unreachable', library: conn.app}), 'problem'));
     });
     return;
   }
   only(main);
+  signedOut(false);
   $('recode').hidden = !conn.stored; // a store copy takes a new code when the library moves or its key changes
   let r;
   try {
     r = await fetch(conn.app + '/api/v2/canvas/status', {headers: {'X-Study-Stash-Key': conn.key}});
   } catch (e) {
-    s.textContent = statusWords({state: 'library_unreachable', library: conn.app});
+    say(statusWords({state: 'library_unreachable', library: conn.app}), 'problem');
     return;
   }
   if (r.status === 401 || r.status === 403) {
-    s.textContent = statusWords({state: 'library_refused'});
+    say(statusWords({state: 'library_refused'}), 'problem');
     return;
   }
   let j = {};
   try { j = await r.json(); } catch (e) { /* not the library's answer */ }
   let told = null;
   try { told = (await chrome.storage.local.get('status')).status; } catch (e) { /* storage unavailable */ }
-  if (j.busy) s.textContent = j.busy;
-  else if (told && told.state === 'signed_out') s.textContent = statusWords(told);
-  else s.textContent = j.error ? j.error : 'Canvas synced ' + ago(j.synced) + '.';
+  if (j.busy) say(j.busy, 'busy');
+  else if (told && told.state === 'signed_out') { say(statusWords(told), 'problem'); signedOut(true); }
+  else if (j.error) say(j.error, 'problem');
+  else say('Canvas synced ' + ago(j.synced) + '.', 'ok');
 }
 show();
 
@@ -93,7 +108,7 @@ go.onclick = () => {
     if (granted) wake();
     return show();
   }, e => {
-    s.textContent = e.message;
+    say(e.message, 'problem');
   }).finally(() => { go.disabled = false; });
 };
 $('allow').onclick = () => allowAccess(conn).then(granted => {
@@ -102,12 +117,16 @@ $('allow').onclick = () => allowAccess(conn).then(granted => {
 }, () => show());
 $('recode').onclick = () => {
   only(connect);
-  s.textContent = 'Paste the new code from Syft Notes.';
+  say('Paste the new code from Syft Notes.', 'ask');
   code.focus();
 };
 $('sync').onclick = () => {
   wake();
-  s.textContent = 'Syncing… you can close this.';
+  say('Syncing… you can close this.', 'busy');
+};
+$('canvas').onclick = () => {
+  if (conn && conn.canvas) chrome.tabs.create({url: conn.canvas + '/'});
+  window.close();
 };
 $('open').onclick = () => {
   if (conn) chrome.tabs.create({url: conn.app + '/'});
