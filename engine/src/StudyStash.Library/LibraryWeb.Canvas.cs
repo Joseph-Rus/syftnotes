@@ -43,6 +43,13 @@ public sealed partial class LibraryWeb
     /// started, or since one with the right key checked in.</summary>
     string? refusedAt;
 
+    /// <summary>Until when the add-on from a store may be handed this library's address and key (<c>canvas/hello</c>):
+    /// open for <see cref="PairWindow"/> after the app's Add Syft Notes to your browser; null when it never was.</summary>
+    DateTimeOffset? pairUntil;
+
+    /// <summary>How long the app's Add Syft Notes to your browser keeps the door open for the add-on to find this library.</summary>
+    static readonly TimeSpan PairWindow = TimeSpan.FromMinutes(20);
+
     /// <summary>The request came with the extension's current key (not the library password).</summary>
     bool WithExtensionKey(HttpContext ctx) => CanvasSettings.KeyMatches(cfg.Home, ctx.Request.Headers["X-Study-Stash-Key"].ToString());
 
@@ -90,6 +97,42 @@ public sealed partial class LibraryWeb
             var body = await Http.JsonBodyAsync(ctx.Request);
             Canvas.Results((body?["results"] as JsonArray ?? []).OfType<JsonObject>().Select(CanvasResult.From).ToList());
             return Http.Json(new JsonObject { ["ok"] = true });
+        }));
+        // Connecting the add-on with nothing to type (1.8 on): the app opens a short window when the student presses Add
+        // Syft Notes to Chrome; the add-on, just installed from its store and knowing nothing yet, finds this library on
+        // this computer and is handed where it is and its key (only to the store copy's own origin, and only while the
+        // window's open); then it finds the student's Canvas by itself and says where it is.
+        app.MapPost("/api/v2/canvas/pair", (HttpContext ctx) => Api(ctx, () =>
+        {
+            pairUntil = Canvas.Clock() + PairWindow;
+            return Http.Json(new JsonObject { ["until"] = pairUntil.Value.ToString("o", CultureInfo.InvariantCulture) });
+        }));
+        app.MapGet("/api/v2/canvas/hello", (HttpContext ctx) =>
+        {
+            string origin = ctx.Request.Headers.Origin.ToString();
+            if (!Extension.MayPair(origin)) return Http.Detail(403, "Only Syft Notes for Canvas may ask.");
+            ctx.Response.Headers.AccessControlAllowOrigin = origin;
+            ctx.Response.Headers.Vary = "Origin";
+            if (pairUntil is not { } until || Canvas.Clock() > until)
+                return Http.Detail(403, "Open Syft Notes and press Add Syft Notes to your browser there.");
+            return Http.Json(Extension.Hello($"http://127.0.0.1:{cfg.WebPort}", CanvasSettings.ExtensionKey(cfg.Home), Canvas.Settings.Url));
+        });
+        app.MapPost("/api/v2/canvas/found", Http.Handle(async ctx =>
+        {
+            if (RequireExtension(ctx) is { } no) return no;
+            var body = await Http.JsonBodyAsync(ctx.Request);
+            if (CanvasSettings.CleanUrl(S(body?["url"])) is not { } found) return Http.Detail(400, "That isn't a web address.");
+            // The first Canvas the add-on finds is the student's, and so is a new one while setup's window is open;
+            // after that, one that's already set stays (Settings changes it).
+            string had = Canvas.Settings.Url;
+            bool take = had.Length == 0 || pairUntil is { } until && Canvas.Clock() <= until;
+            if (take && had != found)
+            {
+                CanvasSettings.Update(cfg.Home, s => s.Url = found);
+                EnsureHere();
+                Console.WriteLine($"[canvas] the add-on found Canvas at {found}");
+            }
+            return Http.Json(new JsonObject { ["canvas"] = Canvas.Settings.Url });
         }));
         app.MapGet("/api/v2/canvas/status", (HttpContext ctx) =>
         {

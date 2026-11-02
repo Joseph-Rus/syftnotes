@@ -52,7 +52,9 @@ public partial class ExtensionStoreTests
         Assert.Equal(Extension.Version(), m["version"]!.GetValue<string>());
         Assert.Null(m["host_permissions"]);
         Assert.Equal(["https://*/*", "http://*/*"], m["optional_host_permissions"]!.AsArray().Select(h => h!.GetValue<string>()));
-        Assert.Equal(["alarms", "storage"], m["permissions"]!.AsArray().Select(p => p!.GetValue<string>()));
+        // 1.8 finds the student's Canvas from their own session (cookies) or the Canvas page they click the button on
+        // (activeTab): neither adds a warning when it's installed or updated, and neither reaches a site by itself.
+        Assert.Equal(["alarms", "storage", "cookies", "activeTab"], m["permissions"]!.AsArray().Select(p => p!.GetValue<string>()));
 
         // The store's rules: a name of 45 characters at most, a description of 132, a short name of 12.
         Assert.Equal("Syft Notes for Canvas", m["name"]!.GetValue<string>());

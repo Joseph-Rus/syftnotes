@@ -175,6 +175,42 @@ public static class Extension
         canvasUrl.Trim().Length == 0 || key.Length == 0 || library.Trim().Length == 0 ? ""
             : System.Buffers.Text.Base64Url.EncodeToString(System.Text.Encoding.UTF8.GetBytes(ConfigJson(library.Trim(), key, canvasUrl.Trim())));
 
+    /// <summary>
+    /// What the library hands the add-on from a store when it asks on its own (<c>canvas/hello</c>, 1.8 on): the same
+    /// as a connection code's config, with the Canvas address when the library has one already and "" when it hasn't
+    /// (the add-on then finds the student's Canvas by itself and says where it is).
+    /// </summary>
+    public static JsonObject Hello(string library, string key, string canvasUrl) => new()
+    {
+        ["app"] = library.TrimEnd('/'), ["key"] = key, ["canvas"] = canvasUrl.TrimEnd('/'),
+        ["files"] = new JsonArray(FileHosts.Select(h => (JsonNode)h).ToArray()), ["protocol"] = Protocol,
+    };
+
+    /// <summary>The pages that may ask the library for its address and key with nothing typed: the store copy's own
+    /// (Chrome, Edge, Brave, Arc and Vivaldi share the Chrome Web Store's ID) and the Firefox add-on's (Firefox gives
+    /// each install an origin of its own, so any moz-extension page; the library answers only for the minutes after the
+    /// student pressed Add in the app). Never a web page.</summary>
+    public static bool MayPair(string origin) =>
+        origin == "chrome-extension://" + ChromeStoreId
+        || origin.StartsWith("moz-extension://", StringComparison.Ordinal) && origin.Length > "moz-extension://".Length && !origin[16..].Contains('/');
+
+    /// <summary>
+    /// The add-on the browsers' stores hand out finds the student's library and their Canvas by itself (1.8 on), so
+    /// the app asks nothing: false while the stores still have 1.6 or 1.7, which are connected with a pasted code made
+    /// with the school's Canvas address. Set true once 1.8 is live on the Chrome Web Store and Firefox Add-ons
+    /// (docs/chrome-web-store.md, "Finding Canvas by itself"); STUDYSTASH_ADDON_FINDS_CANVAS=1 (or 0) says otherwise,
+    /// for trying 1.8 before then.
+    /// </summary>
+    public const bool StoreFindsCanvas = false;
+
+    /// <summary><see cref="StoreFindsCanvas"/>, or what STUDYSTASH_ADDON_FINDS_CANVAS says.</summary>
+    public static bool FindsCanvas => Environment.GetEnvironmentVariable("STUDYSTASH_ADDON_FINDS_CANVAS") switch
+    {
+        "1" => true,
+        "0" => false,
+        _ => StoreFindsCanvas,
+    };
+
     /// <summary>What a connection code connects to; null when the text isn't one (whitespace from copying is fine).</summary>
     public static ExtensionConnection? ReadConnectionCode(string code)
     {
