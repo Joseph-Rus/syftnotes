@@ -230,6 +230,25 @@ public static partial class SelfTest
         return done();
     }
 
+    /// <summary>Until <paramref name="done"/>: at least <paramref name="atLeast"/> seconds, then for as long as
+    /// <paramref name="progress"/> keeps rising, giving up after <paramref name="quiet"/> seconds with no rise or
+    /// <paramref name="most"/> in all.</summary>
+    static async Task<bool> UntilProgress(Func<bool> done, Func<int> progress, double atLeast, double quiet, double most)
+    {
+        var start = DateTime.UtcNow;
+        var end = start.AddSeconds(most);
+        var lastRise = start;
+        int seen = progress();
+        while (!done() && DateTime.UtcNow < end
+            && ((DateTime.UtcNow - start).TotalSeconds < atLeast || (DateTime.UtcNow - lastRise).TotalSeconds < quiet))
+        {
+            await Task.Delay(250);
+            int now = progress();
+            if (now > seen) { seen = now; lastRise = DateTime.UtcNow; }
+        }
+        return done();
+    }
+
     /// <summary>Opens the dropdown the way the icon would, takes its picture under <paramref name="name"/>, and
     /// hides it again.</summary>
     static async Task PanelShot(string name)
@@ -688,7 +707,11 @@ public static partial class SelfTest
         Shot(Shell.Windows.Recorder, "recorder-expanded");
 
         Shell.Windows.StopRecording();
-        bool transcribed = await Until(() => host.Lectures.Get(live.Id)?.State is LectureState.Sending or LectureState.Writing or LectureState.Filed or LectureState.Failed, 300); // a CI Mac has no GPU: Whisper works through the rest of the lecture on its CPU
+        // A CI Mac has no GPU: Whisper works through the rest of the lecture on its CPU, as fast as that runner lets it
+        // (one took over 300 s), so after 300 s the wait goes on while the transcript still gains lines, and gives up
+        // after 120 s with none, or 900 s in all.
+        bool transcribed = await UntilProgress(() => host.Lectures.Get(live.Id)?.State is LectureState.Sending or LectureState.Writing or LectureState.Filed or LectureState.Failed,
+            () => host.Lectures.Get(live.Id)?.Segments.Count ?? 0, atLeast: 300, quiet: 120, most: 900);
         l = host.Lectures.Get(live.Id);
         Say($"after stopping: {l?.State} ({l?.Segments.Count} lines, {TimedText.Clock(l?.Seconds ?? 0)})");
         if (!transcribed) throw new InvalidOperationException("Whisper never finished the lecture");
