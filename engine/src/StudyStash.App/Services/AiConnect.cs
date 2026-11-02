@@ -102,6 +102,8 @@ public sealed class AiConnect(IAiLibrary library)
                 if (!installed.Ok) return new ConnectOutcome(false, installed.Words) { Install = installed.Failure, Overview = overview };
                 overview = await library.EnginesAsync();
                 engine = overview?.Engines.FirstOrDefault(e => e.Id == id);
+                // Just installed: nothing to check, it can only be signed out (its sign-in comes straight after).
+                if (engine is { State: "unchecked" }) engine = engine with { State = "not_signed_in" };
             }
             if (engine is { Installed: false } && Install is null)
                 return new ConnectOutcome(false, $"Install {brand} on your library's computer, then connect it here.") { Overview = overview };
