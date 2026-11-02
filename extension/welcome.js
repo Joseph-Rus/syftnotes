@@ -40,7 +40,7 @@ async function start() {
     return;
   }
   if (!(await hasAccess(conn))) {
-    say('Allow Syft Notes to read Canvas', where + ' asks you next. Syft Notes reads Canvas with your own sign-in and keeps it in your library on this computer. It never changes anything on Canvas.');
+    say('Allow Syft Notes to read Canvas', where.charAt(0).toUpperCase() + where.slice(1) + ' asks you next. Syft Notes reads Canvas with your own sign-in and keeps it in your library on this computer. It never changes anything on Canvas.');
     show('allow');
     return;
   }
