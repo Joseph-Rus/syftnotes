@@ -259,6 +259,9 @@ public sealed partial class RealCliSignInTests
             GetWindowThreadProcessId(h, out uint pid);
             var name = new StringBuilder(256);
             GetClassName(h, name, name.Capacity);
+            // A hidden terminal's own stand-in window (ConPTY's): a CLI that shows its console (Antigravity's does) makes
+            // it count as visible, but it's never drawn, so nobody sees it.
+            if (name.ToString() == "PseudoConsoleWindow") return true;
             found.Add((h, (int)pid, name.ToString()));
             return true;
         }, IntPtr.Zero);
