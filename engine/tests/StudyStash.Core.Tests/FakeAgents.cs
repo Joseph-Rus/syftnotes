@@ -81,26 +81,13 @@ public static class FakeAgents
         }
     }
 
-    /// <summary>How many times the fake's sign-in was started (<c>logins</c>, a line each).</summary>
+    /// <summary>How many times the fake's sign-in was started: a file of its own in <c>logins</c> for each, so nothing
+    /// is ever shared with a fake still writing (on Windows a fake in a pseudo-console could hold one appended-to file
+    /// for longer than any wait, and the count failed for a file in use).</summary>
     public static int Logins(string bin)
     {
-        string path = Path.Combine(bin, "logins");
-        // On Windows the fake's Add-Content may hold the file this moment: it's read sharing every way, and looked at
-        // again until it's free (a few seconds at most).
-        var until = DateTime.UtcNow.AddSeconds(5);
-        while (true)
-        {
-            try
-            {
-                if (!File.Exists(path)) return 0;
-                using var reader = new StreamReader(new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete));
-                return reader.ReadToEnd().Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).Length;
-            }
-            catch (IOException) when (DateTime.UtcNow < until)
-            {
-                Thread.Yield();
-            }
-        }
+        string dir = Path.Combine(bin, "logins");
+        return Directory.Exists(dir) ? Directory.GetFiles(dir).Length : 0;
     }
 
     public static int Turns(string bin) => File.Exists(Path.Combine(bin, "turns")) ? int.Parse(File.ReadAllText(Path.Combine(bin, "turns")).Trim(), System.Globalization.CultureInfo.InvariantCulture) : 0;
@@ -143,7 +130,7 @@ public static class FakeAgents
           exit 0
         fi
         if { [ "{{id}}" = claude ] && [ "$1" = auth ] && [ "$2" = login ]; } || { [ "{{id}}" = codex ] && [ "$1" = login ]; }; then
-          echo x >> "$D/logins"
+          mkdir -p "$D/logins" && : > "$D/logins/$$-$(date +%s)"
           # As Claude Code does, it stops at once without a terminal.
           { [ -t 0 ] && [ ! -f "$D/login-fails" ]; } || { echo "Raw mode is not supported on the current process.stdin" >&2; exit 1; }
           if [ "{{id}}" = claude ]; then
@@ -252,7 +239,7 @@ public static class FakeAgents
           exit 0
         }
         if (($ID -eq 'claude' -and $argv[0] -eq 'auth' -and $argv[1] -eq 'login') -or ($ID -eq 'codex' -and $argv[0] -eq 'login')) {
-          Add-Content "$D\logins" 'x'
+          New-Item -ItemType File -Force -Path "$D\logins\$([guid]::NewGuid())" | Out-Null
           # As Claude Code does, it stops at once without a terminal.
           if ([Console]::IsInputRedirected -or (Test-Path "$D\login-fails")) { [Console]::Error.WriteLine('Raw mode is not supported'); exit 1 }
           if ($ID -eq 'claude') {
