@@ -1518,6 +1518,12 @@ public static partial class Shell
             Find = SelfTest.Dir is not null ? _ => AgentFound.None : cli => AgentInstall.Find(cli),
             AiApps = aiApps.DesktopStates,
             ConnectAiApp = aiApps.Connect,
+            // An AI got ready here (setup's AI step, a lecture's Get study notes): its apps on this computer get Syft Notes too.
+            ConnectAppsOf = id => Task.Run(() =>
+            {
+                foreach (var app in aiApps.StatesOf(id))
+                    if (app.Installed && !app.Good) aiApps.Connect(app.Id);
+            }),
             Downloading = () => host.Downloading?.Fraction,
             Log = host.Log,
         };

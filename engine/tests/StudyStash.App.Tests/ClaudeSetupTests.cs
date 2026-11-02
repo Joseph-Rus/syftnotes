@@ -5,9 +5,10 @@ using StudyStash.Core;
 
 namespace StudyStash.App.Tests;
 
-/// <summary>Connecting the AI apps on this computer (Claude Desktop, Claude Code, ChatGPT, Gemini CLI) to the library:
-/// what goes into each app's own settings file, and that nothing else in it is ever lost. Every file is in a test's
-/// own folder: never a real app's settings.</summary>
+/// <summary>Connecting the AI apps on this computer (Claude Desktop, Claude Code, ChatGPT, Gemini CLI, Antigravity) to the
+/// library: what goes into the file each app really reads, that nothing else in it is ever lost, that Syft Notes' old
+/// name and a copy left where an app no longer reads are put right, and where Claude Desktop reads on each computer.
+/// Every file is in a test's own folder: never a real app's settings.</summary>
 public class ClaudeSetupTests
 {
     const string Program = "/Applications/Study Stash.app/Contents/MacOS/StudyStash";
@@ -15,8 +16,10 @@ public class ClaudeSetupTests
     static ClaudeSetup Setup(TempHome home, string program = Program) => new()
     {
         Program = program, Home = home["study-stash"], UserHome = home["user"], Find = _ => null, AppInstalled = _ => false, ReopenApp = null,
+        Running = _ => false, Probe = null,
         DesktopConfig = home["user/Claude/claude_desktop_config.json"], ClaudeCodeConfig = home["user/.claude.json"],
         CodexConfig = home["user/.codex/config.toml"], GeminiConfig = home["user/.gemini/settings.json"],
+        AntigravityConfig = home["user/.gemini/config/mcp_config.json"],
     };
 
     static void Write(string path, string text)
@@ -29,7 +32,8 @@ public class ClaudeSetupTests
     [InlineData("claude-desktop")]
     [InlineData("claude-code")]
     [InlineData("gemini")]
-    public void Connecting_a_json_app_keeps_its_other_servers_and_settings_and_disconnecting_takes_out_only_study_stash(string id)
+    [InlineData("antigravity")]
+    public void Connecting_a_json_app_keeps_its_other_servers_and_settings_and_disconnecting_takes_out_only_syft_notes(string id)
     {
         using var home = new TempHome();
         var setup = Setup(home);
@@ -109,7 +113,7 @@ public class ClaudeSetupTests
         var other = Setup(home, "/elsewhere/StudyStash");
         Assert.True(other.State("codex").OtherCopy);
         Assert.True(other.Connect("codex").Ok);
-        Assert.Single(System.Text.RegularExpressions.Regex.Matches(File.ReadAllText(setup.CodexConfig), @"\[mcp_servers\.study-stash\]"));
+        Assert.Single(System.Text.RegularExpressions.Regex.Matches(File.ReadAllText(setup.CodexConfig), @"\[mcp_servers\.syft-notes\]"));
         Assert.False(other.State("codex").OtherCopy);
 
         Assert.True(setup.Disconnect("codex").Ok);
@@ -131,9 +135,9 @@ public class ClaudeSetupTests
 
         Assert.False(result.Ok);
         Assert.Contains(why, result.Say);
-        Assert.Contains("study-stash", result.Written); // what to paste by hand
+        Assert.Contains("syft-notes", result.Written); // what to paste by hand
         Assert.Equal(text, File.ReadAllText(path));
-        Assert.False(File.Exists(path + ".study-stash-backup"));
+        Assert.False(File.Exists(path + ".syft-notes-backup"));
     }
 
     [Fact]
@@ -192,71 +196,135 @@ public class ClaudeSetupTests
 
     [Theory]
     [InlineData("claude-desktop")]
+    [InlineData("claude-code")]
     [InlineData("codex")]
-    public void Study_stash_pasted_in_by_hand_is_offered_an_update_so_its_row_can_say_connected(string id)
+    public void Syft_notes_under_its_old_name_is_renamed_and_never_left_twice(string id)
     {
         using var home = new TempHome();
         var setup = Setup(home);
-        // What "Copy setup" and the docs give: the command, with nothing saying which app started it.
+        // What an earlier Syft Notes (Study Stash) wrote: its old name, and the app's own server beside it.
         Write(setup.State(id).ConfigPath, id == "codex"
-            ? $"[mcp_servers.study-stash]\ncommand = \"{Program}\"\nargs = [\"mcp\"]\n"
-            : new JsonObject { ["mcpServers"] = new JsonObject { ["study-stash"] = new JsonObject { ["command"] = Program, ["args"] = new JsonArray("mcp") } } }.ToJsonString());
+            ? $"[mcp_servers.github]\ncommand = \"gh-mcp\"\n\n[mcp_servers.study-stash]\ncommand = \"{Program}\"\nargs = [\"mcp\"]\n"
+            : new JsonObject { ["mcpServers"] = new JsonObject { ["github"] = new JsonObject { ["command"] = "gh-mcp" }, ["study-stash"] = new JsonObject { ["command"] = Program, ["args"] = new JsonArray("mcp") } } }.ToJsonString());
 
-        var state = setup.State(id);
-        Assert.True(state is { Added: true, OtherCopy: false, Outdated: true });
-        var row = new AiAppRow { Id = id, Name = state.Name };
-        row.Show(state, DateTime.Now);
-        Assert.Equal("Update", row.ConnectWords);
-        Assert.True(row.CanConnect);
-        Assert.Contains("Set up by hand", row.Status);
+        var before = setup.State(id);
+        Assert.True(before is { Added: true, OldName: true, Outdated: true, Good: false });
 
         Assert.True(setup.Connect(id).Ok);
 
-        Assert.True(setup.State(id) is { Added: true, Outdated: false });
-        Assert.Contains("--client", File.ReadAllText(setup.State(id).ConfigPath));
+        string text = File.ReadAllText(setup.State(id).ConfigPath);
+        Assert.DoesNotContain(id == "codex" ? "mcp_servers.study-stash" : "\"study-stash\":", text);
+        Assert.Contains("syft-notes", text);
+        Assert.Contains("gh-mcp", text);
+        Assert.True(setup.State(id) is { Good: true, OldName: false });
+        // Pressed again, nothing changes: no rewrite, and no backup of it.
+        var again = setup.Connect(id);
+        Assert.True(again.Ok);
+        Assert.Null(again.Backup);
+        Assert.Equal(text, File.ReadAllText(setup.State(id).ConfigPath));
+    }
+
+    /// <summary>A Windows home in a test's own folder, for a user name with a space and an accent in it.</summary>
+    static ClaudeSetup Windows(TempHome home, string program = @"C:\Users\Zoë Test\AppData\Local\Programs\Syft Notes\StudyStash.exe") => new()
+    {
+        Program = program, Home = home[Path.Combine("Zoë Test", ".study-stash")], UserHome = home["Zoë Test"], Windows = true, Mac = false,
+        LocalAppData = home[Path.Combine("Zoë Test", "AppData", "Local")], AppData = home[Path.Combine("Zoë Test", "AppData", "Roaming")],
+        Find = _ => null, Running = _ => false, ReopenApp = null, Probe = null,
+    };
+
+    const string Package = "Claude_pzs8sxrjxfjjc";
+
+    /// <summary>Claude's own settings as the Microsoft Store build keeps them: keys Syft Notes must never lose.</summary>
+    const string ClaudesOwn = """{"coworkUserFilesPath": "D:\\Uni", "preferences": {"menuBarEnabled": true, "quickEntryShortcut": "off"}}""";
+
+    [Fact]
+    public void Claude_on_windows_after_its_data_moved_reads_claude_data_and_the_entry_left_in_the_old_folder_is_taken_out()
+    {
+        using var home = new TempHome();
+        var setup = Windows(home);
+        // As a tester's PC had it: the Store build moved its data to Claude-Data (the old folder keeps Claude's marker and
+        // the entry an earlier Syft Notes wrote there), and the moved settings have no mcpServers at all.
+        string old = home[$"Zoë Test/AppData/Local/Packages/{Package}/LocalCache/Roaming/Claude/claude_desktop_config.json"];
+        Write(old, new JsonObject { ["mcpServers"] = new JsonObject { ["study-stash"] = new JsonObject { ["command"] = setup.Program, ["args"] = new JsonArray("mcp", "--client", "claude-desktop") } } }.ToJsonString());
+        Write(Path.Combine(Path.GetDirectoryName(old)!, ".user-data-left.claude_pzs8sxrjxfjjc"), "");
+        string moved = home["Zoë Test/AppData/Local/Claude-Data/claude_pzs8sxrjxfjjc/claude_desktop_config.json"];
+        Write(moved, ClaudesOwn);
+
+        Assert.Equal(Path.GetFullPath(moved), Path.GetFullPath(setup.DesktopConfig));
+        // Never "connected" from a file Claude ignores.
+        Assert.True(setup.State("claude-desktop") is { Installed: true, Added: false, Stale: true, Good: false });
+
+        var done = setup.Connect("claude-desktop");
+
+        Assert.True(done.Ok, done.Say);
+        var config = JsonNode.Parse(File.ReadAllText(moved))!;
+        Assert.Equal(@"D:\Uni", config["coworkUserFilesPath"]!.GetValue<string>());
+        Assert.True(config["preferences"]!["menuBarEnabled"]!.GetValue<bool>());
+        Assert.Equal(setup.Program, config["mcpServers"]!["syft-notes"]!["command"]!.GetValue<string>());
+        Assert.Contains("Zoë Test", File.ReadAllText(moved)); // the path as it is, not escaped
+        Assert.Null(JsonNode.Parse(File.ReadAllText(old))!["mcpServers"]);
+        Assert.True(File.Exists(old + ".syft-notes-backup"));
+        Assert.True(setup.State("claude-desktop") is { Good: true, Stale: false });
+    }
+
+    [Theory]
+    [InlineData("moved", "Claude-Data/claude_pzs8sxrjxfjjc")]
+    [InlineData("marker only", "Claude-Data/claude_pzs8sxrjxfjjc")]
+    [InlineData("not moved", $"Packages/{Package}/LocalCache/Roaming/Claude")]
+    [InlineData("never opened", "Claude-Data/claude_pzs8sxrjxfjjc")]
+    [InlineData("installer", "../Roaming/Claude")]
+    public void Claude_on_windows_is_connected_where_its_build_reads(string how, string folder)
+    {
+        using var home = new TempHome();
+        string local = home[Path.Combine("Zoë Test", "AppData", "Local")];
+        string legacy = Path.Combine(local, "Packages", Package, "LocalCache", "Roaming", "Claude");
+        switch (how)
+        {
+            case "moved":
+                Directory.CreateDirectory(Path.Combine(local, "Claude-Data", "claude_pzs8sxrjxfjjc"));
+                Directory.CreateDirectory(legacy);
+                break;
+            case "marker only":
+                Write(Path.Combine(legacy, ".user-data-left.claude_pzs8sxrjxfjjc"), "");
+                break;
+            case "not moved":
+                Write(Path.Combine(legacy, "claude_desktop_config.json"), ClaudesOwn);
+                break;
+            case "never opened":
+                Directory.CreateDirectory(Path.Combine(local, "Packages", Package));
+                break;
+            default:
+                Directory.CreateDirectory(Path.Combine(local, "AnthropicClaude"));
+                break;
+        }
+        var setup = Windows(home);
+
+        Assert.Equal(Path.GetFullPath(Path.Combine(local, folder, "claude_desktop_config.json")), Path.GetFullPath(setup.DesktopConfig));
+        Assert.True(setup.State("claude-desktop").Installed);
+        Assert.True(setup.Connect("claude-desktop").Ok);
+        Assert.True(setup.State("claude-desktop").Good);
+        var config = JsonNode.Parse(File.ReadAllText(setup.DesktopConfig))!;
+        Assert.Equal(["--home", home[Path.Combine("Zoë Test", ".study-stash")], "mcp", "--client", "claude-desktop"],
+            config["mcpServers"]!["syft-notes"]!["args"]!.AsArray().Select(a => a!.GetValue<string>()));
+        if (how == "not moved") Assert.Equal(@"D:\Uni", config["coworkUserFilesPath"]!.GetValue<string>());
     }
 
     [Fact]
-    public void An_app_is_connected_once_it_has_started_study_stash_since_it_was_added()
+    public void Claude_on_a_mac_reads_application_support_and_gemini_cli_counts_only_when_its_own_command_is_here()
     {
-        var now = new DateTime(2026, 10, 4, 15, 0, 0);
-        AiAppState State(bool added = true, DateTime? addedAt = null, DateTime? started = null, bool other = false, bool installed = true, bool reopen = false) =>
-            new("claude-desktop", "Claude Desktop", installed, added, other, addedAt, started, "", CanReopen: reopen);
-        var row = new AiAppRow { Id = "claude-desktop", Name = "Claude Desktop" };
+        using var home = new TempHome();
+        var mac = new ClaudeSetup { Home = home["s"], UserHome = home["Zoë Test"], Windows = false, Mac = true, Find = _ => null, AppInstalled = _ => false, Running = _ => false, Probe = null };
+        Assert.Equal(Path.GetFullPath(home["Zoë Test/Library/Application Support/Claude/claude_desktop_config.json"]), Path.GetFullPath(mac.DesktopConfig));
+        Assert.Empty(mac.Desktop.Others);
 
-        row.Show(State(added: false, installed: false), now);
-        Assert.Equal("Not on this computer", row.Status);
-        Assert.False(row.CanConnect);
-
-        row.Show(State(added: false), now);
-        Assert.Equal("Not connected yet", row.Status);
-        Assert.True(row.CanConnect);
-        Assert.False(row.CanDisconnect);
-
-        // Added, but the app hasn't loaded it: the row says the one step left, and offers to do it where it can.
-        row.Show(State(addedAt: now.AddMinutes(-1), started: now.AddMinutes(-30)), now);
-        Assert.Equal("Almost done. Quit Claude completely, then open it again.", row.Status);
-        Assert.False(row.Ok);
-        Assert.False(row.CanReopen);
-        Assert.True(row.CanDisconnect);
-        row.Show(State(addedAt: now.AddMinutes(-1), reopen: true), now);
-        Assert.Equal("Almost done. Reopen Claude so it loads Syft Notes.", row.Status);
-        Assert.True(row.CanReopen);
-        Assert.Equal("Reopen Claude", row.ReopenWords);
-        // ChatGPT starts Syft Notes only when a chat in Codex begins, so its row says that too.
-        var chatgpt = new AiAppRow { Id = "codex", Name = "ChatGPT" };
-        chatgpt.Show(new AiAppState("codex", "ChatGPT", true, true, false, now, null, "", CanReopen: true), now);
-        Assert.Equal("Almost done. Reopen ChatGPT, then start a chat in Codex.", chatgpt.Status);
-
-        row.Show(State(addedAt: now.AddMinutes(-30), started: now.AddMinutes(-1), reopen: true), now);
-        Assert.Equal("Connected · started 14:59", row.Status);
-        Assert.True(row.Ok);
-        Assert.False(row.CanConnect);
-        Assert.False(row.CanReopen);
-
-        row.Show(State(other: true), now);
-        Assert.Equal("Fix", row.ConnectWords);
-        Assert.True(row.CanConnect);
+        // Antigravity keeps its things under ~/.gemini too: that folder alone isn't Gemini CLI.
+        Directory.CreateDirectory(home["Zoë Test/.gemini/antigravity-cli"]);
+        Assert.False(mac.State("gemini").Installed);
+        var withAgy = new ClaudeSetup { Home = home["s"], UserHome = home["Zoë Test"], Windows = false, Mac = true, Find = c => c == "agy" ? "/x/agy" : null, AppInstalled = _ => false, Running = _ => false, Probe = null };
+        Assert.True(withAgy.State("antigravity").Installed);
+        Assert.Equal(Path.GetFullPath(home["Zoë Test/.gemini/config/mcp_config.json"]), Path.GetFullPath(withAgy.State("antigravity").ConfigPath));
+        Assert.Equal(["antigravity", "gemini"], ClaudeSetup.AppsOf("gemini").Order());
+        Assert.Equal(["claude-code", "claude-desktop"], ClaudeSetup.AppsOf("claude").Order());
     }
 
     [Fact]

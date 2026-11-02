@@ -65,6 +65,16 @@ public static partial class AiWords
         _ => "Set up gets it ready on this computer.",
     };
 
+    /// <summary>The line on an AI's card before it's connected: what it's for, plainly, and that one Connect does it all
+    /// (Syft Notes sets it up, signs in and adds your lectures to its apps; nothing to type).</summary>
+    public static string ConnectAbout(string id) => id switch
+    {
+        "claude" => "For a Claude Pro or Max plan. Connect sets it up and signs you in.",
+        "codex" => "For a ChatGPT Plus plan or higher. Connect sets it up and signs you in.",
+        "gemini" => "Free with a Google account. Connect sets it up and signs you in.",
+        _ => "Connect sets it up and signs you in.",
+    };
+
     /// <summary>Only "Sign in" is the tinted, accent-coloured button; every other row action is a plain pill.</summary>
     public static bool RowActionPrimary(string state) => state == "not_signed_in";
 
