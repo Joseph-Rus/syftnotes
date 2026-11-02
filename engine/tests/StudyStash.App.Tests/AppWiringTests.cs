@@ -98,7 +98,7 @@ public class AppWiringTests
         var ai = new FakeAiLibrary { Overview = AiDemo.Overview(), Access = AiDemo.Access() };
         using var model = SettingsModel.Make(host, ai: ai, canvas: CanvasFixtures.Context());
 
-        Assert.Equal(["Ask your AI", "General", "Appearance", "Recording", "Calendars", "Phone", "Classes", "Notes", "Your AI", "Canvas", "AI apps", "Granola", "Your files", "Library", "Connection"],
+        Assert.Equal(["Ask your AI", "General", "Appearance", "Recording", "Calendars", "Phone", "Classes", "Notes", "Your AI", "Canvas", "Granola", "Your files", "Library", "Connection"],
             model.NavItems.Select(n => n.Label));
         Assert.Empty(ai.Calls); // nothing asked before a section opens
 
@@ -107,9 +107,11 @@ public class AppWiringTests
         await Until(() => model.Engines.Engines.Count > 0);
         Assert.Contains("engines", ai.Calls);
 
+        // AI apps is part of Your AI now, under Advanced settings: its old name opens it there.
         model.Section = "Access";
         await Until(() => ai.Calls.Contains("access"));
-        Assert.True(model.OnAccess);
+        Assert.True(model.OnAi);
+        Assert.True(model.Engines.AdvancedOpen);
 
         model.Section = "Canvas";
         Assert.True(model.OnPlainPage);

@@ -481,10 +481,9 @@ public class FreeAiFilms
             m.Frame();
             m.Window.Close();
 
-            // Settings → AI apps, at its switch.
+            // Settings → Your AI → Advanced settings, the AI apps' part, at its switch.
             var access = new AiAccessModel(new FakeAiLibrary { Access = new ToolAccessInfo(true, new ReadingScopes(), []) });
-            access.Apps.Add(new AiAppRow { Id = "claude-desktop", Name = "Claude", First = true, Status = "Connected · started 9:12", Ok = true });
-            var s = new Film($"still-settings-{tag}", () => skin == SkinKind.Mac ? new MacAiAccess { DataContext = access } : new WinAiAccess { DataContext = access },
+            var s = new Film($"still-settings-{tag}", () => new ScrollViewer { Padding = new Thickness(40, 30), Content = skin == SkinKind.Mac ? new MacAiAccess { DataContext = access } : new WinAiAccess { DataContext = access } },
                 skin, variant, 760, 1000, named[theme]);
             s.NoPointer();
             var scroll = s.Window.GetVisualDescendants().OfType<ScrollViewer>().First();

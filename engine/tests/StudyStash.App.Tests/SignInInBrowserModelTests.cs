@@ -32,7 +32,8 @@ public class SignInInBrowserModelTests
         var model = new AiEnginesModel(lib) { SignInEvery = TimeSpan.FromMilliseconds(20) };
         await model.Load();
         AiEngineRow Row() => model.Engines.Single(r => r.Id == "claude");
-        Assert.Equal("Sign in", Row().ActionWords);
+        // Signed out is something wrong on Claude's card: Fix, which runs Connect (here only its sign-in is missing).
+        Assert.Equal(("Needs attention", "Fix"), (Row().StateWords, Row().ActionWords));
 
         await Row().ActCommand.ExecuteAsync(null);
 
@@ -187,13 +188,14 @@ public class SignInInBrowserModelTests
     }
 
     [AvaloniaFact]
-    public async Task The_line_under_the_list_matches_the_row_once_a_sign_in_stopped()
+    public async Task The_card_says_where_a_sign_in_stopped_and_the_line_under_the_list_says_no_more()
     {
-        // Pressing Sign in answers "Finish signing in…"; when the sign-in then couldn't start, or gave up, the line says so.
+        // Pressing Fix starts the sign-in; when it then couldn't start, gave up, or isn't offered here, Claude's card says
+        // so itself (the line under the list doesn't say it again).
         foreach (var (phase, said) in new[]
         {
             (SignInPhase.Stuck, "Syft Notes couldn't start Claude's sign-in."),
-            (SignInPhase.GaveUp, "Signing in to Claude stopped before you'd finished. Try again."),
+            (SignInPhase.GaveUp, "It stopped waiting before you'd finished. Try again."),
             (SignInPhase.Region, "Claude isn't offered in your country yet."),
         })
         {
@@ -202,7 +204,9 @@ public class SignInInBrowserModelTests
             var model = new AiEnginesModel(lib) { SignInEvery = TimeSpan.FromHours(1) };
             await model.Load();
             await model.Engines.Single(r => r.Id == "claude").ActCommand.ExecuteAsync(null);
-            Assert.Equal(said, model.Say);
+            var card = model.Engines.Single(r => r.Id == "claude");
+            Assert.Equal(("Needs attention", said), (card.StateWords, card.About));
+            Assert.Null(model.Say);
         }
 
         // Still waiting: the press's own words stand.
@@ -227,10 +231,15 @@ public class SignInInBrowserModelTests
 
         var rows = new AiEnginesModel(lib) { Here = true };
         await rows.Load();
-        Assert.Equal("Through Claude Code. Runs on this computer.", rows.Engines.Single(r => r.Id == "claude").About);
+        Assert.Equal("Signed out of Claude. Fix signs you in again.", rows.Engines.Single(r => r.Id == "claude").About);
         Assert.Equal("Runs on this computer. Nothing leaves it.", rows.Engines.Single(r => r.Id == "ollama").About);
-        var elsewhere = new AiEnginesModel(lib);
+        // Signed in, doing nothing yet, and in no app: where it runs.
+        var ready = new FakeAiLibrary { Overview = Claude("ready") with { Ask = "ollama" } };
+        var here2 = new AiEnginesModel(ready) { Here = true };
+        await here2.Load();
+        Assert.Equal("Signed in, on this computer.", here2.Engines.Single(r => r.Id == "claude").About);
+        var elsewhere = new AiEnginesModel(ready);
         await elsewhere.Load();
-        Assert.Equal("Through Claude Code. Runs on your library.", elsewhere.Engines.Single(r => r.Id == "claude").About);
+        Assert.Equal("Signed in, on your library.", elsewhere.Engines.Single(r => r.Id == "claude").About);
     }
 }

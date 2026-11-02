@@ -55,7 +55,7 @@ public class SettingsSearchTests
                 var missing = new List<string>();
                 foreach (var e in SettingsIndex.All.Where(e => !e.IsPage && model.Shows(e) && !Sometimes.Contains(e.Title)))
                 {
-                    model.Section = e.Section;
+                    model.Show(e);
                     Dispatcher.UIThread.RunJobs();
                     window.UpdateLayout();
                     if (view.Find(e.Title) is null) missing.Add($"{e.Section} → {e.Title}");
