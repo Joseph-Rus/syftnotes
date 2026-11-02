@@ -51,10 +51,45 @@ public sealed partial class Important(string home)
     {
         if (l.Flags.Count == 0) return [];
         if (Get(l) is { } kept) return kept;
-        var items = Read(await plan(Prompt(l), Schema), l.Flags);
+        return Keep(l.Id, l.Flags, await plan(Prompt(l), Schema));
+    }
+
+    /// <summary>Keeps an AI's answer for a lecture's flags (from the notes' own call, or one of its own).</summary>
+    public List<KeyIdea> Keep(string lecture, IReadOnlyList<ExamHint> flags, string json)
+    {
+        var items = Read(json, flags);
         Directory.CreateDirectory(Dir);
-        SharedFile.Write(PathOf(l.Id), JsonSerializer.Serialize(new Kept(Key(l.Flags), items), Review.Options) + "\n");
+        SharedFile.Write(PathOf(lecture), JsonSerializer.Serialize(new Kept(Key(flags), items), Review.Options) + "\n");
         return items;
+    }
+
+    /// <summary>What the notes' own call is asked as well, so naming the flags costs no call of its own: the flags,
+    /// numbered, and a block after the notes to answer in (taken off them by <see cref="Take"/>).</summary>
+    public static string NotesAsk(IReadOnlyList<ExamHint> flags)
+    {
+        var sb = new StringBuilder("\n\nAlso: the speaker flagged these moments as worth remembering (or, marked SKIP, as not ")
+            .Append("needed). The flagged sentence alone usually doesn't say what \"this\" or \"it\" is; the transcript round it ")
+            .Append("does.\n");
+        for (int i = 0; i < flags.Count; i++)
+            sb.Append($"Flag {i + 1}{(flags[i].Not ? " (SKIP)" : "")}{(flags[i].Moment.Length > 0 ? $" at {flags[i].Moment}" : "")}: \"{flags[i].Said}\"\n");
+        sb.Append("After the notes, on its own, add one ```important code block holding a JSON object that fits this schema: ")
+          .Append(Schema.ToJsonString())
+          .Append(". For each flag, \"concept\" names the idea it's about (2 to 7 words, a noun phrase in the speaker's own ")
+          .Append("terms) and \"detail\" says in one short sentence what to know about it. \"keep\" is false for a flag that ")
+          .Append("isn't about anything to remember (a figure of speech, a rhetorical \"right?\", admin) and for one that repeats ")
+          .Append("an earlier flag's idea. \"flag\" is the flag's number. The block is read by the app, not shown in the notes.");
+        return sb.ToString();
+    }
+
+    [GeneratedRegex(@"\n*```important[ \t]*\n(?<json>[\s\S]*?)\n?```[ \t]*", RegexOptions.IgnoreCase)]
+    private static partial Regex Block();
+
+    /// <summary>The notes with the ```important block taken off, and the JSON it held (null with none, or none whole).</summary>
+    public static (string Notes, string? Json) Take(string reply)
+    {
+        if (Block().Match(reply) is not { Success: true } m) return (reply, null);
+        string notes = (reply[..m.Index] + reply[(m.Index + m.Length)..]).TrimEnd() + "\n";
+        return (notes, Ai.AiJobs.FirstObject(m.Groups["json"].Value));
     }
 
     public static readonly JsonObject Schema = JsonNode.Parse("""
