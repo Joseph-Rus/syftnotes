@@ -55,6 +55,10 @@ public sealed partial class RealCliSignInTests
         }
         Set("HOME", home);
         if (OperatingSystem.IsWindows()) Set("USERPROFILE", home);
+        // Codex on Windows finds its home from the system's own idea of the profile, not USERPROFILE: it's told this one.
+        // (It must be there already.)
+        Directory.CreateDirectory(Path.Combine(home, ".codex"));
+        Set("CODEX_HOME", Path.Combine(home, ".codex"));
         Set("PATH", openers + Path.PathSeparator + Environment.GetEnvironmentVariable("PATH"));
         Set("BROWSER", Path.Combine(openers, OperatingSystem.IsWindows() ? "xdg-open.cmd" : "xdg-open"));
         var agyHome = Antigravity.Use(Path.Combine(home, "syft-gemini"));
