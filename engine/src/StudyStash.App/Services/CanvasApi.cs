@@ -196,6 +196,9 @@ public static class CanvasApi
         public DateTimeOffset? NextSync { get; init; }
         public int PollMinutes { get; init; }
         public SyncingInfo? Syncing { get; init; }
+        /// <summary>How far this sync, or the last one, has read each listing; null before any sync, and from a library
+        /// older than it.</summary>
+        public SyncProgressInfo? Progress { get; init; }
         public DateTimeOffset? PausedUntil { get; init; }
         public ErrorInfo? Error { get; init; }
         public IReadOnlyList<string> Warnings { get; init; } = [];
@@ -244,6 +247,22 @@ public static class CanvasApi
         public int Left { get; init; }
         public int Total { get; init; }
         public IReadOnlyList<string> Classes { get; init; } = [];
+    }
+
+    /// <summary>A sync's progress: how many classes it reads (<see cref="Classes"/>), and for each listing
+    /// ("assignments", "submissions", "planner", "modules", "announcements", "files", "quizzes", "discussions") how many
+    /// of them are finished with it.</summary>
+    public sealed record SyncProgressInfo
+    {
+        public int Classes { get; init; }
+        public IReadOnlyDictionary<string, ListingProgress> Listings { get; init; } = new Dictionary<string, ListingProgress>();
+    }
+
+    /// <summary>One listing's count: classes finished with it, and how many of those Canvas kept failing for.</summary>
+    public sealed record ListingProgress
+    {
+        public int Done { get; init; }
+        public int Failed { get; init; }
     }
 
     public sealed record ErrorInfo

@@ -139,6 +139,11 @@ public sealed class CanvasClient(string serverUrl, string key, HttpClient? http 
 
     static string? Text(JsonNode? n) => n is JsonValue v && v.TryGetValue(out string? s) ? s : null;
 
+    /// <summary>Add Syft Notes to your browser: for the next few minutes the library hands the add-on from a store its
+    /// address and key when the add-on asks (1.8 on), so nothing is pasted. Null from a library older than that.</summary>
+    public Task<JsonObject?> PairAsync(CancellationToken stop = default) =>
+        SendAsync<JsonObject>(HttpMethod.Post, canvasRoot + "/pair", new JsonObject(), stop);
+
     public Task<CanvasApi.Overview?> FindCoursesAsync(CancellationToken stop = default) =>
         SendAsync<CanvasApi.Overview>(HttpMethod.Post, canvasRoot + "/courses", null, stop);
 

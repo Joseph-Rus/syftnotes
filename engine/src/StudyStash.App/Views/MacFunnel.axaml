@@ -1,0 +1,369 @@
+<!-- The first run (macOS): one screen at a time. The welcome (the pixel s, "Record your lectures. Get the notes." and
+     Get started); then, each with the step indicator, Back and one thing to do: "Are you a student?", Connect your
+     classes (Syft Notes added to the browser, Canvas found by itself), the first sync (a line per stage, ticked as it
+     happens), and Connect your AI (Claude, ChatGPT, Gemini, and Continue with Google ringed as the default). Getting an AI
+     ready is guided setup's own two screens (MacGetReady), shown in this window in the funnel's place. The same white
+     sheet on the window's canvas as setup's pages (SetupStyles). -->
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:StudyStash.App.ViewModels"
+             xmlns:c="using:StudyStash.App.Controls"
+             xmlns:v="using:StudyStash.App.Views"
+             x:Class="StudyStash.App.Views.MacFunnel"
+             x:DataType="vm:FunnelModel"
+             Classes="in-setup"
+             Width="620" Height="660">
+  <UserControl.Styles>
+    <StyleInclude Source="avares://StudyStash/Views/SetupStyles.axaml" />
+    <StyleInclude Source="avares://StudyStash/Views/WelcomeStyles.axaml" />
+    <StyleInclude Source="avares://StudyStash/Views/FunnelStyles.axaml" />
+    <!-- The real window has its own rounded corners and shadow; a screenshot draws both itself. -->
+    <Style Selector="Border#Chrome.chrome">
+      <Setter Property="CornerRadius" Value="18" />
+      <Setter Property="BoxShadow" Value="{DynamicResource WindowShadow}" />
+    </Style>
+  </UserControl.Styles>
+
+  <Panel>
+  <Border Name="Chrome" Classes="chrome" Background="{DynamicResource Canvas}" ClipToBounds="True" IsVisible="{Binding ShowFunnel}">
+    <DockPanel>
+      <!-- The title bar: drag the window by it; the system's traffic lights sit in it. -->
+      <c:WindowHeader Name="Header" DockPanel.Dock="Top" CanResize="False" Title="Syft Notes" />
+      <Panel Margin="8,0,8,8">
+        <Border Classes="setup-pane" />
+        <Border Classes="setup-clip">
+          <Panel>
+
+            <!-- 1 · The welcome: one button. It never greys while it works (the loader says it is). -->
+            <StackPanel Classes="welcome" IsVisible="{Binding OnWelcome}">
+              <c:SyftSplash Name="Mark" Kind="PopBack" Inline="True" Size="150" HorizontalAlignment="Center" />
+              <TextBlock Name="WelcomeTitle" Classes="page-title step-title welcome-title" Text="{x:Static vm:SetupModel.StartTitleLines}"
+                         AutomationProperties.Name="{x:Static vm:SetupModel.StartTitle}" />
+              <TextBlock Classes="page-lede step-lede welcome-lede" Text="{Binding Setup.StartLede}" />
+              <Button Name="GetStarted" Classes="btn ink welcome-go" Command="{Binding GetStartedCommand}" IsDefault="{Binding OnWelcome}"
+                      AutomationProperties.Name="{Binding WelcomeLabel}" AutomationProperties.HelpText="{Binding Setup.StartHint}">
+                <StackPanel Orientation="Horizontal" Spacing="10" HorizontalAlignment="Center">
+                  <c:SyftLoader Kind="HoppingBits" Size="20" IsActive="{Binding Setup.Starting}" IsVisible="{Binding Setup.Starting}" VerticalAlignment="Center" />
+                  <TextBlock Text="{Binding WelcomeLabel}" VerticalAlignment="Center" />
+                </StackPanel>
+              </Button>
+              <TextBlock Name="StartHint" Classes="hint welcome-hint" Text="{Binding Setup.StartHint}" IsVisible="{Binding !Setup.HasStartProblem}" />
+              <Grid Classes="welcome-problem" ColumnDefinitions="Auto,8,*" IsVisible="{Binding Setup.HasStartProblem}">
+                <c:Icon Classes="warn" Size="16" VerticalAlignment="Top" Margin="0,2,0,0" />
+                <TextBlock Grid.Column="2" Name="StartProblem" Classes="say" Text="{Binding Setup.LibraryResult}" />
+              </Grid>
+              <CheckBox Name="OpenAtLogin" Classes="welcome-login" IsChecked="{Binding Setup.StartAtLogin}" IsEnabled="{Binding !Setup.Starting}"
+                        Content="{x:Static vm:SetupModel.StartAtLoginLabel}" AutomationProperties.Name="{x:Static vm:SetupModel.StartAtLoginLabel}" />
+            </StackPanel>
+
+            <!-- Every step after it: the indicator, the page, and Back with the step's own buttons at the foot. -->
+            <DockPanel IsVisible="{Binding OnPage}">
+              <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Spacing="12" Margin="40,22,40,0">
+                <ItemsControl Name="Dots" ItemsSource="{Binding Indicator}" VerticalAlignment="Center">
+                  <ItemsControl.ItemsPanel>
+                    <ItemsPanelTemplate><StackPanel Orientation="Horizontal" Spacing="6" /></ItemsPanelTemplate>
+                  </ItemsControl.ItemsPanel>
+                  <ItemsControl.ItemTemplate>
+                    <DataTemplate x:DataType="vm:FunnelDot">
+                      <Border Classes="dot" Classes.current="{Binding Current}" Classes.passed="{Binding Passed}" />
+                    </DataTemplate>
+                  </ItemsControl.ItemTemplate>
+                </ItemsControl>
+                <TextBlock Name="StepLabel" Classes="step-label" Text="{Binding StepLabel}" VerticalAlignment="Center" />
+              </StackPanel>
+
+              <Grid DockPanel.Dock="Bottom" Classes="setup-foot" ColumnDefinitions="Auto,*,Auto">
+                <Button Name="Back" Classes="btn" Command="{Binding BackCommand}" IsEnabled="{Binding CanGoBack}" Content="Back" />
+                <!-- Classes: the quiet way out for a school without Canvas; Continue once it's done (back on it). -->
+                <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="16" IsVisible="{Binding OnClasses}">
+                  <Button Name="NoCanvasFoot" Classes="text-link small" VerticalAlignment="Center" Command="{Binding NoCanvasCommand}" Content="My school doesn't use Canvas" />
+                  <Button Name="ClassesNext" Classes="btn ink" Command="{Binding NextCommand}" Content="Continue" IsVisible="{Binding AddOn.IsDone, FallbackValue=False}" />
+                </StackPanel>
+                <!-- Sync: Skip for now while it works; Continue once the assignments are in. -->
+                <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="16" IsVisible="{Binding OnSync}">
+                  <Button Name="SkipSync" Classes="text-link small" VerticalAlignment="Center" Command="{Binding NextCommand}" Content="Skip for now"
+                          IsVisible="{Binding Sync.CanSkip, FallbackValue=True}" />
+                  <Button Name="SyncNext" Classes="btn ink" Command="{Binding NextCommand}" Content="Continue" IsEnabled="{Binding Sync.CanContinue, FallbackValue=False}"
+                          IsDefault="{Binding OnSync}" />
+                </StackPanel>
+                <!-- The AI: Skip (which asks once more), then Later under that ask. -->
+                <Button Name="SkipAi" Grid.Column="2" Classes="text-link small" VerticalAlignment="Center" Command="{Binding SkipCommand}" Content="Skip"
+                        IsVisible="{Binding ShowAiChoices}" />
+                <Button Name="Later" Grid.Column="2" Classes="text-link small" VerticalAlignment="Center" Command="{Binding LaterCommand}" Content="Later"
+                        IsVisible="{Binding AskedAgain}" />
+              </Grid>
+
+              <ScrollViewer VerticalScrollBarVisibility="Auto">
+                <Panel>
+
+                  <!-- 2 · Are you a student? -->
+                  <StackPanel Classes="funnel-page" IsVisible="{Binding OnStudent}">
+                    <TextBlock Classes="page-title step-title" Text="Are you a student?" />
+                    <TextBlock Classes="page-lede step-lede" Text="Syft Notes can bring in your classes, with their assignments and due dates, from Canvas." />
+                    <StackPanel Spacing="12" Margin="0,26,0,0">
+                      <Button Name="IAmAStudent" Classes="choice big" Command="{Binding IAmAStudentCommand}" AutomationProperties.Name="Yes, I'm a student">
+                        <Grid ColumnDefinitions="Auto,16,*">
+                          <c:Icon Classes="choice-icon" Glyph="school" />
+                          <StackPanel Grid.Column="2" Spacing="2" VerticalAlignment="Center">
+                            <TextBlock Classes="choice-title" Text="Yes, I'm a student" />
+                            <TextBlock Classes="choice-about" Text="Bring in my classes from Canvas" />
+                          </StackPanel>
+                        </Grid>
+                      </Button>
+                      <Button Name="NotAStudent" Classes="choice big" Command="{Binding NotAStudentCommand}" AutomationProperties.Name="No, I'm not a student">
+                        <Grid ColumnDefinitions="Auto,16,*">
+                          <c:Icon Classes="choice-icon" Glyph="forum" />
+                          <StackPanel Grid.Column="2" Spacing="2" VerticalAlignment="Center">
+                            <TextBlock Classes="choice-title" Text="No, I'm not a student" />
+                            <TextBlock Classes="choice-about" Text="Lectures, talks or meetings: add your folders on Home" />
+                          </StackPanel>
+                        </Grid>
+                      </Button>
+                    </StackPanel>
+                    <Button Name="NoCanvas" Classes="text-link small" HorizontalAlignment="Left" Margin="0,18,0,0" Command="{Binding NoCanvasCommand}"
+                            Content="I'm a student, but my school doesn't use Canvas" />
+                  </StackPanel>
+
+                  <!-- 3 · Connect your classes, with nothing to type: added to the browser, then Canvas found. -->
+                  <StackPanel Classes="funnel-page" IsVisible="{Binding OnClasses}">
+                    <TextBlock Classes="page-title step-title" Text="Connect your classes" />
+                    <TextBlock Classes="page-lede step-lede" Text="Syft Notes brings in your classes, assignments and due dates from Canvas, with your own sign-in. It only reads; nothing on Canvas changes." />
+
+                    <StackPanel Margin="0,22,0,0" Spacing="12" IsVisible="{Binding FindsItself}">
+                      <Grid ColumnDefinitions="Auto,8,*" IsVisible="{Binding AddOn.HasAdvice, FallbackValue=False}">
+                        <c:Icon Glyph="info" Size="16" Foreground="{DynamicResource InkMuted}" VerticalAlignment="Top" Margin="0,2,0,0" />
+                        <TextBlock Grid.Column="2" Classes="hint" Text="{Binding AddOn.Advice, FallbackValue=''}" />
+                      </Grid>
+                      <Border Classes="lines">
+                        <StackPanel>
+                          <Grid Classes="line" ColumnDefinitions="20,12,*">
+                            <Panel>
+                              <Border Classes="mark" IsVisible="{Binding AddOn.ShowAdd, FallbackValue=True}"><TextBlock Text="1" /></Border>
+                              <c:SyftLoader Kind="HoppingBits" Size="18" IsActive="{Binding AddOn.Waiting, FallbackValue=False}" IsVisible="{Binding AddOn.Waiting, FallbackValue=False}" />
+                              <c:Icon Classes="tick" IsVisible="{Binding AddOn.Connected, FallbackValue=False}" />
+                            </Panel>
+                            <TextBlock Name="AddedLine" Grid.Column="2" Classes="line-title" Text="{Binding AddOn.AddedLine, FallbackValue=''}" />
+                          </Grid>
+                          <StackPanel Classes="line-body" IsVisible="{Binding AddOn.ShowAdd, FallbackValue=False}">
+                            <Button Name="AddToBrowser" Classes="btn sm ink" HorizontalAlignment="Left" Command="{Binding AddOn.AddCommand, FallbackValue={x:Null}}"
+                                    IsEnabled="{Binding !AddOn.Adding, FallbackValue=True}" Content="{Binding AddOn.AddLabel, FallbackValue=''}" />
+                            <TextBlock Classes="hint" Text="It opens Syft Notes' page in your browser's own store. Free, and it only reads Canvas." />
+                          </StackPanel>
+                          <StackPanel Classes="line-body" IsVisible="{Binding AddOn.Waiting, FallbackValue=False}">
+                            <TextBlock Classes="say" Text="{Binding AddOn.StoreSteps, FallbackValue=''}" />
+                            <TextBlock Classes="say" Text="{Binding AddOn.AllowStep, FallbackValue=''}" />
+                            <Button Classes="text-link small" HorizontalAlignment="Left" Command="{Binding AddOn.OpenAgainCommand, FallbackValue={x:Null}}" Content="Open the page again" />
+                          </StackPanel>
+                          <Border Classes="sep" />
+                          <Grid Classes="line" ColumnDefinitions="20,12,*">
+                            <Panel>
+                              <Border Classes="mark" IsVisible="{Binding !AddOn.Connected, FallbackValue=True}"><TextBlock Text="2" /></Border>
+                              <c:SyftLoader Kind="HoppingBits" Size="18" IsActive="{Binding AddOn.LookingForCanvas, FallbackValue=False}" IsVisible="{Binding AddOn.LookingForCanvas, FallbackValue=False}" />
+                              <c:Icon Classes="tick" IsVisible="{Binding AddOn.Found, FallbackValue=False}" />
+                            </Panel>
+                            <TextBlock Name="CanvasLine" Grid.Column="2" Classes="line-title" Classes.todo="{Binding !AddOn.Connected, FallbackValue=True}" Text="{Binding AddOn.CanvasLine, FallbackValue=''}" />
+                          </Grid>
+                          <StackPanel Classes="line-body" IsVisible="{Binding !AddOn.Found, FallbackValue=True}">
+                            <TextBlock Classes="hint" Text="{Binding AddOn.CanvasWaitLine, FallbackValue=''}" />
+                            <Button Name="OpenBrowser" Classes="btn sm" HorizontalAlignment="Left" Command="{Binding AddOn.OpenBrowserCommand, FallbackValue={x:Null}}"
+                                    IsVisible="{Binding AddOn.LookingForCanvas, FallbackValue=False}">
+                              <TextBlock Text="{Binding AddOn.BrowserName, StringFormat='Open {0}', FallbackValue=''}" />
+                            </Button>
+                          </StackPanel>
+                        </StackPanel>
+                      </Border>
+                      <Border Classes="problem" IsVisible="{Binding AddOn.HasProblem, FallbackValue=False}">
+                        <Grid ColumnDefinitions="Auto,10,*">
+                          <c:Icon Classes="warn" Size="18" VerticalAlignment="Top" Margin="0,1,0,0" />
+                          <TextBlock Grid.Column="2" Classes="say" Text="{Binding AddOn.Problem, FallbackValue=''}" />
+                        </Grid>
+                      </Border>
+                      <!-- Another browser here, quietly. -->
+                      <StackPanel Orientation="Horizontal" Spacing="8" IsVisible="{Binding AddOn.CanSwitchBrowser, FallbackValue=False}">
+                        <TextBlock Classes="hint" Text="Use another browser:" VerticalAlignment="Center" />
+                        <ItemsControl ItemsSource="{Binding AddOn.BrowserChoices, FallbackValue={x:Null}}">
+                          <ItemsControl.ItemsPanel>
+                            <ItemsPanelTemplate><StackPanel Orientation="Horizontal" Spacing="10" /></ItemsPanelTemplate>
+                          </ItemsControl.ItemsPanel>
+                          <ItemsControl.ItemTemplate>
+                            <DataTemplate x:DataType="vm:BrowserChoice">
+                              <Button Classes="text-link small" Command="{Binding Pick}" Content="{Binding Name}" IsVisible="{Binding !Current}" />
+                            </DataTemplate>
+                          </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                      </StackPanel>
+                    </StackPanel>
+
+                    <!-- Until the stores' add-on finds Canvas by itself (1.8), the school's address once, then the code. -->
+                    <StackPanel Margin="0,22,0,0" Spacing="12" IsVisible="{Binding AsksSchool}">
+                      <Border Classes="lines">
+                        <StackPanel>
+                          <Grid Classes="line" ColumnDefinitions="20,12,*,Auto">
+                            <Panel>
+                              <Border Classes="mark" IsVisible="{Binding !Canvas.Step1.IsDone, FallbackValue=True}"><TextBlock Text="1" /></Border>
+                              <c:Icon Classes="tick" IsVisible="{Binding Canvas.Step1.IsDone, FallbackValue=False}" />
+                            </Panel>
+                            <TextBlock Grid.Column="2" Classes="line-title" Text="Your school's Canvas" />
+                            <StackPanel Grid.Column="3" Orientation="Horizontal" Spacing="10" IsVisible="{Binding Canvas.Step1.IsDone, FallbackValue=False}">
+                              <TextBlock Classes="line-detail" Text="{Binding Canvas.Step1.Summary, FallbackValue=''}" />
+                              <Button Classes="text-link small" VerticalAlignment="Center" Command="{Binding Canvas.ChangeSchoolCommand, FallbackValue={x:Null}}" Content="Change" />
+                            </StackPanel>
+                          </Grid>
+                          <StackPanel Classes="line-body" IsVisible="{Binding Canvas.Step1.IsCurrent, FallbackValue=False}">
+                            <TextBlock Classes="hint" Text="The address you open Canvas at." />
+                            <StackPanel Orientation="Horizontal" Spacing="10">
+                              <Border Classes="field" Width="260">
+                                <TextBox Name="School" Classes="bare" Text="{Binding Canvas.SchoolField, FallbackValue=''}" PlaceholderText="school.instructure.com" />
+                              </Border>
+                              <Button Name="SaveSchool" Classes="btn sm ink" Command="{Binding Canvas.ContinueCommand, FallbackValue={x:Null}}" IsEnabled="{Binding !Canvas.SavingSchool, FallbackValue=True}" Content="Continue" />
+                            </StackPanel>
+                            <TextBlock Classes="say" Foreground="{DynamicResource Warn}" Text="{Binding Canvas.SchoolError, FallbackValue=''}"
+                                       IsVisible="{Binding Canvas.SchoolError, Converter={x:Static StringConverters.IsNotNullOrEmpty}, FallbackValue=False}" />
+                          </StackPanel>
+                          <Border Classes="sep" />
+                          <Grid Classes="line" ColumnDefinitions="20,12,*">
+                            <Panel>
+                              <Border Classes="mark" IsVisible="{Binding !Canvas.WaitingForBrowser, FallbackValue=True}"><TextBlock Text="2" /></Border>
+                              <c:SyftLoader Kind="HoppingBits" Size="18" IsActive="{Binding Canvas.WaitingForBrowser, FallbackValue=False}" IsVisible="{Binding Canvas.WaitingForBrowser, FallbackValue=False}" />
+                            </Panel>
+                            <TextBlock Grid.Column="2" Classes="line-title" Classes.todo="{Binding !Canvas.Step2.IsCurrent, FallbackValue=True}"
+                                       Text="{Binding Canvas.BrowserName, StringFormat='Add Syft Notes to {0}', FallbackValue=''}" />
+                          </Grid>
+                          <StackPanel Classes="line-body" IsVisible="{Binding Canvas.Step2.IsCurrent, FallbackValue=False}">
+                            <Button Name="AddByCode" Classes="btn sm ink" HorizontalAlignment="Left" Command="{Binding Canvas.AddToBrowserCommand, FallbackValue={x:Null}}"
+                                    IsVisible="{Binding Canvas.ShowAddToBrowser, FallbackValue=False}" IsEnabled="{Binding !Canvas.AddingToBrowser, FallbackValue=True}">
+                              <TextBlock Text="{Binding Canvas.BrowserName, StringFormat='Add Syft Notes to {0}', FallbackValue=''}" />
+                            </Button>
+                            <StackPanel Spacing="8" IsVisible="{Binding Canvas.WaitingForBrowser, FallbackValue=False}">
+                              <TextBlock Classes="say" Text="{Binding Canvas.StoreStep1, FallbackValue=''}" />
+                              <TextBlock Classes="say" Text="{Binding Canvas.StoreStep2, FallbackValue=''}" />
+                              <Grid ColumnDefinitions="*,8,Auto" IsVisible="{Binding Canvas.ShowCode, FallbackValue=False}">
+                                <Border Classes="mono"><SelectableTextBlock Text="{Binding Canvas.ConnectionCode, FallbackValue=''}" MaxHeight="40" /></Border>
+                                <Button Grid.Column="2" Classes="btn sm" VerticalAlignment="Center" Command="{Binding Canvas.CopyCodeCommand, FallbackValue={x:Null}}"
+                                        Content="{Binding Canvas.CopyLabel, FallbackValue=''}" />
+                              </Grid>
+                              <TextBlock Classes="say" Text="{Binding Canvas.StoreStep3, FallbackValue=''}" />
+                            </StackPanel>
+                            <TextBlock Classes="say" Foreground="{DynamicResource Warn}" Text="{Binding Canvas.BrowserError, FallbackValue=''}"
+                                       IsVisible="{Binding Canvas.BrowserError, Converter={x:Static StringConverters.IsNotNullOrEmpty}, FallbackValue=False}" />
+                          </StackPanel>
+                        </StackPanel>
+                      </Border>
+                    </StackPanel>
+                  </StackPanel>
+
+                  <!-- 4 · The first sync: a line per stage, ticked as it really happens. -->
+                  <StackPanel Classes="funnel-page" IsVisible="{Binding OnSync}">
+                    <TextBlock Classes="page-title step-title" Text="Bringing in your classes" />
+                    <TextBlock Classes="page-lede step-lede" Text="Syft Notes reads Canvas through your browser, with your own sign-in. The first time takes a few minutes." />
+                    <Border Classes="lines" Margin="0,22,0,0">
+                      <ItemsControl Name="Stages" ItemsSource="{Binding Sync.Stages, FallbackValue={x:Null}}">
+                        <ItemsControl.ItemTemplate>
+                          <DataTemplate x:DataType="vm:SyncStage">
+                            <StackPanel>
+                              <Grid Classes="line" ColumnDefinitions="20,12,*">
+                                <Panel>
+                                  <Border Classes="mark" IsVisible="{Binding IsToDo}" />
+                                  <c:SyftLoader Kind="HoppingBits" Size="18" IsActive="{Binding IsBusy}" IsVisible="{Binding IsBusy}" />
+                                  <c:Icon Classes="tick" IsVisible="{Binding IsDone}" />
+                                  <c:Icon Classes="part" IsVisible="{Binding IsPartial}" />
+                                  <c:Icon Classes="warn" Size="20" VerticalAlignment="Center" IsVisible="{Binding IsFailed}" />
+                                </Panel>
+                                <WrapPanel Grid.Column="2" VerticalAlignment="Center">
+                                  <TextBlock Classes="line-title" Classes.todo="{Binding IsToDo}" Text="{Binding Title}" Margin="0,0,8,0" />
+                                  <TextBlock Classes="line-detail" Text="{Binding Detail}" />
+                                </WrapPanel>
+                              </Grid>
+                              <Border Classes="thin" Margin="32,0,0,12" IsVisible="{Binding ShowBar}">
+                                <Border Width="{Binding BarWidth}" />
+                              </Border>
+                            </StackPanel>
+                          </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                      </ItemsControl>
+                    </Border>
+                    <TextBlock Name="SlowLine" Classes="hint" Margin="0,14,0,0" Text="{Binding Sync.SlowLine, FallbackValue=''}" IsVisible="{Binding Sync.HasSlowLine, FallbackValue=False}" />
+                    <Button Name="OpenCanvas" Classes="btn sm" HorizontalAlignment="Left" Margin="0,14,0,0" Command="{Binding Sync.OpenCanvasCommand, FallbackValue={x:Null}}"
+                            IsVisible="{Binding Sync.SignInNeeded, FallbackValue=False}" Content="Open Canvas" />
+                    <Border Classes="problem" Margin="0,16,0,0" IsVisible="{Binding Sync.HasProblem, FallbackValue=False}">
+                      <Grid ColumnDefinitions="Auto,10,*,10,Auto">
+                        <c:Icon Classes="warn" Size="18" VerticalAlignment="Top" Margin="0,1,0,0" />
+                        <TextBlock Name="SyncProblem" Grid.Column="2" Classes="say" Text="{Binding Sync.Problem, FallbackValue=''}" />
+                        <Button Name="TryAgain" Grid.Column="4" Classes="btn sm" VerticalAlignment="Center" Command="{Binding Sync.TryAgainCommand, FallbackValue={x:Null}}" Content="Try again" />
+                      </Grid>
+                    </Border>
+                    <StackPanel Orientation="Horizontal" Spacing="8" Margin="0,16,0,0" IsVisible="{Binding Sync.HasDoneLine, FallbackValue=False}">
+                      <c:Icon Classes="ok" Size="18" />
+                      <TextBlock Name="DoneLine" Classes="say" Text="{Binding Sync.DoneLine, FallbackValue=''}" MaxWidth="480" />
+                    </StackPanel>
+                  </StackPanel>
+
+                  <!-- 5 · Connect your AI: the three as equals, Continue with Google ringed as the default. -->
+                  <StackPanel Classes="funnel-page" IsVisible="{Binding ShowAiChoices}">
+                    <TextBlock Classes="page-title step-title" Text="{x:Static vm:FunnelModel.AiTitle}" />
+                    <TextBlock Classes="page-lede step-lede" Text="{x:Static vm:FunnelModel.AiLede}" />
+                    <Border Classes="problem" Margin="0,18,0,0" IsVisible="{Binding HasAlreadyHere}">
+                      <Grid ColumnDefinitions="Auto,10,*,10,Auto">
+                        <c:Icon Classes="ok" Size="18" />
+                        <TextBlock Grid.Column="2" Classes="say" Text="{Binding AlreadyHereLine}" />
+                        <Button Name="UseAlreadyHere" Grid.Column="4" Classes="btn sm ink" Command="{Binding UseAlreadyHereCommand}">
+                          <TextBlock Text="{Binding AlreadyHereName, StringFormat='Continue with {0}'}" />
+                        </Button>
+                      </Grid>
+                    </Border>
+                    <Border Classes="problem" Margin="0,18,0,0" IsVisible="{Binding HasAiProblem}">
+                      <Grid ColumnDefinitions="Auto,10,*">
+                        <c:Icon Classes="warn" Size="18" VerticalAlignment="Top" Margin="0,1,0,0" />
+                        <TextBlock Name="AiProblem" Grid.Column="2" Classes="say" Text="{Binding AiProblem}" />
+                      </Grid>
+                    </Border>
+                    <Grid ColumnDefinitions="*,10,*,10,*" Margin="0,22,0,0">
+                      <Button Name="UseClaude" Classes="ai" Command="{Binding UseClaudeCommand}" AutomationProperties.Name="Claude">
+                        <StackPanel Spacing="8"><c:Icon Glyph="brand:claude" Size="22" HorizontalAlignment="Center" /><TextBlock Text="Claude" /></StackPanel>
+                      </Button>
+                      <Button Name="UseChatGpt" Grid.Column="2" Classes="ai" Command="{Binding UseChatGptCommand}" AutomationProperties.Name="ChatGPT">
+                        <StackPanel Spacing="8"><c:Icon Glyph="brand:chatgpt" Size="22" HorizontalAlignment="Center" /><TextBlock Text="ChatGPT" /></StackPanel>
+                      </Button>
+                      <Button Name="UseGemini" Grid.Column="4" Classes="ai" Command="{Binding UseGeminiCommand}" AutomationProperties.Name="Gemini">
+                        <StackPanel Spacing="8"><c:Icon Glyph="brand:gemini" Size="22" HorizontalAlignment="Center" /><TextBlock Text="Gemini" /></StackPanel>
+                      </Button>
+                    </Grid>
+                    <Grid Classes="or" ColumnDefinitions="*,Auto,*" Margin="0,22,0,18">
+                      <Border />
+                      <TextBlock Grid.Column="1" Text="No plan?" />
+                      <Border Grid.Column="2" />
+                    </Grid>
+                    <Border Name="GoogleCard" Classes="google">
+                      <Grid ColumnDefinitions="*,12,Auto">
+                        <StackPanel Spacing="4" VerticalAlignment="Center">
+                          <TextBlock Classes="choice-title" Text="Gemini, free with your Google account" />
+                          <TextBlock Classes="choice-about" Text="Google's free plan may use what's sent to improve its products." />
+                        </StackPanel>
+                        <Button Name="ContinueWithGoogle" Grid.Column="2" Classes="btn ink" VerticalAlignment="Center" Command="{Binding ContinueWithGoogleCommand}"
+                                IsDefault="{Binding ShowAiChoices}" Content="{x:Static vm:FunnelModel.GoogleButton}" />
+                      </Grid>
+                    </Border>
+                  </StackPanel>
+
+                  <!-- Going on without an AI: one more push to Gemini, and Later at the foot. -->
+                  <StackPanel Classes="funnel-page" IsVisible="{Binding AskedAgain}">
+                    <TextBlock Classes="page-title step-title" Text="{x:Static vm:FunnelModel.AgainTitle}" />
+                    <TextBlock Classes="page-lede step-lede" Text="{x:Static vm:FunnelModel.AgainLede}" />
+                    <Button Name="GoogleAgain" Classes="btn ink" HorizontalAlignment="Left" Margin="0,26,0,0" Command="{Binding ContinueWithGoogleCommand}"
+                            IsDefault="{Binding AskedAgain}" Content="{x:Static vm:FunnelModel.GoogleButton}" />
+                    <TextBlock Classes="hint" Margin="0,14,0,0" Text="Without one, Syft Notes still records your lectures and writes down what's said. Home keeps this button until you connect an AI." />
+                  </StackPanel>
+                </Panel>
+              </ScrollViewer>
+            </DockPanel>
+          </Panel>
+        </Border>
+      </Panel>
+    </DockPanel>
+  </Border>
+  <!-- Getting the AI ready: guided setup's own screens, in this window. -->
+  <Panel IsVisible="{Binding ConnectingAi}">
+    <v:MacGetReady Name="GetReady" DataContext="{Binding Ready}" Width="620" Height="660" />
+  </Panel>
+  </Panel>
+</UserControl>
