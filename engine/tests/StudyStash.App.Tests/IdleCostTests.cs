@@ -70,16 +70,17 @@ public class IdleCostTests
         w.Close();
     }
 
-    /// <summary>A level meter is the s's cells: whole cells lit from the bottom by the level (a lively one never less than
-    /// the bottom cell, none at all while nothing records), on whole pixels; and its clock runs only while a cell is
+    /// <summary>A level meter is the s's cells: lit from the bottom by the level, the top one partly (a lively one never
+    /// less than the bottom cell, none at all while nothing records), on whole pixels; and its clock runs only while a cell is
     /// fading, so a quiet room, or someone who asked for less motion, costs no frames.</summary>
     [AvaloniaFact]
-    public async Task A_meter_lights_whole_cells_and_moves_only_while_one_changes()
+    public async Task A_meter_lights_cells_from_the_bottom_and_moves_only_while_one_changes()
     {
         static int[] Columns(float[] lit) => [.. lit.Chunk(StudyStash.App.Controls.Waveform.Rows).Select(c => (int)c.Sum())];
         Assert.Equal([0, 0, 0], Columns(StudyStash.App.Controls.Waveform.Lit(null, 3, lively: true)));
         Assert.Equal([1, 2, 4], Columns(StudyStash.App.Controls.Waveform.Lit([0.9, 0.25, 0.5, 1.0], 3, lively: false)));
         Assert.Equal([1, 4, 1], Columns(StudyStash.App.Controls.Waveform.Lit([0.2, 0.9, 0.25], 3, lively: true)));
+        Assert.Equal([1, 1, 0.5f, 0], StudyStash.App.Controls.Waveform.Lit([0.625], 1, lively: false)); // the top one partly
         foreach (var (height, scale) in new[] { (10.0, 2.0), (16, 1), (16, 2), (20, 1), (22, 1), (28, 1), (28, 2) })
         {
             var (pitch, cell) = StudyStash.App.Controls.Waveform.Grid(height, scale);
@@ -93,7 +94,7 @@ public class IdleCostTests
         Motion.Override = false;
         try
         {
-            var wave = new StudyStash.App.Controls.Waveform { Bars = 3, Height = 16, Levels = [0.1, 0.1, 0.1] };
+            var wave = new StudyStash.App.Controls.Waveform { Bars = 3, Height = 16, Levels = [0, 0, 0] };
             var w = Show(wave);
             Assert.False(wave.Turning);
             wave.Levels = [0.9, 0.9, 0.9];
