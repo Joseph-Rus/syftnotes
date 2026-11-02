@@ -8,10 +8,11 @@ using Avalonia.Threading;
 namespace StudyStash.App.Controls;
 
 /// <summary>
-/// The recording's loudness as columns of the pixel s's cells, so it's all in order: each column four cells on the
+/// The recording's loudness as columns of the pixel s's cells, so it's all in order: each column five cells on the
 /// mark's grid (pitch 8, cell 6.6, corners 1.8), scaled to its height and laid on whole pixels so the gaps stay
-/// crisp, lit from the bottom by the level in <see cref="Foreground"/> (the recording colour), the top one only as far
-/// as the level reaches into it, the rest the mesh's quiet fill. The pills' three, the note page's bar's five, the dropdown's and setup's microphone
+/// crisp, lit in <see cref="Foreground"/> (the recording colour) from the middle out, up and down at once, the way the
+/// old bars grew: the middle cell always while it records, the outer ones only as far as the level reaches into them,
+/// and nothing drawn where it's quiet. The pills' three, the note page's bar's five, the dropdown's and setup's microphone
 /// check's longer rows. <see cref="Levels"/> is 0 to 1, oldest first; the newest columns are drawn. While one is bound
 /// to a recording and on screen, it reads the newest levels itself (<see cref="Live"/>) twenty times a second, one
 /// column's worth of sound (50 ms) at a time, so it moves with the voice: the app's own tick, four times a second, made
@@ -27,8 +28,8 @@ public sealed class Waveform : Clocked
 
     public static readonly TimeSpan Step = TimeSpan.FromMilliseconds(50);
 
-    /// <summary>Cells in a column.</summary>
-    public const int Rows = 4;
+    /// <summary>Cells in a column: odd, so one is the middle.</summary>
+    public const int Rows = 5;
 
     /// <summary>How long a cell takes to light, in seconds.</summary>
     public const double Fade = 0.08;
@@ -138,8 +139,9 @@ public sealed class Waveform : Clocked
 
     double Elapsed() => Stopwatch.GetElapsedTime(started).TotalSeconds;
 
-    /// <summary>How much of each cell the levels light, column by column, the bottom first: the loudness on four cells,
-    /// the top one partly (a lively one at least the bottom cell); none at all while nothing records.</summary>
+    /// <summary>How much of each cell the levels light, column by column, the bottom first: the loudness from the middle
+    /// cell out, the same each way, the outermost lit partly (the middle one at least while it records); none at all
+    /// while nothing records.</summary>
     internal static float[] Lit(IReadOnlyList<double>? levels, int columns, bool lively)
     {
         var lit = new float[Math.Max(0, columns) * Rows];
@@ -150,8 +152,9 @@ public sealed class Waveform : Clocked
         {
             double level = levels.Count > 0 ? levels[Math.Max(0, levels.Count - columns + col)] : 0;
             if (span > 0) level = Math.Clamp((level - Hush) / span, 0, 1);
-            double cells = Math.Clamp(level * Rows, lively ? 1 : 0, Rows);
-            for (int row = 0; row < Rows; row++) lit[col * Rows + row] = (float)Math.Clamp(cells - row, 0, 1);
+            // Steps out from the middle: 1 is the middle cell alone, Rows / 2 + 1 the whole column.
+            double steps = Math.Clamp(level * (Rows / 2 + 1), 1, Rows / 2 + 1);
+            for (int row = 0; row < Rows; row++) lit[col * Rows + row] = (float)Math.Clamp(steps - Math.Abs(row - Rows / 2), 0, 1);
         }
         return lit;
     }
@@ -230,7 +233,6 @@ public sealed class Waveform : Clocked
         float left = (float)(Math.Round((size.Width - ((columns - 1) * pitch + cell)) / 2 * scale) / scale);
         float top = (float)(Math.Round((size.Height - ((Rows - 1) * pitch + cell)) / 2 * scale) / scale);
         var lit = Foreground is ISolidColorBrush b ? b.Color : Colors.Gray;
-        var mesh = ActualThemeVariant == ThemeVariant.Dark ? Syft.MeshDark : Syft.MeshLight;
         var (was, now, at) = (from, to, changed);
         float p = (float)pitch, c = (float)cell, r = (float)(cell * SyftCell.Round);
         DrawClocked(context, (canvas, seconds, _) =>
@@ -240,8 +242,6 @@ public sealed class Waveform : Clocked
                 for (int row = 0; row < Rows; row++)
                 {
                     float x = left + col * p, y = top + (Rows - 1 - row) * p;
-                    paint.Color = Syft.Sk(mesh);
-                    Syft.DrawCell(canvas, paint, x, y, c, r);
                     int i = col * Rows + row;
                     float shown = i < now.Length ? Shown(was[i], now[i], seconds - at) : 0;
                     if (shown <= 0.004f) continue;
