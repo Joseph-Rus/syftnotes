@@ -166,6 +166,24 @@ async function stayAwake() {
   try { await chrome.storage.session.set({lastPoll: Date.now()}); } catch (e) { /* no session storage */ }
 }
 
+// Just added (1.8): its own page opens, which finds Syft Notes on this computer, asks the browser for Canvas and the
+// library, and finds the student's Canvas, with nothing to type. A folder's copy (Syft Notes wrote where its library
+// and Canvas are) needs none of that.
+async function welcome() {
+  const c = await loadConnection();
+  if (c && c.canvas) return;
+  try { await chrome.tabs.create({url: chrome.runtime.getURL('welcome.html')}); } catch (e) { /* no tab to open */ }
+}
+
+// A connection with no Canvas yet (1.8): the student's Canvas, found from the browser's Canvas session, is told to the
+// library; nothing happens until the student has signed in to Canvas once.
+async function lookForCanvas() {
+  try {
+    const found = await findCanvas();
+    if (found) conn.canvas = await tellCanvas(conn, found);
+  } catch (e) { /* the library didn't take it now: the next round tries again */ }
+}
+
 let running = false;
 let again = false;      // asked to sync while a request for work was waiting: ask again, with force
 let waiting = null;     // the waiting request's AbortController
@@ -184,8 +202,11 @@ async function pump(force) {
       if (await needsReload()) { chrome.runtime.reload(); return; }
       const where = await whichBrowser();
       conn = await loadConnection();
+      // Just added from a store (1.8): Syft Notes on this computer may be waiting for it, with nothing to paste.
+      if (!conn) conn = await adoptLibrary();
       if (!conn) { await setStatus('no_config'); return; }
       if (!(await hasAccess(conn))) { await setStatus('no_access'); return; } // a store copy the student hasn't allowed yet
+      if (!conn.canvas) await lookForCanvas();
       const forced = force && round === 0 || again;
       again = false;
       let work;
@@ -246,7 +267,11 @@ async function pump(force) {
 // Every 30 seconds (Chrome 120 and later, Firefox): starts the pump again when this script slept or the library went
 // away.
 function schedule() { chrome.alarms.create('sync', {periodInMinutes: 0.5}); }
-chrome.runtime.onInstalled.addListener(() => { schedule(); pump(true); });
+chrome.runtime.onInstalled.addListener(details => {
+  schedule();
+  pump(true);
+  if (details && details.reason === 'install') welcome();
+});
 chrome.runtime.onStartup.addListener(() => { schedule(); pump(false); });
 chrome.alarms.onAlarm.addListener(a => { if (a.name === 'sync') pump(false); });
 // A browser that lost the alarm (Firefox keeps none from one run to the next; an extension switched off and on again
@@ -256,6 +281,11 @@ try {
 } catch (e) { /* no alarms to ask */ }
 // a store copy was just allowed to reach Canvas and the library: start at once rather than at the next alarm
 if (chrome.permissions && chrome.permissions.onAdded) chrome.permissions.onAdded.addListener(() => pump(true));
+// The student signed in to a Canvas Cloud school: a copy that doesn't know its Canvas yet looks at once.
+if (chrome.cookies && chrome.cookies.onChanged) chrome.cookies.onChanged.addListener(change => {
+  const k = change && change.cookie;
+  if (!change.removed && k && CANVAS_COOKIES.indexOf(k.name) >= 0 && /instructure\.com$/.test(String(k.domain || ''))) pump(true);
+});
 // the toolbar popup asks for a sync
 chrome.runtime.onMessage.addListener((msg, _sender, reply) => {
   if (msg && msg.sync) { pump(true); reply({ok: true}); }
