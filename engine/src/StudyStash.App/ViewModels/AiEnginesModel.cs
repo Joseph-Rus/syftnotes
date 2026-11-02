@@ -523,6 +523,8 @@ public sealed partial class AiEnginesModel : ObservableObject
             OnPropertyChanged(nameof(HasKeys));
             shown = SignInWatch.Signature(overview);
             watch.Begin(overview);
+            // An app still to be opened again: looked at until it has loaded Syft Notes.
+            if (appWatch is null && Engines.Any(r => r.HasNext)) WatchApps();
             if (!adopting) Heard?.Invoke(overview);
         }
         finally
@@ -860,7 +862,6 @@ public sealed partial class AiEnginesModel : ObservableObject
         else await Load();
         // A card that stopped says why itself; one with a step left says that.
         Say = outcome.Ok && outcome.Next.Length == 0 ? outcome.Words : null;
-        if (Engines.Any(r => r.HasNext)) WatchApps();
         return outcome;
     }
 
@@ -900,16 +901,25 @@ public sealed partial class AiEnginesModel : ObservableObject
                 for (int i = 0; i < 100 && !cts.IsCancellationRequested; i++)
                 {
                     await Task.Delay(AppsEvery, cts.Token);
+                    string before = AppsSignature();
                     await LoadAppsAsync();
-                    Redraw();
+                    // Drawn again only when something changed: a menu open on a card stays open meanwhile.
+                    if (AppsSignature() != before) Redraw();
                     if (!Engines.Any(r => r.HasNext)) return;
                 }
             }
             catch (OperationCanceledException)
             {
             }
+            finally
+            {
+                if (appWatch == cts) appWatch = null;
+            }
         }
     }
+
+    /// <summary>What the cards show of the apps, to tell when that's changed.</summary>
+    string AppsSignature() => string.Join("|", apps.Select(a => $"{a.Id}:{a.Good}:{a.Running}:{a.Loaded}:{a.Stale}"));
 
     /// <summary>The rows drawn again from what the library last said (a set-up row's words moved on).</summary>
     void Redraw()
