@@ -15,21 +15,45 @@ namespace StudyStash.App.Services;
 /// hand, say), so it never says which app started it and Settings can't tell when it's connected.
 /// <paramref name="CanReopen"/>: it's a desktop app Syft Notes can quit and open again for the student (a Mac).</summary>
 public sealed record AiAppState(string Id, string Name, bool Installed, bool Added, bool OtherCopy, DateTime? AddedAt, DateTime? Started, string ConfigPath,
-    bool Outdated = false, bool CanReopen = false);
+    bool Outdated = false, bool CanReopen = false)
+{
+    /// <summary>Syft Notes is in the app's settings only under its old name (study-stash): Connect renames it.</summary>
+    public bool OldName { get; init; }
+    /// <summary>A copy of Syft Notes' entry is in a settings file this app no longer reads (Claude's folder from before
+    /// it moved, on Windows): Connect takes it out.</summary>
+    public bool Stale { get; init; }
+    /// <summary>The desktop app is open now, so it has to be quit and opened again to load what Connect wrote.</summary>
+    public bool Running { get; init; }
+    /// <summary>The app as a student calls it, on the AI's card ("Claude app", "Claude Code", "ChatGPT app").</summary>
+    public string Words { get; init; } = Name;
+    /// <summary>The AI the app belongs to: "claude", "codex" (ChatGPT) or "gemini".</summary>
+    public string Provider => ClaudeSetup.ProviderOf(Id);
+    /// <summary>Syft Notes is in the file the app reads, for this copy, the way Connect writes it.</summary>
+    public bool Good => Added && !OtherCopy && !Outdated && !OldName && !Stale;
+    /// <summary>The app has started Syft Notes since it was added (it has loaded it).</summary>
+    public bool Loaded => Started is { } s && (AddedAt is null || s >= AddedAt);
+}
+
+/// <summary>Where Claude Desktop reads its settings on this computer (<see cref="Config"/>), and the other places
+/// Syft Notes (or Windows, for the Microsoft Store build) may have put them before, which it no longer reads.</summary>
+public sealed record DesktopPlace(string Config, IReadOnlyList<string> Others);
 
 /// <summary>What connecting or disconnecting an app did: the words to show, and, for the "what was written" panel,
 /// the file, the copy of it kept from before, and the setup that went in (never anything secret: there's none in it).</summary>
 public sealed record AiAppChange(bool Ok, string Say, string? File = null, string? Backup = null, string? Written = null);
 
 /// <summary>
-/// Connecting AI apps on this computer to your lectures (Settings → AI tool access). Claude Desktop, Claude Code,
-/// ChatGPT (the ChatGPT app, the Codex CLI and its IDE extension share one settings file, Codex's) and Gemini CLI
-/// each start Syft Notes' MCP server themselves (<c>StudyStash mcp --client ID</c>), which reads the library with
-/// the password this computer already keeps in Syft Notes' own settings. So their settings get no password and no
-/// address: nothing on the network, no Tailscale. Every change is a merge into the app's own file (its other servers
-/// and settings stay as they were), with the file as it was kept next to it, and a file that can't be read safely
-/// (not valid, or with comments a rewrite would drop) is left alone. Claude and ChatGPT on the web need an internet
-/// address instead: that's the library's Tailscale Funnel switch, not this.
+/// Connecting the AI apps on this computer to your lectures: what Connect on an AI's card in Settings → Your AI does
+/// for that AI's apps. Claude Desktop and Claude Code (Claude), the ChatGPT app with Codex (ChatGPT: the app, the Codex
+/// CLI and its IDE extension share one settings file, Codex's), and Gemini CLI and Google's Antigravity CLI (Gemini)
+/// each start Syft Notes' MCP server themselves (<c>StudyStash mcp --client ID</c>), which reads the library with the
+/// password this computer already keeps in Syft Notes' own settings. So their settings get no password and no address:
+/// nothing on the network, no Tailscale. Every change is a merge into the file the app really reads (its other servers
+/// and settings stay as they were), with the file as it was kept next to it, and a file that can't be read safely (not
+/// valid, or with comments a rewrite would drop) is left alone. Syft Notes' entry is called
+/// <see cref="ClaudeTools.ServerName"/>; one under its old name is renamed, and one left in a file the app no longer
+/// reads is taken out. Claude and ChatGPT on the web need an internet address instead: that's the library's Tailscale
+/// Funnel switch, not this.
 /// </summary>
 public sealed class ClaudeSetup
 {
@@ -37,20 +61,35 @@ public sealed class ClaudeSetup
     public string Home { get; init; } = Configs.DefaultHome;
     /// <summary>The student's home folder, where the AI apps keep their settings.</summary>
     public string UserHome { get; init; } = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+    /// <summary>Windows' AppData\Local and AppData\Roaming, wherever this account has them (a redirected AppData too):
+    /// where Claude Desktop keeps its settings there.</summary>
+    public string LocalAppData { get; init; } = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
+    public string AppData { get; init; } = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
+    /// <summary>Which computer's places to look in (a test looks at Windows' on a Mac).</summary>
+    public bool Windows { get; init; } = OperatingSystem.IsWindows();
+    public bool Mac { get; init; } = OperatingSystem.IsMacOS();
     /// <summary>A command on the PATH (or where installers put it), or null.</summary>
     public Func<string, string?> Find { get; init; } = StudyStash.Core.Ai.AiProvider.Which;
-    /// <summary>Whether an app by this name ("Claude", "ChatGPT") is installed as a desktop app.</summary>
-    public Func<string, bool> AppInstalled { get; init; } = DesktopAppInstalled;
+    /// <summary>Whether an app by this name ("Claude", "ChatGPT") is installed as a desktop app; null looks for it.</summary>
+    public Func<string, bool>? AppInstalled { get; init; }
+    /// <summary>Whether a desktop app (by this setup's id: claude-desktop, codex) is open now; null looks.</summary>
+    public Func<string, bool>? Running { get; init; }
     /// <summary>False in a test or a self-test: nothing is written to an AI app's settings.</summary>
     public bool CanWrite { get; init; } = true;
     /// <summary>Quits a desktop app (by its bundle id) and opens it again; whether it did. A Mac only: elsewhere the
     /// student is told to do it.</summary>
     public Func<string, Task<bool>>? ReopenApp { get; init; } = OperatingSystem.IsMacOS() ? id => Platform.MacApps.ReopenAsync(id) : null;
+    /// <summary>Starts a server the way an app's settings say (command, arguments) and asks for its tools; null: not checked.</summary>
+    public Func<string, IReadOnlyList<string>, Task<McpProbeResult>>? Probe { get; init; } = (command, args) => McpProbe.ToolsAsync(command, args);
 
-    string? desktop, claudeCode, codex, gemini;
+    string? claudeCode, codex, gemini, antigravity;
+    DesktopPlace? desktop;
 
-    /// <summary>Claude Desktop's settings (claude_desktop_config.json).</summary>
-    public string DesktopConfig { get => desktop ??= DesktopConfigIn(UserHome); init => desktop = value; }
+    /// <summary>Where Claude Desktop reads its settings, and where it no longer does.</summary>
+    public DesktopPlace Desktop => desktop ??= DesktopPlaceIn(UserHome, LocalAppData, AppData, Windows, Mac);
+
+    /// <summary>Claude Desktop's settings (claude_desktop_config.json), the one it reads.</summary>
+    public string DesktopConfig { get => Desktop.Config; init => desktop = new DesktopPlace(value, []); }
     /// <summary>Claude Code's own settings, where its servers for every project are (~/.claude.json).</summary>
     public string ClaudeCodeConfig
     {
@@ -65,6 +104,14 @@ public sealed class ClaudeSetup
     }
     /// <summary>Gemini CLI's settings for every folder (~/.gemini/settings.json).</summary>
     public string GeminiConfig { get => gemini ??= Path.Combine(UserHome, ".gemini", "settings.json"); init => gemini = value; }
+    /// <summary>The student's own Antigravity CLI's MCP servers (~/.gemini/config/mcp_config.json, where <c>agy mcp add</c>
+    /// puts them). Never Syft Notes' own home for agy (<see cref="StudyStash.Core.Ai.Antigravity.Home"/>), whose
+    /// global servers would start inside Syft Notes' own work.</summary>
+    public string AntigravityConfig
+    {
+        get => antigravity ??= StudyStash.Core.Ai.Antigravity.McpConfigPath(UserHome);
+        init => antigravity = value;
+    }
 
     public static ClaudeSetup ThisComputer(string home)
     {
@@ -73,17 +120,38 @@ public sealed class ClaudeSetup
         string user = Path.Combine(home, "ai-apps-home");
         return new()
         {
-            Home = home, UserHome = user, CanWrite = false, Find = _ => null, AppInstalled = _ => false, ReopenApp = null,
+            Home = home, UserHome = user, CanWrite = false, Find = _ => null, AppInstalled = _ => false, Running = _ => false, ReopenApp = null, Probe = null,
+            LocalAppData = Path.Combine(user, "AppData", "Local"), AppData = Path.Combine(user, "AppData", "Roaming"),
             DesktopConfig = Path.Combine(user, "Claude", "claude_desktop_config.json"), ClaudeCodeConfig = Path.Combine(user, ".claude.json"),
             CodexConfig = Path.Combine(user, ".codex", "config.toml"), GeminiConfig = Path.Combine(user, ".gemini", "settings.json"),
+            AntigravityConfig = Path.Combine(user, ".gemini", "config", "mcp_config.json"),
         };
     }
 
     /// <summary>The apps, in the order Settings lists them.</summary>
     public static readonly IReadOnlyList<(string Id, string Name)> Apps =
-        [("claude-desktop", "Claude Desktop"), ("claude-code", "Claude Code"), ("codex", "ChatGPT"), ("gemini", "Gemini CLI")];
+        [("claude-desktop", "Claude Desktop"), ("claude-code", "Claude Code"), ("codex", "ChatGPT"), ("gemini", "Gemini CLI"), ("antigravity", "Antigravity CLI")];
 
     static string NameOf(string id) => Apps.First(a => a.Id == id).Name;
+
+    /// <summary>The AI an app belongs to, by the library's ids: "claude", "codex" (ChatGPT) or "gemini".</summary>
+    public static string ProviderOf(string appId) => appId switch
+    {
+        "claude-desktop" or "claude-code" => "claude",
+        "codex" => "codex",
+        _ => "gemini",
+    };
+
+    /// <summary>The apps of one AI, in the order its card names them.</summary>
+    public static IEnumerable<string> AppsOf(string provider) => Apps.Select(a => a.Id).Where(id => ProviderOf(id) == provider);
+
+    /// <summary>The app as a student calls it on its AI's card.</summary>
+    string WordsFor(string id) => id switch
+    {
+        "claude-desktop" => "Claude app",
+        "codex" => Installed("ChatGPT") ? "ChatGPT app" : "Codex",
+        _ => NameOf(id),
+    };
 
     /// <summary>The desktop app behind a row, as its own menu bar names it ("Claude", "ChatGPT"), and its bundle on a
     /// Mac; null for the ones that live in a terminal.</summary>
@@ -97,48 +165,105 @@ public sealed class ClaudeSetup
     /// <summary>The ChatGPT and Claude desktop apps that are on this computer, as their settings stand: the ones
     /// guided setup offers to connect.</summary>
     public IReadOnlyList<AiAppState> DesktopStates() =>
-        [.. Apps.Where(a => DesktopApp(a.Id) is { } desktop && AppInstalled(desktop.Name)).Select(a => State(a.Id))];
+        [.. Apps.Where(a => DesktopApp(a.Id) is { } desktop && Installed(desktop.Name)).Select(a => State(a.Id))];
 
     /// <summary>Quits the row's desktop app and opens it again, so it loads the settings Connect just wrote.</summary>
     public async Task<AiAppChange> ReopenAsync(string id)
     {
-        if (DesktopApp(id) is not { } desktop || ReopenApp is null || !AppInstalled(desktop.Name)) return new(false, $"Quit {NameOf(id)} completely, then open it again.");
+        if (DesktopApp(id) is not { } desktop || ReopenApp is null || !Installed(desktop.Name)) return new(false, $"Quit {NameOf(id)} completely, then open it again.");
         return await ReopenApp(desktop.Bundle)
             ? new(true, "")
             : new(false, $"{desktop.Name} didn't quit and open again. Quit it yourself ({desktop.Name} menu → Quit {desktop.Name}), then open it again.");
     }
 
-    /// <summary>Claude Desktop's settings file. On Windows the Microsoft Store (MSIX) build keeps its AppData inside its
-    /// package folder, and reads that copy first, so that's the one to change when it's there.</summary>
-    public static string DesktopConfigIn(string userHome)
+    const string DesktopFile = "claude_desktop_config.json";
+
+    /// <summary>Claude Desktop's settings file on this computer, for a Mac and Linux.</summary>
+    public static string DesktopConfigIn(string userHome) => OperatingSystem.IsMacOS()
+        ? Path.Combine(userHome, "Library", "Application Support", "Claude", DesktopFile)
+        : Path.Combine(userHome, ".config", "Claude", DesktopFile);
+
+    /// <summary>
+    /// Where Claude Desktop reads its settings. A Mac: ~/Library/Application Support/Claude. Linux: ~/.config/Claude.
+    /// Windows has three:
+    /// <list type="bullet">
+    /// <item>the Microsoft Store (MSIX) build since it moved its data out of its package (Claude 3.x):
+    /// <c>%LOCALAPPDATA%\Claude-Data\claude_ID\</c>, for the package <c>%LOCALAPPDATA%\Packages\Claude_ID</c>. It has
+    /// moved when that folder is there, or when the package's old folder holds Claude's marker
+    /// <c>.user-data-left.claude_ID</c>; a package never opened yet gets it there too, where it will look;</item>
+    /// <item>the Store build before that move: its package's own copy of AppData, <c>Packages\Claude_ID\LocalCache\Roaming\Claude\</c>
+    /// (Windows shows it the app instead of <c>%APPDATA%\Claude</c>);</item>
+    /// <item>the installer's build (no package): <c>%APPDATA%\Claude\</c>.</item>
+    /// </list>
+    /// Every other one of those that exists is in <see cref="DesktopPlace.Others"/>: one Syft Notes wrote to before is
+    /// cleaned of its entry, and none counts as connected.
+    /// </summary>
+    public static DesktopPlace DesktopPlaceIn(string userHome, string localAppData, string appData, bool windows, bool mac)
     {
-        if (OperatingSystem.IsWindows())
+        if (!windows)
+            return new(mac ? Path.Combine(userHome, "Library", "Application Support", "Claude", DesktopFile) : Path.Combine(userHome, ".config", "Claude", DesktopFile), []);
+        string roaming = Path.Combine(appData, "Claude", DesktopFile);
+        var packages = Folders(Path.Combine(localAppData, "Packages"), "Claude_*");
+        var moved = Folders(Path.Combine(localAppData, "Claude-Data"), "claude_*");
+        string? config = null;
+        foreach (string package in packages)
         {
-            string packages = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Packages");
-            try
-            {
-                foreach (string pkg in Directory.Exists(packages) ? Directory.EnumerateDirectories(packages, "Claude_*") : [])
-                {
-                    string dir = Path.Combine(pkg, "LocalCache", "Roaming", "Claude");
-                    if (Directory.Exists(dir)) return Path.Combine(dir, "claude_desktop_config.json");
-                }
-            }
-            catch (Exception e) when (e is IOException or UnauthorizedAccessException)
-            {
-            }
-            return Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "Claude", "claude_desktop_config.json");
+            string id = Path.GetFileName(package)["Claude_".Length..];
+            string old = Path.Combine(package, "LocalCache", "Roaming", "Claude");
+            string? data = moved.FirstOrDefault(m => string.Equals(Path.GetFileName(m), "claude_" + id, StringComparison.OrdinalIgnoreCase));
+            bool left = Directory.Exists(old) && Files(old, ".user-data-left.*").Count > 0;
+            if (data is not null || left || !Directory.Exists(old))
+                config = Path.Combine(data ?? Path.Combine(localAppData, "Claude-Data", "claude_" + id.ToLowerInvariant()), DesktopFile);
+            else config = Path.Combine(old, DesktopFile);
+            break;
         }
-        return OperatingSystem.IsMacOS()
-            ? Path.Combine(userHome, "Library", "Application Support", "Claude", "claude_desktop_config.json")
-            : Path.Combine(userHome, ".config", "Claude", "claude_desktop_config.json");
+        // No Store build: the installer's, unless only the Store build's moved data is here (and no installer's build).
+        config ??= moved.Count > 0 && !Directory.Exists(Path.Combine(localAppData, "AnthropicClaude")) && !File.Exists(roaming)
+            ? Path.Combine(moved[0], DesktopFile) : roaming;
+        var others = new List<string> { roaming };
+        others.AddRange(packages.Select(p => Path.Combine(p, "LocalCache", "Roaming", "Claude", DesktopFile)));
+        others.AddRange(moved.Select(m => Path.Combine(m, DesktopFile)));
+        return new(config, [.. others.Where(o => !string.Equals(o, config, StringComparison.OrdinalIgnoreCase)).Distinct(StringComparer.OrdinalIgnoreCase)]);
     }
 
-    static bool DesktopAppInstalled(string name)
+    /// <summary>The folders in <paramref name="dir"/> named like <paramref name="pattern"/> (case doesn't matter on
+    /// Windows), sorted; none when it can't be read.</summary>
+    static List<string> Folders(string dir, string pattern)
+    {
+        try
+        {
+            return Directory.Exists(dir)
+                ? [.. Directory.EnumerateDirectories(dir, pattern, new EnumerationOptions { MatchCasing = MatchCasing.CaseInsensitive }).Order(StringComparer.Ordinal)]
+                : [];
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException)
+        {
+            return [];
+        }
+    }
+
+    static List<string> Files(string dir, string pattern)
+    {
+        try
+        {
+            return [.. Directory.EnumerateFiles(dir, pattern, new EnumerationOptions { MatchCasing = MatchCasing.CaseInsensitive, AttributesToSkip = 0 })];
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException)
+        {
+            return [];
+        }
+    }
+
+    bool Installed(string name) => (AppInstalled ?? DesktopAppInstalled)(name);
+
+    bool DesktopAppInstalled(string name)
     {
         if (name == "ChatGPT") return ChatGptAppInstalled();
-        if (OperatingSystem.IsMacOS()) return MacApps(name).Any(Directory.Exists);
-        if (OperatingSystem.IsWindows() && name == "Claude")
-            return Directory.Exists(Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "AnthropicClaude"));
+        if (Mac) return MacApps(name).Any(Directory.Exists);
+        // Claude on Windows: the Store build (its package, or the data it moved out of it), or the installer's.
+        if (Windows && name == "Claude")
+            return Folders(Path.Combine(LocalAppData, "Packages"), "Claude_*").Count > 0 || Folders(Path.Combine(LocalAppData, "Claude-Data"), "claude_*").Count > 0
+                || Directory.Exists(Path.Combine(LocalAppData, "AnthropicClaude"));
         return false;
     }
 
@@ -148,18 +273,14 @@ public sealed class ClaudeSetup
     /// <summary>The ChatGPT app that reads Codex's settings: the one OpenAI merged with Codex in July 2026 (it's
     /// Codex's own app underneath, whichever of the two names it has). ChatGPT Classic, the app from before, has no
     /// MCP servers on this computer, so it doesn't count.</summary>
-    static bool ChatGptAppInstalled()
+    bool ChatGptAppInstalled()
     {
         try
         {
-            if (OperatingSystem.IsMacOS())
+            if (Mac)
                 return new[] { "ChatGPT", "Codex" }.SelectMany(MacApps).Any(app => IsCodexBundle(Path.Combine(app, "Contents", "Info.plist")));
-            if (OperatingSystem.IsWindows())
-            {
-                // The Microsoft Store's "ChatGPT" is the OpenAI.Codex package.
-                string packages = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Packages");
-                return Directory.Exists(packages) && Directory.EnumerateDirectories(packages, "OpenAI.Codex_*").Any();
-            }
+            // The Microsoft Store's "ChatGPT" is the OpenAI.Codex package.
+            if (Windows) return Folders(Path.Combine(LocalAppData, "Packages"), "OpenAI.Codex_*").Count > 0;
         }
         catch (Exception e) when (e is IOException or UnauthorizedAccessException)
         {
@@ -171,6 +292,31 @@ public sealed class ClaudeSetup
     /// not of ChatGPT Classic (com.openai.chat). The name is in the file as plain text whether the plist is XML or binary.</summary>
     public static bool IsCodexBundle(string infoPlist) =>
         File.Exists(infoPlist) && File.ReadAllBytes(infoPlist).AsSpan().IndexOf("com.openai.codex"u8) >= 0;
+
+    /// <summary>Whether a desktop app is open now: on a Mac by its bundle, on Windows by its program and where it's
+    /// installed (Claude Code's own claude.exe isn't the Claude app).</summary>
+    bool IsRunning(string id)
+    {
+        if (Running is { } running) return running(id);
+        if (DesktopApp(id) is not { } app) return false;
+        if (Mac) return Platform.MacApps.IsRunning(app.Bundle);
+        if (!Windows) return false;
+        string[] names = id == "codex" ? ["ChatGPT", "Codex"] : ["claude"];
+        string[] places = id == "codex" ? [@"\WindowsApps\OpenAI.Codex_"] : [@"\AnthropicClaude\", @"\WindowsApps\Claude_"];
+        foreach (string name in names)
+            foreach (var p in System.Diagnostics.Process.GetProcessesByName(name))
+                using (p)
+                {
+                    try
+                    {
+                        if (p.MainModule?.FileName is { } file && places.Any(place => file.Contains(place, StringComparison.OrdinalIgnoreCase))) return true;
+                    }
+                    catch (Exception e) when (e is System.ComponentModel.Win32Exception or InvalidOperationException or NotSupportedException)
+                    {
+                    }
+                }
+        return false;
+    }
 
     /// <summary>The MCP server's command: the app, told to be the server (and where its settings are, if not the usual).</summary>
     public List<string> McpArgs => Home == Configs.DefaultHome ? ["mcp"] : ["--home", Home, "mcp"];
@@ -209,69 +355,112 @@ public sealed class ClaudeSetup
         "claude-code" => ClaudeCodeConfig,
         "codex" => CodexConfig,
         "gemini" => GeminiConfig,
+        "antigravity" => AntigravityConfig,
         _ => throw new ArgumentException($"no AI app called {id}", nameof(id)),
     };
 
     bool IsInstalled(string id) => id switch
     {
-        "claude-desktop" => AppInstalled("Claude") || Directory.Exists(Path.GetDirectoryName(DesktopConfig)),
+        "claude-desktop" => Installed("Claude") || Directory.Exists(Path.GetDirectoryName(DesktopConfig)),
         "claude-code" => Find("claude") is not null || File.Exists(ClaudeCodeConfig),
-        "codex" => Find("codex") is not null || AppInstalled("ChatGPT") || Directory.Exists(Path.GetDirectoryName(CodexConfig)),
-        "gemini" => Find("gemini") is not null || Directory.Exists(Path.GetDirectoryName(GeminiConfig)),
+        "codex" => Find("codex") is not null || Installed("ChatGPT") || Directory.Exists(Path.GetDirectoryName(CodexConfig)),
+        // Antigravity keeps its own things under ~/.gemini too, so only Gemini CLI's own command, or its settings file, says it's here.
+        "gemini" => Find("gemini") is not null || File.Exists(GeminiConfig),
+        "antigravity" => Find(StudyStash.Core.Ai.Antigravity.Binary) is not null,
         _ => false,
     };
 
     bool SameProgram(string? command) => command is not null
-        && string.Equals(command, Program, OperatingSystem.IsWindows() || OperatingSystem.IsMacOS() ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal);
+        && string.Equals(command, Program, Windows || Mac ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal);
 
     /// <summary>Every app, read fresh from its own settings file (read only: nothing is changed).</summary>
     public IReadOnlyList<AiAppState> States() => [.. Apps.Select(a => State(a.Id))];
 
-    public AiAppState State(string id)
+    /// <summary>One AI's apps, read fresh (read only).</summary>
+    public IReadOnlyList<AiAppState> StatesOf(string provider) => [.. AppsOf(provider).Select(State)];
+
+    /// <summary>Syft Notes' entry in an app's settings text: its command and arguments, and whether it's under the old
+    /// name; null when there's none.</summary>
+    static (string? Command, List<string?> Args, bool OldName)? EntryIn(string id, string text)
     {
-        string path = ConfigOf(id);
-        string? command = null;
-        List<string?> args = [];
-        bool added = false;
+        if (id == "codex")
+        {
+            if (ServersOf(TomlOf(text)) is not { } servers) return null;
+            foreach (string name in (string[])[ClaudeTools.ServerName, .. ClaudeTools.OldServerNames])
+                if (servers.TryGetValue(name, out var s) && s is TomlTable t)
+                {
+                    string? command = t.TryGetValue("command", out var c) ? c as string : null;
+                    List<string?> args = t.TryGetValue("args", out var a) && a is TomlArray list ? [.. list.Select(x => x as string)] : [];
+                    return (command, args, name != ClaudeTools.ServerName);
+                }
+            return null;
+        }
+        if (JsonOf(text, lenient: true)?["mcpServers"] is not JsonObject json) return null;
+        foreach (string name in (string[])[ClaudeTools.ServerName, .. ClaudeTools.OldServerNames])
+            if (json[name] is JsonObject entry)
+            {
+                string? command = entry["command"] is JsonValue v && v.TryGetValue(out string? c) ? c : null;
+                List<string?> args = entry["args"] is JsonArray list ? [.. list.Select(x => x is JsonValue av && av.TryGetValue(out string? arg) ? arg : null)] : [];
+                return (command, args, name != ClaudeTools.ServerName);
+            }
+        return null;
+    }
+
+    static string? ReadText(string path)
+    {
         try
         {
-            if (File.Exists(path))
-            {
-                string text = File.ReadAllText(path);
-                if (id == "codex")
-                {
-                    if (ServersOf(TomlOf(text)) is { } servers && servers.TryGetValue(ClaudeTools.ServerName, out var s))
-                    {
-                        added = true;
-                        command = (s as TomlTable)?.TryGetValue("command", out var c) == true ? c as string : null;
-                        if ((s as TomlTable)?.TryGetValue("args", out var a) == true && a is TomlArray list) args = [.. list.Select(x => x as string)];
-                    }
-                }
-                else if (JsonOf(text, lenient: true)?["mcpServers"]?[ClaudeTools.ServerName] is JsonObject entry)
-                {
-                    added = true;
-                    command = entry["command"] is JsonValue v && v.TryGetValue(out string? c) ? c : null;
-                    if (entry["args"] is JsonArray list) args = [.. list.Select(x => x is JsonValue av && av.TryGetValue(out string? arg) ? arg : null)];
-                }
-            }
+            return File.Exists(path) ? File.ReadAllText(path) : null;
         }
         catch (Exception e) when (e is IOException or UnauthorizedAccessException)
         {
+            return null;
         }
-        bool ours = added && SameProgram(command);
+    }
+
+    /// <summary>The places this app doesn't read that may hold a copy of Syft Notes' entry (Claude Desktop's older folders).</summary>
+    IReadOnlyList<string> OthersOf(string id) => id == "claude-desktop" ? Desktop.Others : [];
+
+    public AiAppState State(string id)
+    {
+        string path = ConfigOf(id);
+        var entry = ReadText(path) is { } text ? EntryIn(id, text) : null;
+        bool added = entry is not null;
+        bool ours = added && SameProgram(entry!.Value.Command);
+        bool oldName = entry?.OldName == true;
+        bool stale = OthersOf(id).Any(o => ReadText(o) is { } t && EntryIn(id, t) is not null);
+        bool outdated = ours && (!entry!.Value.Args.SequenceEqual(ArgsFor(id)) || oldName);
         return new AiAppState(id, NameOf(id), IsInstalled(id) || added, added, added && !ours,
             ToLocal(McpClients.When(McpClients.AddedFile(Home, id))), ToLocal(McpClients.When(McpClients.StartedFile(Home, id))), path,
-            Outdated: ours && !args.SequenceEqual(ArgsFor(id)),
-            CanReopen: ReopenApp is not null && DesktopApp(id) is { } desktop && AppInstalled(desktop.Name));
+            Outdated: outdated || stale && ours,
+            CanReopen: ReopenApp is not null && DesktopApp(id) is { } desktop && Installed(desktop.Name))
+        {
+            OldName = oldName, Stale = stale, Running = DesktopApp(id) is not null && IsRunning(id), Words = WordsFor(id),
+        };
     }
 
     static DateTime? ToLocal(DateTime? utc) => utc?.ToLocalTime();
 
-    /// <summary>Adds Syft Notes to this app's settings, or puts this copy of it in place of another.</summary>
+    /// <summary>Adds Syft Notes to this app's settings, or puts this copy of it in place of another (or of its old
+    /// name), and takes any copy out of the places the app no longer reads.</summary>
     public AiAppChange Connect(string id) => Change(id, add: true);
 
-    /// <summary>Takes Syft Notes out of this app's settings, leaving everything else in them.</summary>
+    /// <summary>Takes Syft Notes out of this app's settings (and the places it no longer reads), leaving everything else.</summary>
     public AiAppChange Disconnect(string id) => Change(id, add: false);
+
+    /// <summary>
+    /// Checks one AI's apps the way the apps will: starts Syft Notes' server exactly as the first good entry's settings
+    /// say (its command and arguments), and asks it for its tools, as an app does when it loads it. That start leaves no
+    /// "started" note of its own (<see cref="McpClients.ProbeEnv"/>). Null when there's nothing to check, or no way to.
+    /// </summary>
+    public async Task<McpProbeResult?> CheckAsync(string provider)
+    {
+        if (Probe is null) return null;
+        foreach (string id in AppsOf(provider))
+            if (State(id) is { Good: true } && ReadText(ConfigOf(id)) is { } text && EntryIn(id, text) is { Command: { } command } entry)
+                return await Probe(command, [.. entry.Args.Select(a => a ?? "")]);
+        return null;
+    }
 
     AiAppChange Change(string id, bool add)
     {
@@ -287,6 +476,8 @@ public sealed class ClaudeSetup
         {
             return new(false, $"Couldn't change {name}'s settings ({path}): {e.Message}", path, null, add ? written : null);
         }
+        // Claude Desktop's older folders (on Windows): a copy of the entry there is never read, and would only mislead.
+        foreach (string other in OthersOf(id)) Forget(id, other);
         if (result.Ok)
         {
             string marker = McpClients.AddedFile(Home, id);
@@ -318,26 +509,31 @@ public sealed class ClaudeSetup
         if (root["mcpServers"] is { } existing && existing is not JsonObject)
             return new(false, $"{name}'s settings have mcpServers in a shape Syft Notes doesn't know, so they're left alone.", path, null, add ? written : null);
         var servers = root["mcpServers"] as JsonObject;
+        // Its old name goes either way: an app never has both.
+        int removed = servers is null ? 0 : ClaudeTools.OldServerNames.Count(servers.Remove);
         if (add)
         {
             if (servers is null) root["mcpServers"] = servers = [];
             servers[ClaudeTools.ServerName] = EntryFor(id);
         }
-        else if (servers is null || !servers.Remove(ClaudeTools.ServerName))
+        else if (servers is null || !servers.Remove(ClaudeTools.ServerName) && removed == 0)
             return new(true, $"{name} doesn't have Syft Notes.", path);
         else if (servers.Count == 0) root.Remove("mcpServers"); // the file goes back to how it was before Syft Notes
 
         string after = root.ToJsonString(Indented);
         if (before is not null && before.Contains("\r\n", StringComparison.Ordinal)) after = after.ReplaceLineEndings("\r\n");
         if (before is null || before.EndsWith('\n')) after += before?.Contains("\r\n", StringComparison.Ordinal) == true ? "\r\n" : "\n";
-        string? backup = Save(path, before, after);
+        // Already just so (Connect pressed again): nothing is written, and no backup made of it.
+        string? backup = after == before ? null : Save(path, before, after);
         return add
             ? new(true, $"Added Syft Notes to {name}.", path, backup, written)
             : new(true, $"Took Syft Notes out of {name}. Its other settings are as they were.", path, backup);
     }
 
-    // A heading for Syft Notes' own table in config.toml, or one of its sub-tables ([mcp_servers.study-stash.env]).
-    static readonly Regex OurHeading = new($@"^\s*\[\s*mcp_servers\s*\.\s*(?:{Regex.Escape(ClaudeTools.ServerName)}|""{Regex.Escape(ClaudeTools.ServerName)}""|'{Regex.Escape(ClaudeTools.ServerName)}')\s*(?:\.[^\]]*)?\]\s*(?:#.*)?$");
+    // A heading for Syft Notes' own table in config.toml, or one of its sub-tables ([mcp_servers.syft-notes.env]), under
+    // its name or its old one.
+    static readonly string OurNames = string.Join("|", ((string[])[ClaudeTools.ServerName, .. ClaudeTools.OldServerNames]).Select(Regex.Escape));
+    static readonly Regex OurHeading = new($@"^\s*\[\s*mcp_servers\s*\.\s*(?:(?:{OurNames})|""(?:{OurNames})""|'(?:{OurNames})')\s*(?:\.[^\]]*)?\]\s*(?:#.*)?$");
     static readonly Regex AnyHeading = new(@"^\s*\[");
 
     AiAppChange ChangeToml(string name, string path, bool add, string written)
@@ -349,19 +545,40 @@ public sealed class ClaudeSetup
         string nl = before.Contains("\r\n", StringComparison.Ordinal) ? "\r\n" : "\n";
         var (rest, had) = WithoutOurTables(before, nl);
         var left = TomlOf(rest);
-        if (left is null || ServersOf(left)?.ContainsKey(ClaudeTools.ServerName) == true)
+        if (left is null || ServersOf(left)?.Keys.Any(ClaudeTools.IsOurServer) == true)
             return new(false, Manual($"{name}'s config.toml has Syft Notes set up by hand in a way Syft Notes won't rewrite, so it's left alone."), path, null, add ? written : null);
         string after;
         if (add) after = (rest.Trim().Length > 0 ? rest.TrimEnd('\r', '\n') + nl + nl : "") + written.ReplaceLineEndings(nl) + nl;
         else if (!had) return new(true, $"{name} doesn't have Syft Notes.", path);
         else after = rest;
         // What ChatGPT and Codex will read has Syft Notes exactly when it should, or nothing is written.
-        if (TomlOf(after) is not { } check || (ServersOf(check)?.ContainsKey(ClaudeTools.ServerName) == true) != add)
+        if (TomlOf(after) is not { } check || (ServersOf(check)?.ContainsKey(ClaudeTools.ServerName) == true) != add
+            || ServersOf(check)?.Keys.Any(k => ClaudeTools.OldServerNames.Contains(k)) == true)
             return new(false, Manual($"Couldn't make a change to {name}'s config.toml that it would read, so it's left alone."), path, null, add ? written : null);
-        string? backup = Save(path, File.Exists(path) ? before : null, after);
+        string? backup = after == before ? null : Save(path, File.Exists(path) ? before : null, after);
         return add
             ? new(true, $"Added Syft Notes to {name}.", path, backup, written)
             : new(true, $"Took Syft Notes out of {name}. Its other settings are as they were.", path, backup);
+    }
+
+    /// <summary>Takes Syft Notes' entry (under either name) out of a settings file the app no longer reads, keeping the
+    /// rest and a backup. Quietly nothing when the file isn't there, has none, or can't be read safely.</summary>
+    void Forget(string id, string path)
+    {
+        if (!CanWrite || ReadText(path) is not { } text || EntryIn(id, text) is null || JsonOf(text, lenient: false) is not { } root) return;
+        if (root["mcpServers"] is not JsonObject servers) return;
+        foreach (string name in (string[])[ClaudeTools.ServerName, .. ClaudeTools.OldServerNames]) servers.Remove(name);
+        if (servers.Count == 0) root.Remove("mcpServers");
+        string after = root.ToJsonString(Indented);
+        if (text.Contains("\r\n", StringComparison.Ordinal)) after = after.ReplaceLineEndings("\r\n");
+        if (text.EndsWith('\n')) after += text.Contains("\r\n", StringComparison.Ordinal) ? "\r\n" : "\n";
+        try
+        {
+            Save(path, text, after);
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException)
+        {
+        }
     }
 
     /// <summary>config.toml without Syft Notes' own tables (and the blank lines that led up to them), and whether it
@@ -431,7 +648,7 @@ public sealed class ClaudeSetup
     }
 
     /// <summary>Writes <paramref name="after"/> in place of the file, keeping what was there as
-    /// <c>NAME.study-stash-backup</c> beside it. A link (a dotfiles setup) is followed, so the file it points to is
+    /// <c>NAME.syft-notes-backup</c> beside it. A link (a dotfiles setup) is followed, so the file it points to is
     /// changed, not the link replaced; the file keeps its permissions; it's swapped in whole, never half-written.
     /// The backup's path, or null when there was no file before.</summary>
     static string? Save(string path, string? before, string after)
@@ -442,10 +659,10 @@ public sealed class ClaudeSetup
         string? backup = null;
         if (before is not null && File.Exists(target))
         {
-            backup = target + ".study-stash-backup";
+            backup = target + ".syft-notes-backup";
             File.Copy(target, backup, overwrite: true);
         }
-        string tmp = target + ".study-stash-new";
+        string tmp = target + ".syft-notes-new";
         File.WriteAllText(tmp, after, new UTF8Encoding(false));
         if (!OperatingSystem.IsWindows() && File.Exists(target)) File.SetUnixFileMode(tmp, File.GetUnixFileMode(target));
         File.Move(tmp, target, overwrite: true);
