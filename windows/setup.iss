@@ -200,6 +200,55 @@ begin
   end;
 end;
 
+// The background library ("Answer your phone when Syft Notes is closed": StudyStash.exe ... helper, started from the
+// Run key, and the library it keeps going) holds this install's files and never quits by itself. Each copy of it is
+// stopped before any file is replaced, whoever ran Setup; the app starts it again on the new version when it opens.
+// WMI can't see another account's: those are left alone. True when none is left within TimeoutMs.
+function StopBackground(TimeoutMs: Cardinal): Boolean;
+var
+  Wmi, Found, Proc: Variant;
+  I, Pid, ResultCode: Integer;
+  Handle: THandle;
+  Started, Spent: Cardinal;
+  Pids: array of Integer;
+  Cmd: String;
+begin
+  Result := True;
+  Wmi := CreateOleObject('WbemScripting.SWbemLocator');
+  Wmi := Wmi.ConnectServer('.', 'root\CIMV2');
+  Found := Wmi.ExecQuery('SELECT ProcessId, ExecutablePath, CommandLine FROM Win32_Process WHERE Name = ''StudyStash.exe''');
+  SetArrayLength(Pids, 0);
+  for I := 0 to Found.Count - 1 do
+  begin
+    Proc := Found.ItemIndex(I);
+    if (not VarIsNull(Proc.ExecutablePath)) and (not VarIsNull(Proc.CommandLine)) then
+    begin
+      // Pos takes a String, not the Variant WMI hands back
+      Cmd := Proc.CommandLine;
+      if (CompareText(Proc.ExecutablePath, ExpandConstant('{app}\StudyStash.exe')) = 0) and (Pos(' helper', Cmd) > 0) then
+      begin
+        Pid := Proc.ProcessId;
+        Log('Stopping Syft Notes in the background (' + IntToStr(Pid) + ')');
+        Exec(ExpandConstant('{sys}\taskkill.exe'), '/f /pid ' + IntToStr(Pid), '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
+        SetArrayLength(Pids, GetArrayLength(Pids) + 1);
+        Pids[GetArrayLength(Pids) - 1] := Pid;
+      end;
+    end;
+  end;
+  Started := GetTickCount;
+  for I := 0 to GetArrayLength(Pids) - 1 do
+  begin
+    Handle := OpenProcess($00100000, False, Pids[I]); // SYNCHRONIZE
+    if Handle <> 0 then
+    begin
+      Spent := GetTickCount - Started;
+      if Spent > TimeoutMs then Spent := TimeoutMs;
+      if WaitForSingleObject(Handle, TimeoutMs - Spent) <> 0 then Result := False;
+      CloseHandle(Handle);
+    end;
+  end;
+end;
+
 // A silent update (/relaunch=1): the copy that started it is quitting by itself. It gets a moment to, then whatever
 // still runs from this folder is stopped (again, should something have opened one meanwhile), so no file is in use
 // when the new ones go in. Anything that goes wrong here is only logged: Restart Manager (CloseApplications) still
@@ -207,6 +256,11 @@ end;
 function PrepareToInstall(var NeedsRestart: Boolean): String;
 begin
   Result := '';
+  try
+    if not StopBackground(10000) then Log('Syft Notes in the background was still running 10 s after it was stopped');
+  except
+    Log('Couldn''t stop Syft Notes in the background: ' + GetExceptionMessage);
+  end;
   if not Relaunch then Exit;
   try
     StopOldRelaunchers;
@@ -246,14 +300,25 @@ begin
   end;
 end;
 
-// The app's own start-at-login entry (Desktop.StartAtLogin): removed only if it still points at this
-// install, so a second profile's entry (a different value name) or someone else's app is left alone.
+// The app's own start-at-login entry (Desktop.StartAtLogin), and the background library's ("Syft Notes background",
+// one per settings folder: BackgroundLibrary.cs): removed only if they still point at this install, so a second
+// profile's entry or someone else's app is left alone. [UninstallRun] has already stopped whatever ran from here.
 procedure CurUninstallStepChanged(CurUninstallStep: TUninstallStep);
 var
   RunValue: String;
+  Names: TArrayOfString;
+  I: Integer;
 begin
   if CurUninstallStep = usUninstall then
+  begin
     if RegQueryStringValue(HKCU, 'Software\Microsoft\Windows\CurrentVersion\Run', 'Study Stash', RunValue) then
       if Pos(ExpandConstant('{app}'), RunValue) > 0 then
         RegDeleteValue(HKCU, 'Software\Microsoft\Windows\CurrentVersion\Run', 'Study Stash');
+    if RegGetValueNames(HKCU, 'Software\Microsoft\Windows\CurrentVersion\Run', Names) then
+      for I := 0 to GetArrayLength(Names) - 1 do
+        if Pos('Syft Notes background', Names[I]) = 1 then
+          if RegQueryStringValue(HKCU, 'Software\Microsoft\Windows\CurrentVersion\Run', Names[I], RunValue) then
+            if Pos(ExpandConstant('{app}'), RunValue) > 0 then
+              RegDeleteValue(HKCU, 'Software\Microsoft\Windows\CurrentVersion\Run', Names[I]);
+  end;
 end;

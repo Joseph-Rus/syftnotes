@@ -26,6 +26,8 @@ static class TestSafety
         // Antigravity's home of Syft Notes' own: a folder of the tests' own, never ~/.study-stash/gemini (an off-screen
         // film points it at a signed-in one with STUDYSTASH_AGY_HOME).
         Core.Ai.Antigravity.Home = () => Core.Ai.Antigravity.For(System.IO.Path.Combine(System.IO.Path.GetTempPath(), "studystash-app-tests"));
+        // A sign-in's page never goes to this computer's browser from a test (CI's real sign-ins give their own opener).
+        Core.Ai.AgentSignIn.Browser = _ => true;
     }
 #pragma warning restore CA2255
 }

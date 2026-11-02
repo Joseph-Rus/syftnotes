@@ -81,6 +81,8 @@
       <Setter Property="Padding" Value="6,0" />
       <Setter Property="Foreground" Value="{DynamicResource AccentText}" />
     </Style>
+    <!-- In Settings, Settings' look (white panel, hairlines, the keys a white pill); setup's last page keeps this one. -->
+    <StyleInclude Source="avares://StudyStash/Views/SettingsPaneStyles.axaml" />
   </UserControl.Styles>
 
   <StackPanel Spacing="8">

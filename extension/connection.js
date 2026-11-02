@@ -113,7 +113,13 @@ function originsFor(c) {
 // a store copy has them once the student allowed them.
 async function hasAccess(c) {
   if (!c || !c.stored) return true;
-  try { return await chrome.permissions.contains({origins: originsFor(c)}); } catch (e) { return false; }
+  try { return await chrome.permissions.contains({origins: originsWanted(c)}); } catch (e) { return false; }
+}
+
+// The sites a store copy asks for: its Canvas, the file store and the library; before its Canvas is known (1.8), every
+// Canvas Cloud school's in its place, so the student's can be found.
+function originsWanted(c) {
+  return c.canvas ? originsFor(c) : originsToFind(c);
 }
 
 // The popup's Connect: ask the browser for the code's sites while the click still counts (a permission request needs
@@ -128,5 +134,96 @@ function connectWithCode(code) {
 
 // Ask again for a saved connection's sites (the student said no the first time, or the browser forgot).
 function allowAccess(c) {
-  return chrome.permissions.request({origins: originsFor(c)}).then(granted => !!granted);
+  return chrome.permissions.request({origins: originsWanted(c)}).then(granted => !!granted);
+}
+
+// ---- Connecting with nothing to type (1.8) --------------------------------------------------------------------------
+// Just added from a store, this copy knows nothing. Syft Notes on this computer opens a short window when the student
+// presses Add Syft Notes to <browser> there: the library answers this copy (and no web page) with where it is and its
+// key. Then the copy finds the student's Canvas by itself: Canvas Cloud schools are all at <school>.instructure.com,
+// and the browser has a Canvas session cookie for the one the student signs in to. A school with Canvas at its own
+// address is found from the toolbar button instead, on a Canvas page (popup.js). Nothing is typed or pasted.
+
+// Where a library on this computer listens: 8787, or the next free pair after it.
+const LIBRARY_PORTS = [8787, 8789, 8791, 8793, 8795, 8797];
+
+// Canvas's own session cookies (canvas-lms names it _normandy_session; Instructure's hosting, canvas_session).
+const CANVAS_COOKIES = ['canvas_session', '_normandy_session', '_legacy_normandy_session'];
+
+// What a copy needs before it knows the student's Canvas: its library, every Canvas Cloud school and the file store.
+const ANY_CANVAS = 'https://*.instructure.com/*';
+function originsToFind(c) {
+  const out = [originPattern(c.app), ANY_CANVAS].concat((c.files || []).map(h => 'https://' + h + '/*'));
+  return out.filter((o, i) => o && out.indexOf(o) === i);
+}
+
+// The library on this computer, as it answers this copy while its window is open: {app, key, canvas, files, protocol}
+// ('' canvas until it's found), or null when none answered.
+async function findLibrary(ports) {
+  for (const port of ports || LIBRARY_PORTS) {
+    try {
+      const r = await fetch('http://127.0.0.1:' + port + '/api/v2/canvas/hello', {cache: 'no-store'});
+      if (!r.ok) continue;
+      const c = await r.json();
+      if (!c || !/^https?:\/\//i.test(c.app || '') || !c.key) continue;
+      return {
+        app: c.app.replace(/\/+$/, ''), key: String(c.key), canvas: String(c.canvas || '').replace(/\/+$/, ''),
+        files: Array.isArray(c.files) ? c.files.filter(h => typeof h === 'string') : [], protocol: c.protocol || 0,
+      };
+    } catch (e) { /* nothing on that port */ }
+  }
+  return null;
+}
+
+// The library on this computer, kept as this copy's connection (as a pasted code's would be): the connection, or null
+// when no library answered (Syft Notes isn't waiting for this copy just now).
+async function adoptLibrary(ports) {
+  const c = await findLibrary(ports);
+  if (!c) return null;
+  await chrome.storage.local.set({connection: c});
+  return Object.assign({}, c, {stored: true});
+}
+
+// Whether a site is a Canvas the browser is signed in to: Canvas answers who's signed in with their id.
+async function isCanvas(origin) {
+  try {
+    const r = await fetch(origin.replace(/\/+$/, '') + '/api/v1/users/self', {credentials: 'include', headers: {Accept: 'application/json'}});
+    if (!r.ok) return false;
+    const me = JSON.parse((await r.text()).replace(/^while\(1\);/, ''));
+    return !!(me && me.id);
+  } catch (e) {
+    return false;
+  }
+}
+
+// The student's Canvas, from the browser's Canvas session cookies on instructure.com (newest first), checked by asking
+// Canvas who's signed in: "https://school.instructure.com", or '' when there's none (signed out, or Canvas at the
+// school's own address).
+async function findCanvas() {
+  if (!chrome.cookies || !chrome.cookies.getAll) return '';
+  let cookies = [];
+  try { cookies = await chrome.cookies.getAll({domain: 'instructure.com'}); } catch (e) { return ''; }
+  const hosts = [];
+  for (const k of cookies.filter(k => CANVAS_COOKIES.indexOf(k.name) >= 0).sort((a, b) => (b.expirationDate || 0) - (a.expirationDate || 0))) {
+    const host = String(k.domain || '').replace(/^\./, '').toLowerCase();
+    if (/^[a-z0-9-]+(\.[a-z0-9-]+)*\.instructure\.com$/.test(host) && hosts.indexOf(host) < 0) hosts.push(host);
+  }
+  for (const host of hosts) if (await isCanvas('https://' + host)) return 'https://' + host;
+  return '';
+}
+
+// Tell the library where the student's Canvas is, and keep it in this copy's connection. Resolves to the Canvas the
+// library goes by (the one it had already, when Settings set another).
+async function tellCanvas(c, url) {
+  const r = await fetch(c.app + '/api/v2/canvas/found', {
+    method: 'POST', headers: {'X-Study-Stash-Key': c.key, 'Content-Type': 'application/json'}, body: JSON.stringify({url}),
+  });
+  if (!r.ok) throw new Error('/api/v2/canvas/found: ' + r.status);
+  const canvas = String((await r.json()).canvas || url).replace(/\/+$/, '');
+  if (c.stored) {
+    const keep = Object.assign({}, c, {canvas});
+    delete keep.stored;
+    await chrome.storage.local.set({connection: keep});
+  }
+  return canvas;
 }

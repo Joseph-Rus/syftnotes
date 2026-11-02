@@ -9,6 +9,10 @@ using StudyStash.Core.PhoneDrive;
 
 namespace StudyStash.App.ViewModels;
 
+/// <summary>Settings → Phone's "Answer your phone when Syft Notes is closed": what it is now, turning it on or off (the
+/// library moves to the background or back), and why it couldn't, if it couldn't.</summary>
+public sealed record PhoneBackgroundSwitch(Func<bool> Get, Func<bool, Task> Set, Func<string?> Problem);
+
 /// <summary>A phone that uses the Google Drive folder: its name, and whether it's open now or when it last was.</summary>
 public sealed record DrivePhoneRow(string Id, string Name, string Meta);
 
@@ -20,12 +24,15 @@ public sealed record DrivePhoneRow(string Id, string Name, string Meta);
 public sealed partial class PhoneGoogleModel : ObservableObject, IDisposable
 {
     readonly PhoneDrive drive;
+    readonly PhoneBackgroundSwitch? background;
     readonly Func<DateTimeOffset> now;
     readonly Action<Action> ui;
+    bool reading;
 
-    public PhoneGoogleModel(PhoneDrive drive, Func<DateTimeOffset>? now = null, Action<Action>? ui = null)
+    public PhoneGoogleModel(PhoneDrive drive, Func<DateTimeOffset>? now = null, Action<Action>? ui = null, PhoneBackgroundSwitch? background = null)
     {
         this.drive = drive;
+        this.background = background;
         this.now = now ?? (() => DateTimeOffset.UtcNow);
         this.ui = ui ?? (a => Dispatcher.UIThread.Post(a));
         drive.Changed += OnChanged;
@@ -71,6 +78,34 @@ public sealed partial class PhoneGoogleModel : ObservableObject, IDisposable
     public string StepTwo => Email.Length > 0 ? $"Use the same Google account: {Email}." : "Use the same Google account as here.";
     public string HowItWorks => $"Your phone keeps a copy of your notes, so it can read them while this {Device} is off. Recordings, files and questions from your phone reach this {Device} when it's on.";
     public string ConfirmWords => "Your phone stops getting your notes, and Syft Notes empties its folder in your Google Drive.";
+    public string WhenClosedTitle => "Answer your phone when Syft Notes is closed";
+    public string WhenClosedSub => $"Your phone's questions, recordings and files are answered whenever this {Device} is on, even after you quit Syft Notes. Recording still needs Syft Notes open.";
+
+    /// <summary>The switch shows once the phone is linked (and wherever Settings has one to give).</summary>
+    public bool ShowWhenClosed => Connected && background is not null;
+    [ObservableProperty] public partial bool AnswerWhenClosed { get; set; }
+    /// <summary>Why it couldn't keep answering with the app closed; null while it's fine.</summary>
+    [ObservableProperty] public partial string? WhenClosedProblem { get; set; }
+
+    partial void OnAnswerWhenClosedChanged(bool value)
+    {
+        if (reading || background is null || value == background.Get()) return;
+        _ = SwitchAsync(value);
+    }
+
+    async Task SwitchAsync(bool on)
+    {
+        Busy = true;
+        try
+        {
+            await background!.Set(on);
+        }
+        finally
+        {
+            Busy = false;
+            Refresh();
+        }
+    }
 
     partial void OnConnectedChanged(bool value) => Notify();
     partial void OnConnectingChanged(bool value) => Notify();
@@ -78,7 +113,7 @@ public sealed partial class PhoneGoogleModel : ObservableObject, IDisposable
 
     void Notify()
     {
-        foreach (string p in new[] { nameof(ShowConnect), nameof(ShowConnected), nameof(NoPhones), nameof(HasPhones), nameof(Account), nameof(StepTwo) })
+        foreach (string p in new[] { nameof(ShowConnect), nameof(ShowConnected), nameof(NoPhones), nameof(HasPhones), nameof(Account), nameof(StepTwo), nameof(ShowWhenClosed) })
             OnPropertyChanged(p);
     }
 
@@ -90,6 +125,13 @@ public sealed partial class PhoneGoogleModel : ObservableObject, IDisposable
         Connecting = drive.Connecting;
         SignedOut = drive.SignedOut;
         Status = drive.Status;
+        if (background is not null)
+        {
+            reading = true;
+            AnswerWhenClosed = background.Get();
+            reading = false;
+            WhenClosedProblem = AnswerWhenClosed ? background.Problem() : null;
+        }
         if (account is null)
         {
             Email = "";

@@ -29,6 +29,7 @@
       <Setter Property="BorderThickness" Value="1" />
       <Setter Property="HorizontalContentAlignment" Value="Stretch" />
     </Style>
+    <StyleInclude Source="avares://StudyStash/Views/SettingsPaneStyles.axaml" />
   </UserControl.Styles>
   <ScrollViewer VerticalScrollBarVisibility="Auto">
     <StackPanel Spacing="0">

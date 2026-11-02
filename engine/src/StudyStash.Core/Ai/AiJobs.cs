@@ -18,6 +18,49 @@ public sealed class AiJobs(string home, Func<string>? ollamaHost = null)
     /// <summary>How the library checks whether each engine is ready, without ever contacting an account.</summary>
     public EngineChecks Checks { get; init; } = EngineChecks.Machine with { HasKey = id => ApiKeys.Has(home, id) };
 
+    /// <summary>How often a sign-in that's waiting for the student is looked at, and how long it's looked at before it
+    /// gives up: a test sets them small.</summary>
+    public TimeSpan SignInEvery { get; init; } = TimeSpan.FromSeconds(3);
+    public TimeSpan SignInPatience { get; init; } = TimeSpan.FromMinutes(10);
+
+    AiSignIns? signIns;
+
+    /// <summary>The AIs' own sign-ins, started hidden from every Sign in button (<see cref="AiSignIns"/>): once one says it's
+    /// signed in, the AI is marked ready (<see cref="MarkSignedIn"/>).</summary>
+    public AiSignIns SignIns => signIns ??= new AiSignIns(Checks, MarkSignedIn) { Every = SignInEvery, Patience = SignInPatience };
+
+    /// <summary>An AI's own status command said the student signed in: it's ready now, with no check to press, and the
+    /// notes it couldn't write while it was signed out are written (<see cref="SignedInAgain"/>). A usage limit is left
+    /// alone: signing in doesn't end one.</summary>
+    public void MarkSignedIn(string id)
+    {
+        var s = Settings;
+        bool back = Engines.LooksLikeAuth(s.Tests.GetValueOrDefault(id, ""));
+        s.Tests[id] = "works";
+        // The first AI a student gets working, with none chosen yet, is the one that writes their notes (and answers).
+        bool first = !s.Picked("notes") && id != "ollama";
+        if (first) s.Provider = id;
+        s.Save(home);
+        if (first) NotesAiChosen?.Invoke();
+        if (back) SignedInAgain?.Invoke(id);
+    }
+
+    /// <summary>An AI was chosen to write the notes where none was before: the library writes the notes it kept waiting.</summary>
+    public event Action? NotesAiChosen;
+
+    /// <summary>The library's start: an ai.json from before "nobody chosen yet" whose Ollama was only the old default
+    /// becomes one where nobody is chosen (<see cref="AiSettings.Migrated"/>), unless Ollama is here or has written
+    /// notes (<paramref name="notesFromOllama"/>, from the store). Returns whether it changed.</summary>
+    public bool MigrateAiSettings(Func<bool> notesFromOllama)
+    {
+        if (!File.Exists(AiSettings.PathIn(home))) return false;
+        var s = AiSettings.Load(home);
+        if (s.Version >= AiSettings.CurrentVersion) return false;
+        bool changed = s.Migrated(Checks.OllamaInstalled(), s.Provider == "ollama" && notesFromOllama());
+        s.Save(home);
+        return changed;
+    }
+
     /// <summary>How long <see cref="AskAsync"/> waits for the picked engine before falling back to Ollama: for the
     /// whole answer, or, when it's shown as it's written, for the engine to start writing it.</summary>
     public TimeSpan AskTimeout { get; init; } = TimeSpan.FromSeconds(90);
@@ -206,7 +249,7 @@ public sealed class AiJobs(string home, Func<string>? ollamaHost = null)
     /// pre-flight check only, before the run starts; a job already under way never changes engines mid-run (the
     /// pipeline's own retry does that, not this).</summary>
     bool NotesOnOllama(AiSettings settings) =>
-        settings.Local("notes") || (settings.Fallback && Checks.OllamaInstalled() && Engines.KnownUnusableWhy(settings.For("notes").Provider, settings, Checks) is not null);
+        settings.NotesChosen && (settings.Local("notes") || (settings.Fallback && Checks.OllamaInstalled() && Engines.KnownUnusableWhy(settings.For("notes").Provider, settings, Checks) is not null));
 
     /// <summary>What an engine's notes may draw: Ollama's small models keep to flowcharts; the CLI engines, whose
     /// SVG holds together, may draw what's spatial too.</summary>
@@ -218,6 +261,8 @@ public sealed class AiJobs(string home, Func<string>? ollamaHost = null)
     {
         var settings = Settings;
         notesNote = "";
+        // Nobody chosen to write the notes yet: the lecture is filed with its transcript, and its notes are written once an AI is chosen.
+        if (!settings.NotesChosen) throw new NoNotesAiException();
         bool onOllama = NotesOnOllama(settings);
         string engine = onOllama ? "ollama" : settings.For("notes").Provider;
         // Over its usage limit with no free AI on this computer to fall back to (a student on Gemini's free plan): said at
@@ -497,7 +542,7 @@ public sealed class AiJobs(string home, Func<string>? ollamaHost = null)
     {
         if (!settings.Local("sort") || (settings.ByJob.TryGetValue("sort", out var own) && own.Provider.Length > 0)) return null;
         string notes = settings.For("notes").Provider;
-        if (notes == "ollama" || Engines.KnownUnusableWhy(notes, settings, checks) is not null) return null;
+        if (notes is "ollama" or "" || Engines.KnownUnusableWhy(notes, settings, checks) is not null) return null;
         bool ollamaSorts = await checks.OllamaModels(cfg.OllamaHost) is { } models
             && Ollama.HasModel(models.Select(m => m.Name).ToList(), cfg.OllamaModel);
         return ollamaSorts ? null : notes;
@@ -527,7 +572,7 @@ public sealed class AiJobs(string home, Func<string>? ollamaHost = null)
     public bool NotesInFastMode()
     {
         var settings = Settings;
-        if (NotesOnOllama(settings)) return false;
+        if (!settings.NotesChosen || NotesOnOllama(settings)) return false;
         var c = settings.For("notes");
         return AiSpeed.ForNotes(c.Provider, c.Model, settings.Speed).Fast;
     }
@@ -537,6 +582,7 @@ public sealed class AiJobs(string home, Func<string>? ollamaHost = null)
     {
         var settings = Settings;
         var c = settings.For(job);
+        if (job == "notes" && !settings.NotesChosen) return ""; // nobody writes them yet: nothing to name
         if (c.Provider == "ollama" || (job == "notes" && NotesOnOllama(settings)))
             return job == "notes" ? cfg.EffectiveSummaryModel : cfg.OllamaModel;
         string model = job == "notes" ? AiSpeed.ForNotes(c.Provider, c.Model, settings.Speed).Model : c.Model;
@@ -874,6 +920,7 @@ public sealed class AiJobs(string home, Func<string>? ollamaHost = null)
         return new AskReply(Py.AsString(result["answer"]) ?? "", sources, engine, note.Length > 0 ? note : Engines.Name(engine))
         {
             Asked = asked, AskedName = Engines.Name(asked), FellBack = fellBack, Why = why, Remembered = remembered,
+            Quotes = AskQuotes.Clean(result["quotes"]),
         };
     }
 }

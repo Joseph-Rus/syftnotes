@@ -1,7 +1,9 @@
 <!-- Ask, docked at the foot of a page (Home, a class's home, a lecture's notes): the question, what it's asked about
      ("All classes"), which AI answers (its own mark; a click opens "Answer with"), and the shortcut that puts the caret
-     here, which gives way to Send once there's a question. It fills the width it's given. The latest answer has its own
-     card above it (MacAiAnswer), in its own room on the page. -->
+     here, which gives way to Send once there's a question. It fills the width it's given. Once something's asked it
+     travels to the foot of the conversation's panel (MacAiAnswer, in AskSplit); narrower than a full row there, the
+     question has a line of its own over what it's asked about and which AI. Its menus open over it, kept to its right
+     edge, so none hangs past the bar or out of the panel. -->
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="using:StudyStash.App.ViewModels"
@@ -12,10 +14,44 @@
              ClipToBounds="False">
   <UserControl.Styles>
     <StyleInclude Source="avares://StudyStash/Views/MacAiStyles.axaml" />
+    <!-- What it's asked about: a long folder name is cut short (the whole of it under the pointer) -->
+    <Style Selector="Button.ask-scope">
+      <Setter Property="Grid.Column" Value="2" />
+    </Style>
+    <Style Selector="Button.ask-scope TextBlock">
+      <Setter Property="MaxWidth" Value="160" />
+      <Setter Property="TextTrimming" Value="CharacterEllipsis" />
+    </Style>
+    <!-- In the conversation's panel its header has Chats: the bar doesn't say it twice -->
+    <Style Selector="v|AskSplit:open Panel#ChatsRoom">
+      <Setter Property="IsVisible" Value="False" />
+    </Style>
+    <!-- Stacked (narrower than a full row): the question on lines of its own (a long one wraps), the rest under it -->
+    <Style Selector=":is(Control).stacked Border.ask">
+      <Setter Property="Height" Value="NaN" />
+      <Setter Property="Padding" Value="16,8,8,8" />
+    </Style>
+    <Style Selector=":is(Control).stacked TextBox#AskInput">
+      <Setter Property="Grid.ColumnSpan" Value="11" />
+      <Setter Property="Margin" Value="0,4,8,6" />
+      <Setter Property="TextWrapping" Value="Wrap" />
+      <Setter Property="MaxHeight" Value="132" />
+    </Style>
+    <Style Selector=":is(Control).stacked Grid#Row > :is(Control):not(TextBox)">
+      <Setter Property="Grid.Row" Value="1" />
+    </Style>
+    <Style Selector=":is(Control).stacked Button.ask-scope">
+      <Setter Property="Grid.Column" Value="0" />
+      <Setter Property="HorizontalAlignment" Value="Left" />
+      <Setter Property="Margin" Value="-8,0,0,0" />
+    </Style>
+    <Style Selector=":is(Control).stacked Button.ask-scope TextBlock">
+      <Setter Property="MaxWidth" Value="180" />
+    </Style>
   </UserControl.Styles>
 
   <Border Classes="ask" ClipToBounds="False">
-    <Grid ColumnDefinitions="*,12,Auto,2,Auto,2,Auto,2,Auto,8,Auto" VerticalAlignment="Center">
+    <Grid Name="Row" ColumnDefinitions="*,12,Auto,2,Auto,2,Auto,2,Auto,8,Auto" RowDefinitions="Auto,Auto" VerticalAlignment="Center">
       <TextBox Name="AskInput" c:OneLinePaste.IsOn="True" Classes="bare" Text="{Binding Question}" PlaceholderText="{Binding Placeholder}" PlaceholderForeground="{DynamicResource InkSubtle}"
                FontSize="15.5" VerticalAlignment="Center" AutomationProperties.Name="Ask about your lectures">
         <TextBox.KeyBindings>
@@ -33,35 +69,37 @@
               ToolTip.Tip="Recipes" AutomationProperties.Name="Recipes">
         <c:Icon Glyph="bookmark" Size="18" />
         <Button.Flyout>
-          <Flyout Placement="Top" VerticalOffset="-12" ShowMode="Standard" FlyoutPresenterClasses="bare">
+          <Flyout Placement="TopEdgeAlignedRight" VerticalOffset="-12" ShowMode="Standard" FlyoutPresenterClasses="bare">
             <v:AiRecipesMenu />
           </Flyout>
         </Button.Flyout>
       </Button>
       <!-- What it's asked about -->
-      <Button Grid.Column="2" Classes="ask-scope" AutomationProperties.Name="{Binding ScopeName}">
+      <Button Classes="ask-scope" AutomationProperties.Name="{Binding ScopeName}">
         <StackPanel Orientation="Horizontal" Spacing="4">
-          <TextBlock Text="{Binding ScopeName}" VerticalAlignment="Center" />
+          <TextBlock Text="{Binding ScopeName}" VerticalAlignment="Center" ToolTip.Tip="{Binding ScopeName}" c:Tips.WhenCut="True" />
           <c:Icon Glyph="expand_more" Size="14" VerticalAlignment="Center" />
         </StackPanel>
         <Button.Flyout>
-          <MenuFlyout Placement="Top" VerticalOffset="-12" FlyoutPresenterTheme="{StaticResource AiMenuFlyout}" ItemsSource="{Binding ScopeChoices}" ItemContainerTheme="{StaticResource AiChoiceItem}" />
+          <MenuFlyout Placement="TopEdgeAlignedRight" VerticalOffset="-12" FlyoutPresenterTheme="{StaticResource AiMenuFlyout}" ItemsSource="{Binding ScopeChoices}" ItemContainerTheme="{StaticResource AiChoiceItem}" />
         </Button.Flyout>
       </Button>
       <!-- Which AI answers: its own mark, no sparkle and no pill -->
-      <!-- This place's kept conversations, when it has any: one picked opens in the card above, to carry on -->
-      <Button Name="ChatsButton" Grid.Column="6" Classes="icon-btn" VerticalAlignment="Center" IsVisible="{Binding HasChats}" AutomationProperties.Name="Chats">
+      <!-- This place's kept conversations, when it has any: one picked opens in the panel, to carry on -->
+      <Panel Name="ChatsRoom" Grid.Column="6" VerticalAlignment="Center">
+      <Button Name="ChatsButton" Classes="icon-btn" VerticalAlignment="Center" IsVisible="{Binding HasChats}" AutomationProperties.Name="Chats" ToolTip.Tip="Chats">
         <c:Icon Glyph="forum" Size="18" />
         <Button.Flyout>
-          <Flyout Placement="Top" VerticalOffset="-12" ShowMode="Standard" FlyoutPresenterClasses="bare">
+          <Flyout Placement="TopEdgeAlignedRight" VerticalOffset="-12" ShowMode="Standard" FlyoutPresenterClasses="bare">
             <v:AiChatsMenu />
           </Flyout>
         </Button.Flyout>
       </Button>
+      </Panel>
       <Button Name="EngineChip" Grid.Column="8" Classes="icon-btn" VerticalAlignment="Center" ToolTip.Tip="{Binding EngineTip}" AutomationProperties.Name="{Binding EngineTip}">
         <c:Icon Glyph="{Binding EngineIcon}" Size="18" />
         <Button.Flyout>
-          <Flyout Placement="Top" VerticalOffset="-12" ShowMode="Standard" FlyoutPresenterClasses="bare">
+          <Flyout Placement="TopEdgeAlignedRight" VerticalOffset="-12" ShowMode="Standard" FlyoutPresenterClasses="bare">
             <ContentControl Content="{Binding Menu}">
               <ContentControl.ContentTemplate>
                 <DataTemplate x:DataType="vm:EngineMenuModel">
@@ -73,7 +111,7 @@
         </Button.Flyout>
       </Button>
       <!-- Nothing typed: the keys that bring the caret here. A question: Send takes their place. -->
-      <Border Grid.Column="10" Classes="kbd" IsVisible="{Binding ShowKeys}">
+      <Border Grid.Column="10" Classes="kbd" IsVisible="{Binding ShowKeys}" VerticalAlignment="Center">
         <TextBlock Text="{x:Static v:AskKeys.Shown}" />
       </Border>
       <Button AutomationProperties.Name="Send question" Grid.Column="10" Classes="ask-send" Command="{Binding AskCommand}" IsVisible="{Binding CanSend}" ToolTip.Tip="Send">

@@ -12,6 +12,8 @@ public partial class NotePage : UserControl
     public NotePage()
     {
         InitializeComponent();
+        // Opening the conversation slides the notes' column over to the left, from where it was.
+        Split.Anchor = Column;
         // Files dropped on the note are attached to it.
         AttachFiles.AcceptDrops(NoteScroll, () => (DataContext as LibraryModel)?.LectureFiles);
         // The notes' diagrams ask about their boxes in this note's Ask bar, and find them in its transcript.

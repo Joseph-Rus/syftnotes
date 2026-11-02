@@ -1,5 +1,7 @@
-<!-- Settings → AI engines (design 13): who writes the notes, the rich notes switches and who designs them, who answers questions, every
-     engine's state and what to do about it, and the Ollama fallback. The pane's own padding and scrolling; the settings window is the host's. -->
+<!-- Settings → Your AI: one card per AI (Claude, ChatGPT, Gemini, then Ollama, advanced), each with its state, what's
+     connected in the student's words and one button (Connect, or Fix), then who does what and the rich notes, and the power
+     options folded under Advanced settings (Claude's speed, the fallback, API keys; the Settings page adds the AI apps' own
+     switches and Open in a terminal under them). No padding or scrolling of its own: the Your AI page has them. -->
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="using:StudyStash.App.ViewModels"
@@ -8,29 +10,111 @@
              x:DataType="vm:AiEnginesModel">
   <UserControl.Styles>
     <StyleInclude Source="avares://StudyStash/Views/MacAiStyles.axaml" />
+    <StyleInclude Source="avares://StudyStash/Views/SettingsPaneStyles.axaml" />
   </UserControl.Styles>
 
-  <ScrollViewer VerticalScrollBarVisibility="Auto">
-    <StackPanel Margin="40,12,40,32" Spacing="24" MaxWidth="640">
+  <StackPanel Spacing="24">
 
       <StackPanel Spacing="6">
-        <TextBlock Classes="ai-title" Text="Your AI" c:Typography.Extra="-0.39" />
-        <TextBlock Classes="ai-sub" MaxWidth="540" HorizontalAlignment="Left"
+        <TextBlock Classes="ai-title" Text="Your AI" />
+        <TextBlock Classes="ai-sub lede" MaxWidth="540" HorizontalAlignment="Left"
                    Text="{Binding Lede}" />
       </StackPanel>
 
       <TextBlock Text="{Binding OlderLibraryWords}" Classes="ai-sub" IsVisible="{Binding OlderLibrary}" />
       <TextBlock Text="Your library isn't answering. Check it's on and connected." Classes="ai-sub" IsVisible="{Binding Offline}" />
 
+      <!-- The AIs: a card each, in the order a student meets them -->
+      <StackPanel Spacing="8">
+        <Grid ColumnDefinitions="*,Auto">
+          <TextBlock Classes="ai-section" Text="{Binding ListTitle}" />
+          <Button Grid.Column="1" Classes="ai-textbtn" IsVisible="{Binding HasAddChoices}">
+            <TextBlock Classes="ai-link" Text="Add another AI" />
+            <Button.Flyout>
+              <MenuFlyout Placement="BottomEdgeAlignedRight" FlyoutPresenterTheme="{StaticResource AiMenuFlyout}" ItemsSource="{Binding AddChoices}" ItemContainerTheme="{StaticResource AiAddItem}">
+                <MenuFlyout.ItemTemplate>
+                  <DataTemplate x:DataType="vm:AiEngineRow">
+                        <StackPanel Spacing="2">
+                          <TextBlock Text="{Binding Name, StringFormat='Get {0}'}" FontSize="13" />
+                          <TextBlock Text="{Binding About}" FontSize="11" Foreground="{DynamicResource Fg2}" />
+                        </StackPanel>
+                  </DataTemplate>
+                </MenuFlyout.ItemTemplate>
+              </MenuFlyout>
+            </Button.Flyout>
+          </Button>
+        </Grid>
+        <ItemsControl ItemsSource="{Binding Engines}">
+          <ItemsControl.ItemsPanel>
+            <ItemsPanelTemplate><StackPanel Spacing="8" /></ItemsPanelTemplate>
+          </ItemsControl.ItemsPanel>
+          <ItemsControl.ItemTemplate>
+            <DataTemplate x:DataType="vm:AiEngineRow">
+              <Border Classes="ai-group ai-card-mac">
+                <StackPanel Margin="16,12" Spacing="8">
+                  <Grid Classes="ai-row" ColumnDefinitions="Auto,12,*,Auto" MinHeight="40">
+                    <Border Classes="ai-tile" VerticalAlignment="Top">
+                      <c:Icon Glyph="{Binding Icon}" Size="17" Foreground="{DynamicResource Fg}" />
+                    </Border>
+                    <StackPanel Classes="ai-row-text" Grid.Column="2" VerticalAlignment="Center" Margin="0,0,12,0" Spacing="2">
+                      <TextBlock Classes="ai-row-title" Text="{Binding Name}" />
+                      <StackPanel Orientation="Horizontal" Spacing="6">
+                        <Ellipse Classes="ai-dot" Classes.good="{Binding Good}" Classes.warn="{Binding Warn}" VerticalAlignment="Center" />
+                        <TextBlock Classes="ai-state" Classes.warn="{Binding Warn}" Text="{Binding StateWords}" />
+                      </StackPanel>
+                    </StackPanel>
+                    <StackPanel Grid.Column="3" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                      <Button Classes="ai-pillbtn" Command="{Binding ActCommand}" IsVisible="{Binding ShowPill}" AutomationProperties.Name="{Binding ActionName}">
+                        <Border Classes="ai-pill" Classes.primary="{Binding IsPrimary}">
+                          <TextBlock Text="{Binding ActionWords}" />
+                        </Border>
+                      </Button>
+                      <Button Classes="ai-pillbtn" IsVisible="{Binding NeedsOptions}" AutomationProperties.Name="{Binding ActionName}">
+                        <Border Classes="ai-pill">
+                          <TextBlock Text="{Binding ActionWords}" />
+                        </Border>
+                        <Button.Flyout>
+                          <MenuFlyout Placement="BottomEdgeAlignedRight" FlyoutPresenterTheme="{StaticResource AiMenuFlyout}">
+                            <MenuItem Theme="{StaticResource AiMenuItem}" Header="Connect again" Command="{Binding ConnectCommand}" IsVisible="{Binding CanConnectAgain}" />
+                            <MenuItem Theme="{StaticResource AiMenuItem}" Header="Check it works" Command="{Binding CheckCommand}" />
+                            <MenuItem Theme="{StaticResource AiMenuItem}" Header="Models" ItemsSource="{Binding ModelChoices}" IsVisible="{Binding HasModels}" ItemContainerTheme="{StaticResource AiModelItem}" />
+                          </MenuFlyout>
+                        </Button.Flyout>
+                      </Button>
+                    </StackPanel>
+                  </Grid>
+                  <!-- What's connected ("Writes your notes · Claude app · Claude Code"), where Connect has got to, or what's wrong -->
+                  <TextBlock Classes="ai-row-sub" Text="{Binding About}" TextWrapping="Wrap" Margin="40,0,0,0" />
+                  <!-- The one thing left for the student: an app to quit and open again -->
+                  <Grid ColumnDefinitions="Auto,8,*,Auto" Margin="40,0,0,0" IsVisible="{Binding HasNext}">
+                    <c:Icon Glyph="info" Size="15" Foreground="{DynamicResource Fg}" VerticalAlignment="Top" Margin="0,1,0,0" />
+                    <TextBlock Grid.Column="2" Classes="ai-row-sub ai-next" Text="{Binding Next}" TextWrapping="Wrap" VerticalAlignment="Center" />
+                    <Button Grid.Column="3" Classes="ai-pillbtn" Command="{Binding ReopenCommand}" IsVisible="{Binding CanReopen}" Margin="12,0,0,0" VerticalAlignment="Center">
+                      <Border Classes="ai-pill primary"><TextBlock Text="{Binding ReopenWords}" /></Border>
+                    </Button>
+                  </Grid>
+                  <!-- What else to try (Open the page again, or Get help) -->
+                  <Button Classes="ai-textbtn" Name="SignInLink" Command="{Binding LinkCommand}" IsVisible="{Binding HasLink}" HorizontalAlignment="Left" Margin="40,0,0,0">
+                    <Border Classes="ai-pill-plain"><TextBlock Text="{Binding LinkWords}" /></Border>
+                  </Button>
+                </StackPanel>
+              </Border>
+            </DataTemplate>
+          </ItemsControl.ItemTemplate>
+        </ItemsControl>
+        <!-- What the last thing done here came to (Claude is connected, a download, a choice the library refused) -->
+        <c:PageText Classes="ai-sub" MaxWidth="560" HorizontalAlignment="Left" TextWrapping="Wrap" Text="{Binding SayOfAis}" IsVisible="{Binding HasSayOfAis}" />
+      </StackPanel>
+
       <!-- Who does what -->
       <StackPanel Spacing="8">
-        <TextBlock Classes="ai-section" Text="Who does what" Margin="4,0" />
+        <TextBlock Classes="ai-section" Text="Who does what" />
         <Border Classes="ai-group">
           <StackPanel>
             <Grid Classes="ai-row" ColumnDefinitions="Auto,12,*,Auto" Margin="16,8">
               <StackPanel Classes="ai-row-text" Grid.Column="2" VerticalAlignment="Center">
                 <TextBlock Classes="ai-row-title" Text="Writes your notes" />
-                <TextBlock Classes="ai-row-sub" Text="After each lecture, on your library" />
+                <TextBlock Classes="ai-row-sub" Text="{Binding NotesRowAbout}" />
               </StackPanel>
               <Button AutomationProperties.Name="Writes your notes" Grid.Column="3" Classes="ai-select-btn" VerticalAlignment="Center">
                 <Border Classes="ai-select">
@@ -68,7 +152,7 @@
 
       <!-- Rich notes: diagrams, formula plots and drawings after the notes, and who designs them -->
       <StackPanel Spacing="8" IsVisible="{Binding HasRich}">
-        <TextBlock Classes="ai-section" Text="Rich notes" Margin="4,0" />
+        <TextBlock Classes="ai-section" Text="Rich notes" />
         <Border Classes="ai-group">
           <StackPanel>
             <Grid Classes="ai-row" ColumnDefinitions="Auto,12,*,Auto" MinHeight="44" Margin="16,8">
@@ -76,7 +160,7 @@
                 <TextBlock Classes="ai-row-title" Text="Rich notes" />
                 <TextBlock Classes="ai-row-sub" Text="{Binding RichAbout}" TextWrapping="Wrap" />
               </StackPanel>
-              <ToggleButton AutomationProperties.Name="Rich notes" Grid.Column="3" Theme="{StaticResource AiToggle}" IsChecked="{Binding RichOn}" VerticalAlignment="Center" />
+              <ToggleButton AutomationProperties.Name="Rich notes" Grid.Column="3" Classes="switch" IsChecked="{Binding RichOn}" VerticalAlignment="Center" />
             </Grid>
             <StackPanel IsVisible="{Binding ShowKinds}">
               <Border Classes="ai-sep" />
@@ -85,7 +169,7 @@
                   <TextBlock Classes="ai-row-title" Text="Diagrams" />
                   <TextBlock Classes="ai-row-sub" Text="Flowcharts, state and sequence diagrams, timelines and mind maps" TextWrapping="Wrap" />
                 </StackPanel>
-                <ToggleButton AutomationProperties.Name="Diagrams" Grid.Column="3" Theme="{StaticResource AiToggle}" IsChecked="{Binding RichDiagrams}" VerticalAlignment="Center" />
+                <ToggleButton AutomationProperties.Name="Diagrams" Grid.Column="3" Classes="switch" IsChecked="{Binding RichDiagrams}" VerticalAlignment="Center" />
               </Grid>
               <Border Classes="ai-sep" />
               <Grid Classes="ai-row" ColumnDefinitions="Auto,12,*,Auto" MinHeight="44" Margin="16,8">
@@ -93,7 +177,7 @@
                   <TextBlock Classes="ai-row-title" Text="Formula plots" />
                   <TextBlock Classes="ai-row-sub" Text="A curve or distribution drawn from the lecturer's formula, with sliders" TextWrapping="Wrap" />
                 </StackPanel>
-                <ToggleButton AutomationProperties.Name="Formula plots" Grid.Column="3" Theme="{StaticResource AiToggle}" IsChecked="{Binding RichPlots}" VerticalAlignment="Center" />
+                <ToggleButton AutomationProperties.Name="Formula plots" Grid.Column="3" Classes="switch" IsChecked="{Binding RichPlots}" VerticalAlignment="Center" />
               </Grid>
               <Border Classes="ai-sep" />
               <Grid Classes="ai-row" ColumnDefinitions="Auto,12,*,Auto" MinHeight="44" Margin="16,8">
@@ -101,7 +185,7 @@
                   <TextBlock Classes="ai-row-title" Text="Drawings" />
                   <TextBlock Classes="ai-row-sub" Text="Labelled figures of what a lecture describes (not on Ollama)" TextWrapping="Wrap" />
                 </StackPanel>
-                <ToggleButton AutomationProperties.Name="Drawings" Grid.Column="3" Theme="{StaticResource AiToggle}" IsChecked="{Binding RichDrawings}" VerticalAlignment="Center" />
+                <ToggleButton AutomationProperties.Name="Drawings" Grid.Column="3" Classes="switch" IsChecked="{Binding RichDrawings}" VerticalAlignment="Center" />
               </Grid>
             </StackPanel>
             <StackPanel IsVisible="{Binding ShowDrawnBy}">
@@ -128,9 +212,19 @@
         </Border>
       </StackPanel>
 
+      <!-- The power options, folded away until asked for -->
+      <Button Classes="ai-textbtn" Command="{Binding ToggleAdvancedCommand}" HorizontalAlignment="Left" Padding="0,2"
+              AutomationProperties.Name="{Binding AdvancedWords}">
+        <StackPanel Orientation="Horizontal" Spacing="4">
+          <TextBlock Classes="ai-link" Text="{Binding AdvancedWords}" />
+          <c:Icon Glyph="expand_more" Size="16" Foreground="{DynamicResource Fg2}" IsVisible="{Binding !AdvancedOpen}" />
+          <c:Icon Glyph="expand_less" Size="16" Foreground="{DynamicResource Fg2}" IsVisible="{Binding AdvancedOpen}" />
+        </StackPanel>
+      </Button>
+      <StackPanel Spacing="24" IsVisible="{Binding AdvancedOpen}">
       <!-- How fast Claude Code writes the notes and designs the rich notes -->
       <StackPanel Spacing="8" IsVisible="{Binding HasSpeed}">
-        <TextBlock Classes="ai-section" Text="How fast Claude works" Margin="4,0" />
+        <TextBlock Classes="ai-section" Text="How fast Claude works" />
         <Border Classes="ai-group">
           <Grid Classes="ai-row" ColumnDefinitions="Auto,12,*,Auto" Margin="16,8">
             <StackPanel Classes="ai-row-text" Grid.Column="2" VerticalAlignment="Center" Margin="0,0,12,0">
@@ -152,75 +246,23 @@
         </Border>
       </StackPanel>
 
-      <!-- Engines -->
+      <!-- If an engine isn’t available -->
       <StackPanel Spacing="8">
-        <Grid ColumnDefinitions="*,Auto">
-          <TextBlock Classes="ai-section" Text="AIs on your library" Margin="4,0" />
-          <Button Grid.Column="1" Classes="ai-textbtn" IsVisible="{Binding HasAddChoices}">
-            <TextBlock Classes="ai-link" Text="Add another AI" />
-            <Button.Flyout>
-              <MenuFlyout Placement="BottomEdgeAlignedRight" FlyoutPresenterTheme="{StaticResource AiMenuFlyout}" ItemsSource="{Binding AddChoices}" ItemContainerTheme="{StaticResource AiAddItem}">
-                <MenuFlyout.ItemTemplate>
-                  <DataTemplate x:DataType="vm:AiEngineRow">
-                        <StackPanel Spacing="2">
-                          <TextBlock Text="{Binding Name, StringFormat='Get {0}'}" FontSize="13" />
-                          <TextBlock Text="{Binding About}" FontSize="11" Foreground="{DynamicResource Fg2}" />
-                        </StackPanel>
-                  </DataTemplate>
-                </MenuFlyout.ItemTemplate>
-              </MenuFlyout>
-            </Button.Flyout>
-          </Button>
-        </Grid>
+        <TextBlock Classes="ai-section" Text="If your AI isn’t available" />
         <Border Classes="ai-group">
-          <ItemsControl ItemsSource="{Binding Engines}">
-            <ItemsControl.ItemTemplate>
-              <DataTemplate x:DataType="vm:AiEngineRow">
-                <StackPanel>
-                  <Border Classes="ai-sep" IsVisible="{Binding !First}" />
-                  <Grid Classes="ai-row" ColumnDefinitions="Auto,12,*,Auto" MinHeight="45" Margin="16,8">
-                    <Border Classes="ai-tile">
-                      <c:Icon Glyph="{Binding Icon}" Size="17" Foreground="{DynamicResource Fg}" />
-                    </Border>
-                    <StackPanel Classes="ai-row-text" Grid.Column="2" VerticalAlignment="Center">
-                      <TextBlock Classes="ai-row-title" Text="{Binding Name}" />
-                      <TextBlock Classes="ai-row-sub" Text="{Binding About}" />
-                    </StackPanel>
-                    <StackPanel Grid.Column="3" Orientation="Horizontal" Spacing="10" VerticalAlignment="Center">
-                      <StackPanel Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
-                        <Ellipse Classes="ai-dot" Classes.good="{Binding Good}" Classes.warn="{Binding Warn}" />
-                        <TextBlock Classes="ai-state" Classes.warn="{Binding Warn}" Text="{Binding StateWords}" />
-                      </StackPanel>
-                      <Button Classes="ai-pillbtn" Command="{Binding ActCommand}" IsVisible="{Binding !NeedsOptions}">
-                        <Border Classes="ai-pill" Classes.primary="{Binding IsPrimary}">
-                          <TextBlock Text="{Binding ActionWords}" />
-                        </Border>
-                      </Button>
-                      <Button Classes="ai-pillbtn" IsVisible="{Binding NeedsOptions}">
-                        <Border Classes="ai-pill">
-                          <TextBlock Text="{Binding ActionWords}" />
-                        </Border>
-                        <Button.Flyout>
-                          <MenuFlyout Placement="BottomEdgeAlignedRight" FlyoutPresenterTheme="{StaticResource AiMenuFlyout}">
-                            <MenuItem Theme="{StaticResource AiMenuItem}" Header="Check it works" Command="{Binding CheckCommand}" />
-                            <MenuItem Theme="{StaticResource AiMenuItem}" Header="Models" ItemsSource="{Binding ModelChoices}" IsVisible="{Binding HasModels}" ItemContainerTheme="{StaticResource AiModelItem}" />
-                          </MenuFlyout>
-                        </Button.Flyout>
-                      </Button>
-                    </StackPanel>
-                  </Grid>
-                </StackPanel>
-              </DataTemplate>
-            </ItemsControl.ItemTemplate>
-          </ItemsControl>
+          <Grid Classes="ai-row" ColumnDefinitions="Auto,12,*,Auto" MinHeight="44" Margin="16,8">
+            <StackPanel Classes="ai-row-text" Grid.Column="2" VerticalAlignment="Center">
+              <TextBlock Classes="ai-row-title" Text="Use Ollama instead" />
+              <TextBlock Classes="ai-row-sub" Text="So notes and answers never stall" />
+            </StackPanel>
+            <ToggleButton AutomationProperties.Name="Use Ollama instead" Grid.Column="3" Classes="switch" IsChecked="{Binding Fallback}" VerticalAlignment="Center" />
+          </Grid>
         </Border>
-        <!-- What the last thing done here came to (a download, a sign-in, a choice the library refused) -->
-        <c:PageText Classes="ai-sub" MaxWidth="560" HorizontalAlignment="Left" Margin="4,0" TextWrapping="Wrap" Text="{Binding SayOfAis}" IsVisible="{Binding HasSayOfAis}" />
       </StackPanel>
 
       <!-- API keys: an engine can run on a key instead of (or as well as) its app -->
       <StackPanel Spacing="8" IsVisible="{Binding HasKeys}">
-        <TextBlock Classes="ai-section" Text="API keys" Margin="4,0" />
+        <TextBlock Classes="ai-section" Text="API keys" />
         <Border Classes="ai-group">
           <ItemsControl ItemsSource="{Binding Keys}">
             <ItemsControl.ItemTemplate>
@@ -261,23 +303,10 @@
           </ItemsControl>
         </Border>
         <!-- What the key just saved came to: "Claude works with your API key.", or what its maker said of it -->
-        <c:PageText Classes="ai-sub" MaxWidth="560" HorizontalAlignment="Left" Margin="4,0" TextWrapping="Wrap" Text="{Binding SayOfKeys}" IsVisible="{Binding HasSayOfKeys}" />
+        <c:PageText Classes="ai-sub" MaxWidth="560" HorizontalAlignment="Left" TextWrapping="Wrap" Text="{Binding SayOfKeys}" IsVisible="{Binding HasSayOfKeys}" />
       </StackPanel>
 
-      <!-- If an engine isn’t available -->
-      <StackPanel Spacing="8">
-        <TextBlock Classes="ai-section" Text="If your AI isn’t available" Margin="4,0" />
-        <Border Classes="ai-group">
-          <Grid Classes="ai-row" ColumnDefinitions="Auto,12,*,Auto" MinHeight="44" Margin="16,8">
-            <StackPanel Classes="ai-row-text" Grid.Column="2" VerticalAlignment="Center">
-              <TextBlock Classes="ai-row-title" Text="Use Ollama instead" />
-              <TextBlock Classes="ai-row-sub" Text="So notes and answers never stall" />
-            </StackPanel>
-            <ToggleButton AutomationProperties.Name="Use Ollama instead" Grid.Column="3" Theme="{StaticResource AiToggle}" IsChecked="{Binding Fallback}" VerticalAlignment="Center" />
-          </Grid>
-        </Border>
       </StackPanel>
 
-    </StackPanel>
-  </ScrollViewer>
+  </StackPanel>
 </UserControl>

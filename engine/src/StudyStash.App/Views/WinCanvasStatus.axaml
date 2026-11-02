@@ -8,6 +8,7 @@
              x:DataType="vm:CanvasStatusModel">
   <UserControl.Styles>
     <StyleInclude Source="avares://StudyStash/Views/WinCanvasStyles.axaml" />
+    <StyleInclude Source="avares://StudyStash/Views/SettingsPaneStyles.axaml" />
   </UserControl.Styles>
   <Border Classes="cv-bar" IsVisible="{Binding IsVisible}"
           Classes.cv-info="{Binding IsInfo}" Classes.cv-ok="{Binding IsOk}" Classes.cv-warn="{Binding IsWarn}" Classes.cv-error="{Binding IsError}">

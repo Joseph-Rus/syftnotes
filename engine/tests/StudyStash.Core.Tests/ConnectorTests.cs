@@ -35,6 +35,8 @@ static class NoInternetFetch
         StudyStash.Core.Ai.ClaudeProvider.VersionOf = _ => new Version(2, 1, 260);
         // Antigravity's home of Syft Notes' own: a folder of the tests' own, never ~/.study-stash/gemini.
         StudyStash.Core.Ai.Antigravity.Home = () => Path.Combine(Path.GetTempPath(), "studystash-core-tests-agy-home");
+        // A sign-in's page never goes to this computer's browser from a test.
+        StudyStash.Core.Ai.AgentSignIn.Browser = _ => true;
     }
 #pragma warning restore CA2255
 }
@@ -928,7 +930,7 @@ public class ConnectorTests
         Assert.False(init.Headers.Contains("Mcp-Session-Id"));
         string body = await init.Content.ReadAsStringAsync();
         Assert.Contains($"\"protocolVersion\":\"{version}\"", body);
-        Assert.Contains("\"name\":\"study-stash\"", body);
+        Assert.Contains("\"name\":\"syft-notes\"", body);
 
         var note = await c.SendAsync(Rpc(token, new { jsonrpc = "2.0", method = "notifications/initialized" }, headers: ("MCP-Protocol-Version", version)));
         Assert.Equal(HttpStatusCode.Accepted, note.StatusCode);
@@ -1297,7 +1299,7 @@ public class ConnectorTests
             Endpoint = new Uri(Ts + "/mcp"), TransportMode = HttpTransportMode.StreamableHttp,
             AdditionalHeaders = new Dictionary<string, string> { ["Authorization"] = "Bearer " + token },
         }, door.Internet(), ownsHttpClient: true));
-        Assert.Equal("study-stash", mcp.ServerInfo.Name);
+        Assert.Equal("syft-notes", mcp.ServerInfo.Name);
         Assert.Contains("search_notes", (await mcp.ListToolsAsync()).Select(t => t.Name));
         var result = await mcp.CallToolAsync("search_notes", new Dictionary<string, object?> { ["query"] = "recursion" });
         Assert.True(result.IsError is null or false, Text(result));

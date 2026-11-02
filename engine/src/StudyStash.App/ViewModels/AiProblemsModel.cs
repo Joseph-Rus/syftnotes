@@ -52,9 +52,57 @@ public sealed class AiProblem
 /// this last one has no server source yet: nothing asks for approval today, but the shape is here for when
 /// something does). Reads and drives one library's AI (<see cref="IAiLibrary"/>); the view is just this list.
 /// </summary>
-public sealed class AiProblemsModel(IAiLibrary library)
+public sealed class AiProblemsModel
 {
+    readonly IAiLibrary library;
+    readonly SignInWatch watch;
+    string shown = "";
+
+    /// <summary>Opens a page in the browser (Get help); null in tests.</summary>
+    public Action<string>? OpenUrl { get; set; }
+
+    public AiProblemsModel(IAiLibrary library)
+    {
+        this.library = library;
+        watch = new SignInWatch(library, SignInMovedAsync);
+    }
+
+    /// <summary>Said whenever these cards learn the AIs' state from the library (a sign-in's progress among it), so the
+    /// rows on the same page show it too; <see cref="Adopt"/> is the other direction.</summary>
+    public event Action<AiOverview>? Heard;
+
+    /// <summary>Takes the state the AI rows learned, so a sign-in started from a row shows on its card at once.</summary>
+    public void Adopt(AiOverview overview)
+    {
+        if (SignInWatch.Signature(overview) == shown) return;
+        shown = SignInWatch.Signature(overview);
+        Apply(overview.Problems);
+        watch.Begin(overview);
+    }
+
+    /// <summary>How often a sign-in that's going is looked at; a test sets it small.</summary>
+    public TimeSpan SignInEvery
+    {
+        get => watch.Every;
+        set => watch.Every = value;
+    }
+
+    /// <summary>Whether the library is on this computer (one computer does everything): its cards say "this computer"
+    /// rather than "your library".</summary>
+    public bool Here { get; init; }
+
     public ObservableCollection<AiProblem> Problems { get; } = [];
+
+    /// <summary>A sign-in going from a card: its card turns into "Finish signing in…", and goes by itself once the AI
+    /// says it's signed in (nothing to press).</summary>
+    Task SignInMovedAsync(AiOverview now)
+    {
+        if (SignInWatch.Signature(now) == shown) return Task.CompletedTask;
+        shown = SignInWatch.Signature(now);
+        Apply(now.Problems);
+        Heard?.Invoke(now);
+        return Task.CompletedTask;
+    }
 
     public async Task Load()
     {
@@ -67,7 +115,11 @@ public sealed class AiProblemsModel(IAiLibrary library)
         {
             return;
         }
-        if (overview is not null) Apply(overview.Problems);
+        if (overview is null) return;
+        shown = SignInWatch.Signature(overview);
+        Apply(overview.Problems);
+        watch.Begin(overview);
+        Heard?.Invoke(overview);
     }
 
     void Apply(List<AiProblemInfo> infos)
@@ -81,23 +133,58 @@ public sealed class AiProblemsModel(IAiLibrary library)
     AiProblem Build(AiProblemInfo p)
     {
         string fallbackName = Engines.Name(p.FallbackTo.Length > 0 ? p.FallbackTo : "ollama");
+        // A sign-in going from this card says where it is, in the card's own words.
+        string signIn = p.Kind == "not_signed_in" ? p.SignIn : "";
         var problem = new AiProblem
         {
             Id = p.Id,
             Kind = p.Kind,
             Caption = AiWords.ProblemCaption(p.Kind),
-            Title = AiWords.ProblemTitle(p.Kind, p.EngineName, fallbackName),
+            Title = signIn.Length > 0 ? AiWords.SignInTitle(p.EngineName, signIn) : AiWords.ProblemTitle(p.Kind, p.EngineName, fallbackName, Here),
             // A sign-in with no stand-in says so, rather than naming Ollama, which isn't used.
-            Message = AiWords.ProblemMessage(p.Kind, p.EngineName, p.Kind == "not_signed_in" && p.FallbackTo.Length == 0 ? "" : fallbackName,
-                p.Until, p.SizeGb, ""),
+            Message = signIn.Length > 0 ? AiWords.SignInAbout(p.EngineName, signIn)
+                : AiWords.ProblemMessage(p.Kind, p.EngineName, p.Kind == "not_signed_in" && p.FallbackTo.Length == 0 ? "" : fallbackName,
+                    p.Until, p.SizeGb, "", Here),
             Icon = AiWords.ProblemIcon(p.Kind),
             ColorKey = AiWords.ProblemColorKey(p.Kind),
             Severity = AiWords.ProblemSeverity(p.Kind),
-            PrimaryWords = p.Kind == "not_signed_in" && signingIn.Contains(p.Engine) ? "Check" : AiWords.ProblemAction(p.Kind),
+            PrimaryWords = signIn.Length > 0 ? AiWords.SignInButton(signIn)
+                : p.Kind == "not_signed_in" && signingIn.Contains(p.Engine) ? "Check" : AiWords.ProblemAction(p.Kind),
+            SecondaryWords = AiWords.SignInLink(signIn),
         };
         problem.PrimaryCommand = new AsyncRelayCommand(() => Act(p));
+        if (signIn.Length > 0) problem.SecondaryCommand = new AsyncRelayCommand(() => ActOnLink(p, signIn));
         problem.CloseCommand = new AsyncRelayCommand(() => CloseServerAsync(p.Id));
         return problem;
+    }
+
+    /// <summary>The small link on a sign-in: the page again while it waits, or Syft Notes' help page once it couldn't
+    /// start.</summary>
+    async Task ActOnLink(AiProblemInfo p, string signIn)
+    {
+        if (signIn == SignInPhase.Stuck)
+        {
+            OpenUrl?.Invoke(AiWords.HelpPage);
+            return;
+        }
+        try
+        {
+            var said = await library.SignInAgainAsync(p.Engine);
+            if (said?.Overview is not null) Take(said.Overview);
+        }
+        catch
+        {
+            // The card stays: its link can be pressed again.
+        }
+    }
+
+    /// <summary>The overview an action answered: its cards, and the watch for a sign-in it started.</summary>
+    void Take(AiOverview overview)
+    {
+        shown = SignInWatch.Signature(overview);
+        Apply(overview.Problems);
+        watch.Begin(overview);
+        Heard?.Invoke(overview);
     }
 
     async Task Act(AiProblemInfo p)
@@ -114,7 +201,7 @@ public sealed class AiProblemsModel(IAiLibrary library)
                 "usage_limit" => await Dismissed(p.Id),
                 _ => null,
             };
-            if (said?.Overview is not null) Apply(said.Overview.Problems);
+            if (said?.Overview is not null) Take(said.Overview);
         }
         catch (LibraryRefusedException)
         {
@@ -130,10 +217,14 @@ public sealed class AiProblemsModel(IAiLibrary library)
     /// <summary>AIs whose Sign in was pressed on their card: the card's button is Check until it's pressed.</summary>
     readonly HashSet<string> signingIn = [];
 
-    Task<AiSaid?> SignInAsync(string engine)
+    async Task<AiSaid?> SignInAsync(string engine)
     {
         signingIn.Add(engine);
-        return library.SignInAsync(engine);
+        var said = await library.SignInAsync(engine);
+        // A library that signs in hidden says so on the card; one that doesn't leaves the student to press Check.
+        if (said?.Overview?.Problems.FirstOrDefault(x => x.Engine == engine && x.Kind == "not_signed_in") is { SignIn.Length: > 0 }
+            || said?.Overview?.Engines.FirstOrDefault(x => x.Id == engine) is { SignIn.Length: > 0 }) signingIn.Remove(engine);
+        return said;
     }
 
     async Task<AiSaid?> Dismissed(string id)
@@ -176,7 +267,7 @@ public sealed class AiProblemsModel(IAiLibrary library)
     public void AddLibraryOffline(Func<Task> retry, string id = "library-offline") => AddLocal(new AiProblem
     {
         Id = id, Kind = "library_offline", Caption = AiWords.ProblemCaption("library_offline"),
-        Title = AiWords.ProblemTitle("library_offline", "", ""), Message = AiWords.ProblemMessage("library_offline", "", "", "", 0, ""),
+        Title = AiWords.ProblemTitle("library_offline", "", ""), Message = AiWords.ProblemMessage("library_offline", "", "", "", 0, "", Here),
         Icon = AiWords.ProblemIcon("library_offline"), ColorKey = AiWords.ProblemColorKey("library_offline"), Severity = AiWords.ProblemSeverity("library_offline"),
         PrimaryWords = AiWords.ProblemAction("library_offline"),
     }.Also(p => p.PrimaryCommand = new AsyncRelayCommand(retry)));

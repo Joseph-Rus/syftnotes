@@ -217,6 +217,43 @@ Fix it, bump the version and resubmit.
 Unpacked folders keep updating the way they do now: the library and the app rewrite their folders, and the extension
 reloads itself from them.
 
+## Finding Canvas by itself (1.8)
+
+From 1.8 the first run asks nothing: no school address, no code to paste. Joey's ask (2026-11-01): pull the Canvas
+address without asking, through the add-on, and have the student add it first.
+
+**What a student does:** Add Syft Notes to Chrome in the app (the store's page opens) → Add to Chrome, Add extension →
+a Syft Notes page opens by itself: **Allow**, then Chrome's own **Allow** → sign in to Canvas the way they usually do
+(nothing to do if they're signed in already). The app's step ticks "Added to Chrome", then "Found your Canvas:
+school.instructure.com", and the sync starts.
+
+**How:**
+1. The app's Add (and the step opening) posts `canvas/pair`: for 20 minutes the library answers `GET canvas/hello`
+   with its address, the add-on's key and the Canvas address if it has one, and only to the store copy's own origin
+   (`chrome-extension://dfhoenhdjjbnopbepgkgjdgdnfmecjjd`) or a Firefox add-on's (`moz-extension://…`). Never a web
+   page; outside the window it says to press Add in the app.
+2. The add-on, just added, opens `welcome.html` (`runtime.onInstalled`, reason `install`). It asks 127.0.0.1 on 8787
+   and the next free pairs (8789 … 8797) for `canvas/hello`; the background script tries the same on every round, so
+   a closed tab doesn't stop it.
+3. **Allow** asks the browser for the library, every Canvas Cloud school (`https://*.instructure.com/*`) and the file
+   store (`*.inscloudgate.net`), inside the click as browsers require.
+4. With those, the browser's Canvas session cookies (`canvas_session`, `_normandy_session`) on `*.instructure.com`
+   name the student's school; `/api/v1/users/self` on it says they're signed in. The add-on posts it to
+   `canvas/found` (with its key); the library takes the first one it's told (and a new one while the window is open).
+5. A school with Canvas at its own address (`canvas.school.edu`) isn't under instructure.com: the welcome page says to
+   open Canvas and click the Syft Notes button, and the popup (with `activeTab`, the tab clicked on only) offers **Use
+   this Canvas**, which asks for that one site.
+
+**Permissions added in 1.8:** `cookies` and `activeTab`. Neither shows a warning at install or on update, so 1.6 copies
+update without being turned off. The sites are still optional and asked for at Allow: "Read and change your data on
+all instructure.com sites, inscloudgate.net and 127.0.0.1". That's wider than 1.6's one school, but it's one prompt and
+no typing. Nothing reads history or every site's cookies.
+
+**Until 1.8 is live:** `Extension.StoreFindsCanvas` is false, so the app's step asks for the school's address once and
+shows the code, as before (both stores serve 1.6). To publish: pack 1.8 for both stores (`extension-zip`, and
+`extension-zip --firefox`), submit, and once both are live set `StoreFindsCanvas` to true. `STUDYSTASH_ADDON_FINDS_CANVAS=1`
+tries the new step before then. A 1.6 copy that updates to 1.8 keeps its pasted connection and its school.
+
 ## Keep "Load unpacked"
 
 The store copy doesn't replace the folder. A school-managed Chrome (a Chromebook, or Chrome with an

@@ -239,7 +239,9 @@ public static class Antigravity
         {
             return false;
         }
-        if (root["mcpServers"] is not JsonObject servers || !servers.Remove(server)) return false;
+        // Syft Notes' own server goes under its old name too (an earlier build's): never one of the home's.
+        string[] names = server == ClaudeTools.ServerName ? [server, .. ClaudeTools.OldServerNames] : [server];
+        if (root["mcpServers"] is not JsonObject servers || names.Count(servers.Remove) == 0) return false;
         File.WriteAllText(path, root.ToJsonString(Indented));
         return true;
     }

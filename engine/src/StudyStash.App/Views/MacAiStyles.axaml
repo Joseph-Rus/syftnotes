@@ -334,19 +334,53 @@
     <Setter Property="LineHeight" Value="18.85" />
     <Setter Property="TextWrapping" Value="Wrap" />
   </Style>
-  <!-- The library's answer card: solid, so the notes never show through it; the question it answers heads it. -->
-  <Style Selector="Border.ai-answer-card">
-    <Setter Property="CornerRadius" Value="18" />
-    <Setter Property="Background" Value="{DynamicResource PopupBg}" />
-    <Setter Property="BorderBrush" Value="{DynamicResource PopupStroke}" />
-    <Setter Property="BorderThickness" Value="1" />
-    <Setter Property="BoxShadow" Value="{DynamicResource PopupShadow}" />
+  <!-- The conversation's panel beside the page: no card of its own, just the page's surface (AskSplit draws it and the
+       hairline down its left). -->
+  <Style Selector="Border.ai-panel">
+    <Setter Property="Background" Value="Transparent" />
   </Style>
-  <!-- A question in the answer card's conversation: the student's own words, in ink and heavier than the answers -->
-  <Style Selector="TextBlock.ai-q">
+  <!-- Its header's buttons: Chats, New chat, and as a sheet the way back -->
+  <Style Selector="Button.ai-head">
+    <Setter Property="Theme" Value="{StaticResource Surface}" />
+    <Setter Property="Height" Value="32" />
+    <Setter Property="Padding" Value="8,0,10,0" />
+    <Setter Property="CornerRadius" Value="16" />
+  </Style>
+  <Style Selector="TextBlock.ai-head">
     <Setter Property="FontSize" Value="13" />
+    <Setter Property="FontWeight" Value="Medium" />
+    <Setter Property="Foreground" Value="{DynamicResource Fg}" />
+  </Style>
+  <!-- A question in the conversation: the student's own words, on the right on a quiet fill, never the whole width -->
+  <Style Selector="Border.ai-asked-q">
+    <Setter Property="HorizontalAlignment" Value="Right" />
+    <Setter Property="Margin" Value="40,0,0,0" />
+    <Setter Property="Padding" Value="14,9" />
+    <Setter Property="CornerRadius" Value="16" />
+    <Setter Property="Background" Value="{DynamicResource Fill}" />
+  </Style>
+  <Style Selector="TextBlock.ai-q">
+    <Setter Property="FontSize" Value="15" />
+    <Setter Property="LineHeight" Value="22" />
+    <Setter Property="Foreground" Value="{DynamicResource Fg}" />
+    <Setter Property="TextWrapping" Value="Wrap" />
+  </Style>
+  <!-- Why an answer didn't come -->
+  <Style Selector="TextBlock.ai-failed">
+    <Setter Property="FontSize" Value="14.5" />
+    <Setter Property="LineHeight" Value="22" />
+    <Setter Property="Foreground" Value="{DynamicResource Warn}" />
+    <Setter Property="TextWrapping" Value="Wrap" />
+  </Style>
+  <!-- A new chat, before its first question -->
+  <Style Selector="TextBlock.ai-fresh-title">
+    <Setter Property="FontSize" Value="17" />
     <Setter Property="FontWeight" Value="SemiBold" />
     <Setter Property="Foreground" Value="{DynamicResource Fg}" />
+  </Style>
+  <Style Selector="TextBlock.ai-fresh">
+    <Setter Property="FontSize" Value="14.5" />
+    <Setter Property="Foreground" Value="{DynamicResource Fg2}" />
     <Setter Property="TextWrapping" Value="Wrap" />
   </Style>
   <!-- New chat, at the head of the answer card and the recorder's chat -->
@@ -361,9 +395,6 @@
     <Setter Property="FontWeight" Value="Medium" />
     <Setter Property="Foreground" Value="{DynamicResource Fg2}" />
   </Style>
-  <Style Selector="ScrollViewer.ai-answer-scroll">
-    <Setter Property="MaxHeight" Value="220" />
-  </Style>
   <Style Selector="Button.ai-close">
     <Setter Property="Theme" Value="{StaticResource Surface}" />
     <Setter Property="Width" Value="28" />
@@ -372,7 +403,7 @@
     <Setter Property="HorizontalContentAlignment" Value="Center" />
   </Style>
   <Style Selector="TextBlock.ai-byline">
-    <Setter Property="FontSize" Value="11" />
+    <Setter Property="FontSize" Value="12" />
     <Setter Property="Foreground" Value="{DynamicResource Fg2}" />
   </Style>
   <Style Selector="TextBlock.ai-thinking">

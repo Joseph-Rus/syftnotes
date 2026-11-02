@@ -1,6 +1,7 @@
 using System.Collections.ObjectModel;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using StudyStash.App.Services;
 using StudyStash.Core;
 using StudyStash.Core.Ai;
 
@@ -32,8 +33,10 @@ public sealed class AiModelChoice(string id, string label, bool current, IAsyncR
     public IAsyncRelayCommand Pick { get; } = pick;
 }
 
-/// <summary>One row of the AI engines pane: an installed engine (or Ollama, always) with its state and what its
-/// button does. The row owns its own commands, closed over its id, so a view binds them straight from the row.</summary>
+/// <summary>One card of Settings → Your AI: Claude, ChatGPT, Gemini or Ollama, with its state (Not set up, Connected,
+/// Needs attention, or where its Connect has got to), what's connected in the student's words, and one button: Connect,
+/// or Fix when something's wrong (Ollama keeps its own Set up). The row owns its own commands, closed over its id, so a
+/// view binds them straight from the row.</summary>
 public sealed partial class AiEngineRow : ObservableObject
 {
     public string Id { get; init; } = "";
@@ -49,6 +52,17 @@ public sealed partial class AiEngineRow : ObservableObject
     public bool IsPrimary { get; init; }
     /// <summary>The row's button opens the Options menu (models, Check it works) instead of acting straight away.</summary>
     public bool NeedsOptions { get; init; }
+    /// <summary>Where the AI's own sign-in is while one is going from this row (<see cref="SignInPhase"/>); "" otherwise.</summary>
+    public string SignIn { get; init; } = "";
+    /// <summary>The button's name for a screen reader: "Connect Claude", "Options for ChatGPT".</summary>
+    public string ActionName => NeedsOptions ? $"{ActionWords} for {Name}" : $"{ActionWords} {Name}";
+    /// <summary>The row's pill: not while it has no words (a sign-in that waits for the browser has no button to press).</summary>
+    public bool ShowPill => !NeedsOptions && ActionWords.Length > 0;
+    /// <summary>A small link beside a sign-in: "Open the page again" while it waits, or "Get help" once Syft Notes couldn't
+    /// start it.</summary>
+    public string LinkWords { get; init; } = "";
+    public bool HasLink => LinkWords.Length > 0;
+    public IAsyncRelayCommand LinkCommand { get; internal set; } = null!;
     public string Model { get; init; } = "";
     public List<ModelOption> Models { get; init; } = [];
     public List<AiModelChoice> ModelChoices { get; internal set; } = [];
@@ -56,12 +70,24 @@ public sealed partial class AiEngineRow : ObservableObject
     public string Site { get; init; } = "";
     /// <summary>The first row in its group shows no separator above it.</summary>
     public bool First { get; internal set; }
+    /// <summary>The one thing the student still has to do, said once and plainly ("Quit Claude fully and open it
+    /// again."); "" when there's nothing.</summary>
+    public string Next { get; init; } = "";
+    public bool HasNext => Next.Length > 0;
+    /// <summary>A Mac can quit the app and open it again for the student: the card offers to.</summary>
+    public bool CanReopen { get; init; }
+    public string ReopenWords { get; init; } = "";
+    public IAsyncRelayCommand ReopenCommand { get; internal set; } = null!;
+    /// <summary>"Connect again", in a connected card's Options menu: puts right anything that's wrong (safe to press).</summary>
+    public IAsyncRelayCommand ConnectCommand { get; internal set; } = null!;
+    /// <summary>Claude, ChatGPT and Gemini have Connect again in their Options menu; Ollama doesn't.</summary>
+    public bool CanConnectAgain => Id != "ollama";
 
-    /// <summary>Ready to shown rows: Sign in / Start / Download / Check / Get it, whichever this row's state needs.</summary>
+    /// <summary>The row's button: Set up / Sign in / Start / Download / Check, whichever this row's state needs.</summary>
     public IAsyncRelayCommand ActCommand { get; internal set; } = null!;
     /// <summary>"Check it works", from the Options menu (ready/limited/failed rows).</summary>
     public IAsyncRelayCommand CheckCommand { get; internal set; } = null!;
-    /// <summary>Not-installed rows in the "Add an engine" menu: opens the engine's site.</summary>
+    /// <summary>A library on another computer: not-installed rows are in the "Add another AI" menu, and open the AI's site.</summary>
     public IRelayCommand AddCommand { get; internal set; } = null!;
 }
 
@@ -109,7 +135,61 @@ public sealed partial class AiEnginesModel : ObservableObject
     readonly IAiLibrary library;
     bool loading;
 
-    public AiEnginesModel(IAiLibrary library) => this.library = library;
+    public AiEnginesModel(IAiLibrary library)
+    {
+        this.library = library;
+        watch = new SignInWatch(library, SignInMovedAsync);
+    }
+
+    /// <summary>Keeps asking the library while a sign-in is going, so its row turns ready by itself (also when the
+    /// student left this page and came back to a sign-in still waiting: <see cref="Apply"/> starts it again).</summary>
+    readonly SignInWatch watch;
+    string shown = "";
+
+    /// <summary>Said whenever this pane learns the AIs' state from the library (a sign-in's progress among it), so the
+    /// problem cards on the same page show it too; <see cref="Adopt"/> is the other direction.</summary>
+    public event Action<AiOverview>? Heard;
+    bool adopting;
+
+    /// <summary>Settings' page shows both this pane and the problem cards: each shows what the other learned.</summary>
+    public void ShareWith(AiProblemsModel cards)
+    {
+        Heard += cards.Adopt;
+        cards.Heard += Adopt;
+    }
+
+    /// <summary>Takes the state the problem cards learned, so a sign-in started from a card shows here at once.</summary>
+    public void Adopt(AiOverview overview)
+    {
+        if (SignInWatch.Signature(overview) == shown) return;
+        adopting = true;
+        try
+        {
+            Apply(overview);
+        }
+        finally
+        {
+            adopting = false;
+        }
+    }
+
+    /// <summary>How often a sign-in that's going is looked at; a test sets it small.</summary>
+    public TimeSpan SignInEvery
+    {
+        get => watch.Every;
+        set => watch.Every = value;
+    }
+
+    Task SignInMovedAsync(AiOverview now)
+    {
+        if (SignInWatch.Signature(now) == shown) return Task.CompletedTask;
+        var waiting = Engines.Where(r => r.SignIn == SignInPhase.Waiting).ToList();
+        Apply(now);
+        foreach (var r in waiting)
+            if (now.Engines.FirstOrDefault(e => e.Id == r.Id) is { State: not "not_signed_in" })
+                Say = $"{r.Name} is signed in.";
+        return Task.CompletedTask;
+    }
 
     /// <summary>AIs whose Sign in was pressed: their row's button is Check until it's pressed, since nothing else here
     /// learns the student has signed in (the library still remembers the AI turning them away). Check that finds it
@@ -119,11 +199,19 @@ public sealed partial class AiEnginesModel : ObservableObject
     /// <summary>The line under the pane's title: where the engines run (the library elsewhere, or this computer).</summary>
     public string Lede { get; init; } = "Choose which AI writes your notes and answers your questions. You can change it here any time. It runs on your library, and you can set it up there or from this laptop.";
 
+    /// <summary>Whether the library is on this computer (one computer does everything): its rows say "this computer"
+    /// rather than "your library".</summary>
+    public bool Here { get; init; }
+
+    /// <summary>The heading over the list of AIs.</summary>
+    public string ListTitle => $"AIs on {AiWords.Where(Here)}";
+
     public ObservableCollection<AiEngineRow> Engines { get; } = [];
     /// <summary>API keys for Claude, ChatGPT and Gemini (shown once the library says it takes them).</summary>
     public ObservableCollection<ApiKeyRow> Keys { get; } = [];
     public bool HasKeys => Keys.Count > 0;
-    /// <summary>Not-installed engines: the "Add an engine" menu.</summary>
+    /// <summary>Not-installed engines on a library on another computer: the "Add another AI" menu. (On this computer every
+    /// AI is a row of its own.)</summary>
     public ObservableCollection<AiEngineRow> AddChoices { get; } = [];
     public List<EngineChoice> NotesChoices { get; private set; } = [];
     public List<EngineChoice> AskChoices { get; private set; } = [];
@@ -179,8 +267,13 @@ public sealed partial class AiEnginesModel : ObservableObject
     [ObservableProperty] public partial bool OlderLibrary { get; set; }
     [ObservableProperty] public partial bool Offline { get; set; }
 
-    public string SelectedNotesName => NotesChoices.FirstOrDefault(c => c.Id == SelectedNotes)?.Name ?? SelectedNotes;
-    public string SelectedAskName => AskChoices.FirstOrDefault(c => c.Id == SelectedAsk)?.Name ?? SelectedAsk;
+    public string SelectedNotesName => SelectedNotes.Length == 0 ? AiWords.ChooseAnAi : NotesChoices.FirstOrDefault(c => c.Id == SelectedNotes)?.Name ?? SelectedNotes;
+    public string SelectedAskName => SelectedAsk.Length == 0 ? AiWords.ChooseAnAi : AskChoices.FirstOrDefault(c => c.Id == SelectedAsk)?.Name ?? SelectedAsk;
+    /// <summary>Nobody writes the notes yet (a fresh library, nothing chosen): the row says so and offers the choice, rather
+    /// than naming an AI that may not even be here.</summary>
+    public bool NoNotesAi => last is not null && SelectedNotes.Length == 0;
+    /// <summary>The notes row's line: where the notes are written, or that no AI writes them yet.</summary>
+    public string NotesRowAbout => NoNotesAi ? AiWords.NoNotesAi : "After each lecture, on your library";
     public string SelectedDiagramsName => DiagramsChoices.FirstOrDefault(c => c.Id == SelectedDiagrams)?.Name ?? SelectedDiagrams;
     /// <summary>The diagrams row's line: who reads each transcript to draw them, or that nobody does.</summary>
     public string DiagramsAbout => AiWords.DiagramsAbout(SelectedDiagrams, DiagramsBy);
@@ -199,10 +292,66 @@ public sealed partial class AiEnginesModel : ObservableObject
     /// <summary>Opens a link (the app hands this to the OS browser); null in tests.</summary>
     public Action<string>? OpenUrl { get; set; }
 
+    /// <summary>Installs an AI's own helper on this computer with its maker's installer (<see cref="AgentInstall"/>), saying
+    /// where it's got to: Set up on a row. Null where the library is on another computer (it's installed there).</summary>
+    public Func<string, Action<string>, Task<InstallOutcome>>? Install
+    {
+        get => install;
+        set
+        {
+            install = value;
+            connector = null;
+        }
+    }
+    Func<string, Action<string>, Task<InstallOutcome>>? install;
+
+    /// <summary>The AI apps on this computer (Claude Desktop, Claude Code, the ChatGPT app with Codex, Gemini CLI,
+    /// Antigravity), which Connect adds Syft Notes to; null where it can't (a test, a shot).</summary>
+    public ClaudeSetup? AiApps
+    {
+        get => aiApps;
+        set
+        {
+            aiApps = value;
+            connector = null;
+        }
+    }
+    ClaudeSetup? aiApps;
+
+    AiConnect? connector;
+    /// <summary>The one Connect per AI that the cards here and setup's AI step both call (<see cref="AiConnect"/>).</summary>
+    public AiConnect Connector
+    {
+        get => connector ??= new AiConnect(library) { Apps = AiApps, Install = Install, WaitForSignIn = false };
+        set => connector = value;
+    }
+
+    /// <summary>The AIs being connected from a card now, and where each has got to ("Installing Claude…").</summary>
+    readonly Dictionary<string, string> settingUp = [];
+    /// <summary>How each AI's last Connect here ended, while it says something the card should show (why it stopped).</summary>
+    readonly Dictionary<string, ConnectOutcome> outcomes = [];
+    /// <summary>AIs whose install stopped for a reason Syft Notes can't put right: their row offers Get help.</summary>
+    readonly HashSet<string> installStopped = [];
+    AiOverview? last;
+    /// <summary>The AI apps on this computer, as their own settings had them when last looked at.</summary>
+    IReadOnlyList<AiAppState> apps = [];
+
+    /// <summary>The Advanced part of the page (Claude's speed, the fallback, API keys, what AI apps may read, the web
+    /// address, opening a class in a terminal): folded away until asked for.</summary>
+    [ObservableProperty] public partial bool AdvancedOpen { get; set; }
+    public string AdvancedWords => AdvancedOpen ? "Hide advanced settings" : "Advanced settings";
+    partial void OnAdvancedOpenChanged(bool value) => OnPropertyChanged(nameof(AdvancedWords));
+    [RelayCommand] void ToggleAdvanced() => AdvancedOpen = !AdvancedOpen;
+
+    /// <summary>How often the apps are looked at again while one still has to be opened again to load Syft Notes.</summary>
+    public TimeSpan AppsEvery { get; set; } = TimeSpan.FromSeconds(3);
+
     partial void OnSelectedNotesChanged(string value)
     {
         EngineChoice.Mark(NotesChoices, value);
         OnPropertyChanged(nameof(SelectedNotesName));
+        OnPropertyChanged(nameof(NoNotesAi));
+        OnPropertyChanged(nameof(NotesRowAbout));
         if (!loading) _ = PostDefaultsAsync(notes: value);
     }
 
@@ -273,9 +422,10 @@ public sealed partial class AiEnginesModel : ObservableObject
     [RelayCommand]
     public Task Refresh() => Load();
 
-    /// <summary>Reads the library's AI once and fills every row: called when the pane opens.</summary>
+    /// <summary>Reads the library's AI, and the AI apps on this computer, once and fills every row: called when the pane opens.</summary>
     public async Task Load()
     {
+        await LoadAppsAsync();
         AiOverview? overview;
         try
         {
@@ -302,9 +452,10 @@ public sealed partial class AiEnginesModel : ObservableObject
             }
             OlderLibrary = false;
             Offline = false;
-            NotesChoices = [.. overview.Engines.Select(e => new EngineChoice(e.Id, AiWords.PlainName(e.Id, e.Name)))];
+            last = overview;
+            NotesChoices = [.. AiWords.InShownOrder(overview.Engines).Select(e => new EngineChoice(e.Id, AiWords.PlainName(e.Id, e.Name)))];
             foreach (var c in NotesChoices) c.Pick = new RelayCommand(() => SelectedNotes = c.Id);
-            AskChoices = [.. overview.Engines.Select(e => new EngineChoice(e.Id, AiWords.PlainName(e.Id, e.Name)))];
+            AskChoices = [.. AiWords.InShownOrder(overview.Engines).Select(e => new EngineChoice(e.Id, AiWords.PlainName(e.Id, e.Name)))];
             foreach (var c in AskChoices) c.Pick = new RelayCommand(() => SelectedAsk = c.Id);
             DiagramsChoices = [.. DiagramEngines.Picks.Select(id => new EngineChoice(id, AiWords.DiagramsChoiceName(id)))];
             foreach (var c in DiagramsChoices) c.Pick = new RelayCommand(() => SelectedDiagrams = c.Id);
@@ -332,13 +483,25 @@ public sealed partial class AiEnginesModel : ObservableObject
             OnPropertyChanged(nameof(SelectedDiagramsName));
             OnPropertyChanged(nameof(SelectedSpeedName));
             Fallback = overview.Fallback;
+            OnPropertyChanged(nameof(NoNotesAi));
+            OnPropertyChanged(nameof(NotesRowAbout));
+            OnPropertyChanged(nameof(SelectedAskName));
+            // A sign-in the press said was going that has stopped since (or never started): the line says so, as its row does.
+            if (Say?.StartsWith("Finish signing in to ", StringComparison.Ordinal) == true
+                && overview.Engines.FirstOrDefault(e => e.State == "not_signed_in" && e.SignIn is SignInPhase.GaveUp or SignInPhase.Region or SignInPhase.Stuck) is { } stopped)
+                Say = AiWords.SignInSaid(AiWords.PlainName(stopped.Id, stopped.Name), stopped.SignIn);
+            // Or it worked (learned here, or from the problem card on the same page): the line says so, not "Finish…".
+            else if (Say is { } said && overview.Engines.FirstOrDefault(e => said == AiSignIns.StartedWords(e.Id)) is { State: not "not_signed_in" } done)
+                Say = $"{AiWords.PlainName(done.Id, done.Name)} is signed in.";
 
             Engines.Clear();
             AddChoices.Clear();
-            foreach (var e in overview.Engines)
+            // Every AI, always, in the order a student meets them: Claude, ChatGPT, Gemini, then Ollama (advanced). One
+            // not on this computer yet has Set up. (A library on another computer keeps those in its Add menu.)
+            foreach (var e in AiWords.InShownOrder(overview.Engines))
             {
                 var row = BuildRow(e);
-                if (e.Id == "ollama" || e.Installed) { row.First = Engines.Count == 0; Engines.Add(row); }
+                if (Here || e.Id == "ollama" || e.Installed) { row.First = Engines.Count == 0; Engines.Add(row); }
                 else AddChoices.Add(row);
             }
             OnPropertyChanged(nameof(HasAddChoices));
@@ -358,10 +521,38 @@ public sealed partial class AiEnginesModel : ObservableObject
                     Keys.Add(k);
                 }
             OnPropertyChanged(nameof(HasKeys));
+            shown = SignInWatch.Signature(overview);
+            watch.Begin(overview);
+            // An app still to be opened again: looked at until it has loaded Syft Notes.
+            if (appWatch is null && Engines.Any(r => r.HasNext)) WatchApps();
+            if (!adopting) Heard?.Invoke(overview);
         }
         finally
         {
             loading = false;
+        }
+    }
+
+    /// <summary>For a picture: the AI apps as <paramref name="states"/> say (on Windows' words when <paramref name="windows"/>),
+    /// without looking at any file.</summary>
+    public void UseApps(IReadOnlyList<AiAppState> states, bool windows = false)
+    {
+        apps = states;
+        appsOnWindows = windows;
+        Redraw();
+    }
+    bool? appsOnWindows;
+
+    /// <summary>Reads the AI apps' own settings again (off the UI thread: Claude Code's file can be large).</summary>
+    async Task LoadAppsAsync()
+    {
+        if (AiApps is not { } setup) return;
+        try
+        {
+            apps = await Task.Run(setup.States);
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException)
+        {
         }
     }
 
@@ -397,20 +588,167 @@ public sealed partial class AiEnginesModel : ObservableObject
         }
     }
 
-    AiEngineRow BuildRow(EngineInfo e)
+    AiEngineRow BuildRow(EngineInfo e) => e.Id == "ollama" ? BuildOllamaRow(e) : BuildCard(e);
+
+    /// <summary>
+    /// Claude's, ChatGPT's or Gemini's card: where it stands, in one of a few states, and the one button that moves it on.
+    /// <list type="bullet">
+    /// <item>Connecting: where its Connect has got to ("Installing Claude…", "Signing in to Claude… finish in your
+    /// browser"), with no button (and "Open the page again" while the browser waits);</item>
+    /// <item>Not set up: what it's for, and Connect;</item>
+    /// <item>Needs attention: what's wrong in a sentence (signed out, an app not reading Syft Notes, an install or a sign-in
+    /// that stopped), and Fix (Try again for a sign-in that stopped), which runs the same Connect;</item>
+    /// <item>Connected: what it does and the apps it's in ("Writes your notes · Claude app · Claude Code"), with its Options
+    /// menu, and the one thing left to do when an app still has to be opened again ("Almost done").</item>
+    /// </list>
+    /// </summary>
+    AiEngineRow BuildCard(EngineInfo e)
     {
+        string name = AiWords.PlainName(e.Id, e.Name);
+        string signIn = e.State == "not_signed_in" ? e.SignIn : "";
+        string? going = settingUp.GetValueOrDefault(e.Id);
+        var mine = apps.Where(a => a.Provider == e.Id).ToList();
+        var broken = mine.FirstOrDefault(a => a is { Installed: true, Added: true, Good: false } || a.Stale);
+        var said = outcomes.GetValueOrDefault(e.Id);
+        bool connected = e.Installed && e.State is "ready" or "limited";
+        string next = connected && broken is null ? NextFor(mine) : "";
+        var reopen = next.Length > 0 ? mine.FirstOrDefault(a => a is { Good: true, Running: true, Loaded: false, CanReopen: true }) : null;
+
+        string state, about, action = "", link = "";
+        bool good = false, warn = false, primary = false, options = false;
+        if (going is not null || signIn == SignInPhase.Waiting)
+        {
+            state = signIn == SignInPhase.Waiting ? "Signing in" : "Connecting";
+            about = going ?? AiWords.SignInWaiting;
+            if (signIn == SignInPhase.Waiting) link = AiWords.SignInLink(signIn);
+        }
+        else if (said is { Ok: false } || signIn.Length > 0 || e.State is "not_signed_in" or "failed" || broken is not null && e.Installed
+                 || !e.Installed && installStopped.Contains(e.Id))
+        {
+            state = "Needs attention";
+            warn = true;
+            primary = true;
+            about = signIn.Length > 0 ? AiWords.SignInAbout(name, signIn)
+                : said is { Ok: false } ? said.Words
+                : e.State == "not_signed_in" ? $"Signed out of {name}. Fix signs you in again."
+                : e.State == "failed" ? $"{name} didn't work last time. Fix checks it and signs you in if it needs to."
+                : broken is not null ? $"{broken.Words} isn't reading your lectures yet. Fix connects it."
+                : AiWords.ConnectAbout(e.Id);
+            action = signIn is SignInPhase.GaveUp or SignInPhase.Stuck || said?.SignIn is SignInPhase.GaveUp or SignInPhase.Stuck ? "Try again"
+                : signIn == SignInPhase.Region ? "" : "Fix";
+            if (signIn == SignInPhase.Stuck || said?.SignIn == SignInPhase.Stuck || installStopped.Contains(e.Id)) link = "Get help";
+        }
+        else if (!e.Installed)
+        {
+            state = "Not set up";
+            about = AiWords.ConnectAbout(e.Id);
+            action = "Connect";
+            primary = true;
+        }
+        else if (e.State == "unchecked")
+        {
+            // Here, but nobody knows yet whether it's signed in (a tool installed before Syft Notes, say).
+            state = "Not checked yet";
+            about = "Connect checks it works, signs you in if it needs to, and adds your lectures to its apps.";
+            action = "Connect";
+            primary = true;
+        }
+        else
+        {
+            state = e.State == "limited" ? AiWords.EngineStateWords(e.State) : next.Length > 0 ? "Almost done" : "Connected";
+            good = e.State != "limited" && next.Length == 0;
+            warn = e.State == "limited";
+            about = ConnectedWords(e, mine);
+            options = true;
+            action = "Options";
+        }
         var row = new AiEngineRow
         {
             Id = e.Id,
-            Name = AiWords.PlainName(e.Id, e.Name),
+            Name = name,
             Icon = AiWords.EngineIcon(e.Id),
-            About = e.Installed || e.Id == "ollama" ? AiWords.EngineAbout(e.Id, e.State) : "Install it on your library's computer.",
+            About = about,
             State = e.State,
-            StateWords = AiWords.EngineStateWords(e.State),
+            StateWords = state,
+            Good = good,
+            Warn = warn,
+            Muted = !good && !warn,
+            SignIn = signIn,
+            LinkWords = link,
+            ActionWords = action,
+            IsPrimary = primary,
+            NeedsOptions = options,
+            Next = next,
+            CanReopen = reopen is not null,
+            ReopenWords = reopen is not null ? $"Reopen {ClaudeSetup.DesktopApp(reopen.Id)?.Name}" : "",
+            Model = e.Model,
+            Models = e.Models,
+            Site = e.Site,
+        };
+        Wire(row, e);
+        if (reopen is not null) row.ReopenCommand = new AsyncRelayCommand(() => ReopenAsync(reopen.Id));
+        return row;
+    }
+
+    /// <summary>What a connected AI does and the apps it's in, in the student's words: "Writes your notes · Claude app ·
+    /// Claude Code".</summary>
+    string ConnectedWords(EngineInfo e, List<AiAppState> mine)
+    {
+        var parts = new List<string>();
+        if (SelectedNotes == e.Id) parts.Add("Writes your notes");
+        else if (SelectedAsk == e.Id) parts.Add("Answers your questions");
+        parts.AddRange(mine.Where(a => a.Good).Select(a => a.Words));
+        return parts.Count > 0 ? string.Join(" · ", parts) : $"Signed in, on {AiWords.Where(Here)}.";
+    }
+
+    /// <summary>The one thing left: an app of this AI that is open and hasn't loaded Syft Notes since it was added has to
+    /// be quit and opened again (it reads its settings only when it starts).</summary>
+    string NextFor(List<AiAppState> mine) =>
+        mine.FirstOrDefault(a => a is { Good: true, Running: true, Loaded: false } && ClaudeSetup.DesktopApp(a.Id) is not null) is { } app
+            ? AiConnect.QuitWords(ClaudeSetup.DesktopApp(app.Id)!.Value.Name, appsOnWindows ?? AiApps?.Windows ?? OperatingSystem.IsWindows())
+            : "";
+
+    void Wire(AiEngineRow row, EngineInfo e)
+    {
+        row.ActCommand = new AsyncRelayCommand(() => RunRowActionAsync(row));
+        row.CheckCommand = new AsyncRelayCommand(() => CheckAsync(row.Id));
+        row.LinkCommand = new AsyncRelayCommand(() => SignInLinkAsync(row));
+        row.ConnectCommand = new AsyncRelayCommand(() => ConnectAsync(row.Id));
+        row.ReopenCommand = new AsyncRelayCommand(() => Task.CompletedTask);
+        row.ModelChoices = [.. e.Models.Select(m => new AiModelChoice(m.Id, m.Label, m.Id == e.Model, new AsyncRelayCommand(() => PickModelAsync(row.Id, m.Id))))];
+        row.AddCommand = new RelayCommand(() =>
+        {
+            if (row.Site.Length > 0) OpenUrl?.Invoke(row.Site);
+            Say = Here ? $"Install {row.Name} on this computer." : $"Install {row.Name} on your library's computer.";
+        });
+    }
+
+    /// <summary>Ollama's row (the free AI, advanced): its own Set up, Start, Download and Check, as before.</summary>
+    AiEngineRow BuildOllamaRow(EngineInfo e)
+    {
+        // A sign-in going from here (the AI's own, hidden, in the student's browser): the row says where it is, and turns
+        // ready by itself when it's done.
+        string signIn = e.State == "not_signed_in" ? e.SignIn : "";
+        string name = AiWords.PlainName(e.Id, e.Name);
+        bool cli = e.Id != "ollama";
+        string? phase = settingUp.GetValueOrDefault(e.Id);
+        var row = new AiEngineRow
+        {
+            Id = e.Id,
+            Name = name,
+            Icon = AiWords.EngineIcon(e.Id),
+            About = phase ?? (signIn.Length > 0 ? AiWords.SignInAbout(name, signIn)
+                : e.Installed || !cli ? AiWords.EngineAbout(e.Id, e.State, Here) : Here ? AiWords.NotSetUpAbout(e.Id) : "Install it on your library's computer."),
+            State = e.State,
+            StateWords = phase is not null ? "Setting up" : signIn == SignInPhase.Waiting ? "Signing in" : AiWords.EngineStateWords(e.State),
             Good = AiWords.StateIsGood(e.State),
-            Warn = AiWords.StateIsWarn(e.State),
-            Muted = AiWords.StateIsMuted(e.State),
-            ActionWords = !e.Installed && e.Id != "ollama" ? "Get it"
+            Warn = AiWords.StateIsWarn(e.State) && signIn != SignInPhase.Waiting && phase is null,
+            Muted = AiWords.StateIsMuted(e.State) || signIn == SignInPhase.Waiting || phase is not null,
+            SignIn = signIn,
+            LinkWords = signIn.Length > 0 ? AiWords.SignInLink(signIn) : !e.Installed && installStopped.Contains(e.Id) ? "Get help" : "",
+            ActionWords = phase is not null ? ""
+                : signIn.Length > 0 ? AiWords.SignInButton(signIn)
+                : !e.Installed && cli && !Here ? "Get it"
                 : e.State == "not_signed_in" && signingIn.Contains(e.Id) ? "Check" : AiWords.RowActionWords(e.State),
             IsPrimary = AiWords.RowActionPrimary(e.State),
             NeedsOptions = AiWords.NeedsOptions(e.State),
@@ -418,24 +756,24 @@ public sealed partial class AiEnginesModel : ObservableObject
             Models = e.Models,
             Site = e.Site,
         };
-        row.ActCommand = new AsyncRelayCommand(() => RunRowActionAsync(row));
-        row.CheckCommand = new AsyncRelayCommand(() => CheckAsync(row.Id));
-        row.ModelChoices = [.. e.Models.Select(m => new AiModelChoice(m.Id, m.Label, m.Id == e.Model, new AsyncRelayCommand(() => PickModelAsync(row.Id, m.Id))))];
-        row.AddCommand = new RelayCommand(() =>
-        {
-            if (row.Site.Length > 0) OpenUrl?.Invoke(row.Site);
-            Say = $"Install {row.Name} on your library's computer.";
-        });
+        Wire(row, e);
         return row;
     }
 
     async Task RunRowActionAsync(AiEngineRow row)
     {
+        // Claude, ChatGPT and Gemini: one Connect, whatever is needed.
+        if (row.Id != "ollama")
+        {
+            await ConnectAsync(row.Id);
+            return;
+        }
         Busy = true;
         try
         {
             AiSaid? said = row.State switch
             {
+                "not_installed" => await library.SetUpAsync(row.Id),
                 "not_signed_in" when signingIn.Remove(row.Id) => await library.CheckAsync(row.Id),
                 "not_signed_in" => await SignInAsync(row.Id),
                 "not_running" => await library.StartAsync(row.Id),
@@ -461,12 +799,160 @@ public sealed partial class AiEnginesModel : ObservableObject
         }
     }
 
-    /// <summary>Sign in: the library opens a terminal to do it in (or says where to, from a laptop); the row's button
-    /// becomes Check for when it's done.</summary>
-    Task<AiSaid?> SignInAsync(string id)
+    /// <summary>Sign in: the library starts the AI's own sign-in, hidden, and it opens the student's browser; the row says
+    /// it's waiting and turns ready by itself. (A library from before that opens a terminal to do it in, or says where to,
+    /// from a laptop: the row's button becomes Check for when that's done.)</summary>
+    async Task<AiSaid?> SignInAsync(string id)
     {
         signingIn.Add(id);
-        return library.SignInAsync(id);
+        var said = await library.SignInAsync(id);
+        return HiddenOrOld(id, said);
+    }
+
+    /// <summary>A library that signs in hidden says where each sign-in is on the AI's row; one that doesn't leaves the
+    /// student to press Check.</summary>
+    AiSaid? HiddenOrOld(string id, AiSaid? said)
+    {
+        if (said?.Overview?.Engines.FirstOrDefault(e => e.Id == id) is { SignIn.Length: > 0 }) signingIn.Remove(id);
+        return said;
+    }
+
+    /// <summary>
+    /// Connect on Claude's, ChatGPT's or Gemini's card (and setup's AI step): installs it when it isn't here, adds Syft
+    /// Notes to every app of it on this computer, signs in hidden in the student's browser, and makes it the AI that
+    /// writes the notes when none is chosen (<see cref="AiConnect"/>), the card saying where it's got to all the way.
+    /// Safe to press again: it puts right whatever is wrong. On a library on another computer, an AI not installed there
+    /// opens its site, as before.
+    /// </summary>
+    public async Task<ConnectOutcome> ConnectAsync(string id)
+    {
+        if (!Here && last?.Engines.FirstOrDefault(e => e.Id == id) is { Installed: false } away)
+        {
+            if (away.Site.Length > 0) OpenUrl?.Invoke(away.Site);
+            Say = $"Install {AiWords.PlainName(away.Id, away.Name)} on your library's computer.";
+            return new ConnectOutcome(false, Say);
+        }
+        if (settingUp.ContainsKey(id)) return new ConnectOutcome(false, "");
+        outcomes.Remove(id);
+        installStopped.Remove(id);
+        signingIn.Remove(id);
+        Say = null;
+        settingUp[id] = $"Connecting {AiConnect.Brand(id)}…";
+        Redraw();
+        var ui = SynchronizationContext.Current;
+        ConnectOutcome outcome;
+        try
+        {
+            // Said on the UI thread (most steps are), it shows at once; from an installer's own thread, it's posted there.
+            outcome = await Connector.ConnectAsync(id, step => (ui is null || SynchronizationContext.Current == ui ? (Action<Action>)(a => a()) : a => ui.Post(_ => a(), null))(() =>
+            {
+                if (!settingUp.ContainsKey(id)) return;
+                settingUp[id] = step.Words;
+                Redraw();
+            }));
+        }
+        finally
+        {
+            settingUp.Remove(id);
+        }
+        if (!outcome.Ok) outcomes[id] = outcome;
+        if (outcome.Install is InstallFailure.Other or InstallFailure.WontStart or InstallFailure.TimedOut) installStopped.Add(id);
+        await LoadAppsAsync();
+        if (outcome.Overview is { } o) Apply(o);
+        else await Load();
+        // A card that stopped says why itself; one with a step left says that.
+        Say = outcome.Ok && outcome.Next.Length == 0 ? outcome.Words : null;
+        return outcome;
+    }
+
+    /// <summary>Quits an app and opens it again (a Mac), so it loads Syft Notes; then looks until it has.</summary>
+    async Task ReopenAsync(string appId)
+    {
+        if (AiApps is not { } setup) return;
+        var done = await setup.ReopenAsync(appId);
+        if (!done.Ok) Say = done.Say;
+        await LoadAppsAsync();
+        Redraw();
+        WatchApps();
+    }
+
+    CancellationTokenSource? appWatch;
+
+    /// <summary>Stops looking at the apps again (Settings closed, or a newer look took its place).</summary>
+    public void StopWatchingApps()
+    {
+        appWatch?.Cancel();
+        appWatch = null;
+    }
+
+    /// <summary>While an app still has to be opened again to load Syft Notes, looks at the apps every few seconds for
+    /// five minutes, so the card turns to Connected by itself the moment it has.</summary>
+    void WatchApps()
+    {
+        StopWatchingApps();
+        var cts = new CancellationTokenSource();
+        appWatch = cts;
+        _ = LoopAsync();
+
+        async Task LoopAsync()
+        {
+            try
+            {
+                for (int i = 0; i < 100 && !cts.IsCancellationRequested; i++)
+                {
+                    await Task.Delay(AppsEvery, cts.Token);
+                    string before = AppsSignature();
+                    await LoadAppsAsync();
+                    // Drawn again only when something changed: a menu open on a card stays open meanwhile.
+                    if (AppsSignature() != before) Redraw();
+                    if (!Engines.Any(r => r.HasNext)) return;
+                }
+            }
+            catch (OperationCanceledException)
+            {
+            }
+            finally
+            {
+                if (appWatch == cts) appWatch = null;
+            }
+        }
+    }
+
+    /// <summary>What the cards show of the apps, to tell when that's changed.</summary>
+    string AppsSignature() => string.Join("|", apps.Select(a => $"{a.Id}:{a.Good}:{a.Running}:{a.Loaded}:{a.Stale}"));
+
+    /// <summary>The rows drawn again from what the library last said (a set-up row's words moved on).</summary>
+    void Redraw()
+    {
+        if (last is { } o) Apply(o);
+    }
+
+    /// <summary>The small link on a row's sign-in: the page again (it opens once more, or the sign-in runs once more and
+    /// opens it), or Syft Notes' help page once it couldn't start (or its install stopped).</summary>
+    async Task SignInLinkAsync(AiEngineRow row)
+    {
+        if (row.SignIn == SignInPhase.Stuck || row.LinkWords == "Get help")
+        {
+            OpenUrl?.Invoke(AiWords.HelpPage);
+            return;
+        }
+        Busy = true;
+        try
+        {
+            await AfterAction(await library.SignInAgainAsync(row.Id));
+        }
+        catch (LibraryRefusedException ex)
+        {
+            Say = ex.Message;
+        }
+        catch
+        {
+            Offline = true;
+        }
+        finally
+        {
+            Busy = false;
+        }
     }
 
     async Task CheckAsync(string id)

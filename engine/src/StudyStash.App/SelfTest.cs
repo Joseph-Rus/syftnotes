@@ -32,6 +32,12 @@ public static partial class SelfTest
     /// <summary>Setup chooses Just this computer: the app runs its own library, and nothing else is a library.</summary>
     internal static bool OneComputer => Environment.GetEnvironmentVariable("STUDYSTASH_SELFTEST_FLOW") == "one-computer";
 
+    /// <summary>STUDYSTASH_SELFTEST_BACKGROUND=1 (CI's throwaway computers only): Just this computer's run ends by
+    /// turning on "Answer your phone when Syft Notes is closed" for real, with a stand-in for Google Drive, so the
+    /// script that started it can check, once the app has quit, that the library still answers the phone. Never set
+    /// on a real computer: it registers a LaunchAgent, a Run key value or a systemd unit.</summary>
+    internal static bool BackgroundOn => Dir is not null && OneComputer && Environment.GetEnvironmentVariable("STUDYSTASH_SELFTEST_BACKGROUND") == "1";
+
     /// <summary>The self-test's own library, once <see cref="Prepare"/> has started it.</summary>
     internal static LibraryService? Library { get; private set; }
     internal static SelfTestEngine? Engine { get; private set; }
@@ -113,6 +119,8 @@ public static partial class SelfTest
             // Setup makes the library itself: its notes in this run's own folder, on a port far from a real 8787.
             Environment.SetEnvironmentVariable("STUDYSTASH_NOTES_DIR", Path.Combine(home, "Study Stash"));
             Environment.SetEnvironmentVariable("STUDYSTASH_LIBRARY_PORT", SelfTestPorts.FreePair().ToString());
+            // The background run's stand-in for the Google Drive folder, which the library it registers is given.
+            if (BackgroundOn) Environment.SetEnvironmentVariable("STUDYSTASH_DRIVE_FOLDER", DriveFolder(home));
             return;
         }
         string libHome = Path.Combine(home, "selftest-library");
@@ -133,6 +141,7 @@ public static partial class SelfTest
         };
         Directory.CreateDirectory(cfg.PoolDir);
         Configs.Save(cfg);
+        new StudyStash.Core.Ai.AiSettings { Provider = "ollama" }.Save(libHome); // a fresh library has no AI chosen: this one picked the stand-in engine
         Library = new LibraryService(libHome, cfg);
         await Library.StartAsync();
         if (Library.State is not (LibraryServiceState.Running or LibraryServiceState.Elsewhere))
@@ -266,6 +275,7 @@ public static partial class SelfTest
         await RunNotificationsAsync();
         await RunSettingsAsync();
         await RunLooksAsync();
+        if (BackgroundOn) await RunBackgroundAsync(host);
     }
 
     // --- setup -------------------------------------------------------------------------------------------------------
@@ -382,30 +392,65 @@ public static partial class SelfTest
         Shot(Shell.Windows.Main, "library-empty");
     }
 
-    /// <summary>Just this computer, as every first run starts now: one page, one button. Get started makes the library
-    /// here (listening to this computer alone), asks for the microphone, starts the model and, with no AI here, leaves
-    /// the notes for the first lecture's page; the window closes on Home with "Ready when class starts". Open when you log
-    /// in starts ticked and is unticked first (the self-test never adds a login item).</summary>
+    /// <summary>Just this computer, as every first run starts now: the funnel. Get started makes the library here
+    /// (listening to this computer alone), asks for the microphone and starts the model; then "Are you a student?" (yes),
+    /// Connect your classes (pictured: the self-test has no browser or Canvas, so its school "doesn't use Canvas"),
+    /// Connect your AI (no AI here: Skip, the one more push to Gemini, then Later), and the window closes on Home with
+    /// "Ready when class starts" and "Notes need an AI". Open when you log in starts ticked and is unticked first (the
+    /// self-test never adds a login item).</summary>
     static async Task RunOneComputerSetupAsync(AppHost host)
     {
         bool opened = await Until(() => Shell.Windows.Setup is not null, 10);
         Say(opened ? "setup opened" : "setup didn't open");
         var m = Shell.Windows.SetupModel ?? throw new InvalidOperationException("no setup window");
-        if (!m.OnStart || m.Steps.Count != 1) throw new InvalidOperationException($"a first run should open on the one-button welcome, got {m.Step} in {m.Steps.Count} step(s)");
-        Say($"welcome: \"{SetupModel.StartTitle}\" · {m.ContinueLabel} · open when you log in {(m.StartAtLogin ? "ticked" : "unticked")}");
+        var f = Shell.Windows.Funnel ?? throw new InvalidOperationException("a first run should open the funnel");
+        if (!m.OnStart || m.Steps.Count != 1 || !f.OnWelcome) throw new InvalidOperationException($"a first run should open on the welcome, got {m.Step}/{f.Step}");
+        Say($"welcome: \"{SetupModel.StartTitle}\" · {f.WelcomeLabel} · open when you log in {(m.StartAtLogin ? "ticked" : "unticked")}");
         if (!m.StartAtLogin) throw new InvalidOperationException("Open Syft Notes when you log in should start ticked");
         await Settle();
         Shot(Shell.Windows.Setup, "setup-welcome");
         m.StartAtLogin = false;
-        var started = m.NextCommand.ExecuteAsync(null);
+        var started = f.GetStartedCommand.ExecuteAsync(null);
         if (await Until(() => m.Starting || started.IsCompleted, 5) && m.Starting) Shot(Shell.Windows.Setup, "setup-getting-ready");
         await started;
+        bool asked = await Until(() => f.OnStudent, 30);
+        Say(asked ? $"get started: the library is made · \"Are you a student?\" · {f.StepLabel}" : $"get started: no \"Are you a student?\" ({m.LibraryResult})");
+        if (!asked || !m.LibraryOk) throw new InvalidOperationException("Get started didn't make the library and go on to \"Are you a student?\"");
+        await Settle();
+        Shot(Shell.Windows.Setup, "setup-student");
+
+        // A student: Connect your classes opens (its way to Canvas made from the library's state).
+        f.IAmAStudentCommand.Execute(null);
+        bool classes = await Until(() => f.OnClasses && (f.AddOn is not null || f.Canvas is not null), 15);
+        Say(classes ? $"classes: {(f.FindsItself ? "Syft Notes added to the browser, then Canvas found by itself" : "the school's Canvas, then the code")} · {f.StepLabel}"
+            : "classes: the step didn't open");
+        if (!classes) throw new InvalidOperationException("Connect your classes didn't open");
+        await Settle();
+        Shot(Shell.Windows.Setup, "setup-classes");
+        // No Canvas or browser here: the school "doesn't use Canvas", and Home offers adding classes by hand.
+        f.NoCanvasCommand.Execute(null);
+        if (!f.OnAi) throw new InvalidOperationException($"\"My school doesn't use Canvas\" should go to the AI, got {f.Step}");
+        await Settle();
+        Shot(Shell.Windows.Setup, "setup-ai");
+        // No AI here: going on without one asks once more, with Continue with Google; Later is the quiet way out.
+        f.SkipCommand.Execute(null);
+        Say($"ai: {FunnelModel.AiTitle} · skipped · \"{FunnelModel.AgainTitle}\" {(f.AskedAgain ? "asked" : "not asked")}");
+        if (!f.AskedAgain) throw new InvalidOperationException("going on without an AI should push to Gemini once more");
+        await Settle();
+        Shot(Shell.Windows.Setup, "setup-ai-again");
+        f.LaterCommand.Execute(null);
         bool closed = await Until(() => Shell.Windows.Setup is null, 30);
-        Say(closed ? $"get started: role {host.Settings.Role}, setup done {host.Settings.SetupDone}, home card {(host.Settings.WelcomeCard ? "on" : "off")}"
-            : $"get started: the window never closed ({m.LibraryResult})");
-        if (!closed || !host.Settings.SetupDone || host.Settings.Role != AppRole.Both) throw new InvalidOperationException("Get started didn't set up just this computer");
+        Say(closed ? $"later: role {host.Settings.Role}, setup done {host.Settings.SetupDone}, home card {(host.Settings.WelcomeCard ? "on" : "off")}, ai {host.Settings.SetupAi}"
+            : $"later: the window never closed ({m.LibraryResult})");
+        if (!closed || !host.Settings.SetupDone || host.Settings.Role != AppRole.Both) throw new InvalidOperationException("the funnel didn't set up just this computer");
+        if (host.Settings.SetupAi != "later" || !host.Settings.AddClassesOnHome) throw new InvalidOperationException("Home wasn't told to offer an AI and adding classes");
         if (!m.LibraryOk || host.LocalLibrary is not { } lib) throw new InvalidOperationException("Get started didn't make its library");
         if (host.LoginItems.StartsAtLogin(host.Home)) throw new InvalidOperationException("unticked, Get started still added a login item");
+        bool needsAi = await Until(() => Shell.Windows.WelcomeCard is { NeedsAi: true, AddClasses: true }, 15);
+        await Settle();
+        Shot(Shell.Windows.Main, "home-needs-ai");
+        Say(needsAi ? $"home: \"{WelcomeCardModel.AiTitle}\" with {WelcomeCardModel.GoogleButton}, and adding classes by hand" : "home: no \"Notes need an AI\" card");
+        if (!needsAi) throw new InvalidOperationException("Home didn't say notes need an AI after Later");
         var cfg = Configs.Load(host.Home);
         Say($"it listens on {cfg.WebHost}:{cfg.WebPort} ({(LibraryHere.OnlyHere(cfg) ? "this computer only" : "the network")}), notes in {cfg.PoolDir}");
         if (!LibraryHere.OnlyHere(cfg)) throw new InvalidOperationException("Just this computer's library listens to the network");
@@ -428,6 +473,7 @@ public static partial class SelfTest
         cfg.OllamaEnabled = true;
         cfg.Classes = [new ClassDef("CS 101")];
         Configs.Save(cfg);
+        new StudyStash.Core.Ai.AiSettings { Provider = "ollama" }.Save(cfg.Home); // picking the stand-in engine, as the lecture page's card would
         await lib.StopAsync();
         await lib.StartAsync();
         Say($"library restarted on the self-test's notes engine: {lib.State}");

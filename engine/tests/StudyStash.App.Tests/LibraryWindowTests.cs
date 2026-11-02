@@ -1,10 +1,12 @@
 using Avalonia;
 using Avalonia.Controls;
+using Avalonia.Headless;
 using Avalonia.Headless.XUnit;
 using Avalonia.Media;
 using Avalonia.Styling;
 using Avalonia.Threading;
 using Avalonia.VisualTree;
+using StudyStash.App.Controls;
 using StudyStash.App.ViewModels;
 using StudyStash.App.Views;
 using StudyStash.Core.Ai;
@@ -12,8 +14,7 @@ using StudyStash.Core.Ai;
 namespace StudyStash.App.Tests;
 
 /// <summary>The library window as the student uses it: one sidebar (no Unsorted in it, folders under Classes, Clubs and
-/// Work, what's coming up as buttons that record), deleting a note, and an answer that has its own room above the ask
-/// bar.</summary>
+/// Work, what's coming up as buttons that record), deleting a note, and the conversation that opens beside the notes.</summary>
 public class LibraryWindowTests
 {
     static Window Host(Control content, SkinKind skin)
@@ -117,43 +118,102 @@ public class LibraryWindowTests
     [AvaloniaTheory]
     [InlineData(SkinKind.Mac)]
     [InlineData(SkinKind.Win)]
-    public void A_long_answer_has_its_own_solid_room_above_the_ask_bar_and_scrolls_inside(SkinKind skin)
+    public void The_conversation_opens_beside_the_notes_and_Close_brings_the_bar_back(SkinKind skin)
     {
+        Platform.Motion.Override = true; // no glide: each change lands at once
         var m = Demo.Library(answered: true);
-        m.Ask!.Latest!.Answer = string.Join(" ", Enumerable.Repeat(m.Ask.Latest.Answer, 4));
+        m.Ask!.Latest!.Answer = string.Join(" ", Enumerable.Repeat(m.Ask.Latest.Answer, 6));
         var view = Library(skin, m);
         var w = Host(view, skin);
         try
         {
+            w.Width = 1180;
+            Dispatcher.UIThread.RunJobs();
+            w.UpdateLayout();
             Rect Box(Control c) => new(c.TranslatePoint(default, view)!.Value, c.Bounds.Size);
-            var notes = view.GetVisualDescendants().OfType<ScrollViewer>().First(s => s.Name == "NoteScroll");
-            var card = view.GetVisualDescendants().OfType<Border>().First(b => b.Classes.Contains("ai-answer-card"));
+            var split = view.GetVisualDescendants().OfType<AskSplit>().Single(s => s.IsEffectivelyVisible);
+            var column = view.GetVisualDescendants().OfType<StackPanel>().First(s => s.Name == "Column" && s.IsEffectivelyVisible);
+            var thread = view.GetVisualDescendants().OfType<ScrollViewer>().First(s => s.Name == "Thread");
             var bar = view.GetVisualDescendants().OfType<UserControl>().First(u => u is MacAiAskBar or WinAiAskBar);
+            var answer = thread.GetVisualDescendants().OfType<NoteView>().First(n => n.IsEffectivelyVisible);
 
-            // The notes end above the answer, and the answer above the bar: nothing readable lies under it.
-            Assert.True(Box(notes).Bottom <= Box(card).Top + 0.5, $"notes {Box(notes)} run under the answer {Box(card)}");
-            Assert.True(Box(card).Bottom <= Box(bar).Top + 0.5, $"answer {Box(card)} runs under the bar {Box(bar)}");
-            Assert.True(Box(notes).Height > 200, "the notes keep room to read");
+            // Split: the notes on the left, the conversation down the right, nothing of one under the other.
+            Assert.True(split.Beside);
+            var panel = new Rect(Box(split).Right - AskSplit.PanelWidth(split.Bounds.Width), Box(split).Top, AskSplit.PanelWidth(split.Bounds.Width), split.Bounds.Height);
+            Assert.False(Box(column).Intersects(panel), $"the notes {Box(column)} run under the panel {panel}");
+            Assert.True(Box(column).Width >= 420, $"the notes keep a column to read: {Box(column).Width}");
+            // The bar is docked at the panel's foot, and the thread ends above it.
+            Assert.True(panel.Contains(Box(bar)), $"the bar {Box(bar)} isn't in the panel {panel}");
+            Assert.True(Box(thread).Bottom <= Box(bar).Top + 0.5, $"the thread {Box(thread)} runs under the bar {Box(bar)}");
+            // An answer has the panel's width, and a long one scrolls in the panel.
+            Assert.True(Box(answer).Width >= panel.Width - 64, $"the answer is {Box(answer).Width} in a panel {panel.Width} wide");
+            Assert.True(thread.Extent.Height > thread.Viewport.Height + 1, "the long answer should scroll inside the panel");
 
-            // A solid card, not glass: the notes could never show through it.
-            var fill = Assert.IsAssignableFrom<ISolidColorBrush>(card.Background);
-            Assert.Equal(255, fill.Color.A);
-
-            // A long answer scrolls inside its card.
-            var inside = card.GetVisualDescendants().OfType<ScrollViewer>().Single();
-            Assert.True(inside.Extent.Height > inside.Viewport.Height + 1, "the long answer should scroll inside the card");
-
-            // Close gives the notes their room back.
-            double before = Box(notes).Height;
-            var close = card.GetVisualDescendants().OfType<Button>().First(b => b.Classes.Contains("ai-close"));
+            // Close: the notes get the page back, and the bar is at its foot in the middle again.
+            var close = view.GetVisualDescendants().OfType<Button>().First(b => b.Name == "Close" && b.IsEffectivelyVisible);
             close.Command!.Execute(close.CommandParameter);
             Dispatcher.UIThread.RunJobs();
+            w.UpdateLayout();
             Assert.False(m.HasAnswer);
-            Assert.True(Box(notes).Height > before + 100, "the notes grow back once the answer is closed");
+            Assert.False(split.Beside);
+            Assert.False(thread.IsEffectivelyVisible);
+            Assert.True(Math.Abs(Box(bar).Center.X - Box(split).Center.X) < 1, $"the bar {Box(bar)} is back in the middle of {Box(split)}");
+            Assert.True(Box(bar).Bottom > Box(split).Bottom - 40);
+
+            // Open again, then Esc in the bar closes it too.
+            m.Ask.AnswerClosed = false;
+            Dispatcher.UIThread.RunJobs();
+            w.UpdateLayout();
+            Assert.True(split.Beside);
+            var field = bar.GetVisualDescendants().OfType<TextBox>().Single(t => t.Name == "AskInput");
+            field.Focus();
+            w.KeyPress(Avalonia.Input.Key.Escape, Avalonia.Input.RawInputModifiers.None, Avalonia.Input.PhysicalKey.Escape, null);
+            Dispatcher.UIThread.RunJobs();
+            Assert.False(m.HasAnswer);
+            Assert.False(split.Beside);
         }
         finally
         {
             w.Close();
+            Platform.Motion.Override = null;
+        }
+    }
+
+    [AvaloniaTheory]
+    [InlineData(SkinKind.Mac)]
+    [InlineData(SkinKind.Win)]
+    public void In_a_narrow_window_the_conversation_covers_the_notes_with_a_way_back(SkinKind skin)
+    {
+        Platform.Motion.Override = true;
+        var m = Demo.Library(answered: true);
+        var view = Library(skin, m);
+        var w = Host(view, skin);
+        try
+        {
+            w.Width = 900; // with the sidebar, under AskSplit.SheetBelow for the page area
+            Dispatcher.UIThread.RunJobs();
+            w.UpdateLayout();
+            Rect Box(Control c) => new(c.TranslatePoint(default, view)!.Value, c.Bounds.Size);
+            var split = view.GetVisualDescendants().OfType<AskSplit>().Single(s => s.IsEffectivelyVisible);
+            var thread = view.GetVisualDescendants().OfType<ScrollViewer>().First(s => s.Name == "Thread");
+            Assert.True(split.Sheet);
+            Assert.False(split.Beside);
+            // The sheet has the whole page area: none of the notes shows beside it, half covered.
+            var sheet = thread.GetVisualAncestors().OfType<Border>().First(b => b.Parent == split);
+            Assert.Equal(Box(split), Box(sheet));
+            var back = view.GetVisualDescendants().OfType<Button>().First(b => b.Name == "BackToPage");
+            Assert.True(back.IsEffectivelyVisible);
+            Assert.False(view.GetVisualDescendants().OfType<Button>().First(b => b.Name == "Close").IsEffectivelyVisible);
+            back.Command!.Execute(back.CommandParameter);
+            Dispatcher.UIThread.RunJobs();
+            w.UpdateLayout();
+            Assert.False(split.Sheet);
+            Assert.False(sheet.IsVisible);
+        }
+        finally
+        {
+            w.Close();
+            Platform.Motion.Override = null;
         }
     }
 

@@ -10,13 +10,14 @@
              x:DataType="vm:CanvasSettingsModel">
   <UserControl.Styles>
     <StyleInclude Source="avares://StudyStash/Views/MacCanvasStyles.axaml" />
+    <StyleInclude Source="avares://StudyStash/Views/SettingsPaneStyles.axaml" />
   </UserControl.Styles>
   <StackPanel Spacing="24">
 
     <!-- Header -->
     <StackPanel Spacing="6">
       <Grid ColumnDefinitions="Auto,*,Auto">
-        <TextBlock Classes="cv-h1" Text="Canvas" c:Typography.Extra="-0.39" VerticalAlignment="Center" />
+        <TextBlock Classes="cv-h1" Text="Canvas" VerticalAlignment="Center" />
         <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8" HorizontalAlignment="Right" VerticalAlignment="Center"
                     IsVisible="{Binding Status.IsCompact}">
           <Ellipse Width="7" Height="7" Fill="{DynamicResource Good}" VerticalAlignment="Center" />
@@ -42,7 +43,7 @@
       <Border Classes="cv-group">
         <StackPanel>
           <Grid Classes="cv-row" ColumnDefinitions="*,Auto">
-            <TextBlock Text="School" VerticalAlignment="Center" FontSize="13" />
+            <TextBlock Classes="cv-label" Text="School" />
             <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="10" IsVisible="{Binding !EditingSchool}">
               <c:PageText Classes="cv-value" Text="{Binding School}" VerticalAlignment="Center" />
               <Button Classes="cv-pill" Command="{Binding ChangeSchoolCommand}"><TextBlock Text="Change" /></Button>
@@ -55,7 +56,7 @@
           </Grid>
           <Border Classes="cv-sep" />
           <Grid Classes="cv-row" ColumnDefinitions="*,Auto,Auto,Auto">
-            <TextBlock Text="{Binding ExtensionLabel}" VerticalAlignment="Center" FontSize="13" />
+            <TextBlock Classes="cv-label" Text="{Binding ExtensionLabel}" />
             <c:PageText Grid.Column="1" Classes="cv-value" Text="{Binding ExtensionLine}" VerticalAlignment="Center" />
             <Button Name="ChooseBrowser" Grid.Column="2" Classes="cv-pill cv-plain" Margin="12,0,0,0" VerticalAlignment="Center" Command="{Binding ChooseBrowserCommand}"
                     IsVisible="{Binding CanChooseBrowser}" ToolTip.Tip="{Binding ChooseBrowserTip}"><TextBlock Text="Change browser" /></Button>
@@ -64,7 +65,7 @@
           </Grid>
           <Border Classes="cv-sep" />
           <Grid Classes="cv-row" ColumnDefinitions="*,Auto">
-            <TextBlock Text="Sync" VerticalAlignment="Center" FontSize="13" />
+            <TextBlock Classes="cv-label" Text="Sync" />
             <Button Grid.Column="1" Classes="cv-select" Width="140" VerticalAlignment="Center">
               <Grid ColumnDefinitions="*,Auto">
                 <TextBlock Text="{Binding PollLabel}" TextTrimming="CharacterEllipsis" />
@@ -101,9 +102,9 @@
           <TextBlock Classes="cv-link" Text="Find my courses again" />
         </Button>
       </Grid>
-      <TextBlock Classes="cv-value" FontSize="12" Margin="4,0" TextWrapping="Wrap"
+      <TextBlock Classes="cv-value" TextWrapping="Wrap"
                  Text="Only ticked courses become classes and sync. This term's start ticked; past terms, sandboxes and chapel don't." />
-      <TextBlock Classes="cv-value" FontSize="12" Margin="4,0" Text="Find your courses to choose which to bring in." IsVisible="{Binding !Picker.HasCourses}" />
+      <TextBlock Classes="cv-value" Text="Find your courses to choose which to bring in." IsVisible="{Binding !Picker.HasCourses}" />
       <v:MacCoursePicker DataContext="{Binding Picker}" />
     </StackPanel>
 

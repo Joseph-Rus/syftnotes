@@ -10,7 +10,7 @@
              x:DataType="vm:CalendarSettingsModel">
   <StackPanel Spacing="8">
     <TextBlock Classes="h" Text="{x:Static vm:CalendarWords.Title}" />
-    <TextBlock Classes="body" Text="{x:Static vm:CalendarWords.Lede}" />
+    <TextBlock Classes="body lede" Text="{x:Static vm:CalendarWords.Lede}" />
 
     <!-- Add a calendar feed -->
     <Border Classes="group">
@@ -24,8 +24,8 @@
               <TextBox Classes="bare" Text="{Binding FeedUrl}" PlaceholderText="{x:Static vm:CalendarWords.FeedPlaceholder}" FontSize="13" />
             </Border>
           </StackPanel>
-          <Button Grid.Column="4" Classes="pill primary" IsEnabled="{Binding !Adding}" Command="{Binding AddFeedCommand}" VerticalAlignment="Center">
-            <TextBlock Text="Add" FontSize="13" FontWeight="Medium" />
+          <Button Grid.Column="4" Classes="btn sm ink" IsEnabled="{Binding !Adding}" Command="{Binding AddFeedCommand}" VerticalAlignment="Center">
+            <TextBlock Text="Add" />
           </Button>
         </Grid>
       </Border>
@@ -37,8 +37,8 @@
       <ItemsControl ItemsSource="{Binding Connectable}">
         <ItemsControl.ItemTemplate>
           <DataTemplate x:DataType="cal:CalendarKind">
-            <Button Classes="pill" Margin="0,0,8,0" Command="{Binding $parent[ItemsControl].((vm:CalendarSettingsModel)DataContext).ConnectCommand}" CommandParameter="{Binding}">
-              <TextBlock Text="{Binding ConnectLabel}" FontSize="13" />
+            <Button Classes="btn sm" Margin="0,0,8,0" Command="{Binding $parent[ItemsControl].((vm:CalendarSettingsModel)DataContext).ConnectCommand}" CommandParameter="{Binding}">
+              <TextBlock Text="{Binding ConnectLabel}" />
             </Button>
           </DataTemplate>
         </ItemsControl.ItemTemplate>
@@ -62,8 +62,8 @@
                     <TextBlock Classes="row-title" Text="{Binding Name}" TextTrimming="CharacterEllipsis" />
                     <c:PageText Classes="row-sub" Text="{Binding Problem}" TextWrapping="Wrap" IsVisible="{Binding HasProblem}" Foreground="{DynamicResource Warn}" />
                   </StackPanel>
-                  <Button Grid.Column="4" Classes="pill" VerticalAlignment="Center" Command="{Binding RemoveCommand}">
-                    <TextBlock Text="Remove" FontSize="13" />
+                  <Button Grid.Column="4" Classes="btn sm" VerticalAlignment="Center" Command="{Binding RemoveCommand}">
+                    <TextBlock Text="Remove" />
                   </Button>
                 </Grid>
               </Border>

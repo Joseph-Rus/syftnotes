@@ -8,7 +8,7 @@ using StudyStash.Core.Ai;
 namespace StudyStash.App.ViewModels;
 
 /// <summary>One library grant: an app signed in from the web, or a token made in Settings. The row owns its own
-/// Remove, closed over its id. (The AI apps on this computer are <see cref="AiAppRow"/>s.)</summary>
+/// Remove, closed over its id. (The AI apps on this computer are on their AI's card, in <see cref="AiEnginesModel"/>.)</summary>
 public sealed class AiConnectionRow
 {
     public string Id { get; init; } = "";
@@ -34,99 +34,11 @@ public sealed class AiConnectionRow
     public bool First { get; set; }
 }
 
-/// <summary>One AI app on this computer (Claude Desktop, Claude Code, ChatGPT, Gemini CLI): what it's called, where it
-/// stands, and its own Connect and Disconnect, closed over its id.</summary>
-public sealed partial class AiAppRow : ObservableObject
-{
-    public string Id { get; init; } = "";
-    public string Name { get; init; } = "";
-    /// <summary>What the app is, in a few words ("The ChatGPT app, and Codex in the terminal or your editor"): the
-    /// row's tooltip.</summary>
-    public string About { get; init; } = "";
-    /// <summary>The app's own mark where it has one the student would know; the ChatGPT app and Codex share an id
-    /// here, and the row is named for ChatGPT.</summary>
-    public string Icon => Id switch
-    {
-        "codex" => "brand:chatgpt",
-        "gemini" => "brand:gemini",
-        "claude-code" or "claude-desktop" or "claude" => "brand:claude",
-        _ => "desktop_windows",
-    };
-    [ObservableProperty] public partial string Status { get; set; } = "";
-    /// <summary>Connected: an app started Syft Notes since it was added.</summary>
-    [ObservableProperty] public partial bool Ok { get; set; }
-    [ObservableProperty] public partial bool CanConnect { get; set; }
-    [ObservableProperty] public partial bool CanDisconnect { get; set; }
-    /// <summary>"Connect", "Fix" when the app has another copy of Syft Notes set up, or "Update" when it has this
-    /// one the way it was pasted in by hand.</summary>
-    [ObservableProperty] public partial string ConnectWords { get; set; } = "Connect";
-    /// <summary>Added, but the app hasn't loaded it yet, and it's a desktop app Syft Notes can quit and open again
-    /// (a Mac): the row offers to, since closing a Mac app's window doesn't quit it.</summary>
-    [ObservableProperty] public partial bool CanReopen { get; set; }
-    /// <summary>The app as its own menu bar names it ("Claude", "ChatGPT"): what the words about it say.</summary>
-    public string AppName => ClaudeSetup.DesktopApp(Id)?.Name ?? Name;
-    public string ReopenWords => $"Reopen {AppName}";
-    /// <summary>While Reopen is quitting and opening the app.</summary>
-    public bool Reopening { get; set; }
-    /// <summary>Reopen opened the app since it was added: the row says what's left, if anything.</summary>
-    public bool Reopened { get; set; }
-    [ObservableProperty] public partial bool First { get; set; }
-    public IAsyncRelayCommand? Connect { get; internal set; }
-    public IAsyncRelayCommand? Disconnect { get; internal set; }
-    public IAsyncRelayCommand? Reopen { get; internal set; }
-    /// <summary>Windows shows the status in the one subtitle line.</summary>
-    public string WinDetail => Status;
-    partial void OnStatusChanged(string value) => OnPropertyChanged(nameof(WinDetail));
-
-    /// <summary>Where an app stands, in words: not here, not connected, added but not loaded yet, connected (and when
-    /// it last started Syft Notes), set up for another copy of Syft Notes, or set up by hand.</summary>
-    public void Show(AiAppState s, DateTime now)
-    {
-        Ok = false;
-        CanConnect = s.Installed && (!s.Added || s.OtherCopy || s.Outdated);
-        CanDisconnect = s.Added;
-        ConnectWords = s.OtherCopy ? "Fix" : s.Outdated ? "Update" : "Connect";
-        bool waiting = false;
-        if (!s.Installed) Status = "Not on this computer";
-        else if (!s.Added) Status = "Not connected yet";
-        else if (s.OtherCopy) Status = "Set up for another copy of Syft Notes. Choose Fix to use this one.";
-        else if (s.Outdated) Status = "Set up by hand, so Syft Notes can't tell when it's connected. Choose Update.";
-        else if (s.Started is { } started && (s.AddedAt is null || started >= s.AddedAt))
-        {
-            Ok = true;
-            Reopened = false;
-            Status = "Connected · " + (started.Date == now.Date ? $"started {started:H:mm}" : now - started < TimeSpan.FromDays(7) ? $"started {started:ddd}" : $"started {started:d MMM}");
-        }
-        else
-        {
-            waiting = true;
-            Status = Reopening ? $"Reopening {AppName}…" : Reopened ? OpenedWords : WaitingWords(s.CanReopen);
-        }
-        CanReopen = waiting && s.CanReopen && !Reopening;
-    }
-
-    /// <summary>The one step left after Connect: the app reads its settings when it starts. ChatGPT starts Study
-    /// Stash only once a chat in Codex begins, so its row says that too.</summary>
-    string WaitingWords(bool canReopen) => Id switch
-    {
-        "claude-desktop" => canReopen ? "Almost done. Reopen Claude so it loads Syft Notes." : "Almost done. Quit Claude completely, then open it again.",
-        "codex" => canReopen ? "Almost done. Reopen ChatGPT, then start a chat in Codex." : "Almost done. Quit ChatGPT and open it again, then start a chat in Codex.",
-        "claude-code" => "Almost done. Start a new Claude Code session.",
-        _ => $"Almost done. Start {Name} again.",
-    };
-
-    string OpenedWords => Id == "codex"
-        ? "ChatGPT is open. Start a chat in Codex and this turns to Connected."
-        : $"{AppName} is opening. This turns to Connected in a moment.";
-}
-
 /// <summary>
-/// Settings → AI tool access (design 14): the off switch, what AI apps may read, the AI apps on this computer (each
-/// connected with one click, no Tailscale needed), Claude and ChatGPT on the web (Tailscale Funnel), and the other
-/// connections.
-/// Reads and drives one library's AI (<see cref="IAiLibrary"/>); what it can't do through that (reading and changing
-/// the AI apps' own settings on this computer) goes through hooks the host sets, so this model never touches a file
-/// or a process itself.
+/// Settings → Your AI → Advanced settings, the AI apps' part: the off switch, what AI apps may read and change, Claude
+/// and ChatGPT on the web (Tailscale Funnel), the other connections, and the setup to paste into any other AI app. (The
+/// AI apps on this computer are connected from their AI's card: <see cref="AiEnginesModel.ConnectAsync"/>.)
+/// Reads and drives one library's AI (<see cref="IAiLibrary"/>); the clipboard and the browser are hooks the host sets.
 /// </summary>
 public sealed partial class AiAccessModel : ObservableObject
 {
@@ -156,7 +68,7 @@ public sealed partial class AiAccessModel : ObservableObject
     public const string SaveToggleSub = "When you ask an AI app to write a lecture's notes, they're saved on its page. Notes they replace are kept, so you can put them back.";
 
     /// <summary>The one line a student with no paid AI is told here: the Claude app can write their notes.</summary>
-    public const string NoPlanLine = "No paid AI? Connect the free Claude app above and ask it to “write notes for my last lecture”: they appear on the lecture's page.";
+    public const string NoPlanLine = "No paid AI? Connect Claude at the top of this page, then ask the free Claude app to “write notes for my last lecture”: they appear on the lecture's page.";
     [ObservableProperty] public partial bool Busy { get; set; }
     [ObservableProperty] public partial string? Say { get; set; }
     [ObservableProperty] public partial bool OlderLibrary { get; set; }
@@ -230,78 +142,11 @@ public sealed partial class AiAccessModel : ObservableObject
     public ObservableCollection<AiConnectionRow> Connected { get; } = [];
     public bool HasConnections => Connected.Count > 0;
 
-    /// <summary>The AI apps on this computer, each with its status and its own Connect / Disconnect.</summary>
-    public ObservableCollection<AiAppRow> Apps { get; } = [];
-
     /// <summary>The <c>mcpServers</c> JSON for any other MCP app, to paste in by hand (from <c>ClaudeSetup</c>).</summary>
     public string McpJson { get; set; } = "";
 
     /// <summary>Puts text on the clipboard (write-only: this model never reads it).</summary>
     public Func<string, Task>? Copy { get; set; }
-    /// <summary>Reads every AI app's settings on this computer (read only), asked fresh each <see cref="Load"/>.</summary>
-    public Func<IReadOnlyList<AiAppState>>? ReadApps { get; set; }
-    /// <summary>Adds Syft Notes to one app's settings, or takes it out; answers what happened.</summary>
-    public Func<string, AiAppChange>? ConnectApp { get; set; }
-    public Func<string, AiAppChange>? DisconnectApp { get; set; }
-    /// <summary>Quits one app and opens it again (a Mac); answers whether it did, with the words to show if not.</summary>
-    public Func<string, Task<AiAppChange>>? ReopenApp { get; set; }
-
-    /// <summary>The apps Syft Notes looked for and didn't find, in one quiet line under the ones it did.</summary>
-    [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(ShowMissingApps))]
-    public partial string? MissingApps { get; set; }
-    /// <summary>None of them is on this computer: the group says where to get one instead of a list of absences.</summary>
-    [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(ShowMissingApps))]
-    public partial bool NoApps { get; set; }
-    public bool ShowMissingApps => !NoApps && MissingApps is { Length: > 0 };
-
-    public const string ChatGptDownload = "https://openai.com/chatgpt/download/";
-    public const string ClaudeDownload = "https://claude.com/download";
-
-    [RelayCommand] public void GetChatGpt() => OpenUrl?.Invoke(ChatGptDownload);
-    [RelayCommand] public void GetClaude() => OpenUrl?.Invoke(ClaudeDownload);
-
-    /// <summary>Once an app is connected: a first question to ask it, so the student sees it work.</summary>
-    public const string TryQuestion = "What did my last lecture cover?";
-    public bool ShowTry => Apps.Any(a => a.Ok);
-    public string TryLead => Apps.FirstOrDefault(a => a.Ok) switch
-    {
-        { Id: "codex" } => "Try it. In ChatGPT, start a chat in Codex and ask:",
-        { } row => $"Try it. In {row.AppName}, ask:",
-        null => "",
-    };
-
-    [RelayCommand]
-    public async Task CopyTry()
-    {
-        if (Copy is null) return;
-        await Copy(TryQuestion);
-        Say = "Copied. Paste it into the app.";
-    }
-
-    /// <summary>The "what was written" panel after a change: the app's settings file, the copy of it from before, and
-    /// the setup that went in (no secrets: the apps start Syft Notes, which reads its own settings).</summary>
-    [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(ShowWritten), nameof(HasWritten))]
-    public partial string? WrittenFile { get; set; }
-    /// <summary>The panel is folded away behind "Show what changed": it's there for whoever wants to see it, and
-    /// opens by itself only when a change couldn't be made and the setup has to be pasted in by hand.</summary>
-    [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(ShowWritten), nameof(DetailsWords))]
-    public partial bool DetailsOpen { get; set; }
-    public bool HasWritten => WrittenFile is { Length: > 0 };
-    public string DetailsWords => DetailsOpen ? "Hide what changed" : "Show what changed";
-    [RelayCommand] public void ToggleDetails() => DetailsOpen = !DetailsOpen;
-    [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(WrittenBackupWords))]
-    public partial string? WrittenBackup { get; set; }
-    [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(HasWrittenText))]
-    public partial string? WrittenText { get; set; }
-    public bool ShowWritten => HasWritten && DetailsOpen;
-    public bool HasWrittenText => WrittenText is { Length: > 0 };
-    public string WrittenBackupWords => WrittenBackup is { Length: > 0 } b ? "As it was before: " + b : "It's a new file: there was nothing to keep.";
     public bool HasSay => Say is { Length: > 0 };
     partial void OnSayChanged(string? value) => OnPropertyChanged(nameof(HasSay));
 
@@ -344,11 +189,9 @@ public sealed partial class AiAccessModel : ObservableObject
     [RelayCommand]
     public Task Refresh() => Load();
 
-    /// <summary>Reads the library's tool access, and this computer's own Claude Code / Claude Desktop, once: called
-    /// when the pane opens.</summary>
+    /// <summary>Reads the library's tool access once: called when the pane opens.</summary>
     public async Task Load()
     {
-        await LoadApps();
         ToolAccessInfo? info;
         try
         {
@@ -455,150 +298,6 @@ public sealed partial class AiAccessModel : ObservableObject
         if (Copy is null) return;
         await Copy(McpJson);
         Say = "Copied. Paste it into the tool's settings.";
-    }
-
-    /// <summary>Reads every app's settings again and shows where each stands (off the UI thread: Claude Code's
-    /// settings file can be large).</summary>
-    async Task LoadApps()
-    {
-        if (ReadApps is null) return;
-        IReadOnlyList<AiAppState> states;
-        try
-        {
-            states = await Task.Run(ReadApps);
-        }
-        catch (Exception e) when (e is IOException or UnauthorizedAccessException)
-        {
-            return;
-        }
-        // A row for each app this computer has, in the order Settings lists them; the rest are named in one line.
-        int at = 0;
-        foreach (var s in states)
-        {
-            var row = Apps.FirstOrDefault(a => a.Id == s.Id);
-            if (!s.Installed)
-            {
-                if (row is not null) Apps.Remove(row);
-                continue;
-            }
-            if (row is null)
-            {
-                row = new AiAppRow { Id = s.Id, Name = s.Name, About = AppAbout(s.Id) };
-                string id = s.Id;
-                row.Connect = new AsyncRelayCommand(() => ChangeAppAsync(id, add: true));
-                row.Disconnect = new AsyncRelayCommand(() => ChangeAppAsync(id, add: false));
-                row.Reopen = new AsyncRelayCommand(() => ReopenAppAsync(id));
-                Apps.Insert(Math.Min(at, Apps.Count), row);
-            }
-            row.Show(s, now());
-            at = Apps.IndexOf(row) + 1;
-        }
-        for (int i = 0; i < Apps.Count; i++) Apps[i].First = i == 0;
-        NoApps = Apps.Count == 0;
-        var missing = states.Where(s => !s.Installed).Select(s => s.Name).ToList();
-        MissingApps = missing.Count > 0 ? $"Not found on this computer: {string.Join(", ", missing)}." : null;
-        OnPropertyChanged(nameof(ShowTry));
-        OnPropertyChanged(nameof(TryLead));
-    }
-
-    /// <summary>The row's Reopen: quits the app and opens it again, then keeps looking for it to load Syft Notes.</summary>
-    async Task ReopenAppAsync(string id)
-    {
-        if (ReopenApp is null || Apps.FirstOrDefault(a => a.Id == id) is not { } row) return;
-        row.Reopening = true;
-        await LoadApps();
-        AiAppChange done;
-        try
-        {
-            done = await ReopenApp(id);
-        }
-        finally
-        {
-            row.Reopening = false;
-        }
-        row.Reopened = done.Ok;
-        Say = done.Ok ? null : done.Say;
-        await LoadApps();
-        StopWatchingApps();
-        if (done.Ok) WatchApp(id);
-    }
-
-    static string AppAbout(string id) => id switch
-    {
-        "claude-desktop" => "The Claude app on this computer",
-        "claude-code" => "In the terminal, the Claude app's Code tab, or your editor",
-        "codex" => "The ChatGPT app, and Codex in the terminal or your editor",
-        "gemini" => "Google's Gemini in the terminal",
-        _ => "",
-    };
-
-    async Task ChangeAppAsync(string id, bool add)
-    {
-        if ((add ? ConnectApp : DisconnectApp) is not { } change) return;
-        Busy = true;
-        try
-        {
-            var done = await Task.Run(() => change(id));
-            Say = done.Say;
-            WrittenFile = done.File;
-            WrittenBackup = done.Backup;
-            WrittenText = done.Written;
-            // Folded away unless the setup has to be pasted in by hand, which is what the words then point at.
-            DetailsOpen = !done.Ok && done.Written is { Length: > 0 };
-            if (Apps.FirstOrDefault(a => a.Id == id) is { } changed) changed.Reopened = false;
-            await LoadApps();
-            StopWatchingApps();
-            if (add && done.Ok) WatchApp(id);
-        }
-        finally
-        {
-            Busy = false;
-        }
-    }
-
-    CancellationTokenSource? appWatch;
-
-    /// <summary>Stops looking again after a Connect (<see cref="WatchApp"/>): another change took its place, or
-    /// Settings closed, and looking went on for its five minutes with nobody to see it.</summary>
-    public void StopWatchingApps()
-    {
-        appWatch?.Cancel();
-        appWatch = null;
-    }
-
-    /// <summary>After Connect or Reopen, the app still has to load Syft Notes (ChatGPT, once a chat in Codex starts).
-    /// Looks again every few seconds for five minutes, so the row turns to Connected by itself the moment it does,
-    /// with Settings still open.</summary>
-    void WatchApp(string id)
-    {
-        var cts = new CancellationTokenSource();
-        appWatch = cts;
-        _ = WatchAsync();
-
-        async Task WatchAsync()
-        {
-            try
-            {
-                for (var i = 0; i < 100 && !cts.IsCancellationRequested; i++)
-                {
-                    await (Delay?.Invoke(TimeSpan.FromSeconds(3)) ?? Task.Delay(TimeSpan.FromSeconds(3), cts.Token));
-                    if (cts.IsCancellationRequested) return;
-                    await LoadApps();
-                    if (Apps.FirstOrDefault(a => a.Id == id) is not { Ok: false, CanDisconnect: true }) return;
-                }
-            }
-            catch (OperationCanceledException)
-            {
-            }
-        }
-    }
-
-    [RelayCommand]
-    public async Task CopyWritten()
-    {
-        if (Copy is null || WrittenText is not { Length: > 0 } text) return;
-        await Copy(text);
-        Say = "Copied.";
     }
 
     /// <summary>Turns Claude's address on or off through the library (task 4's <c>/api/v2/ai/access/web</c>), then,

@@ -134,9 +134,9 @@ public class SettingsHighlightTests
                 var window = new Window { Width = 900, Height = 900, Content = view };
                 window.Show();
                 var swatch = view.GetVisualDescendants().OfType<Button>().First(b => b.DataContext is ThemeSwatch { Chosen: false });
-                Border Ring() => swatch.GetVisualDescendants().OfType<Border>().First(x => x.Classes.Contains(skin == SkinKind.Mac ? "swatchring" : "swatchborder") && x.IsEffectivelyVisible);
+                Border Ring() => swatch.GetVisualDescendants().OfType<Border>().First(x => x.Classes.Contains("swatchring") && x.IsEffectivelyVisible);
                 Border Focus() => swatch.GetVisualDescendants().OfType<Border>().First(x => x.Classes.Contains("focusring") && x.GetVisualParent() is Visual { IsEffectivelyVisible: true });
-                IBrush? RingBrush() => skin == SkinKind.Mac ? Ring().Background : Ring().BorderBrush;
+                IBrush? RingBrush() => Ring().Background;
 
                 Assert.False(Shows(RingBrush()));
                 Set(swatch, ":pointerover");

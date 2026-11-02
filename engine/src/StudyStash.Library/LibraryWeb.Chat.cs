@@ -74,7 +74,8 @@ public sealed partial class LibraryWeb
         {
             ["role"] = m.Role, ["text"] = m.Text, ["when"] = m.When, ["tools"] = new JsonArray(m.Tools.Select(t => (JsonNode)t).ToArray()),
             ["changed"] = new JsonArray(m.Changed.Select(t => (JsonNode)t).ToArray()), ["change"] = m.Change, ["failed"] = m.Failed,
-            ["sources"] = System.Text.Json.JsonSerializer.SerializeToNode(m.Sources, AiRemote.Options), ["engine"] = m.Engine,
+            ["sources"] = System.Text.Json.JsonSerializer.SerializeToNode(m.Sources, AiRemote.Options),
+            ["quotes"] = new JsonArray(m.Quotes.Select(q => (JsonNode)q).ToArray()), ["engine"] = m.Engine,
             ["engine_name"] = m.EngineName, ["stopped"] = m.Stopped,
         }).ToArray()) : null,
     };

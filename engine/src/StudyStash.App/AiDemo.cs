@@ -262,6 +262,75 @@ public static class AiDemo
         return m;
     }
 
+    /// <summary>Claude signed out with its own sign-in going from Syft Notes, at <paramref name="phase"/>
+    /// (<see cref="SignInPhase"/>): the overview its row and its card read.</summary>
+    static AiOverview SigningIn(string phase)
+    {
+        var o = Overview();
+        return o with
+        {
+            Engines = [.. o.Engines.Select(e => e.Id == "claude" ? e with { State = "not_signed_in", SignIn = phase } : e)],
+            Problems = [new AiProblemInfo("not_signed_in:claude", "not_signed_in", "claude", "Claude") { SignIn = phase }],
+        };
+    }
+
+    /// <summary>The Your AI rows with Claude's sign-in at <paramref name="phase"/> (waiting for the browser, gave up, ...).</summary>
+    /// <summary>A fresh library on a computer with none of the AIs installed and nobody chosen yet: Your AI says no AI writes
+    /// the notes, and offers Set up on each.</summary>
+    public static AiEnginesModel FreshEngines()
+    {
+        var none = new AiOverview(Engines_.Select(e => e with { State = "not_installed", Installed = false, Model = "", Models = [] }).ToList(), Notes: "", Ask: "", Fallback: true, Problems: [])
+        {
+            Diagrams = "auto", DiagramsBy = "", Rich = new RichNotesInfo(true, true, true, true), Speed = "standard",
+        };
+        var m = new AiEnginesModel(new Library(none)) { Here = true };
+        m.Load().GetAwaiter().GetResult();
+        return m;
+    }
+
+    /// <summary>Your AI as a student sees it once Connect has been pressed: Claude connected and writing the notes, in
+    /// the Claude app and Claude Code, ChatGPT in the ChatGPT app with the app still to be opened again, and Gemini not
+    /// set up yet, with its Connect.</summary>
+    public static AiEnginesModel ConnectedEngines(bool windows = false)
+    {
+        var engines = new List<EngineInfo>
+        {
+            new("claude", "Claude", "ready") { Installed = true },
+            new("codex", "ChatGPT", "ready") { Installed = true },
+            new("gemini", "Gemini", "not_installed") { Site = "https://antigravity.google" },
+            new("ollama", "Ollama", "not_installed") { SetUpGb = 5.2 },
+        };
+        var overview = new AiOverview(engines, Notes: "claude", Ask: "claude", Fallback: false, Problems: [])
+        {
+            Diagrams = "auto", DiagramsBy = "claude", Rich = new RichNotesInfo(true, true, true, true), Speed = "standard",
+        };
+        var m = new AiEnginesModel(new Library(overview)) { Here = true };
+        m.Load().GetAwaiter().GetResult();
+        var at = new DateTime(2026, 11, 1, 9, 0, 0);
+        m.UseApps(
+        [
+            new("claude-desktop", "Claude Desktop", true, true, false, at, at.AddMinutes(2), "") { Words = "Claude app" },
+            new("claude-code", "Claude Code", true, true, false, at, null, "") { Words = "Claude Code" },
+            new("codex", "ChatGPT", true, true, false, at, null, "", CanReopen: !windows) { Words = "ChatGPT app", Running = true },
+        ], windows);
+        return m;
+    }
+
+    public static AiEnginesModel EnginesSigningIn(string phase)
+    {
+        var m = new AiEnginesModel(new Library(SigningIn(phase))) { SignInEvery = TimeSpan.FromHours(1) };
+        m.Load().GetAwaiter().GetResult();
+        return m;
+    }
+
+    /// <summary>Settings' card for Claude, its sign-in at <paramref name="phase"/>.</summary>
+    public static AiProblemsModel ProblemSigningIn(string phase)
+    {
+        var m = new AiProblemsModel(new Library(SigningIn(phase))) { SignInEvery = TimeSpan.FromHours(1) };
+        m.Load().GetAwaiter().GetResult();
+        return m;
+    }
+
     /// <summary>The design's six problems, in its own order (row-major into the sheet's two columns).</summary>
     public static AiProblemsModel Problems()
     {
