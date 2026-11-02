@@ -221,9 +221,40 @@ public class FunnelTests
         await addOn.AddCommand.ExecuteAsync(null);
 
         // The store gave 1.6 after all: it checks in saying so, and the step becomes the one that asks for the school.
-        handler.Json(HttpMethod.Get, "/api/v2/canvas/state", """{"state": "not_set_up", "url": "", "extension": {"connected": true, "version": "1.6", "browser": "Chrome"}}""");
+        handler.Json(HttpMethod.Get, "/api/v2/canvas/state", """{"state": "not_set_up", "url": "", "extension": {"connected": true, "version": "1.6", "browser": "Chrome", "last_seen": "2999-01-01T00:00:00Z"}}""");
         await watch.RefreshAsync();
         Assert.False(f.FindsItself);
+        f.Dispose();
+    }
+
+    [AvaloniaFact]
+    public async Task A_version_the_library_heard_yesterday_changes_nothing_until_a_fresh_check_in_says_it_is_older()
+    {
+        var now = DateTimeOffset.Parse("2026-11-02T09:00:00Z");
+        var handler = new FakeLibrary()
+            .Json(HttpMethod.Post, "/api/v2/canvas/pair", """{"until":"2026-11-02T09:05:00Z"}""")
+            .Json(HttpMethod.Get, "/api/v2/canvas/state", """{"state": "not_set_up", "url": "", "extension": {"connected": false, "version": "1.6", "last_seen": "2026-11-01T09:00:00Z"}}""");
+        var context = CanvasFixtures.Context(handler, browsers: [Browsers.Firefox]);
+        var watch = new CanvasWatch(context);
+        var stores = new StoreVersions(new HttpClient(new FakeStores("1.6", "1.8")), Path.Combine(Directory.CreateTempSubdirectory("ss-stores-").FullName, "s.json"));
+        var (f, _) = Make(new FunnelServices
+        {
+            AddOnFindsCanvas = () => AddOnModel.FindsCanvasAsync(context, stores),
+            MakeAddOn = () => new AddOnModel(context, watch, () => now),
+            MakeCanvas = () => Task.FromResult<CanvasConnectModel?>(new CanvasConnectModel(context, watch, forSetup: true)),
+        });
+        await f.GetStartedCommand.ExecuteAsync(null);
+        await f.IAmAStudentCommand.ExecuteAsync(null);
+        Assert.True(f.FindsItself);
+        await f.AddOn!.StartAsync();
+        await f.AddOn.AddCommand.ExecuteAsync(null);
+        await watch.RefreshAsync();
+        Assert.True(f.FindsItself); // yesterday's 1.6 is ignored
+
+        now += TimeSpan.FromSeconds(30);
+        handler.Json(HttpMethod.Get, "/api/v2/canvas/state", """{"state": "not_set_up", "url": "", "extension": {"connected": true, "version": "1.6", "last_seen": "2026-11-02T09:00:30Z"}}""");
+        await watch.RefreshAsync();
+        Assert.True(f.AsksSchool); // a check-in since Add says 1.6
         f.Dispose();
     }
 
