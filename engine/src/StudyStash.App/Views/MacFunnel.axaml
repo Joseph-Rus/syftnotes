@@ -282,6 +282,7 @@
                         </ItemsControl.ItemTemplate>
                       </ItemsControl>
                     </Border>
+                    <TextBlock Name="CarryOn" Classes="hint" Margin="0,14,0,0" Text="{Binding Sync.CarryOnLine, FallbackValue=''}" IsVisible="{Binding Sync.CarryOn, FallbackValue=False}" />
                     <TextBlock Name="SlowLine" Classes="hint" Margin="0,14,0,0" Text="{Binding Sync.SlowLine, FallbackValue=''}" IsVisible="{Binding Sync.HasSlowLine, FallbackValue=False}" />
                     <Button Name="OpenCanvas" Classes="btn sm" HorizontalAlignment="Left" Margin="0,14,0,0" Command="{Binding Sync.OpenCanvasCommand, FallbackValue={x:Null}}"
                             IsVisible="{Binding Sync.SignInNeeded, FallbackValue=False}" Content="Open Canvas" />

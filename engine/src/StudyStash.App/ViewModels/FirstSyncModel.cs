@@ -129,6 +129,9 @@ public sealed partial class FirstSyncModel : ObservableObject, IDisposable
     /// <summary>"Skip for now", for a student who doesn't want to wait (or is stopped): the sync carries on, or can be
     /// tried again from Settings → Canvas.</summary>
     public bool CanSkip => !CanContinue;
+    /// <summary>The assignments are in and the files aren't yet: Continue is open, and this says the rest carries on.</summary>
+    public bool CarryOn => CanContinue && !Finished && !HasProblem;
+    public string CarryOnLine => $"You can carry on: the files keep coming in while {BrowserName} is open.";
 
     /// <summary>The browser that reads Canvas, by its name ("Chrome"), or "your browser".</summary>
     string BrowserName => connect.ConnectedIn();
@@ -361,6 +364,8 @@ public sealed partial class FirstSyncModel : ObservableObject, IDisposable
         // Continue opens with the assignments line, not only at the end: the buttons hear of every change.
         OnPropertyChanged(nameof(CanContinue));
         OnPropertyChanged(nameof(CanSkip));
+        OnPropertyChanged(nameof(CarryOn));
+        OnPropertyChanged(nameof(CarryOnLine));
         string now = string.Join("|", Stages.Select(st => $"{st.State}:{st.Detail}")) + $"|{Problem}|{Finished}";
         var at = Now();
         if (now != shown)
