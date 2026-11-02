@@ -172,8 +172,13 @@ public sealed class AgentInstallTests
         using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(60));
         Assert.True(await signIn.WaitAsync(cts.Token, seen.Add));
         Assert.Equal(new AgentSignedIn(true, "claude.ai", "pro"), seen[^1]);
-        Assert.Equal("https://example.com/fake-sign-in?code=abc", signIn.Url);
-        Assert.False(signIn.NeedsTerminal);
+        // It found a terminal (the stand-in stops, as Claude Code does, without one) and showed its page.
+        Assert.True(signIn.Waiting);
+        Assert.False(signIn.WantedTerminal);
+        Assert.False(signIn.Stuck);
+        // Its printed page ends on a code to paste: never opened.
+        Assert.False(signIn.PageFinishesByItself);
+        Assert.Equal(0, signIn.Opened);
     }
 
     [Fact]
@@ -188,23 +193,47 @@ public sealed class AgentInstallTests
         Assert.True(signIn.Running);
         using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(60));
         Assert.True(await signIn.WaitAsync(cts.Token));
-        Assert.False(signIn.NeedsTerminal);
+        Assert.False(signIn.Stuck);
     }
 
     [Fact]
-    public async Task A_sign_in_that_stops_at_once_offers_the_terminal_and_the_wait_goes_on()
+    public async Task A_sign_in_that_stops_at_once_is_stuck_and_the_wait_ends_with_no_terminal()
     {
         using var home = new TempHome();
         string exe = FakeAgents.WriteCli(home["bin"], "codex");
         File.WriteAllText(home["bin/login-fails"], "");
         using var signIn = new AgentSignIn(AgentCli.Codex, exe) { Every = TimeSpan.FromMilliseconds(200) };
         signIn.Start();
-        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(4));
+        // It ends by itself, well before the wait would: nothing is left waiting on a sign-in that isn't going.
+        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
         Assert.False(await signIn.WaitAsync(cts.Token));
-        Assert.True(signIn.NeedsTerminal);
-        // Signing in in the Terminal instead: the next check sees it.
-        File.WriteAllText(home["bin/signed-in"], "");
-        Assert.True(await signIn.WaitAsync(TestContext.Current.CancellationToken));
+        Assert.False(cts.IsCancellationRequested);
+        Assert.True(signIn.Stuck);
+        Assert.False(signIn.GaveUp);
+    }
+
+    [Fact]
+    public async Task Codexs_page_opens_itself_when_it_says_the_browser_wouldnt_and_again_on_asking()
+    {
+        using var home = new TempHome();
+        string exe = FakeAgents.WriteCli(home["bin"], "codex");
+        File.WriteAllText(home["bin/login-delay"], "120");
+        File.WriteAllText(home["bin/no-browser"], "");
+        var pages = new List<string>();
+        using var signIn = new AgentSignIn(AgentCli.Codex, exe) { Every = TimeSpan.FromMilliseconds(200), OpenPage = p => { lock (pages) pages.Add(p); return true; } };
+        Assert.True(signIn.Start());
+        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+        while (signIn.Opened == 0) await Task.Delay(50, cts.Token);
+        Assert.True(signIn.PageFinishesByItself);
+        Assert.True(signIn.OpenAgain());
+        while (true)
+        {
+            lock (pages) if (pages.Count == 2) break;
+            await Task.Delay(50, cts.Token);
+        }
+        // Opened again without starting another sign-in.
+        Assert.Equal(1, FakeAgents.Logins(home["bin"]));
+        lock (pages) Assert.All(pages, p => Assert.StartsWith("https://auth.example.com/oauth/authorize?", p));
     }
 
     [Fact]

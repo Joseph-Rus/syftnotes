@@ -15,6 +15,7 @@ struct SearchTab: View {
             SearchResultsView(query: query, live: true) { query = $0 }
                 .searchable(text: $query, prompt: "Lectures, topics, what was said")
                 .onSubmit(of: .search) { RecentSearches.add(query) }
+                .laptopNotice()
                 .routes()
         }
     }

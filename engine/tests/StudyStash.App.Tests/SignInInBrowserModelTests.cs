@@ -1,0 +1,245 @@
+using Avalonia.Headless.XUnit;
+using StudyStash.App.ViewModels;
+using StudyStash.Core.Ai;
+
+namespace StudyStash.App.Tests;
+
+/// <summary>
+/// What a Sign in button's row and card do once the library signs in hidden (<see cref="SignInPhase"/>): they say they
+/// wait for the browser, turn ready by themselves when the library says so, say plainly when it gave up, and only offer a
+/// terminal when the hidden sign-in couldn't start. The library is scripted (<see cref="FakeAiLibrary"/>): no CLI, account or
+/// browser is ever reached.
+/// </summary>
+public class SignInInBrowserModelTests
+{
+    static AiOverview Claude(string state, string signIn = "", bool problem = true) => AiTestData.MixedOverview() with
+    {
+        Engines = [.. AiTestData.MixedOverview().Engines.Select(e => e.Id == "claude" ? e with { State = state, SignIn = signIn } : e)],
+        Problems = problem && state == "not_signed_in" ? [new AiProblemInfo("not_signed_in:claude", "not_signed_in", "claude", "Claude") { SignIn = signIn }] : [],
+    };
+
+    static async Task Until(Func<bool> done)
+    {
+        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(20));
+        while (!done()) await Task.Delay(20, cts.Token);
+    }
+
+    [AvaloniaFact]
+    public async Task The_row_waits_for_the_browser_and_turns_ready_by_itself_with_nothing_to_press()
+    {
+        var lib = new FakeAiLibrary { Overview = Claude("not_signed_in") };
+        lib.OnSignIn = _ => new AiSaid("Finish signing in to Claude in the browser page that just opened.", lib.Overview = Claude("not_signed_in", SignInPhase.Waiting));
+        var model = new AiEnginesModel(lib) { SignInEvery = TimeSpan.FromMilliseconds(20) };
+        await model.Load();
+        AiEngineRow Row() => model.Engines.Single(r => r.Id == "claude");
+        // Signed out is something wrong on Claude's card: Fix, which runs Connect (here only its sign-in is missing).
+        Assert.Equal(("Needs attention", "Fix"), (Row().StateWords, Row().ActionWords));
+
+        await Row().ActCommand.ExecuteAsync(null);
+
+        // Waiting: its words, a small link to open the page again, and no button (and no Check to press).
+        Assert.Equal(AiWords.SignInWaiting, Row().About);
+        Assert.Equal("Open the page again", Row().LinkWords);
+        Assert.False(Row().ShowPill);
+        Assert.Equal("Finish signing in to Claude in the browser page that just opened.", model.Say);
+
+        // The library's own look at the sign-in says it's done: the row is ready, by itself.
+        lib.Overview = Claude("ready");
+        await Until(() => Row().State == "ready");
+        Assert.Equal("Claude is signed in.", model.Say);
+        Assert.False(Row().HasLink);
+        Assert.DoesNotContain(lib.Calls, c => c.StartsWith("check", StringComparison.Ordinal));
+    }
+
+    [AvaloniaFact]
+    public async Task Leaving_the_page_and_coming_back_to_a_sign_in_still_waiting_carries_on()
+    {
+        var lib = new FakeAiLibrary { Overview = Claude("not_signed_in", SignInPhase.Waiting) };
+
+        var back = new AiEnginesModel(lib) { SignInEvery = TimeSpan.FromMilliseconds(20) }; // a page opened afresh
+        await back.Load();
+        Assert.Equal("Open the page again", back.Engines.Single(r => r.Id == "claude").LinkWords);
+
+        lib.Overview = Claude("ready");
+        await Until(() => back.Engines.Single(r => r.Id == "claude").State == "ready");
+    }
+
+    [AvaloniaFact]
+    public async Task Open_the_page_again_asks_the_library_and_never_a_terminal()
+    {
+        var lib = new FakeAiLibrary { Overview = Claude("not_signed_in", SignInPhase.Waiting) };
+        lib.OnSignInAgain = _ => new AiSaid("Finish signing in to Claude in the browser page that just opened.", lib.Overview!);
+        var model = new AiEnginesModel(lib) { SignInEvery = TimeSpan.FromHours(1) };
+        await model.Load();
+
+        await model.Engines.Single(r => r.Id == "claude").LinkCommand.ExecuteAsync(null);
+
+        Assert.Contains("sign-in-again:claude", lib.Calls);
+    }
+
+    [AvaloniaFact]
+    public async Task A_sign_in_that_gave_up_says_so_with_Try_again_and_a_country_refusal_has_no_button()
+    {
+        var gaveUp = new AiEnginesModel(new FakeAiLibrary { Overview = Claude("not_signed_in", SignInPhase.GaveUp) });
+        await gaveUp.Load();
+        var row = gaveUp.Engines.Single(r => r.Id == "claude");
+        Assert.Equal("It stopped waiting before you'd finished. Try again.", row.About);
+        Assert.Equal("Try again", row.ActionWords);
+        Assert.False(row.HasLink); // the hidden sign-in worked, it just wasn't finished
+
+        var region = new AiEnginesModel(new FakeAiLibrary { Overview = Claude("not_signed_in", SignInPhase.Region) });
+        await region.Load();
+        row = region.Engines.Single(r => r.Id == "claude");
+        Assert.Equal("Claude isn't offered in your country yet.", row.About);
+        Assert.False(row.ShowPill);
+    }
+
+    [AvaloniaFact]
+    public async Task A_sign_in_Syft_Notes_couldnt_start_says_so_with_Try_again_and_Get_help_and_never_a_terminal()
+    {
+        var lib = new FakeAiLibrary { Overview = Claude("not_signed_in", SignInPhase.Stuck) };
+        var pages = new List<string>();
+        var model = new AiEnginesModel(lib) { SignInEvery = TimeSpan.FromHours(1), OpenUrl = pages.Add };
+        var cards = new AiProblemsModel(lib) { SignInEvery = TimeSpan.FromHours(1), OpenUrl = pages.Add };
+        await model.Load();
+        await cards.Load();
+        var row = model.Engines.Single(r => r.Id == "claude");
+        Assert.Equal(("Syft Notes couldn't start Claude's sign-in.", "Try again", "Get help"), (row.About, row.ActionWords, row.LinkWords));
+        var card = cards.Problems.Single();
+        Assert.Equal(("Syft Notes couldn't start Claude's sign-in.", "Try again", "Get help"), (card.Message, card.PrimaryWords, card.SecondaryWords));
+
+        await row.LinkCommand.ExecuteAsync(null);
+        await card.SecondaryCommand!.ExecuteAsync(null);
+        Assert.Equal([AiWords.HelpPage, AiWords.HelpPage], pages);
+        Assert.DoesNotContain(lib.Calls, c => c.StartsWith("sign-in", StringComparison.Ordinal));
+
+        // Try again: the hidden sign-in once more.
+        await row.ActCommand.ExecuteAsync(null);
+        Assert.Contains("sign-in:claude", lib.Calls);
+        foreach (string phase in new[] { SignInPhase.Waiting, SignInPhase.GaveUp, SignInPhase.Region, SignInPhase.Stuck })
+            foreach (string words in new[] { AiWords.SignInAbout("Claude", phase), AiWords.SignInSaid("Claude", phase), AiWords.SignInTitle("Claude", phase), AiWords.SignInLink(phase), AiWords.SignInButton(phase) })
+                Assert.DoesNotMatch("Terminal|PowerShell", words);
+    }
+
+    [AvaloniaFact]
+    public async Task The_problem_card_follows_the_sign_in_and_goes_by_itself_when_it_works()
+    {
+        var lib = new FakeAiLibrary { Overview = Claude("not_signed_in") };
+        lib.OnSignIn = _ => new AiSaid("Finish signing in to Claude in the browser page that just opened.", lib.Overview = Claude("not_signed_in", SignInPhase.Waiting));
+        var card = new AiProblemsModel(lib) { SignInEvery = TimeSpan.FromMilliseconds(20) };
+        await card.Load();
+        Assert.Equal("Sign in", card.Problems.Single().PrimaryWords);
+
+        await card.Problems.Single().PrimaryCommand!.ExecuteAsync(null);
+
+        var waiting = card.Problems.Single();
+        Assert.Equal("Finish signing in to Claude", waiting.Title);
+        Assert.Equal(AiWords.SignInWaiting, waiting.Message);
+        Assert.Equal("", waiting.PrimaryWords);
+        Assert.Equal("Open the page again", waiting.SecondaryWords);
+
+        lib.Overview = Claude("ready");
+        await Until(() => card.Problems.Count == 0);
+        Assert.DoesNotContain(lib.Calls, c => c.StartsWith("check", StringComparison.Ordinal));
+    }
+
+    [AvaloniaFact]
+    public async Task The_problem_cards_gave_up_and_stuck_words()
+    {
+        var gaveUp = new AiProblemsModel(new FakeAiLibrary { Overview = Claude("not_signed_in", SignInPhase.GaveUp) });
+        await gaveUp.Load();
+        Assert.Equal(("Signing in to Claude stopped", "Try again", ""),
+            (gaveUp.Problems.Single().Title, gaveUp.Problems.Single().PrimaryWords, gaveUp.Problems.Single().SecondaryWords));
+
+        var stuck = new AiProblemsModel(new FakeAiLibrary { Overview = Claude("not_signed_in", SignInPhase.Stuck) }) { SignInEvery = TimeSpan.FromHours(1) };
+        await stuck.Load();
+        Assert.Equal(("Try again", "Get help"), (stuck.Problems.Single().PrimaryWords, stuck.Problems.Single().SecondaryWords));
+    }
+
+    [AvaloniaFact]
+    public async Task A_sign_in_started_from_the_card_shows_on_the_row_below_and_the_other_way_round()
+    {
+        // Settings shows the problem cards and the AI rows on one page: whichever started the sign-in, both follow it.
+        var lib = new FakeAiLibrary { Overview = Claude("not_signed_in") };
+        lib.OnSignIn = _ => new AiSaid("Finish signing in to Claude in the browser page that just opened.", lib.Overview = Claude("not_signed_in", SignInPhase.Waiting));
+        var rows = new AiEnginesModel(lib) { SignInEvery = TimeSpan.FromMilliseconds(20) };
+        var card = new AiProblemsModel(lib) { SignInEvery = TimeSpan.FromMilliseconds(20) };
+        rows.ShareWith(card);
+        await rows.Load();
+        await card.Load();
+        AiEngineRow Row() => rows.Engines.Single(r => r.Id == "claude");
+
+        // From the card: the row says it waits too, then turns ready with the card gone, nothing pressed.
+        await card.Problems.Single().PrimaryCommand!.ExecuteAsync(null);
+        Assert.Equal(AiWords.SignInWaiting, Row().About);
+        lib.Overview = Claude("ready");
+        await Until(() => card.Problems.Count == 0 && Row().State == "ready");
+
+        // From the row: the card follows.
+        lib.Overview = Claude("not_signed_in");
+        await rows.Load();
+        await card.Load();
+        await Row().ActCommand.ExecuteAsync(null);
+        Assert.Equal("Finish signing in to Claude", card.Problems.Single().Title);
+        lib.Overview = Claude("ready");
+        await Until(() => card.Problems.Count == 0 && Row().State == "ready");
+        // The line under the list, which said "Finish signing in…", says it's done, whichever of the two heard first.
+        await Until(() => rows.Say == "Claude is signed in.");
+    }
+
+    [AvaloniaFact]
+    public async Task The_card_says_where_a_sign_in_stopped_and_the_line_under_the_list_says_no_more()
+    {
+        // Pressing Fix starts the sign-in; when it then couldn't start, gave up, or isn't offered here, Claude's card says
+        // so itself (the line under the list doesn't say it again).
+        foreach (var (phase, said) in new[]
+        {
+            (SignInPhase.Stuck, "Syft Notes couldn't start Claude's sign-in."),
+            (SignInPhase.GaveUp, "It stopped waiting before you'd finished. Try again."),
+            (SignInPhase.Region, "Claude isn't offered in your country yet."),
+        })
+        {
+            var lib = new FakeAiLibrary { Overview = Claude("not_signed_in") };
+            lib.OnSignIn = _ => new AiSaid("Finish signing in to Claude in the browser page that just opened.", lib.Overview = Claude("not_signed_in", phase));
+            var model = new AiEnginesModel(lib) { SignInEvery = TimeSpan.FromHours(1) };
+            await model.Load();
+            await model.Engines.Single(r => r.Id == "claude").ActCommand.ExecuteAsync(null);
+            var card = model.Engines.Single(r => r.Id == "claude");
+            Assert.Equal(("Needs attention", said), (card.StateWords, card.About));
+            Assert.Null(model.Say);
+        }
+
+        // Still waiting: the press's own words stand.
+        var waiting = new FakeAiLibrary { Overview = Claude("not_signed_in") };
+        waiting.OnSignIn = _ => new AiSaid("Finish signing in to Claude in the browser page that just opened.", waiting.Overview = Claude("not_signed_in", SignInPhase.Waiting));
+        var m = new AiEnginesModel(waiting) { SignInEvery = TimeSpan.FromHours(1) };
+        await m.Load();
+        await m.Engines.Single(r => r.Id == "claude").ActCommand.ExecuteAsync(null);
+        Assert.Equal("Finish signing in to Claude in the browser page that just opened.", m.Say);
+    }
+
+    [AvaloniaFact]
+    public async Task One_computer_says_this_computer_and_a_library_elsewhere_still_says_your_library()
+    {
+        var lib = new FakeAiLibrary { Overview = Claude("not_signed_in") };
+        var here = new AiProblemsModel(lib) { Here = true };
+        await here.Load();
+        Assert.Equal("Sign in to Claude", here.Problems.Single().Title);
+        var away = new AiProblemsModel(lib);
+        await away.Load();
+        Assert.Equal("Sign in to Claude on your library", away.Problems.Single().Title);
+
+        var rows = new AiEnginesModel(lib) { Here = true };
+        await rows.Load();
+        Assert.Equal("Signed out of Claude. Fix signs you in again.", rows.Engines.Single(r => r.Id == "claude").About);
+        Assert.Equal("Runs on this computer. Nothing leaves it.", rows.Engines.Single(r => r.Id == "ollama").About);
+        // Signed in, doing nothing yet, and in no app: where it runs.
+        var ready = new FakeAiLibrary { Overview = Claude("ready") with { Ask = "ollama" } };
+        var here2 = new AiEnginesModel(ready) { Here = true };
+        await here2.Load();
+        Assert.Equal("Signed in, on this computer.", here2.Engines.Single(r => r.Id == "claude").About);
+        var elsewhere = new AiEnginesModel(ready);
+        await elsewhere.Load();
+        Assert.Equal("Signed in, on your library.", elsewhere.Engines.Single(r => r.Id == "claude").About);
+    }
+}

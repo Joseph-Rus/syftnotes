@@ -47,7 +47,7 @@ public class CanvasExtensionTests
         manifest = JsonNode.Parse(Manifest(ext))!.AsObject();
         Assert.Equal(Extension.Version(), manifest["version"]!.GetValue<string>());
         Assert.Equal(hosts, manifest["host_permissions"]!.AsArray().Select(h => h!.GetValue<string>()));
-        Assert.Equal(["alarms", "storage"], manifest["permissions"]!.AsArray().Select(p => p!.GetValue<string>()));
+        Assert.Equal(["alarms", "storage", "cookies", "activeTab"], manifest["permissions"]!.AsArray().Select(p => p!.GetValue<string>()));
         // The key, the library's address and the Canvas stay; config.json joins config.js.
         Assert.Equal(new ExtensionConnection("http://mini.tail.ts.net:8787", "k3y", "https://canvas.test"), Extension.Connection(ext));
         Assert.Contains("\"key\":\"k3y\"", File.ReadAllText(Path.Combine(ext, "config.js")));

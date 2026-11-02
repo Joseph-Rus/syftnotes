@@ -13,6 +13,10 @@ struct AskIntent: AppIntent {
         guard let api = await AppModel.current?.api else {
             return .result(value: "", dialog: "Open Syft Notes and add this phone to your library first.")
         }
+        // The app says where a question goes before the first one is sent (AskConsent): Siri doesn't send it before.
+        guard AskConsent.agreed else {
+            return .result(value: "", dialog: "Open Syft Notes and ask there once first. It shows where your questions go.")
+        }
         var answer = ""
         do {
             for try await event in try await api.ask(question) {

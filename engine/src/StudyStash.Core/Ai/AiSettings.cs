@@ -18,13 +18,20 @@ public sealed record AiChoice(string Provider, string Model = "");
 /// Rich notes (diagrams, formula plots and drawings) have their own switches (<see cref="RichNotes"/> and one for each kind)
 /// and a pick of who designs them (<see cref="Diagrams"/>): a separate pass after the notes, automatic by default.
 /// <see cref="Speed"/> says how fast Claude Code writes the notes and designs them.
-/// With no ai.json, everything is the library's Ollama model, as before.
+/// With no ai.json nobody has been chosen yet: <see cref="Provider"/> is empty, nothing writes the notes (they wait for
+/// the student to pick an AI), and sorting and Ask keep to the library's own Ollama when it's there, as they always did.
 /// </summary>
 public sealed class AiSettings
 {
     public static readonly string[] Jobs = ["notes", "sort", "ask", "agent"];
 
-    public string Provider { get; set; } = "ollama";
+    /// <summary>The AI picked for everything, or "" while nobody has been chosen yet (a fresh library).</summary>
+    public string Provider { get; set; } = "";
+    /// <summary>Which shape of ai.json this is. Older files have none (0): their "ollama" may only be what a fresh library
+    /// used to say, which <see cref="Migrated"/> sorts out once; every file saved from now on is stamped, so a pick the
+    /// student made is never taken for it.</summary>
+    public int Version { get; set; }
+    public const int CurrentVersion = 1;
     /// <summary>Per kind of work: its own provider and model, when it isn't the one above.</summary>
     public Dictionary<string, AiChoice> ByJob { get; set; } = [];
     /// <summary>Per provider: the model to use when a job doesn't name one.</summary>
@@ -59,7 +66,31 @@ public sealed class AiSettings
     {
         if (ByJob.TryGetValue(job, out var c) && c.Provider.Length > 0)
             return c.Model.Length > 0 ? c : c with { Model = Models.GetValueOrDefault(c.Provider, "") };
+        // Nobody chosen: the notes have no writer ("" here), while sorting and Ask keep to the library's own Ollama.
+        if (Provider.Length == 0) return job == "notes" ? new AiChoice("") : new AiChoice("ollama", Models.GetValueOrDefault("ollama", ""));
         return new AiChoice(Provider, Models.GetValueOrDefault(Provider, ""));
+    }
+
+    /// <summary>Whether the student (or setup) has chosen an AI for this kind of work: its own, or the one for everything.</summary>
+    public bool Picked(string job) => (ByJob.TryGetValue(job, out var c) && c.Provider.Length > 0) || Provider.Length > 0;
+
+    /// <summary>Whether any AI is chosen to write the notes. False on a fresh library: no AI writes the notes yet.</summary>
+    public bool NotesChosen => Picked("notes");
+
+    /// <summary>
+    /// A library from before "nobody chosen yet" existed, whose ai.json says Ollama only because that was what a fresh
+    /// library said, becomes one where nobody is chosen: nothing was picked (no per-job pick, no model), Ollama isn't on
+    /// this computer, and no note was ever written by it. Anything else is kept as the student has it, an ai.json that
+    /// is already stamped, a pick of another AI, and an Ollama that is here or has written notes (<paramref name="wroteNotes"/>).
+    /// Returns whether it changed; the stamp is set either way, so this never runs twice.
+    /// </summary>
+    public bool Migrated(bool ollamaInstalled, bool ollamaWroteNotes)
+    {
+        if (Version >= CurrentVersion) return false;
+        Version = CurrentVersion;
+        if (Provider != "ollama" || ByJob.Count > 0 || Models.Count > 0 || ollamaInstalled || ollamaWroteNotes) return false;
+        Provider = "";
+        return true;
     }
 
     /// <summary>The kinds of rich notes to make now: none when rich notes are off (or diagrams were turned off the way
@@ -123,6 +154,7 @@ public sealed class AiSettings
     public void Save(string home)
     {
         Directory.CreateDirectory(home);
+        Version = CurrentVersion; // the library runs Migrated at start, before anything else saves, so this never hides an unsorted old file
         string text = JsonSerializer.Serialize(this, Options) + "\n";
         for (int attempt = 1; ; attempt++)
         {

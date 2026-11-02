@@ -69,6 +69,37 @@ public sealed partial class WelcomeCardModel(bool mac) : ObservableObject
             : $"Getting speech-to-text ready on this {device}…";
     }
 
+    /// <summary>The how-to-record part (the title, the Record keys, where the S. lives, the model, the microphone, Got
+    /// it): until Got it, or the first recording. The parts below can stay without it.</summary>
+    [ObservableProperty] public partial bool Intro { get; set; } = true;
+
+    /// <summary>The first run ended with no AI ("Later"): "Notes need an AI" with Continue with Google, until an AI
+    /// writes the notes. Never a silent state.</summary>
+    [ObservableProperty] public partial bool NeedsAi { get; set; }
+    public const string AiTitle = "Notes need an AI";
+    public const string AiLine = "Gemini is free with your Google account. Syft Notes uses it to write your notes after every class.";
+    public const string GoogleButton = "Continue with Google";
+    public const string OtherAiLabel = "Use Claude or ChatGPT";
+
+    /// <summary>The first run ended with no Canvas: how to add classes by hand.</summary>
+    [ObservableProperty] public partial bool AddClasses { get; set; }
+    public const string ClassesLine = "Add your classes with + beside Classes in the sidebar. Each lecture is filed under the one it's about. Canvas can join any time, in Settings.";
+
+    /// <summary>Anything to show at all.</summary>
+    public bool Shows => Intro || NeedsAi || AddClasses;
+
+    partial void OnIntroChanged(bool value) => OnPropertyChanged(nameof(Shows));
+    partial void OnNeedsAiChanged(bool value) => OnPropertyChanged(nameof(Shows));
+    partial void OnAddClassesChanged(bool value) => OnPropertyChanged(nameof(Shows));
+
+    public Action? OnGoogle { get; set; }
+    public Action? OnOtherAi { get; set; }
+    public Action? OnAddClass { get; set; }
+
+    [RelayCommand] void ContinueWithGoogle() => OnGoogle?.Invoke();
+    [RelayCommand] void OtherAi() => OnOtherAi?.Invoke();
+    [RelayCommand] void AddClass() => OnAddClass?.Invoke();
+
     public Action? OnShowIt { get; set; }
     public Action? OnRetry { get; set; }
     public Action? OnMic { get; set; }

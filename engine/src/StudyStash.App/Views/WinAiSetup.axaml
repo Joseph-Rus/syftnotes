@@ -1,5 +1,5 @@
-<!-- Setup's AI step on Windows: the Mac's page (MacAiSetup), with Open PowerShell where the Mac has Open Terminal (the
-     model's own label). "Choose who writes your notes", each engine a card, "No AI for now", then "Who answers your
+<!-- Setup's AI step on Windows: the Mac's page (MacAiSetup). "Choose who writes your notes" (Claude, ChatGPT, Gemini and
+     the free AI, each a card with the one button that gets it ready), "No AI for now", then "Who answers your
      questions". In setup's look (SetupStyles). -->
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
@@ -45,57 +45,17 @@
                     </Grid>
                   </Button>
                   <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
-                    <!-- Not ready yet: one button gets it ready (the free AI, Claude or ChatGPT), and nothing is left to do by hand -->
+                    <!-- Not ready yet: one button gets it ready (Claude, ChatGPT, Gemini or the free AI), and nothing is left to do by hand -->
                     <!-- Or an API key instead (Claude, ChatGPT, Gemini): the box for it opens under the list -->
                     <Button AutomationProperties.Name="Use an API key" Classes="text-link small" VerticalAlignment="Center" Command="{Binding KeyCommand}" IsVisible="{Binding ShowKeyLink}" Content="Use an API key" />
                     <Button AutomationProperties.Name="{Binding OpenLabel}" Name="SetUpFree" Classes="btn sm" Command="{Binding OpenCommand}" IsVisible="{Binding ShowOneButton}" Content="{Binding OpenLabel}" />
                     <Button AutomationProperties.Name="Sign in" Classes="btn sm" Command="{Binding SignInCommand}" IsVisible="{Binding ShowSignIn}" Content="Sign in" />
-                    <Button AutomationProperties.Name="{Binding HelpLabel}" Classes="btn sm" Command="{Binding ToggleHelpCommand}" IsVisible="{Binding HasHelp}" Content="{Binding HelpLabel}" />
                   </StackPanel>
                 </Grid>
                 <!-- The free AI being got ready: how far along -->
                 <StackPanel IsVisible="{Binding Working}" Margin="34,10,0,4" Spacing="6">
                   <c:SyftLoader Kind="PixelProgress" Size="9" Progress="{Binding Fraction}" IsIndeterminate="{Binding Steady}" HorizontalAlignment="Left" />
                   <TextBlock Classes="hint" Text="{Binding Progress}" />
-                </StackPanel>
-                <!-- How to get it going: numbered steps under the name, then Open PowerShell | Check again -->
-                <StackPanel IsVisible="{Binding ShowHelp}" Margin="34,12,0,4" Spacing="14">
-                  <ItemsControl ItemsSource="{Binding Help}">
-                    <ItemsControl.ItemsPanel>
-                      <ItemsPanelTemplate><StackPanel Spacing="14" /></ItemsPanelTemplate>
-                    </ItemsControl.ItemsPanel>
-                    <ItemsControl.ItemTemplate>
-                      <DataTemplate x:DataType="vm:AiSetupStep">
-                        <Grid ColumnDefinitions="20,10,*">
-                          <Border Classes="stepnum"><TextBlock Text="{Binding Number}" /></Border>
-                          <StackPanel Grid.Column="2" Spacing="8">
-                            <TextBlock Classes="say" Text="{Binding Title}" FontSize="13.5" LineHeight="20" />
-                            <Border Classes="code" IsVisible="{Binding HasCommand}">
-                              <Grid ColumnDefinitions="*,8,Auto">
-                                <SelectableTextBlock Text="{Binding Command}" />
-                                <Button AutomationProperties.Name="Copy" Grid.Column="2" Classes="btn sm" Command="{Binding CopyCommand}" VerticalAlignment="Center">
-                                  <StackPanel Orientation="Horizontal" Spacing="6">
-                                    <c:Icon Glyph="content_copy" Size="14" />
-                                    <TextBlock Text="Copy" VerticalAlignment="Center" />
-                                  </StackPanel>
-                                </Button>
-                              </Grid>
-                            </Border>
-                            <TextBlock Classes="hint" Text="{Binding Note}" IsVisible="{Binding HasNote}" FontSize="12.5" LineHeight="18" />
-                          </StackPanel>
-                        </Grid>
-                      </DataTemplate>
-                    </ItemsControl.ItemTemplate>
-                  </ItemsControl>
-                  <Grid ColumnDefinitions="30,*,Auto">
-                    <Button AutomationProperties.Name="{Binding OpenLabel}" Grid.Column="1" Classes="btn sm" Command="{Binding OpenCommand}" HorizontalAlignment="Left" Content="{Binding OpenLabel}" />
-                    <Button AutomationProperties.Name="Check again" Grid.Column="2" Classes="btn sm" Command="{Binding CheckAgainCommand}">
-                      <StackPanel Orientation="Horizontal" Spacing="6">
-                        <c:Icon Glyph="refresh" Size="14" />
-                        <TextBlock Text="Check again" VerticalAlignment="Center" />
-                      </StackPanel>
-                    </Button>
-                  </Grid>
                 </StackPanel>
               </StackPanel>
             </Border>

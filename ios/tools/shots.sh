@@ -14,7 +14,8 @@ here="$(cd "$(dirname "$0")" && pwd)"
 ios="$(dirname "$here")"
 bundle=app.studystash.ios
 
-# name|launch arguments (after -demo -quiet; "-unpaired" screens get no -demo)
+# name|launch arguments (after -demo -quiet -ask-agreed yes; "-unpaired" screens get no -demo, and a screen that says
+# -ask-agreed itself keeps its own)
 screens=(
   "home|-tab home"
   "class|-open 'class:Calculus II'"
@@ -31,6 +32,7 @@ screens=(
   "ask-answer|-tab ask -ask 'How do I choose u in integration by parts?'"
   "ask-error|-tab ask -ask-new -ask 'What did we cover in Calculus II this week?' -ask-fail -ask-drive"
   "ask-chats|-tab ask -ask-new -ask-chats"
+  "ask-consent|-tab ask -ask-new -ask-agreed no -ask 'How do I choose u in integration by parts?'"
   "ask-thinking-chatgpt|-tab ask -ask-new -ask 'What is due next?' -ask-waiting -ask-stage reading -ask-engine codex"
   "ask-thinking-gemini|-tab ask -ask-new -ask 'What is due next?' -ask-waiting -ask-stage reading -ask-engine gemini"
   "ask-thinking-ollama|-tab ask -ask-new -ask 'What is due next?' -ask-waiting -ask-stage reading -ask-engine ollama"
@@ -104,7 +106,8 @@ for mode in "${modes[@]}"; do
     name="${want%%=*}"
     line="$(args_of "$want")"
     eval "extra=($line)"
-    base=(-demo -quiet)
+    base=(-demo -quiet -ask-agreed yes)
+    [[ " ${extra[*]} " == *" -ask-agreed "* ]] && base=(-demo -quiet)
     [[ " ${extra[*]} " == *" -unpaired "* ]] && base=(-quiet)
     xcrun simctl terminate "$udid" "$bundle" 2>/dev/null || true
     xcrun simctl launch "$udid" "$bundle" "${base[@]}" "${extra[@]}" >/dev/null

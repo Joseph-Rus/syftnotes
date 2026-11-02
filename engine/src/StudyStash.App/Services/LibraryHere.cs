@@ -77,8 +77,8 @@ public sealed class LibraryHere
         svc.Cfg.PoolPassword = saved.PoolPassword;
         svc.Cfg.PoolName = saved.PoolName;
         svc.Cfg.WebHost = saved.WebHost;
-        await svc.StopAsync();
-        await svc.StartAsync();
+        // The background library, when that's the one answering, is started again by the computer.
+        await svc.RestartAsync();
     }
 
     /// <summary>Why the library just started can't be used, in the student's words, or null when it's up and answers

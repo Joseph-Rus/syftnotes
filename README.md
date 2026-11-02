@@ -235,7 +235,7 @@ feedback, files, pages and announcements. See [Canvas](#canvas-assignments-due-d
 
 Your library serves a phone app you can use today on an iPhone, iPad or Android phone over
 Tailscale: read your notes, see what's due, search and add photos. A native iPhone and iPad app that
-also records is in [`ios/`](ios/), and isn't on the App Store yet. See
+also records is in [`ios/`](ios/), and is coming soon to the App Store. See
 [On your phone](#on-your-phone).
 
 ## One computer or two
@@ -668,8 +668,11 @@ page that opens to your home screen, and it opens like any other app; an iPhone 
 same from Safari ([docs/phone.md](docs/phone.md) has the details).
 
 A native Syft Notes app for iPhone and iPad is in [`ios/`](ios/): it records lectures (written down
-on the phone as they're said), reads your notes, asks, takes handwritten notes and adds files. It
-isn't on the App Store yet.
+on the phone as they're said), reads your notes, asks, takes handwritten notes and adds files. It's
+coming soon to the App Store.
+
+You can build the iPhone app from this repo yourself. The App Store version is the easy way: it
+pays for the app's development and updates itself.
 
 ## Granola
 
@@ -817,6 +820,11 @@ installers, with no rebuild, within a minute. Add `-f installers=true` to rehear
 Syft Notes is free and open source, and two students build it with Claude. If it saves you time,
 you can [buy us a coffee](https://ko-fi.com/studystashteam) on Ko-fi, and it goes into
 building the next version. A star on GitHub helps other students find it.
+
+## Trademarks
+
+The MIT license covers the code, not the Syft Notes name or the pixel-s logo. If you make a fork,
+give it its own name and icon.
 
 ## License
 

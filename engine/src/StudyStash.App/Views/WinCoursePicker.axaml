@@ -53,6 +53,7 @@
     <Style Selector=":is(UserControl).inset Grid.pk-row">
       <Setter Property="Margin" Value="0,0,12,0" />
     </Style>
+    <StyleInclude Source="avares://StudyStash/Views/SettingsPaneStyles.axaml" />
   </UserControl.Styles>
   <StackPanel Spacing="8">
     <Border Classes="cv-group pk-group" IsVisible="{Binding HasCourses}">

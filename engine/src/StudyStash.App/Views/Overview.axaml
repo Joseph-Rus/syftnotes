@@ -3,7 +3,8 @@
      page Attach) at its side. Home: Up next (the rest of today's and tomorrow's events, each a button that records
      it) and every note, newest first, with a filter. A folder: its lectures or meetings by week, and a rail with
      what's due, its lists on Canvas and when it next meets. Due: the calendar. Sections are parted by space and
-     hairlines: no boxes inside boxes, no metric tiles. Ask floats at the foot of Home and a folder's page. -->
+     hairlines: no boxes inside boxes, no metric tiles. Ask floats at the foot of Home and a folder's page, and its
+     conversation opens beside the page. -->
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="using:StudyStash.App.ViewModels"
@@ -14,7 +15,7 @@
              x:DataType="vm:OverviewModel">
   <UserControl.Styles>
     <!-- The page's side margins: the design's 56, drawn in when the window is narrow. On a wide pane (the sidebar
-         shut, a big screen) the page stops at 1040 and sits in the middle, the ask bar with it. -->
+         shut, a big screen) the page stops at 1040 and sits in the middle; the ask bar keeps to the notes' measure. -->
     <Style Selector="StackPanel.ov-page">
       <Setter Property="Margin" Value="56,6,56,132" />
       <Setter Property="MaxWidth" Value="1040" />
@@ -22,12 +23,12 @@
     <Style Selector="StackPanel.ov-page.narrow">
       <Setter Property="Margin" Value="24,6,24,132" />
     </Style>
-    <Style Selector="StackPanel.ov-ask">
-      <Setter Property="Margin" Value="56,0,56,20" />
-      <Setter Property="MaxWidth" Value="1040" />
+    <!-- Beside the conversation the page has the left of the pane, laid out as in a narrow window, with no bar under it. -->
+    <Style Selector="v|AskSplit:beside StackPanel.ov-page">
+      <Setter Property="Margin" Value="40,6,40,56" />
     </Style>
-    <Style Selector="StackPanel.ov-ask.narrow">
-      <Setter Property="Margin" Value="24,0,24,20" />
+    <Style Selector="v|AskSplit:open Border#Fade">
+      <Setter Property="Height" Value="0" />
     </Style>
     <!-- The page's buttons: at the title's foot beside it, or a row of their own under it (narrow) -->
     <Style Selector="StackPanel.ov-actions">
@@ -49,13 +50,18 @@
     </Style>
   </UserControl.Styles>
 
+  <!-- The page, and Ask: at rest the bar floats at the foot of the page; once something's asked the page keeps the left
+       and the conversation is a panel down the right, the bar docked at its foot (AskSplit). -->
+  <v:AskSplit Name="Split" IsOpen="{Binding HasAnswer}" Narrow="{Binding Narrow}" BackWords="Back"
+              CloseCommand="{Binding Ask.CloseAnswerCommand, FallbackValue={x:Null}}">
+  <v:AskSplit.Page>
   <Panel>
   <ScrollViewer Name="Page" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
-    <StackPanel Classes="ov-page" Classes.narrow="{Binding Narrow}">
+    <StackPanel Name="Column" Classes="ov-page" Classes.narrow="{Binding Tight}">
 
       <!-- The date (or "Due", or the folder), the sentence under it, and the page's buttons at the header's foot. The
            title wraps in a column of its own, so a long name never runs under the buttons. -->
-      <Grid Classes="ov-head" Classes.narrow="{Binding Narrow}" ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto">
+      <Grid Classes="ov-head" Classes.narrow="{Binding Tight}" ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto">
         <StackPanel>
           <TextBlock Name="Title" Classes="page-title" Text="{Binding Title}" IsVisible="{Binding !IsFolder}" />
           <c:Highlight Name="FolderTitle" Classes="page-title" Under="True" Text="{Binding Title}" Fill="{Binding Dot}" IsVisible="{Binding IsFolder}" HorizontalAlignment="Left" />
@@ -101,13 +107,30 @@
       <!-- Home, after a first run: "Ready when class starts". How to record, where the menu bar icon lives, how the model's
            download is getting on, and why the microphone can't be used yet when it can't. Got it puts it away. -->
       <Panel IsVisible="{Binding HasWelcome}" Margin="0,28,0,0" MaxWidth="560" HorizontalAlignment="Left">
-      <Border Name="WelcomeCard" Classes="free-ai" DataContext="{Binding Welcome}" x:DataType="vm:WelcomeCardModel">
+      <StackPanel Spacing="14" DataContext="{Binding Welcome}" x:DataType="vm:WelcomeCardModel">
+      <!-- A first run that ended with no AI ("Later"): Continue with Google, until an AI writes the notes. -->
+      <Border Name="NeedsAiCard" Classes="free-ai" IsVisible="{Binding NeedsAi}">
+        <StackPanel Spacing="8">
+          <TextBlock Classes="free-ai-lead" Text="{x:Static vm:WelcomeCardModel.AiTitle}" />
+          <TextBlock Classes="free-ai-more" Text="{x:Static vm:WelcomeCardModel.AiLine}" />
+          <WrapPanel Margin="0,6,0,0" ItemSpacing="14" LineSpacing="6">
+            <Button Name="HomeGoogle" Classes="btn ink" VerticalAlignment="Center" Command="{Binding ContinueWithGoogleCommand}" Content="{x:Static vm:WelcomeCardModel.GoogleButton}" />
+            <Button Name="HomeOtherAi" Classes="text-link small" VerticalAlignment="Center" Command="{Binding OtherAiCommand}" Content="{x:Static vm:WelcomeCardModel.OtherAiLabel}" />
+          </WrapPanel>
+        </StackPanel>
+      </Border>
+      <Border Name="WelcomeCard" Classes="free-ai" IsVisible="{Binding Intro}">
         <StackPanel Spacing="10">
           <TextBlock Name="WelcomeTitle" Classes="free-ai-lead" Text="{x:Static vm:WelcomeCardModel.Title}" />
           <TextBlock Name="WelcomeLede" Classes="free-ai-more" Text="{Binding Lede}" />
           <TextBlock Name="WelcomeWhere" Classes="free-ai-more" Text="{Binding WhereLine}" />
           <Button Name="WelcomeShowIt" Classes="btn sm" HorizontalAlignment="Left" Content="{x:Static vm:WelcomeCardModel.ShowItLabel}" Command="{Binding ShowItCommand}"
                   IsVisible="{Binding CanShowIt}" />
+          <!-- A first run that ended with no Canvas: classes are added by hand. -->
+          <Grid ColumnDefinitions="*,Auto" IsVisible="{Binding AddClasses}">
+            <TextBlock Name="WelcomeClasses" Classes="free-ai-more" Text="{x:Static vm:WelcomeCardModel.ClassesLine}" VerticalAlignment="Center" />
+            <Button Name="WelcomeAddClass" Grid.Column="1" Classes="btn sm" Margin="12,0,0,0" Content="Add a class" Command="{Binding AddClassCommand}" VerticalAlignment="Center" />
+          </Grid>
           <Grid ColumnDefinitions="*,Auto" IsVisible="{Binding HasMicLine}">
             <TextBlock Name="WelcomeMic" Classes="free-ai-problem" Text="{Binding MicLine}" VerticalAlignment="Center" />
             <Button Grid.Column="1" Classes="btn sm" Margin="12,0,0,0" Content="{Binding MicButton}" Command="{Binding MicCommand}" VerticalAlignment="Center" />
@@ -119,6 +142,7 @@
           <Button Name="WelcomeGotIt" Classes="btn sm" HorizontalAlignment="Right" Content="Got it" Command="{Binding GotItCommand}" />
         </StackPanel>
       </Border>
+      </StackPanel>
       </Panel>
 
       <!-- Home: up next. The rest of today's and tomorrow's events; each row is a button that starts recording it. -->
@@ -208,7 +232,7 @@
       </StackPanel>
 
       <!-- A folder: its lectures (or meetings) by week, and beside them the rail -->
-      <Grid Name="Folder" Classes.narrow="{Binding Narrow}" IsVisible="{Binding IsFolder}" ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto" Margin="0,36,0,0">
+      <Grid Name="Folder" Classes.narrow="{Binding Tight}" IsVisible="{Binding IsFolder}" ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto" Margin="0,36,0,0">
         <StackPanel>
           <TextBlock Name="FolderNotes" Classes="h2" Text="{Binding NotesHeading}" Margin="0,0,0,14" />
           <StackPanel Orientation="Horizontal" Spacing="18" IsVisible="{Binding NoNotes}">
@@ -323,11 +347,15 @@
   </ScrollViewer>
   <!-- The page fades out under Ask, so what scrolls beneath never collides with it -->
   <Border Name="Fade" Height="120" VerticalAlignment="Bottom" IsHitTestVisible="False" IsVisible="{Binding HasAsk}" />
-  <!-- Ask about every note (Home) or this folder's, docked at the foot of the page; its latest answer just above -->
-  <StackPanel Classes="ov-ask" Classes.narrow="{Binding Narrow}" VerticalAlignment="Bottom" Spacing="8" IsVisible="{Binding HasAsk}">
-    <c:BySkin Mac="{x:Type v:MacAiAnswer}" Win="{x:Type v:WinAiAnswer}" DataContext="{Binding Ask}"
-              IsVisible="{Binding $parent[UserControl].((vm:OverviewModel)DataContext).HasAnswer}" MaxHeight="420" HorizontalAlignment="Center" />
-    <c:BySkin Name="AskBar" Mac="{x:Type v:MacAiAskBar}" Win="{x:Type v:WinAiAskBar}" DataContext="{Binding Ask}" />
-  </StackPanel>
   </Panel>
+  </v:AskSplit.Page>
+  <!-- The conversation: its panel's header and thread -->
+  <v:AskSplit.Chat>
+    <c:BySkin Name="Answer" Mac="{x:Type v:MacAiAnswer}" Win="{x:Type v:WinAiAnswer}" DataContext="{Binding Ask}" />
+  </v:AskSplit.Chat>
+  <!-- Ask about every note (Home) or this folder's, docked at the foot of the page -->
+  <v:AskSplit.Bar>
+    <c:BySkin Name="AskBar" Mac="{x:Type v:MacAiAskBar}" Win="{x:Type v:WinAiAskBar}" DataContext="{Binding Ask}" IsVisible="{Binding $parent[UserControl].((vm:OverviewModel)DataContext).HasAsk, FallbackValue=False}" />
+  </v:AskSplit.Bar>
+  </v:AskSplit>
 </UserControl>

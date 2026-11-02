@@ -71,6 +71,10 @@ on:
         description: "Rehearse a release's fast path: the id of an earlier run by hand on exactly this code, whose installers are reused, not rebuilt."
         type: string
         default: ""
+      real_sign_in_only:
+        description: "Only the real AI sign-ins (Claude Code, Codex, Antigravity in the hidden terminal), and keep what each showed with every address taken out, for a day. Nothing else runs, so the run proves nothing else, and a merge never counts it as tested."
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -97,8 +101,9 @@ jobs:
     outputs:
       version: ${{ steps.plan.outputs.version }}
       new: ${{ steps.plan.outputs.new }}
-      installers: ${{ steps.plan.outputs.installers }}
-      tested: ${{ steps.plan.outputs.tested }}
+      # A run of the real sign-ins alone skips everything else (as code already tested would), and builds no installers.
+      installers: ${{ inputs.real_sign_in_only && 'false' || steps.plan.outputs.installers }}
+      tested: ${{ inputs.real_sign_in_only && 'true' || steps.plan.outputs.tested }}
       reuse_run: ${{ steps.plan.outputs.reuse_run }}
       mac_signing: ${{ steps.signing.outputs.mac_signing }}
       mac_notarize: ${{ steps.signing.outputs.mac_notarize }}
@@ -107,10 +112,12 @@ jobs:
       - uses: actions/checkout@v4
       # A run by hand keeps the exact tree it tests, so that merging that branch into main with the very same code
       # (main hadn't moved meanwhile) is known to have passed already (plan.sh).
-      - if: github.event_name != 'push'
+      # (Not a run of the real sign-ins alone, which tests nothing else.)
+      - if: github.event_name != 'push' && !inputs.real_sign_in_only
         run: git rev-parse 'HEAD^{tree}' > tested-tree.txt
-      - if: github.event_name != 'push'
+      - if: github.event_name != 'push' && !inputs.real_sign_in_only
         uses: actions/upload-artifact@v4
+        continue-on-error: true
         with:
           name: tested-tree
           path: tested-tree.txt
@@ -160,8 +167,8 @@ jobs:
       matrix:
         os: [ubuntu-latest, macos-latest, windows-latest]
         suite: [Core, App]
-    # A leg takes 2 to 9 minutes; the App tests on a slow Windows runner the most. 15 and 20 only bound a hang.
-    timeout-minutes: ${{ matrix.suite == 'Core' && 15 || 20 }}
+    # A leg takes 2 to 20 minutes; the App tests on a slow Windows runner the most. 15 and 30 only bound a hang.
+    timeout-minutes: ${{ matrix.suite == 'Core' && 15 || 30 }}
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
@@ -201,6 +208,7 @@ jobs:
       - name: Crash reports, if a test process crashed
         if: ${{ failure() && runner.os != 'Windows' }}
         uses: actions/upload-artifact@v4
+        continue-on-error: true
         with:
           name: crash-${{ matrix.os }}-${{ matrix.suite }}
           path: ${{ runner.temp }}/crash/*.crashreport.json
@@ -208,6 +216,7 @@ jobs:
       - name: The notes' formulas and diagrams, as Windows draws them
         if: ${{ always() && runner.os == 'Windows' && matrix.suite == 'App' }}
         uses: actions/upload-artifact@v4
+        continue-on-error: true
         with:
           name: windows-rich-notes
           path: |
@@ -217,12 +226,87 @@ jobs:
       - name: Notifications, as Windows draws them, where they land above the taskbar
         if: ${{ always() && runner.os == 'Windows' && matrix.suite == 'App' }}
         uses: actions/upload-artifact@v4
+        continue-on-error: true
         with:
           name: windows-notifications
           path: |
             ${{ runner.temp }}\shots\win-12-notify-*
             ${{ runner.temp }}\shots\win-12-toast-*
           if-no-files-found: error
+
+  # Every AI sign-in with no terminal, proved with the real CLIs: Claude Code, Codex and Antigravity CLI (Gemini), each
+  # installed the way the app installs it (its maker's installer) in a home of the run's own, then signed in with the
+  # app's own hidden sign-in (a pseudo-terminal nobody sees; ConPTY on Windows) until it waits for the browser, and
+  # stopped (RealCliSignInTests). No account is used and nothing finishes; the app's browser opener is replaced and the
+  # system's are stand-ins, so nothing opens from the app; on Windows no window of the sign-in's own may show. Then
+  # Connect's own step adds Syft Notes to that AI's apps in the run's home, the real CLI is asked what it sees
+  # (claude mcp list, codex mcp list, agy mcp list where it has one), and the server each app's settings name is started
+  # exactly as written there and lists its tools (RealCliConnect.cs); the Claude app's settings are a copy of each
+  # computer's real layout (on Windows the Store build after it moved its data). On Windows, Git for Windows is out of
+  # reach for all of it, as on a student's PC. The log says only yes or no for each (needed a terminal, prompts
+  # answered, waiting for the browser, a window, connected, listed), never an address, a code or a token. A CLI whose
+  # download fails for the network is skipped and said so. It's the makers' CLIs as they are today, so it isn't one a
+  # release waits for.
+  real-sign-in:
+    name: Real sign-ins, hidden, and Connect (${{ matrix.os }})
+    needs: [version]
+    if: needs.version.outputs.tested != 'true' || inputs.real_sign_in_only
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-latest, windows-latest, ubuntu-latest]
+    # About 7 to 11 minutes, most of it building; 20 only bounds a hang.
+    timeout-minutes: 20
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "10.0.x"
+      - name: Build the app's tests
+        run: dotnet build engine/tests/StudyStash.App.Tests
+      # A student's PC has no Git for Windows: its folder is moved aside and it's taken off the PATH for the sign-ins and
+      # Connect, then put back (the steps after it, and the checkout's own clean-up, use it).
+      - name: Windows - Git for Windows out of reach
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          "GIT_KEPT_PATH=$env:PATH" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          $git = Join-Path $env:ProgramFiles 'Git'
+          if (Test-Path $git) { Rename-Item $git 'Git-out-of-reach' }
+          $path = ($env:PATH -split ';' | Where-Object { $_ -notmatch '\\Git\\' }) -join ';'
+          "PATH=$path" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+      - name: Each real AI's sign-in, in the hidden terminal, then Connect against what each reads
+        shell: pwsh
+        run: dotnet test engine/tests/StudyStash.App.Tests --no-build --filter "FullyQualifiedName~RealCliSignInTests"
+        env:
+          STUDYSTASH_REAL_CLIS: "1"
+          STUDYSTASH_REAL_CLIS_DIR: ${{ runner.temp }}/real-sign-in
+          STUDYSTASH_REAL_CLIS_RECORD: ${{ inputs.real_sign_in_only && '1' || '' }}
+      - name: Windows - Git for Windows back
+        if: always() && runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $kept = Join-Path $env:ProgramFiles 'Git-out-of-reach'
+          if (Test-Path $kept) { Rename-Item $kept 'Git' }
+          if ($env:GIT_KEPT_PATH) { "PATH=$env:GIT_KEPT_PATH" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append }
+      - name: What each did
+        if: always()
+        shell: bash
+        run: cat "$RUNNER_TEMP/real-sign-in/summary.txt" 2>/dev/null || echo "no summary was written"
+      # Only for a run of the real sign-ins alone: what each showed, every address, email and anything like a code or a
+      # key already taken out by the test, kept for a day to write the tests' recordings from.
+      - name: What each showed, addresses taken out
+        if: always() && inputs.real_sign_in_only
+        uses: actions/upload-artifact@v4
+        continue-on-error: true
+        with:
+          name: real-sign-in-${{ matrix.os }}
+          path: |
+            ${{ runner.temp }}/real-sign-in/transcripts
+            ${{ runner.temp }}/real-sign-in/install-*.log
+          retention-days: 1
+          if-no-files-found: ignore
 
   # The Mac app: one universal bundle for Apple silicon and Intel, started by its own launcher (D1); ad hoc signed with
   # the microphone entitlement; the DMG (D2). Proved with the real self-test (D5): real windows open, the pretend
@@ -344,6 +428,7 @@ jobs:
           path: dist/mac/Syft-Notes.dmg
           retention-days: 30
       - uses: actions/upload-artifact@v4
+        continue-on-error: true
         if: always() && needs.version.outputs.tested != 'true'
         with:
           name: mac-selftest
@@ -353,6 +438,7 @@ jobs:
         if: needs.version.outputs.installers == 'true'
         run: echo "${{ needs.version.outputs.mac_signing }}" > "$RUNNER_TEMP/mac-signing.txt"
       - uses: actions/upload-artifact@v4
+        continue-on-error: true
         if: needs.version.outputs.installers == 'true'
         with:
           name: signing-mac-${{ needs.version.outputs.mac_signing }}
@@ -383,11 +469,19 @@ jobs:
           cache-dependency-path: web/package-lock.json
       - name: Build Study Stash.app
         run: sh macos/build-app.sh dist/mac
-      - name: Self-test, just this computer - setup makes the app's own library, and the notes are written here
+      # Then "Answer your phone when Syft Notes is closed" goes on with a stand-in phone (a real LaunchAgent, on this
+      # throwaway Mac only), the app quits, and the library must still answer the phone, and leave nothing once removed.
+      - name: Self-test, just this computer - setup makes the app's own library, the notes are written here, and the phone is answered with the app closed
         env:
           STUDYSTASH_SELFTEST_FLOW: one-computer
-        run: sh macos/selftest.sh "dist/mac/Study Stash.app" "$RUNNER_TEMP/selftest/one-computer"
+          STUDYSTASH_SELFTEST_BACKGROUND: "1"
+        run: |
+          sh macos/selftest.sh "dist/mac/Study Stash.app" "$RUNNER_TEMP/selftest/one-computer"
+          grep -q "^background library registered" "$RUNNER_TEMP/selftest/one-computer/selftest.txt" || { echo "the self-test didn't turn on answering with the app closed"; exit 1; }
+          grep -q "^the phone got its answer with the app closed" "$RUNNER_TEMP/selftest/one-computer/background.txt" || { echo "the phone wasn't answered with the app closed"; exit 1; }
+          [ ! -e "$HOME/Library/LaunchAgents/"com.study-stash.background.*.plist ] || { echo "a LaunchAgent was left behind"; ls "$HOME/Library/LaunchAgents"; exit 1; }
       - uses: actions/upload-artifact@v4
+        continue-on-error: true
         if: always()
         with:
           name: mac-one-computer-selftest
@@ -425,6 +519,7 @@ jobs:
       - name: Self-test, natively on Intel
         run: sh macos/selftest.sh "$RUNNER_TEMP/Study Stash.app" "$RUNNER_TEMP/selftest"
       - uses: actions/upload-artifact@v4
+        continue-on-error: true
         if: always()
         with:
           name: mac-intel-selftest
@@ -583,16 +678,32 @@ jobs:
           New-Item -ItemType Directory -Force -Path $selftestHome, $out | Out-Null
           $env:STUDYSTASH_SELFTEST = $out
           $env:STUDYSTASH_SELFTEST_FLOW = "one-computer"
+          # Ends with "Answer your phone when Syft Notes is closed" on (a real Run key value, on this throwaway PC only).
+          $env:STUDYSTASH_SELFTEST_BACKGROUND = "1"
           $env:STUDYSTASH_MIC_FILE = (Resolve-Path "engine\tests\StudyStash.Core.Tests\Fixtures\speech.wav").Path
           $env:STUDYSTASH_MIC_SPEED = "4"
           $env:STUDYSTASH_MODEL_FILE = $env:STUDYSTASH_WHISPER_MODEL
           $exe = (Resolve-Path "dist\windows\win-x64\StudyStash.exe").Path
           $p = Start-Process -FilePath $exe -ArgumentList "--home", $selftestHome -PassThru
           if (-not $p.WaitForExit(480000)) { $p.Kill(); throw "Syft Notes didn't exit within 480 s" }
+          # The app has quit: its library must still answer the phone in the background, then go cleanly once removed.
+          # Run whatever happened above, so the Run key value it made is always taken away again.
+          $env:STUDYSTASH_SELFTEST_AFTER_QUIT = "1"
+          $b = Start-Process -FilePath $exe -ArgumentList "--home", $selftestHome -PassThru
+          if (-not $b.WaitForExit(300000)) { $b.Kill(); throw "the after-quit check didn't finish within 300 s" }
+          Remove-Item Env:STUDYSTASH_SELFTEST_AFTER_QUIT
           $lines = Get-Content "$out\selftest.txt"
           $lines | Write-Host
+          Write-Host "--- background.txt"
+          $background = Get-Content "$out\background.txt"
+          $background | Write-Host
           if (Test-Path "$selftestHome\logs\library.log") { Write-Host "--- library.log"; Get-Content "$selftestHome\logs\library.log" -Tail 40 | Write-Host }
           if ($p.ExitCode -ne 0) { throw "exit code $($p.ExitCode)" }
+          if ($b.ExitCode -ne 0 -or $background[-1] -ne "ok") { throw "the phone wasn't answered with the app closed, or something was left behind" }
+          if (-not ($lines -match "^background library registered")) { throw "the self-test didn't turn on answering with the app closed" }
+          if (-not ($background -match "^the phone got its answer with the app closed")) { throw "the phone wasn't answered with the app closed" }
+          $run = Get-ItemProperty "HKCU:\Software\Microsoft\Windows\CurrentVersion\Run" -ErrorAction SilentlyContinue
+          if ($run -and ($run.PSObject.Properties.Name -like "Syft Notes background*")) { throw "a Run key value was left behind" }
           if ($lines[-1] -ne "ok") { throw "last line was not ok" }
           if ($lines -match "heard nothing|no model|recording didn't start|FAILED") { throw "the self-test reported a problem" }
           if (-not ($lines -match "just this computer")) { throw "the self-test didn't run Just this computer" }
@@ -727,6 +838,7 @@ jobs:
           path: dist\windows\Syft-Notes-Setup.exe
           retention-days: 30
       - uses: actions/upload-artifact@v4
+        continue-on-error: true
         if: always()
         with:
           name: windows-selftest
@@ -738,6 +850,7 @@ jobs:
         run: |
           "${{ needs.version.outputs.win_signing }}" | Set-Content "$env:RUNNER_TEMP\windows-signing.txt"
       - uses: actions/upload-artifact@v4
+        continue-on-error: true
         if: needs.version.outputs.installers == 'true'
         with:
           name: signing-windows-${{ needs.version.outputs.win_signing }}
@@ -811,18 +924,29 @@ jobs:
           [ -z "$(find "$app" -name '*.pdb')" ] || { echo "$RID carries debug symbols"; exit 1; }
           [ -z "$(find "$app" -name '*.bin' -size +1M ! -name 'live-whisper-*.bin')" ] || { echo "a model file is bundled"; exit 1; }
           [ ! -e "$app/needle" ] && [ ! -e "$app/models/whistle.cact" ] || { echo "$RID carries Cactus Whistle, which has no Linux engine"; exit 1; }
-      - name: Self-test, just this computer - setup makes the app's own library, the notes are written here, and quitting stops it
+      # It ends with "Answer your phone when Syft Notes is closed" on (a real systemd --user unit on this throwaway
+      # runner, or an autostart entry where the account has no systemd of its own), checked once the app has quit.
+      - name: Self-test, just this computer - setup makes the app's own library, the notes are written here, quitting stops it, and the phone is answered with the app closed
         if: needs.version.outputs.tested != 'true'
-        timeout-minutes: 12
+        timeout-minutes: 14
         env:
           STUDYSTASH_SELFTEST_FLOW: one-computer
+          STUDYSTASH_SELFTEST_BACKGROUND: "1"
           RID: ${{ matrix.rid }}
         run: |
+          # A systemd of the runner's own account, as a desktop login has (started and waited for by systemctl itself).
+          if sudo loginctl enable-linger "$(id -un)" && sudo systemctl start "user@$(id -u).service"; then
+            export XDG_RUNTIME_DIR="/run/user/$(id -u)" DBUS_SESSION_BUS_ADDRESS="unix:path=/run/user/$(id -u)/bus"
+          fi
           out="$RUNNER_TEMP/selftest/one-computer"
           sh linux/selftest.sh "dist/linux/$RID/syft-notes" "$out"
           grep -q "just this computer" "$out/selftest.txt" || { echo "the self-test didn't run Just this computer"; exit 1; }
           grep -q "notes written on this computer by its own library" "$out/selftest.txt" || { echo "the notes weren't written by this computer's own library"; exit 1; }
-          # The library ran as the app's own child (StudyStash serve): quitting the app stops it too.
+          grep -q "^background library registered" "$out/selftest.txt" || { echo "the self-test didn't turn on answering with the app closed"; exit 1; }
+          grep -q "^the phone got its answer with the app closed" "$out/background.txt" || { echo "the phone wasn't answered with the app closed"; exit 1; }
+          ! ls "${XDG_CONFIG_HOME:-$HOME/.config}"/systemd/user/syft-notes-background*.service "${XDG_CONFIG_HOME:-$HOME/.config}"/autostart/syft-notes-background*.desktop 2>/dev/null || { echo "a registration was left behind"; exit 1; }
+          # The library ran as the app's own child (StudyStash serve): quitting the app stops it too, and the background one
+          # is gone once the self-test took it away.
           for i in $(seq 20); do pgrep -f "dist/linux/$RID/syft-notes/StudyStash" >/dev/null || break; sleep 1; done
           if pgrep -fa "dist/linux/$RID/syft-notes/StudyStash"; then echo "the app's library was still running 20 s after the app quit"; exit 1; fi
       - name: install.sh puts Syft Notes on an account of its own (the app, its menu entry, its icon, syft-notes on the PATH), the installed copy self-tests as a laptop, and uninstall.sh takes it off again
@@ -856,6 +980,7 @@ jobs:
           path: dist/linux/Syft-Notes-${{ matrix.rid }}.tar.gz
           retention-days: 30
       - uses: actions/upload-artifact@v4
+        continue-on-error: true
         if: always()
         with:
           name: linux-selftest-${{ matrix.rid }}

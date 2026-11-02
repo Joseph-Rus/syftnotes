@@ -310,7 +310,7 @@ public static partial class Shell
         string error = S(l["error"]);
         ShowFreeAi(note, has: notes.Length > 0 && !mine, offer: !writing && notes.Length == 0 && heard && S(l["no_notes"]) != Summarize.NoNotesShort,
             // No AI writes notes yet: the card asks which. Over its usage limit: it says until when.
-            choose: S(l["no_notes"]) == Summarize.NoNotesOff, limitedBy: notes.Length == 0 ? Core.Ai.Engines.WaitsForLimit(error) : null,
+            choose: FreeAiModel.AsksWhichAi(S(l["no_notes"]), error), limitedBy: notes.Length == 0 ? Core.Ai.Engines.WaitsForLimit(error) : null,
             limitedUntil: Core.Ai.Engines.LimitUntil(error));
         // Notes to read that nothing is writing now (with none written, what the student typed) can be edited and rewritten.
         ShowLectureAi(l, note, written: !writing && (notes.Length > 0 || (mine && S(l["error"]).Length == 0)));
@@ -343,7 +343,12 @@ public static partial class Shell
         free.HasNotes = has;
         free.Offer = offer && !has;
         free.Choose = choose;
-        free.OnGetReady = engine => GetNotesWith(engine, note.Id);
+        // Ollama is set up in Settings → Your AI (its download is big, and it's for the comfortable with it).
+        free.OnGetReady = engine =>
+        {
+            if (engine == "ollama") ShowSettings("AI");
+            else GetNotesWith(engine, note.Id);
+        };
         // Over its usage limit says so (and until when); a school account Google turned down stays said until the page
         // is left.
         if (limitedBy is not null)
@@ -522,7 +527,11 @@ public static partial class Shell
         if (fresh && EarlierDrafts().Remove(note.Id, out var draft)) notes!.RestoreEdit(draft.From, draft.Text);
         else if (notes is not null && !ReferenceEquals(before, notes)) _ = notes.Refresh(); // kept: the library says where they stand now
         // The same note read again keeps its ask bar, with what's typed and answered in it.
-        if (library.Ask is { } kept && kept.LectureId == note.Id && kept.Live is null) return;
+        if (library.Ask is { } kept && kept.LectureId == note.Id && kept.Live is null)
+        {
+            if (library.Notes is { } shown) shown.Highlights = kept.Highlights;
+            return;
+        }
         var ask = new AiAskModel(ai)
         {
             LectureId = note.Id, ClassName = note.HasClass ? note.ClassName : null,
@@ -537,6 +546,8 @@ public static partial class Shell
         ask.NameScopes(note.Noun, note.HasClass ? note.ClassShown : null);
         if (!ReferenceEquals(library.Ask, recorder.Ask)) library.Ask?.Stop(); // an answer about the note being left isn't wanted any more
         library.Ask = ask;
+        // What an answer here quotes is highlighted in these notes.
+        if (library.Notes is { } these) these.Highlights = ask.Highlights;
         _ = ask.Load();
     }
 

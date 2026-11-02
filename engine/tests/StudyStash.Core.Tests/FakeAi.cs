@@ -31,6 +31,14 @@ public sealed class FakeChecks
         return this;
     }
 
+    /// <summary>A command that's really a script of the test's own at <paramref name="path"/> (a stand-in CLI): the only
+    /// way anything run for this fake can reach a CLI, never the real one on this computer.</summary>
+    public FakeChecks InstalledAt(string binary, string path)
+    {
+        which[binary] = path;
+        return this;
+    }
+
     public FakeChecks HasFile(string path)
     {
         files.Add(path);

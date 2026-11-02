@@ -310,6 +310,48 @@ struct FakeLaptop {
     }
 }
 
+/// Whether the laptop is there, as the banner and Ask's first screen tell the student before they try anything.
+@Suite(.serialized) struct LaptopPresenceTests {
+    let now = Date(timeIntervalSince1970: 1_800_000_000)
+
+    @Test func aLaptopHeardFromLatelyIsHereAndOneQuietForMinutesIsAway() {
+        #expect(LaptopPresence.evaluate(hasLaptop: true, seen: now.addingTimeInterval(-100), checked: true, now: now) == .here)
+        let old = now.addingTimeInterval(-2 * 3600)
+        #expect(LaptopPresence.evaluate(hasLaptop: true, seen: old, checked: true, now: now) == .away(since: old))
+    }
+
+    @Test func nothingIsSaidUntilTheLaptopsFileWasReadSinceTheAppOpened() {
+        // The copy on the phone is from the last time: its `seen` always looks old.
+        let old = now.addingTimeInterval(-2 * 3600)
+        #expect(LaptopPresence.evaluate(hasLaptop: true, seen: old, checked: false, now: now) == .unknown)
+        #expect(LaptopPresence.evaluate(hasLaptop: false, seen: nil, checked: false, now: now) == .unknown)
+    }
+
+    @Test func noLaptopInTheFolderIsAway() {
+        #expect(LaptopPresence.evaluate(hasLaptop: false, seen: nil, checked: true, now: now) == .away(since: nil))
+        // An older laptop that never wrote `seen` isn't called away.
+        #expect(LaptopPresence.evaluate(hasLaptop: true, seen: nil, checked: true, now: now) == .unknown)
+    }
+
+    @Test func theWordsSayHowLongAgo() {
+        #expect(LaptopPresence.lastHere(now.addingTimeInterval(-2 * 3600), now: now) == "Last here 2 hours ago.")
+        #expect(LaptopPresence.lastHere(nil, now: now) == "It hasn't checked in yet.")
+    }
+
+    @Test func theLinkSaysTheFileWasReadOnceItHasBeen() async throws {
+        let drive = FakeDrive()
+        let folder = FileManager.default.temporaryDirectory.appending(path: "presence-test-\(UUID().uuidString)")
+        defer { try? FileManager.default.removeItem(at: folder) }
+        let link = DriveLink(drive: drive, account: "sam@example.com", folder: folder, phoneName: "Sam's iPhone", phoneModel: "iPhone")
+        #expect(await link.status.checked == false)
+        // A folder with no laptop in it is a read too: the laptop isn't there.
+        try await link.refresh()
+        let none = await link.status
+        #expect(none.checked && none.laptop == nil)
+        #expect(LaptopPresence.evaluate(hasLaptop: none.laptop != nil, seen: none.seen, checked: none.checked) == .away(since: nil))
+    }
+}
+
 /// Whether the Ask screen had the first piece before the laptop wrote the rest.
 actor Heard {
     private(set) var first = false

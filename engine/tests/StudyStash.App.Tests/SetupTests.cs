@@ -242,18 +242,18 @@ public sealed class SetupTests
     }
 
     [AvaloniaFact]
-    public async Task The_setup_window_grows_while_an_engines_setup_steps_show()
+    public async Task The_setup_window_grows_while_an_api_key_box_shows()
     {
         var m = SetupModel.For(SkinKind.Mac);
         m.Go(SetupStep.Ai);
         var o = AiDemo.Overview();
-        m.Ai = new AiSetupModel(new FakeAiLibrary { Overview = o with { Engines = [.. o.Engines.Select(e => e.Id == "claude" ? e with { State = "not_installed", Installed = false } : e)] } });
+        m.Ai = new AiSetupModel(new FakeAiLibrary { Overview = o with { Engines = [.. o.Engines.Select(e => e.Id == "claude" ? e with { State = "not_installed", Installed = false } : e)] } }) { TakesKeys = true };
         await m.Ai.Load();
         var view = new MacSetup { DataContext = m };
         Assert.Equal(780, view.Height);
         Assert.False(m.AiHelpOpen);
 
-        m.Ai.Engines.Single(r => r.Id == "claude").ToggleHelpCommand.Execute(null);
+        m.Ai.Engines.Single(r => r.Id == "claude").KeyCommand.Execute(null);
 
         Assert.True(m.AiHelpOpen);
         Assert.Equal(900, view.Height);

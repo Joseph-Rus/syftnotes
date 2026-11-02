@@ -7,11 +7,15 @@ namespace StudyStash.Core.Tests;
 public class AiTests
 {
     [Fact]
-    public void Without_ai_json_everything_stays_on_ollama()
+    public void Without_ai_json_nobody_writes_the_notes_and_sorting_and_ask_keep_to_ollama()
     {
         using var dir = new TempDir();
         var s = AiSettings.Load(dir.Path);
-        foreach (string job in AiSettings.Jobs) Assert.True(s.Local(job));
+        Assert.False(s.NotesChosen);
+        Assert.Equal("", s.For("notes").Provider);
+        Assert.False(s.Local("notes"));
+        foreach (string job in new[] { "sort", "ask", "agent" }) Assert.True(s.Local(job));
+        Assert.False(s.Picked("ask"));
     }
 
     [Fact]
@@ -61,9 +65,9 @@ public class AiTests
         Assert.Contains("Edit(/" + ClaudeProvider.ClaudePath(Path.GetFullPath("/lib")) + "/**)", rw);
         Assert.Equal("/c/Users/sam/lib", ClaudeProvider.ClaudePath(@"C:\Users\sam\lib"));
         Assert.Equal("/lib", ClaudeProvider.ClaudePath("/lib"));
-        Assert.Contains("mcp__study-stash", rw);
+        Assert.Contains("mcp__syft-notes", rw);
         Assert.Equal("sonnet", rw[rw.IndexOf("--model") + 1]);
-        Assert.Contains("\"study-stash\"", rw[rw.IndexOf("--mcp-config") + 1]);
+        Assert.Contains("\"syft-notes\"", rw[rw.IndexOf("--mcp-config") + 1]);
     }
 
     [Fact]

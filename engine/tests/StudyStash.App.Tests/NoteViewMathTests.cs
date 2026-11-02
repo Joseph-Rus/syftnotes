@@ -75,6 +75,49 @@ public class NoteViewMathTests
         window.Close();
     }
 
+    static List<string> Words(NoteView note) => [.. note.GetLogicalDescendants().OfType<TextBlock>().Select(t => string.Concat(t.Inlines?.OfType<Run>().Select(r => r.Text) ?? []))];
+
+    [AvaloniaFact]
+    public void A_full_stop_after_a_tall_formula_is_drawn_after_it_not_starting_the_next_line()
+    {
+        // An answer's "…the values: $$…$$. Attention on its own…": the tall formula is lifted onto a line of its own, and
+        // the full stop that belongs to it went with the words below it.
+        var note = new NoteView { Markdown = "Scores are used to weight the values: $$\\text{Attention}(Q,K,V)=\\text{softmax}\\left(\\frac{QK^T}{\\sqrt{d_k}}\\right)V$$. Attention on its own ignores word order." };
+        var window = Show(note);
+        var mv = Assert.Single(note.GetLogicalDescendants().OfType<MathDisplay>().SelectMany(d => d.GetLogicalDescendants().OfType<MathView>()));
+        Assert.EndsWith("V.", mv.Latex);
+        Assert.Null(mv.ErrorMessage);
+        Assert.DoesNotContain(Words(note), t => t.StartsWith('.') || t.StartsWith(" ."));
+        Assert.Contains(Words(note), t => t == "Attention on its own ignores word order.");
+        window.Close();
+    }
+
+    [AvaloniaFact]
+    public void A_tall_formula_with_no_punctuation_after_it_and_inline_formulas_stay_as_written()
+    {
+        var note = new NoteView { Markdown = "Scores weight the values: $$\\text{softmax}\\left(\\frac{QK^T}{\\sqrt{d_k}}\\right)V$$ and so on, with $x = 1$. Done." };
+        var window = Show(note);
+        var tall = Assert.Single(note.GetLogicalDescendants().OfType<MathDisplay>().SelectMany(d => d.GetLogicalDescendants().OfType<MathView>()));
+        Assert.EndsWith("V", tall.Latex);
+        Assert.Contains(Words(note), t => t.StartsWith(" and so on, with "));
+        var inline = Assert.Single(MathViews(note), m => !m.Display);
+        Assert.Equal("x = 1", inline.Latex);
+        Assert.Contains(Words(note), t => t.EndsWith(". Done."));
+        window.Close();
+    }
+
+    [AvaloniaFact]
+    public void A_display_formula_closed_with_a_full_stop_after_its_dollars_is_typeset_with_the_stop_inside()
+    {
+        var note = new NoteView { Markdown = "So:\n$$\n\\frac{a}{b} = c\n$$.\nThat is all, and here is more." };
+        var window = Show(note);
+        var display = Assert.Single(note.GetLogicalDescendants().OfType<MathDisplay>());
+        var mv = Assert.Single(display.GetLogicalDescendants().OfType<MathView>());
+        Assert.EndsWith("= c.", mv.Latex!.Trim());
+        Assert.Contains(Words(note), t => t.Contains("That is all, and here is more."));
+        window.Close();
+    }
+
     [AvaloniaFact]
     public void A_formula_csharpmath_cannot_typeset_shows_its_source_calmly_instead()
     {

@@ -24,8 +24,8 @@ public static partial class Shell
     static Window? readyWindow;
 
     /// <summary>The card's buttons: <paramref name="engine"/> ("gemini", "claude", "codex") is got ready, then writes
-    /// <paramref name="lectureId"/>'s notes.</summary>
-    static void GetNotesWith(string engine, string lectureId)
+    /// <paramref name="lectureId"/>'s notes (Home's "Notes need an AI" card has no lecture: null).</summary>
+    static void GetNotesWith(string engine, string? lectureId)
     {
         if (readyWindow is { IsVisible: true } open)
         {
@@ -68,7 +68,8 @@ public static partial class Shell
                 // offers copy and paste.
                 done = true;
                 w.Close();
-                ShowNotesFallback(lectureId, NotesFallback.GoogleAccount);
+                if (lectureId is not null) ShowNotesFallback(lectureId, NotesFallback.GoogleAccount);
+                else Toast("Use a personal Google account", "Google doesn't let school and work accounts use Gemini from other apps. Continue with a personal one (like Gmail), or connect Claude or ChatGPT in Settings.", null, null);
             }
             else if (guided.PlanProblem == Core.Ai.ChatProblem.Limit)
             {
@@ -98,29 +99,44 @@ public static partial class Shell
     /// questions with it, notes and sorting turned on, and every lecture filed without notes is queued to have them;
     /// <paramref name="lectureId"/>'s page is read again (its notes on their way).
     /// </summary>
-    static async Task UseForNotesAsync(string engine, string lectureId)
+    static async Task UseForNotesAsync(string engine, string? lectureId)
     {
-        if (host.Remote() is not { } lib) return;
+        if (!await UseAiAsync(engine))
+        {
+            Toast("Your library didn't answer", "Nothing changed. Try again in a moment.", null, null);
+            return;
+        }
+        if (lectureId is not null && openLecture == lectureId) _ = ShowLectureAsync(lectureId, library.Note?.ShowTranscript == true);
+        else RequestRefresh(); // Home's "Notes need an AI" goes
+    }
+
+    /// <summary>
+    /// <paramref name="engine"/> writes the notes and answers questions from now on (the first run's AI step, a lecture's
+    /// card, Home's): notes and sorting on, and every lecture filed without notes queued to have them. False when the
+    /// library didn't take it (it didn't answer, or runs an older Syft Notes).
+    /// </summary>
+    static async Task<bool> UseAiAsync(string engine)
+    {
+        if (host.Remote() is not { } lib) return false;
         try
         {
             if (await Ai().DefaultsAsync(notes: engine, ask: engine) is null)
             {
-                Toast("Update your library", "Your library runs an older Syft Notes. Update it to have notes written.", null, null);
-                return;
+                host.Log("[notes] the library runs an older Syft Notes: it can't be told which AI writes the notes");
+                return false;
             }
             await WriteNotesAsync(true);
             host.Save(s => s.SetupAi = engine);
             var queued = await lib.SettingsAsync(HttpMethod.Post, "/write-missing");
             int n = queued?["queued"] is JsonValue v && v.TryGetValue(out int count) ? count : 0;
             host.Log($"[notes] {Core.Ai.Engines.Name(engine)} writes the notes now: {n} lecture(s) queued for theirs");
+            return true;
         }
         catch (Exception e) when (e is HttpRequestException or TaskCanceledException or LibraryRefusedException)
         {
             host.Log($"[notes] couldn't switch the notes to {engine}: {e.Message}");
-            Toast("Your library didn't answer", "Nothing changed. Try again in a moment.", null, null);
-            return;
+            return false;
         }
-        if (openLecture == lectureId) _ = ShowLectureAsync(lectureId, library.Note?.ShowTranscript == true);
     }
 
     /// <summary>The card on <paramref name="lectureId"/>'s page says why it can't just offer the AIs.</summary>

@@ -104,9 +104,6 @@ public sealed partial class SettingsModel : ObservableObject, IDisposable
     /// <summary>The first group's heading: "This laptop" on a laptop, this Mac or PC where the library runs.</summary>
     public string ComputerNavTitle { get; }
 
-    /// <summary>Whether this window draws the Mac's round swatches or Windows' squared ones.</summary>
-    public bool ShowMacSwatch => Skin.Current == SkinKind.Mac;
-
     // Appearance
     public IReadOnlyList<ThemeSwatch> Themes { get; } = [.. ColourThemes.All.Select(t => new ThemeSwatch(t))];
     [ObservableProperty] public partial string ColourTheme { get; set; } = "";
@@ -247,6 +244,14 @@ public sealed partial class SettingsModel : ObservableObject, IDisposable
         return this;
     }
 
+    /// <summary>For a test or a film: Your AI's Connect adds Syft Notes to the AI apps <paramref name="apps"/> describes
+    /// (a made-up home's), instead of this computer's.</summary>
+    public SettingsModel WithAiApps(ClaudeSetup apps)
+    {
+        Engines.AiApps = apps;
+        return this;
+    }
+
     /// <summary>For a test: making this computer the library uses <paramref name="here"/> (a built engine to run)
     /// instead of the app's own copy of itself.</summary>
     public SettingsModel WithLibraryHere(Func<LibraryHere> here)
@@ -312,9 +317,10 @@ public sealed partial class SettingsModel : ObservableObject, IDisposable
     public bool OnCanvas => Section == "Canvas";
     public bool OnCalendars => Section == "Calendars";
     public bool OnGranola => Section == "Granola";
-    public bool OnAccess => Section == "Access";
-    /// <summary>The AI panes scroll and pad themselves; every other section sits in the page's own scroller.</summary>
-    public bool OnPlainPage => !OnAi && !OnAccess && !OnAssistant;
+    /// <summary>Your AI and Ask your AI scroll and pad themselves; every other section sits in the page's own scroller.</summary>
+    public bool OnPlainPage => !OnAi && !OnAssistant;
+    /// <summary>How wide Your AI's page gets: each look's own measure.</summary>
+    public double AiPageWidth => IsMac ? 640 : 680;
     public bool IsMac => Skin.Current == SkinKind.Mac;
     public bool IsWin => !IsMac;
     public bool OnGeneral => Section == "General";
@@ -365,7 +371,6 @@ public sealed partial class SettingsModel : ObservableObject, IDisposable
             ]),
             new("Connect and import",
             [
-                Nav("Access", "hub", "AI apps"),
                 .. records ? new[] { Nav("Granola", "drive_file_move", "Granola") } : [],
                 Nav("Folders", "folder", "Your files"),
             ]),
@@ -413,21 +418,42 @@ public sealed partial class SettingsModel : ObservableObject, IDisposable
         var cc = host.Client();
         // The password as it is at each request: it can change while Settings is open (Add a laptop, Password → Change).
         ai ??= new AiRemote(cc.ServerUrl, () => host.Client().PoolKey);
+        // One computer (Both) has the library on it: the AI's words say this computer, not "your library".
+        bool libraryHere = host.Settings.Role != AppRole.Laptop;
+        // The AI apps on this computer, which each AI's Connect adds Syft Notes to (in a test or a self-test nothing real:
+        // ClaudeSetup.ThisComputer sees to that).
+        var aiApps = ClaudeSetup.ThisComputer(host.Home);
         Engines = new AiEnginesModel(ai)
         {
+            Here = libraryHere,
+            AiApps = aiApps,
             OpenUrl = url => Dialogs.OpenUrl(url),
+            // Set up on an AI not here yet: its maker's installer, for this account, as guided setup's Install runs it.
+            Install = libraryHere ? (id, phase) =>
+            {
+                var install = new AgentInstall(Core.Ai.AgentCli.Get(id), OperatingSystem.IsWindows(), Path.Combine(host.Home, "logs", "setup-install.log"));
+                install.Phase += phase;
+                return install.RunAsync();
+            } : null,
             Lede = "Choose which AI writes your notes and answers your questions. You can change it here any time. " + (host.Settings.Role == AppRole.Laptop
                 ? "It runs on your library, and you can set it up there or from this laptop."
                 : $"It runs on this {device}, as part of your library."),
         };
-        AiProblems = new AiProblemsModel(ai);
-        Access = MakeAccess(ai, host);
+        AiProblems = new AiProblemsModel(ai) { Here = libraryHere, OpenUrl = url => Dialogs.OpenUrl(url) };
+        // A sign-in started from a problem card shows on its AI's row below, and the other way round.
+        Engines.ShareWith(AiProblems);
+        Access = MakeAccess(ai, host, aiApps);
         Canvas = new CanvasSettingsModel(canvas ?? CanvasContext.For(host), watch) { OnSetUpExtension = () => Shell.ShowCanvasConnect(), OnChooseBrowser = Shell.ChooseBrowser };
         Calendars = new CalendarSettingsModel(host.Home, wake: () => host.Calendars.Wake());
         Granola = new ViewModels.GranolaSettingsModel(host.Granola, () => host.Settings.GranolaNotify, on => host.Save(x => x.GranolaNotify = on));
         Phones = new PhonesModel(() => host.Remote() is { } phonesLib ? (m, path, body) => phonesLib.DevicesAsync(m, path, body) : null);
         // Just this computer: the phone connects through the student's Google account (docs/phone-google.md).
-        if (host.Settings.Role == AppRole.Both) Phones.Google = new PhoneGoogleModel(host.Drive);
+        if (host.Settings.Role == AppRole.Both)
+            Phones.Google = new PhoneGoogleModel(host.Drive, background: new PhoneBackgroundSwitch(() => host.Settings.AnswerPhoneWhenClosed, async on =>
+            {
+                host.Save(s => s.AnswerPhoneWhenClosed = on);
+                await host.SyncBackgroundAsync();
+            }, () => host.BackgroundProblem));
         Keys = new ShortcutsModel(() => host.Settings.Keys, change => host.Save(s => change(s.Keys)), Skin.Current == SkinKind.Mac, records);
         Phones.Ticking = Phones.UiTicking();
         Assistant = new SettingsChatModel(new SettingsChatServices
@@ -467,19 +493,13 @@ public sealed partial class SettingsModel : ObservableObject, IDisposable
         Refresh();
     }
 
-    /// <summary>AI tool access, with the AI apps on this computer (Claude Desktop, Claude Code, ChatGPT, Gemini CLI: each
-    /// connected to the library with one click), and the library's Claude routes for turning on the web address and
-    /// removing a connection.</summary>
-    static AiAccessModel MakeAccess(IAiLibrary ai, AppHost host)
+    /// <summary>What AI apps may read, with the setup to paste into any other one, and the library's Claude routes for
+    /// turning on the web address and removing a connection (Your AI → Advanced settings).</summary>
+    static AiAccessModel MakeAccess(IAiLibrary ai, AppHost host, ClaudeSetup setup)
     {
-        var setup = ClaudeSetup.ThisComputer(host.Home);
         return new AiAccessModel(ai)
         {
             McpJson = setup.McpJson,
-            ReadApps = setup.States,
-            ConnectApp = setup.Connect,
-            DisconnectApp = setup.Disconnect,
-            ReopenApp = setup.ReopenAsync,
             OpenUrl = url => Dialogs.OpenUrl(url),
             RevokeConnection = async id =>
             {
@@ -497,9 +517,9 @@ public sealed partial class SettingsModel : ObservableObject, IDisposable
             case "AI":
                 _ = Engines.Load();
                 _ = AiProblems.Load();
-                break;
-            case "Access":
+                // Advanced settings, folded away under the cards: what AI apps may read, and the terminal a class opens in.
                 _ = Access.Load();
+                _ = Lib.Load();
                 break;
             case "Canvas":
                 _ = Canvas.LoadAsync();
@@ -524,7 +544,7 @@ public sealed partial class SettingsModel : ObservableObject, IDisposable
     void Refresh()
     {
         var cc = host.Client();
-        bool runsHere = host.Settings.Role != AppRole.Laptop && host.LocalLibrary?.State == LibraryServiceState.Running;
+        bool runsHere = host.Settings.Role != AppRole.Laptop && (host.LocalLibrary?.State == LibraryServiceState.Running || host.LibraryInBackground);
         LibraryLine = host.Library switch
         {
             LibraryState.Connected when runsHere && !host.OlderLibrary =>
@@ -543,6 +563,7 @@ public sealed partial class SettingsModel : ObservableObject, IDisposable
             LibraryServiceState.Running when host.Library == LibraryState.Connected => "",
             LibraryServiceState.Running => $"Your library runs on this {device}, on port {host.LocalLibrary.Cfg.WebPort}.",
             LibraryServiceState.Starting => "Starting your library…",
+            LibraryServiceState.Elsewhere when host.LibraryInBackground => "It runs in the background, so your phone is answered when Syft Notes is closed.",
             LibraryServiceState.Elsewhere => $"A library is already running on this {device}.",
             LibraryServiceState.PortTaken => host.LocalLibrary.Failure ?? "Its port is taken by another program.",
             LibraryServiceState.Failed => $"It stopped: {host.LocalLibrary.Failure}",
@@ -628,10 +649,17 @@ public sealed partial class SettingsModel : ObservableObject, IDisposable
             Section = "General";
             return;
         }
+        // AI apps is part of Your AI now, under Advanced settings: a link or a search that names it opens it there.
+        if (value == "Access")
+        {
+            Engines.AdvancedOpen = true;
+            Section = "AI";
+            return;
+        }
         foreach (string p in new[]
                  {
                      nameof(OnConnection), nameof(OnRecording), nameof(OnLibrary), nameof(OnClasses), nameof(OnNotes), nameof(OnFolders),
-                     nameof(OnLibraryPage), nameof(LibraryPageTitle), nameof(LibraryPageLine), nameof(OnAi), nameof(OnCanvas), nameof(OnAccess), nameof(OnPlainPage),
+                     nameof(OnLibraryPage), nameof(LibraryPageTitle), nameof(LibraryPageLine), nameof(OnAi), nameof(OnCanvas), nameof(OnPlainPage),
                      nameof(OnGeneral), nameof(OnAppearance), nameof(OnShortcuts), nameof(OnPhone), nameof(OnCalendars), nameof(OnGranola), nameof(OnAssistant),
                  })
             OnPropertyChanged(p);
@@ -1122,7 +1150,7 @@ public sealed partial class SettingsModel : ObservableObject, IDisposable
         Canvas.Dispose();
         Granola.Dispose();
         Phones.Google?.Dispose();
-        // Settings has closed: nobody is waiting to see an AI app's row turn to Connected.
-        Access.StopWatchingApps();
+        // Settings has closed: nobody is waiting to see an AI's card turn to Connected.
+        Engines.StopWatchingApps();
     }
 }
