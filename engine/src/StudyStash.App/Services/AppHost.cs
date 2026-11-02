@@ -82,7 +82,8 @@ public sealed class AppSettings
     /// existed have none, so they come back as <see cref="AppAppearance.System"/>: nothing changes for them.</summary>
     public AppAppearance Appearance { get; set; } = AppAppearance.System;
     /// <summary>How setup was done: "claude" or "codex" (guided, with that AI), "ollama" (by hand, the free model on
-    /// this computer), "manual" (by hand), or "" not yet.</summary>
+    /// this computer), "manual" (by hand), "later" (the first run ended with no AI: Home offers Continue with Google
+    /// until one writes the notes), or "" not yet.</summary>
     public string SetupAi { get; set; } = "";
     /// <summary>Guided setup's chat, so a window closed part-way picks it up again: the AI's CLI and its session.</summary>
     public SetupChatSaved? SetupChat { get; set; }
@@ -110,6 +111,9 @@ public sealed class AppSettings
     /// <summary>Home shows "Ready when class starts" (how to record, where the S. lives, the model's download): set by a
     /// first run's Get started, off once the student presses Got it or records. An update never turns it on.</summary>
     public bool WelcomeCard { get; set; }
+    /// <summary>The first run ended with no Canvas (not a student, a school without it, or skipped): Home's card says
+    /// how to add classes by hand, until it's put away.</summary>
+    public bool AddClassesOnHome { get; set; }
     /// <summary>The first Stop after a first run asks a Mac for its notifications, with the app's own card saying why
     /// first ("To hear when it's ready, allow Syft Notes' notifications when your Mac asks."): set by Get started on a
     /// Mac, cleared once asked. An update never sets it (they were asked long ago).</summary>
