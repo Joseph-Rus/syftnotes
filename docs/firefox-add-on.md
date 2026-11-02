@@ -191,6 +191,12 @@ Listing it is less to run.
 3. Developer hub, the add-on, **Upload New Version**.
 4. Firefox updates installed copies within a day. A copy keeps its pasted connection and its allowed sites.
 
+## 1.8: nothing to paste
+
+1.8 connects itself and finds the student's Canvas, in Firefox as in Chrome ([chrome-web-store.md](chrome-web-store.md#finding-canvas-by-itself-18)).
+Firefox gives each install an origin of its own (`moz-extension://<uuid>`), so the library answers any Firefox
+add-on's page, and only while the app's Add has its window open. Submit 1.8 here too before `StoreFindsCanvas` goes on.
+
 ## Other browsers
 
 - **Edge, Brave, Arc, Vivaldi** run the Chrome copy as it is, from the Chrome Web Store, which the Canvas step opens

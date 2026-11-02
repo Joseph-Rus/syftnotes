@@ -3,7 +3,7 @@
 // isn't connected yet asks for the code from Syft Notes, then for the browser's permission to reach Canvas and the
 // library.
 const $ = id => document.getElementById(id);
-const s = $('s'), connect = $('connect'), allowRow = $('allow-row'), main = $('main'), code = $('code'), go = $('go');
+const s = $('s'), connect = $('connect'), allowRow = $('allow-row'), main = $('main'), code = $('code'), go = $('go'), useRow = $('use-row'), use = $('use');
 let conn = null;
 
 function ago(iso) {
@@ -12,9 +12,9 @@ function ago(iso) {
   return m < 1 ? 'just now' : m < 60 ? m + ' min ago' : Math.round(m / 60) + ' h ago';
 }
 
-// Show one of the popup's three parts: the code field, the Allow button, or Sync / Open.
+// Show one of the popup's four parts: the code field, the Allow button, Use this Canvas, or Sync / Open.
 function only(part) {
-  for (const p of [connect, allowRow, main]) p.hidden = p !== part;
+  for (const p of [connect, allowRow, main, useRow]) p.hidden = p !== part;
 }
 
 // Tell the background script to start now rather than at its next alarm.
@@ -25,9 +25,22 @@ function wake() {
   } catch (e) { /* the worker is starting: its alarm picks it up */ }
 }
 
+// The tab the student clicked this button on, when it's a Canvas they're signed in to (the button's click lets this
+// copy look at that one tab): its address, else ''.
+async function canvasHere() {
+  try {
+    const tabs = await chrome.tabs.query({active: true, currentWindow: true});
+    const m = /^https:\/\/[^\/?#]+/i.exec(tabs && tabs[0] && tabs[0].url || '');
+    return m && await isCanvas(m[0]) ? m[0] : '';
+  } catch (e) {
+    return '';
+  }
+}
+
 async function show() {
   const where = await whichBrowser();
-  conn = await loadConnection();
+  // Just added from a store (1.8): Syft Notes on this computer may be waiting for it, with nothing to paste.
+  conn = await loadConnection() || await adoptLibrary();
   if (!conn) {
     only(connect);
     s.textContent = 'Connect this extension to your library: Syft Notes shows the code when you add the extension to ' + (where || 'your browser') + '.';
@@ -36,6 +49,18 @@ async function show() {
   if (!(await hasAccess(conn))) {
     only(allowRow);
     s.textContent = statusWords({state: 'no_access'});
+    return;
+  }
+  if (!conn.canvas) {
+    // No Canvas found yet (1.8): a school with Canvas at its own address is found here, on its page.
+    const here = await canvasHere();
+    only(here ? useRow : null);
+    s.textContent = here ? 'Read Canvas at ' + libraryHost(here) + '?'
+      : 'Sign in to Canvas in ' + (where || 'this browser') + '. Syft Notes finds it by itself; if it doesn\'t, open Canvas and click this button there.';
+    use.onclick = () => chrome.permissions.request({origins: [originPattern(here)]}).then(granted => {
+      if (!granted) return show();
+      return tellCanvas(conn, here).then(() => { wake(); return show(); }, () => { s.textContent = statusWords({state: 'library_unreachable', library: conn.app}); });
+    });
     return;
   }
   only(main);

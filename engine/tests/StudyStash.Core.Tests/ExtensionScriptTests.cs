@@ -65,8 +65,10 @@ public class ExtensionScriptTests
         /// <param name="granted">What chrome.permissions.contains answers: whether the student allowed a store copy's sites.</param>
         /// <param name="firefox">Firefox rather than Chrome: a background page (no importScripts) at moz-extension://,
         /// which says its own name.</param>
+        /// <param name="cookies">The browser's cookies chrome.cookies.getAll answers from, as a JSON array of {name, domain,
+        /// expirationDate} (1.8 finds the student's Canvas in them); null for a browser that gave no cookies permission.</param>
         public Worker(string running = "1.4", string? onDisk = null, string? config = DefaultConfig, string? stored = null, string? legacy = null,
-            string[]? runningHosts = null, string[]? diskHosts = null, bool granted = true, bool firefox = false)
+            string[]? runningHosts = null, string[]? diskHosts = null, bool granted = true, bool firefox = false, string? cookies = null)
         {
             runningHosts ??= Hosts;
             string at = firefox ? "moz-extension://study-stash/" : "chrome-extension://study-stash/";
@@ -83,6 +85,7 @@ public class ExtensionScriptTests
             js.SetValue("atob", new Func<string, string>(s => Encoding.Latin1.GetString(Convert.FromBase64String(s))));
             js.Execute($$$"""
                 var __legacy = {{{legacy ?? "null"}}};
+                var __cookies = {{{cookies ?? "null"}}};
                 var __reloads = 0;
                 var __granted = {{{(granted ? "true" : "false")}}}, __checked = [];
                 var __badge = '', __title = 'Syft Notes';
@@ -110,6 +113,10 @@ public class ExtensionScriptTests
                   permissions: {contains: async o => { __checked.push(o.origins); return __granted; }, onAdded: listeners},
                   storage: {local: area({{{(stored is null ? "{}" : $"{{connection: {stored}}}")}}}), session: area({})},
                   action: {setBadgeText: async o => { __badge = o.text; }, setTitle: async o => { __title = o.title; }},
+                  cookies: __cookies === null ? undefined : {
+                    getAll: async q => __cookies.filter(k => ('.' + String(k.domain).replace(/^\./, '')).endsWith('.' + q.domain)),
+                    onChanged: listeners,
+                  },
                 };
                 function setTimeout(f) { f(); return 0; }
                 function URL(u) {

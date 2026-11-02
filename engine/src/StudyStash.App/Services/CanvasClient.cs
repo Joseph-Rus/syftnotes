@@ -139,6 +139,16 @@ public sealed class CanvasClient(string serverUrl, string key, HttpClient? http 
 
     static string? Text(JsonNode? n) => n is JsonValue v && v.TryGetValue(out string? s) ? s : null;
 
+    /// <summary>Add Syft Notes to your browser: for the next few minutes the library hands the add-on from a store its
+    /// address and key when the add-on asks (1.8 on), so nothing is pasted. Null from a library older than that.</summary>
+    public Task<JsonObject?> PairAsync(CancellationToken stop = default) =>
+        SendAsync<JsonObject>(HttpMethod.Post, canvasRoot + "/pair", new JsonObject(), stop);
+
+    /// <summary>The student's answer to "Your browser is asking to connect to Syft Notes": Allow hands the add-on the
+    /// library's key; "That wasn't me" gives it nothing and closes the door until Add is pressed again.</summary>
+    public Task<JsonObject?> AnswerPairAsync(bool allow, CancellationToken stop = default) =>
+        SendAsync<JsonObject>(HttpMethod.Post, canvasRoot + "/pair/answer", new JsonObject { ["allow"] = allow }, stop);
+
     public Task<CanvasApi.Overview?> FindCoursesAsync(CancellationToken stop = default) =>
         SendAsync<CanvasApi.Overview>(HttpMethod.Post, canvasRoot + "/courses", null, stop);
 
