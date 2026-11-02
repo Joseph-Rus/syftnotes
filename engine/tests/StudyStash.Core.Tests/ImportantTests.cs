@@ -54,4 +54,20 @@ public class ImportantTests
         Assert.Empty(await important.MakeAsync(Blood("[00:01] Nothing to see."), Plan));
         Assert.Equal(2, asked);
     }
+
+    [Fact]
+    public async Task A_meeting_outside_the_classes_has_what_s_important_too()
+    {
+        await using var lib = await StudyLibrary.StartAsync(l =>
+        {
+            l.Cfg.Classes.Add(new ClassDef("Robotics Club", group: "Clubs"));
+            l.Store.Save(new Meeting("club") { Title = "Build night", Date = "2026-10-09", Transcript = StudyLibrary.BloodTranscript },
+                new Classification("Robotics Club", 1, "folder"), "## Summary\nWe built the arm.", "Claude");
+        });
+        lib.Answers.Add(Answer);
+
+        var named = (await lib.Study.ImportantAsync("club"))!;
+        Assert.Equal(["Three layers of an artery wall", "Who discovered capillaries"], named.Select(n => n.Concept));
+        Assert.Empty((await lib.Study.ExamFlagsAsync("club"))!); // what Review, exam prep and Listen are told stays the classes'
+    }
 }

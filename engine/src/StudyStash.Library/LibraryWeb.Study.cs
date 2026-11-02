@@ -109,11 +109,12 @@ public sealed partial class LibraryWeb
         app.MapGet("/api/v2/lectures/{id}/exam-flags", (HttpContext ctx, string id) => Api(ctx, () =>
             StudyMaterial.Read(store, id, cfg.IsClass) is { } l ? StudyJson(l.Flags) : Http.Detail(404, "no such lecture")));
 
-        // What those flags were about, named by the library's AI (kept, so only the first ask waits for it).
+        // What was flagged as important, named by the library's AI (kept, so only the first ask waits for it): in any
+        // recording, a meeting in Clubs or Work as much as a lecture, since it's what to remember, not an exam.
         app.MapPost("/api/v2/lectures/{id}/important", Http.Handle(ctx => ApiAsync(ctx, async () =>
         {
             string id = (string)ctx.Request.RouteValues["id"]!;
-            if (StudyMaterial.Read(store, id, cfg.IsClass) is not { } lecture) return Http.Detail(404, "no such lecture");
+            if (StudyMaterial.Read(store, id, _ => true) is not { } lecture) return Http.Detail(404, "no such lecture");
             try
             {
                 return StudyJson(await ImportantKept.MakeAsync(lecture, (p, s) => Jobs.PlanAsync("ask", p, s)));
