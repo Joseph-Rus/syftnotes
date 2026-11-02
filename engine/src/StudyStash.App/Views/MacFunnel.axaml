@@ -149,7 +149,12 @@
                                     IsEnabled="{Binding !AddOn.Adding, FallbackValue=True}" Content="{Binding AddOn.AddLabel, FallbackValue=''}" />
                             <TextBlock Classes="hint" Text="It opens Syft Notes' page in your browser's own store. Free, and it only reads Canvas." />
                           </StackPanel>
-                          <StackPanel Classes="line-body" IsVisible="{Binding AddOn.Waiting, FallbackValue=False}">
+                          <StackPanel Classes="line-body" IsVisible="{Binding AddOn.IsAsking, FallbackValue=False}">
+                            <TextBlock Name="AskingLine" Classes="say" Text="{Binding AddOn.AskingLine, FallbackValue=''}" />
+                            <Button Name="AllowAddOn" Classes="btn sm ink" HorizontalAlignment="Left" Command="{Binding AddOn.AllowCommand, FallbackValue={x:Null}}" Content="Allow" />
+                            <Button Name="NotMe" Classes="text-link small" HorizontalAlignment="Left" Command="{Binding AddOn.NotMeCommand, FallbackValue={x:Null}}" Content="That wasn't me" />
+                          </StackPanel>
+                          <StackPanel Classes="line-body" IsVisible="{Binding AddOn.ShowStoreSteps, FallbackValue=False}">
                             <TextBlock Classes="say" Text="{Binding AddOn.StoreSteps, FallbackValue=''}" />
                             <TextBlock Classes="say" Text="{Binding AddOn.AllowStep, FallbackValue=''}" />
                             <Button Classes="text-link small" HorizontalAlignment="Left" Command="{Binding AddOn.OpenAgainCommand, FallbackValue={x:Null}}" Content="Open the page again" />

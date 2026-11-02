@@ -144,6 +144,11 @@ public sealed class CanvasClient(string serverUrl, string key, HttpClient? http 
     public Task<JsonObject?> PairAsync(CancellationToken stop = default) =>
         SendAsync<JsonObject>(HttpMethod.Post, canvasRoot + "/pair", new JsonObject(), stop);
 
+    /// <summary>The student's answer to "Your browser is asking to connect to Syft Notes": Allow hands the add-on the
+    /// library's key; "That wasn't me" gives it nothing and closes the door until Add is pressed again.</summary>
+    public Task<JsonObject?> AnswerPairAsync(bool allow, CancellationToken stop = default) =>
+        SendAsync<JsonObject>(HttpMethod.Post, canvasRoot + "/pair/answer", new JsonObject { ["allow"] = allow }, stop);
+
     public Task<CanvasApi.Overview?> FindCoursesAsync(CancellationToken stop = default) =>
         SendAsync<CanvasApi.Overview>(HttpMethod.Post, canvasRoot + "/courses", null, stop);
 

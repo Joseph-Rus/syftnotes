@@ -18,13 +18,13 @@ public class CanvasFindsItselfTests
     const string Password = "maple otter";
     const string StoreCopy = "chrome-extension://" + Extension.ChromeStoreId;
 
-    static async Task<(TempDir Dir, TestSite Site)> LibraryAsync(string canvasUrl = "")
+    static async Task<(TempDir Dir, TestSite Site)> LibraryAsync(string canvasUrl = "", Func<DateTimeOffset>? clock = null)
     {
         var dir = new TempDir();
         var cfg = new Config(dir.Path, dir["pool"]) { PoolPassword = Password, OllamaEnabled = false, Classes = [new ClassDef("CS 101")] };
         if (canvasUrl.Length > 0) CanvasSettings.Update(dir.Path, s => s.Url = canvasUrl);
         var store = new Store(cfg.DbPath, cfg.PoolDir);
-        var sync = new CanvasSync(dir.Path, c => store.ClassDir(c), _ => { });
+        var sync = new CanvasSync(dir.Path, c => store.ClassDir(c), _ => { }) { Clock = clock ?? (() => DateTimeOffset.Now) };
         var options = new LibraryWebOptions
         {
             Canvas = sync, ListModels = _ => Task.FromResult<List<(string, double)>?>(null), Tailscale = () => new TailscaleInfo(),
@@ -68,8 +68,14 @@ public class CanvasFindsItselfTests
         Assert.Equal(HttpStatusCode.Unauthorized, (await Send(site, "/api/v2/canvas/pair", "{}", key: "not-a-key")).StatusCode);
         Assert.True((await Send(site, "/api/v2/canvas/pair", "{}")).IsSuccessStatusCode);
 
+        // Asking opens nothing by itself: the key comes only once the student has pressed Allow in the app.
         foreach (string origin in new[] { StoreCopy, "moz-extension://9b2c1f0e-1111-4a6b-9c3d-123456789abc" })
         {
+            await Send(site, "/api/v2/canvas/pair", "{}");
+            var asked = await Hello(site, origin);
+            Assert.Equal(HttpStatusCode.Accepted, asked.StatusCode);
+            Assert.DoesNotContain(CanvasSettings.ExtensionKey(dir.Path), await asked.Content.ReadAsStringAsync());
+            Assert.Equal(HttpStatusCode.OK, (await Send(site, "/api/v2/canvas/pair/answer", """{"allow":true}""")).StatusCode);
             var hello = await Hello(site, origin);
             Assert.True(hello.IsSuccessStatusCode, origin);
             var c = JsonNode.Parse(await hello.Content.ReadAsStringAsync())!;
@@ -77,6 +83,99 @@ public class CanvasFindsItselfTests
             Assert.Equal(CanvasSettings.ExtensionKey(dir.Path), c["key"]!.GetValue<string>());
             Assert.Equal("", c["canvas"]!.GetValue<string>()); // the add-on finds it
         }
+    }
+
+    static async Task<string?> Asking(TestSite site) =>
+        JsonNode.Parse(await site.Client.SendAsync(new HttpRequestMessage(HttpMethod.Get, "/api/v2/canvas/state") { Headers = { Authorization = new("Bearer", Password) } })
+            .ContinueWith(t => t.Result.Content.ReadAsStringAsync()).Unwrap())!["extension"]!["asking"]?.GetValue<string>();
+
+    [Fact]
+    public async Task No_key_goes_to_an_add_on_before_Allow_and_the_app_is_told_who_is_asking()
+    {
+        var (dir, site) = await LibraryAsync();
+        using var _ = dir;
+        await using var __ = site;
+        string key = CanvasSettings.ExtensionKey(dir.Path);
+        await Send(site, "/api/v2/canvas/pair", "{}");
+        Assert.Null(await Asking(site));
+
+        for (int i = 0; i < 3; i++) // asking again and again changes nothing
+        {
+            var r = await Hello(site, "moz-extension://9b2c1f0e-1111-4a6b-9c3d-123456789abc");
+            Assert.Equal(HttpStatusCode.Accepted, r.StatusCode);
+            Assert.DoesNotContain(key, await r.Content.ReadAsStringAsync());
+        }
+        Assert.Equal("firefox", await Asking(site));
+        // Pressing Add again starts afresh (no answer is carried over).
+        await Send(site, "/api/v2/canvas/pair", "{}");
+        Assert.Null(await Asking(site));
+        // Nobody can answer for the student, and with nothing asking there's nothing to answer.
+        Assert.Equal(HttpStatusCode.Unauthorized, (await Send(site, "/api/v2/canvas/pair/answer", """{"allow":true}""", key: key)).StatusCode);
+        Assert.Equal(HttpStatusCode.Conflict, (await Send(site, "/api/v2/canvas/pair/answer", """{"allow":true}""")).StatusCode);
+        Assert.Equal(HttpStatusCode.Accepted, (await Hello(site, StoreCopy)).StatusCode);
+        Assert.Equal("chrome", await Asking(site));
+        await Send(site, "/api/v2/canvas/pair/answer", """{"allow":true}""");
+        Assert.Null(await Asking(site));
+        Assert.Contains(key, await (await Hello(site, StoreCopy)).Content.ReadAsStringAsync());
+    }
+
+    [Fact]
+    public async Task That_wasnt_me_gives_the_asker_nothing_and_shuts_the_door_until_Add_is_pressed_again()
+    {
+        var (dir, site) = await LibraryAsync();
+        using var _ = dir;
+        await using var __ = site;
+        await Send(site, "/api/v2/canvas/pair", "{}");
+        Assert.Equal(HttpStatusCode.Accepted, (await Hello(site, StoreCopy)).StatusCode);
+        Assert.Equal(HttpStatusCode.OK, (await Send(site, "/api/v2/canvas/pair/answer", """{"allow":false}""")).StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, (await Hello(site, StoreCopy)).StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, (await Hello(site, "moz-extension://9b2c1f0e-1111-4a6b-9c3d-123456789abc")).StatusCode);
+        Assert.Null(await Asking(site));
+        await Send(site, "/api/v2/canvas/pair", "{}");
+        Assert.Equal(HttpStatusCode.Accepted, (await Hello(site, StoreCopy)).StatusCode);
+    }
+
+    [Fact]
+    public async Task A_second_add_on_is_refused_while_the_first_waits_and_the_one_allowed_keeps_the_key_to_itself()
+    {
+        var (dir, site) = await LibraryAsync();
+        using var _ = dir;
+        await using var __ = site;
+        string firefox = "moz-extension://9b2c1f0e-1111-4a6b-9c3d-123456789abc", other = "moz-extension://00000000-2222-4333-8444-555555555555";
+        string key = CanvasSettings.ExtensionKey(dir.Path);
+        await Send(site, "/api/v2/canvas/pair", "{}");
+        Assert.Equal(HttpStatusCode.Accepted, (await Hello(site, firefox)).StatusCode);
+        Assert.Equal(HttpStatusCode.Conflict, (await Hello(site, other)).StatusCode);
+        Assert.Equal(HttpStatusCode.Conflict, (await Hello(site, StoreCopy)).StatusCode);
+        await Send(site, "/api/v2/canvas/pair/answer", """{"allow":true}""");
+        var late = await Hello(site, other); // it asked too late: Allow was for the first
+        Assert.Equal(HttpStatusCode.Conflict, late.StatusCode);
+        Assert.DoesNotContain(key, await late.Content.ReadAsStringAsync());
+        Assert.Contains(key, await (await Hello(site, firefox)).Content.ReadAsStringAsync());
+    }
+
+    [Fact]
+    public async Task An_ask_the_student_never_answered_dies_with_its_twenty_minutes()
+    {
+        var now = DateTimeOffset.Now;
+        var (dir, site) = await LibraryAsync(clock: () => now);
+        using var _ = dir;
+        await using var __ = site;
+        await Send(site, "/api/v2/canvas/pair", "{}");
+        Assert.Equal(HttpStatusCode.Accepted, (await Hello(site, StoreCopy)).StatusCode);
+        now += TimeSpan.FromMinutes(21);
+        Assert.Equal(HttpStatusCode.Forbidden, (await Hello(site, StoreCopy)).StatusCode);
+        Assert.Null(await Asking(site));
+        Assert.Equal(HttpStatusCode.Conflict, (await Send(site, "/api/v2/canvas/pair/answer", """{"allow":true}""")).StatusCode); // too late to say yes
+        Assert.Equal(HttpStatusCode.Forbidden, (await Hello(site, StoreCopy)).StatusCode);
+        // Allowed in time, the key still stops coming when the window closes.
+        now = DateTimeOffset.Now;
+        await Send(site, "/api/v2/canvas/pair", "{}");
+        await Hello(site, StoreCopy);
+        await Send(site, "/api/v2/canvas/pair/answer", """{"allow":true}""");
+        Assert.True((await Hello(site, StoreCopy)).IsSuccessStatusCode);
+        now += TimeSpan.FromMinutes(21);
+        Assert.Equal(HttpStatusCode.Forbidden, (await Hello(site, StoreCopy)).StatusCode);
     }
 
     [Fact]

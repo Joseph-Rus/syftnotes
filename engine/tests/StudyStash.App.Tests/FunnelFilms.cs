@@ -38,11 +38,16 @@ sealed class AddOnStandIn(string library, FakeCanvas canvas) : IDisposable
     /// <summary>Added in the browser: it finds the library (as the store copy) and checks in.</summary>
     public async Task AddedAsync()
     {
-        using var ask = new HttpRequestMessage(HttpMethod.Get, library + "/api/v2/canvas/hello");
-        ask.Headers.Add("Origin", "chrome-extension://" + Extension.ChromeStoreId);
-        using var r = await http.SendAsync(ask, stop.Token);
-        r.EnsureSuccessStatusCode();
-        key = JsonNode.Parse(await r.Content.ReadAsStringAsync(stop.Token))!["key"]!.GetValue<string>();
+        // It asks again every second or so (as the add-on's page does) until the student has pressed Allow in the app.
+        while (key.Length == 0)
+        {
+            using var ask = new HttpRequestMessage(HttpMethod.Get, library + "/api/v2/canvas/hello");
+            ask.Headers.Add("Origin", "chrome-extension://" + Extension.ChromeStoreId);
+            using var r = await http.SendAsync(ask, stop.Token);
+            if (r.IsSuccessStatusCode)
+                key = JsonNode.Parse(await r.Content.ReadAsStringAsync(stop.Token))!["key"]?.GetValue<string>() ?? "";
+            if (key.Length == 0) await Task.Delay(TimeSpan.FromMilliseconds(400), stop.Token);
+        }
         await VisitAsync();
     }
 
@@ -352,6 +357,12 @@ public sealed class FunnelFilms
         run.Desk.Hold(2.0);
         run.Desk.Press(run.View.Part<Button>("AddToBrowser"));
         if (captions) run.Desk.Caption("Chrome opens Syft Notes' store page (a stand-in): Add to Chrome, then Allow");
+        run.Desk.NoPointer();
+        await run.Desk.UntilAsync(() => run.Funnel.AddOn!.IsAsking, "the add-on asks to connect", TimeSpan.FromSeconds(40));
+        if (captions) run.Desk.Caption("The add-on asks: nothing is handed over until the student says so");
+        run.Desk.Pointer();
+        run.Desk.Hold(2.2);
+        run.Desk.Press(run.View.Part<Button>("AllowAddOn"));
         run.Desk.NoPointer();
         await run.Desk.UntilAsync(() => run.Funnel.AddOn!.Connected, "the add-on checks in", TimeSpan.FromSeconds(40));
         if (captions) run.Desk.Caption("Added. It finds your Canvas from your own sign-in (a stand-in)");
