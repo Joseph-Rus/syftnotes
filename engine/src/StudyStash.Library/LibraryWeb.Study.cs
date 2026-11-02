@@ -108,7 +108,25 @@ public sealed partial class LibraryWeb
         // What the lecturer said is on the exam, for the phone and Claude.
         app.MapGet("/api/v2/lectures/{id}/exam-flags", (HttpContext ctx, string id) => Api(ctx, () =>
             StudyMaterial.Read(store, id, cfg.IsClass) is { } l ? StudyJson(l.Flags) : Http.Detail(404, "no such lecture")));
+
+        // What those flags were about, named by the library's AI (kept, so only the first ask waits for it).
+        app.MapPost("/api/v2/lectures/{id}/important", Http.Handle(ctx => ApiAsync(ctx, async () =>
+        {
+            string id = (string)ctx.Request.RouteValues["id"]!;
+            if (StudyMaterial.Read(store, id, cfg.IsClass) is not { } lecture) return Http.Detail(404, "no such lecture");
+            try
+            {
+                return StudyJson(await ImportantKept.MakeAsync(lecture, (p, s) => Jobs.PlanAsync("ask", p, s)));
+            }
+            catch (Exception e) when (e is InvalidOperationException or InvalidDataException or HttpRequestException or TimeoutException or JsonException)
+            {
+                return Http.Detail(503, $"What's important couldn't be named: {e.Message}");
+            }
+        })));
     }
+
+    Important? important;
+    Important ImportantKept => important ??= new Important(cfg.Home);
 
     ExamPrep? examPreps;
     ExamPrep ExamPreps => examPreps ??= new ExamPrep(cfg.Home);
