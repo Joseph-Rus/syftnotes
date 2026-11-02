@@ -47,6 +47,9 @@ public sealed class GuidedServices
     public Func<IReadOnlyList<AiAppState>> AiApps { get; init; } = () => [];
     /// <summary>Adds Syft Notes to one of those apps' settings, as Settings → AI tool access's Connect does.</summary>
     public Func<string, AiAppChange>? ConnectAiApp { get; init; }
+    /// <summary>Once an AI is ready here, adds Syft Notes to every app of it on this computer (Claude: the Claude app and
+    /// Claude Code), in the file each reads, as its Connect in Settings does; null: none are touched.</summary>
+    public Func<string, Task>? ConnectAppsOf { get; init; }
 
     public AgentInstall MakeInstaller(AgentCliInfo cli) =>
         Installer?.Invoke(cli) ?? new AgentInstall(cli, Windows, Path.Combine(Home, "logs", "setup-install.log"));
@@ -560,7 +563,10 @@ public sealed partial class GuidedSetupModel : ObservableObject, IDisposable
         forNotes = "";
         Notify(nameof(ForNotes), nameof(ByHandLabel));
         Screen = GuidedScreen.Manual;
-        if (ready) ReadyForNotes?.Invoke(id);
+        if (!ready) return;
+        // Connected all the way, as Connect in Settings does it: its apps here read the lectures too.
+        if (services.ConnectAppsOf is { } apps) _ = apps(id);
+        ReadyForNotes?.Invoke(id);
     }
 
     void ByHandAt(string item)
