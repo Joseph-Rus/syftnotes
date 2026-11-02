@@ -1,3 +1,4 @@
+using StudyStash.Core.Ai;
 using StudyStash.Core.Study;
 
 namespace StudyStash.Core.Tests;
@@ -69,5 +70,32 @@ public class ImportantTests
         var named = (await lib.Study.ImportantAsync("club"))!;
         Assert.Equal(["Three layers of an artery wall", "Who discovered capillaries"], named.Select(n => n.Concept));
         Assert.Empty((await lib.Study.ExamFlagsAsync("club"))!); // what Review, exam prep and Listen are told stays the classes'
+    }
+
+    [Fact]
+    public async Task The_notes_own_call_names_them_so_the_card_needs_no_call_of_its_own()
+    {
+        using var dir = new TempDir();
+        var cfg = new Config(dir["home"], dir["pool"]) { OllamaEnabled = true, OllamaModel = "qwen3:8b" };
+        new AiSettings { Provider = "claude", Fallback = false }.Save(cfg.Home);
+        var claude = new DiagramDesignTests.Answering("claude", (_, _) => Task.FromResult("## Vessels\n- Arteries carry blood away.\n\n```important\n" + Answer + "\n```\n"));
+        var ai = new AiJobs(cfg.Home) { Providers = _ => claude, Checks = new FakeChecks().Installed("claude").Build() };
+        var lecture = new Meeting("v1") { Title = "Blood vessels", Date = "2026-10-08", Transcript = StudyLibrary.BloodTranscript };
+
+        string notes = await ai.SummarizeAsync(lecture, cfg);
+        Assert.Equal("## Vessels\n- Arteries carry blood away.", notes.TrimEnd());
+        Assert.Contains("Flag 1 at 02:30:", claude.Requests[0].Prompt);
+        Assert.Contains("```important", claude.Requests[0].Prompt);
+
+        int asked = 0;
+        var kept = await new Important(cfg.Home).MakeAsync(Blood(), (_, _) => { asked++; return Task.FromResult(Answer); });
+        Assert.Equal(["Three layers of an artery wall", "Who discovered capillaries"], kept.Select(k => k.Concept));
+        Assert.Equal(0, asked);
+    }
+
+    [Fact]
+    public void A_reply_without_the_block_is_the_notes_as_they_are()
+    {
+        Assert.Equal(("## Notes\n- A.", (string?)null), Important.Take("## Notes\n- A."));
     }
 }

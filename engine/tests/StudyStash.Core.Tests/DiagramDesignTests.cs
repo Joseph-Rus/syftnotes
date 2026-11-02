@@ -226,7 +226,7 @@ public class DiagramDesignTests
     // --- through AiJobs: which engine, and never a failure of the notes -----------------------------------------------
 
     /// <summary>An engine that answers each prompt its own way, and keeps every request it was sent.</summary>
-    sealed class Answering(string id, Func<string, CancellationToken, Task<string>> answer) : AiProvider
+    internal sealed class Answering(string id, Func<string, CancellationToken, Task<string>> answer) : AiProvider
     {
         public override string Id { get; } = id;
         public override string Name => Id == "claude" ? "Claude" : Id;

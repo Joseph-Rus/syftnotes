@@ -283,12 +283,26 @@ public sealed class AiJobs(string home, Func<string>? ollamaHost = null)
         {
             // Other models read a whole lecture at once: tell the splitter their context is large.
             var (folder, images) = GivePhotos(m, engine);
+            // The same call names what was flagged as important, for the page's card, so that needs no call of its own.
+            var flags = ExamHints.Find(m.Transcript ?? "");
             try
             {
                 notes = await Core.Summarize.SummarizeTranscriptAsync(m, cfg,
-                    chat: (_, _, prompt, _) => AnswerAsync("notes", prompt, images: images),
+                    chat: async (_, _, prompt, _) =>
+                    {
+                        var (written, important) = Study.Important.Take(await AnswerAsync("notes", prompt, images: images));
+                        if (important is not null && flags.Count > 0)
+                            try
+                            {
+                                new Study.Important(home).Keep(m.Id, flags, important);
+                            }
+                            catch (Exception e) when (e is System.Text.Json.JsonException or IOException or UnauthorizedAccessException)
+                            {
+                            }
+                        return written;
+                    },
                     show: (_, _) => Task.FromResult<int?>(200_000),
-                    drawings: drawings);
+                    drawings: drawings, also: flags.Count > 0 ? Study.Important.NotesAsk(flags) : "");
             }
             finally
             {

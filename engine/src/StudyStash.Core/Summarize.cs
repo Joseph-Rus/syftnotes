@@ -903,7 +903,7 @@ public static partial class Summarize
     /// <summary>Our own study notes for a lecture, written from its transcript, drawing what <paramref name="drawings"/>
     /// allows; a diagram that came out broken is sent back once to be fixed (<see cref="RepairDiagramsAsync"/>).</summary>
     public static async Task<string> SummarizeTranscriptAsync(Meeting m, Config cfg, ChatFn? chat = null, ShowFn? show = null,
-        Drawings drawings = Drawings.Flowcharts)
+        Drawings drawings = Drawings.Flowcharts, string also = "")
     {
         chat ??= (c, model, prompt, ctx) => OllamaGenerateAsync(c, model, prompt, ctx);
         if (!cfg.ForSchool)
@@ -932,7 +932,8 @@ public static partial class Summarize
         // What the student typed is in the notes that come back, marked as theirs, whatever the model made of the asking.
         string typed = Typed(m);
         async Task<string> Repaired(string notes) => KeepTyped(await RepairDiagramsAsync(notes, prompt => chat(cfg, model, prompt, ctx)), typed);
-        if (text.Length <= budget) return await Repaired(CleanOutput(await chat(cfg, model, WholePrompt(m, text, drawings, attached), ctx)));
+        // What else the one call is asked (what the flags were about): only a lecture that fits in one call is.
+        if (text.Length <= budget) return await Repaired(CleanOutput(await chat(cfg, model, WholePrompt(m, text, drawings, attached) + also, ctx)));
         var parts = SplitTranscript(text[hint.Length..], budget).Select(part => hint + part).ToList();
         var notes = new List<string>();
         for (int i = 0; i < parts.Count; i++)
