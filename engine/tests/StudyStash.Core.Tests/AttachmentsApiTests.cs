@@ -419,9 +419,12 @@ public class AttachmentsApiTests
         Assert.DoesNotContain("Attachments", before);
         Assert.DoesNotContain("Attachments", classBefore);
 
+        // The library reads one file at a time and which waiting file goes first isn't promised, so the picture (whose
+        // reading this test holds open) is attached only once the PDF's words are in, or it could take the turn first.
         var body = await Upload(site, Form([("My notes.pdf", Pdf("words"))], lecture: "n1"));
-        await Upload(site, Form([("IMG_1.png", [0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 0])], cls: "BIO 110"));
         await Read(store, body["attachments"]![0]!["id"]!.GetValue<string>());
+        Assert.Equal(Attachment.Read, store.GetAttachment(body["attachments"]![0]!["id"]!.GetValue<string>())!.State);
+        await Upload(site, Form([("IMG_1.png", [0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 0])], cls: "BIO 110"));
 
         string page = await site.Text("/note/n1");
         Assert.Contains("<h2>Attachments</h2>", page);
