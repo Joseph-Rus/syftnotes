@@ -23,7 +23,9 @@ public sealed partial class LibraryReader(Config cfg, Store store)
     /// much is waiting.</summary>
     public JsonObject Overview()
     {
-        var counts = Store.ClassesSummary().ToDictionary(c => c.ClassName, c => c.Count);
+        // One class whatever its letters: lectures filed as "cs 101" count for "CS 101".
+        var counts = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+        foreach (var (cls, n) in Store.ClassesSummary()) counts[cls] = counts.GetValueOrDefault(cls) + n;
         var classes = new JsonArray();
         int index = 0;
         var canvas = Canvas.CanvasSettings.Load(Cfg.Home);
@@ -45,7 +47,7 @@ public sealed partial class LibraryReader(Config cfg, Store store)
                 ["aliases"] = new JsonArray(c.Aliases.Select(a => (JsonNode?)a).ToArray()),
             });
         // Lectures filed under a class since removed from the config still show, after the rest.
-        foreach (var (name, n) in counts.Where(kv => kv.Key != Configs.Unsorted && Cfg.Classes.All(c => c.Name != kv.Key)))
+        foreach (var (name, n) in counts.Where(kv => !kv.Key.Equals(Configs.Unsorted, StringComparison.OrdinalIgnoreCase) && Cfg.Classes.All(c => !c.Name.Equals(kv.Key, StringComparison.OrdinalIgnoreCase))))
             classes.Add(new JsonObject { ["name"] = name, ["lectures"] = n, ["color"] = index++ });
         var status = Store.StatusCounts();
         return new JsonObject

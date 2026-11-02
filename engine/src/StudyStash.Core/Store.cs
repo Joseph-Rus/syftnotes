@@ -767,7 +767,7 @@ public sealed partial class Store : IDisposable
             var args = new List<object?> { match };
             if (className is not null)
             {
-                sql += " AND notes.class_name=?";
+                sql += " AND notes.class_name=? COLLATE NOCASE";
                 args.Add(className);
             }
             if (noteId is not null)
@@ -828,7 +828,9 @@ public sealed partial class Store : IDisposable
             var args = new List<object?>();
             if (className is not null)
             {
-                sql += " AND class_name=?";
+                // A class is the same class in other letters: a lecture filed as "cs 101" before Canvas named the class
+                // "CS 101" is in it (Windows and macOS folders already treat the two as one folder).
+                sql += " AND class_name=? COLLATE NOCASE";
                 args.Add(className);
             }
             sql += " ORDER BY date DESC, title";
