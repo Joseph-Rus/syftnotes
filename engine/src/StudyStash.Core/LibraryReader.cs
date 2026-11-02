@@ -57,6 +57,9 @@ public sealed partial class LibraryReader(Config cfg, Store store)
             ["classes"] = classes,
             ["unsorted"] = counts.GetValueOrDefault(Configs.Unsorted),
             ["writing"] = status.GetValueOrDefault(Store.Queued) + status.GetValueOrDefault(Store.Working),
+            // Lectures that arrived but couldn't be filed (so no class lists them), and the first one's reason.
+            ["stuck"] = status.GetValueOrDefault(Store.Failed),
+            ["stuck_why"] = Store.Processing().FirstOrDefault(r => r.Status == Store.Failed)?.Error,
             ["ask"] = Cfg.OllamaEnabled,
             ["notes_model"] = Cfg.SummaryEnabled && Cfg.OllamaEnabled ? Cfg.EffectiveSummaryModel : null,
             // What it's for (empty until asked) and so whether it's for school: classes, Canvas and due dates, or folders.
