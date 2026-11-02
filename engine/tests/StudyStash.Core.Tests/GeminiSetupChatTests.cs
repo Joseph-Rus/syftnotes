@@ -186,17 +186,17 @@ public class GeminiSetupChatTests
         var gemini = new GeminiProvider();
         gemini.Prepare(["/Applications/Study Stash.app/Contents/MacOS/studystash", "--home", "/Users/s/.study-stash", "mcp"], [dir["pool"]]);
         string agent = File.ReadAllText(Antigravity.AgentPath(Antigravity.Home(), Antigravity.LibraryAgent));
-        Assert.Contains("  - name: study-stash\n    command: \"/Applications/Study Stash.app/Contents/MacOS/studystash\"\n    args: [\"--home\", \"/Users/s/.study-stash\", \"mcp\"]\n", agent);
+        Assert.Contains("  - name: syft-notes\n    command: \"/Applications/Study Stash.app/Contents/MacOS/studystash\"\n    args: [\"--home\", \"/Users/s/.study-stash\", \"mcp\"]\n", agent);
         var servers = JsonNode.Parse(File.ReadAllText(global))!["mcpServers"]!.AsObject();
         Assert.Equal(["theirs"], servers.Select(kv => kv.Key));
-        Assert.Contains("mcp(study-stash/*)", File.ReadAllText(Antigravity.SettingsPath(Antigravity.Home())));
+        Assert.Contains("mcp(syft-notes/*)", File.ReadAllText(Antigravity.SettingsPath(Antigravity.Home())));
         Assert.Contains("study-stash-library", gemini.Command(new AiRequest("q", dir.Path) { Tools = true }, false));
 
         // The setup chat's turn takes it out too, and its agent names no server but the setup tools'.
         File.WriteAllText(global, """{"mcpServers": {"study-stash": {"command": "studystash"}}}""");
         Antigravity.PrepareSetup(SetupChat.Folder(dir["home"]), "brief", "http://127.0.0.1:1/setup-mcp", "t");
         Assert.Empty(JsonNode.Parse(File.ReadAllText(global))!["mcpServers"]!.AsObject());
-        Assert.DoesNotContain("study-stash\n", File.ReadAllText(Antigravity.AgentPath(Antigravity.Home(), Antigravity.SetupAgent)));
+        Assert.DoesNotContain("syft-notes\n", File.ReadAllText(Antigravity.AgentPath(Antigravity.Home(), Antigravity.SetupAgent)));
     }
 
     /// <summary>Lines the real agy 1.4.5 printed for a setup turn (its paths and the tools' long output shortened): read

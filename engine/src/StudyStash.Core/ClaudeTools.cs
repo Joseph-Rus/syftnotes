@@ -527,7 +527,15 @@ public sealed class RemoteLibrary(string serverUrl, string key, HttpClient? http
 /// </summary>
 public static class ClaudeTools
 {
-    public const string ServerName = "study-stash";
+    /// <summary>The name Syft Notes has in every AI app's list of servers, which students see there ("syft-notes").</summary>
+    public const string ServerName = "syft-notes";
+
+    /// <summary>The name the server had in the apps' settings before (Study Stash): Connect takes it out wherever it
+    /// writes the new one, so an app never has both.</summary>
+    public static readonly IReadOnlyList<string> OldServerNames = ["study-stash"];
+
+    /// <summary>Whether <paramref name="name"/> is Syft Notes' entry in an app's servers, now or under its old name.</summary>
+    public static bool IsOurServer(string name) => name == ServerName || OldServerNames.Contains(name);
 
     /// <summary>What the stdio server tells Claude Code and Claude Desktop about the library.</summary>
     public const string Instructions =
