@@ -12,7 +12,7 @@ function say(title, text) {
 }
 
 function show(...ids) {
-  for (const id of ['allow', 'again', 'other']) $(id).hidden = ids.indexOf(id) < 0;
+  for (const id of ['allow', 'again', 'other', 'paste']) $(id).hidden = ids.indexOf(id) < 0;
 }
 
 // The background script starts now rather than at its next alarm.
@@ -33,7 +33,9 @@ async function start() {
   conn = await loadConnection() || await adoptLibrary();
   if (!conn) {
     say('Open Syft Notes', 'Open Syft Notes on this computer and press Add Syft Notes to ' + where + ' there, then press Allow when Syft Notes asks. This page carries on by itself.');
-    show();
+    // A Syft Notes from before 1.8 connects a store copy with a code instead.
+    $('paste').textContent = 'Syft Notes showed you a code instead? Click the Syft Notes button at the top right of ' + where + ' (it may be under the puzzle-piece button) and paste it there.';
+    show('paste');
     setTimeout(start, 3000);
     return;
   }
