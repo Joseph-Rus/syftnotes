@@ -22,7 +22,7 @@ public static class Motion
         get
         {
             if (Override is { } forced) return forced;
-            if (Environment.GetEnvironmentVariable("STUDYSTASH_STILL") == "1") return true;
+            if (StudyStash.Core.TestSwitches.Get("STUDYSTASH_STILL") == "1") return true;
             if (reduced is { } known && DateTime.UtcNow - askedAt < TimeSpan.FromSeconds(5)) return known;
             askedAt = DateTime.UtcNow;
             return (reduced = Ask()).Value;

@@ -16,4 +16,11 @@
     <InformationalVersion>$(StudyStashVersion)</InformationalVersion>
     <IncludeSourceRevisionInInformationalVersion>false</IncludeSourceRevisionInInformationalVersion>
   </PropertyGroup>
+  <PropertyGroup>
+    <!-- The self-test, the demo libraries and the STUDYSTASH_* switches tests steer the app with (a pretend microphone,
+         fixed ports, a made-up update): in every build unless TestHelpers=false, which is how a student's copy is built
+         (windows\build.ps1 without -TestHelpers). Off, the switches read as unset and the self-test isn't there. -->
+    <TestHelpers Condition="'$(TestHelpers)' == ''">true</TestHelpers>
+    <DefineConstants Condition="'$(TestHelpers)' == 'true'">$(DefineConstants);TEST_HELPERS</DefineConstants>
+  </PropertyGroup>
 </Project>

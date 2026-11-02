@@ -51,7 +51,7 @@ public sealed class PhoneLink : IDisposable
         this.folder = folder;
         makeDrive = drive ?? (folder is not null ? _ => new FolderDrive(folder)
             : account => new GoogleDrive(new GoogleTokens(new GoogleSignIn(this.secret() ?? "", googleHttp), account.RefreshToken).GetAsync, log: this.log));
-        Space = space ?? Environment.GetEnvironmentVariable("STUDYSTASH_DRIVE_SPACE") ?? "";
+        Space = space ?? TestSwitches.Get("STUDYSTASH_DRIVE_SPACE") ?? "";
         Account = GoogleAccount.Load(home);
     }
 
