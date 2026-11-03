@@ -66,7 +66,7 @@ public class CutTextTests
         var home = new TempHome();
         var host = new AppHost(home.Path);
         var library = new FakeLibrarySettings();
-        var settings = SettingsModel.Make(host, ai: AiDemo.DemoLibrary(), canvas: CanvasFixtures.Context(CanvasShots.ConnectedLibrary()), library: () => library.Call);
+        var settings = SettingsModel.Make(host, ai: AiDemo.DemoLibrary(), canvas: CanvasFixtures.Context(Scenes.ConnectedLibrary()), library: () => library.Call);
         try
         {
             await settings.Engines.Load();

@@ -5,3 +5,5 @@ engine/tests/StudyStash.Core.Tests/Golden/** -text
 engine/**/*.cs text eol=lf
 # Calendar feeds as servers send them, with CRLF line endings.
 engine/tests/StudyStash.Core.Tests/Fixtures/calendar/** -text
+# The verified pictures of the screens: compared as pictures, never merged as text.
+engine/tests/StudyStash.App.Tests/Snapshots/*.verified.png binary

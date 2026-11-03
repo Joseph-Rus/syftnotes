@@ -368,7 +368,7 @@ personal Gmail on both."
   before connecting (Connect with Google, or greyed out with the words when the build has no secret), and Other ways
   opening Add a phone over Tailscale in both looks (the code and its QR code, black on white; folded away again, the
   code goes).
-- `PhonesShots`: `shots/mac-settings-phone-google-{not-connected,connected,phones,other-ways}-{light,dark}.png` and
+- Pictures (drawn by `PhonesShots`, since removed): `shots/mac-settings-phone-google-{not-connected,connected,phones,other-ways}-{light,dark}.png` and
   the `win-` ones (other-ways: Other ways open with a code on show for an Android phone), kept (cropped to the window)
   in `docs/qa/2026-10-24/`. Their QR codes were decoded with macOS's CoreImage
   detector.

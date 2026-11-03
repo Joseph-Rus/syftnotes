@@ -35,19 +35,55 @@ public static partial class Machine
             foreach (var (k, v) in env ?? new Dictionary<string, string>()) psi.Environment[k] = v;
             using var p = Process.Start(psi);
             if (p is null) return null;
-            var stdout = p.StandardOutput.ReadToEndAsync();
+            var stdout = new OutputSoFar(p.StandardOutput);
             _ = p.StandardError.ReadToEndAsync();
             if (!p.WaitForExit(timeout))
             {
                 try { p.Kill(entireProcessTree: true); } catch (InvalidOperationException) { }
                 return null;
             }
-            // Something it started in the background may still hold its output open: don't wait for that forever.
-            return new ProcResult(p.ExitCode, stdout.Wait(timeout) ? stdout.Result : "");
+            // Once it has stopped, all it printed is in the pipe. The pipe's end can still be held off by something it
+            // started that took its output along (on Windows a child inherits it, and git's background helpers live on
+            // after the command): what it printed is taken without waiting for them. Before, this waited out the whole
+            // timeout and then lost what was printed, so `git rev-parse` after a commit came back empty.
+            return new ProcResult(p.ExitCode, stdout.Take(OutputSettles));
         }
         catch (Exception e) when (e is System.ComponentModel.Win32Exception or InvalidOperationException or IOException)
         {
             return null;
+        }
+    }
+
+    /// <summary>How long a stopped command's output may still take to end by itself before what it printed is taken as
+    /// it is (it normally ends at once).</summary>
+    static readonly TimeSpan OutputSettles = TimeSpan.FromSeconds(2);
+
+    /// <summary>A command's output, read as it comes, so what's been printed can be had before the pipe has ended.</summary>
+    sealed class OutputSoFar
+    {
+        readonly System.Text.StringBuilder text = new();
+        readonly Task reading;
+
+        public OutputSoFar(StreamReader from) => reading = Task.Run(async () =>
+        {
+            var buffer = new char[4096];
+            int n;
+            while ((n = await from.ReadAsync(buffer)) > 0)
+                lock (text) text.Append(buffer, 0, n);
+        });
+
+        /// <summary>All of it once the pipe has ended, or, after <paramref name="settle"/>, what has come so far.</summary>
+        public string Take(TimeSpan settle)
+        {
+            try
+            {
+                reading.Wait(settle);
+            }
+            catch (AggregateException)
+            {
+                // The pipe broke: what came before it is still what it printed.
+            }
+            lock (text) return text.ToString();
         }
     }
 

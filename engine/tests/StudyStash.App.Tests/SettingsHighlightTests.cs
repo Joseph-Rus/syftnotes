@@ -32,7 +32,7 @@ public class SettingsHighlightTests
         var home = new TempHome();
         var host = new AppHost(home.Path);
         var library = new FakeLibrarySettings();
-        var model = SettingsModel.Make(host, ai: AiDemo.DemoLibrary(), canvas: CanvasFixtures.Context(CanvasShots.ConnectedLibrary()), library: () => library.Call);
+        var model = SettingsModel.Make(host, ai: AiDemo.DemoLibrary(), canvas: CanvasFixtures.Context(Scenes.ConnectedLibrary()), library: () => library.Call);
         await model.Engines.Load();
         await model.Access.Load();
         await model.Canvas.LoadAsync();
@@ -95,7 +95,7 @@ public class SettingsHighlightTests
             {
                 var m = SetupModel.For(skin, role);
                 m.Ai = AiDemo.Setup();
-                m.Canvas = await CanvasShots.SetupStepAsync("found");
+                m.Canvas = await Scenes.SetupStepAsync("found");
                 var view = skin == SkinKind.Mac ? (Control)new MacSetup { DataContext = m } : new WinSetup { DataContext = m };
                 var window = new Window { Width = 900, Height = 900, Content = view };
                 window.Show();
@@ -132,42 +132,4 @@ public class SettingsHighlightTests
         return view;
     }
 
-    [AvaloniaFact]
-    public async Task Shots()
-    {
-        var size = new Size(1100, 900);
-        foreach (var skin in new[] { SkinKind.Mac, SkinKind.Win })
-        {
-            string look = skin == SkinKind.Mac ? "mac" : "win";
-            var (model, host, home) = await SettingsAsync();
-            using (home)
-            using (host)
-            using (model)
-            {
-                foreach (var t in new[] { ThemeVariant.Light, ThemeVariant.Dark })
-                {
-                    Control Settings(string section, Func<Button, bool> which, string state)
-                    {
-                        model.Section = section;
-                        return With(new SettingsView { DataContext = model, DrawChrome = true }, which, state);
-                    }
-                    // Appearance: light, dark or follow the system, its choice hovered.
-                    Shot.Take($"{look}-settings-appearance-hover", skin, t, () => Settings("Appearance", b => b.Classes.Contains("seg-item"), ":pointerover"), size: size);
-                    if (skin == SkinKind.Win)
-                        Shot.Take($"{look}-settings-appearance-row-hover", skin, t, () => Settings("Appearance", b => b.DataContext is AppearanceOption, ":pointerover"), size: size);
-                    Shot.Take($"{look}-settings-model-hover", skin, t, () => Settings("Recording", b => b.DataContext is ModelChoice { Chosen: false }, ":pointerover"), size: size);
-                    Shot.Take($"{look}-settings-model-focus", skin, t, () => Settings("Recording", b => b.DataContext is ModelChoice { Chosen: true }, ":focus-visible"), size: size);
-                    Shot.Take($"{look}-settings-access-hover", skin, t, () => Settings("Access", b => b.Classes.Contains("ai-textbtn") && b.Bounds.Width > 400, ":pointerover"), size: size);
-                }
-            }
-            foreach (var t in new[] { ThemeVariant.Light, ThemeVariant.Dark })
-            {
-                var m = SetupModel.For(skin, AppRole.Library);
-                m.Ai = AiDemo.Setup();
-                m.Go(SetupStep.Ai);
-                Shot.Take($"{look}-setup-ai-hover", skin, t, () => With(skin == SkinKind.Mac ? new MacSetup { DataContext = m, DrawChrome = true } : new WinSetup { DataContext = m, DrawChrome = true },
-                    b => b.DataContext is AiSetupRow { Selected: false }, ":pointerover"), size: size);
-            }
-        }
-    }
 }
