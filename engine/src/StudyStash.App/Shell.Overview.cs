@@ -65,8 +65,9 @@ public static partial class Shell
         SelectInSidebar(null, home: true);
         if (host.Remote() is not { } lib) return;
         int want = Math.Clamp(homeShown, OverviewModel.PageSize, 480);
-        var lectures = await NotesAsync(lib, homeUnsorted ? Configs.Unsorted : null, want + 1, null);
+        var listed = await NotesAsync(lib, homeUnsorted ? Configs.Unsorted : null, want + 1, null);
         if (turn != pageState.Turn) return;
+        if (listed is not { } lectures) { ListFailed(); return; }
         var sources = OverviewSources(WithLocal([.. lectures.Take(want)], null, homeUnsorted, all: lectures.Count <= want));
         var home = OverviewModel.Home(sources, homeUnsorted);
         home.CanLoadMore = lectures.Count > want;
@@ -83,6 +84,7 @@ public static partial class Shell
             if (home.Notes.LastOrDefault() is not { Date.Length: > 0 } last) return;
             var more = await NotesAsync(lib, homeUnsorted ? Configs.Unsorted : null, OverviewModel.PageSize + 1, last.Date);
             if (!ReferenceEquals(library.Overview, home)) return;
+            if (more is null) return; // a page that couldn't be read adds nothing; "load more" is still there to try again
             var dot = OverviewModel.DotsOf(sources);
             home.Add(more.Take(OverviewModel.PageSize).Where(l => home.Notes.All(n => n.Id != l.Id)).Select(l => OverviewModel.Row(l, sources, dot, showFolder: true)),
                 more.Count > OverviewModel.PageSize);
@@ -111,8 +113,10 @@ public static partial class Shell
         int turn = pageState.Turn;
         SelectInSidebar(name);
         if (host.Remote() is not { } lib) return;
-        var lectures = WithLocal(await NotesAsync(lib, name, 500, null), name, false, all: true);
+        var listed = await NotesAsync(lib, name, 500, null);
         if (turn != pageState.Turn) return;
+        if (listed is null) { ListFailed(); return; }
+        var lectures = WithLocal(listed, name, false, all: true);
         var row = CanvasClassRow(name);
         var info = (host.Overview?["classes"] as JsonArray ?? []).OfType<JsonObject>().FirstOrDefault(c => S(c["name"]) == name);
         var known = host.Classes().FirstOrDefault(c => c.Name == name);
@@ -152,7 +156,7 @@ public static partial class Shell
         if (turn != pageState.Turn) return;
         // The week's planner says which class meetings were recorded. The calendars hold this week's meetings (from
         // Monday on), and the newest hundred notes reach back well past those.
-        var recorded = Events() is null ? [] : await NotesAsync(lib, null, 100, null);
+        var recorded = Events() is null ? [] : (await NotesAsync(lib, null, 100, null)) ?? [];
         if (turn != pageState.Turn) return;
         var page = OverviewModel.ForDue(OverviewSources(recorded, WithTerm(CanvasLinked ? canvasDue : null, term)), dueOnly);
         if (library.Overview is { IsDuePage: true, Calendar: { } before } && page.Calendar is { } now) now.Resume(before);
@@ -415,9 +419,23 @@ public static partial class Shell
         if (pageState.Overview == cls) await ShowFolderAsync(cls);
     }
 
+    /// <summary>The library couldn't list the notes (though its check said it was there): that isn't "No notes yet". A
+    /// page being read again stays as it is; any other opening says the library can't be reached, as a load of the
+    /// library does. Either way the library is checked again, which brings the page back when it answers.</summary>
+    static void ListFailed()
+    {
+        if (!OverviewModel.KeepsPageWhenListFails(restoring, library.Overview is not null))
+        {
+            ClearPane();
+            library.Overview = null;
+            library.Empty = UnreachableText;
+        }
+        Run(() => host.CheckLibraryAsync(), "CheckLibrary");
+    }
+
     /// <summary>Notes as the library lists them, newest first: a folder's, or (null) every folder's; from before a
-    /// date, for the next page of a list.</summary>
-    static async Task<List<OverviewModel.LectureFacts>> NotesAsync(ILibrarySource lib, string? cls, int limit, string? before)
+    /// date, for the next page of a list. Null when the library couldn't be asked.</summary>
+    static async Task<List<OverviewModel.LectureFacts>?> NotesAsync(ILibrarySource lib, string? cls, int limit, string? before)
     {
         JsonArray list;
         try
@@ -426,7 +444,8 @@ public static partial class Shell
         }
         catch (Exception e) when (e is HttpRequestException or TaskCanceledException or LibraryRefusedException)
         {
-            return [];
+            Program.Log($"[library] couldn't list the notes: {e.Message}");
+            return null;
         }
         return [.. list.OfType<JsonObject>().Select(l => new OverviewModel.LectureFacts(S(l["id"]), S(l["title"]), S(l["class"]), Date(S(l["date"])),
             l["seconds"] is JsonValue v && v.TryGetValue(out double sec) ? sec : null, S(l["summary"]), S(l["status"]) is "queued" or "working", S(l["date"])))];

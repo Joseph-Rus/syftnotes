@@ -46,6 +46,8 @@ public static partial class Shell
         }, TimeSpan.FromSeconds(1));
     }
 
+    const string UnreachableText = "Can't reach your library. What you record waits on this computer until it's back.";
+
     /// <summary>The sidebar's lecture counts, as the library says them now: only the numbers change, not the page showing.</summary>
     static async Task RefreshCountsAsync()
     {
@@ -166,7 +168,7 @@ public static partial class Shell
             {
                 LibraryState.NotSetUp => "Connect to your library in Settings to see your notes here.",
                 LibraryState.WrongPassword => "Your library's password changed. Sign in again in Settings.",
-                _ => "Can't reach your library. What you record waits on this computer until it's back.",
+                _ => UnreachableText,
             };
             return;
         }
