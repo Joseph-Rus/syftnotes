@@ -1309,19 +1309,19 @@ public static partial class Shell
             // The library's setup and the laptop's have their own names: the window's follows the flow.
             setup.PropertyChanged += (_, e) =>
             {
-                if (e.PropertyName == nameof(SetupModel.HeaderTitle) && w.Content == manualView) w.Title = model.HeaderTitle;
+                if (e.PropertyName == nameof(SetupModel.HeaderTitle) && ConfirmLayer.ViewOf(w) == manualView) w.Title = model.HeaderTitle;
             };
             // The AI and Canvas steps are the design's bigger window, and so is the chat (each view sizes itself): the
             // window follows whichever is showing (the one it opens on, from the start).
             var other = byHand ? guidedView : manualView;
-            AppWindows.Follow(w, other, () => w.Content == other, open: false);
+            AppWindows.Follow(w, other, () => ConfirmLayer.ViewOf(w) == other, open: false);
             guided.PropertyChanged += (_, e) =>
             {
                 if (e.PropertyName != nameof(GuidedSetupModel.Screen)) return;
                 var want = guided.Screen == GuidedScreen.Manual ? manualView : guidedView;
                 model.GuidedLabel = guided.AiReady ? $"Set up with {guided.Brand} instead" : "Set up with an AI instead";
-                if (w.Content == want) return;
-                w.Content = want;
+                if (ConfirmLayer.ViewOf(w) == want) return;
+                ConfirmLayer.SetView(w, want);
                 w.Title = want == manualView ? model.HeaderTitle : "Set up Syft Notes";
                 AppWindows.FitTo(w, want);
             };
@@ -1645,7 +1645,7 @@ public static partial class Shell
     {
         if (settingsWindow is { IsVisible: true })
         {
-            if (section is not null && settingsWindow.Content is Control { DataContext: SettingsModel open }) open.Section = section;
+            if (section is not null && ConfirmLayer.ViewOf(settingsWindow) is { DataContext: SettingsModel open }) open.Section = section;
             AppWindows.Raise(settingsWindow);
             return;
         }

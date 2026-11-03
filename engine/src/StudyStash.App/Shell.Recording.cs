@@ -2,7 +2,9 @@ using System.Globalization;
 using Avalonia.Threading;
 using StudyStash.App.Platform;
 using StudyStash.App.Services;
+using StudyStash.App.Controls;
 using StudyStash.App.ViewModels;
+using StudyStash.App.ViewModels.Kit;
 using StudyStash.Core;
 using StudyStash.Core.Calendar;
 
@@ -32,6 +34,13 @@ public static partial class Shell
     /// or of <paramref name="forEvent"/> (its title, its folder). <paramref name="openPage"/> opens its page in the
     /// library window. False when it couldn't start, which a notice or a toast has said why.
     /// </summary>
+    /// <summary>Asks over the library window, which comes up first when only the menu bar's panel is showing.</summary>
+    static Task<bool> AskAsync(ConfirmAsk ask)
+    {
+        if (ConfirmLayer.Pick() is null) ShowLibrary();
+        return library.Confirmer.AskAsync(ask);
+    }
+
     static Task<bool> StartRecordingAsync(string className, CalendarEvent? forEvent, bool openPage) =>
         BeginAsync(() => host.RecordAsync(className, forEvent), openPage);
 
@@ -50,12 +59,12 @@ public static partial class Shell
                 return;
             }
             string now = live.Title.Length > 0 ? live.Title : live.ClassName.Length > 0 ? ClassNames.Display(live.ClassName) : "this recording";
-            library.Confirming = new ConfirmAsk($"Stop recording {now} and keep recording this one?",
-                SavedSoFar, "Stop and switch", () =>
-                {
-                    StopRecording(stay: true);
-                    Run(() => BeginAsync(() => host.ContinueAsync(id, title), openPage: true), "Begin");
-                });
+            Run(async () =>
+            {
+                if (!await AskAsync(new ConfirmAsk($"Stop recording {now} and keep recording this one?", SavedSoFar, "Stop and switch", "Keep recording"))) return;
+                StopRecording(stay: true);
+                await BeginAsync(() => host.ContinueAsync(id, title), openPage: true);
+            }, "ContinueRecording");
             return;
         }
         Run(() => BeginAsync(() => host.ContinueAsync(id, title), openPage: true), "Begin");
@@ -161,12 +170,9 @@ public static partial class Shell
                 return;
             }
             string now = live.Title.Length > 0 ? live.Title : live.ClassName.Length > 0 ? ClassNames.Display(live.ClassName) : "this recording";
-            library.Confirming = new ConfirmAsk($"Stop recording {now} and start {pick.Title}?",
-                SavedSoFar, "Stop and start", () =>
-                {
-                    StopRecording(stay: true);
-                    Run(() => StartRecordingAsync("", pick, openPage: true), "StartRecording");
-                });
+            if (!await AskAsync(new ConfirmAsk($"Stop recording {now} and start {pick.Title}?", SavedSoFar, "Stop and start", "Keep recording"))) return;
+            StopRecording(stay: true);
+            await StartRecordingAsync("", pick, openPage: true);
             return;
         }
         await StartRecordingAsync("", pick, openPage: true);

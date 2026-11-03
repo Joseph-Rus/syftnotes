@@ -4,6 +4,7 @@ using System.Text.Json.Nodes;
 using Avalonia.Media;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using StudyStash.App.ViewModels.Kit;
 using StudyStash.Core;
 
 namespace StudyStash.App.ViewModels;
@@ -105,6 +106,9 @@ public sealed partial class LibrarySettingsModel : ObservableObject
     static readonly double[] Confidences = [0.4, 0.5, 0.6, 0.7, 0.8, 0.9];
 
     /// <summary>Over the library <paramref name="connect"/> reaches (null: no library set up yet).</summary>
+    /// <summary>Asks "Rename these classes?" and the like over the window (the app's; a test gives its own).</summary>
+    public IConfirm Confirmer { get; init; } = Confirm.Default;
+
     public LibrarySettingsModel(Func<Call?> connect)
     {
         this.connect = connect;
@@ -215,8 +219,6 @@ public sealed partial class LibrarySettingsModel : ObservableObject
     public ObservableCollection<CourseNameRow> CourseNames { get; } = [];
     /// <summary>Why they can't be renamed right now ("Canvas is syncing…"), or null.</summary>
     [ObservableProperty] public partial string? CourseNamesBlocked { get; set; }
-    /// <summary>The preview is open: the list, and Cancel / Rename.</summary>
-    [ObservableProperty] public partial bool ConfirmingCourseNames { get; set; }
     [ObservableProperty] public partial bool RenamingClasses { get; set; }
     /// <summary>The library renamed classes (old → new): this computer's waiting lectures follow.</summary>
     public Action<IReadOnlyList<(string From, string To)>>? ClassesRenamed { get; set; }
@@ -244,7 +246,6 @@ public sealed partial class LibrarySettingsModel : ObservableObject
     [ObservableProperty] public partial IReadOnlyList<SettingChoice> SortEngineChoices { get; set; } = [];
     [ObservableProperty] public partial string Terminal { get; set; } = "";
     [ObservableProperty] public partial int Lectures { get; set; }
-    [ObservableProperty] public partial bool ConfirmingRewrite { get; set; }
     public IReadOnlyList<SettingChoice> ConfidenceChoices { get; }
 
     public string WriteNotesSub => Writer.Length > 0 ? $"With {Writer}, after each lecture" : "After each lecture";
@@ -745,7 +746,6 @@ public sealed partial class LibrarySettingsModel : ObservableObject
         CourseNames.Clear();
         foreach (var r in rows) CourseNames.Add(r);
         CourseNamesBlocked = Str(names?["blocked"]) is { Length: > 0 } why ? why : null;
-        if (rows.Count == 0) ConfirmingCourseNames = false;
         foreach (string p in new[] { nameof(HasCourseNames), nameof(CanUseCourseNames), nameof(CourseNamesSub), nameof(RenameLabel) }) OnPropertyChanged(p);
     }
 
@@ -757,15 +757,16 @@ public sealed partial class LibrarySettingsModel : ObservableObject
 
     partial void OnRenamingClassesChanged(bool value) => OnPropertyChanged(nameof(CanUseCourseNames));
 
-    [RelayCommand] void AskUseCourseNames() => ConfirmingCourseNames = true;
-
-    [RelayCommand] void CancelUseCourseNames() => ConfirmingCourseNames = false;
-
-    /// <summary>Rename every class in the preview to its Canvas course name, on the library.</summary>
+    /// <summary>Rename every class to its Canvas course name, on the library, after a preview that lists each one.</summary>
     [RelayCommand]
     async Task UseCourseNames()
     {
         if (connect() is not { } call || !CanUseCourseNames) return;
+        var preview = new ConfirmAsk("Use Canvas course names?", CourseNamesSub, RenameLabel, "Cancel")
+        {
+            Lines = [.. CourseNames.Select(r => $"{r.From} becomes {r.To} · {r.Meta}")],
+        };
+        if (!await Confirmer.AskAsync(preview)) return;
         RenamingClasses = true;
         try
         {
@@ -781,7 +782,6 @@ public sealed partial class LibrarySettingsModel : ObservableObject
             Say = renamed.Count == 0 ? (problem.Length > 0 ? problem : "Nothing was renamed.")
                 : $"Renamed {(renamed.Count == 1 ? "1 class" : $"{renamed.Count} classes")} to {(renamed.Count == 1 ? "its Canvas course name" : "their Canvas course names")}; {(moved == 1 ? "1 lecture" : $"{moved} lectures")} moved with them."
                   + (problem.Length > 0 ? " " + problem : "");
-            ConfirmingCourseNames = false;
             if (renamed.Count > 0)
             {
                 ClassesRenamed?.Invoke(renamed);
@@ -837,14 +837,12 @@ public sealed partial class LibrarySettingsModel : ObservableObject
         _ = SendAsync(new JsonObject { ["notes"] = new JsonObject { ["min_confidence"] = Confidence } }, "The confidence");
     }
 
-    [RelayCommand] void AskRewriteAll() => ConfirmingRewrite = true;
-
-    [RelayCommand] void CancelRewriteAll() => ConfirmingRewrite = false;
-
+    /// <summary>Rewrite every lecture's summary, after asking: the old ones are replaced, and it takes a while.</summary>
     [RelayCommand]
     async Task RewriteAll()
     {
-        ConfirmingRewrite = false;
+        if (!await Confirmer.AskAsync(new ConfirmAsk($"{RewriteTitle}?",
+                "Each summary is written again with the AI you use now. Useful after switching AIs. It can take a while.", "Rewrite them all"))) return;
         if (connect() is not { } call) return;
         try
         {
