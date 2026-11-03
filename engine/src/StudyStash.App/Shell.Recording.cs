@@ -24,7 +24,7 @@ public static partial class Shell
     static void ToggleRecording()
     {
         if (host.Recorder.Current is not null) StopRecording();
-        else _ = StartRecordingAsync(RecordClass(), null, openPage: mainWindow is { IsVisible: true, IsActive: true });
+        else Run(() => StartRecordingAsync(RecordClass(), null, openPage: mainWindow is { IsVisible: true, IsActive: true }), "StartRecording");
     }
 
     /// <summary>
@@ -54,11 +54,11 @@ public static partial class Shell
                 SavedSoFar, "Stop and switch", () =>
                 {
                     StopRecording(stay: true);
-                    _ = BeginAsync(() => host.ContinueAsync(id, title), openPage: true);
+                    Run(() => BeginAsync(() => host.ContinueAsync(id, title), openPage: true), "Begin");
                 });
             return;
         }
-        _ = BeginAsync(() => host.ContinueAsync(id, title), openPage: true);
+        Run(() => BeginAsync(() => host.ContinueAsync(id, title), openPage: true), "Begin");
     }
 
     static async Task<bool> BeginAsync(Func<Task<RecordStart>> begin, bool openPage)
@@ -141,7 +141,7 @@ public static partial class Shell
         {
             // It's gone from the calendar since the list was drawn.
             UpdateComingUp();
-            if (overviewOf == "") _ = ShowHomeAsync();
+            if (overviewOf == "") Run(() => ShowHomeAsync(), "ShowHome");
             return;
         }
         // Not started yet: its note opens, not recording. Recording starts on its own when the event does.
@@ -165,7 +165,7 @@ public static partial class Shell
                 SavedSoFar, "Stop and start", () =>
                 {
                     StopRecording(stay: true);
-                    _ = StartRecordingAsync("", pick, openPage: true);
+                    Run(() => StartRecordingAsync("", pick, openPage: true), "StartRecording");
                 });
             return;
         }
@@ -228,7 +228,7 @@ public static partial class Shell
         bool showing = library.Note is { Planned: true } p && p.Id == due.Id && library.ShowNotePage && mainWindow?.IsVisible == true;
         string name = WorkingTitle(due);
         Program.Log($"[calendar] {due.Id}: its event started: recording");
-        _ = StartPlanAsync(due.Id, name, showing);
+        Run(() => StartPlanAsync(due.Id, name, showing), "StartPlan");
     }
 
     static async Task StartPlanAsync(string id, string name, bool openPage)

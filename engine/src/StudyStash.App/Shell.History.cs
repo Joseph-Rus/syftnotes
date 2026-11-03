@@ -57,7 +57,7 @@ public static partial class Shell
         from.RemoveAt(from.Count - 1);
         to.Add(Here());
         UpdateHistory();
-        _ = BackToAsync(place);
+        Run(() => BackToAsync(place), "BackTo");
     }
 
     static async Task BackToAsync(Place place)
@@ -79,13 +79,13 @@ public static partial class Shell
         LeavePage();
         if (backPlaces.Count == 0)
         {
-            _ = ShowHomeAsync();
+            Run(() => ShowHomeAsync(), "ShowHome");
             return;
         }
         var place = backPlaces[^1];
         backPlaces.RemoveAt(backPlaces.Count - 1);
         UpdateHistory();
-        _ = BackToAsync(place);
+        Run(() => BackToAsync(place), "BackTo");
     }
 
     static async Task GoToAsync(Place place)

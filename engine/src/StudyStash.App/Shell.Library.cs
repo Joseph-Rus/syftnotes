@@ -44,9 +44,9 @@ public static partial class Shell
             if (quitting || mainWindow?.IsVisible != true) return;
             // Back after being away (the window opened before the library was up, say): its classes too, not just the
             // page showing, which may be "Can't reach your library" with no classes beside it.
-            _ = all ? LoadLibraryAsync() : ReshowAsync();
+            Run(all ? LoadLibraryAsync : ReshowAsync, all ? "LoadLibrary" : "Reshow");
             // The page showing has its new note; the sidebar's counts beside it follow (a whole load does its own).
-            if (!all) _ = RefreshCountsAsync();
+            if (!all) Run(() => RefreshCountsAsync(), "RefreshCounts");
         }, TimeSpan.FromSeconds(1));
     }
 
@@ -69,7 +69,7 @@ public static partial class Shell
     static void LibraryClassesChanged()
     {
         if (quitting) return;
-        _ = mainWindow?.IsVisible == true ? LoadLibraryAsync() : host.CheckLibraryAsync();
+        Run(() => mainWindow?.IsVisible == true ? LoadLibraryAsync() : host.CheckLibraryAsync(), "LibraryClassesChanged");
     }
 
     static string S(JsonNode? n) => n is JsonValue v && v.TryGetValue(out string? s) ? s ?? "" : "";
@@ -127,7 +127,7 @@ public static partial class Shell
             {
                 var item = new ClassItem { Name = name, Dot = Skin.ClassDot(color), Count = count, Group = group, Section = first && group.Length > 0 ? group : "" };
                 item.MoveChoices = [.. new[] { "" }.Concat(offered).Where(g => g != group)
-                    .Select(g => new FolderChoice(g.Length == 0 ? "Classes" : g, new CommunityToolkit.Mvvm.Input.RelayCommand(() => _ = MoveToFolderAsync(name, g)))),
+                    .Select(g => new FolderChoice(g.Length == 0 ? "Classes" : g, new CommunityToolkit.Mvvm.Input.RelayCommand(() => Run(() => MoveToFolderAsync(name, g), "MoveToFolder")))),
                     new FolderChoice("New group…", new CommunityToolkit.Mvvm.Input.RelayCommand(() => library.NamingFolder = new NewFolderAsk(name)))];
                 library.Classes.Add(item);
                 first = false;
@@ -171,7 +171,7 @@ public static partial class Shell
         }
         library.Empty = null;
         AskForSupportIfDue(host.Classes().Sum(c => c.Lectures) + unsorted);
-        _ = HearNotesWriterAsync();
+        Run(() => HearNotesWriterAsync(), "HearNotesWriter");
         await ReshowAsync();
     }
 
@@ -337,7 +337,7 @@ public static partial class Shell
             };
             free.Saved += () => Avalonia.Threading.Dispatcher.UIThread.Post(() =>
             {
-                if (openLecture == id) _ = ShowLectureAsync(id, library.Note?.ShowTranscript == true);
+                if (openLecture == id) Run(() => ShowLectureAsync(id, library.Note?.ShowTranscript == true), "ShowLecture");
             });
         }
         free.HasNotes = has;
@@ -512,7 +512,7 @@ public static partial class Shell
                 notes.NotesChanged += () => Avalonia.Threading.Dispatcher.UIThread.Post(() =>
                 {
                     KeepOwnNotes(note.Id, made);
-                    if (openLecture == note.Id) _ = ShowLectureAsync(note.Id, library.Note?.ShowTranscript == true);
+                    if (openLecture == note.Id) Run(() => ShowLectureAsync(note.Id, library.Note?.ShowTranscript == true), "ShowLecture");
                 });
             }
         }
@@ -522,10 +522,10 @@ public static partial class Shell
             LeaveNotes(before);
         }
         // (With no notes written for it, the notes are what the student typed: the library's own are none.)
-        if (fresh) _ = notes!.Load(note.Id, note.Markdown, S(l["notes_model"]), S(l["updated"]), typed: note.Mine);
+        if (fresh) Run(() => notes!.Load(note.Id, note.Markdown, S(l["notes_model"]), S(l["updated"]), typed: note.Mine), "notes.Load");
         // Typing that was in this lecture's editor when the app last quit goes back into it.
         if (fresh && EarlierDrafts().Remove(note.Id, out var draft)) notes!.RestoreEdit(draft.From, draft.Text);
-        else if (notes is not null && !ReferenceEquals(before, notes)) _ = notes.Refresh(); // kept: the library says where they stand now
+        else if (notes is not null && !ReferenceEquals(before, notes)) Run(() => notes.Refresh(), "notes.Refresh"); // kept: the library says where they stand now
         // The same note read again keeps its ask bar, with what's typed and answered in it.
         if (library.Ask is { } kept && kept.LectureId == note.Id && kept.Live is null)
         {
@@ -548,11 +548,11 @@ public static partial class Shell
         library.Ask = ask;
         // What an answer here quotes is highlighted in these notes.
         if (library.Notes is { } these) these.Highlights = ask.Highlights;
-        _ = ask.Load();
+        Run(() => ask.Load(), "ask.Load");
     }
 
     /// <summary>A kept Ask conversation deleted from a Chats list: the toast says which, with Undo.</summary>
-    static void ChatDeleted(string title, Func<Task> undo) => Toast("Chat deleted", title, "Undo", () => _ = undo());
+    static void ChatDeleted(string title, Func<Task> undo) => Toast("Chat deleted", title, "Undo", () => Run(() => undo(), "undo"));
 
     /// <summary>Notes saved by hand that are all the student's own (what they typed while it recorded, changed or added
     /// to since): the recording on this computer keeps them as what the student typed, so Keep recording starts from
@@ -688,7 +688,7 @@ public static partial class Shell
         bool loaded = mainWindow?.IsVisible == true && host.Library == LibraryState.Connected && library.Classes.Count > 0;
         ShowLibrary();
         // The window is already up and read: the note opens now, not after the whole window is read again.
-        if (loaded || transcript) _ = ShowLectureAsync(id, transcript);
+        if (loaded || transcript) Run(() => ShowLectureAsync(id, transcript), "ShowLecture");
     }
 
     /// <summary>The ••• menu: open the class in a terminal with the AI (when the library is on this computer), the
@@ -707,9 +707,17 @@ public static partial class Shell
                 {
                     Toast("Syft Notes", await lib.TerminalAsync(cls), null, null);
                 }
-                catch (Exception e) when (e is HttpRequestException or TaskCanceledException or LibraryRefusedException)
+                catch (LibraryRefusedException e)
                 {
+                    // The library's own words for why it won't.
+                    Program.Log($"[library] couldn't open {cls ?? "the library"} in Claude Code: {e.Message}");
                     Toast("Couldn't open it", e.Message, null, null);
+                }
+                catch (Exception e) when (e is HttpRequestException or TaskCanceledException)
+                {
+                    // The system's words for a network error go to the log; the student gets plain ones.
+                    Program.Log($"[library] couldn't open {cls ?? "the library"} in Claude Code: {e.Message}");
+                    Toast("Couldn't open it", "Can't reach your library right now.", null, null);
                 }
             };
             menu.Items.Add(term);
@@ -756,13 +764,13 @@ public static partial class Shell
             {
                 if (l.State is LectureState.Sending or LectureState.Writing) l.State = LectureState.Filed;
             });
-            _ = host.CheckLibraryAsync();
+            Run(() => host.CheckLibraryAsync(), "host.CheckLibrary");
             return true;
         }
         catch (Exception e) when (e is HttpRequestException or TaskCanceledException or LibraryRefusedException)
         {
             Toast("Couldn't delete it", e.Message, null, null);
-            _ = LoadLibraryAsync();
+            Run(() => LoadLibraryAsync(), "LoadLibrary");
             return false;
         }
     }
@@ -804,10 +812,10 @@ public static partial class Shell
         if (library.Note is not { } note || mainWindow?.Content is not Control anchor || mainWindow is null || host.Remote() is not { } lib) return;
         string? cls = note.HasClass ? note.ClassName : null;
         DownloadMenu.Build(cls, host.Settings.DownloadTranscripts,
-            download: () => _ = NotesDownload.LectureAsync(mainWindow, lib, note.Id, NoteExport.SaveName(note.Title), host.Settings.DownloadTranscripts, MermaidSvg()),
-            downloadPdf: () => _ = NotesDownload.LecturePdfAsync(mainWindow, lib, note.Id, NoteExport.SaveName(note.Title, ".pdf"), host.Settings.DownloadTranscripts,
-                note.Dot is ISolidColorBrush dot ? dot.Color : Colors.Gray),
-            downloadClass: () => _ = NotesDownload.ClassAsync(mainWindow, lib, cls!, host.Settings.DownloadTranscripts, MermaidSvg()),
+            download: () => Run(() => NotesDownload.LectureAsync(mainWindow, lib, note.Id, NoteExport.SaveName(note.Title), host.Settings.DownloadTranscripts, MermaidSvg()), "NotesDownload.Lecture"),
+            downloadPdf: () => Run(() => NotesDownload.LecturePdfAsync(mainWindow, lib, note.Id, NoteExport.SaveName(note.Title, ".pdf"), host.Settings.DownloadTranscripts,
+                note.Dot is ISolidColorBrush dot ? dot.Color : Colors.Gray), "NotesDownload.LecturePdf"),
+            downloadClass: () => Run(() => NotesDownload.ClassAsync(mainWindow, lib, cls!, host.Settings.DownloadTranscripts, MermaidSvg()), "NotesDownload.Class"),
             toggleTranscripts: () => host.Save(s => s.DownloadTranscripts = !s.DownloadTranscripts)).Open(anchor);
     }
 
@@ -871,7 +879,7 @@ public static partial class Shell
                     Run = () =>
                     {
                         quickWindow?.Hide();
-                        _ = CaptureAsync(query.Trim());
+                        Run(() => CaptureAsync(query.Trim()), "Capture");
                     },
                 });
         }
@@ -953,7 +961,7 @@ public static partial class Shell
     {
         quickWindow?.Hide();
         if (Canvas().Client is not { } client) return;
-        _ = Task.Run(async () =>
+        Run(() => Task.Run(async () =>
         {
             try
             {
@@ -962,7 +970,7 @@ public static partial class Shell
             catch (Exception e) when (e is HttpRequestException or TaskCanceledException or CanvasLibraryException or System.Text.Json.JsonException)
             {
             }
-        });
+        }), "SyncCanvas");
         Toast("Syncing Canvas", $"On {CanvasWords.Browser(canvasWatch?.State)}'s next check, within a minute.", null, null);
     }
 

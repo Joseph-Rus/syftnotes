@@ -49,7 +49,7 @@ public static partial class Shell
         {
             done = true;
             w.Close();
-            _ = UseForNotesAsync(ready, lectureId);
+            Run(() => UseForNotesAsync(ready, lectureId), "UseForNotes");
         };
         guided.PropertyChanged += (_, e) =>
         {
@@ -77,7 +77,7 @@ public static partial class Shell
                 // (the lecture says when).
                 done = true;
                 w.Close();
-                _ = UseForNotesAsync("gemini", lectureId);
+                Run(() => UseForNotesAsync("gemini", lectureId), "UseForNotes");
             }
         };
         w.Closed += (_, _) =>
@@ -91,7 +91,7 @@ public static partial class Shell
         w.Show();
         UpdateDock();
         w.Activate();
-        _ = guided.GetReadyForNotesAsync(engine);
+        Run(() => guided.GetReadyForNotesAsync(engine), "guided.GetReadyForNotes");
     }
 
     /// <summary>
@@ -106,7 +106,7 @@ public static partial class Shell
             Toast("Your library didn't answer", "Nothing changed. Try again in a moment.", null, null);
             return;
         }
-        if (lectureId is not null && openLecture == lectureId) _ = ShowLectureAsync(lectureId, library.Note?.ShowTranscript == true);
+        if (lectureId is not null && openLecture == lectureId) Run(() => ShowLectureAsync(lectureId, library.Note?.ShowTranscript == true), "ShowLecture");
         else RequestRefresh(); // Home's "Notes need an AI" goes
     }
 

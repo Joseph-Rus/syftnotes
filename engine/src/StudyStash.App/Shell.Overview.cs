@@ -88,7 +88,7 @@ public static partial class Shell
             if (homeUnsorted == unsorted) return;
             homeUnsorted = unsorted;
             homeShown = OverviewModel.PageSize;
-            _ = ShowHomeAsync();
+            Run(() => ShowHomeAsync(), "ShowHome");
         };
         // The next page: the notes from before the last one showing.
         home.OnMore = async () =>
@@ -106,7 +106,7 @@ public static partial class Shell
         Equip(home, null);
         ClearPane();
         library.Overview = home;
-        _ = CountStudyAsync();
+        Run(() => CountStudyAsync(), "CountStudy");
     }
 
     // --- a folder's page ----------------------------------------------------------------------------------------------
@@ -137,14 +137,14 @@ public static partial class Shell
         page.AddLinks(facts, row is null ? null : tab =>
         {
             Remember();
-            _ = ShowCanvasListsAsync(name, tab);
+            Run(() => ShowCanvasListsAsync(name, tab), "ShowCanvasLists");
         });
-        page.SetFolders(LinkedFolders(lib, name, info), host.Settings.LibraryHere ? () => _ = LinkFolderAsync(lib, name) : null);
+        page.SetFolders(LinkedFolders(lib, name, info), host.Settings.LibraryHere ? () => Run(() => LinkFolderAsync(lib, name), "LinkFolder") : null);
         page.OnDelete = note => library.DeleteCommand.Execute(note);
         Equip(page, name);
         var files = new AttachmentsModel(lib, name, null);
         page.Files = files;
-        _ = files.LoadAsync();
+        Run(() => files.LoadAsync(), "files.Load");
         ClearPane();
         library.Overview = page;
     }
@@ -286,7 +286,7 @@ public static partial class Shell
             {
                 Remember();
                 library.Opened();
-                _ = ShowAssignmentAsync(cls, id);
+                Run(() => ShowAssignmentAsync(cls, id), "ShowAssignment");
             },
             OnReader = reader =>
             {
@@ -371,7 +371,7 @@ public static partial class Shell
             page.OnRecord = () =>
             {
                 if (host.Recorder.Current is not null) OpenRecording();
-                else _ = StartRecordingAsync(cls ?? "", null, openPage: true);
+                else Run(() => StartRecordingAsync(cls ?? "", null, openPage: true), "StartRecording");
             };
             page.OnStop = () => StopRecording();
         }
@@ -399,7 +399,7 @@ public static partial class Shell
         else ask.OnlyScopes("class", "all");
         ask.NameScopes(page.Noun, cls is null ? null : ClassNames.Display(cls));
         page.Ask = ask;
-        _ = ask.Load();
+        Run(() => ask.Load(), "ask.Load");
     }
 
     /// <summary>The folders linked to a class, as the library's overview lists them.</summary>
@@ -409,7 +409,7 @@ public static partial class Shell
             string path = S(f["path"]);
             return new LinkedFolder(S(f["name"]), path, f["here"]?.GetValue<bool>() ?? true,
                 () => Dialogs.OpenUrl(path),
-                () => _ = ChangeFolderAsync(lib, cls, path, remove: true));
+                () => Run(() => ChangeFolderAsync(lib, cls, path, remove: true), "ChangeFolder"));
         });
 
     /// <summary>Link a folder: the folder dialog, then the library lists it on the class's page.</summary>
@@ -552,25 +552,25 @@ public static partial class Shell
             OpenClass = cls =>
             {
                 Remember();
-                _ = ShowFolderAsync(cls);
+                Run(() => ShowFolderAsync(cls), "ShowFolder");
             },
             OpenLecture = (cls, id) =>
             {
                 Remember();
-                _ = ShowLectureAsync(id);
+                Run(() => ShowLectureAsync(id), "ShowLecture");
             },
             OpenAssignment = (cls, id) =>
             {
                 Remember();
-                _ = ShowAssignmentPageAsync(cls, id);
+                Run(() => ShowAssignmentPageAsync(cls, id), "ShowAssignmentPage");
             },
             OpenDue = cls =>
             {
                 Remember();
                 dueOnly = cls;
-                _ = ShowDuePageAsync();
+                Run(() => ShowDuePageAsync(), "ShowDuePage");
             },
-            RecordEvent = id => _ = RecordEventAsync(id),
+            RecordEvent = id => Run(() => RecordEventAsync(id), "RecordEvent"),
         };
     }
 
@@ -583,8 +583,8 @@ public static partial class Shell
         if (host.Remote() is null) return null;
         return new FolderPickerModel(host.Classes().Select(c => (c.Name, host.GroupOf(c.Name), (IBrush)Skin.ClassDot(c.Color), c.Lectures)), folder)
         {
-            OnPick = to => _ = MoveNoteAsync(id, folder, to, say: true),
-            OnNew = name => _ = MoveToNewFolderAsync(id, folder, name),
+            OnPick = to => Run(() => MoveNoteAsync(id, folder, to, say: true), "MoveNote"),
+            OnNew = name => Run(() => MoveToNewFolderAsync(id, folder, name), "MoveToNewFolder"),
         };
     }
 
@@ -617,7 +617,7 @@ public static partial class Shell
         }
         else if (library.Overview is { IsFolder: true } page && page.ClassName != folder) page.Remove(id);
         if (openLecture == id && overviewOf is null) await ShowLectureAsync(id, library.Note?.ShowTranscript == true);
-        _ = RefreshCountsAsync();
+        Run(() => RefreshCountsAsync(), "RefreshCounts");
         if (say) library.SayMoved(new NoteMove(id, from, folder));
     }
 
