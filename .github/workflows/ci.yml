@@ -900,7 +900,8 @@ jobs:
   linux-app:
     name: Linux app (${{ matrix.rid }}, self-test, tarball)
     needs: [version]
-    if: needs.version.outputs.tested != 'true' || needs.version.outputs.installers == 'true'
+    # As the Mac and Windows apps: a release that reuses a rehearsal's installers doesn't build them again.
+    if: needs.version.outputs.tested != 'true' || (needs.version.outputs.installers == 'true' && needs.version.outputs.reuse_run == '')
     strategy:
       fail-fast: false
       matrix:
@@ -1022,10 +1023,12 @@ jobs:
   # "Connect your laptop" links point at them), and their checksums. A version already tagged is never published
   # again. The installers are the ones this run built and proved, or the ones a run by hand built and proved on
   # exactly this code. A run by hand goes through all of it but the last step, and publishes nothing.
+  # Every job it needs must have passed or been skipped: a job that runs out of time ends "cancelled", not "failed", so
+  # !failure() alone let a release through after Windows' Core tests timed out (run 41495152314).
   release:
     name: publish release
-    needs: [version, engine, mac-app, mac-one-computer, mac-intel, windows-app, linux-app]
-    if: ${{ !cancelled() && !failure() && needs.version.outputs.installers == 'true' && (needs.version.outputs.reuse_run != '' || (needs.mac-app.result == 'success' && needs.mac-intel.result == 'success' && needs.windows-app.result == 'success' && needs.linux-app.result == 'success')) }}
+    needs: [version, connections, engine, mac-app, mac-one-computer, mac-intel, windows-app, linux-app]
+    if: ${{ !cancelled() && !contains(needs.*.result, 'failure') && !contains(needs.*.result, 'cancelled') && needs.version.outputs.installers == 'true' && (needs.version.outputs.reuse_run != '' || (needs.mac-app.result == 'success' && needs.mac-intel.result == 'success' && needs.windows-app.result == 'success' && needs.linux-app.result == 'success')) }}
     timeout-minutes: 10
     runs-on: ubuntu-latest
     permissions:
