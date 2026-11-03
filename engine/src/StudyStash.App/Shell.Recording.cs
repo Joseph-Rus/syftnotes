@@ -29,18 +29,19 @@ public static partial class Shell
         else Run(() => StartRecordingAsync(RecordClass(), null, openPage: mainWindow is { IsVisible: true, IsActive: true }), "StartRecording");
     }
 
-    /// <summary>
-    /// Starts a recording: into <paramref name="className"/> ("" lets the event that's on, or the library, say where),
-    /// or of <paramref name="forEvent"/> (its title, its folder). <paramref name="openPage"/> opens its page in the
-    /// library window. False when it couldn't start, which a notice or a toast has said why.
-    /// </summary>
-    /// <summary>Asks over the library window, which comes up first when only the menu bar's panel is showing.</summary>
+    /// <summary>Asks over the library window, which comes up first when only the menu bar's panel is showing (and is
+    /// brought to the front when it was open behind another app: the question itself raises its window).</summary>
     static Task<bool> AskAsync(ConfirmAsk ask)
     {
         if (ConfirmLayer.Pick() is null) ShowLibrary();
         return library.Confirmer.AskAsync(ask);
     }
 
+    /// <summary>
+    /// Starts a recording: into <paramref name="className"/> ("" lets the event that's on, or the library, say where),
+    /// or of <paramref name="forEvent"/> (its title, its folder). <paramref name="openPage"/> opens its page in the
+    /// library window. False when it couldn't start, which a notice or a toast has said why.
+    /// </summary>
     static Task<bool> StartRecordingAsync(string className, CalendarEvent? forEvent, bool openPage) =>
         BeginAsync(() => host.RecordAsync(className, forEvent), openPage);
 

@@ -62,6 +62,25 @@ public class ConfirmTests
     }
 
     [AvaloniaFact]
+    public async Task A_question_over_a_window_behind_another_brings_it_to_the_front()
+    {
+        var behind = ShownWindow();
+        var front = ShownWindow();
+        front.Activate();
+        Assert.False(behind.IsActive);
+
+        var asking = ConfirmLayer.For(behind)!.AskAsync(new ConfirmAsk("Delete this lecture?", "", "Delete"));
+        var dialog = await DialogShowingAsync(behind);
+
+        Assert.True(behind.IsActive); // where the student can see the question
+        behind.KeyPressQwerty(PhysicalKey.Escape, RawInputModifiers.None);
+        Assert.False(await asking);
+        Assert.NotNull(dialog);
+        front.Close();
+        behind.Close();
+    }
+
+    [AvaloniaFact]
     public async Task Yes_goes_ahead_once_even_when_pressed_twice()
     {
         var window = ShownWindow();

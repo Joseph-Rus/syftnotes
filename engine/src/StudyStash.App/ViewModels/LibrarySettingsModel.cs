@@ -105,10 +105,10 @@ public sealed partial class LibrarySettingsModel : ObservableObject
 
     static readonly double[] Confidences = [0.4, 0.5, 0.6, 0.7, 0.8, 0.9];
 
-    /// <summary>Over the library <paramref name="connect"/> reaches (null: no library set up yet).</summary>
     /// <summary>Asks "Rename these classes?" and the like over the window (the app's; a test gives its own).</summary>
     public IConfirm Confirmer { get; init; } = Confirm.Default;
 
+    /// <summary>Over the library <paramref name="connect"/> reaches (null: no library set up yet).</summary>
     public LibrarySettingsModel(Func<Call?> connect)
     {
         this.connect = connect;
