@@ -194,7 +194,7 @@ so on the run's summary. Some of a group's secrets but not all of them fails the
 | Mac installer | ad hoc signed, as now | **Developer ID**, hardened runtime, secure timestamp, notarized, stapled (the app and the DMG) |
 | Windows installer | unsigned, as now | the app's unsigned exe and dlls, **Setup.exe and the uninstaller** signed |
 
-- Forks and pull requests get no secrets from GitHub, and CI doesn't run on pull requests at all.
+- Forks and pull requests get no secrets from GitHub, and a pull request's CI run is the Linux tests alone: nothing it runs signs.
 - Signing is a **step of its own after the build** (`macos/sign-release.sh`, `windows/sign-release.ps1`), so nothing
   the build runs (npm's packages, the .NET restore) ever sees a key, which is where a stolen secret would otherwise
   come from. Each secret reaches only the step that uses it, nothing prints one, and the Mac's keychain, the notary
