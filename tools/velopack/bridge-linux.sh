@@ -90,7 +90,9 @@ say "FUSE: the AppImage $(grep -q 'needs FUSE' "$LOGS/app.log" && echo "said it 
 [ "$("$IMAGE" version | tail -n 1)" = "$V1" ]; check $? "$IMAGE runs $V1"
 [ "$(readlink "$HOME/.local/bin/syft-notes")" = "$IMAGE" ]; check $? "syft-notes on the PATH is the AppImage"
 grep -qF "$IMAGE" "$AUTOSTART/com.study-stash.app.desktop"; check $? "start at login opens the AppImage"
-grep -qF "$IMAGE" "$AUTOSTART/syft-notes-background.desktop" || ls "$HOME/.config/systemd/user/"syft-notes-background*.service > /dev/null 2>&1; check $? "the background library runs from the AppImage"
+# The background library: registered again from the AppImage, or taken away by the app itself (never turned on in
+# this test's settings); never left naming the old program.
+! grep -qsF "$OLD_PROGRAM" "$AUTOSTART/syft-notes-background.desktop" "$HOME/.config/systemd/user/"syft-notes-background*.service; check $? "the background library's registration doesn't name the tarball's program"
 grep -qF "$IMAGE" "$CLAUDE"; check $? "Claude Code's connection starts the AppImage"
 sha256sum -c "$RES/markers.sha256" > /dev/null; check $? "settings (~/.study-stash) and lectures (Documents/Study Stash) are untouched"
 python3 -I "$ROOT/tools/velopack/wait-port.py" 8787 30 || { "$IMAGE" serve > "$RES/serve.log" 2>&1 & python3 -I "$ROOT/tools/velopack/wait-port.py" 8787 120; }

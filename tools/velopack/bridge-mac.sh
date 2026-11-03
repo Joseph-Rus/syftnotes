@@ -109,7 +109,9 @@ grep -h "\[rename\]\|\[moved\]" "$LOGS/app.log" | sed 's/^/  log: /' | tee -a "$
 codesign --verify --deep --strict "$APP"; check $? "Syft Notes.app's signature is valid"
 [ -x "$APP/Contents/MacOS/UpdateMac" ]; check $? "Syft Notes.app is Velopack's bundle (UpdateMac)"
 grep -qF "$PROGRAM" "$AGENTS/com.study-stash.app.plist"; check $? "start at login opens Syft Notes.app"
-grep -qF "$PROGRAM" "$AGENTS/com.study-stash.background.plist"; check $? "the background library runs from Syft Notes.app"
+# The background library: registered again from the new place, or taken away by the app itself (it was never turned
+# on in this test's settings); never left naming the old program.
+! grep -qF "$OLD_PROGRAM" "$AGENTS/com.study-stash.background.plist" 2>/dev/null; check $? "the background library's registration doesn't name Study Stash.app"
 grep -qF "$PROGRAM" "$CODEX"; check $? "ChatGPT's (Codex's) connection starts Syft Notes.app"
 shasum -a 256 -c "$RES/markers.sha256" > /dev/null; check $? "settings (~/.study-stash) and lectures (Documents/Study Stash) are untouched"
 # The background library, registered again from the new place, is what answers; started here if it isn't yet.

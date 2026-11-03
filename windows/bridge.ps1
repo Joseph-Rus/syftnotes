@@ -14,16 +14,34 @@
 # If Velopack's Setup fails, nothing else happens: the old copy opens again as it was. Settings (~\.study-stash),
 # lectures and Documents are never touched. Everything it does goes to -Log.
 #   powershell -NoProfile -ExecutionPolicy Bypass -File bridge.ps1 -Setup <Setup.exe> -WaitPid <pid> -Log <file>
+# Whatever happens, an app opens at the end: the new copy if it's installed, or else the old one (-OldExe), and a move
+# that fails is written to -FailedFile (-Tag), so the app doesn't try it again for a week (Bridge.cs).
 param(
   [Parameter(Mandatory)][string]$Setup,
   [Parameter(Mandatory)][string]$Log,
   [int]$WaitPid = 0,
   [int]$Seconds = 300,
   [string]$InnoKey = "HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall\{6F2C9A51-3B7E-4D28-9C41-8E5A0B7D2F63}_is1",
+  [string]$OldExe = "",
+  [string]$FailedFile = "",
+  [string]$Tag = "",
+  [string]$OpenArgs = "--background",
   [switch]$NoOpen
 )
 $ErrorActionPreference = "Stop"
+# Never in a folder the move deletes: Windows keeps a folder something is working in.
+Set-Location -LiteralPath ([IO.Path]::GetTempPath())
 function Say([string]$Line) { Add-Content -LiteralPath $Log -Value ("{0:yyyy-MM-dd HH:mm:ss} [bridge] {1}" -f (Get-Date), $Line) }
+$new = Join-Path $env:LOCALAPPDATA "SyftNotes"
+$newExe = Join-Path $new "current\StudyStash.exe"
+$moved = $false
+function Finish {
+  if (-not $script:moved -and $FailedFile -and $Tag) { Set-Content -LiteralPath $FailedFile -Value $Tag -ErrorAction SilentlyContinue }
+  if ($NoOpen) { return }
+  $open = if ((Test-Path -LiteralPath $newExe) -and -not (Test-Path -Path $InnoKey)) { $newExe } elseif ($OldExe -and (Test-Path -LiteralPath $OldExe)) { $OldExe } elseif (Test-Path -LiteralPath $newExe) { $newExe } else { $null }
+  if ($open) { Say "opening $open"; Start-Process -FilePath $open -ArgumentList $OpenArgs -WorkingDirectory (Split-Path -Parent $open) } else { Say "no copy of the app to open" }
+}
+try {
 $Shell = New-Object -ComObject WScript.Shell
 function Target([string]$Lnk) { $Shell.CreateShortcut($Lnk).TargetPath }
 # The same path, whatever its letters' case (PowerShell 5.1's String.Replace has no comparison argument).
@@ -31,11 +49,9 @@ function Swap([string]$Text, [string]$Old, [string]$New) { [regex]::Replace($Tex
 function Has([string]$Text, [string]$Part) { $Text -and $Text.IndexOf($Part, [StringComparison]::OrdinalIgnoreCase) -ge 0 }
 
 $inno = Get-ItemProperty -Path $InnoKey -ErrorAction SilentlyContinue
-if (-not $inno) { Say "no Inno Setup install of Syft Notes on this account; nothing to move"; exit 2 }
-$old = $inno.InstallLocation.TrimEnd('\')
+if (-not $inno -or -not $inno.InstallLocation) { throw "no Inno Setup install of Syft Notes on this account; nothing to move" }
+$old = ([string]$inno.InstallLocation).TrimEnd('\')
 $oldExe = Join-Path $old "StudyStash.exe"
-$new = Join-Path $env:LOCALAPPDATA "SyftNotes"
-$newExe = Join-Path $new "current\StudyStash.exe"
 $lnk = Join-Path ([Environment]::GetFolderPath("Programs")) "Syft Notes.lnk"
 $clock = [Diagnostics.Stopwatch]::StartNew()
 Say "moving $old ($($inno.DisplayVersion)) to $new"
@@ -58,10 +74,9 @@ try {
   if ($p.ExitCode -ne 0 -or -not (Test-Path -LiteralPath $newExe)) { throw "Velopack's Setup ended with $($p.ExitCode) and no $newExe (its log: $setupLog)" }
   Say "Velopack's Setup installed $newExe after $([int]$clock.Elapsed.TotalSeconds) s"
 } catch {
-  # Nothing has changed yet: the old copy opens again, as it was, and its next update round tries again.
-  Say "the move didn't start: $($_.Exception.Message); opening the old copy again"
-  if (-not $NoOpen -and (Test-Path -LiteralPath $oldExe)) { Start-Process -FilePath $oldExe -ArgumentList "--background" }
-  exit 1
+  # Nothing has changed yet: the old copy opens again, as it was (Finish, below).
+  Say "the move didn't start: $($_.Exception.Message)"
+  throw
 }
 
 # 3. Run entries and shortcuts that start the old program start the new one.
@@ -108,12 +123,19 @@ if ((Test-Path -LiteralPath $lnk) -and (Has (Target $lnk) $new)) {
   Copy-Item -LiteralPath $lnk -Destination $kept -Force
 }
 
+# From here the new copy is installed and starts the app, whatever else goes wrong.
+$moved = $true
+
 # 5. The Inno uninstaller. unins000.exe starts a copy of itself from the temp folder and ends at once, so what is waited
 # for is the old folder going (on its own change events, with a deadline).
-$uninstaller = ($inno.UninstallString -replace '^"([^"]+)".*$', '$1')
-$u = Start-Process -FilePath $uninstaller -ArgumentList "/VERYSILENT", "/SUPPRESSMSGBOXES", "/NORESTART" -PassThru
-$null = $u.Handle
-if (-not $u.WaitForExit($Seconds * 1000)) { Say "the Inno uninstaller didn't start in $Seconds s" }
+$uninstaller = ([string]$inno.UninstallString -replace '^"([^"]+)".*$', '$1')
+try {
+  $u = Start-Process -FilePath $uninstaller -ArgumentList "/VERYSILENT", "/SUPPRESSMSGBOXES", "/NORESTART" -PassThru -WorkingDirectory ([IO.Path]::GetTempPath())
+  $null = $u.Handle
+  if (-not $u.WaitForExit($Seconds * 1000)) { Say "the Inno uninstaller didn't start in $Seconds s" }
+} catch {
+  Say "couldn't run the Inno uninstaller: $($_.Exception.Message)"
+}
 $watch = Split-Path -Parent $old
 $watcher = New-Object IO.FileSystemWatcher $watch
 $watcher.IncludeSubdirectories = $false
@@ -133,5 +155,12 @@ if (-not (Test-Path -LiteralPath $lnk) -and $kept) {
 }
 if ($kept) { Remove-Item -LiteralPath $kept -Force -ErrorAction SilentlyContinue }
 Say "done in $([int]$clock.Elapsed.TotalSeconds) s"
-if (-not $NoOpen) { Start-Process -FilePath $newExe -ArgumentList "--background" }
+} catch {
+  Say "the move stopped: $($_.Exception.Message)"
+} finally {
+  Finish
+  # Velopack's Setup.exe and this script, downloaded for the move, go (this script is already loaded).
+  Remove-Item -LiteralPath (Split-Path -Parent $Setup) -Recurse -Force -ErrorAction SilentlyContinue
+}
+if (-not $moved) { exit 1 }
 exit 0

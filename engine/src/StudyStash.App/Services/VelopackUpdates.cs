@@ -20,29 +20,25 @@ public static class VelopackUpdates
     /// <summary>The switch that points Velopack at another feed (test helpers only).</summary>
     public const string FeedVariable = "STUDYSTASH_VELOPACK_FEED";
 
-    static UpdateManager? manager;
-    static bool looked;
+    /// <summary>This copy's Velopack, or null when Velopack didn't install it; made once, whichever thread asks first
+    /// (the start-up repair and the updater ask at the same time).</summary>
+    static readonly Lazy<UpdateManager?> manager = new(Make, LazyThreadSafetyMode.ExecutionAndPublication);
 
-    /// <summary>This copy's Velopack, or null when Velopack didn't install it.</summary>
-    static UpdateManager? Manager
+    static UpdateManager? Manager => manager.Value;
+
+    static UpdateManager? Make()
     {
-        get
+        try
         {
-            if (looked) return manager;
-            looked = true;
-            try
-            {
-                // STUDYSTASH_VELOPACK_FEED (test helpers only): a folder of releases served by the bridge test's runner.
-                IUpdateSource source = TestSwitches.Get(FeedVariable) is { Length: > 0 } feed ? new SimpleWebSource(feed) : new GithubSource(Repo, null, false);
-                var m = new UpdateManager(source);
-                manager = m.IsInstalled ? m : null;
-            }
-            catch (Exception e) when (e is InvalidOperationException or IOException or UnauthorizedAccessException or NotSupportedException)
-            {
-                Program.Log("[update] Velopack couldn't read this copy: " + e.Message);
-                manager = null;
-            }
-            return manager;
+            // STUDYSTASH_VELOPACK_FEED (test helpers only): a folder of releases served by the bridge test's runner.
+            IUpdateSource source = TestSwitches.Get(FeedVariable) is { Length: > 0 } feed ? new SimpleWebSource(feed) : new GithubSource(Repo, null, false);
+            var m = new UpdateManager(source);
+            return m.IsInstalled ? m : null;
+        }
+        catch (Exception e) when (e is InvalidOperationException or IOException or UnauthorizedAccessException or NotSupportedException)
+        {
+            Program.Log("[update] Velopack couldn't read this copy: " + e.Message);
+            return null;
         }
     }
 

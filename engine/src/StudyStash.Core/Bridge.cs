@@ -56,10 +56,44 @@ public static class Bridge
     }
 
     /// <summary>Whether <paramref name="release"/> moves this copy over: it's installed the old way, the release
-    /// carries the download for it, and it isn't older than this copy.</summary>
-    public static bool Offers(Release release, UpdateHost host, string? running = null, Architecture? arch = null) =>
+    /// carries the download for it, it isn't older than this copy, and a move to it hasn't failed here in the last
+    /// <see cref="RetryAfter"/> (<see cref="Failed"/>): a move that keeps failing would otherwise download again and
+    /// close the app every round.</summary>
+    public static bool Offers(Release release, UpdateHost host, string? running = null, Architecture? arch = null, string? home = null) =>
         AssetFor(host, arch) is { } asset && release.Assets?.GetValueOrDefault(asset) is { Length: > 0 }
-        && Updates.Compare(release.Version, Updates.ParseVersion(running ?? Engine.Version)) >= 0;
+        && Updates.Compare(release.Version, Updates.ParseVersion(running ?? Engine.Version)) >= 0
+        && !(home is not null && FailedLately(home, release.Tag));
+
+    /// <summary>How long a release whose move failed here is left alone before it's tried again.</summary>
+    public static readonly TimeSpan RetryAfter = TimeSpan.FromDays(7);
+
+    /// <summary>Where a failed move is remembered: the release's tag (the move's script writes it too, windows/bridge.ps1).</summary>
+    public static string FailedFile(string home) => Path.Combine(home, "bridge-failed.txt");
+
+    /// <summary>Remembers that the move to <paramref name="tag"/> failed here.</summary>
+    public static void Failed(string home, string tag)
+    {
+        try
+        {
+            File.WriteAllText(FailedFile(home), tag);
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException)
+        {
+        }
+    }
+
+    static bool FailedLately(string home, string tag)
+    {
+        try
+        {
+            string file = FailedFile(home);
+            return File.Exists(file) && File.ReadAllText(file).Trim() == tag && DateTime.UtcNow - File.GetLastWriteTimeUtc(file) < RetryAfter;
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException)
+        {
+            return false;
+        }
+    }
 
     /// <summary>Downloads the move's file and checks it against the release's SHA256SUMS.txt; null (and said) when
     /// either fails.</summary>
@@ -109,15 +143,26 @@ public static class Bridge
     {
         if (AssetFor(host) is not { } asset) return false;
         log($"Moving to {release.Tag}, installed the new way...");
-        return host.System == "Windows"
-            ? await WindowsAsync(release, home, host, asset, ready, log, pid)
+        var (ok, retry) = host.System == "Windows"
+            ? await WindowsAsync(release, home, host, asset, ready, log, pid, relaunchArgs)
             : await LinuxAsync(release, host, asset, ready, log, pid, relaunchArgs, userHome ?? Py.UserHome(), menu ?? new LinuxMenu());
+        // Put off for a lecture, or a download that didn't come: the next round tries again. Anything else is
+        // remembered, so the move isn't tried again for a week.
+        if (!ok && !retry) Failed(home, release.Tag);
+        return ok;
     }
 
-    static async Task<bool> WindowsAsync(Release release, string home, UpdateHost host, string asset, Func<bool> ready, Action<string> log, int pid)
+    static async Task<(bool Ok, bool Retry)> WindowsAsync(Release release, string home, UpdateHost host, string asset, Func<bool> ready,
+        Action<string> log, int pid, IReadOnlyList<string> relaunchArgs)
     {
+        // The Inno uninstaller the move runs, and its entry: without them there's nothing to move over from.
+        if (!InnoInstalled())
+        {
+            log("This copy's Setup entry is missing, so it can't move to the new installer here.");
+            return (false, false);
+        }
         string dir = Path.Combine(host.TempDir, "Syft Notes move");
-        if (await FetchAsync(release, host, asset, Path.Combine(dir, asset), log) is not { } setup) return false;
+        if (await FetchAsync(release, host, asset, Path.Combine(dir, asset), log) is not { } setup) return (false, true);
         string script = Path.Combine(dir, "bridge.ps1");
         try
         {
@@ -129,28 +174,48 @@ public static class Bridge
         catch (Exception e) when (e is IOException or UnauthorizedAccessException)
         {
             log($"Couldn't get the move ready: {e.Message}");
-            return false;
+            return (false, false);
         }
-        // The last moment to put it off: the script closes nothing itself, but once it starts the old copy is uninstalled.
+        // The last moment to put it off: once the script starts, the old copy is uninstalled.
         if (!ready())
         {
             log(Updates.PutOff);
-            return false;
+            return (false, true);
         }
-        Updates.StopBackground(Path.Combine(host.AppDir, "StudyStash.exe"), host);
         string logPath = Path.Combine(home, "logs", "update.log");
-        host.SpawnDetached(["powershell.exe", "-NoProfile", "-ExecutionPolicy", "Bypass", "-WindowStyle", "Hidden", "-File", script,
-            "-Setup", setup, "-WaitPid", pid.ToString(CultureInfo.InvariantCulture), "-Log", logPath]);
+        try
+        {
+            // The script stops what still runs from the old folder (the background library) once the app has quit.
+            host.SpawnDetached(["powershell.exe", "-NoProfile", "-ExecutionPolicy", "Bypass", "-WindowStyle", "Hidden", "-File", script,
+                "-Setup", setup, "-WaitPid", pid.ToString(CultureInfo.InvariantCulture), "-Log", logPath,
+                "-OldExe", Path.Combine(host.AppDir, "StudyStash.exe"), "-FailedFile", FailedFile(home), "-Tag", release.Tag,
+                "-OpenArgs", string.Join(' ', relaunchArgs.Select(a => a.Contains(' ') ? $"\"{a}\"" : a))]);
+        }
+        catch (Exception e) when (e is System.ComponentModel.Win32Exception or IOException or InvalidOperationException)
+        {
+            log($"Couldn't start the move: {e.Message}");
+            return (false, false);
+        }
         log($"Moving to {release.Tag} once Syft Notes has quit (log: {logPath}).");
-        return true;
+        return (true, false);
     }
 
-    static async Task<bool> LinuxAsync(Release release, UpdateHost host, string asset, Func<bool> ready, Action<string> log,
+    /// <summary>Inno Setup's uninstall entry for Syft Notes on this account (its AppId).</summary>
+    static bool InnoInstalled()
+    {
+        if (!OperatingSystem.IsWindows()) return true;
+        using var key = Microsoft.Win32.Registry.CurrentUser.OpenSubKey(
+            @"Software\Microsoft\Windows\CurrentVersion\Uninstall\{6F2C9A51-3B7E-4D28-9C41-8E5A0B7D2F63}_is1");
+        return key?.GetValue("UninstallString") is string u && key.GetValue("InstallLocation") is string { Length: > 0 }
+            && File.Exists(u.Trim('"').Split("\" ")[0].Trim('"'));
+    }
+
+    static async Task<(bool Ok, bool Retry)> LinuxAsync(Release release, UpdateHost host, string asset, Func<bool> ready, Action<string> log,
         int pid, IReadOnlyList<string> relaunchArgs, string userHome, LinuxMenu menu)
     {
         string place = AppImagePlace(userHome);
         string fresh = place + ".new";
-        if (await FetchAsync(release, host, asset, fresh, log) is null) return false;
+        if (await FetchAsync(release, host, asset, fresh, log) is null) return (false, true);
         try
         {
             if (!OperatingSystem.IsWindows()) File.SetUnixFileMode(fresh, UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute
@@ -160,24 +225,23 @@ public static class Bridge
         {
             TryDelete(fresh);
             log($"Couldn't get the move ready: {e.Message}");
-            return false;
+            return (false, false);
         }
-        // An AppImage runs through FUSE, which some systems don't have: then this copy stays, and says what to install.
+        // An AppImage runs through FUSE, which some systems don't have: then this copy stays, says what to install, and
+        // isn't tried again for a week (Failed).
         if (host.VersionOf(fresh) is not { } v || Updates.Compare(Updates.ParseVersion(v), release.Version) != 0)
         {
             TryDelete(fresh);
             log("The new Syft Notes (an AppImage) doesn't run on this computer yet: it needs FUSE. On Ubuntu and Debian, "
                 + "install it with: sudo apt install libfuse2 (libfuse2t64 on Ubuntu 24.04). This copy stays until then.");
-            return false;
+            return (false, false);
         }
         if (!ready())
         {
             TryDelete(fresh);
             log(Updates.PutOff);
-            return false;
+            return (false, true);
         }
-        string oldProgram = Updates.LinuxProgram(host.AppDir);
-        Updates.StopBackground(oldProgram, host);
         try
         {
             File.Move(fresh, place, overwrite: true);
@@ -187,15 +251,16 @@ public static class Bridge
         {
             TryDelete(fresh);
             log($"Install failed: {e.Message}");
-            return false;
+            return (false, false);
         }
-        // The old folder goes (this process keeps running from what it already loaded until it quits).
-        Apps.TryDeleteFolder(host.AppDir);
+        // The background library runs the old program: it stops now, and the AppImage registers it again on its first
+        // start (NewPlace). The old folder goes once this process has quit (this process still loads code from it):
+        // the waiter below deletes it, then opens the AppImage in its place (tail --pid follows this process to its end).
+        Updates.StopBackground(Updates.LinuxProgram(host.AppDir), host);
         log($"Installed {release.Tag} as {place}.");
-        // Waits for this process to be gone (tail --pid follows it to its end), then opens the AppImage in its place.
-        const string script = "exe=\"$1\"; shift; tail --pid=\"$0\" -f /dev/null; exec \"$exe\" \"$@\"";
-        host.SpawnDetached(["/bin/sh", "-c", script, pid.ToString(CultureInfo.InvariantCulture), place, .. relaunchArgs]);
-        return true;
+        const string script = "exe=\"$1\"; old=\"$2\"; shift 2; tail --pid=\"$0\" -f /dev/null; rm -rf -- \"$old\"; exec \"$exe\" \"$@\"";
+        host.SpawnDetached(["/bin/sh", "-c", script, pid.ToString(CultureInfo.InvariantCulture), place, host.AppDir, .. relaunchArgs]);
+        return (true, false);
     }
 
     static void TryDelete(string path)

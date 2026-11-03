@@ -107,7 +107,11 @@ try {
   Check ((Target $pin) -eq $newExe) "the taskbar pin opens the new copy ($(Target $pin))"
   $values = Get-ItemProperty -Path $run
   Check ([string]$values."Study Stash" -like "*$newExe*") "start at login starts the new copy: $($values.'Study Stash')"
-  Check ([string]$values."Syft Notes background" -like "*$newExe*") "the background library's entry starts the new copy: $($values.'Syft Notes background')"
+  # The background library's entry: pointed at the new copy, or taken away by the app itself (it was never turned on
+  # in this test's settings); never left naming the old program.
+  $bg = [string]$values."Syft Notes background"
+  Check (-not $bg -or $bg -like "*$newExe*") "the background library's entry doesn't name the old program ($(if ($bg) { $bg } else { 'taken away by the app: not turned on here' }))"
+  Check ((Get-Content (Join-Path $logs "update.log") -Raw) -match "Run entry 'Study Stash' now starts the new copy") "the move pointed start at login at the new copy itself"
   Check (((Get-Content -LiteralPath $claude -Raw | ConvertFrom-Json).mcpServers."syft-notes".command) -eq $newExe) "Claude Desktop's connection starts the new copy"
   Check ((Get-Content -LiteralPath $codex -Raw) -like "*SyftNotes\\current\\StudyStash.exe*" -or (Get-Content -LiteralPath $codex -Raw) -like "*SyftNotes\current\StudyStash.exe*") "ChatGPT's (Codex's) connection starts the new copy"
   $after = $markers | ForEach-Object { (Get-FileHash -LiteralPath $_).Hash }
