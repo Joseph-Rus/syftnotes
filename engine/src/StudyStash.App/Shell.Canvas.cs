@@ -52,7 +52,7 @@ public static partial class Shell
         canvasWatch.Changed += OnCanvasChanged;
         canvasFeed?.Dispose();
         canvasFeed = new CanvasFeed(context, canvasWatch);
-        canvasFeed.Updated += () => Dispatcher.UIThread.Post(() => _ = CanvasUpdatedAsync());
+        canvasFeed.Updated += () => Dispatcher.UIThread.Post(() => Run(() => CanvasUpdatedAsync(), "CanvasUpdated"));
         canvasNotifier = new CanvasNotifier(canvas) { OnOpen = OpenCanvasNotification };
         return canvas;
     }
@@ -80,9 +80,9 @@ public static partial class Shell
         }
         if (want && canvasNotifyTimer is null)
         {
-            canvasNotifyTimer = new DispatcherTimer(TimeSpan.FromMinutes(1), DispatcherPriority.Background, (_, _) => _ = PollCanvasNotificationsAsync());
+            canvasNotifyTimer = new DispatcherTimer(TimeSpan.FromMinutes(1), DispatcherPriority.Background, (_, _) => UiTasks.RunQuietly(() => PollCanvasNotificationsAsync(), "PollCanvasNotifications"));
             canvasNotifyTimer.Start();
-            _ = PollCanvasNotificationsAsync();
+            Run(() => PollCanvasNotificationsAsync(), "PollCanvasNotifications");
         }
     }
 
@@ -140,22 +140,16 @@ public static partial class Shell
         var model = new BrowserChoiceModel(ask.Browsers, browser => ChooseBrowserAsync(where, browser));
         var w = BrowserChoiceWindow.Make(model);
         browserChoiceWindow = w;
+        // Asked for, it takes the keyboard like any window the student opens. Come up by itself, it doesn't.
+        AppWindows.Dress(w, "browser-choice", activate: byHand, appForward: false);
         w.Closed += (_, _) =>
         {
             if (browserChoiceWindow == w) browserChoiceWindow = null;
-            UpdateDock();
         };
         // In the middle of the pointer's display. It sets its own height (as tall as what it says).
         w.WindowStartupLocation = WindowStartupLocation.Manual;
-        w.Position = Placement.Centred(ScreenFor(w), BrowserChoiceWindow.Wanted).Position;
-        Look.Apply(w);
-        WinChrome.Apply(w);
-        AppMenu.Attach(w, ShowLibrary, SettingsFromAnywhere);
-        if (Skin.Current == SkinKind.Mac) MacTitleBar.Attach(w);
-        w.Show();
-        UpdateDock();
-        // Asked for, it takes the keyboard like any window the student opens. Come up by itself, it doesn't.
-        if (byHand) w.Activate();
+        w.Position = Placement.Centred(AppWindows.ScreenFor(w), BrowserChoiceWindow.Wanted).Position;
+        AppWindows.Show(w);
     }
 
     /// <summary>The student's pick: the library is told, the app opens Canvas in that browser from now on, and the
@@ -194,11 +188,11 @@ public static partial class Shell
         UpdateNextDue();
         UpdateDueItem();
         // A sync's news (new work, a score, an announcement) shows now, not at the notifications' next minute.
-        _ = PollCanvasNotificationsAsync();
+        Run(() => PollCanvasNotificationsAsync(), "PollCanvasNotifications");
         termAssignments = null;
         if (mainWindow?.IsVisible != true) return;
-        if (overviewOf is { } over) await ShowOverviewAsync(over);
-        else if (openCanvasClass is { } name && library.CanvasClass is { } cls && CanvasClassRow(name) is { } row) await cls.LoadAsync(row);
+        if (pageState.Overview is { } over) await ShowOverviewAsync(over);
+        else if (pageState.CanvasClass is { } name && library.CanvasClass is { } cls && CanvasClassRow(name) is { } row) await cls.LoadAsync(row);
     }
 
     /// <summary>Asks the library what's due and which classes are linked. False when it couldn't (no library, an
@@ -269,7 +263,7 @@ public static partial class Shell
             if (item is not null) library.Classes.Remove(item);
             return;
         }
-        if (item is null) library.Classes.Insert(0, new ClassItem { Name = "Due", IsDue = true, Count = canvasDue.ToHandIn, Selected = overviewOf == DueHome });
+        if (item is null) library.Classes.Insert(0, new ClassItem { Name = "Due", IsDue = true, Count = canvasDue.ToHandIn, Selected = pageState.Overview == DueHome });
         else item.Count = canvasDue.ToHandIn;
     }
 
@@ -279,8 +273,7 @@ public static partial class Shell
         Remember();
         panelWindow?.Hide();
         quickWindow?.Hide();
-        LeavePage();
-        openAssignment = (cls, id);
+        pageState = pageState.Left() with { Assignment = (cls, id) };
         ShowLibrary();
     }
 
@@ -325,15 +318,13 @@ public static partial class Shell
             // An announcement opens in its class's reader, once the class's Canvas lists have loaded.
             Remember();
             announcementToOpen = n.AnnouncementId;
-            LeavePage();
-            openCanvasClass = c;
+            pageState = pageState.Left() with { CanvasClass = c };
             canvasTab = ClassTab.Announcements;
             ShowLibrary();
             return;
         }
         Remember();
-        LeavePage();
-        overviewOf = DueHome;
+        pageState = pageState.Left() with { Overview = DueHome };
         ShowLibrary();
     }
 
@@ -352,7 +343,7 @@ public static partial class Shell
     {
         if (canvasConnectWindow is { IsVisible: true })
         {
-            Raise(canvasConnectWindow);
+            AppWindows.Raise(canvasConnectWindow);
             return;
         }
         var watch = CanvasPoll();
@@ -371,42 +362,33 @@ public static partial class Shell
             body.Bind(Border.BorderBrushProperty, body.GetResourceObservable("LayerStroke"));
             body.BorderThickness = new Avalonia.Thickness(0, 1, 0, 0);
         }
-        var w = new Window
+        var spec = new WindowSpec("canvas-connect", "Canvas", new DockPanel { Children = { header, body } })
         {
-            Title = "Canvas",
-            ExtendClientAreaToDecorationsHint = true, ExtendClientAreaTitleBarHeightHint = Skin.Current == SkinKind.Mac ? WindowHeader.MacHeight : 32,
-            Content = new DockPanel { Children = { header, body } },
+            Kind = WindowKind.Main, Size = WindowSize.Centred, Centred = new Avalonia.Size(640, 680),
         };
-        if (Skin.Current == SkinKind.Mac) w.Bind(Window.BackgroundProperty, w.GetResourceObservable("Win"));
-        OpenCentred(w, new Avalonia.Size(640, 680));
-        Look.Apply(w);
-        WinChrome.Apply(w);
-        AppMenu.Attach(w, ShowLibrary, SettingsFromAnywhere);
-        if (Skin.Current == SkinKind.Mac) MacTitleBar.Attach(w);
-        model.Picker.OnSaved = () =>
+        AppWindows.Open(spec, w =>
         {
-            LibraryClassesChanged();
-            return Task.CompletedTask;
-        };
-        model.OnSkip = w.Close;
-        model.OnBack = w.Close;
-        model.OnFinish = () =>
-        {
-            w.Close();
-            _ = CanvasSyncedAsync();
-        };
-        w.Closed += (_, _) =>
-        {
-            if (canvasConnectWindow == w) canvasConnectWindow = null;
-            model.Dispose();
-            UpdateDock();
-        };
-        canvasConnectWindow = w;
-        w.Show();
-        UpdateDock();
-        w.Activate();
-        Desktop.Activate();
-        _ = StartConnectAsync(model, watch);
+            if (Skin.Current == SkinKind.Mac) w.Bind(Window.BackgroundProperty, w.GetResourceObservable("Win"));
+            model.Picker.OnSaved = () =>
+            {
+                LibraryClassesChanged();
+                return Task.CompletedTask;
+            };
+            model.OnSkip = w.Close;
+            model.OnBack = w.Close;
+            model.OnFinish = () =>
+            {
+                w.Close();
+                Run(() => CanvasSyncedAsync(), "CanvasSynced");
+            };
+            w.Closed += (_, _) =>
+            {
+                if (canvasConnectWindow == w) canvasConnectWindow = null;
+                model.Dispose();
+            };
+            canvasConnectWindow = w;
+        });
+        Run(() => StartConnectAsync(model, watch), "StartConnect");
     }
 
     static async Task StartConnectAsync(CanvasConnectModel model, CanvasWatch watch)

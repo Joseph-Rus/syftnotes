@@ -13,11 +13,11 @@ namespace StudyStash.App;
 /// rail), and a class's lists on Canvas. A note's own page is in Shell.Library.cs.</summary>
 public static partial class Shell
 {
-    /// <summary>The overview showing: "" for Home, <see cref="DueHome"/> for Due, a folder's name for its page, null
-    /// for none (a note, an assignment or a class's Canvas lists is showing instead).</summary>
-    static string? overviewOf;
+    /// <summary>Which page the window shows (an overview, a note, an assignment, a class's Canvas lists), the folder in
+    /// mind, and the turn the page took: one value, replaced whole as each page opens.</summary>
+    static PageState pageState = new();
 
-    /// <summary>What <see cref="overviewOf"/> holds while Due shows (no folder can be called this).</summary>
+    /// <summary>What <see cref="PageState.Overview"/> holds while Due shows (no folder can be called this).</summary>
     const string DueHome = "\u0001due";
 
     /// <summary>Due's calendar is for one class (the folder page's "See these on the calendar"); null for every class.</summary>
@@ -26,21 +26,9 @@ public static partial class Shell
     static bool homeUnsorted;
     /// <summary>How many notes Home has brought so far (it brings as many again when it's read again).</summary>
     static int homeShown = OverviewModel.PageSize;
-    /// <summary>Every page shown takes the next turn: one that's no longer the latest by the time its answer is back
-    /// stops instead of drawing over what a later one already drew.</summary>
-    static int pageTurn;
 
     /// <summary>Home (""), Due, or a folder's page.</summary>
     static Task ShowOverviewAsync(string of) => of.Length == 0 ? ShowHomeAsync() : of == DueHome ? ShowDuePageAsync() : ShowFolderAsync(of);
-
-    /// <summary>Nothing is open any more: whatever is shown next says what is.</summary>
-    static void LeavePage()
-    {
-        overviewOf = null;
-        openLecture = null;
-        openCanvasClass = null;
-        openAssignment = null;
-    }
 
     /// <summary>The sidebar's selected row: Home, Due, a folder, or (a note in no folder, say) none.</summary>
     static void SelectInSidebar(string? cls, bool home = false, bool due = false)
@@ -72,14 +60,13 @@ public static partial class Shell
 
     static async Task ShowHomeAsync()
     {
-        int turn = ++pageTurn;
-        LeavePage();
-        overviewOf = "";
+        pageState = pageState.Next() with { Overview = "" };
+        int turn = pageState.Turn;
         SelectInSidebar(null, home: true);
         if (host.Remote() is not { } lib) return;
         int want = Math.Clamp(homeShown, OverviewModel.PageSize, 480);
         var lectures = await NotesAsync(lib, homeUnsorted ? Configs.Unsorted : null, want + 1, null);
-        if (turn != pageTurn) return;
+        if (turn != pageState.Turn) return;
         var sources = OverviewSources(WithLocal([.. lectures.Take(want)], null, homeUnsorted, all: lectures.Count <= want));
         var home = OverviewModel.Home(sources, homeUnsorted);
         home.CanLoadMore = lectures.Count > want;
@@ -88,7 +75,7 @@ public static partial class Shell
             if (homeUnsorted == unsorted) return;
             homeUnsorted = unsorted;
             homeShown = OverviewModel.PageSize;
-            _ = ShowHomeAsync();
+            Run(() => ShowHomeAsync(), "ShowHome");
         };
         // The next page: the notes from before the last one showing.
         home.OnMore = async () =>
@@ -106,7 +93,7 @@ public static partial class Shell
         Equip(home, null);
         ClearPane();
         library.Overview = home;
-        _ = CountStudyAsync();
+        Run(() => CountStudyAsync(), "CountStudy");
     }
 
     // --- a folder's page ----------------------------------------------------------------------------------------------
@@ -120,14 +107,12 @@ public static partial class Shell
             await ShowHomeAsync();
             return;
         }
-        int turn = ++pageTurn;
-        LeavePage();
-        overviewOf = name;
-        openClass = name;
+        pageState = pageState.Next() with { Overview = name, Class = name };
+        int turn = pageState.Turn;
         SelectInSidebar(name);
         if (host.Remote() is not { } lib) return;
         var lectures = WithLocal(await NotesAsync(lib, name, 500, null), name, false, all: true);
-        if (turn != pageTurn) return;
+        if (turn != pageState.Turn) return;
         var row = CanvasClassRow(name);
         var info = (host.Overview?["classes"] as JsonArray ?? []).OfType<JsonObject>().FirstOrDefault(c => S(c["name"]) == name);
         var known = host.Classes().FirstOrDefault(c => c.Name == name);
@@ -137,14 +122,14 @@ public static partial class Shell
         page.AddLinks(facts, row is null ? null : tab =>
         {
             Remember();
-            _ = ShowCanvasListsAsync(name, tab);
+            Run(() => ShowCanvasListsAsync(name, tab), "ShowCanvasLists");
         });
-        page.SetFolders(LinkedFolders(lib, name, info), host.Settings.LibraryHere ? () => _ = LinkFolderAsync(lib, name) : null);
+        page.SetFolders(LinkedFolders(lib, name, info), host.Settings.LibraryHere ? () => Run(() => LinkFolderAsync(lib, name), "LinkFolder") : null);
         page.OnDelete = note => library.DeleteCommand.Execute(note);
         Equip(page, name);
         var files = new AttachmentsModel(lib, name, null);
         page.Files = files;
-        _ = files.LoadAsync();
+        Run(() => files.LoadAsync(), "files.Load");
         ClearPane();
         library.Overview = page;
     }
@@ -155,21 +140,20 @@ public static partial class Shell
     /// as they were when it's only being read again.</summary>
     static async Task ShowDuePageAsync()
     {
-        int turn = ++pageTurn;
-        LeavePage();
-        overviewOf = DueHome;
+        pageState = pageState.Next() with { Overview = DueHome };
+        int turn = pageState.Turn;
         SelectInSidebar(null, due: true);
         if (host.Remote() is not { } lib) return;
         await LoadCanvasAsync();
-        if (turn != pageTurn) return;
+        if (turn != pageState.Turn) return;
         UpdateDueItem();
         UpdateNextDue();
         var term = await TermAsync();
-        if (turn != pageTurn) return;
+        if (turn != pageState.Turn) return;
         // The week's planner says which class meetings were recorded. The calendars hold this week's meetings (from
         // Monday on), and the newest hundred notes reach back well past those.
         var recorded = Events() is null ? [] : await NotesAsync(lib, null, 100, null);
-        if (turn != pageTurn) return;
+        if (turn != pageState.Turn) return;
         var page = OverviewModel.ForDue(OverviewSources(recorded, WithTerm(CanvasLinked ? canvasDue : null, term)), dueOnly);
         if (library.Overview is { IsDuePage: true, Calendar: { } before } && page.Calendar is { } now) now.Resume(before);
         if (page.Calendar is { } calendar)
@@ -231,8 +215,6 @@ public static partial class Shell
 
     // --- a class's lists on Canvas ------------------------------------------------------------------------------------
 
-    /// <summary>The class whose Canvas lists are open (Assignments, Modules, Announcements); null when they aren't.</summary>
-    static string? openCanvasClass;
     /// <summary>The list it's on.</summary>
     static ClassTab canvasTab = ClassTab.Assignments;
 
@@ -245,10 +227,8 @@ public static partial class Shell
             await ShowFolderAsync(name);
             return;
         }
-        int turn = ++pageTurn;
-        LeavePage();
-        openCanvasClass = name;
-        openClass = name;
+        pageState = pageState.Next() with { CanvasClass = name, Class = name };
+        int turn = pageState.Turn;
         canvasTab = tab == ClassTab.Lectures ? ClassTab.Assignments : tab;
         SelectInSidebar(name);
         bool kept = library.CanvasClass is not null && library.CanvasOf == name && library.Overview is null;
@@ -269,7 +249,7 @@ public static partial class Shell
         catch (Exception e) when (e is HttpRequestException or TaskCanceledException or CanvasLibraryException or System.Text.Json.JsonException or InvalidOperationException)
         {
         }
-        if (turn != pageTurn) return;
+        if (turn != pageState.Turn) return;
         // A notification's announcement: its own reader, beside the list.
         if (announcementToOpen is { } announcement)
         {
@@ -286,13 +266,13 @@ public static partial class Shell
             {
                 Remember();
                 library.Opened();
-                _ = ShowAssignmentAsync(cls, id);
+                Run(() => ShowAssignmentAsync(cls, id), "ShowAssignment");
             },
             OnReader = reader =>
             {
                 Remember();
                 library.Opened();
-                openAssignment = null;
+                pageState = pageState with { Assignment = null };
                 library.Assignment = null;
                 library.Reader = reader;
             },
@@ -310,16 +290,14 @@ public static partial class Shell
     /// the rubric, and what was handed in.</summary>
     static async Task ShowAssignmentPageAsync(string cls, string id)
     {
-        int turn = ++pageTurn;
-        LeavePage();
-        openAssignment = (cls, id);
-        openClass = cls;
+        pageState = pageState.Next() with { Assignment = (cls, id), Class = cls };
+        int turn = pageState.Turn;
         SelectInSidebar(cls);
         var row = canvasDue?.Groups.SelectMany(g => g.Items).FirstOrDefault(i => i.Class == cls && i.Id == id);
-        if (await AssignmentAsync(cls, id, row) is not { } page || turn != pageTurn)
+        if (await AssignmentAsync(cls, id, row) is not { } page || turn != pageState.Turn)
         {
             // It's gone from Canvas (or the library can't be reached): Due is where it would have been.
-            if (turn == pageTurn && library.Overview is null && library.Note is null) await ShowDuePageAsync();
+            if (turn == pageState.Turn && library.Overview is null && library.Note is null) await ShowDuePageAsync();
             return;
         }
         ClearPane();
@@ -332,7 +310,7 @@ public static partial class Shell
     {
         if (await AssignmentAsync(cls, id, row) is not { } page) return;
         library.Reader = null;
-        openAssignment = (cls, id);
+        pageState = pageState with { Assignment = (cls, id) };
         library.Assignment = page;
     }
 
@@ -371,7 +349,7 @@ public static partial class Shell
             page.OnRecord = () =>
             {
                 if (host.Recorder.Current is not null) OpenRecording();
-                else _ = StartRecordingAsync(cls ?? "", null, openPage: true);
+                else Run(() => StartRecordingAsync(cls ?? "", null, openPage: true), "StartRecording");
             };
             page.OnStop = () => StopRecording();
         }
@@ -399,7 +377,7 @@ public static partial class Shell
         else ask.OnlyScopes("class", "all");
         ask.NameScopes(page.Noun, cls is null ? null : ClassNames.Display(cls));
         page.Ask = ask;
-        _ = ask.Load();
+        Run(() => ask.Load(), "ask.Load");
     }
 
     /// <summary>The folders linked to a class, as the library's overview lists them.</summary>
@@ -409,7 +387,7 @@ public static partial class Shell
             string path = S(f["path"]);
             return new LinkedFolder(S(f["name"]), path, f["here"]?.GetValue<bool>() ?? true,
                 () => Dialogs.OpenUrl(path),
-                () => _ = ChangeFolderAsync(lib, cls, path, remove: true));
+                () => Run(() => ChangeFolderAsync(lib, cls, path, remove: true), "ChangeFolder"));
         });
 
     /// <summary>Link a folder: the folder dialog, then the library lists it on the class's page.</summary>
@@ -436,7 +414,7 @@ public static partial class Shell
             return;
         }
         await host.CheckLibraryAsync();
-        if (overviewOf == cls) await ShowFolderAsync(cls);
+        if (pageState.Overview == cls) await ShowFolderAsync(cls);
     }
 
     /// <summary>Notes as the library lists them, newest first: a folder's, or (null) every folder's; from before a
@@ -552,25 +530,25 @@ public static partial class Shell
             OpenClass = cls =>
             {
                 Remember();
-                _ = ShowFolderAsync(cls);
+                Run(() => ShowFolderAsync(cls), "ShowFolder");
             },
             OpenLecture = (cls, id) =>
             {
                 Remember();
-                _ = ShowLectureAsync(id);
+                Run(() => ShowLectureAsync(id), "ShowLecture");
             },
             OpenAssignment = (cls, id) =>
             {
                 Remember();
-                _ = ShowAssignmentPageAsync(cls, id);
+                Run(() => ShowAssignmentPageAsync(cls, id), "ShowAssignmentPage");
             },
             OpenDue = cls =>
             {
                 Remember();
                 dueOnly = cls;
-                _ = ShowDuePageAsync();
+                Run(() => ShowDuePageAsync(), "ShowDuePage");
             },
-            RecordEvent = id => _ = RecordEventAsync(id),
+            RecordEvent = id => Run(() => RecordEventAsync(id), "RecordEvent"),
         };
     }
 
@@ -583,8 +561,8 @@ public static partial class Shell
         if (host.Remote() is null) return null;
         return new FolderPickerModel(host.Classes().Select(c => (c.Name, host.GroupOf(c.Name), (IBrush)Skin.ClassDot(c.Color), c.Lectures)), folder)
         {
-            OnPick = to => _ = MoveNoteAsync(id, folder, to, say: true),
-            OnNew = name => _ = MoveToNewFolderAsync(id, folder, name),
+            OnPick = to => Run(() => MoveNoteAsync(id, folder, to, say: true), "MoveNote"),
+            OnNew = name => Run(() => MoveToNewFolderAsync(id, folder, name), "MoveToNewFolder"),
         };
     }
 
@@ -616,8 +594,8 @@ public static partial class Shell
             }
         }
         else if (library.Overview is { IsFolder: true } page && page.ClassName != folder) page.Remove(id);
-        if (openLecture == id && overviewOf is null) await ShowLectureAsync(id, library.Note?.ShowTranscript == true);
-        _ = RefreshCountsAsync();
+        if (pageState.Lecture == id && pageState.Overview is null) await ShowLectureAsync(id, library.Note?.ShowTranscript == true);
+        Run(() => RefreshCountsAsync(), "RefreshCounts");
         if (say) library.SayMoved(new NoteMove(id, from, folder));
     }
 

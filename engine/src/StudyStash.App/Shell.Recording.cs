@@ -24,7 +24,7 @@ public static partial class Shell
     static void ToggleRecording()
     {
         if (host.Recorder.Current is not null) StopRecording();
-        else _ = StartRecordingAsync(RecordClass(), null, openPage: mainWindow is { IsVisible: true, IsActive: true });
+        else Run(() => StartRecordingAsync(RecordClass(), null, openPage: mainWindow is { IsVisible: true, IsActive: true }), "StartRecording");
     }
 
     /// <summary>
@@ -54,11 +54,11 @@ public static partial class Shell
                 SavedSoFar, "Stop and switch", () =>
                 {
                     StopRecording(stay: true);
-                    _ = BeginAsync(() => host.ContinueAsync(id, title), openPage: true);
+                    Run(() => BeginAsync(() => host.ContinueAsync(id, title), openPage: true), "Begin");
                 });
             return;
         }
-        _ = BeginAsync(() => host.ContinueAsync(id, title), openPage: true);
+        Run(() => BeginAsync(() => host.ContinueAsync(id, title), openPage: true), "Begin");
     }
 
     static async Task<bool> BeginAsync(Func<Task<RecordStart>> begin, bool openPage)
@@ -141,7 +141,7 @@ public static partial class Shell
         {
             // It's gone from the calendar since the list was drawn.
             UpdateComingUp();
-            if (overviewOf == "") _ = ShowHomeAsync();
+            if (pageState.Overview == "") Run(() => ShowHomeAsync(), "ShowHome");
             return;
         }
         // Not started yet: its note opens, not recording. Recording starts on its own when the event does.
@@ -165,7 +165,7 @@ public static partial class Shell
                 SavedSoFar, "Stop and start", () =>
                 {
                     StopRecording(stay: true);
-                    _ = StartRecordingAsync("", pick, openPage: true);
+                    Run(() => StartRecordingAsync("", pick, openPage: true), "StartRecording");
                 });
             return;
         }
@@ -184,8 +184,8 @@ public static partial class Shell
     {
         string id = l.Id, cls = l.ClassName, noun = Nouns.For(cls, cls.Length > 0 ? host.GroupOf(cls) : "");
         if (library.Note is { Planned: true } shown && shown.Id == id && library.ShowNotePage) return;
-        openClass = cls.Length > 0 ? cls : null;
-        SelectInSidebar(openClass);
+        pageState = pageState with { Class = cls.Length > 0 ? cls : null };
+        SelectInSidebar(pageState.Class);
         var starts = Services.AppHost.PlanStarts(l)?.ToLocalTime();
         string at = starts is { } s ? s.ToString(s.Date == DateTime.Today ? "h:mm tt" : "ddd d MMM 'at' h:mm tt", CultureInfo.InvariantCulture) : "";
         bool past = starts is { } st && st <= DateTimeOffset.Now;
@@ -228,7 +228,7 @@ public static partial class Shell
         bool showing = library.Note is { Planned: true } p && p.Id == due.Id && library.ShowNotePage && mainWindow?.IsVisible == true;
         string name = WorkingTitle(due);
         Program.Log($"[calendar] {due.Id}: its event started: recording");
-        _ = StartPlanAsync(due.Id, name, showing);
+        Run(() => StartPlanAsync(due.Id, name, showing), "StartPlan");
     }
 
     static async Task StartPlanAsync(string id, string name, bool openPage)
@@ -253,12 +253,9 @@ public static partial class Shell
     static void ShowRecordingPage()
     {
         if (host.Recorder.Current is not { } l) return;
-        ++pageTurn;
-        LeavePage();
-        openLecture = l.Id;
         string cls = l.ClassName;
-        openClass = cls.Length > 0 ? cls : null;
-        SelectInSidebar(openClass);
+        pageState = pageState.Next() with { Lecture = l.Id, Class = cls.Length > 0 ? cls : null };
+        SelectInSidebar(pageState.Class);
         if (library.Note is { Live: true } shown && shown.Id == l.Id)
         {
             // Already its page: only what was over it goes.
