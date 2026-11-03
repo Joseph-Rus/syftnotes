@@ -349,7 +349,8 @@ public class AiApiTests
                 installed = appComes;
                 return Task.FromResult(appComes);
             },
-            OllamaModels = _ => Task.FromResult(running ? models.ToList() : null),
+            // Read by the library's answers (on its request threads) while the setup adds to it in the background.
+            OllamaModels = _ => { lock (models) return Task.FromResult(running ? models.ToList() : null); },
             StartOllama = _ =>
             {
                 did.Add("start");
@@ -362,7 +363,7 @@ public class AiApiTests
                 did.Add("model " + model);
                 progress?.Invoke(1, 4);
                 seen.Add($"{jobs!.Pulling?.Step} {jobs.Pulling?.Fraction}");
-                models.Add((model, 5.2));
+                lock (models) models.Add((model, 5.2));
                 return Task.FromResult((true, ""));
             },
         };
