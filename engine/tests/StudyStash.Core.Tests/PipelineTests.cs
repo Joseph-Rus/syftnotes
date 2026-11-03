@@ -318,12 +318,12 @@ public class PipelineTests
         var running = p.Start(stop.Token);
         try
         {
-            for (int i = 0; i < 100 && p.EngineProblem is null; i++) await Task.Delay(50);
+            await Waiting.UntilAsync(() => p.EngineProblem is not null, 5);
             Assert.NotNull(p.EngineProblem);
             Assert.Equal("queued", store.Get("l1")!.Status);
             up = true;
             p.Wake();
-            for (int i = 0; i < 100 && store.Get("l1")!.Status != "done"; i++) await Task.Delay(50);
+            await Waiting.UntilAsync(() => store.Get("l1")!.Status == "done", 5);
             Assert.Equal("done", store.Get("l1")!.Status);
             Assert.Null(p.EngineProblem);
         }

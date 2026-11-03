@@ -291,7 +291,7 @@ public class DiagramDesignTests
         design = (_, _) => throw new InvalidOperationException("unknown option '--effort'");
         Assert.Equal(Notes, await Written());
         Assert.Equal(("", ""), (claude.Requests[^1].Model, claude.Requests[^1].Effort)); // asked again as set up
-        design = (_, ct) => Task.Delay(Timeout.Infinite, ct).ContinueWith(_ => "", TaskScheduler.Default);
+        design = (_, ct) => new TaskCompletionSource().Task.WaitAsync(ct).ContinueWith(_ => "", TaskScheduler.Default);
         Assert.Equal(Notes, await Written());
         Assert.Contains("took longer than", log[^1]);
         design = (_, _) => throw new InvalidOperationException("Claude usage limit reached, resets at 3pm");
