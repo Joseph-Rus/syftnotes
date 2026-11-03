@@ -84,6 +84,8 @@ public static partial class SelfTest
         // from our own engine instead of Hugging Face.
         Environment.SetEnvironmentVariable("STUDYSTASH_WHISPER_MODEL", "tiny");
         Environment.SetEnvironmentVariable("STUDYSTASH_MODEL_URL", Engine!.Url.TrimEnd('/') + "/models");
+        // A store's review status must never change a self-test: the school-address step, as before 1.8 was live.
+        if (Environment.GetEnvironmentVariable("STUDYSTASH_ADDON_FINDS_CANVAS") is not { Length: > 0 }) Environment.SetEnvironmentVariable("STUDYSTASH_ADDON_FINDS_CANVAS", "0");
         if (Environment.GetEnvironmentVariable("STUDYSTASH_MIC_SPEED") is not { Length: > 0 }) Environment.SetEnvironmentVariable("STUDYSTASH_MIC_SPEED", "4");
         return null;
     }

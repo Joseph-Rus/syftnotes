@@ -59,6 +59,13 @@ public class LibraryPanelTests
     }
 
     [Fact]
+    public void A_lecture_that_couldnt_be_filed_is_said_not_left_out()
+    {
+        var o = new JsonObject { ["classes"] = new JsonArray(new JsonObject { ["name"] = "CS 101", ["lectures"] = 0 }), ["unsorted"] = 0, ["writing"] = 0, ["stuck"] = 2 };
+        Assert.Equal("No lectures yet · 2 couldn't be filed", LibraryPanelWords.Lectures(o));
+    }
+
+    [Fact]
     public void Laptops_that_went_quiet_say_when_they_were_last_seen()
     {
         var zone = TimeZoneInfo.Utc;

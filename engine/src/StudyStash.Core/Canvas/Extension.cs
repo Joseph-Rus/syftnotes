@@ -194,22 +194,8 @@ public static class Extension
         origin == "chrome-extension://" + ChromeStoreId
         || origin.StartsWith("moz-extension://", StringComparison.Ordinal) && origin.Length > "moz-extension://".Length && !origin[16..].Contains('/');
 
-    /// <summary>
-    /// The add-on the browsers' stores hand out finds the student's library and their Canvas by itself (1.8 on), so
-    /// the app asks nothing: false while the stores still have 1.6 or 1.7, which are connected with a pasted code made
-    /// with the school's Canvas address. Set true once 1.8 is live on the Chrome Web Store and Firefox Add-ons
-    /// (docs/chrome-web-store.md, "Finding Canvas by itself"); STUDYSTASH_ADDON_FINDS_CANVAS=1 (or 0) says otherwise,
-    /// for trying 1.8 before then.
-    /// </summary>
-    public const bool StoreFindsCanvas = false;
-
-    /// <summary><see cref="StoreFindsCanvas"/>, or what STUDYSTASH_ADDON_FINDS_CANVAS says.</summary>
-    public static bool FindsCanvas => TestSwitches.Get("STUDYSTASH_ADDON_FINDS_CANVAS") switch
-    {
-        "1" => true,
-        "0" => false,
-        _ => StoreFindsCanvas,
-    };
+    /// <summary>Whether text is a version number ("1.8", "1.10.2").</summary>
+    public static bool IsVersion(string v) => Parse(v) is not null;
 
     /// <summary>What a connection code connects to; null when the text isn't one (whitespace from copying is fine).</summary>
     public static ExtensionConnection? ReadConnectionCode(string code)

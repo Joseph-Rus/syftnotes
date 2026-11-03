@@ -50,6 +50,9 @@ public static partial class Notes
     [GeneratedRegex(@"\s+")]
     private static partial Regex Spaces();
 
+    [GeneratedRegex(@"\A(CON|PRN|AUX|NUL|COM[1-9]|LPT[1-9])(\.|\z)", RegexOptions.IgnoreCase)]
+    private static partial Regex DeviceName();
+
     [GeneratedRegex(@"\A([0-9]{4}-[0-9]{2}-[0-9]{2})")]
     private static partial Regex IsoDay();
 
@@ -60,7 +63,17 @@ public static partial class Notes
     {
         string t = Py.Strip(BadFileChars().Replace(text ?? "", " "));
         t = Spaces().Replace(t, " ");
-        return Py.Strip(Py.Head(t.Length > 0 ? t : "untitled", maxLen));
+        // Windows can't make a folder or file ending in a dot or space, nor one named like a device (CON, NUL, COM1).
+        t = Py.Strip(Py.Head(t.Length > 0 ? t : "untitled", maxLen)).TrimEnd('.', ' ');
+        return t.Length > 0 ? t : "untitled";
+    }
+
+    /// <summary>The folder a class keeps its lectures in, named after it: a name Windows can make (a class called
+    /// "Con" or "NUL" gets an underscore, as no folder can be named after a device there).</summary>
+    public static string FolderName(string? className)
+    {
+        string t = Slugify(className, 60);
+        return DeviceName().IsMatch(t) ? t + "_" : t;
     }
 
     /// <summary>The note's day for its file name, or today's (UTC) when its date has none.</summary>
@@ -591,7 +604,7 @@ public sealed partial class Store : IDisposable
     {
         lock (gate)
         {
-            string d = Path.Combine(PoolDir, Notes.Slugify(string.IsNullOrEmpty(className) ? Configs.Unsorted : className, 60));
+            string d = Path.Combine(PoolDir, Notes.FolderName(string.IsNullOrEmpty(className) ? Configs.Unsorted : className));
             Directory.CreateDirectory(d);
             return d;
         }
@@ -754,7 +767,7 @@ public sealed partial class Store : IDisposable
             var args = new List<object?> { match };
             if (className is not null)
             {
-                sql += " AND notes.class_name=?";
+                sql += " AND notes.class_name=? COLLATE NOCASE";
                 args.Add(className);
             }
             if (noteId is not null)
@@ -815,7 +828,9 @@ public sealed partial class Store : IDisposable
             var args = new List<object?>();
             if (className is not null)
             {
-                sql += " AND class_name=?";
+                // A class is the same class in other letters: a lecture filed as "cs 101" before Canvas named the class
+                // "CS 101" is in it (Windows and macOS folders already treat the two as one folder).
+                sql += " AND class_name=? COLLATE NOCASE";
                 args.Add(className);
             }
             sql += " ORDER BY date DESC, title";
@@ -897,7 +912,7 @@ public sealed partial class Store : IDisposable
     }
 
     /// <summary>The folder a class's lectures (and its Canvas files) live in, without making it.</summary>
-    public string ClassFolder(string className) => Path.Combine(PoolDir, Notes.Slugify(className, 60));
+    public string ClassFolder(string className) => Path.Combine(PoolDir, Notes.FolderName(className));
 
     /// <summary>
     /// Rename a class's lectures: its folder moves whole (its notes and its Canvas files with it), and each lecture's
