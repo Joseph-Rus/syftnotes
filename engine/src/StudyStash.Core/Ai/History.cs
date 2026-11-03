@@ -17,9 +17,14 @@ public sealed class History(string root, Runner? run = null)
 
     public const string Trailer = "Study-Stash-By";
 
-    // Files go back exactly as they were: git never turns a lecture's line endings into Windows ones on undo.
+    // Files go back exactly as they were: git never turns a lecture's line endings into Windows ones on undo. And no
+    // housekeeping of git's own after a commit: newer git (2.56 on Windows) starts its maintenance in the background
+    // after each commit, which kept this call's output open until it was done and held the repository's locks, so the
+    // next commit waited out its 30 seconds and the one after found the index locked: a change the AI made went
+    // unrecorded and couldn't be undone. A library's history is small; it never needs git's housekeeping.
     string? Git(params string[] args) =>
-        run(AiProvider.Which("git") ?? "git", ["-c", "core.autocrlf=false", "-C", root, .. args], Wait) is { ExitCode: 0 } r ? r.Stdout : null;
+        run(AiProvider.Which("git") ?? "git",
+            ["-c", "core.autocrlf=false", "-c", "maintenance.auto=false", "-c", "gc.auto=0", "-C", root, .. args], Wait) is { ExitCode: 0 } r ? r.Stdout : null;
 
     public bool Available => AiProvider.Which("git") is not null;
 
