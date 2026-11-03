@@ -20,17 +20,14 @@ public static partial class Shell
     static readonly List<Place> backPlaces = [], forwardPlaces = [];
     /// <summary>A place is being gone back (or forward) to, or read again: the navigation that does it isn't a new step.</summary>
     static bool restoring;
-    /// <summary>The assignment open, if any (the class and its id): on a page of its own, or beside the Canvas list it
-    /// was picked from.</summary>
-    static (string Class, string Id)? openAssignment;
 
     /// <summary>Where the window is: Home, until something else has been opened.</summary>
     static Place Here()
     {
-        if (overviewOf is { } over) return new Place(Overview: over, DueOnly: over == DueHome ? dueOnly : null);
-        if (openCanvasClass is { } cls) return new Place(Canvas: cls, Tab: canvasTab, Assignment: library.Assignment is null ? null : openAssignment, Reader: library.Reader);
-        if (openAssignment is { } assignment) return new Place(Assignment: assignment);
-        if (openLecture is { } id) return new Place(Lecture: id);
+        if (pageState.Overview is { } over) return new Place(Overview: over, DueOnly: over == DueHome ? dueOnly : null);
+        if (pageState.CanvasClass is { } cls) return new Place(Canvas: cls, Tab: canvasTab, Assignment: library.Assignment is null ? null : pageState.Assignment, Reader: library.Reader);
+        if (pageState.Assignment is { } assignment) return new Place(Assignment: assignment);
+        if (pageState.Lecture is { } id) return new Place(Lecture: id);
         if (library.Study is not null) return new Place(Study: true);
         return new Place(Overview: "");
     }
@@ -57,7 +54,7 @@ public static partial class Shell
         from.RemoveAt(from.Count - 1);
         to.Add(Here());
         UpdateHistory();
-        _ = BackToAsync(place);
+        Run(() => BackToAsync(place), "BackTo");
     }
 
     static async Task BackToAsync(Place place)
@@ -76,16 +73,16 @@ public static partial class Shell
     /// <summary>The page a note's own page gives way to when the note is deleted: where the student came from, or Home.</summary>
     static void LeaveNote()
     {
-        LeavePage();
+        pageState = pageState.Left();
         if (backPlaces.Count == 0)
         {
-            _ = ShowHomeAsync();
+            Run(() => ShowHomeAsync(), "ShowHome");
             return;
         }
         var place = backPlaces[^1];
         backPlaces.RemoveAt(backPlaces.Count - 1);
         UpdateHistory();
-        _ = BackToAsync(place);
+        Run(() => BackToAsync(place), "BackTo");
     }
 
     static async Task GoToAsync(Place place)
@@ -104,17 +101,17 @@ public static partial class Shell
         else if (place.Canvas is { } cls)
         {
             await ShowCanvasListsAsync(cls, place.Tab);
-            if (openCanvasClass != cls) return;
+            if (pageState.CanvasClass != cls) return;
             if (place.Assignment is { } beside) await ShowAssignmentAsync(beside.Class, beside.Id);
             else if (place.Reader is { } reader)
             {
-                openAssignment = null;
+                pageState = pageState with { Assignment = null };
                 library.Assignment = null;
                 library.Reader = reader;
             }
             else
             {
-                openAssignment = null;
+                pageState = pageState with { Assignment = null };
                 library.Assignment = null;
                 library.Reader = null;
             }

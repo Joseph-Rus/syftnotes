@@ -17,8 +17,7 @@ public static partial class Shell
     /// <summary>The Study page, in the pane: what's due in Review, by class.</summary>
     static async Task ShowStudyAsync(string? reviewLecture = null)
     {
-        ++pageTurn;
-        LeavePage();
+        pageState = pageState.Next();
         SelectInSidebar(null);
         library.StudySelected = true;
         if (host.Remote() is null) return;
@@ -61,21 +60,21 @@ public static partial class Shell
             library.LectureStudy = null;
             return;
         }
-        _ = NameFlagsAsync(note);
+        Run(() => NameFlagsAsync(note), "NameFlags");
         if (library.LectureStudy is { } kept && kept.LectureId == note.Id) return;
         var study = new LectureStudyModel(Study(), note.Id, note.Noun)
         {
-            OnMade = () => _ = CountStudyAsync(),
+            OnMade = () => Run(() => CountStudyAsync(), "CountStudy"),
             OnReview = id =>
             {
                 Remember();
-                _ = ShowStudyAsync(reviewLecture: id);
+                Run(() => ShowStudyAsync(reviewLecture: id), "ShowStudy");
             },
         };
         study.Listen = new ListenModel(Study(), note.Id);
         library.LectureStudy = study;
-        _ = study.LoadAsync();
-        _ = study.Listen.LoadAsync();
+        Run(() => study.LoadAsync(), "study.Load");
+        Run(() => study.Listen.LoadAsync(), "study.Listen.Load");
     }
 
     static readonly Dictionary<string, List<KeyIdea>> namedFlags = [];
