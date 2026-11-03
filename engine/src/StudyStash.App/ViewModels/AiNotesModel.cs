@@ -1,3 +1,4 @@
+using StudyStash.App.Services;
 using System.Collections.ObjectModel;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
@@ -218,7 +219,7 @@ public sealed partial class AiNotesModel : ObservableObject, IDisposable
             overview = await library.EnginesAsync();
             info = await library.RewriteAsync(LectureId);
         }
-        catch
+        catch (Exception e) when (LibraryCall.Handled(e, "[ai-notes] LoadOnce"))
         {
             Offline = true;
             return;
@@ -296,8 +297,9 @@ public sealed partial class AiNotesModel : ObservableObject, IDisposable
 
     void StartPolling()
     {
-        pollCts = new CancellationTokenSource();
-        _ = PollLoop(pollCts.Token);
+        var cts = new CancellationTokenSource();
+        pollCts = cts;
+        _ = PollLoop(cts.Token);
     }
 
     void StopPolling()
@@ -306,6 +308,9 @@ public sealed partial class AiNotesModel : ObservableObject, IDisposable
         pollCts = null;
     }
 
+    /// <summary>Asks again every few seconds while <see cref="Polls"/>. A call that fails shows Offline and is tried again
+    /// on the next tick (Offline clears when one works); however the loop ends, it clears <c>pollCts</c> if that is still
+    /// its own, so the next <see cref="Apply"/> can start it again.</summary>
     async Task PollLoop(CancellationToken ct)
     {
         try
@@ -319,22 +324,28 @@ public sealed partial class AiNotesModel : ObservableObject, IDisposable
                 {
                     info = await library.RewriteAsync(LectureId);
                 }
-                catch
+                catch (Exception e) when (LibraryCall.Handled(e, "[ai-notes] PollLoop"))
                 {
                     Offline = true;
-                    return;
+                    continue;
                 }
+                if (ct.IsCancellationRequested) return;
                 if (info is null)
                 {
                     OlderLibrary = true;
                     return;
                 }
+                Offline = false;
                 Apply(info);
             }
         }
         catch (OperationCanceledException)
         {
             // Cancel()/Dispose() stopped this on purpose.
+        }
+        finally
+        {
+            if (pollCts is { } mine && mine.Token == ct) pollCts = null;
         }
     }
 
@@ -359,7 +370,7 @@ public sealed partial class AiNotesModel : ObservableObject, IDisposable
         {
             Say = ex.Message;
         }
-        catch
+        catch (Exception e) when (LibraryCall.Handled(e, "[ai-notes] Rewrite"))
         {
             Offline = true;
         }
@@ -383,7 +394,7 @@ public sealed partial class AiNotesModel : ObservableObject, IDisposable
         {
             Say = ex.Message;
         }
-        catch
+        catch (Exception e) when (LibraryCall.Handled(e, "[ai-notes] Cancel"))
         {
             Offline = true;
         }
@@ -407,7 +418,7 @@ public sealed partial class AiNotesModel : ObservableObject, IDisposable
         {
             Say = ex.Message;
         }
-        catch
+        catch (Exception e) when (LibraryCall.Handled(e, "[ai-notes] KeepOld"))
         {
             Offline = true;
         }
@@ -444,7 +455,7 @@ public sealed partial class AiNotesModel : ObservableObject, IDisposable
         {
             Say = ex.Message;
         }
-        catch
+        catch (Exception e) when (LibraryCall.Handled(e, "[ai-notes] UseNew"))
         {
             Offline = true;
         }
@@ -521,7 +532,7 @@ public sealed partial class AiNotesModel : ObservableObject, IDisposable
         {
             Say = ex.Message;
         }
-        catch
+        catch (Exception e) when (LibraryCall.Handled(e, "[ai-notes] PutBack"))
         {
             Offline = true;
         }
@@ -577,7 +588,7 @@ public sealed partial class AiNotesModel : ObservableObject, IDisposable
         {
             Say = ex.Message;
         }
-        catch
+        catch (Exception e) when (LibraryCall.Handled(e, "[ai-notes] OpenHistory"))
         {
             Offline = true;
         }
@@ -619,7 +630,7 @@ public sealed partial class AiNotesModel : ObservableObject, IDisposable
         {
             PickedSummary = ex.Message;
         }
-        catch
+        catch (Exception e) when (LibraryCall.Handled(e, "[ai-notes] Pick"))
         {
             Offline = true;
         }
@@ -822,7 +833,7 @@ public sealed partial class AiNotesModel : ObservableObject, IDisposable
         {
             EditProblem = AiWords.EditRefused(ex.Status, ex.Message);
         }
-        catch
+        catch (Exception e) when (LibraryCall.Handled(e, "[ai-notes] SaveEdit"))
         {
             Offline = true;
             EditProblem = AiWords.EditOffline;
@@ -845,7 +856,7 @@ public sealed partial class AiNotesModel : ObservableObject, IDisposable
             editBase = written;
             return true;
         }
-        catch
+        catch (Exception e) when (LibraryCall.Handled(e, "[ai-notes] SeeWhatChanged"))
         {
             return false;
         }
