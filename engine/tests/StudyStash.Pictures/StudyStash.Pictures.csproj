@@ -1,0 +1,72 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- The code that draws the app's pictures for the README, the website and the promo films (each only when its
+       STUDYSTASH_README, STUDYSTASH_SITE or STUDYSTASH_FILM switch names a folder or says yes). Not run by CI: the App
+       tests' own picture checks are the Snapshots there. It builds with the solution, so an app change that breaks it
+       shows at once. Run it with: dotnet test engine/tests/StudyStash.Pictures and a filter on the class (ReadmeShots, SiteShots, ...). -->
+  <PropertyGroup>
+    <IsPackable>false</IsPackable>
+    <OutputType>Exe</OutputType>
+    <NoWarn>$(NoWarn);xUnit1051</NoWarn>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Avalonia.Headless.XUnit" Version="12.1.3" />
+    <PackageReference Include="Avalonia.Skia" Version="12.1.3" />
+    <PackageReference Include="Microsoft.AspNetCore.TestHost" Version="10.0.12" />
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.14.1" />
+    <PackageReference Include="Microsoft.Extensions.TimeProvider.Testing" Version="10.0.0" />
+    <PackageReference Include="xunit.v3" Version="3.2.2" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="3.1.4" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Using Include="Xunit" />
+    <!-- The helpers shared with the App tests, linked from there: one copy of each. -->
+    <Using Include="StudyStash.App.Tests" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Compile Include="..\StudyStash.App.Tests\Support\WallpaperPicture.cs" Link="Shared\WallpaperPicture.cs" />
+    <Compile Include="..\StudyStash.App.Tests\DiagramsReady.cs" Link="Shared\DiagramsReady.cs" />
+    <!-- Nothing a picture does touches this computer's own settings, login items or sign-ins. -->
+    <Compile Include="..\StudyStash.App.Tests\TestSafety.cs" Link="Shared\TestSafety.cs" />
+    <Compile Include="..\StudyStash.App.Tests\FakeAiLibrary.cs" Link="Shared\FakeAiLibrary.cs" />
+    <Compile Include="..\StudyStash.App.Tests\Support\Mirror.cs" Link="Shared\Mirror.cs" />
+    <Compile Include="..\StudyStash.App.Tests\Finds.cs" Link="Shared\Finds.cs" />
+    <Compile Include="..\StudyStash.App.Tests\Support\Scenes.cs" Link="Shared\Scenes.cs" />
+    <Compile Include="..\StudyStash.App.Tests\Support\CountingLoginItems.cs" Link="Shared\CountingLoginItems.cs" />
+    <Compile Include="..\StudyStash.App.Tests\CanvasFakes.cs" Link="Shared\CanvasFakes.cs" />
+    <Compile Include="..\StudyStash.App.Tests\CanvasFixtures.cs" Link="Shared\CanvasFixtures.cs" />
+    <Compile Include="..\StudyStash.App.Tests\LibraryRig.cs" Link="Shared\LibraryRig.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\StudyStash.App\StudyStash.App.csproj" />
+    <ProjectReference Include="..\..\src\StudyStash.Engine\StudyStash.Engine.csproj" ReferenceOutputAssembly="false" Private="false" />
+  </ItemGroup>
+
+  <!-- The library's own pretend Canvas, so the app's Canvas client is tested against what a real library sends. -->
+  <ItemGroup>
+    <Compile Include="..\StudyStash.Core.Tests\FakeCanvas.cs" Link="Library\FakeCanvas.cs" />
+    <Compile Include="..\StudyStash.Core.Tests\TestUtil.cs" Link="Library\TestUtil.cs" />
+    <Compile Include="..\StudyStash.Core.Tests\FakeAi.cs" Link="Library\FakeAi.cs" />
+    <Compile Include="..\StudyStash.Core.Tests\FakeAgents.cs" Link="Library\FakeAgents.cs" />
+    <Compile Include="..\StudyStash.Core.Tests\TestSite.cs" Link="Library\TestSite.cs" />
+    <Compile Include="..\StudyStash.Core.Tests\StudyLibrary.cs" Link="Library\StudyLibrary.cs" />
+    <Compile Include="..\StudyStash.Core.Tests\FakeVoicePack.cs" Link="Library\FakeVoicePack.cs" />
+    <Compile Include="..\StudyStash.Core.Tests\E2E\FakeCanvasHttp.cs" Link="Library\FakeCanvasHttp.cs" />
+    <Compile Include="..\StudyStash.Core.Tests\E2E\CanvasServer.cs" Link="Library\CanvasServer.cs" />
+    <Compile Include="..\StudyStash.Core.Tests\E2E\ChromeRunner.cs" Link="Library\ChromeRunner.cs" />
+    <None Include="..\StudyStash.Core.Tests\Fixtures\canvas\**" Link="Fixtures\canvas\%(RecursiveDir)%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="xunit.runner.json" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="..\StudyStash.App.Tests\Fixtures\**" CopyToOutputDirectory="PreserveNewest" LinkBase="Fixtures" />
+  </ItemGroup>
+
+</Project>

@@ -51,9 +51,13 @@ dotnet test engine/StudyStash.slnx
   in a scratch folder.
 - **Signing in for Claude** (`ClaudeTests`): OAuth 2.1 with PKCE, dynamic client registration,
   token refresh and rotation, against `/.well-known/oauth-authorization-server`.
-- **Rendering the app's screens** (`STUDYSTASH_SHOTS=<dir> dotnet test engine/tests/StudyStash.App.Tests`):
-  draws every surface, light and dark, for each colour theme, to PNGs under `<dir>`, for comparing
-  against the design.
+- **Pictures of the app's screens** (`engine/tests/StudyStash.App.Tests/Snapshots`): about ten screens (Home in
+  light and dark, a class page, notes with a formula and a diagram, Due, Settings → Your AI, the first-run funnel,
+  the recorder, the menu-bar dropdown, a notification, Ask beside the notes) are drawn off screen from demo data and
+  compared with their `*.verified.png` (SSIM, so a letter's edge may differ but a moved line may not). Only the Linux
+  job checks them; `STUDYSTASH_SNAPSHOTS=1` runs them elsewhere. When one fails, CI keeps the received and verified
+  pictures as an artifact. The README's, the website's and the promo films' pictures are drawn by
+  `engine/tests/StudyStash.Pictures` instead (not run by CI).
 
 ### Live tests (need something real; CI runs them, your own computer shouldn't)
 
