@@ -17,7 +17,7 @@ RESULTS="$OUT/results.txt"
 say() { echo "$*" | tee -a "$RESULTS"; }
 size() { stat -c%s "$1"; }
 
-for n in 1 2; do
+for n in 1 2 3; do
   v="$BASE-trial.$n"
   sed -i "s:<StudyStashVersion>.*</StudyStashVersion>:<StudyStashVersion>$v</StudyStashVersion>:" "$PROPS"
   STUDYSTASH_LINUX_RIDS=linux-x64 sh linux/build.sh "$ROOT/dist/linux-v$n"
@@ -28,6 +28,8 @@ for n in 1 2; do
     --icon "$ROOT/assets/icon.png" --outputDir "$OUT/releases/linux-x64"
   echo "linux pack-seconds linux-x64 v$n $(( $(date +%s) - t0 ))" >> "$OUT/sizes.txt"
   [ "$n" != 1 ] || cp "$OUT/releases/linux-x64/"*.AppImage "$OUT/v1/"
+  # The feed as it stood at version 2, for the first update; the second one goes on to version 3.
+  [ "$n" != 2 ] || { rm -rf "$ROOT/dist/feed-v2"; cp -R "$OUT/releases/linux-x64" "$ROOT/dist/feed-v2"; }
 done
 for f in "$OUT/releases/linux-x64"/*; do echo "linux file linux-x64 $(basename "$f") $(size "$f")" >> "$OUT/sizes.txt"; done
 
@@ -55,7 +57,7 @@ say "linux: menu entries Velopack wrote: $(ls "$HOME/.local/share/applications" 
 # Update: the app's own Velopack update, from the folder of releases.
 REPORT="$OUT/update-report.txt"
 t0=$(date +%s)
-"$APP" velopack-trial-update "$OUT/releases/linux-x64" "$REPORT" || say "linux: the update command exited $?"
+"$APP" velopack-trial-update "$ROOT/dist/feed-v2" "$REPORT" || say "linux: the update command exited $?"
 $WAIT -Path "$REPORT" -Pattern " relaunched " -Seconds 300 || { cat "$REPORT"; say "linux: FAILED - no relaunch"; exit 1; }
 say "linux: update to v2 and relaunch took $(( $(date +%s) - t0 )) s"
 cat "$REPORT" | tee -a "$RESULTS"
@@ -64,6 +66,17 @@ printed=$("$APP" version | tail -n 1)
 [ "$printed" = "$V2" ] || { say "linux: FAILED - after the update it says '$printed'"; exit 1; }
 say "linux: after the update the same path runs $printed"
 grep -hi "delta" /tmp/velopack*.log 2>/dev/null | tail -n 5 | sed 's/^/linux log: /' | tee -a "$RESULTS" || true
+
+# A second update, to version 3: the package version 2 left in the cache is the base a delta needs (the first update
+# after an install has none, so it downloads the whole package).
+V3="$BASE-trial.3"
+REPORT3="$OUT/update-report-3.txt"
+t0=$(date +%s)
+"$APP" velopack-trial-update "$OUT/releases/linux-x64" "$REPORT3" || say "linux: the second update command exited $?"
+$WAIT -Path "$REPORT3" -Pattern " relaunched " -Seconds 300 || { cat "$REPORT3"; say "linux: FAILED - no relaunch to v3"; exit 1; }
+say "linux: second update (to v3) and relaunch took $(( $(date +%s) - t0 )) s"
+sed 's/^/linux v3 report: /' "$REPORT3" | tee -a "$RESULTS"
+grep -q " relaunched version=$V3 " "$REPORT3" || { say "linux: FAILED - the relaunched copy isn't $V3"; exit 1; }
 
 # Uninstall: remove the AppImage (Velopack has no uninstaller on Linux) and its package cache.
 rm -f "$APP"

@@ -80,8 +80,9 @@ if [ "$ARCH" = arm64 ]; then
     close_app
     APP="/Applications/Study Stash.app"
     say "B: installed at $APP (owner $(stat -f%Su:%Sg "$APP"); MacOS folder owner $(stat -f%Su "$APP/Contents/MacOS"))"
-    # Expected to be refused: the bundle is root's, and a silent update may not ask for a password.
-    update "$APP" "$OUT/releases/osx-universal" B "$V2"
+    # Refused, as run 1 showed: the bundle is root's, and a silent update may not ask for a password, so the app
+    # starts again on version 1 (a non-silent one shows Velopack's dialog, then macOS asks for an admin password).
+    update "$APP" "$OUT/releases/osx-universal" B "$V1"
     grep -hi "permission\|elevat" "$HOME/Library/Logs/"velopack*.log 2>/dev/null | tail -n 4 | sed 's/^/B log: /' | tee -a "$RESULTS"
     sudo rm -rf "$APP"
   else
@@ -97,6 +98,18 @@ plist=$(/usr/libexec/PlistBuddy -c "Print :CFBundleShortVersionString" "$APP/Con
 say "C: today's updater would see: Info.plist $plist; codesign $(verify "$APP"); version $("$APP/Contents/MacOS/StudyStash" version); under Rosetta $(arch -x86_64 "$APP/Contents/MacOS/StudyStash" version 2>&1 | tail -n 1)"
 update "$APP" "$OUT/releases/osx-universal" C "$V2"
 rm -rf "$APP" "$HOME/Library/Caches/velopack/SyftNotes"
+
+# --- E: the layout experiment (mac-pack.sh: the .NET trees under Contents/Resources), dragged in, then updated
+APP="/Applications/Study Stash.app"
+if ls "$OUT/v1/osx-universal-res/"*-Portable.zip > /dev/null 2>&1; then
+  ditto -x -k "$(ls "$OUT/v1/osx-universal-res/"*-Portable.zip)" /Applications/
+  say "E: Resources layout: codesign $(verify "$APP"); version $("$APP/Contents/MacOS/StudyStash" version 2>&1 | tail -n 1); under Rosetta $(arch -x86_64 "$APP/Contents/MacOS/StudyStash" version 2>&1 | tail -n 1)"
+  update "$APP" "$OUT/releases/osx-universal-res" E "$V2"
+  say "E: under Rosetta after the update: $(arch -x86_64 "$APP/Contents/MacOS/StudyStash" version 2>&1 | tail -n 1)"
+  rm -rf "$APP" "$HOME/Library/Caches/velopack/SyftNotes"
+else
+  fail "E: no osx-universal-res package (see sizes.txt)"
+fi
 
 # --- D: this processor's own package
 APP="/Applications/Syft Notes.app"

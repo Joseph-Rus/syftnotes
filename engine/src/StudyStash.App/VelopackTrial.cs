@@ -22,7 +22,10 @@ static class VelopackTrial
     /// <summary>An exit code when the arguments were one of the trial's commands or a Velopack hook; null otherwise.</summary>
     public static int? Run(string[] args)
     {
-        VelopackApp.Build().Run();
+        // Not applied at start-up: Velopack would otherwise apply a downloaded update whenever the program starts, even
+        // as `mcp` for an AI app or as the background library, and start it again in its place (run 1 of the trial saw
+        // `version` do that). Only the trial's own command applies one, as AppUpdates would.
+        VelopackApp.Build().SetAutoApplyOnStartup(false).Run();
         if (args.Length == 3 && args[0] == "velopack-trial-update") return Update(args[1], args[2]);
         if (args.Length == 2 && args[0] == "velopack-trial-report") return Report(args[1], "relaunched");
         return null;

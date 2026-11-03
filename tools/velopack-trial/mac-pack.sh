@@ -24,6 +24,9 @@ for n in 1 2; do
   echo "=== $v: the universal app, as today"
   t0=$(date +%s)
   sh macos/build-app.sh "$ROOT/dist/mac"
+  # A copy for the layout experiment below, taken before signing.
+  rm -rf "$ROOT/dist/res" && mkdir -p "$ROOT/dist/res"
+  ditto "$ROOT/dist/mac/Study Stash.app" "$ROOT/dist/res/Study Stash.app"
   STUDYSTASH_SIGN_REHEARSAL=1 sh macos/sign-release.sh "$ROOT/dist/mac"
   echo "mac today-dmg v$n $(size "$ROOT/dist/mac/Syft-Notes.dmg") (built and signed in $(( $(date +%s) - t0 )) s)" >> "$OUT/sizes.txt"
 
@@ -34,6 +37,28 @@ for n in 1 2; do
     --signAppIdentity "$STUDYSTASH_SIGN_IDENTITY" --keychain "$STUDYSTASH_SIGN_KEYCHAIN" --signDisableDeep \
     --signEntitlements "$ROOT/macos/StudyStash.entitlements" --outputDir "$OUT/releases/osx-universal"
   echo "mac pack-seconds osx-universal v$n $(( $(date +%s) - t0 ))" >> "$OUT/sizes.txt"
+
+  # The layout experiment (osx-universal-res): each processor's .NET tree under Contents/Resources/<arch>, with
+  # Contents/MacOS/<arch> a link to it, so the launcher is unchanged. Velopack's packages keep no extended attributes,
+  # where codesign keeps the signature of every file that isn't a Mach-O (the .dll files); in Resources such a file is
+  # sealed by its hash instead, which survives an update.
+  RES="$ROOT/dist/res/Study Stash.app"
+  for arch in arm64 x64; do
+    mv "$RES/Contents/MacOS/$arch" "$RES/Contents/Resources/$arch"
+    ln -s "../Resources/$arch" "$RES/Contents/MacOS/$arch"
+  done
+  find "$RES/Contents/Resources/arm64" "$RES/Contents/Resources/x64" -type f -print0 | xargs -0 -n 25 -P 6 sh macos/codesign-files.sh
+  sh macos/codesign-files.sh "$RES/Contents/MacOS/StudyStash"
+  if codesign --force --options runtime --timestamp --entitlements macos/StudyStash.entitlements \
+    --keychain "$STUDYSTASH_SIGN_KEYCHAIN" --sign "$STUDYSTASH_SIGN_IDENTITY" "$RES" \
+    && codesign --verify --deep --strict --verbose=2 "$RES" && t0=$(date +%s) && vpk pack --packId SyftNotes --packVersion "$v" \
+    --packDir "$RES" --mainExe StudyStash --channel osx-universal-res --packTitle "Study Stash" --packAuthors "Syft Notes" \
+    --signAppIdentity "$STUDYSTASH_SIGN_IDENTITY" --keychain "$STUDYSTASH_SIGN_KEYCHAIN" --signDisableDeep \
+    --signEntitlements "$ROOT/macos/StudyStash.entitlements" --outputDir "$OUT/releases/osx-universal-res"; then
+    echo "mac pack-seconds osx-universal-res v$n $(( $(date +%s) - t0 ))" >> "$OUT/sizes.txt"
+  else
+    echo "mac FAILED pack osx-universal-res v$n" >> "$OUT/sizes.txt"
+  fi
 
   icns="$ROOT/dist/mac/Study Stash.app/Contents/Resources/AppIcon.icns"
   minos=$(/usr/libexec/PlistBuddy -c "Print :LSMinimumSystemVersion" "$ROOT/dist/mac/Study Stash.app/Contents/Info.plist")
@@ -51,7 +76,7 @@ for n in 1 2; do
     # A failure here is a finding, not the end of the run: the universal packages above are the main question.
     if vpk pack --packId SyftNotes --packVersion "$v" --packDir "$pub" --mainExe StudyStash --runtime "osx-$arch" \
       --channel "osx-$arch" --packTitle "Syft Notes" --packAuthors "Syft Notes" --icon "$icns" \
-      --bundleId com.study-stash.app --plist "$ROOT/dist/Info-$arch.plist" \
+      --plist "$ROOT/dist/Info-$arch.plist" \
       --signAppIdentity "$STUDYSTASH_SIGN_IDENTITY" --keychain "$STUDYSTASH_SIGN_KEYCHAIN" \
       --signEntitlements "$ROOT/macos/StudyStash.entitlements" --outputDir "$OUT/releases/osx-$arch"; then
       echo "mac pack-seconds osx-$arch v$n $(( $(date +%s) - t0 ))" >> "$OUT/sizes.txt"
@@ -61,14 +86,14 @@ for n in 1 2; do
   done
 
   if [ "$n" = 1 ]; then
-    for c in osx-universal osx-arm64 osx-x64; do
+    for c in osx-universal osx-universal-res osx-arm64 osx-x64; do
       mkdir -p "$OUT/v1/$c"
       cp "$OUT/releases/$c/"*-Setup.pkg "$OUT/releases/$c/"*-Portable.zip "$OUT/v1/$c/" || echo "mac FAILED no v1 installers for $c" >> "$OUT/sizes.txt"
     done
   fi
 done
 
-for c in osx-universal osx-arm64 osx-x64; do
+for c in osx-universal osx-universal-res osx-arm64 osx-x64; do
   [ -d "$OUT/releases/$c" ] || continue
   for f in "$OUT/releases/$c"/*; do
     echo "mac file $c $(basename "$f") $(size "$f")" >> "$OUT/sizes.txt"
