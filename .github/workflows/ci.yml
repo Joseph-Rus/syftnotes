@@ -201,9 +201,9 @@ jobs:
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-dotnet@v4
+      - uses: ./.github/actions/dotnet
         with:
-          dotnet-version: "10.0.x"
+          packages: engine-${{ matrix.slug }}
       - uses: ./.github/actions/whisper-tiny
       - name: Where a crashed test process leaves its report
         shell: bash
@@ -359,9 +359,9 @@ jobs:
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-dotnet@v4
+      - uses: ./.github/actions/dotnet
         with:
-          dotnet-version: "10.0.x"
+          packages: engine-${{ runner.os == 'Windows' && 'app' || 'all' }}
       - name: Build the app's tests
         run: dotnet build engine/tests/StudyStash.App.Tests
       - name: Windows - Git for Windows out of reach
@@ -418,9 +418,9 @@ jobs:
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-dotnet@v4
+      - uses: ./.github/actions/dotnet
         with:
-          dotnet-version: "10.0.x"
+          packages: mac-app
       - uses: ./.github/actions/whisper-tiny
         if: needs.version.outputs.tested != 'true'
       - name: install.sh parses
@@ -646,9 +646,9 @@ jobs:
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-dotnet@v4
+      - uses: ./.github/actions/dotnet
         with:
-          dotnet-version: "10.0.x"
+          packages: windows-app
       - name: Inno Setup 6, if this image lacks it
         if: needs.version.outputs.installers == 'true'
         shell: pwsh
@@ -1028,9 +1028,9 @@ jobs:
     runs-on: ${{ matrix.runner }}
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-dotnet@v4
+      - uses: ./.github/actions/dotnet
         with:
-          dotnet-version: "10.0.x"
+          packages: linux-app
       - uses: actions/setup-node@v4
         with:
           node-version: 22
