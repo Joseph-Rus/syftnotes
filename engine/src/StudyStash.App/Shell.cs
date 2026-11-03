@@ -78,6 +78,8 @@ public static partial class Shell
         // First, so a copy started a moment after this one finds it listening (what it says waits for the UI thread).
         Desktop.Listen(home, OnHandOff, stop.Token);
         Dispatcher.UIThread.UnhandledException += OnUnhandled;
+        // Work started and not waited for that fails unexpectedly is said the same way.
+        UiTasks.Use(Program.Log, SayOops);
         desktop.ShutdownMode = ShutdownMode.OnExplicitShutdown;
         // The system quitting the app (logging out, the Dock's Quit): tidy up and let it go on.
         desktop.ShutdownRequested += (_, _) => CleanUp();
@@ -123,7 +125,7 @@ public static partial class Shell
         if (host.PretendMic) Program.Log("[app] recording from a pretend microphone (STUDYSTASH_MIC_FILE)");
         Wire();
         host.Start();
-        _ = SuggestLighterModelAsync();
+        Run(() => SuggestLighterModelAsync(), "SuggestLighterModel");
         AppUpdates.Start(host, stop.Token, SayUpdate, () => TypingNotes);
         if (AppUpdates.Current is { } updater)
             updater.FoundChanged += () => Dispatcher.UIThread.Post(() => panel.UpdateVersion = updater.Found is { } r ? string.Join('.', r.Version) : null);
@@ -250,6 +252,13 @@ public static partial class Shell
     {
         Program.Log($"[error] {e.Exception}");
         e.Handled = true;
+        SayOops();
+    }
+
+    /// <summary>Something unexpected went wrong (already written in the log): the student is told once, not a toast for
+    /// each of a burst, and not while quitting.</summary>
+    static void SayOops()
+    {
         if (quitting || DateTime.UtcNow - lastOops < TimeSpan.FromSeconds(10)) return;
         lastOops = DateTime.UtcNow;
         try
@@ -262,6 +271,10 @@ public static partial class Shell
             Program.Log($"[error] couldn't say so: {again.Message}");
         }
     }
+
+    /// <summary>Starts <paramref name="work"/> without waiting for it; an unexpected failure is logged with
+    /// <paramref name="what"/> and said (<see cref="UiTasks"/>), never lost.</summary>
+    static void Run(Func<Task> work, string what) => UiTasks.Run(work, what);
 
     static void OnShortcut(Shortcut s)
     {
@@ -524,7 +537,7 @@ public static partial class Shell
         panel.OnUpdate = () =>
         {
             panel.UpdateVersion = null;
-            _ = UpdateNowAsync();
+            Run(() => UpdateNowAsync(), "UpdateNow");
         };
         panel.OnSwitchClass = PickClass;
         panel.OnPickClass = name =>
@@ -537,7 +550,7 @@ public static partial class Shell
         panel.ComingUp.OnRecord = id =>
         {
             panelWindow?.Hide();
-            _ = RecordEventAsync(id);
+            Run(() => RecordEventAsync(id), "RecordEvent");
         };
         panel.OnFixProblem = FixProblem;
         panel.OnOpenLecture = OpenRecentLecture;
@@ -559,7 +572,7 @@ public static partial class Shell
         };
         recorder.Busy = () => recorderWindow?.Refitting == true;
 
-        quick.OnQuery = q => _ = SearchAsync(q);
+        quick.OnQuery = q => Run(() => SearchAsync(q), "Search");
         quick.OnAsk = AskQuick;
         quick.OnOpen = OpenQuickRow;
         quick.OnClose = () => quickWindow?.Hide();
@@ -571,33 +584,33 @@ public static partial class Shell
             {
                 // Home from the sidebar is every note again, whatever its filter was on.
                 homeUnsorted = false;
-                _ = ShowHomeAsync();
+                Run(() => ShowHomeAsync(), "ShowHome");
             }
             else if (c.IsDue)
             {
                 dueOnly = null;
-                _ = ShowDuePageAsync();
+                Run(() => ShowDuePageAsync(), "ShowDuePage");
             }
-            else _ = ShowFolderAsync(c.Name);
+            else Run(() => ShowFolderAsync(c.Name), "ShowFolder");
         };
         library.OnStudy = () =>
         {
             Remember();
-            _ = ShowStudyAsync();
+            Run(() => ShowStudyAsync(), "ShowStudy");
         };
         library.OnMoveToFolder = MoveToFolderAsync;
         library.OnFolder = name =>
         {
             Remember();
-            _ = ShowFolderAsync(name);
+            Run(() => ShowFolderAsync(name), "ShowFolder");
         };
         library.OnLeaveNote = LeaveNote;
         library.PickerForNote = () => library.Note is { Live: false } note ? PickerFor(note.Id, note.ClassName) : null;
         library.OnUndoMove = move => MoveNoteAsync(move.Id, move.To, move.From, say: false);
         library.OnOpenRecording = OpenRecording;
-        library.ComingUp.OnRecord = id => _ = RecordEventAsync(id);
-        library.ComingUp.OnFile = row => _ = FileEventAsync(row);
-        panel.ComingUp.OnFile = row => _ = FileEventAsync(row);
+        library.ComingUp.OnRecord = id => Run(() => RecordEventAsync(id), "RecordEvent");
+        library.ComingUp.OnFile = row => Run(() => FileEventAsync(row), "FileEvent");
+        panel.ComingUp.OnFile = row => Run(() => FileEventAsync(row), "FileEvent");
         library.OnGoBack = GoBack;
         library.OnGoForward = GoForward;
         library.SidebarHidden = host.Settings.SidebarHidden;
@@ -607,7 +620,7 @@ public static partial class Shell
         library.OnAddClass = () => ShowSettings("Classes");
         library.OnDelete = DeleteLectureAsync;
         library.OnUndo = UndoDeleteAsync;
-        library.OnExport = () => _ = ExportAsync();
+        library.OnExport = () => Run(() => ExportAsync(), "Export");
         library.OnMore = MoreMenu;
         library.OnSupportAnswer = answer => SupportAsk.Answer(host, answer, url => Dialogs.OpenUrl(url), DateTimeOffset.Now);
         // A diagram in a lecture's notes asks about its boxes in the lecture's Ask bar and finds them in its transcript;
@@ -665,7 +678,7 @@ public static partial class Shell
             // The page it was on isn't a place to go back to: it's the note's page now (or, too short to keep, gone).
             library.Note = null;
             library.Ask = null;
-            if (l is not null && !stay) _ = ShowLectureAsync(l.Id);
+            if (l is not null && !stay) Run(() => ShowLectureAsync(l.Id), "ShowLecture");
             else if (!stay) LeaveNote();
         }
         if (id is not null) backPlaces.RemoveAll(p => p.Lecture == id && l is null);
@@ -738,13 +751,13 @@ public static partial class Shell
                 Dialogs.OpenUrl(host.MicSettingsUrl);
                 break;
             case ProblemKind.WhisperFailed:
-                _ = host.RedownloadModel();
+                Run(() => host.RedownloadModel(), "host.RedownloadModel");
                 break;
             case ProblemKind.DownloadFailed or ProblemKind.NoModel:
-                _ = host.DownloadModelAsync();
+                Run(() => host.DownloadModelAsync(), "host.DownloadModel");
                 break;
             case ProblemKind.LibraryStopped:
-                _ = host.RefreshLocalLibraryAsync();
+                Run(() => host.RefreshLocalLibraryAsync(), "host.RefreshLocalLibrary");
                 break;
             case ProblemKind.WrongPassword or ProblemKind.NotSetUp:
                 ShowSettings("Connection");
@@ -836,7 +849,7 @@ public static partial class Shell
         // A recording in no folder has no folder to ask about.
         if (cls.Length == 0) ask.OnlyScopes("lecture", "all");
         ask.NameScopes(Nouns.For(cls, cls.Length > 0 ? host.GroupOf(cls) : ""), cls.Length > 0 ? ClassNames.Display(cls) : null);
-        _ = ask.Load();
+        Run(() => ask.Load(), "ask.Load");
         return ask;
     }
 
@@ -1067,7 +1080,7 @@ public static partial class Shell
         }
         quick.Answering = false;
         quick.Query = "";
-        _ = SearchAsync("");
+        Run(() => SearchAsync(""), "Search");
         var pointer = Floating.Pointer();
         var (_, scale) = quickWindow.WorkArea(pointer);
         var size = quickWindow.Measured(scale);
@@ -1226,10 +1239,20 @@ public static partial class Shell
         // The library in front: the small pill goes now, not only once macOS says the app is active (it may not, when
         // another app was in front), and comes back when the library is left.
         if (recorderWindow?.IsVisible == true && !recorder.Expanded) recorderWindow.Hide();
-        _ = LoadLibraryAsync().ContinueWith(_ => Dispatcher.UIThread.Post(() =>
+        Run(async () =>
         {
-            if (librarySplash is { } splash) splash.IsReady = true;
-        }), TaskScheduler.Default);
+            try
+            {
+                await LoadLibraryAsync();
+            }
+            finally
+            {
+                Dispatcher.UIThread.Post(() =>
+                {
+                    if (librarySplash is { } splash) splash.IsReady = true;
+                });
+            }
+        }, "LoadLibrary");
     }
 
     /// <summary>
@@ -1332,7 +1355,7 @@ public static partial class Shell
         };
         guided.OnFinish = () => model.OnFinish?.Invoke();
         setup.OnEnter = step => EnterSetupStep(model, step);
-        setup.OnCopy = text => _ = w.Clipboard?.SetTextAsync(text);
+        setup.OnCopy = text => Run(() => w.Clipboard?.SetTextAsync(text) ?? Task.CompletedTask, "Copy");
         // Setup by hand's link back to the guided setup, named for the AI when it's ready.
         setup.OnGuided = () => guided.BackToChatCommand.Execute(null);
         // The library's setup and the laptop's have their own names: the window's follows the flow.
@@ -1374,7 +1397,7 @@ public static partial class Shell
             if (setup == model) setup = null;
             if (guidedSetup == guided) guidedSetup = null;
             guided.Dispose();
-            if (door is not null) _ = door.DisposeAsync().AsTask();
+            if (door is { } doorOpen) Run(() => doorOpen.DisposeAsync().AsTask(), "close the tools door");
             mic.Close();
             if (micCheck == mic) micCheck = null;
             model.Canvas?.Dispose();
@@ -1385,7 +1408,7 @@ public static partial class Shell
         UpdateDock();
         w.Activate();
         Desktop.Activate();
-        _ = OpenGuidedAsync();
+        Run(() => OpenGuidedAsync(), "OpenGuided");
 
         async Task OpenGuidedAsync()
         {
@@ -1493,7 +1516,7 @@ public static partial class Shell
             var watch = CanvasPoll();
             var connect = new CanvasConnectModel(Canvas(), watch, forSetup: true) { ShowFooter = false };
             // Started, not waited for: finding the courses can take a while, and the sync screen shows it as it goes.
-            _ = StartConnectAsync(connect, watch);
+            Run(() => StartConnectAsync(connect, watch), "StartConnect");
             return Task.FromResult<CanvasConnectModel?>(connect);
         },
         MakeSync = connect => new FirstSyncModel(connect, Canvas(), CanvasPoll())
@@ -1612,10 +1635,10 @@ public static partial class Shell
                         guided.ReadyForNotes = id =>
                         {
                             // Back on this step: the library looks at it afresh, and it's the pick when it works.
-                            if (model.Ai?.Engines.FirstOrDefault(r => r.Id == id) is { } row) _ = row.CheckAgainCommand.ExecuteAsync(null);
+                            if (model.Ai?.Engines.FirstOrDefault(r => r.Id == id) is { } row) Run(() => row.CheckAgainCommand.ExecuteAsync(null), "row.CheckAgainCommand.Execute");
                         };
                 }
-                _ = model.Ai.Load();
+                Run(() => model.Ai.Load(), "model.Ai.Load");
                 break;
             case SetupStep.Canvas when model.Canvas is null:
                 var watch = CanvasPoll();
@@ -1623,7 +1646,7 @@ public static partial class Shell
                 connect.OnSkip = () => model.SkipCommand.Execute(null);
                 connect.OnFinish = () => model.NextCommand.Execute(null);
                 model.Canvas = connect;
-                _ = StartConnectAsync(connect, watch);
+                Run(() => StartConnectAsync(connect, watch), "StartConnect");
                 break;
         }
     }
@@ -1730,7 +1753,7 @@ public static partial class Shell
         FollowView(w, (Control)w.Content!);
         Look.Apply(w);
         AppMenu.Attach(w, ShowLibrary, SettingsFromAnywhere);
-        model.Lib.Copy = text => _ = w.Clipboard?.SetTextAsync(text);
+        model.Lib.Copy = text => Run(() => w.Clipboard?.SetTextAsync(text) ?? Task.CompletedTask, "Copy");
         // AI tool access's Copy buttons (the web address, a fix link, the setup for another app).
         model.Access.Copy = text => w.Clipboard?.SetTextAsync(text) ?? Task.CompletedTask;
         model.Lib.ClassesChanged = LibraryClassesChanged;
@@ -1763,7 +1786,7 @@ public static partial class Shell
         w.Closed += (_, _) =>
         {
             closed = true;
-            if (door is not null) _ = door.DisposeAsync().AsTask();
+            if (door is { } doorOpen) Run(() => doorOpen.DisposeAsync().AsTask(), "close the tools door");
             settingsWindow = null;
             model.Dispose();
             UpdateDock();
@@ -1967,7 +1990,7 @@ public static partial class Shell
             card = new WelcomeCardModel(mac)
             {
                 OnShowIt = MoveIconIntoView,
-                OnRetry = () => _ = host.DownloadModelAsync(),
+                OnRetry = () => Run(() => host.DownloadModelAsync(), "host.DownloadModel"),
                 OnMic = () => Dialogs.OpenUrl(host.MicSettingsUrl),
                 OnGotIt = PutWelcomeCardAway,
                 OnGoogle = () => GetNotesWith("gemini", null),

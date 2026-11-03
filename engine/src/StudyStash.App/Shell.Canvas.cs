@@ -52,7 +52,7 @@ public static partial class Shell
         canvasWatch.Changed += OnCanvasChanged;
         canvasFeed?.Dispose();
         canvasFeed = new CanvasFeed(context, canvasWatch);
-        canvasFeed.Updated += () => Dispatcher.UIThread.Post(() => _ = CanvasUpdatedAsync());
+        canvasFeed.Updated += () => Dispatcher.UIThread.Post(() => Run(() => CanvasUpdatedAsync(), "CanvasUpdated"));
         canvasNotifier = new CanvasNotifier(canvas) { OnOpen = OpenCanvasNotification };
         return canvas;
     }
@@ -80,9 +80,9 @@ public static partial class Shell
         }
         if (want && canvasNotifyTimer is null)
         {
-            canvasNotifyTimer = new DispatcherTimer(TimeSpan.FromMinutes(1), DispatcherPriority.Background, (_, _) => _ = PollCanvasNotificationsAsync());
+            canvasNotifyTimer = new DispatcherTimer(TimeSpan.FromMinutes(1), DispatcherPriority.Background, (_, _) => Run(() => PollCanvasNotificationsAsync(), "PollCanvasNotifications"));
             canvasNotifyTimer.Start();
-            _ = PollCanvasNotificationsAsync();
+            Run(() => PollCanvasNotificationsAsync(), "PollCanvasNotifications");
         }
     }
 
@@ -194,7 +194,7 @@ public static partial class Shell
         UpdateNextDue();
         UpdateDueItem();
         // A sync's news (new work, a score, an announcement) shows now, not at the notifications' next minute.
-        _ = PollCanvasNotificationsAsync();
+        Run(() => PollCanvasNotificationsAsync(), "PollCanvasNotifications");
         termAssignments = null;
         if (mainWindow?.IsVisible != true) return;
         if (overviewOf is { } over) await ShowOverviewAsync(over);
@@ -393,7 +393,7 @@ public static partial class Shell
         model.OnFinish = () =>
         {
             w.Close();
-            _ = CanvasSyncedAsync();
+            Run(() => CanvasSyncedAsync(), "CanvasSynced");
         };
         w.Closed += (_, _) =>
         {
@@ -406,7 +406,7 @@ public static partial class Shell
         UpdateDock();
         w.Activate();
         Desktop.Activate();
-        _ = StartConnectAsync(model, watch);
+        Run(() => StartConnectAsync(model, watch), "StartConnect");
     }
 
     static async Task StartConnectAsync(CanvasConnectModel model, CanvasWatch watch)
