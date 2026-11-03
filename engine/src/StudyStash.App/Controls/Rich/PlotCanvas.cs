@@ -186,13 +186,13 @@ sealed class PlotCanvas : Control
         return paint.Role switch
         {
             PlotRole.Series => Rgb(paint.Index is >= 0 and < 5 ? (dark ? PlotPalette.DarkSeries : PlotPalette.LightSeries)[paint.Index] : (dark ? PlotPalette.DarkPaper : PlotPalette.Light).Red),
-            PlotRole.Ink => ColorOf(Ink, dark ? Colors.White : Color.Parse("#1D1D1F")),
-            PlotRole.Ink2 => ColorOf(Ink2, dark ? Color.Parse("#B8B8BE") : Color.Parse("#5E5E63")),
-            PlotRole.Ink3 => ColorOf(Ink3, dark ? Color.Parse("#8E8E94") : Color.Parse("#86868B")),
+            PlotRole.Ink => ColorOf(Ink, (dark ? Skin.Dark : Skin.Light).Ink),
+            PlotRole.Ink2 => ColorOf(Ink2, (dark ? Skin.Dark : Skin.Light).InkMuted),
+            PlotRole.Ink3 => ColorOf(Ink3, (dark ? Skin.Dark : Skin.Light).InkSubtle),
             PlotRole.Grid => ColorOf(Grid, dark ? Color.FromArgb(30, 255, 255, 255) : Color.FromArgb(20, 0, 0, 0)),
             PlotRole.Axis => WithAlpha(ColorOf(Ink3, Colors.Gray), 0.75),
             PlotRole.Surface when Still => Colors.White, // paper
-            PlotRole.Surface => Over(ColorOf(Layer, Colors.Transparent), Opaque(ColorOf(Paper, dark ? Color.Parse("#1E1E20") : Colors.White), dark)),
+            PlotRole.Surface => Over(ColorOf(Layer, Colors.Transparent), Opaque(ColorOf(Paper, (dark ? Skin.Dark : Skin.Light).Surface), dark)),
             _ => dark ? Color.FromArgb(72, 255, 255, 255) : Color.FromArgb(80, 0, 0, 0),
         };
     }

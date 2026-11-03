@@ -34,68 +34,30 @@ public static class Oklch
 }
 
 /// <summary>
-/// A colour theme: the accent's hue, chroma and lightness (<see cref="H"/>, <see cref="C"/>, <see cref="L"/>), the
-/// faint hue the neutral surfaces lean to (<see cref="Nh"/>, <see cref="Nc"/>), the design's wallpaper hues
-/// (<see cref="Wall"/>) and the highlighter's hue (<see cref="Hl"/>). Every accent token is worked out from these,
-/// the way the design's <c>renderVals()</c> does.
+/// What a colour theme was. There's one look now (the Syft look, <see cref="Skin"/>), light, dark or following the
+/// computer; the twenty themes and their palettes are gone. The name stays because app.json may still keep one
+/// ("Lagoon", "Plum"): it loads as before and the app simply shows the Syft look.
 /// </summary>
-public sealed record ColourTheme(string Name, double H, double C, double L, double Nh, double Nc, double[] Wall, double Hl)
-{
-    /// <summary>A light accent (Chalkboard, Highlighter, Lilac, Peach, Mint): text on it is dark ink, and dark mode keeps it as it is.</summary>
-    public bool IsLight => L >= 0.75;
+public sealed record ColourTheme(string Name);
 
-    /// <summary>The design's <c>o(l, c, a)</c>: the accent's hue at another lightness and chroma.</summary>
-    public Color O(double l, double c, double alpha = 1) => Oklch.ToColor(l, c, H, alpha);
-
-    /// <summary>The design's <c>ok(l, nc·k, nh, a)</c>: a surface with the theme's faint lean.</summary>
-    public Color Neutral(double l, double chroma, double alpha = 1) => Oklch.ToColor(l, Nc * chroma, Nh, alpha);
-}
-
-/// <summary>The twenty colour themes the student can pick from, in the picker's order (five to a row: the first ten,
-/// then ten more round the colour wheel from blue to green). Lagoon (teal) is the default.</summary>
+/// <summary>The one look, under the name a saved setting would have.</summary>
 public static class ColourThemes
 {
-    public static readonly IReadOnlyList<ColourTheme> All =
-    [
-        new("Lagoon", 195, 0.12, 0.58, 210, 0.012, [195, 160, 240], 95),
-        new("Library", 160, 0.10, 0.50, 80, 0.014, [150, 70, 40], 95),
-        new("Blueprint", 262, 0.19, 0.55, 250, 0.014, [255, 220, 290], 200),
-        new("Marmalade", 50, 0.17, 0.64, 75, 0.018, [60, 25, 95], 95),
-        new("Plum", 330, 0.14, 0.52, 320, 0.012, [330, 290, 20], 350),
-        new("Chalkboard", 95, 0.14, 0.84, 180, 0.02, [180, 150, 220], 95),
-        new("Highlighter", 125, 0.21, 0.86, 260, 0.004, [125, 300, 200], 125),
-        new("Terracotta", 35, 0.13, 0.58, 60, 0.016, [35, 80, 300], 85),
-        new("Graphite", 260, 0.01, 0.42, 260, 0.004, [250, 260, 240], 95),
-        new("Original red", 22, 0.19, 0.6, 30, 0.003, [250, 25, 160], 22),
-        new("Sky", 235, 0.13, 0.62, 235, 0.012, [235, 200, 270], 95),
-        new("Midnight", 275, 0.13, 0.42, 270, 0.016, [275, 245, 305], 85),
-        new("Violet", 295, 0.17, 0.55, 290, 0.012, [295, 260, 330], 95),
-        new("Lilac", 300, 0.10, 0.82, 300, 0.012, [300, 270, 340], 320),
-        new("Bubblegum", 355, 0.17, 0.64, 350, 0.012, [355, 320, 30], 350),
-        new("Peach", 55, 0.10, 0.84, 55, 0.016, [55, 25, 85], 85),
-        new("Mocha", 55, 0.07, 0.47, 65, 0.02, [55, 35, 85], 85),
-        new("Moss", 115, 0.11, 0.56, 110, 0.014, [115, 85, 150], 95),
-        new("Clover", 148, 0.16, 0.60, 150, 0.012, [148, 120, 180], 95),
-        new("Mint", 165, 0.11, 0.87, 165, 0.012, [165, 135, 200], 165),
-    ];
+    public static readonly ColourTheme Syft = new("Syft");
 
-    public static ColourTheme Default => All[0];
+    public static readonly IReadOnlyList<ColourTheme> All = [Syft];
 
-    /// <summary>The theme with this name (as app.json keeps it), or Lagoon when there's none by that name.</summary>
-    public static ColourTheme Find(string? name) =>
-        All.FirstOrDefault(t => string.Equals(t.Name, name?.Trim(), StringComparison.OrdinalIgnoreCase)) ?? Default;
+    public static ColourTheme Default => Syft;
+
+    /// <summary>Whatever app.json names (an old theme, nothing at all), the Syft look.</summary>
+    public static ColourTheme Find(string? name) => Default;
 }
 
-/// <summary>One colour theme in the picker: its name, a swatch of its accent, and whether it's the one in use.</summary>
+/// <summary>A colour theme as Settings once listed it: its name, and whether it's the one in use.</summary>
 public sealed partial class ThemeSwatch : ObservableObject
 {
-    public ThemeSwatch(ColourTheme theme)
-    {
-        Name = theme.Name;
-        Swatch = new SolidColorBrush(theme.O(theme.L, theme.C));
-    }
+    public ThemeSwatch(ColourTheme theme) => Name = theme.Name;
 
     public string Name { get; }
-    public IBrush Swatch { get; }
     [ObservableProperty] public partial bool Chosen { get; set; }
 }

@@ -15,7 +15,7 @@
                     AutomationProperties.Name="{Binding Name}" Focusable="False">
               <Grid ColumnDefinitions="Auto,8,*">
                 <TextBlock Text="{Binding Slash}" FontSize="13" FontWeight="Medium" Foreground="{DynamicResource Fg}" />
-                <TextBlock Grid.Column="2" Text="{Binding Name}" FontSize="12" Foreground="{DynamicResource Fg2}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
+                <TextBlock Grid.Column="2" Text="{Binding Name}" FontSize="{DynamicResource FontCaption}" Foreground="{DynamicResource Fg2}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
               </Grid>
             </Button>
           </DataTemplate>

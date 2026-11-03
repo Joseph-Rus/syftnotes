@@ -75,9 +75,7 @@ public static class SettingsIndex
 
         Page("Appearance", "Pick how Syft Notes looks.", "look theme"),
         new() { Section = "Appearance", Title = "Mode", Detail = "Match system, light or dark.",
-            Words = "dark light mode night theme appearance black white", Key = "appearance", Takes = "system, light or dark" },
-        new() { Section = "Appearance", Title = "Colour theme", Detail = "The accent for buttons, the selection and highlights.",
-            Words = "color colour accent theme highlight tint", Key = "colour_theme" },
+            Words = "dark light mode night theme appearance black white color colour accent", Key = "appearance", Takes = "system, light or dark" },
 
         new() { Section = "General", Title = "Search and Record work from any app", Detail = "The shortcuts work while you're in another app.",
             Words = "global anywhere hotkeys keyboard shortcuts", Key = "shortcuts_anywhere", Short = "Shortcuts from any app", Takes = OnOff },

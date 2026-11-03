@@ -24,9 +24,6 @@ public partial class SettingsView : UserControl
         // A plain if, not a "Mac ? ... : ..." ternary: ThemeTests.Every_token_a_view_asks_for_exists reads that
         // shape as a by-look DynamicResource pair and would otherwise treat "mac"/"win" as token names.
         if (mac) Classes.Add("mac"); else Classes.Add("win");
-        // The library window's look: no accent anywhere, so whatever inside asks for it (a ticked box, a progress bar,
-        // a pane's own switches and choices) gets ink, and only the swatches show the colour themes.
-        Resources.MergedDictionaries.Add(Skin.NoAccent());
         Header.Title = mac ? "Settings" : "Syft Notes settings";
         // Fixed, like the design's canvas: set here (not by a style on the root matching itself) so it always wins.
         Width = 900;

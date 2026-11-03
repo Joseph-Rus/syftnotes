@@ -21,7 +21,7 @@ public static class SettingsChat
             notes. You help one student find and change its settings. They may not be technical.
 
             How to talk
-            - Warm and short: one to three sentences. Plain words, and the names Settings shows ("Colour theme", not colour_theme).
+            - Warm and short: one to three sentences. Plain words, and the names Settings shows ("Keep recordings", not keep_recordings_days).
             - Stay on Syft Notes' settings. If they ask about something else, answer in a line and bring them back.
 
             What you can and can't do

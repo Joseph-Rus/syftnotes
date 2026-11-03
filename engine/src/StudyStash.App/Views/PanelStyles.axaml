@@ -1,0 +1,135 @@
+<!-- The menu bar dropdown (Mac) and the tray flyout (Windows) in the Syft look, one set of rules for both: the pixel s
+     beside Record at the top, then what's coming up and the recent lectures, then search, the status and the way into
+     the app. Everything sits on the 4-point spacing and the type scale; a picked row is lilac with ink words; progress
+     is sky on the mesh; Record is the main colour (ink, paper in dark) with a coral cell, and coral means recording.
+     Hover and the picked row fade in (a colour change, not motion, so it stays with reduced motion). -->
+<Styles xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:c="using:StudyStash.App.Controls">
+
+  <!-- A row: a lecture, an event coming up, a class to pick. -->
+  <Style Selector="Button.row">
+    <Setter Property="Theme" Value="{StaticResource Surface}" />
+    <Setter Property="CornerRadius" Value="{DynamicResource RadiusControl}" />
+    <Setter Property="Padding" Value="8,6" />
+    <Setter Property="MinHeight" Value="40" />
+    <Setter Property="Foreground" Value="{DynamicResource Ink}" />
+    <Setter Property="Transitions">
+      <Transitions>
+        <BrushTransition Property="Background" Duration="0:0:0.12" />
+      </Transitions>
+    </Setter>
+  </Style>
+  <Style Selector="Button.row.selected">
+    <Setter Property="Background" Value="{DynamicResource Selected}" />
+    <Setter Property="Foreground" Value="{DynamicResource OnSelected}" />
+  </Style>
+  <Style Selector="Button.row.selected /template/ Border#PART_Wash">
+    <Setter Property="Background" Value="Transparent" />
+  </Style>
+  <Style Selector="TextBlock.row-title">
+    <Setter Property="FontSize" Value="{DynamicResource FontBody}" />
+    <Setter Property="TextTrimming" Value="CharacterEllipsis" />
+  </Style>
+  <Style Selector="TextBlock.row-sub, TextBlock.row-when">
+    <Setter Property="FontSize" Value="{DynamicResource FontCaption}" />
+    <Setter Property="Foreground" Value="{DynamicResource InkMuted}" />
+    <Setter Property="TextTrimming" Value="CharacterEllipsis" />
+  </Style>
+  <Style Selector="Button.row.selected TextBlock.row-sub, Button.row.selected TextBlock.row-when">
+    <Setter Property="Foreground" Value="{DynamicResource SelectedMuted}" />
+  </Style>
+  <Style Selector="Button.row.selected c|Progress">
+    <Setter Property="Track" Value="{DynamicResource OnSelected}" />
+    <Setter Property="Opacity" Value="0.9" />
+  </Style>
+  <!-- A part's heading: small, bold, muted. -->
+  <Style Selector="TextBlock.drop-label">
+    <Setter Property="FontSize" Value="{DynamicResource FontCaption}" />
+    <Setter Property="FontWeight" Value="SemiBold" />
+    <Setter Property="Foreground" Value="{DynamicResource InkMuted}" />
+    <Setter Property="Margin" Value="8,0,8,2" />
+  </Style>
+  <Style Selector="TextBlock.drop-hint">
+    <Setter Property="FontSize" Value="{DynamicResource FontCaption}" />
+    <Setter Property="Foreground" Value="{DynamicResource InkMuted}" />
+    <Setter Property="TextTrimming" Value="CharacterEllipsis" />
+  </Style>
+
+  <!-- Record: the main button, ink on paper (paper on ink in dark), the coral cell that starts a recording in it. -->
+  <Style Selector="Button.drop-record">
+    <Setter Property="Theme" Value="{StaticResource Surface}" />
+    <Setter Property="Height" Value="34" />
+    <Setter Property="Padding" Value="12,0" />
+    <Setter Property="c:Cell.Round" Value="True" />
+    <Setter Property="Background" Value="{DynamicResource Accent}" />
+    <Setter Property="Foreground" Value="{DynamicResource OnAccent}" />
+  </Style>
+  <Style Selector="Button.drop-record:pointerover">
+    <Setter Property="Opacity" Value="0.9" />
+  </Style>
+  <Style Selector="Button.drop-record /template/ Border#PART_Wash">
+    <Setter Property="IsVisible" Value="False" />
+  </Style>
+  <!-- The quiet square beside it (the class switcher), the gear, Pause: the mesh, ink words. -->
+  <Style Selector="Button.drop-quiet">
+    <Setter Property="Theme" Value="{StaticResource Surface}" />
+    <Setter Property="c:Cell.Round" Value="True" />
+    <Setter Property="Background" Value="{DynamicResource SurfaceRaised}" />
+    <Setter Property="Foreground" Value="{DynamicResource Ink}" />
+    <Setter Property="HorizontalContentAlignment" Value="Center" />
+  </Style>
+  <Style Selector="Button.drop-plain">
+    <Setter Property="Theme" Value="{StaticResource Surface}" />
+    <Setter Property="c:Cell.Round" Value="True" />
+    <Setter Property="Foreground" Value="{DynamicResource Ink}" />
+    <Setter Property="VerticalContentAlignment" Value="Center" />
+  </Style>
+  <!-- Stop: a coral cell with an ink square, its word in ink. -->
+  <Style Selector="Button.drop-stop">
+    <Setter Property="Theme" Value="{StaticResource Surface}" />
+    <Setter Property="c:Cell.Round" Value="True" />
+    <Setter Property="Background" Value="{DynamicResource Recording}" />
+    <Setter Property="Foreground" Value="{DynamicResource OnRecording}" />
+    <Setter Property="HorizontalContentAlignment" Value="Center" />
+  </Style>
+  <Style Selector="Button.drop-stop /template/ Border#PART_Wash">
+    <Setter Property="IsVisible" Value="False" />
+  </Style>
+  <Style Selector="Button.drop-stop:pointerover">
+    <Setter Property="Opacity" Value="0.88" />
+  </Style>
+  <Style Selector="Button.drop-pause">
+    <Setter Property="Theme" Value="{StaticResource Surface}" />
+    <Setter Property="c:Cell.Round" Value="True" />
+    <Setter Property="Background" Value="{DynamicResource Surface}" />
+    <Setter Property="Foreground" Value="{DynamicResource Ink}" />
+    <Setter Property="HorizontalContentAlignment" Value="Center" />
+  </Style>
+  <!-- The recording card, and the library's: the mesh, the card's corners. -->
+  <Style Selector="Border.drop-card">
+    <Setter Property="Background" Value="{DynamicResource SurfaceRaised}" />
+    <Setter Property="CornerRadius" Value="{DynamicResource RadiusCard}" />
+    <Setter Property="Padding" Value="12" />
+  </Style>
+  <Style Selector="TextBlock.drop-clock">
+    <Setter Property="FontFamily" Value="{DynamicResource DisplayFont}" />
+    <Setter Property="FontSize" Value="{DynamicResource FontDisplay}" />
+    <Setter Property="FontWeight" Value="Light" />
+    <Setter Property="Foreground" Value="{DynamicResource Ink}" />
+    <Setter Property="VerticalAlignment" Value="Center" />
+  </Style>
+  <!-- Search: a quiet field on the mesh. -->
+  <Style Selector="Button.drop-search">
+    <Setter Property="Theme" Value="{StaticResource Surface}" />
+    <Setter Property="c:Cell.Round" Value="True" />
+    <Setter Property="Background" Value="{DynamicResource SurfaceRaised}" />
+    <Setter Property="Foreground" Value="{DynamicResource InkMuted}" />
+    <Setter Property="Padding" Value="10,0" />
+    <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+  </Style>
+  <Style Selector="Border.drop-rule">
+    <Setter Property="Height" Value="1" />
+    <Setter Property="Background" Value="{DynamicResource Border}" />
+  </Style>
+</Styles>

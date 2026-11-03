@@ -21,7 +21,7 @@
     <Setter Property="FontWeight" Value="SemiBold" />
   </Style>
   <Style Selector="TextBlock.ai-link">
-    <Setter Property="FontSize" Value="12" />
+    <Setter Property="FontSize" Value="{DynamicResource FontCaption}" />
     <Setter Property="Foreground" Value="{DynamicResource AccentText}" />
   </Style>
 
@@ -68,7 +68,7 @@
     <Setter Property="Fill" Value="{DynamicResource Warn}" />
   </Style>
   <Style Selector="TextBlock.ai-state">
-    <Setter Property="FontSize" Value="12" />
+    <Setter Property="FontSize" Value="{DynamicResource FontCaption}" />
     <Setter Property="Foreground" Value="{DynamicResource Fg2}" />
   </Style>
   <Style Selector="TextBlock.ai-state.warn">
@@ -80,7 +80,7 @@
        less, so its words stay where they were). -->
   <Style Selector="Border.ai-pill">
     <Setter Property="Height" Value="30" />
-    <Setter Property="CornerRadius" Value="15" />
+    <Setter Property="c:Cell.Round" Value="True" />
     <Setter Property="Padding" Value="13,0" />
     <Setter Property="Background" Value="{DynamicResource Raised}" />
     <Setter Property="BorderBrush" Value="{DynamicResource Line}" />
@@ -108,7 +108,7 @@
   </Style>
   <Style Selector="Button.ai-pillbtn">
     <Setter Property="Theme" Value="{StaticResource Surface}" />
-    <Setter Property="CornerRadius" Value="15" />
+    <Setter Property="c:Cell.Round" Value="True" />
   </Style>
   <Style Selector="Button.ai-textbtn">
     <Setter Property="Theme" Value="{StaticResource Surface}" />
@@ -119,7 +119,7 @@
   <Style Selector="Border.ai-select">
     <Setter Property="Height" Value="28" />
     <Setter Property="Width" Value="180" />
-    <Setter Property="CornerRadius" Value="14" />
+    <Setter Property="c:Cell.Round" Value="True" />
     <Setter Property="Background" Value="{DynamicResource Raised}" />
     <Setter Property="BorderBrush" Value="{DynamicResource Line}" />
     <Setter Property="BorderThickness" Value="1" />
@@ -134,7 +134,7 @@
   </Style>
   <Style Selector="Button.ai-select-btn">
     <Setter Property="Theme" Value="{StaticResource Surface}" />
-    <Setter Property="CornerRadius" Value="14" />
+    <Setter Property="c:Cell.Round" Value="True" />
     <Setter Property="HorizontalContentAlignment" Value="Stretch" />
   </Style>
 
@@ -187,7 +187,7 @@
         <ControlTemplate>
           <Border Name="Track" CornerRadius="11" Background="{DynamicResource Fill2}">
             <Border Name="Knob" Width="18" Height="18" CornerRadius="9" Background="White" HorizontalAlignment="Left" Margin="2,0,0,0"
-                    BoxShadow="0 1 3 0 #40000000" />
+                    BoxShadow="{DynamicResource ShadowKnob}" />
           </Border>
         </ControlTemplate>
       </Setter>
@@ -215,47 +215,49 @@
   </Style>
 
   <!-- The "Answer with" / "Rewrite notes with" menu (16/17): glass, 260/280 wide, r18. -->
+  <!-- The picker's rows (Syft look, the same in both systems): the picked one lilac with ink words, a row that can't
+       be picked in the muted ink at full strength (never faded to 1.5:1). -->
   <Style Selector="TextBlock.ai-menu-header">
-    <Setter Property="FontSize" Value="11" />
+    <Setter Property="FontSize" Value="{DynamicResource FontCaption}" />
     <Setter Property="FontWeight" Value="SemiBold" />
-    <Setter Property="Foreground" Value="{DynamicResource Fg2}" />
+    <Setter Property="Foreground" Value="{DynamicResource InkMuted}" />
     <Setter Property="Padding" Value="10,6,10,4" />
   </Style>
   <Style Selector="Border.ai-menu-item">
-    <Setter Property="CornerRadius" Value="10" />
+    <Setter Property="MinHeight" Value="36" />
+    <Setter Property="CornerRadius" Value="{DynamicResource RadiusControl}" />
     <Setter Property="Padding" Value="10,6" />
   </Style>
   <Style Selector="Border.ai-menu-item.selected">
-    <Setter Property="Background" Value="{DynamicResource Tint}" />
-  </Style>
-  <Style Selector="Border.ai-menu-item.selected TextBlock">
-    <Setter Property="Foreground" Value="{DynamicResource OnAccent}" />
+    <Setter Property="Background" Value="{DynamicResource Selected}" />
   </Style>
   <Style Selector="Border.ai-menu-item.selected c|Icon">
-    <Setter Property="Foreground" Value="{DynamicResource OnAccent}" />
+    <Setter Property="Foreground" Value="{DynamicResource OnSelected}" />
   </Style>
-  <!-- A row that can't be picked: its words in the secondary ink and its mark dimmed, rather than the whole row faded
-       (the button's own disabled fade on top of a faded row left it at about 1.5:1). -->
   <Style Selector="Button.ai-menu-row:disabled">
     <Setter Property="Opacity" Value="1" />
   </Style>
   <Style Selector="Border.ai-menu-item.disabled c|Icon">
-    <Setter Property="Opacity" Value="0.5" />
+    <Setter Property="Opacity" Value="0.6" />
   </Style>
   <Style Selector="TextBlock.ai-menu-title">
-    <Setter Property="FontSize" Value="13" />
+    <Setter Property="FontSize" Value="{DynamicResource FontBody}" />
+    <Setter Property="Foreground" Value="{DynamicResource Ink}" />
   </Style>
   <Style Selector="TextBlock.ai-menu-sub">
-    <Setter Property="FontSize" Value="11" />
-    <Setter Property="Foreground" Value="{DynamicResource Fg2}" />
+    <Setter Property="FontSize" Value="{DynamicResource FontCaption}" />
+    <Setter Property="Foreground" Value="{DynamicResource InkMuted}" />
   </Style>
-  <!-- After the line above, so it wins: the picked row's line is the accent's own ink, a little softer, not grey on teal. -->
+  <!-- After the lines above, so they win: the picked row's words ink, its second line the darker grey that reads on
+       lilac. -->
+  <Style Selector="Border.ai-menu-item.selected TextBlock">
+    <Setter Property="Foreground" Value="{DynamicResource OnSelected}" />
+  </Style>
   <Style Selector="Border.ai-menu-item.selected TextBlock.ai-menu-sub">
-    <Setter Property="Foreground" Value="{DynamicResource OnAccent}" />
-    <Setter Property="Opacity" Value="0.8" />
+    <Setter Property="Foreground" Value="{DynamicResource SelectedMuted}" />
   </Style>
   <Style Selector="Border.ai-menu-item.disabled TextBlock">
-    <Setter Property="Foreground" Value="{DynamicResource Fg2}" />
+    <Setter Property="Foreground" Value="{DynamicResource InkMuted}" />
   </Style>
   <Style Selector="Button.ai-menu-footer">
     <Setter Property="Theme" Value="{StaticResource Surface}" />
@@ -272,7 +274,7 @@
   <!-- The ask bar (16): glass 560×48 r24, an engine chip, a scope chip and a round send button. -->
   <Style Selector="Border.ai-chip">
     <Setter Property="Height" Value="30" />
-    <Setter Property="CornerRadius" Value="15" />
+    <Setter Property="c:Cell.Round" Value="True" />
     <Setter Property="BoxShadow" Value="{DynamicResource EdgeSoft}" />
   </Style>
   <!-- The chip's words and icons sit on its middle line, whatever the host's own alignment. -->
@@ -283,7 +285,7 @@
     <Setter Property="VerticalAlignment" Value="Center" />
   </Style>
   <Style Selector="Border.ai-chip TextBlock">
-    <Setter Property="FontSize" Value="12" />
+    <Setter Property="FontSize" Value="{DynamicResource FontCaption}" />
   </Style>
   <Style Selector="Border.ai-chip-engine">
     <Setter Property="Background" Value="{DynamicResource Fill2}" />
@@ -298,19 +300,19 @@
   </Style>
   <Style Selector="Button.ai-chipbtn">
     <Setter Property="Theme" Value="{StaticResource Surface}" />
-    <Setter Property="CornerRadius" Value="15" />
+    <Setter Property="c:Cell.Round" Value="True" />
   </Style>
   <Style Selector="Button.ai-send">
     <Setter Property="Theme" Value="{StaticResource Surface}" />
     <Setter Property="Width" Value="32" />
     <Setter Property="Height" Value="32" />
-    <Setter Property="CornerRadius" Value="16" />
+    <Setter Property="c:Cell.Round" Value="True" />
     <Setter Property="HorizontalContentAlignment" Value="Center" />
   </Style>
   <Style Selector="Border.ai-send">
     <Setter Property="Width" Value="32" />
     <Setter Property="Height" Value="32" />
-    <Setter Property="CornerRadius" Value="16" />
+    <Setter Property="c:Cell.Round" Value="True" />
     <Setter Property="Background" Value="{DynamicResource Fill2}" />
   </Style>
 
@@ -354,26 +356,30 @@
     <Setter Property="Theme" Value="{StaticResource Surface}" />
     <Setter Property="Height" Value="32" />
     <Setter Property="Padding" Value="8,0,10,0" />
-    <Setter Property="CornerRadius" Value="16" />
+    <Setter Property="c:Cell.Round" Value="True" />
   </Style>
   <Style Selector="TextBlock.ai-head">
     <Setter Property="FontSize" Value="13" />
     <Setter Property="FontWeight" Value="Medium" />
     <Setter Property="Foreground" Value="{DynamicResource Fg}" />
   </Style>
-  <!-- A question in the conversation: the student's own words, on the right on a quiet fill, never the whole width -->
+  <!-- A question in the conversation: the student's own words, on the right on an ink bubble, never the whole width -->
   <Style Selector="Border.ai-asked-q">
     <Setter Property="HorizontalAlignment" Value="Right" />
     <Setter Property="Margin" Value="40,0,0,0" />
     <Setter Property="Padding" Value="14,9" />
-    <Setter Property="CornerRadius" Value="16" />
-    <Setter Property="Background" Value="{DynamicResource Fill}" />
+    <Setter Property="CornerRadius" Value="{DynamicResource RadiusCard}" />
+    <Setter Property="Background" Value="{DynamicResource Accent}" />
   </Style>
   <Style Selector="TextBlock.ai-q">
     <Setter Property="FontSize" Value="15" />
     <Setter Property="LineHeight" Value="22" />
     <Setter Property="Foreground" Value="{DynamicResource Fg}" />
     <Setter Property="TextWrapping" Value="Wrap" />
+  </Style>
+  <!-- The student's words on their ink bubble (paper in dark), as in every chat in the app. -->
+  <Style Selector="Border.ai-asked-q :is(TextBlock).ai-q">
+    <Setter Property="Foreground" Value="{DynamicResource OnAccent}" />
   </Style>
   <!-- Why an answer didn't come -->
   <Style Selector="TextBlock.ai-failed">
@@ -398,7 +404,7 @@
     <Setter Property="Theme" Value="{StaticResource Surface}" />
     <Setter Property="Height" Value="28" />
     <Setter Property="Padding" Value="6,0,9,0" />
-    <Setter Property="CornerRadius" Value="14" />
+    <Setter Property="c:Cell.Round" Value="True" />
   </Style>
   <Style Selector="TextBlock.ai-asked">
     <Setter Property="FontSize" Value="11" />
@@ -409,11 +415,11 @@
     <Setter Property="Theme" Value="{StaticResource Surface}" />
     <Setter Property="Width" Value="28" />
     <Setter Property="Height" Value="28" />
-    <Setter Property="CornerRadius" Value="14" />
+    <Setter Property="c:Cell.Round" Value="True" />
     <Setter Property="HorizontalContentAlignment" Value="Center" />
   </Style>
   <Style Selector="TextBlock.ai-byline">
-    <Setter Property="FontSize" Value="12" />
+    <Setter Property="FontSize" Value="{DynamicResource FontCaption}" />
     <Setter Property="Foreground" Value="{DynamicResource Fg2}" />
   </Style>
   <Style Selector="TextBlock.ai-thinking">
@@ -422,19 +428,19 @@
   </Style>
   <Style Selector="Border.ai-field">
     <Setter Property="Height" Value="44" />
-    <Setter Property="CornerRadius" Value="22" />
+    <Setter Property="c:Cell.Round" Value="True" />
     <Setter Property="Background" Value="{DynamicResource Fill}" />
     <Setter Property="BoxShadow" Value="{DynamicResource EdgeSoft}" />
     <Setter Property="Padding" Value="16,0,6,0" />
   </Style>
   <Style Selector="Border.ai-field-chip">
     <Setter Property="Height" Value="28" />
-    <Setter Property="CornerRadius" Value="14" />
+    <Setter Property="c:Cell.Round" Value="True" />
     <Setter Property="Background" Value="{DynamicResource Fill2}" />
     <Setter Property="Padding" Value="8,0,6,0" />
   </Style>
   <Style Selector="Border.ai-field-chip TextBlock">
-    <Setter Property="FontSize" Value="12" />
+    <Setter Property="FontSize" Value="{DynamicResource FontCaption}" />
     <Setter Property="VerticalAlignment" Value="Center" />
   </Style>
   <Style Selector="Border.ai-field-chip > StackPanel">
@@ -443,14 +449,14 @@
   <Style Selector="Border.ai-field-send">
     <Setter Property="Width" Value="32" />
     <Setter Property="Height" Value="32" />
-    <Setter Property="CornerRadius" Value="16" />
+    <Setter Property="c:Cell.Round" Value="True" />
     <Setter Property="Background" Value="{DynamicResource Fill2}" />
   </Style>
 
   <!-- A borderless pill (Keep old / Dismiss / Deny): text only, no fill, unlike Border.ai-pill. -->
   <Style Selector="Border.ai-pill-plain">
     <Setter Property="Height" Value="30" />
-    <Setter Property="CornerRadius" Value="15" />
+    <Setter Property="c:Cell.Round" Value="True" />
     <Setter Property="Padding" Value="14,0" />
   </Style>
   <Style Selector="Border.ai-pill-plain > TextBlock">
@@ -465,7 +471,7 @@
     <Setter Property="FontWeight" Value="SemiBold" />
   </Style>
   <Style Selector="TextBlock.ai-notes-byline">
-    <Setter Property="FontSize" Value="12" />
+    <Setter Property="FontSize" Value="{DynamicResource FontCaption}" />
     <Setter Property="Foreground" Value="{DynamicResource Fg2}" />
   </Style>
 
@@ -485,7 +491,7 @@
 
   <!-- A compare column's own small heading ("Current notes" / "New notes from …"). -->
   <Style Selector="TextBlock.ai-compare-head">
-    <Setter Property="FontSize" Value="12" />
+    <Setter Property="FontSize" Value="{DynamicResource FontCaption}" />
     <Setter Property="FontWeight" Value="SemiBold" />
     <Setter Property="Foreground" Value="{DynamicResource Fg2}" />
   </Style>
@@ -497,13 +503,13 @@
     <Setter Property="Background" Value="{DynamicResource Group}" />
   </Style>
   <Style Selector="TextBox.ai-editor">
-    <Setter Property="FontSize" Value="14" />
+    <Setter Property="FontSize" Value="{DynamicResource FontBody}" />
     <Setter Property="LineHeight" Value="22" />
     <Setter Property="MinHeight" Value="160" />
     <Setter Property="VerticalContentAlignment" Value="Top" />
   </Style>
   <Style Selector="TextBlock.ai-editor-hint">
-    <Setter Property="FontSize" Value="12" />
+    <Setter Property="FontSize" Value="{DynamicResource FontCaption}" />
     <Setter Property="Foreground" Value="{DynamicResource Fg2}" />
     <Setter Property="TextWrapping" Value="Wrap" />
   </Style>
@@ -536,7 +542,7 @@
     <Setter Property="FontWeight" Value="SemiBold" />
   </Style>
   <Style Selector="TextBlock.ai-problem-message">
-    <Setter Property="FontSize" Value="12" />
+    <Setter Property="FontSize" Value="{DynamicResource FontCaption}" />
     <Setter Property="LineHeight" Value="17.4" />
     <Setter Property="Foreground" Value="{DynamicResource Fg2}" />
     <Setter Property="Margin" Value="0,2,0,0" />

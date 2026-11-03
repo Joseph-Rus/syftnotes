@@ -17,7 +17,7 @@
     <Setter Property="Margin" Value="0,6,0,0" />
   </Style>
   <Style Selector=".in-setup TextBlock.cv-intro">
-    <Setter Property="FontSize" Value="16" />
+    <Setter Property="FontSize" Value="{DynamicResource FontSubtitle}" />
     <Setter Property="LineHeight" Value="24" />
     <Setter Property="Foreground" Value="{DynamicResource InkMuted}" />
     <Setter Property="MaxWidth" Value="560" />
@@ -74,7 +74,7 @@
     <Setter Property="Foreground" Value="{DynamicResource InkSubtle}" />
   </Style>
   <Style Selector=".in-setup TextBlock.cv-value">
-    <Setter Property="FontSize" Value="14" />
+    <Setter Property="FontSize" Value="{DynamicResource FontBody}" />
     <Setter Property="Foreground" Value="{DynamicResource InkMuted}" />
   </Style>
   <!-- Done ("Connected", "Chrome"): ink, not green. -->
@@ -113,12 +113,12 @@
   <Style Selector=".in-setup Button.cv-pill, .in-setup Button.cv-btn">
     <Setter Property="Height" Value="34" />
     <Setter Property="MinWidth" Value="0" />
-    <Setter Property="CornerRadius" Value="17" />
+    <Setter Property="c:Cell.Round" Value="True" />
     <Setter Property="Padding" Value="14,0" />
     <Setter Property="Background" Value="{DynamicResource Surface}" />
     <Setter Property="Foreground" Value="{DynamicResource Ink}" />
     <Setter Property="BorderThickness" Value="0" />
-    <Setter Property="FontSize" Value="14" />
+    <Setter Property="FontSize" Value="{DynamicResource FontBody}" />
     <Setter Property="FontWeight" Value="Bold" />
     <Setter Property="ClipToBounds" Value="False" />
   </Style>
@@ -147,7 +147,7 @@
   </Style>
   <Style Selector=".in-setup Button.cv-pill.cv-mini, .in-setup Button.cv-btn.cv-mini">
     <Setter Property="Height" Value="34" />
-    <Setter Property="CornerRadius" Value="17" />
+    <Setter Property="c:Cell.Round" Value="True" />
     <Setter Property="Padding" Value="14,0" />
   </Style>
   <Style Selector=".in-setup Button.cv-pill:focus-visible /template/ Border#PART_Wash, .in-setup Button.cv-btn:focus-visible /template/ Border#PART_Wash">
@@ -156,7 +156,6 @@
     <Setter Property="BorderBrush" Value="{DynamicResource Focus}" />
     <Setter Property="BorderThickness" Value="2" />
     <Setter Property="Margin" Value="-4" />
-    <Setter Property="CornerRadius" Value="21" />
   </Style>
 
   <!-- The school's address: setup's field. -->
@@ -175,7 +174,7 @@
     <Setter Property="BoxShadow" Value="none" />
   </Style>
   <Style Selector=".in-setup Border.cv-field TextBox.bare">
-    <Setter Property="FontSize" Value="14" />
+    <Setter Property="FontSize" Value="{DynamicResource FontBody}" />
   </Style>
 
   <!-- Quiet links (Show the folder again, Use another browser): the library's text-link, muted words over a grey line. -->
@@ -228,7 +227,7 @@
     <Setter Property="Padding" Value="12,8,8,8" />
   </Style>
   <Style Selector=".in-setup Border.cv-code SelectableTextBlock">
-    <Setter Property="FontSize" Value="12" />
+    <Setter Property="FontSize" Value="{DynamicResource FontCaption}" />
     <Setter Property="LineHeight" Value="16" />
     <Setter Property="Foreground" Value="{DynamicResource InkMuted}" />
   </Style>

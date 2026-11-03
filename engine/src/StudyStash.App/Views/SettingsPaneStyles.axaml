@@ -24,7 +24,7 @@
           <Border Name="Ring" Margin="-4" CornerRadius="15" BorderThickness="2" BorderBrush="{DynamicResource Focus}" IsVisible="False" />
           <Border Name="Track" CornerRadius="11" Background="{DynamicResource Line}" />
           <Border Name="Knob" Width="18" Height="18" CornerRadius="9" Background="{DynamicResource Surface}"
-                  HorizontalAlignment="Left" Margin="2,0,0,0" BoxShadow="0 1 2 0 #40000000" />
+                  HorizontalAlignment="Left" Margin="2,0,0,0" BoxShadow="{DynamicResource ShadowKnob}" />
         </Panel>
       </ControlTemplate>
     </Setter>
@@ -59,7 +59,7 @@
     <Setter Property="Foreground" Value="{DynamicResource InkMuted}" />
   </Style>
   <Style Selector=".in-settings TextBlock.ai-sub.lede">
-    <Setter Property="FontSize" Value="16" />
+    <Setter Property="FontSize" Value="{DynamicResource FontSubtitle}" />
     <Setter Property="LineHeight" Value="24" />
     <Setter Property="MaxWidth" Value="560" />
     <Setter Property="HorizontalAlignment" Value="Left" />
@@ -90,7 +90,7 @@
     <Setter Property="Background" Value="{DynamicResource Line}" />
   </Style>
   <Style Selector=".in-settings TextBlock.ai-row-title">
-    <Setter Property="FontSize" Value="14" />
+    <Setter Property="FontSize" Value="{DynamicResource FontBody}" />
     <Setter Property="FontWeight" Value="SemiBold" />
     <Setter Property="LineHeight" Value="20" />
   </Style>
@@ -122,19 +122,19 @@
        one ink. Its hairline is a border inside it (the button round it would cut a ring off); under the pointer the
        hairline darkens, as the library's does, with no wash. -->
   <Style Selector=".in-settings Button.ai-pillbtn">
-    <Setter Property="CornerRadius" Value="17" />
+    <Setter Property="c:Cell.Round" Value="True" />
     <Setter Property="ClipToBounds" Value="False" />
   </Style>
   <Style Selector=".in-settings Border.ai-pill">
     <Setter Property="Height" Value="34" />
-    <Setter Property="CornerRadius" Value="17" />
+    <Setter Property="c:Cell.Round" Value="True" />
     <Setter Property="Padding" Value="13,0" />
     <Setter Property="Background" Value="{DynamicResource Surface}" />
     <Setter Property="BorderBrush" Value="{DynamicResource Line}" />
     <Setter Property="BorderThickness" Value="1" />
   </Style>
   <Style Selector=".in-settings Border.ai-pill > TextBlock, .in-settings Border.ai-pill > StackPanel > TextBlock">
-    <Setter Property="FontSize" Value="14" />
+    <Setter Property="FontSize" Value="{DynamicResource FontBody}" />
     <Setter Property="FontWeight" Value="Bold" />
     <Setter Property="Foreground" Value="{DynamicResource Ink}" />
   </Style>
@@ -178,7 +178,7 @@
     <Setter Property="VerticalAlignment" Value="Center" />
   </Style>
   <Style Selector=".in-settings Border.ai-pill-plain > TextBlock, .in-settings TextBlock.ai-link">
-    <Setter Property="FontSize" Value="14" />
+    <Setter Property="FontSize" Value="{DynamicResource FontBody}" />
     <Setter Property="FontWeight" Value="Bold" />
     <Setter Property="Foreground" Value="{DynamicResource InkMuted}" />
   </Style>
@@ -190,7 +190,7 @@
   </Style>
   <!-- A menu's button: the choice in ink and a chevron, in a hairline, the control's corners (the library's picker). -->
   <Style Selector=".in-settings Button.ai-select-btn">
-    <Setter Property="CornerRadius" Value="{DynamicResource RadiusControl}" />
+    <Setter Property="c:Cell.Round" Value="True" />
   </Style>
   <Style Selector=".in-settings Border.ai-select">
     <Setter Property="Height" Value="34" />
@@ -202,7 +202,7 @@
     <Setter Property="Padding" Value="12,0,8,0" />
   </Style>
   <Style Selector=".in-settings Border.ai-select TextBlock">
-    <Setter Property="FontSize" Value="14" />
+    <Setter Property="FontSize" Value="{DynamicResource FontBody}" />
     <Setter Property="FontWeight" Value="Medium" />
   </Style>
   <Style Selector=".in-settings Button.ai-select-btn:pointerover Border.ai-select">
@@ -240,7 +240,7 @@
     <Setter Property="Foreground" Value="{DynamicResource InkSubtle}" />
   </Style>
   <Style Selector=".in-settings TextBlock.ai-problem-title">
-    <Setter Property="FontSize" Value="14" />
+    <Setter Property="FontSize" Value="{DynamicResource FontBody}" />
     <Setter Property="FontWeight" Value="Bold" />
   </Style>
   <Style Selector=".in-settings TextBlock.ai-problem-message">
@@ -249,7 +249,7 @@
     <Setter Property="Foreground" Value="{DynamicResource InkMuted}" />
   </Style>
   <Style Selector=".in-settings TextBlock.ai-problem-text">
-    <Setter Property="FontSize" Value="14" />
+    <Setter Property="FontSize" Value="{DynamicResource FontBody}" />
     <Setter Property="LineHeight" Value="20" />
   </Style>
   <Style Selector=".in-settings c|Icon.ai-problem-icon.accent">
@@ -273,7 +273,7 @@
     <Setter Property="Background" Value="{DynamicResource Line}" />
   </Style>
   <Style Selector=".in-settings TextBlock.sk-title">
-    <Setter Property="FontSize" Value="14" />
+    <Setter Property="FontSize" Value="{DynamicResource FontBody}" />
     <Setter Property="FontWeight" Value="SemiBold" />
     <Setter Property="LineHeight" Value="20" />
   </Style>
@@ -285,7 +285,7 @@
   <!-- The keys: a small white pill with a hairline (inside it, as a button cuts a ring off); listening, ink. -->
   <Style Selector=".in-settings Button.sk-keys">
     <Setter Property="Height" Value="34" />
-    <Setter Property="CornerRadius" Value="17" />
+    <Setter Property="c:Cell.Round" Value="True" />
     <Setter Property="Padding" Value="14,0" />
     <Setter Property="Background" Value="{DynamicResource Surface}" />
     <Setter Property="BorderBrush" Value="{DynamicResource Line}" />
@@ -322,7 +322,7 @@
     <Setter Property="LetterSpacing" Value="-0.6" />
   </Style>
   <Style Selector=".in-settings TextBlock.cv-intro">
-    <Setter Property="FontSize" Value="16" />
+    <Setter Property="FontSize" Value="{DynamicResource FontSubtitle}" />
     <Setter Property="LineHeight" Value="24" />
     <Setter Property="Foreground" Value="{DynamicResource InkMuted}" />
     <Setter Property="MaxWidth" Value="560" />
@@ -355,16 +355,16 @@
     <Setter Property="Foreground" Value="{DynamicResource InkMuted}" />
   </Style>
   <Style Selector=".in-settings TextBlock.cv-label">
-    <Setter Property="FontSize" Value="14" />
+    <Setter Property="FontSize" Value="{DynamicResource FontBody}" />
     <Setter Property="FontWeight" Value="SemiBold" />
     <Setter Property="VerticalAlignment" Value="Center" />
   </Style>
   <Style Selector=".in-settings TextBlock.cv-dot-label, .in-settings TextBlock.pk-title">
-    <Setter Property="FontSize" Value="14" />
+    <Setter Property="FontSize" Value="{DynamicResource FontBody}" />
     <Setter Property="FontWeight" Value="SemiBold" />
   </Style>
   <Style Selector=".in-settings TextBlock.pk-detail, .in-settings TextBlock.cv-scout">
-    <Setter Property="FontSize" Value="12" />
+    <Setter Property="FontSize" Value="{DynamicResource FontCaption}" />
     <Setter Property="Foreground" Value="{DynamicResource InkMuted}" />
   </Style>
   <Style Selector=".in-settings TextBlock.pk-why">
@@ -375,11 +375,11 @@
     <Setter Property="Height" Value="52" />
   </Style>
   <Style Selector=".in-settings TextBlock.cv-change">
-    <Setter Property="FontSize" Value="14" />
+    <Setter Property="FontSize" Value="{DynamicResource FontBody}" />
   </Style>
   <!-- A link in words (Find my courses again): muted and bold, ink under the pointer. -->
   <Style Selector=".in-settings TextBlock.cv-link">
-    <Setter Property="FontSize" Value="14" />
+    <Setter Property="FontSize" Value="{DynamicResource FontBody}" />
     <Setter Property="FontWeight" Value="Bold" />
     <Setter Property="Foreground" Value="{DynamicResource InkMuted}" />
   </Style>
@@ -393,7 +393,7 @@
     <Setter Property="BorderThickness" Value="0" />
   </Style>
   <Style Selector=".in-settings TextBlock.cv-title">
-    <Setter Property="FontSize" Value="14" />
+    <Setter Property="FontSize" Value="{DynamicResource FontBody}" />
     <Setter Property="FontWeight" Value="Bold" />
   </Style>
   <Style Selector=".in-settings TextBlock.cv-text">
@@ -410,9 +410,9 @@
   <!-- Its buttons: Styles.axaml's small pills (white with a hairline, the main one ink, a plain one only words). -->
   <Style Selector=".in-settings Button.cv-pill, .in-settings Button.cv-btn">
     <Setter Property="Height" Value="34" />
-    <Setter Property="CornerRadius" Value="17" />
+    <Setter Property="c:Cell.Round" Value="True" />
     <Setter Property="Padding" Value="14,0" />
-    <Setter Property="FontSize" Value="14" />
+    <Setter Property="FontSize" Value="{DynamicResource FontBody}" />
     <Setter Property="FontWeight" Value="Bold" />
     <Setter Property="Background" Value="{DynamicResource Surface}" />
     <Setter Property="Foreground" Value="{DynamicResource Ink}" />
@@ -439,7 +439,7 @@
   </Style>
   <Style Selector=".in-settings Button.cv-pill.cv-mini, .in-settings Button.cv-btn.cv-mini">
     <Setter Property="Height" Value="30" />
-    <Setter Property="CornerRadius" Value="15" />
+    <Setter Property="c:Cell.Round" Value="True" />
     <Setter Property="Padding" Value="12,0" />
   </Style>
   <!-- A plain one (Set up, Change browser, Cancel): only its words, underlined, as a text-link. -->
@@ -459,9 +459,9 @@
   <!-- Its menus' buttons and fields: a hairline, the control's corners. -->
   <Style Selector=".in-settings Button.cv-select">
     <Setter Property="Height" Value="34" />
-    <Setter Property="CornerRadius" Value="{DynamicResource RadiusControl}" />
+    <Setter Property="c:Cell.Round" Value="True" />
     <Setter Property="Padding" Value="12,0,8,0" />
-    <Setter Property="FontSize" Value="14" />
+    <Setter Property="FontSize" Value="{DynamicResource FontBody}" />
     <Setter Property="FontWeight" Value="Medium" />
     <Setter Property="Background" Value="{DynamicResource Surface}" />
     <Setter Property="BorderBrush" Value="{DynamicResource Line}" />
@@ -472,7 +472,7 @@
   </Style>
   <Style Selector=".in-settings Button.cv-select-item">
     <Setter Property="Height" Value="32" />
-    <Setter Property="FontSize" Value="14" />
+    <Setter Property="FontSize" Value="{DynamicResource FontBody}" />
     <Setter Property="CornerRadius" Value="{DynamicResource RadiusControl}" />
   </Style>
   <Style Selector=".in-settings Border.cv-field">
@@ -499,9 +499,6 @@
     <Setter Property="BorderThickness" Value="2" />
     <Setter Property="Margin" Value="-4" />
     <Setter Property="IsHitTestVisible" Value="False" />
-  </Style>
-  <Style Selector=".in-settings Button.btn.sm:focus-visible /template/ Border#PART_Wash, .in-settings Button.ai-pillbtn:focus-visible /template/ Border#PART_Wash, .in-settings Button.cv-pill:focus-visible /template/ Border#PART_Wash, .in-settings Button.cv-btn:focus-visible /template/ Border#PART_Wash, .in-settings Button.sk-keys:focus-visible /template/ Border#PART_Wash">
-    <Setter Property="CornerRadius" Value="21" />
   </Style>
   <Style Selector=".in-settings Button.text-link:focus-visible /template/ Border#PART_Wash, .in-settings Button.ai-textbtn:not(.ai-choice):focus-visible /template/ Border#PART_Wash, .in-settings Button.cv-pill.cv-plain:focus-visible /template/ Border#PART_Wash">
     <Setter Property="CornerRadius" Value="6" />

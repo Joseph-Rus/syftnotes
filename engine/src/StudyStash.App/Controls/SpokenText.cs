@@ -125,7 +125,7 @@ public class NoteText : SelectableTextBlock
 
     // The pen: the mustard of the app's highlighter, flat, light on a light page and lighter still on a dark one so the
     // words keep their ink. The one the pointer is on is stronger.
-    static readonly Color Pen = Color.Parse("#FFC943");
+    static readonly Color Pen = Syft.Mustard;
 
     protected override void RenderTextLayout(DrawingContext context, Point origin)
     {

@@ -10,12 +10,13 @@
              x:DataType="vm:AiAskModel">
   <UserControl.Styles>
     <StyleInclude Source="avares://StudyStash/Views/WinAiStyles.axaml" />
+    <StyleInclude Source="avares://StudyStash/Views/ChatStyles.axaml" />
     <!-- Its own card in styles, not on the Border, so the recorder's embedded chat stays without one when the theme
          changes (a resource set on the Border itself would come back with it) -->
     <Style Selector="Border#Card">
-      <Setter Property="CornerRadius" Value="8" />
-      <Setter Property="Background" Value="{DynamicResource Acrylic}" />
-      <Setter Property="BorderBrush" Value="{DynamicResource FlyStroke}" />
+      <Setter Property="CornerRadius" Value="{DynamicResource RadiusPanel}" />
+      <Setter Property="Background" Value="{DynamicResource Surface}" />
+      <Setter Property="BorderBrush" Value="{DynamicResource Border}" />
       <Setter Property="BorderThickness" Value="1" />
       <Setter Property="BoxShadow" Value="{DynamicResource ShadowLg}" />
       <Setter Property="Padding" Value="14,16,16,16" />
@@ -72,7 +73,7 @@
                   <c:SyftMark Size="24" Bits="False" VerticalAlignment="Top" Margin="0,4,0,0" />
                   <Border Classes="ai-bubble-a" Grid.Column="2" MaxWidth="298">
                     <StackPanel Spacing="6">
-                      <c:NoteView Compact="True" BodySize="14" BodyLineHeight="20.3" Markdown="{Binding Answer}" IsVisible="{Binding Answer, Converter={x:Static c:Converters.NotEmpty}}" />
+                      <c:NoteView Compact="True" BodySize="{DynamicResource FontBody}" BodyLineHeight="20" Markdown="{Binding Answer}" IsVisible="{Binding Answer, Converter={x:Static c:Converters.NotEmpty}}" />
                       <c:PageText Classes="ai-answer" Text="{Binding Failed}" Foreground="{DynamicResource Warn}"
                                  IsVisible="{Binding Failed, Converter={x:Static c:Converters.NotEmpty}}" />
                       <v:AiByline HorizontalAlignment="Left" IsVisible="{Binding Byline, Converter={x:Static c:Converters.NotEmpty}}" />
@@ -96,18 +97,20 @@
       </Button>
 
       <Border Classes="ai-field">
-        <Grid ColumnDefinitions="*,4,Auto,4,Auto" VerticalAlignment="Center">
-          <TextBox Name="ChatInput" Classes="bare" Text="{Binding Question}" c:OneLinePaste.IsOn="True" PlaceholderText="{Binding Placeholder}" FontSize="14" VerticalAlignment="Center">
+        <Grid ColumnDefinitions="*,6,Auto,6,Auto" VerticalAlignment="Center">
+          <TextBox Name="ChatInput" Classes="bare" Text="{Binding Question}" c:OneLinePaste.IsOn="True" PlaceholderText="{Binding Placeholder}" VerticalAlignment="Center">
             <TextBox.KeyBindings>
               <KeyBinding Gesture="Enter" Command="{Binding AskCommand}" />
             </TextBox.KeyBindings>
           </TextBox>
           <Button Name="EngineChip" Grid.Column="2" Classes="ai-chipbtn" VerticalAlignment="Center">
-            <StackPanel Orientation="Horizontal" Spacing="4" Height="30" Margin="6,0">
-              <c:Icon Glyph="{Binding EngineIcon}" Size="14" />
-              <TextBlock Text="{Binding EngineName}" TextTrimming="CharacterEllipsis" MaxWidth="90" FontSize="13" VerticalAlignment="Center" />
-              <c:Icon Glyph="expand_more" Size="15" Foreground="{DynamicResource Fg2}" />
-            </StackPanel>
+            <Border Classes="ai-field-chip">
+              <StackPanel Orientation="Horizontal" Spacing="3">
+                <c:Icon Glyph="{Binding EngineIcon}" Size="13" />
+                <TextBlock Text="{Binding EngineName}" TextTrimming="CharacterEllipsis" MaxWidth="90" />
+                <c:Icon Glyph="unfold_more" Size="14" Foreground="{DynamicResource InkMuted}" />
+              </StackPanel>
+            </Border>
             <Button.Flyout>
               <Flyout Placement="Top" VerticalOffset="-20" ShowMode="Standard" FlyoutPresenterClasses="bare">
                 <ContentControl Content="{Binding Menu}">
@@ -120,14 +123,17 @@
               </Flyout>
             </Button.Flyout>
           </Button>
-          <Button AutomationProperties.Name="Send question" Grid.Column="4" Classes="ai-send" Command="{Binding AskCommand}" Height="30" VerticalAlignment="Center" IsVisible="{Binding !Busy}">
-            <c:Icon Glyph="send" Size="18" Foreground="{DynamicResource Fg}" />
-          </Button>
-          <!-- While an answer is being written, the same place stops it -->
-          <Button Grid.Column="4" Classes="ai-send" Command="{Binding StopCommand}" Height="30" VerticalAlignment="Center" IsVisible="{Binding Busy}"
-                  ToolTip.Tip="Stop" AutomationProperties.Name="Stop the answer">
-            <c:Icon Glyph="stop" Filled="True" Size="18" Foreground="{DynamicResource Fg}" />
-          </Button>
+          <Border Grid.Column="4" Classes="ai-field-send">
+            <Panel>
+              <Button AutomationProperties.Name="Send question" Classes="ai-send" Command="{Binding AskCommand}" IsVisible="{Binding !Busy}">
+                <c:Icon Glyph="arrow_upward" Size="18" />
+              </Button>
+              <!-- While an answer is being written, the same place stops it -->
+              <Button Classes="ai-send" Command="{Binding StopCommand}" IsVisible="{Binding Busy}" ToolTip.Tip="Stop" AutomationProperties.Name="Stop the answer">
+                <c:Icon Glyph="stop" Filled="True" Size="16" />
+              </Button>
+            </Panel>
+          </Border>
         </Grid>
       </Border>
     </StackPanel>

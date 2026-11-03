@@ -51,7 +51,7 @@ public partial class ToastView : UserControl
             if (!OnAButton(e.Source) && !string.IsNullOrEmpty(ActionLabel)) Act();
         };
 
-        Card.CornerRadius = new CornerRadius(mac ? 16 : 8);
+        Bind(Card, Border.CornerRadiusProperty, mac ? "RadiusPanel" : "RadiusControl");
         Card.Padding = mac ? new Thickness(12, 11, 14, 12) : new Thickness(16, 12, 16, 16);
         Bind(Card, Border.BackgroundProperty, "PopupBg");
         Bind(Card, Border.BorderBrushProperty, "PopupStroke");

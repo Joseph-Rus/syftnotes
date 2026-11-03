@@ -20,7 +20,7 @@
       <Setter Property="Theme" Value="{StaticResource Surface}" />
       <Setter Property="Width" Value="26" />
       <Setter Property="Height" Value="26" />
-      <Setter Property="CornerRadius" Value="13" />
+      <Setter Property="c:Cell.Round" Value="True" />
       <Setter Property="HorizontalContentAlignment" Value="Center" />
       <Setter Property="Opacity" Value="0.7" />
     </Style>
@@ -42,11 +42,11 @@
 
     <StackPanel Orientation="Horizontal" Spacing="8" IsVisible="{Binding Busy}">
       <c:SyftLoader Kind="HoppingBits" Size="18" />
-      <TextBlock Text="Attaching…" FontSize="12" Foreground="{DynamicResource Fg2}" />
+      <TextBlock Text="Attaching…" FontSize="{DynamicResource FontCaption}" Foreground="{DynamicResource Fg2}" />
     </StackPanel>
     <StackPanel Name="ReadingNow" Orientation="Horizontal" Spacing="8" IsVisible="{Binding Reading}">
       <c:SyftLoader Kind="HoppingBits" Size="18" />
-      <TextBlock Text="Reading your handwriting…" FontSize="12" Foreground="{DynamicResource Fg2}" />
+      <TextBlock Text="Reading your handwriting…" FontSize="{DynamicResource FontCaption}" Foreground="{DynamicResource Fg2}" />
     </StackPanel>
 
     <ScrollViewer HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Disabled" IsVisible="{Binding HasPhotos}">
@@ -101,7 +101,7 @@
         </Button>
       </Grid>
     </Border>
-    <TextBlock IsVisible="{Binding HasSaid}" Text="{Binding Said}" FontSize="12" Foreground="{DynamicResource Fg2}" TextWrapping="Wrap" />
-    <c:PageText IsVisible="{Binding HasProblem}" Text="{Binding Problem}" FontSize="12" Foreground="{DynamicResource Warn}" TextWrapping="Wrap" />
+    <TextBlock IsVisible="{Binding HasSaid}" Text="{Binding Said}" FontSize="{DynamicResource FontCaption}" Foreground="{DynamicResource Fg2}" TextWrapping="Wrap" />
+    <c:PageText IsVisible="{Binding HasProblem}" Text="{Binding Problem}" FontSize="{DynamicResource FontCaption}" Foreground="{DynamicResource Warn}" TextWrapping="Wrap" />
   </StackPanel>
 </UserControl>

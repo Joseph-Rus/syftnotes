@@ -1,6 +1,6 @@
 <!-- The quick panel (Surfaces, macOS 03): ⌥Space. Two slabs of Liquid Glass: the query, then the results grouped as
-     Lectures, Passages from notes and Classes, with the actions as chips at the bottom; the chosen row is tinted with
-     the accent. ⌘Return turns the query into a question answered from your notes, with sources. The keys sit under the
+     Lectures, Passages from notes and Classes, with the actions as chips at the bottom; the chosen row or chip is lilac
+     with ink words, as everywhere in the Syft look. ⌘Return turns the query into a question answered from your notes, with sources. The keys sit under the
      glass. -->
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
@@ -12,16 +12,19 @@
   <UserControl.Styles>
     <Style Selector="Button.qrow">
       <Setter Property="Theme" Value="{StaticResource Surface}" />
-      <Setter Property="CornerRadius" Value="14" />
+      <Setter Property="CornerRadius" Value="{DynamicResource RadiusCard}" />
+      <Setter Property="Foreground" Value="{DynamicResource Ink}" />
     </Style>
     <Style Selector="Button.chip">
       <Setter Property="Theme" Value="{StaticResource Surface}" />
       <Setter Property="Height" Value="36" />
-      <Setter Property="CornerRadius" Value="18" />
+      <Setter Property="c:Cell.Round" Value="True" />
       <Setter Property="Padding" Value="12,0,14,0" />
+      <Setter Property="Background" Value="{DynamicResource SurfaceRaised}" />
+      <Setter Property="Foreground" Value="{DynamicResource Ink}" />
     </Style>
     <Style Selector="TextBlock.header">
-      <Setter Property="FontSize" Value="11" />
+      <Setter Property="FontSize" Value="{DynamicResource FontCaption}" />
       <Setter Property="FontWeight" Value="SemiBold" />
       <Setter Property="Foreground" Value="{DynamicResource Fg2}" />
       <Setter Property="Margin" Value="14,10,14,4" />
@@ -42,53 +45,56 @@
       <Setter Property="Foreground" Value="{DynamicResource Fg2}" />
     </Style>
     <Style Selector="c|Icon.chip.rec">
-      <Setter Property="Foreground" Value="{DynamicResource AccentText}" />
+      <Setter Property="Foreground" Value="{DynamicResource Recording}" />
       <Setter Property="Filled" Value="True" />
     </Style>
     <Style Selector="TextBlock.enter">
       <Setter Property="IsVisible" Value="False" />
     </Style>
-    <!-- The chosen row or chip: the accent through the glass, its words on the accent. -->
+    <!-- The chosen row or chip: lilac, its words ink. -->
     <Style Selector="TextBlock.meta.strong">
-      <Setter Property="Foreground" Value="{DynamicResource AccentText}" />
+      <Setter Property="Foreground" Value="{DynamicResource Ink}" />
       <Setter Property="FontWeight" Value="SemiBold" />
     </Style>
-    <Style Selector="Button.tint TextBlock.meta">
-      <Setter Property="Foreground" Value="{DynamicResource OnAccent}" />
-      <Setter Property="Opacity" Value="0.85" />
+    <Style Selector="Button.qrow.selected, Button.chip.selected">
+      <Setter Property="Background" Value="{DynamicResource Selected}" />
+      <Setter Property="Foreground" Value="{DynamicResource OnSelected}" />
     </Style>
-    <Style Selector="Button.tint TextBlock.enter">
+    <Style Selector="Button.selected TextBlock.meta, Button.selected TextBlock.meta.strong">
+      <Setter Property="Foreground" Value="{DynamicResource SelectedMuted}" />
+    </Style>
+    <Style Selector="Button.selected TextBlock.enter">
       <Setter Property="IsVisible" Value="True" />
     </Style>
-    <Style Selector="Button.tint c|Icon">
-      <Setter Property="Foreground" Value="{DynamicResource OnAccent}" />
+    <Style Selector="Button.selected c|Icon">
+      <Setter Property="Foreground" Value="{DynamicResource OnSelected}" />
     </Style>
-    <Style Selector="Button.tint c|Icon.source">
+    <Style Selector="Button.selected c|Icon.source">
       <Setter Property="Filled" Value="True" />
     </Style>
     <Style Selector="StackPanel.keys TextBlock, TextBlock.key">
-      <Setter Property="FontSize" Value="11" />
+      <Setter Property="FontSize" Value="{DynamicResource FontCaption}" />
       <Setter Property="Foreground" Value="{DynamicResource Fg2}" />
     </Style>
   </UserControl.Styles>
 
   <StackPanel Spacing="10">
     <!-- The query -->
-    <c:Glass Height="60" CornerRadius="30" Padding="22,0">
+    <c:Glass Height="60" CornerRadius="{DynamicResource RadiusPane}" Padding="22,0">
       <Grid ColumnDefinitions="Auto,12,*,Auto">
         <Panel VerticalAlignment="Center">
-          <c:Icon Glyph="search" Size="24" Foreground="{DynamicResource Fg2}" IsVisible="{Binding Searching}" />
-          <c:Icon Glyph="auto_awesome" Filled="True" Size="24" Foreground="{DynamicResource AccentText}" IsVisible="{Binding Answering}" />
+          <c:Icon Glyph="search" Size="24" Foreground="{DynamicResource InkMuted}" IsVisible="{Binding Searching}" />
+          <c:Icon Glyph="auto_awesome" Filled="True" Size="24" Foreground="{DynamicResource Ink}" IsVisible="{Binding Answering}" />
         </Panel>
-        <TextBox Name="QueryBox" c:OneLinePaste.IsOn="True" Grid.Column="2" Classes="bare" Text="{Binding Query}" FontFamily="{DynamicResource DisplayFont}" FontSize="22" LetterSpacing="-0.22"
+        <TextBox Name="QueryBox" c:OneLinePaste.IsOn="True" Grid.Column="2" Classes="bare" Text="{Binding Query}" FontFamily="{DynamicResource DisplayFont}" FontSize="{DynamicResource FontTitle}" LetterSpacing="-0.2"
                  PlaceholderText="Search notes and lectures" />
-        <TextBlock Grid.Column="3" Text="{Binding AskHint}" IsVisible="{Binding Searching}" FontSize="12" Foreground="{DynamicResource Fg2}" VerticalAlignment="Center"
+        <TextBlock Grid.Column="3" Text="{Binding AskHint}" IsVisible="{Binding Searching}" FontSize="{DynamicResource FontCaption}" Foreground="{DynamicResource InkMuted}" VerticalAlignment="Center"
                    Margin="12,0,0,0" />
       </Grid>
     </c:Glass>
 
     <!-- What was found, or the answer; only once there's something to show -->
-    <c:Glass CornerRadius="26" Padding="10">
+    <c:Glass CornerRadius="{DynamicResource RadiusPane}" Padding="10">
       <c:Glass.IsVisible>
         <MultiBinding Converter="{x:Static BoolConverters.Or}">
           <Binding Path="Rows.Count" Converter="{x:Static c:Converters.Some}" />
@@ -99,13 +105,13 @@
       <StackPanel>
         <!-- The answer -->
         <StackPanel IsVisible="{Binding Answering}" Spacing="10" Margin="14,10,14,14">
-          <TextBlock Text="From your notes" FontSize="11" FontWeight="SemiBold" Foreground="{DynamicResource Fg2}" />
+          <TextBlock Text="From your notes" FontSize="{DynamicResource FontCaption}" FontWeight="SemiBold" Foreground="{DynamicResource InkMuted}" />
           <c:SyftLoader Kind="HoppingBits" Size="24" IsVisible="{Binding Thinking}" HorizontalAlignment="Left" />
-          <c:NoteView Compact="True" BodyFont="SerifFont" BodySize="17" BodyLineHeight="26.35" Markdown="{Binding Answer}"
+          <c:NoteView Compact="True" BodyFont="SerifFont" BodySize="{DynamicResource FontSubtitle}" BodyLineHeight="24" Markdown="{Binding Answer}"
                       IsVisible="{Binding Answer, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
         </StackPanel>
 
-        <c:PageText IsVisible="{Binding HasNote}" Text="{Binding Note}" FontSize="13" Foreground="{DynamicResource Fg2}" Margin="14,10" TextWrapping="Wrap" />
+        <c:PageText IsVisible="{Binding HasNote}" Text="{Binding Note}" FontSize="{DynamicResource FontBody}" Foreground="{DynamicResource InkMuted}" Margin="14,10" TextWrapping="Wrap" />
 
         <!-- Results, or the answer's sources -->
         <ItemsControl ItemsSource="{Binding Rows, Converter={x:Static c:Converters.NotActions}}" Classes.answer="{Binding Answering}">
@@ -113,36 +119,36 @@
             <DataTemplate x:DataType="vm:QuickRow">
               <Panel>
                 <TextBlock IsVisible="{Binding IsHeader}" Text="{Binding Title}" Classes="header" Classes.first="{Binding First}" />
-                <Button IsVisible="{Binding Selectable}" Classes="qrow" Classes.tint="{Binding Selected}"
+                <Button IsVisible="{Binding Selectable}" Classes="qrow" Classes.selected="{Binding Selected}"
                         Command="{Binding $parent[UserControl].((vm:QuickModel)DataContext).OpenCommand}" CommandParameter="{Binding}">
                   <Panel>
                     <!-- A lecture -->
                     <Grid IsVisible="{Binding IsLecture}" Height="40" Margin="14,0" ColumnDefinitions="8,10,*,Auto,10,12">
                       <c:Swatch Classes="dot" Small="True" Fill="{Binding Dot}" VerticalAlignment="Center" />
-                      <TextBlock Grid.Column="2" Text="{Binding Title}" ToolTip.Tip="{Binding Title}" c:Tips.WhenCut="True" FontSize="13" FontWeight="Medium" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
-                      <TextBlock Grid.Column="3" Classes="meta" Classes.strong="{Binding Strong}" Text="{Binding Meta}" FontSize="13" VerticalAlignment="Center" Margin="10,0,0,0" />
-                      <TextBlock Grid.Column="5" Classes="enter meta" Text="&#x21A9;&#xFE0E;" FontSize="13" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                      <TextBlock Grid.Column="2" Text="{Binding Title}" ToolTip.Tip="{Binding Title}" c:Tips.WhenCut="True" FontSize="{DynamicResource FontBody}" FontWeight="Medium" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
+                      <TextBlock Grid.Column="3" Classes="meta" Classes.strong="{Binding Strong}" Text="{Binding Meta}" FontSize="{DynamicResource FontBody}" VerticalAlignment="Center" Margin="10,0,0,0" />
+                      <TextBlock Grid.Column="5" Classes="enter meta" Text="&#x21A9;&#xFE0E;" FontSize="{DynamicResource FontBody}" HorizontalAlignment="Center" VerticalAlignment="Center" />
                     </Grid>
                     <!-- A passage from notes -->
                     <Grid IsVisible="{Binding IsPassage}" Margin="14,8" ColumnDefinitions="8,10,*">
                       <c:Swatch Classes="dot" Small="True" Fill="{Binding Dot}" VerticalAlignment="Top" Margin="0,5,0,0" />
                       <StackPanel Grid.Column="2">
                         <c:Marked Source="{Binding Title}" Terms="{Binding $parent[UserControl].((vm:QuickModel)DataContext).Query}" Mark="{DynamicResource Hl}"
-                                  MarkRadius="4" MarkPadding="3" FontSize="13" LineHeight="18.2" TextWrapping="Wrap" />
-                        <TextBlock Classes="meta" Text="{Binding Sub}" ToolTip.Tip="{Binding Sub}" c:Tips.WhenCut="True" FontSize="11" Margin="0,2,0,0" TextTrimming="CharacterEllipsis" />
+                                  MarkRadius="4" MarkPadding="3" FontSize="{DynamicResource FontBody}" LineHeight="18.2" TextWrapping="Wrap" />
+                        <TextBlock Classes="meta" Text="{Binding Sub}" ToolTip.Tip="{Binding Sub}" c:Tips.WhenCut="True" FontSize="{DynamicResource FontCaption}" Margin="0,2,0,0" TextTrimming="CharacterEllipsis" />
                       </StackPanel>
                     </Grid>
                     <!-- A class -->
                     <Grid IsVisible="{Binding IsClass}" Height="36" Margin="14,0" ColumnDefinitions="8,10,*,Auto">
                       <c:Swatch Classes="dot" Small="True" Fill="{Binding Dot}" VerticalAlignment="Center" />
-                      <TextBlock Grid.Column="2" Text="{Binding Title}" ToolTip.Tip="{Binding Title}" c:Tips.WhenCut="True" FontSize="13" FontWeight="Medium" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
-                      <TextBlock Grid.Column="3" Classes="meta" Text="{Binding Meta}" FontSize="13" VerticalAlignment="Center" Margin="10,0,0,0" />
+                      <TextBlock Grid.Column="2" Text="{Binding Title}" ToolTip.Tip="{Binding Title}" c:Tips.WhenCut="True" FontSize="{DynamicResource FontBody}" FontWeight="Medium" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
+                      <TextBlock Grid.Column="3" Classes="meta" Text="{Binding Meta}" FontSize="{DynamicResource FontBody}" VerticalAlignment="Center" Margin="10,0,0,0" />
                     </Grid>
                     <!-- A source of an answer -->
                     <Grid IsVisible="{Binding IsSource}" Height="40" Margin="14,0" ColumnDefinitions="18,10,*,Auto">
                       <c:Icon Classes="source" Glyph="play_circle" Size="18" VerticalAlignment="Center" />
-                      <TextBlock Grid.Column="2" Text="{Binding Title}" ToolTip.Tip="{Binding Title}" c:Tips.WhenCut="True" FontSize="13" FontWeight="Medium" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
-                      <TextBlock Grid.Column="3" Classes="meta num" Text="{Binding Meta}" FontSize="13" VerticalAlignment="Center" Margin="10,0,0,0" />
+                      <TextBlock Grid.Column="2" Text="{Binding Title}" ToolTip.Tip="{Binding Title}" c:Tips.WhenCut="True" FontSize="{DynamicResource FontBody}" FontWeight="Medium" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
+                      <TextBlock Grid.Column="3" Classes="meta num" Text="{Binding Meta}" FontSize="{DynamicResource FontBody}" VerticalAlignment="Center" Margin="10,0,0,0" />
                     </Grid>
                   </Panel>
                 </Button>
@@ -161,12 +167,12 @@
           </ItemsControl.ItemsPanel>
           <ItemsControl.ItemTemplate>
             <DataTemplate x:DataType="vm:QuickRow">
-              <Button Classes="chip" Classes.fill="{Binding !Selected}" Classes.tint="{Binding Selected}"
+              <Button Classes="chip" Classes.selected="{Binding Selected}"
                       Command="{Binding $parent[UserControl].((vm:QuickModel)DataContext).OpenCommand}" CommandParameter="{Binding}">
                 <StackPanel Orientation="Horizontal" Spacing="8">
                   <c:Icon Classes="chip" Classes.rec="{Binding Glyph, Converter={x:Static c:Converters.Records}}" Glyph="{Binding Glyph}" Size="18" VerticalAlignment="Center" />
-                  <TextBlock Text="{Binding Title}" ToolTip.Tip="{Binding Title}" c:Tips.WhenCut="True" FontSize="13" VerticalAlignment="Center" MaxWidth="420" TextTrimming="CharacterEllipsis" />
-                  <TextBlock Classes="meta" Text="{Binding Meta}" IsVisible="{Binding Meta, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" FontSize="12"
+                  <TextBlock Text="{Binding Title}" ToolTip.Tip="{Binding Title}" c:Tips.WhenCut="True" FontSize="{DynamicResource FontBody}" VerticalAlignment="Center" MaxWidth="420" TextTrimming="CharacterEllipsis" />
+                  <TextBlock Classes="meta" Text="{Binding Meta}" IsVisible="{Binding Meta, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" FontSize="{DynamicResource FontCaption}"
                              VerticalAlignment="Center" />
                 </StackPanel>
               </Button>
