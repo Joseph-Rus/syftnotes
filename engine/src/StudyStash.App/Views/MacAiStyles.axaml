@@ -231,13 +231,15 @@
   <Style Selector="Border.ai-menu-item.selected TextBlock">
     <Setter Property="Foreground" Value="{DynamicResource OnAccent}" />
   </Style>
-  <Style Selector="Border.ai-menu-item.selected TextBlock.ai-menu-sub">
-    <Setter Property="Opacity" Value="0.85" />
-  </Style>
   <Style Selector="Border.ai-menu-item.selected c|Icon">
     <Setter Property="Foreground" Value="{DynamicResource OnAccent}" />
   </Style>
-  <Style Selector="Border.ai-menu-item.disabled">
+  <!-- A row that can't be picked: its words in the secondary ink and its mark dimmed, rather than the whole row faded
+       (the button's own disabled fade on top of a faded row left it at about 1.5:1). -->
+  <Style Selector="Button.ai-menu-row:disabled">
+    <Setter Property="Opacity" Value="1" />
+  </Style>
+  <Style Selector="Border.ai-menu-item.disabled c|Icon">
     <Setter Property="Opacity" Value="0.5" />
   </Style>
   <Style Selector="TextBlock.ai-menu-title">
@@ -245,6 +247,14 @@
   </Style>
   <Style Selector="TextBlock.ai-menu-sub">
     <Setter Property="FontSize" Value="11" />
+    <Setter Property="Foreground" Value="{DynamicResource Fg2}" />
+  </Style>
+  <!-- After the line above, so it wins: the picked row's line is the accent's own ink, a little softer, not grey on teal. -->
+  <Style Selector="Border.ai-menu-item.selected TextBlock.ai-menu-sub">
+    <Setter Property="Foreground" Value="{DynamicResource OnAccent}" />
+    <Setter Property="Opacity" Value="0.8" />
+  </Style>
+  <Style Selector="Border.ai-menu-item.disabled TextBlock">
     <Setter Property="Foreground" Value="{DynamicResource Fg2}" />
   </Style>
   <Style Selector="Button.ai-menu-footer">
