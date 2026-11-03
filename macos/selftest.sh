@@ -11,7 +11,8 @@
 # STUDYSTASH_SELFTEST_BACKGROUND=1 (with one-computer; CI's throwaway Macs only, as it registers a real LaunchAgent) ends
 # the run by linking a stand-in phone and turning on "Answer your phone when Syft Notes is closed"; once the app has
 # quit, the program runs once more (STUDYSTASH_SELFTEST_AFTER_QUIT=1) to check the library still answers the phone,
-# then takes the LaunchAgent away and checks nothing is left (background.txt).
+# that Launch Services lists nothing as the app once it has read a PDF, and that opening the app with `open` (not -n)
+# still starts it, then takes the LaunchAgent away and checks nothing is left (background.txt).
 set -eu
 
 APP=${1:?"usage: sh macos/selftest.sh \"<path>/Study Stash.app\" [out-dir]"}

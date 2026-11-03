@@ -27,6 +27,9 @@ static class Program
     {
         if (StudyStash.Library.Cli.IsCommand(args))
         {
+            // No window here: nothing may check this process in with Launch Services as the app (a Mac), or opening Syft
+            // Notes would find it "running" and show nothing. PDFKit did, as the library read a PDF.
+            StudyStash.Core.Ai.DocumentText.UsePdfKit = false;
             // The library this app runs starts at login the way the app does: its login item, only when asked.
             StudyStash.Library.Cli.LoginItems = home => new(() => Desktop.StartsAtLogin(home), on => Desktop.StartAtLogin(on, home));
             // Listen's downloadable voices: Kokoro, through the sherpa-onnx the app already carries for Parakeet.

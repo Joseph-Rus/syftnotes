@@ -185,7 +185,7 @@ public class DiagramsAfterFilingTests
         Assert.Equal(1, await rig.Jobs.RunPendingAsync());
         rig.Jobs = new DiagramJobs(rig.Cfg, rig.Store, rig.Ai) { HardStop = TimeSpan.FromMilliseconds(300) };
         rig.Jobs.Queue("lec-1", "claude");
-        rig.Claude.Design = (_, ct) => Task.Delay(Timeout.Infinite, ct).ContinueWith(_ => "", TaskScheduler.Default);
+        rig.Claude.Design = (_, ct) => new TaskCompletionSource().Task.WaitAsync(ct).ContinueWith(_ => "", TaskScheduler.Default);
         Assert.Equal(1, await rig.Jobs.RunPendingAsync());
         Assert.Equal(before, File.ReadAllBytes(row.MdPath!));
         Assert.Equal((Notes, row.UpdatedAt), (rig.Row().SummaryMd, rig.Row().UpdatedAt));
@@ -196,7 +196,7 @@ public class DiagramsAfterFilingTests
     public async Task A_pass_cut_off_by_a_restart_runs_again_a_few_times_at_most_and_never_leaves_the_lecture_waiting()
     {
         using var rig = new Rig();
-        rig.Claude.Design = (_, ct) => Task.Delay(Timeout.Infinite, ct).ContinueWith(_ => "", TaskScheduler.Default);
+        rig.Claude.Design = (_, ct) => new TaskCompletionSource().Task.WaitAsync(ct).ContinueWith(_ => "", TaskScheduler.Default);
         await rig.FileAsync();
 
         // The library dies mid-pass (its queue is simply abandoned) and starts again: the job is still there, and runs.
@@ -210,7 +210,7 @@ public class DiagramsAfterFilingTests
 
         // A lecture whose pass is cut off every time is given up on after three tries, its notes as filed.
         byte[] filed = File.ReadAllBytes((await rig.FileAsync("lec-2")).MdPath!);
-        rig.Claude.Design = (_, ct) => Task.Delay(Timeout.Infinite, ct).ContinueWith(_ => "", TaskScheduler.Default);
+        rig.Claude.Design = (_, ct) => new TaskCompletionSource().Task.WaitAsync(ct).ContinueWith(_ => "", TaskScheduler.Default);
         for (int i = 0; i < DiagramJobs.MaxTries; i++)
         {
             _ = rig.Jobs.RunPendingAsync();
@@ -250,7 +250,7 @@ public class DiagramsAfterFilingTests
         };
         bool busy = false;
         rig.Jobs = new DiagramJobs(rig.Cfg, rig.Store, local, rig.Say) { NotesBusy = () => busy, YieldCheck = TimeSpan.FromMilliseconds(20) };
-        rig.Claude.Design = (_, ct) => Task.Delay(Timeout.Infinite, ct).ContinueWith(_ => "", TaskScheduler.Default);
+        rig.Claude.Design = (_, ct) => new TaskCompletionSource().Task.WaitAsync(ct).ContinueWith(_ => "", TaskScheduler.Default);
 
         var running = rig.Jobs.RunPendingAsync();
         await rig.AskedAsync();
@@ -368,8 +368,7 @@ public class DiagramsAfterFilingTests
         rig.Claude.NotesText = Better;
         int designs = rig.Claude.Designs;
         rewrites.Start("lec-1", "claude");
-        var deadline = DateTime.UtcNow.AddSeconds(10);
-        while (rewrites.Get("lec-1").State == "working" && DateTime.UtcNow < deadline) await Task.Delay(20);
+        await Waiting.UntilAsync(() => rewrites.Get("lec-1").State != "working", 10);
         var ready = rewrites.Get("lec-1");
         Assert.Equal("ready", ready.State);
         Assert.Equal(Better, ready.Draft!.Markdown); // the draft never waits for a diagram

@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using NAudio.Wave;
 using StudyStash.Audio;
@@ -8,7 +9,7 @@ namespace StudyStash.Core.Tests;
 /// <summary>A test that needs Windows (its sound system): skipped on a Mac or Linux.</summary>
 public sealed class WindowsFactAttribute : FactAttribute
 {
-    public WindowsFactAttribute()
+    public WindowsFactAttribute([CallerFilePath] string? sourceFilePath = null, [CallerLineNumber] int sourceLineNumber = -1) : base(sourceFilePath, sourceLineNumber)
     {
         if (!OperatingSystem.IsWindows()) Skip = "needs Windows";
     }

@@ -121,7 +121,7 @@ public class AskChatsTests
 
         page.Question = "What are the three kinds of blood vessel?";
         var asking = page.AskCommand.ExecuteAsync(null);
-        while (string.IsNullOrEmpty(page.Turns[0].Answer)) await Task.Delay(10, TestContext.Current.CancellationToken);
+        await Wait.UntilAsync(() => !string.IsNullOrEmpty(page.Turns[0].Answer), "the first words");
         page.Stop(); // the student stops it, to ask it another way
         await asking;
         await lib.Claude.StoppedWhileHeld.Task.WaitAsync(TimeSpan.FromSeconds(20), TestContext.Current.CancellationToken);
