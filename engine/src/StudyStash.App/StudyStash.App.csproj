@@ -42,8 +42,15 @@
   <!-- A student's copy (TestHelpers=false, see engine/Directory.Build.props) leaves out the self-test and the demo
        libraries the tests and the README pictures draw; SelfTest.Off.cs stands in for the self-test. -->
   <ItemGroup Condition="'$(TestHelpers)' != 'true'">
-    <Compile Remove="SelfTest.cs;SelfTest.*.cs;Demo.cs;AiDemo.cs;RichDemo.cs" />
+    <Compile Remove="SelfTest.cs;SelfTest.*.cs;Demo.cs;AiDemo.cs;RichDemo.cs;VelopackTrial.cs" />
     <Compile Include="SelfTest.Off.cs" />
+  </ItemGroup>
+
+  <!-- The Velopack trial (docs/LIBRARIES.md, phase 5, step 1; .github/workflows/velopack-trial.yml): only in a copy with
+       the test helpers, so a student's copy has neither the package nor VelopackTrial.cs, and installs and updates as
+       before. -->
+  <ItemGroup Condition="'$(TestHelpers)' == 'true'">
+    <PackageReference Include="Velopack" Version="1.2.161" />
   </ItemGroup>
 
   <!-- StudyStash.Audio carries both live words' models (see Needle.targets): Cactus Whistle with its engine for ARM
