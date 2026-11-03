@@ -100,6 +100,10 @@ public sealed class AppUpdates
     public required Action<string> Log { get; init; }
     /// <summary>Where lectures and settings live, for <see cref="Apply"/>.</summary>
     public required string Home { get; init; }
+    /// <summary>How long after the app starts the first round is: 10 minutes; STUDYSTASH_UPDATE_AFTER (seconds, test
+    /// helpers only) brings it forward for the bridge test.</summary>
+    public TimeSpan FirstCheck { get; init; } = TimeSpan.FromSeconds(
+        double.TryParse(TestSwitches.Get("STUDYSTASH_UPDATE_AFTER"), System.Globalization.CultureInfo.InvariantCulture, out double s) ? s : Updates.FirstCheckAfter);
     /// <summary>How a round waits between checks; a test finishes at once instead of really sleeping.</summary>
     public Func<TimeSpan, CancellationToken, Task> Delay { get; init; } = Task.Delay;
 
@@ -296,7 +300,7 @@ public sealed class AppUpdates
     {
         try
         {
-            await NapAsync(TimeSpan.FromSeconds(Updates.FirstCheckAfter), stop);
+            await NapAsync(FirstCheck, stop);
             while (!stop.IsCancellationRequested)
             {
                 string result;

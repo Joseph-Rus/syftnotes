@@ -17,7 +17,8 @@ static class VelopackHooks
 {
     public static void Run()
     {
-        var app = VelopackApp.Build().SetAutoApplyOnStartup(false);
+        // The app's own id on Windows (its notifications', and its shortcuts' through vpk --aumid): one app to Windows.
+        var app = VelopackApp.Build().SetAutoApplyOnStartup(false).SetAppUserModelId("StudyStash.App");
         if (OperatingSystem.IsWindows()) app = app.OnBeforeUninstallFastCallback(_ => { if (OperatingSystem.IsWindows()) WindowsUninstalling(); });
         try
         {

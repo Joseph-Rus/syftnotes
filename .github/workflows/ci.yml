@@ -487,7 +487,7 @@ jobs:
         shell: bash
         working-directory: web
         run: npm ci --no-audit --no-fund && npm run build
-      - name: Build Study Stash.app and its one DMG
+      - name: Build Syft Notes.app and its one DMG
         # The laptop's Google sign-in secret (docs/phone-google.md) is built into the app; without it (a pull request has
         # none) the app builds as usual and Connect with Google says this copy can't connect.
         env:
@@ -512,6 +512,13 @@ jobs:
       - name: Signing - a throwaway self-signed identity, for the rehearsal
         if: needs.version.outputs.mac_signing == 'rehearsal'
         run: sh macos/signing-setup.sh selfsigned
+      # Velopack's packager (docs/LIBRARIES.md, phase 5): sign-release.sh packs the signed app with it, so the DMG holds
+      # the bundle Velopack updates, and its feed goes out with the release.
+      - name: vpk, Velopack's packager
+        if: needs.version.outputs.mac_signing != 'off'
+        run: |
+          dotnet tool install -g vpk --version 1.2.161
+          echo "$HOME/.dotnet/tools" >> "$GITHUB_PATH"
       - name: Sign the app, notarize it if there is a key, and make the DMG again around it
         if: needs.version.outputs.mac_signing != 'off'
         env:
@@ -524,7 +531,7 @@ jobs:
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
           STUDYSTASH_LIBRARY_VALIDATION: ${{ vars.STUDYSTASH_LIBRARY_VALIDATION }}
           HOW: ${{ needs.version.outputs.mac_signing == 'rehearsal' && 'rehearsal' || (needs.version.outputs.mac_notarize == 'true' && 'notarized' || 'signed') }}
-        run: sh macos/verify-signing.sh "dist/mac/Study Stash.app" dist/mac/Syft-Notes.dmg "$HOW"
+        run: sh macos/verify-signing.sh "dist/mac/Syft Notes.app" dist/mac/Syft-Notes.dmg "$HOW"
       # As soon as the signature is checked (nothing after this signs), not at the end of the job: the self-tests and
       # everything else that runs the app never have the certificate or the notary key within reach.
       - name: Signing - the keychain and keys are removed
@@ -534,12 +541,12 @@ jobs:
         run: |
           for arch in arm64 x64; do
             for f in index.html sw.js manifest.webmanifest; do
-              test -f "dist/mac/Study Stash.app/Contents/MacOS/$arch/web/$f" || { echo "no web/$f in the $arch tree"; exit 1; }
+              test -f "dist/mac/Syft Notes.app/Contents/MacOS/$arch/web/$f" || { echo "no web/$f in the $arch tree"; exit 1; }
             done
           done
       - name: Each tree carries its own live words - Cactus Whistle (model, licence, its arm64 engine, signed) for Apple silicon, the small Whisper (model, licence) for Intel - and not the other's
         run: |
-          arm="dist/mac/Study Stash.app/Contents/MacOS/arm64"; intel="dist/mac/Study Stash.app/Contents/MacOS/x64"
+          arm="dist/mac/Syft Notes.app/Contents/MacOS/arm64"; intel="dist/mac/Syft Notes.app/Contents/MacOS/x64"
           for f in "$arm/models/whistle.cact" "$arm/needle/LICENSE.txt" "$arm/needle/osx-arm64/libneedle3.dylib" \
                    "$intel/models/live-whisper-tiny-q8_0.bin" "$intel/models/live-whisper-LICENSE.txt"; do
             test -f "$f" || { echo "no $f"; exit 1; }
@@ -551,7 +558,7 @@ jobs:
           fi
       - name: Signed, universal, and reports its version on both architectures
         run: |
-          APP="dist/mac/Study Stash.app"
+          APP="dist/mac/Syft Notes.app"
           codesign --verify --deep --strict --verbose=2 "$APP"
           lipo -info "$APP/Contents/MacOS/StudyStash" | grep -q "x86_64"
           lipo -info "$APP/Contents/MacOS/StudyStash" | grep -q "arm64"
@@ -561,7 +568,7 @@ jobs:
           [ "$(env -u DOTNET_ROOT arch -x86_64 "$APP/Contents/MacOS/StudyStash" version)" = "$V" ]
       - name: Self-test (D5) - real windows, the pretend mic, Whisper from inside the bundle
         if: needs.version.outputs.tested != 'true'
-        run: sh macos/selftest.sh "dist/mac/Study Stash.app" "$RUNNER_TEMP/selftest/laptop"
+        run: sh macos/selftest.sh "dist/mac/Syft Notes.app" "$RUNNER_TEMP/selftest/laptop"
       # The second self-test, on the same app (it used to build it again on a Mac of its own): Just this computer.
       # Then "Answer your phone when Syft Notes is closed" goes on with a stand-in phone (a real LaunchAgent, on this
       # throwaway Mac only), the app quits, and the library must still answer the phone, never be taken for the app
@@ -572,7 +579,7 @@ jobs:
           STUDYSTASH_SELFTEST_FLOW: one-computer
           STUDYSTASH_SELFTEST_BACKGROUND: "1"
         run: |
-          sh macos/selftest.sh "dist/mac/Study Stash.app" "$RUNNER_TEMP/selftest/one-computer"
+          sh macos/selftest.sh "dist/mac/Syft Notes.app" "$RUNNER_TEMP/selftest/one-computer"
           grep -q "^background library registered" "$RUNNER_TEMP/selftest/one-computer/selftest.txt" || { echo "the self-test didn't turn on answering with the app closed"; exit 1; }
           grep -q "^the phone got its answer with the app closed" "$RUNNER_TEMP/selftest/one-computer/background.txt" || { echo "the phone wasn't answered with the app closed"; exit 1; }
           # The background library is never taken for the app: with it running, opening the app still starts it.
@@ -585,12 +592,15 @@ jobs:
           mnt="$RUNNER_TEMP/mnt-dmg"
           mkdir -p "$mnt"
           hdiutil attach -nobrowse -readonly -noautoopen -mountpoint "$mnt" dist/mac/Syft-Notes.dmg
-          if /usr/libexec/PlistBuddy -c "Print :StudyStashRole" "$mnt/Study Stash.app/Contents/Info.plist" >/dev/null 2>&1; then
+          if /usr/libexec/PlistBuddy -c "Print :StudyStashRole" "$mnt/Syft Notes.app/Contents/Info.plist" >/dev/null 2>&1; then
             hdiutil detach -quiet "$mnt"
             echo "Syft-Notes.dmg's app still says a role" >&2
             exit 1
           fi
           [ -L "$mnt/Applications" ]
+          # An older copy's updater looks for Study Stash.app on the disk: a hidden link to the app (macos/dmg.sh).
+          [ "$(readlink "$mnt/Study Stash.app")" = "Syft Notes.app" ] || { echo "no Study Stash.app link for older updaters"; ls -la "$mnt"; exit 1; }
+          ls -lO "$mnt" | grep -F "Study Stash.app" | grep -q hidden || { echo "the Study Stash.app link isn't hidden"; ls -lO "$mnt"; exit 1; }
           # Bar the live words' small Whisper (models/live-whisper-*.bin, Intel only), which comes with the app.
           if find "$mnt" \( -iname 'ggml-*.bin' -o -name '*.bin' -size +1M \) ! -name 'live-whisper-*.bin' | grep -q .; then
             hdiutil detach -quiet "$mnt"
@@ -602,7 +612,9 @@ jobs:
         if: needs.version.outputs.installers == 'true'
         with:
           name: mac-installers
-          path: dist/mac/Syft-Notes.dmg
+          path: |
+            dist/mac/Syft-Notes.dmg
+            dist/mac/velopack/osx
           retention-days: 30
       # What the self-test said and drew, every time; the whole folder (its home, recordings and a copy of the model:
       # 80 to 150 MB) only when something failed.
@@ -660,18 +672,18 @@ jobs:
         run: |
           mkdir -p "$RUNNER_TEMP/mnt"
           hdiutil attach -nobrowse -readonly -noautoopen -mountpoint "$RUNNER_TEMP/mnt" dist/mac/Syft-Notes.dmg
-          ditto "$RUNNER_TEMP/mnt/Study Stash.app" "$RUNNER_TEMP/Study Stash.app"
+          ditto "$RUNNER_TEMP/mnt/Syft Notes.app" "$RUNNER_TEMP/Syft Notes.app"
           hdiutil detach -quiet "$RUNNER_TEMP/mnt"
-          codesign --verify --deep --strict "$RUNNER_TEMP/Study Stash.app"
+          codesign --verify --deep --strict "$RUNNER_TEMP/Syft Notes.app"
       - name: Signed as planned, and Gatekeeper accepts it, offline, on the Intel Mac that will run it
         if: needs.version.outputs.mac_signing != 'off'
         env:
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
           STUDYSTASH_LIBRARY_VALIDATION: ${{ vars.STUDYSTASH_LIBRARY_VALIDATION }}
           HOW: ${{ needs.version.outputs.mac_signing == 'rehearsal' && 'rehearsal' || (needs.version.outputs.mac_notarize == 'true' && 'notarized' || 'signed') }}
-        run: sh macos/verify-signing.sh "$RUNNER_TEMP/Study Stash.app" dist/mac/Syft-Notes.dmg "$HOW"
+        run: sh macos/verify-signing.sh "$RUNNER_TEMP/Syft Notes.app" dist/mac/Syft-Notes.dmg "$HOW"
       - name: Self-test, natively on Intel
-        run: sh macos/selftest.sh "$RUNNER_TEMP/Study Stash.app" "$RUNNER_TEMP/selftest"
+        run: sh macos/selftest.sh "$RUNNER_TEMP/Syft Notes.app" "$RUNNER_TEMP/selftest"
       # What the self-test said and drew, every time; the whole folder (its home, recordings and a copy of the model:
       # 80 to 150 MB) only when something failed.
       - name: The self-test's words, logs and pictures
@@ -785,6 +797,31 @@ jobs:
         if: needs.version.outputs.win_signing == 'rehearsal'
         shell: pwsh
         run: .\windows\sign-release.ps1 -Out dist\windows
+      # Velopack's packages (docs/LIBRARIES.md, phase 5): Setup.exe per processor, which an Inno-era copy moves over
+      # with, and the update feed. Signed by vpk with the same identity (Artifact Signing through its own flag).
+      - name: vpk, Velopack's packager
+        if: needs.version.outputs.installers == 'true'
+        shell: pwsh
+        run: |
+          dotnet tool install -g vpk --version 1.2.161
+          Add-Content $env:GITHUB_PATH "$env:USERPROFILE\.dotnet\tools"
+      - name: Velopack's Setup.exe and update packages, signed as Setup.exe is
+        if: needs.version.outputs.installers == 'true' && needs.version.outputs.win_signing == 'real'
+        shell: pwsh
+        env:
+          AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+          AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+          AZURE_CLIENT_SECRET: ${{ secrets.AZURE_CLIENT_SECRET }}
+          WINDOWS_SIGNING_ENDPOINT: ${{ secrets.WINDOWS_SIGNING_ENDPOINT }}
+          WINDOWS_SIGNING_ACCOUNT: ${{ secrets.WINDOWS_SIGNING_ACCOUNT }}
+          WINDOWS_SIGNING_PROFILE: ${{ secrets.WINDOWS_SIGNING_PROFILE }}
+          WINDOWS_CERT_PFX_BASE64: ${{ secrets.WINDOWS_CERT_PFX_BASE64 }}
+          WINDOWS_CERT_PASSWORD: ${{ secrets.WINDOWS_CERT_PASSWORD }}
+        run: .\windows\velopack-pack.ps1 -Out dist\windows
+      - name: Velopack's Setup.exe and update packages (the rehearsal's certificate, or unsigned as Setup.exe is)
+        if: needs.version.outputs.installers == 'true' && needs.version.outputs.win_signing != 'real'
+        shell: pwsh
+        run: .\windows\velopack-pack.ps1 -Out dist\windows
       - name: The signature is the one this run was told to make
         if: needs.version.outputs.win_signing != 'off'
         shell: pwsh
@@ -793,7 +830,7 @@ jobs:
         run: |
           $check = @{}
           if ($env:HOW -eq "rehearsal") { $check.Rehearsal = $true }
-          .\windows\verify-signing.ps1 @check dist\windows\Syft-Notes-Setup.exe dist\windows\win-x64\StudyStash.exe dist\windows\win-arm64\StudyStash.exe dist\windows\win-x64\StudyStash.Core.dll dist\windows\win-x64\libSkiaSharp.dll
+          .\windows\verify-signing.ps1 @check dist\windows\Syft-Notes-Setup.exe dist\windows\velopack\win-x64\SyftNotes-win-x64-Setup.exe dist\windows\velopack\win-arm64\SyftNotes-win-arm64-Setup.exe dist\windows\win-x64\StudyStash.exe dist\windows\win-arm64\StudyStash.exe dist\windows\win-x64\StudyStash.Core.dll dist\windows\win-x64\libSkiaSharp.dll
       - name: Both trees carry the phone app, which the library serves at /app/
         shell: pwsh
         run: |
@@ -1023,7 +1060,9 @@ jobs:
         if: needs.version.outputs.installers == 'true'
         with:
           name: windows-installers
-          path: dist\windows\Syft-Notes-Setup.exe
+          path: |
+            dist\windows\Syft-Notes-Setup.exe
+            dist\windows\velopack
           retention-days: 30
       # What the self-test said and drew, every time; the whole folder (its home, recordings and a copy of the model:
       # 80 to 150 MB) only when something failed.
@@ -1194,11 +1233,26 @@ jobs:
           for f in "$app" "$HOME/.local/bin/syft-notes" "$HOME/.local/share/applications/syft-notes.desktop"; do
             [ ! -e "$f" ] || { echo "$f survived uninstalling"; exit 1; }
           done
+      # Velopack's package (docs/LIBRARIES.md, phase 5): the AppImage, which a tarball copy moves over to, and the update
+      # feed.
+      - name: vpk, Velopack's packager, and mksquashfs for the AppImage
+        if: needs.version.outputs.installers == 'true'
+        run: |
+          dotnet tool install -g vpk --version 1.2.161
+          echo "$HOME/.dotnet/tools" >> "$GITHUB_PATH"
+          command -v mksquashfs > /dev/null || sudo apt-get install -y -qq squashfs-tools > /dev/null
+      - name: Velopack's AppImage and update packages for ${{ matrix.rid }}
+        if: needs.version.outputs.installers == 'true'
+        env:
+          STUDYSTASH_LINUX_RIDS: ${{ matrix.rid }}
+        run: sh linux/velopack-pack.sh dist/linux
       - uses: actions/upload-artifact@v7
         if: needs.version.outputs.installers == 'true'
         with:
           name: linux-installers-${{ matrix.rid }}
-          path: dist/linux/Syft-Notes-${{ matrix.rid }}.tar.gz
+          path: |
+            dist/linux/Syft-Notes-${{ matrix.rid }}.tar.gz
+            dist/linux/velopack/${{ matrix.rid }}
           retention-days: 30
       # What the self-test said and drew, every time; the whole folder (its home, recordings and a copy of the model:
       # 80 to 150 MB) only when something failed.
@@ -1283,6 +1337,18 @@ jobs:
         run: |
           test -s dist/Syft-Notes.dmg && test -s dist/Syft-Notes-Setup.exe && test -s dist/Syft-Notes-linux-x64.tar.gz && test -s dist/Syft-Notes-linux-arm64.tar.gz \
             || { echo "an installer is missing or empty"; ls -l dist; exit 1; }
+          # Velopack's files for each channel (docs/LIBRARIES.md, phase 5): the update feeds the app reads, the full and
+          # delta packages, Velopack's Setup.exe per Windows processor and the AppImage per Linux one (what an Inno-era
+          # or tarball copy moves over with). The Mac's DMG already holds Velopack's bundle. Each name is vpk's own and
+          # unique to its channel.
+          mkdir -p dist/velopack-all
+          for c in osx win-x64 win-arm64 linux-x64 linux-arm64; do
+            test -s "dist/velopack/$c/releases.$c.json" || { echo "no Velopack feed for $c"; ls -lR dist/velopack; exit 1; }
+            cp dist/velopack/$c/* dist/velopack-all/
+          done
+          test -s dist/velopack-all/SyftNotes-win-x64-Setup.exe && test -s dist/velopack-all/SyftNotes-win-arm64-Setup.exe \
+            && test -s dist/velopack-all/SyftNotes-linux-x64.AppImage && test -s dist/velopack-all/SyftNotes-linux-arm64.AppImage \
+            || { echo "a Velopack installer is missing"; ls -l dist/velopack-all; exit 1; }
           # Re-check the race: another push could have published this tag while this run was building.
           released=false
           if git rev-parse -q --verify "refs/tags/v$V" >/dev/null || gh release view "v$V" >/dev/null 2>&1; then released=true; fi
@@ -1301,7 +1367,8 @@ jobs:
           cp dist/Syft-Notes-Setup.exe dist/Egghead-Notes-Setup.exe
           cp dist/Syft-Notes.dmg dist/Study-Stash.dmg
           cp dist/Syft-Notes-Setup.exe dist/Study-Stash-Setup.exe
-          (cd dist && sha256sum Syft-Notes* Egghead-Notes* Study-Stash* > SHA256SUMS.txt)
+          (cd dist/velopack-all && sha256sum SyftNotes-*-Setup.exe SyftNotes-*.AppImage > ../velopack-sums.txt)
+          (cd dist && sha256sum Syft-Notes* Egghead-Notes* Study-Stash* > SHA256SUMS.txt && cat velopack-sums.txt >> SHA256SUMS.txt)
           ls -l dist
           cat dist/SHA256SUMS.txt
           if [ "$PUBLISH" != true ]; then
@@ -1316,4 +1383,5 @@ jobs:
             dist/Study-Stash.dmg dist/Study-Stash-Setup.exe \
             dist/Study-Stash-Laptop.dmg dist/Study-Stash-Library.dmg \
             dist/Study-Stash-Laptop-Setup.exe dist/Study-Stash-Library-Setup.exe \
+            dist/velopack-all/* \
             dist/SHA256SUMS.txt
