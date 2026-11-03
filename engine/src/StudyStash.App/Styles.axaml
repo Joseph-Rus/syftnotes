@@ -292,10 +292,10 @@
 
   <!-- Status by class, so it follows the look, light and dark: a dot that's green when all is well and amber when
        something needs you, and a result line that says whether it worked. -->
-  <Style Selector="Ellipse.status">
+  <Style Selector="Ellipse.status, c|SyftCell.status">
     <Setter Property="Fill" Value="{DynamicResource Good}" />
   </Style>
-  <Style Selector="Ellipse.status.warn">
+  <Style Selector="Ellipse.status.warn, c|SyftCell.status.warn">
     <Setter Property="Fill" Value="{DynamicResource Warn}" />
   </Style>
   <Style Selector="TextBlock.result">

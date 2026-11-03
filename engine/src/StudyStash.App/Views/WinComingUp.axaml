@@ -8,11 +8,11 @@
              x:Class="StudyStash.App.Views.WinComingUp"
              x:DataType="vm:ComingUpModel">
   <UserControl.Styles>
-    <!-- "File every … in Machine Learning": a line of accent text under the event, not a second row. -->
+    <!-- "File every … in Machine Learning": a line of ink words under the event, not a second row. -->
     <Style Selector="Button.suggest">
       <Setter Property="Background" Value="Transparent" />
       <Setter Property="Padding" Value="0" />
-      <Setter Property="Foreground" Value="{DynamicResource AccentText}" />
+      <Setter Property="Foreground" Value="{DynamicResource Ink}" />
       <Setter Property="Cursor" Value="Hand" />
     </Style>
     <Style Selector="Button.suggest:pointerover /template/ ContentPresenter">
@@ -22,8 +22,8 @@
   </UserControl.Styles>
 
   <StackPanel IsVisible="{Binding HasCalendars}" Spacing="4">
-    <TextBlock Text="{Binding Heading}" FontSize="12" FontWeight="SemiBold" Foreground="{DynamicResource Fg2}" Margin="0,2,0,0" />
-    <TextBlock IsVisible="{Binding IsEmpty}" Text="{Binding EmptyText}" FontSize="13" Foreground="{DynamicResource Fg3}" />
+    <TextBlock Classes="drop-label" Text="{Binding Heading}" />
+    <TextBlock IsVisible="{Binding IsEmpty}" Classes="row-sub" Text="{Binding EmptyText}" Margin="8,0,8,2" />
     <ItemsControl ItemsSource="{Binding Rows}">
       <ItemsControl.ItemsPanel>
         <ItemsPanelTemplate>
@@ -38,13 +38,13 @@
             <Grid ColumnDefinitions="8,10,*,10,Auto">
               <c:Swatch Small="True" Fill="{Binding Dot}" VerticalAlignment="Center"/>
               <StackPanel Grid.Column="2" VerticalAlignment="Center">
-                <TextBlock Text="{Binding Title}" ToolTip.Tip="{Binding Title}" c:Tips.WhenCut="True" FontSize="14" TextTrimming="CharacterEllipsis" />
-                <TextBlock IsVisible="{Binding HasDetail}" Text="{Binding Detail}" ToolTip.Tip="{Binding Detail}" c:Tips.WhenCut="True" FontSize="12" Foreground="{DynamicResource Fg2}" TextTrimming="CharacterEllipsis" />
+                <TextBlock Classes="row-title" Text="{Binding Title}" ToolTip.Tip="{Binding Title}" c:Tips.WhenCut="True" />
+                <TextBlock IsVisible="{Binding HasDetail}" Classes="row-sub" Text="{Binding Detail}" ToolTip.Tip="{Binding Detail}" c:Tips.WhenCut="True" Margin="0,2,0,0" />
               </StackPanel>
-              <TextBlock Grid.Column="4" Classes="num" Text="{Binding When}" FontSize="12" Foreground="{DynamicResource Fg3}" VerticalAlignment="Center" />
+              <TextBlock Grid.Column="4" Classes="num row-when" Text="{Binding When}" VerticalAlignment="Center" />
             </Grid>
           </Button>
-          <Button Classes="suggest" IsVisible="{Binding HasSuggestion}" Margin="23,0,8,4" HorizontalAlignment="Left" FontSize="11"
+          <Button Classes="suggest" IsVisible="{Binding HasSuggestion}" Margin="23,0,8,4" HorizontalAlignment="Left" FontSize="{DynamicResource FontCaption}"
                   Command="{Binding $parent[UserControl].((vm:ComingUpModel)DataContext).FileCommand}" CommandParameter="{Binding}"
                   Content="{Binding SuggestText}" ToolTip.Tip="From now on, every event called this goes in that class, and what's recorded in it." />
           </StackPanel>
