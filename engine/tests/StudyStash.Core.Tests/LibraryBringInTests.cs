@@ -42,6 +42,9 @@ public sealed class LibraryBringInTests
             old.File("con", "Con", "Opening night", "A class Windows won't name a folder after.");
             old.File("deleted", "Thermodynamics", "A lecture deleted since", "Gone.");
         }
+        // Written on Windows: every line ends "\r\n". A copy keeps that, and it's the same lecture as one ending "\n".
+        foreach (string f in Directory.EnumerateFiles(personal, "*.md", SearchOption.AllDirectories))
+            File.WriteAllText(f, File.ReadAllText(f).Replace("\r\n", "\n").Replace("\n", "\r\n"));
         main.File("same", "Thermodynamics", "Heat engines", "Carnot's cycle.");
         main.File("edited", "Thermodynamics", "Entropy", "Entropy only grows, edited since.");
         main.File("deleted", "Thermodynamics", "A lecture deleted since", "Gone.");
