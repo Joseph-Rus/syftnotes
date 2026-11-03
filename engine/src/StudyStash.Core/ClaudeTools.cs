@@ -219,6 +219,21 @@ public sealed class RemoteLibrary(string serverUrl, string key, HttpClient? http
 
     static string Q(string? s) => Uri.EscapeDataString(s ?? "");
 
+    /// <summary>What bringing in each of <paramref name="from"/> (other library folders on the library's computer) would
+    /// do, for a library whose folder is <paramref name="into"/> (<see cref="LibraryBringIn"/>). Null from a library
+    /// older than this.</summary>
+    public async Task<List<BringInCount>?> BringInPlanAsync(string into, IEnumerable<string> from, CancellationToken stop = default) =>
+        await SendAsync(HttpMethod.Get, "/folders?into=" + Q(into) + string.Concat(from.Select(f => "&from=" + Q(f))), stop: stop) is JsonObject o
+            ? [.. (o["plans"] as JsonArray ?? []).OfType<JsonObject>().Select(BringInCount.FromJson)]
+            : null;
+
+    /// <summary>The library lists its own folder's unlisted lectures and brings in each of <paramref name="from"/>'s
+    /// notes: what it did. Null from a library older than this.</summary>
+    public async Task<List<BringInCount>?> BringInAsync(IEnumerable<string> from, CancellationToken stop = default) =>
+        await SendAsync(HttpMethod.Post, "/folders/bring-in", new JsonObject { ["from"] = new JsonArray([.. from.Select(f => (JsonNode)f)]) }, stop) is JsonObject o
+            ? [.. (o["done"] as JsonArray ?? []).OfType<JsonObject>().Select(BringInCount.FromJson)]
+            : null;
+
     /// <summary>The library's name and classes. A library from before /api/v2 (the Python engine) answers 404.</summary>
     public async Task<JsonObject> OverviewAsync() =>
         await SendAsync(HttpMethod.Get, "/library") as JsonObject ?? throw new LibraryRefusedException(404, "This library is older than the app: update it to browse it here.");
