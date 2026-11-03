@@ -273,7 +273,6 @@ public class SelectFilms
     public void Selections_read_in_every_look_and_theme()
     {
         if (!On) return;
-        var named = ColourThemes.All.ToDictionary(t => t.Name);
         foreach (var (skin, variant, theme) in new[]
                  {
                      (SkinKind.Mac, ThemeVariant.Light, "Lagoon"), (SkinKind.Mac, ThemeVariant.Dark, "Lagoon"),
@@ -290,7 +289,7 @@ public class SelectFilms
             recorder.HorizontalAlignment = HorizontalAlignment.Center;
             recorder.VerticalAlignment = VerticalAlignment.Center;
             var ground = new SolidColorBrush(variant == ThemeVariant.Dark ? Color.Parse("#0E0F11") : Color.Parse("#DADCE0"));
-            var f = new Film($"still-chat-{tag}", recorder, skin, variant, 520, 640, named[theme], ground);
+            var f = new Film($"still-chat-{tag}", recorder, skin, variant, 520, 640, ColourThemes.Find(theme), ground);
             f.NoPointer();
             var question = Piece(recorder, "What did she say");
             var answer = Piece(recorder, "Recursion traces and");
@@ -311,7 +310,7 @@ public class SelectFilms
             // transcript, in the library window.
             var lecture = Lecture();
             Control library = skin == SkinKind.Mac ? new MacLibrary { DataContext = lecture } : new WinLibrary { DataContext = lecture };
-            var w = new Film($"still-notes-{tag}", library, skin, variant, 1280, 860, named[theme]);
+            var w = new Film($"still-notes-{tag}", library, skin, variant, 1280, 860, ColourThemes.Find(theme));
             w.NoPointer();
             var note = library.GetVisualDescendants().OfType<NoteView>().First(n => n.IsEffectivelyVisible);
             var pieces = note.GetVisualDescendants().OfType<NoteText>().Where(t => t.IsEffectivelyVisible && Text(t).Length > 20).ToList();

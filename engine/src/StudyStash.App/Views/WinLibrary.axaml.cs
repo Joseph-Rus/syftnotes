@@ -9,8 +9,6 @@ public partial class WinLibrary : UserControl
     public WinLibrary()
     {
         InitializeComponent();
-        // The library window has no accent colour: what's inside that asks for one gets ink.
-        Resources.MergedDictionaries.Add(Skin.NoAccent());
         // Below 900 px a page draws its margins in, and a class's Canvas lists show one column, not two.
         SizeChanged += (_, e) =>
         {

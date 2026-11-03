@@ -211,12 +211,10 @@ public class NotesPdfTests
         });
     }
 
-    /// <summary>The app in dark mode with another colour theme: the paper still gets the light look's ink and the
-    /// first theme's accent, drawn onto white.</summary>
+    /// <summary>The app in dark mode: the paper still gets the light look's ink and accent, drawn onto white.</summary>
     [AvaloniaFact]
     public async Task Paper_is_light_whatever_the_app_is_showing()
     {
-        Skin.UseTheme(ColourThemes.All[4]);
         ((App)Application.Current!).UseSkin(SkinKind.Mac);
         Application.Current!.RequestedThemeVariant = ThemeVariant.Dark;
         try
