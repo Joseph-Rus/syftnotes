@@ -118,6 +118,11 @@ public sealed class AppSettings
     /// first ("To hear when it's ready, allow Syft Notes' notifications when your Mac asks."): set by Get started on a
     /// Mac, cleared once asked. An update never sets it (they were asked long ago).</summary>
     public bool AskNotificationsAtStop { get; set; }
+    /// <summary>The notes folders the student was shown when they last answered "Which notes folder should Syft Notes
+    /// use?" (<see cref="LibraryFolderPick"/>); null until they answer. It's asked again only for a folder not in it.</summary>
+    public List<string>? NotesFoldersSeen { get; set; }
+    /// <summary>The notes folder they picked then.</summary>
+    public string NotesFolderChosen { get; set; } = "";
 
     public static string PathIn(string home) => System.IO.Path.Combine(home, "app.json");
 
