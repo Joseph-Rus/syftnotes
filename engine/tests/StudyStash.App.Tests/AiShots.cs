@@ -105,7 +105,6 @@ public class AiShots
 
         var window = new Border { Width = 900, Height = mac ? 780 : 860, CornerRadius = new CornerRadius(mac ? 18 : 8), ClipToBounds = true, Child = stack };
         window.Classes.Add("in-settings");
-        window.Resources.MergedDictionaries.Add(Skin.NoAccent());
         Res(window, Border.BackgroundProperty, window, "Canvas");
         Res(window, Border.BoxShadowProperty, window, mac ? "WindowShadow" : "ShadowLg");
         return window;
@@ -581,7 +580,6 @@ public class AiShots
         var sheet = new Border { Width = width, Padding = new Thickness(8), Child = child, CornerRadius = new CornerRadius(14) };
         if (height is { } h) sheet.Height = h;
         sheet.Classes.Add("in-settings");
-        sheet.Resources.MergedDictionaries.Add(Skin.NoAccent());
         Res(sheet, Border.BackgroundProperty, sheet, "Surface");
         Res(sheet, Border.BoxShadowProperty, sheet, "LineRing");
         return sheet;

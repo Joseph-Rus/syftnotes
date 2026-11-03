@@ -18,6 +18,15 @@ public sealed partial class HeardLine : ObservableObject
     [ObservableProperty] public partial bool Here { get; set; }
     /// <summary>The newest line reads in the full text color; older ones fade to secondary.</summary>
     [ObservableProperty] public partial bool Latest { get; set; }
+    /// <summary>How many lines have come after it (0 for the newest): the recorder shows the newest bold and fades the
+    /// older ones through three grey steps.</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(Newest), nameof(Fade1), nameof(Fade2), nameof(Fade3))]
+    public partial int Age { get; set; }
+    public bool Newest => Age == 0;
+    public bool Fade1 => Age == 1;
+    public bool Fade2 => Age == 2;
+    public bool Fade3 => Age >= 3;
     /// <summary>What the line is copied with in front when a selection takes it from its start: its time, as a
     /// downloaded transcript writes it ("[12:30] ").</summary>
     public string? CopyLead => Time.Length > 0 ? $"[{Time}] " : null;
@@ -132,6 +141,7 @@ public sealed partial class RecorderModel : ObservableObject
     {
         Lines.CollectionChanged += (_, _) =>
         {
+            for (int i = 0; i < Lines.Count; i++) Lines[i].Age = Lines.Count - 1 - i;
             OnPropertyChanged(nameof(NoLines));
             OnPropertyChanged(nameof(EarlierLine));
             OnPropertyChanged(nameof(NewestLine));

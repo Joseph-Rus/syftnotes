@@ -18,7 +18,7 @@
     <Border Classes="ai-bar working" Padding="16,12,8,12" IsVisible="{Binding IsRewriting}">
       <Grid ColumnDefinitions="Auto,12,*,Auto" VerticalAlignment="Center">
         <c:SyftLoader Kind="HoppingBits" Size="20" />
-        <TextBlock Grid.Column="2" FontSize="14" TextWrapping="Wrap">
+        <TextBlock Grid.Column="2" FontSize="{DynamicResource FontBody}" TextWrapping="Wrap">
           <Run FontWeight="SemiBold" Text="{Binding RewritingLead}" />
           <Run Text=" Your current notes stay until the new ones are ready." />
         </TextBlock>
@@ -32,7 +32,7 @@
     <Border Classes="ai-bar ready" Padding="16,8,8,8" IsVisible="{Binding IsReady}">
       <Grid ColumnDefinitions="Auto,12,*,8,Auto,8,Auto,8,Auto" VerticalAlignment="Center">
         <Border Classes="ai-ok-glyph"><TextBlock Text="✓" /></Border>
-        <TextBlock Grid.Column="2" FontSize="14" Text="{Binding ReadyLead}" TextTrimming="CharacterEllipsis" />
+        <TextBlock Grid.Column="2" FontSize="{DynamicResource FontBody}" Text="{Binding ReadyLead}" TextTrimming="CharacterEllipsis" />
         <Button Grid.Column="4" Classes="ai-textbtn" Command="{Binding KeepOldCommand}">
           <Border Classes="ai-pill-plain"><TextBlock Text="Keep old" /></Border>
         </Button>

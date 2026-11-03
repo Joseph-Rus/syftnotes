@@ -196,8 +196,8 @@ all words in `Words/`. Each piece has one focused test.
 ## 4. Connection rules
 
 `tools/check-connections.sh` counts the patterns behind these rules (fixed waits, engine-state strings outside the store,
-Shell in services, windows built by hand, bare catches, fire-and-forget calls in Shell, Mac views, clients made by
-hand). CI's "Connection rules" job fails when a count rises above `tools/connections-baseline.txt`; when a change
+Shell in services, windows built by hand, bare catches, fire-and-forget calls in Shell, Mac views, literal colours
+and text sizes in views, clients made by hand). CI's "Connection rules" job fails when a count rises above `tools/connections-baseline.txt`; when a change
 brings one down, lower its line in the same change. Rules without a count are kept by review.
 
 1. **One owner per shared thing.** AI state, Canvas state, recording state and settings live in a store on
@@ -225,6 +225,15 @@ brings one down, lower its line in the same change. Rules without a count are ke
     `Thread.Sleep` outside `Kit/Poll.cs` and an allow-list of animation controls.
 12. **Every action a student starts goes through `AsyncAction`.** No bare `catch { }`, no `Busy = true` by hand.
     *Check:* grep.
+13. **The look comes from the Syft look's tokens (`Skin.cs`).** Colours by meaning (`Accent`/`OnAccent` ink on paper,
+    paper on ink in dark; `Recording` coral, only for recording; `Selected`/`OnSelected` lilac with ink; `Progress`
+    sky on `ProgressTrack`; `Highlight` mustard; `SurfaceRaised` the mesh; `Border`, `TextMuted`, `TextFade1`–`3`),
+    text by the type scale (`FontCaption` 12, `FontBody`/`FontBodyStrong` 14, `FontSubtitle` 16, `FontTitle` 20,
+    `FontDisplay` 28), gaps by `Space1`–`Space8` and `Inset1`–`Inset8` (4-point), corners by `RadiusCell`,
+    `RadiusControl`, `RadiusCard`, `RadiusPanel`, and every button's corners by `c:Cell.Round` (the logo's cell, 27 % of
+    its height). No colour themes; light, dark or the system's. *Check:* the `literal-colours` (#hex in Views and
+    Controls, outside Syft.cs) and `literal-font-sizes` (a number in a view's `FontSize`) counts only go down;
+    ThemeTests checks every token exists light and dark and every text and fill pair reads at 4.5:1.
 
 ## 5. Migration order
 

@@ -1,6 +1,8 @@
-<!-- The menu bar dropdown (Surfaces, macOS 01): 320 pt of Liquid Glass, as compact as the system's own menu bar extras
-     (Control Centre, Wi-Fi). Idle: Record (the class picked, or the library sorts it), a 32 pt pill tinted with the accent, and the small
-     chevron beside it opens the class picker under it. Recording: the timer, the waveform, the last line heard, Pause and Stop. -->
+<!-- The menu bar dropdown (Mac): 304 pt, compact like the system's own menu bar extras, in the Syft look (PanelStyles,
+     shared with the Windows flyout). Top: the pixel s beside Record (ink with its coral cell; the square beside it
+     opens the class picker under it). Recording, the s's Path Trace takes its place over the clock, the cell meter, the
+     last line heard, Pause and a coral Stop. Then what's coming up and the recent lectures (a picked one lilac,
+     progress sky), search, the status line and the way into the app with its Settings. -->
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="using:StudyStash.App.ViewModels"
@@ -8,116 +10,108 @@
              xmlns:v="using:StudyStash.App.Views"
              x:Class="StudyStash.App.Views.MacPanel"
              x:DataType="vm:PanelModel"
-             Width="320" ClipToBounds="False">
+             Width="304" ClipToBounds="False">
   <UserControl.Styles>
-    <Style Selector="Button.row">
-      <Setter Property="Theme" Value="{StaticResource Surface}" />
-      <Setter Property="CornerRadius" Value="8" />
-      <Setter Property="Padding" Value="8,5" />
-    </Style>
+    <StyleInclude Source="avares://StudyStash/Views/PanelStyles.axaml" />
   </UserControl.Styles>
 
-  <c:Glass CornerRadius="16" Padding="8">
-    <StackPanel Spacing="8">
+  <c:Glass CornerRadius="{DynamicResource RadiusPane}" Padding="{DynamicResource Inset2}">
+    <StackPanel Spacing="{DynamicResource Space3}">
 
-      <!-- A library-only computer: no Record; what the library is doing instead. One column of 16 pt markers, the
-           words beside them all starting at the same place. -->
-      <Border Name="LibraryCard" Classes="fill" IsVisible="{Binding LibraryOnly}" CornerRadius="10" Padding="10,8">
-        <StackPanel Spacing="5">
-          <Grid ColumnDefinitions="16,6,*">
-            <Ellipse Width="7" Height="7" Classes="status" Classes.warn="{Binding !Library.RunningGood, FallbackValue=False}"
-                     HorizontalAlignment="Center" VerticalAlignment="Center" />
-            <TextBlock Grid.Column="2" Text="{Binding Library.Running, FallbackValue=''}" ToolTip.Tip="{Binding Library.Running, FallbackValue=''}" c:Tips.WhenCut="True" FontSize="12" FontWeight="SemiBold"
-                       TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
+      <!-- A library-only computer: no Record; what the library is doing instead. One column of markers, the words
+           beside them all starting at the same place. -->
+      <Border Name="LibraryCard" Classes="drop-card" IsVisible="{Binding LibraryOnly}">
+        <StackPanel Spacing="{DynamicResource Space1}">
+          <Grid ColumnDefinitions="16,8,*">
+            <c:SyftCell Width="8" Height="8" Classes="status" Classes.warn="{Binding !Library.RunningGood, FallbackValue=False}"
+                        HorizontalAlignment="Center" VerticalAlignment="Center" />
+            <TextBlock Grid.Column="2" Classes="row-title" Text="{Binding Library.Running, FallbackValue=''}" ToolTip.Tip="{Binding Library.Running, FallbackValue=''}" c:Tips.WhenCut="True"
+                       FontWeight="SemiBold" VerticalAlignment="Center" />
           </Grid>
-          <Grid ColumnDefinitions="16,6,*">
-            <c:Icon Glyph="notes" Size="13" Foreground="{DynamicResource Fg2}" HorizontalAlignment="Center" VerticalAlignment="Center" />
-            <TextBlock Grid.Column="2" Text="{Binding Library.Lectures, FallbackValue=''}" ToolTip.Tip="{Binding Library.Lectures, FallbackValue=''}" c:Tips.WhenCut="True" FontSize="11" Foreground="{DynamicResource Fg2}"
-                       TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
+          <Grid ColumnDefinitions="16,8,*">
+            <c:Icon Glyph="notes" Size="14" Foreground="{DynamicResource InkMuted}" HorizontalAlignment="Center" VerticalAlignment="Center" />
+            <TextBlock Grid.Column="2" Classes="row-sub" Text="{Binding Library.Lectures, FallbackValue=''}" ToolTip.Tip="{Binding Library.Lectures, FallbackValue=''}" c:Tips.WhenCut="True" VerticalAlignment="Center" />
           </Grid>
-          <Grid ColumnDefinitions="16,6,*" IsVisible="{Binding HasCanvasLine}">
-            <c:Icon Glyph="school" Size="13" Foreground="{DynamicResource Fg2}" HorizontalAlignment="Center" VerticalAlignment="Center" />
-            <TextBlock Grid.Column="2" Text="{Binding Library.Canvas, FallbackValue=''}" ToolTip.Tip="{Binding Library.Canvas, FallbackValue=''}" c:Tips.WhenCut="True" FontSize="11" Foreground="{DynamicResource Fg2}"
-                       TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
+          <Grid ColumnDefinitions="16,8,*" IsVisible="{Binding HasCanvasLine}">
+            <c:Icon Glyph="school" Size="14" Foreground="{DynamicResource InkMuted}" HorizontalAlignment="Center" VerticalAlignment="Center" />
+            <TextBlock Grid.Column="2" Classes="row-sub" Text="{Binding Library.Canvas, FallbackValue=''}" ToolTip.Tip="{Binding Library.Canvas, FallbackValue=''}" c:Tips.WhenCut="True" VerticalAlignment="Center" />
           </Grid>
-          <Grid ColumnDefinitions="16,6,*" IsVisible="{Binding HasLaptopsLine}">
-            <c:Icon Glyph="laptop_mac" Size="13" Foreground="{DynamicResource Fg2}" HorizontalAlignment="Center" VerticalAlignment="Center" />
-            <TextBlock Grid.Column="2" Text="{Binding Library.Laptops, FallbackValue=''}" ToolTip.Tip="{Binding Library.Laptops, FallbackValue=''}" c:Tips.WhenCut="True" FontSize="11" Foreground="{DynamicResource Fg2}"
-                       TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
+          <Grid ColumnDefinitions="16,8,*" IsVisible="{Binding HasLaptopsLine}">
+            <c:Icon Glyph="laptop_mac" Size="14" Foreground="{DynamicResource InkMuted}" HorizontalAlignment="Center" VerticalAlignment="Center" />
+            <TextBlock Grid.Column="2" Classes="row-sub" Text="{Binding Library.Laptops, FallbackValue=''}" ToolTip.Tip="{Binding Library.Laptops, FallbackValue=''}" c:Tips.WhenCut="True" VerticalAlignment="Center" />
           </Grid>
         </StackPanel>
       </Border>
 
-      <!-- Idle: Record, and the class switcher -->
-      <StackPanel Spacing="6" IsVisible="{Binding ShowRecord}">
-        <Grid ColumnDefinitions="*,6,32">
-          <Button Name="Record" AutomationProperties.Name="Record" Classes="tint" Theme="{StaticResource Surface}" Height="32" CornerRadius="16" Padding="12,0"
+      <!-- Idle: the pixel s, Record, and the class switcher -->
+      <StackPanel Spacing="{DynamicResource Space2}" IsVisible="{Binding ShowRecord}">
+        <Grid ColumnDefinitions="Auto,10,*,6,34">
+          <c:SyftMark Size="26" Bits="False" VerticalAlignment="Center" Margin="4,0,0,0" />
+          <Button Name="Record" Grid.Column="2" AutomationProperties.Name="Record" Classes="drop-record"
                   Command="{Binding RecordCommand}" IsEnabled="{Binding CanRecord}">
             <Grid ColumnDefinitions="Auto,8,*,Auto">
-              <Ellipse Width="10" Height="10" Fill="{DynamicResource OnAccent}" VerticalAlignment="Center" />
-              <TextBlock Grid.Column="2" Text="{Binding RecordLabel}" ToolTip.Tip="{Binding RecordLabel}" c:Tips.WhenCut="True" FontSize="13" FontWeight="SemiBold"
+              <c:SyftCell Width="10" Height="10" Fill="{DynamicResource Recording}" VerticalAlignment="Center" />
+              <TextBlock Grid.Column="2" Text="{Binding RecordLabel}" ToolTip.Tip="{Binding RecordLabel}" c:Tips.WhenCut="True" FontSize="{DynamicResource FontBodyStrong}" FontWeight="SemiBold"
                          VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
-              <TextBlock Grid.Column="3" Text="{Binding RecordShortcut}" FontSize="11" Opacity="0.7" Margin="8,0,0,0" VerticalAlignment="Center" />
+              <TextBlock Grid.Column="3" Text="{Binding RecordShortcut}" FontSize="{DynamicResource FontCaption}" Opacity="0.75" Margin="8,0,0,0" VerticalAlignment="Center" />
             </Grid>
           </Button>
-          <Button Name="SwitchClass" AutomationProperties.Name="Switch class" Grid.Column="2" Classes="fill" Theme="{StaticResource Surface}" Width="32" Height="32" CornerRadius="16"
-                  HorizontalContentAlignment="Center" Command="{Binding SwitchClassCommand}" ToolTip.Tip="Switch class">
-            <c:Icon Glyph="unfold_more" Size="16" Foreground="{DynamicResource Fg}" />
+          <Button Name="SwitchClass" AutomationProperties.Name="Switch class" Grid.Column="4" Classes="drop-quiet" Width="34" Height="34"
+                  Command="{Binding SwitchClassCommand}" ToolTip.Tip="Switch class">
+            <c:Icon Glyph="unfold_more" Size="16" />
           </Button>
         </Grid>
         <!-- The class picker, open under Record: a check on what Record will do now -->
         <ItemsControl Name="ClassChoices" ItemsSource="{Binding ClassChoices}" IsVisible="{Binding ClassesOpen}">
           <ItemsControl.ItemTemplate>
             <DataTemplate x:DataType="vm:ClassChoice">
-              <Button Classes="row" AutomationProperties.Name="{Binding Label}"
+              <Button Classes="row" Classes.selected="{Binding Picked}" MinHeight="32" AutomationProperties.Name="{Binding Label}"
                       Command="{Binding $parent[UserControl].((vm:PanelModel)DataContext).PickClassCommand}" CommandParameter="{Binding}">
-                <Grid ColumnDefinitions="7,8,*,8,Auto">
+                <Grid ColumnDefinitions="8,8,*,8,Auto">
                   <c:Swatch Small="True" Fill="{Binding Dot}" IsVisible="{Binding HasDot}" VerticalAlignment="Center" />
-                  <TextBlock Grid.Column="2" Text="{Binding Label}" ToolTip.Tip="{Binding Label}" c:Tips.WhenCut="True" FontSize="13" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
-                  <c:Icon Grid.Column="4" Glyph="check" Size="13" Foreground="{DynamicResource Fg}" IsVisible="{Binding Picked}" VerticalAlignment="Center" />
+                  <TextBlock Grid.Column="2" Classes="row-title" Text="{Binding Label}" ToolTip.Tip="{Binding Label}" c:Tips.WhenCut="True" VerticalAlignment="Center" />
+                  <c:Icon Grid.Column="4" Glyph="check" Size="14" IsVisible="{Binding Picked}" VerticalAlignment="Center" />
                 </Grid>
               </Button>
             </DataTemplate>
           </ItemsControl.ItemTemplate>
         </ItemsControl>
-        <StackPanel Spacing="2" Margin="8,0">
-          <TextBlock Text="{Binding Hint}" ToolTip.Tip="{Binding Hint}" c:Tips.WhenCut="True" IsVisible="{Binding HasHint}" FontSize="11" Foreground="{DynamicResource Fg2}"
-                     TextTrimming="CharacterEllipsis" />
-          <v:MacNextDue DataContext="{Binding NextDue}" IsVisible="{Binding $parent[UserControl].((vm:PanelModel)DataContext).HasNextDue}" />
+        <StackPanel Spacing="{DynamicResource Space1}" Margin="44,0,8,0" IsVisible="{Binding HasHint}">
+          <TextBlock Classes="drop-hint" Text="{Binding Hint}" ToolTip.Tip="{Binding Hint}" c:Tips.WhenCut="True" />
         </StackPanel>
+        <v:MacNextDue DataContext="{Binding NextDue}" Margin="44,0,8,0" IsVisible="{Binding $parent[UserControl].((vm:PanelModel)DataContext).HasNextDue}" />
       </StackPanel>
 
-      <!-- Recording -->
-      <Border Classes="fill" IsVisible="{Binding IsRecording}" CornerRadius="10" Padding="10,8">
-        <StackPanel Spacing="6">
-          <Grid ColumnDefinitions="Auto,6,*,Auto">
-            <c:SyftCell Width="7" Height="7" Fill="{DynamicResource Accent}" VerticalAlignment="Center" />
-            <TextBlock Grid.Column="2" Text="{Binding RecordingLabel}" ToolTip.Tip="{Binding RecordingLabel}" c:Tips.WhenCut="True" FontSize="12" FontWeight="SemiBold" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
-            <Button Grid.Column="3" Theme="{StaticResource Surface}" CornerRadius="5" Padding="4,1" Margin="0,-1,-4,-1" Command="{Binding ShowRecorderCommand}">
-              <TextBlock Text="Show recorder" FontSize="11" Foreground="{DynamicResource Fg2}" />
+      <!-- Recording: the s tracing its path over the clock, the meter, the last line heard, Pause and Stop -->
+      <Border Classes="drop-card" IsVisible="{Binding IsRecording}">
+        <StackPanel Spacing="{DynamicResource Space2}">
+          <Grid ColumnDefinitions="Auto,8,*,Auto">
+            <c:SyftCell Width="8" Height="8" Fill="{DynamicResource Recording}" VerticalAlignment="Center" IsVisible="{Binding !IsPaused}" />
+            <c:SyftCell Width="8" Height="8" Fill="{DynamicResource InkSubtle}" VerticalAlignment="Center" IsVisible="{Binding IsPaused}" />
+            <TextBlock Grid.Column="2" Text="{Binding RecordingLabel}" ToolTip.Tip="{Binding RecordingLabel}" c:Tips.WhenCut="True" FontSize="{DynamicResource FontCaption}" FontWeight="SemiBold"
+                       Foreground="{DynamicResource Ink}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
+            <Button Grid.Column="3" Classes="text-link" FontSize="{DynamicResource FontCaption}" Command="{Binding ShowRecorderCommand}" VerticalAlignment="Center">
+              <TextBlock Text="Show recorder" />
             </Button>
           </Grid>
           <Grid ColumnDefinitions="Auto,10,Auto,12,*">
             <c:SyftLoader Kind="PathTrace" Size="30" IsActive="{Binding IsRecording}" VerticalAlignment="Center" AutomationProperties.AccessibilityView="Raw" />
-            <TextBlock Grid.Column="2" Classes="num" Text="{Binding Elapsed}" FontFamily="{DynamicResource DisplayFont}" FontSize="24" FontWeight="Light"
-                       c:Typography.Extra="-0.24" VerticalAlignment="Center" />
-            <c:Waveform Grid.Column="4" Height="20" Bars="20" Levels="{Binding Levels}" Foreground="{DynamicResource Record}" VerticalAlignment="Center" />
+            <TextBlock Grid.Column="2" Classes="num drop-clock" Text="{Binding Elapsed}" c:Typography.Extra="-0.24" />
+            <c:Waveform Grid.Column="4" Height="20" Bars="16" Levels="{Binding Levels}" Foreground="{DynamicResource Recording}" VerticalAlignment="Center" />
           </Grid>
-          <TextBlock Text="{Binding LastLine}" ToolTip.Tip="{Binding LastLine}" c:Tips.WhenCut="True" IsVisible="{Binding HasLastLine}" FontSize="11" LineHeight="15" TextWrapping="Wrap" MaxLines="2"
-                     TextTrimming="CharacterEllipsis" Foreground="{DynamicResource Fg2}" />
-          <Grid ColumnDefinitions="*,6,*">
-            <Button Classes="fill2" Theme="{StaticResource Surface}" Height="28" CornerRadius="14" HorizontalContentAlignment="Center"
-                    Command="{Binding PauseCommand}">
-              <StackPanel Orientation="Horizontal" Spacing="5">
-                <c:Icon Glyph="{Binding PauseGlyph}" Filled="True" Size="14" Foreground="{DynamicResource Fg}" />
-                <TextBlock Text="{Binding PauseLabel}" FontSize="12" FontWeight="Medium" VerticalAlignment="Center" />
+          <TextBlock Text="{Binding LastLine}" ToolTip.Tip="{Binding LastLine}" c:Tips.WhenCut="True" IsVisible="{Binding HasLastLine}" FontSize="{DynamicResource FontCaption}" LineHeight="16"
+                     TextWrapping="Wrap" MaxLines="2" TextTrimming="CharacterEllipsis" Foreground="{DynamicResource InkMuted}" />
+          <Grid ColumnDefinitions="*,8,*">
+            <Button Classes="drop-pause" Height="32" Command="{Binding PauseCommand}">
+              <StackPanel Orientation="Horizontal" Spacing="6">
+                <c:Icon Glyph="{Binding PauseGlyph}" Filled="True" Size="15" />
+                <TextBlock Text="{Binding PauseLabel}" FontSize="{DynamicResource FontBody}" FontWeight="SemiBold" VerticalAlignment="Center" />
               </StackPanel>
             </Button>
-            <Button Grid.Column="2" Classes="tint" Theme="{StaticResource Surface}" Height="28" CornerRadius="14" HorizontalContentAlignment="Center"
-                    Command="{Binding StopCommand}">
-              <StackPanel Orientation="Horizontal" Spacing="5">
-                <c:Icon Glyph="stop" Filled="True" Size="14" Foreground="{DynamicResource OnAccent}" />
-                <TextBlock Text="Stop" FontSize="12" FontWeight="SemiBold" VerticalAlignment="Center" />
+            <Button Grid.Column="2" Classes="drop-stop" Height="32" AutomationProperties.Name="Stop" Command="{Binding StopCommand}">
+              <StackPanel Orientation="Horizontal" Spacing="8">
+                <Border Classes="rec-stop-square" VerticalAlignment="Center" />
+                <TextBlock Text="Stop" FontSize="{DynamicResource FontBody}" FontWeight="SemiBold" VerticalAlignment="Center" />
               </StackPanel>
             </Button>
           </Grid>
@@ -127,25 +121,29 @@
       <!-- Coming up on the student's calendars -->
       <v:MacComingUp DataContext="{Binding ComingUp}" IsVisible="{Binding !$parent[UserControl].((vm:PanelModel)DataContext).LibraryOnly}" />
 
-      <!-- Recent lectures -->
-      <StackPanel IsVisible="{Binding ShowRecent}">
-        <TextBlock Text="Recent" FontSize="11" FontWeight="SemiBold" Foreground="{DynamicResource Fg2}" Margin="8,2,8,0" />
-        <ItemsControl ItemsSource="{Binding Recent}" Margin="0,3,0,0">
+      <!-- Recent lectures: the one open lilac, one being written or transcribed with its progress in sky -->
+      <StackPanel IsVisible="{Binding ShowRecent}" Spacing="{DynamicResource Space1}">
+        <TextBlock Classes="drop-label" Text="Recent" />
+        <ItemsControl ItemsSource="{Binding Recent}">
+          <ItemsControl.ItemsPanel>
+            <ItemsPanelTemplate><StackPanel Spacing="2" /></ItemsPanelTemplate>
+          </ItemsControl.ItemsPanel>
           <ItemsControl.ItemTemplate>
             <DataTemplate x:DataType="vm:LectureItem">
-              <Button Classes="row" Classes.fill="{Binding Selected}"
+              <Button Classes="row" Classes.selected="{Binding Selected}"
                       Command="{Binding $parent[UserControl].((vm:PanelModel)DataContext).OpenLectureCommand}" CommandParameter="{Binding}">
-                <Grid ColumnDefinitions="7,8,*,8,Auto">
-                  <c:Swatch Small="True" Fill="{Binding Dot}" VerticalAlignment="Center"/>
-                  <StackPanel Grid.Column="2">
-                    <TextBlock Text="{Binding Title}" ToolTip.Tip="{Binding Title}" c:Tips.WhenCut="True" FontSize="13" TextTrimming="CharacterEllipsis" />
-                    <TextBlock Text="{Binding Detail}" ToolTip.Tip="{Binding Detail}" c:Tips.WhenCut="True" FontSize="11" Foreground="{DynamicResource Fg2}" Margin="0,1,0,0" TextTrimming="CharacterEllipsis" />
-                    <Border IsVisible="{Binding HasProgress}" Width="120" Height="3" CornerRadius="1.5" Background="{DynamicResource Fill2}"
-                            HorizontalAlignment="Left" Margin="0,4,0,0">
-                      <Border Width="{Binding ProgressWidth}" CornerRadius="1.5" Background="{DynamicResource Accent}" HorizontalAlignment="Left" />
-                    </Border>
+                <Grid ColumnDefinitions="8,10,*,8,Auto">
+                  <c:Swatch Small="True" Fill="{Binding Dot}" VerticalAlignment="Center" />
+                  <StackPanel Grid.Column="2" Spacing="2" VerticalAlignment="Center">
+                    <TextBlock Classes="row-title" Text="{Binding Title}" ToolTip.Tip="{Binding Title}" c:Tips.WhenCut="True" />
+                    <StackPanel Orientation="Horizontal" Spacing="6">
+                      <c:SyftLoader Kind="HoppingBits" Size="16" IsVisible="{Binding Busy}" VerticalAlignment="Center" />
+                      <TextBlock Classes="row-sub" Text="{Binding Detail}" ToolTip.Tip="{Binding Detail}" c:Tips.WhenCut="True" />
+                    </StackPanel>
+                    <c:Progress IsVisible="{Binding HasProgress}" Value="{Binding Progress, FallbackValue=0, TargetNullValue=0}" Width="120" Height="4"
+                                HorizontalAlignment="Left" Margin="0,3,0,1" />
                   </StackPanel>
-                  <TextBlock Grid.Column="4" Classes="num" Text="{Binding Time}" FontSize="11" Foreground="{DynamicResource Fg2}" VerticalAlignment="Center" />
+                  <TextBlock Grid.Column="4" Classes="num row-when" Text="{Binding Time}" VerticalAlignment="Center" />
                 </Grid>
               </Button>
             </DataTemplate>
@@ -153,43 +151,36 @@
         </ItemsControl>
       </StackPanel>
 
-      <!-- Search -->
-      <Button Name="Search" AutomationProperties.Name="Search notes and lectures" Classes="fill" Theme="{StaticResource Surface}" Height="28" CornerRadius="14" Padding="10,0" Command="{Binding SearchCommand}">
-        <Grid ColumnDefinitions="Auto,6,*,Auto">
-          <c:Icon Glyph="search" Size="14" Foreground="{DynamicResource Fg2}" />
-          <TextBlock Grid.Column="2" Text="Search notes and lectures" FontSize="12" Foreground="{DynamicResource Fg2}" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
-          <TextBlock Grid.Column="3" Text="{Binding SearchShortcut}" FontSize="10" Foreground="{DynamicResource Fg3}" Margin="6,0,0,0" VerticalAlignment="Center" />
-        </Grid>
-      </Button>
-
-      <!-- Status, then the app and its Settings as the last row (like a menu bar extra's "… Settings" row) -->
-      <StackPanel Spacing="4">
-        <Grid ColumnDefinitions="Auto,6,*" Margin="8,0" IsVisible="{Binding ShowStatus}">
-          <Ellipse Width="6" Height="6" Classes="status" Classes.warn="{Binding !StatusGood}" VerticalAlignment="Center" />
-          <TextBlock Grid.Column="2" Text="{Binding Status}" ToolTip.Tip="{Binding Status}" c:Tips.WhenCut="True" FontSize="11" Foreground="{DynamicResource Fg2}" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
-        </Grid>
-        <Border Height="1" Background="{DynamicResource Sep}" Margin="8,2" />
-        <!-- A newer version is out: install it now, from here -->
-        <Button Name="UpdateNow" Classes="row" Padding="8,3" Height="26" HorizontalContentAlignment="Stretch" VerticalContentAlignment="Center"
-                Command="{Binding UpdateCommand}" IsVisible="{Binding HasUpdate}">
-          <Grid ColumnDefinitions="Auto,6,*">
-            <c:Icon Glyph="download" Size="14" Foreground="{DynamicResource AccentText}" VerticalAlignment="Center" />
-            <TextBlock Grid.Column="2" Text="{Binding UpdateWords}" FontSize="13" Foreground="{DynamicResource AccentText}" VerticalAlignment="Center" />
+      <!-- Search, then the status, then the app and its Settings as the last row (like a menu bar extra's "… Settings") -->
+      <StackPanel Spacing="{DynamicResource Space2}">
+        <Button Name="Search" AutomationProperties.Name="Search notes and lectures" Classes="drop-search" Height="28" Command="{Binding SearchCommand}">
+          <Grid ColumnDefinitions="Auto,8,*,Auto">
+            <c:Icon Glyph="search" Size="14" VerticalAlignment="Center" />
+            <TextBlock Grid.Column="2" Text="Search notes and lectures" FontSize="{DynamicResource FontCaption}" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
+            <TextBlock Grid.Column="3" Text="{Binding SearchShortcut}" FontSize="{DynamicResource FontCaption}" Foreground="{DynamicResource InkSubtle}" Margin="6,0,0,0" VerticalAlignment="Center" />
           </Grid>
         </Button>
-        <!-- The app and its Settings, like a menu bar extra's last row: the gear's right edge is the search field's. -->
+        <Grid ColumnDefinitions="Auto,8,*" Margin="10,0" IsVisible="{Binding ShowStatus}">
+          <c:SyftCell Width="7" Height="7" Classes="status" Classes.warn="{Binding !StatusGood}" VerticalAlignment="Center" />
+          <TextBlock Grid.Column="2" Classes="row-sub" Text="{Binding Status}" ToolTip.Tip="{Binding Status}" c:Tips.WhenCut="True" VerticalAlignment="Center" />
+        </Grid>
+        <Border Classes="drop-rule" Margin="8,0" />
+        <!-- A newer version is out: install it now, from here -->
+        <Button Name="UpdateNow" Classes="drop-plain" Padding="8,0" Height="28" HorizontalContentAlignment="Stretch"
+                Command="{Binding UpdateCommand}" IsVisible="{Binding HasUpdate}">
+          <Grid ColumnDefinitions="Auto,8,*">
+            <c:Icon Glyph="download" Size="15" VerticalAlignment="Center" />
+            <TextBlock Grid.Column="2" Text="{Binding UpdateWords}" FontSize="{DynamicResource FontBody}" FontWeight="SemiBold" VerticalAlignment="Center" />
+          </Grid>
+        </Button>
+        <!-- The app and its Settings: the gear's right edge is the search field's. -->
         <Grid ColumnDefinitions="*,4,Auto">
-          <Button Name="OpenApp" Classes="row" Padding="8,3" Height="26" HorizontalContentAlignment="Stretch" VerticalContentAlignment="Center"
-                  Command="{Binding OpenAppCommand}">
-            <StackPanel Orientation="Horizontal" Spacing="7">
-              <c:SyftMark Size="18" Bits="False" VerticalAlignment="Center" />
-              <TextBlock Text="Open Syft Notes" FontSize="13" VerticalAlignment="Center" />
-
-            </StackPanel>
+          <Button Name="OpenApp" Classes="drop-plain" Padding="8,0" Height="28" HorizontalContentAlignment="Stretch" Command="{Binding OpenAppCommand}">
+            <TextBlock Text="Open Syft Notes" FontSize="{DynamicResource FontBody}" VerticalAlignment="Center" />
           </Button>
-          <Button Name="Settings" AutomationProperties.Name="Settings" Grid.Column="2" Classes="row" Width="26" Height="26" Padding="0" HorizontalContentAlignment="Center"
-                  VerticalContentAlignment="Center" Command="{Binding SettingsCommand}" ToolTip.Tip="{Binding SettingsTip}">
-            <c:Icon Glyph="settings" Size="15" Foreground="{DynamicResource Fg2}" />
+          <Button Name="Settings" AutomationProperties.Name="Settings" Grid.Column="2" Classes="drop-plain" Width="28" Height="28" Padding="0"
+                  HorizontalContentAlignment="Center" Command="{Binding SettingsCommand}" ToolTip.Tip="{Binding SettingsTip}">
+            <c:Icon Glyph="settings" Size="16" Foreground="{DynamicResource InkMuted}" />
           </Button>
         </Grid>
       </StackPanel>

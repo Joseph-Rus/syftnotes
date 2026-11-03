@@ -407,7 +407,6 @@ public class FreeAiFilms
     public void Free_AI_in_every_look_and_theme()
     {
         if (!On) return;
-        var named = ColourThemes.All.ToDictionary(t => t.Name);
         string typed = "## Cardiac cycle\n- 5 phases, **always the same order** (midterm!)\n- S1 = lub, S2 = dub";
         foreach (var (skin, variant, theme) in new[]
                  {
@@ -418,7 +417,7 @@ public class FreeAiFilms
             string tag = $"{skin.ToString().ToLowerInvariant()}-{variant.Key.ToString()!.ToLowerInvariant()}-{theme.ToLowerInvariant()}";
 
             var (page, free, _) = Library("BIO 110", "n1", "The Cardiac Cycle: Phases, Valves, and Cardiac Output", "Monday 12 October at 9:30 AM, 50 min", typed);
-            var f = new Film($"still-offer-{tag}", () => View(page, skin), skin, variant, 1280, 820, named[theme]);
+            var f = new Film($"still-offer-{tag}", () => View(page, skin), skin, variant, 1280, 820, ColourThemes.Find(theme));
             f.NoPointer();
             f.Frame();
             free.Parts.Add(new CopyPart(1, "") { Copied = true });
@@ -457,7 +456,7 @@ public class FreeAiFilms
             var vnotes = new AiNotesModel(versioned);
             vnotes.Load("n1", Claudes, "Claude (in the Claude app)", now).GetAwaiter().GetResult();
             vpage.Notes = vnotes;
-            var h = new Film($"still-history-{tag}", () => View(vpage, skin), skin, variant, 1280, 820, named[theme]);
+            var h = new Film($"still-history-{tag}", () => View(vpage, skin), skin, variant, 1280, 820, ColourThemes.Find(theme));
             h.NoPointer();
             h.Frame();
             vnotes.OpenHistory().GetAwaiter().GetResult();
@@ -476,7 +475,7 @@ public class FreeAiFilms
                 menu.VerticalAlignment = VerticalAlignment.Center;
                 return new Border { Background = variant == ThemeVariant.Dark ? Brushes.Black : Brushes.LightGray, Child = menu };
             }
-            var m = new Film($"still-menu-{tag}", Menu, skin, variant, 420, 560, named[theme]);
+            var m = new Film($"still-menu-{tag}", Menu, skin, variant, 420, 560, ColourThemes.Find(theme));
             m.NoPointer();
             m.Frame();
             m.Window.Close();
@@ -484,7 +483,7 @@ public class FreeAiFilms
             // Settings → Your AI → Advanced settings, the AI apps' part, at its switch.
             var access = new AiAccessModel(new FakeAiLibrary { Access = new ToolAccessInfo(true, new ReadingScopes(), []) });
             var s = new Film($"still-settings-{tag}", () => new ScrollViewer { Padding = new Thickness(40, 30), Content = skin == SkinKind.Mac ? new MacAiAccess { DataContext = access } : new WinAiAccess { DataContext = access } },
-                skin, variant, 760, 1000, named[theme]);
+                skin, variant, 760, 1000, ColourThemes.Find(theme));
             s.NoPointer();
             var scroll = s.Window.GetVisualDescendants().OfType<ScrollViewer>().First();
             var row = s.Window.GetVisualDescendants().OfType<Control>().First(c => c.Name == "SaveNotesToggle");

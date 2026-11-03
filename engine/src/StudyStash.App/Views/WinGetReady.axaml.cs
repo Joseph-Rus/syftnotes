@@ -9,7 +9,6 @@ public partial class WinGetReady : UserControl
     public WinGetReady()
     {
         InitializeComponent();
-        Resources.MergedDictionaries.Add(Skin.NoAccent());
     }
 
     /// <summary>A real window has the system's own title-bar buttons, corners and shadow; screenshots draw them.</summary>

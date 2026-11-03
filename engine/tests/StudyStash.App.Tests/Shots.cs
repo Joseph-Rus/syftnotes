@@ -71,7 +71,6 @@ public static class Shot
     /// </summary>
     public static Bitmap Take(string name, SkinKind skin, ThemeVariant variant, Func<Control> build, ColourTheme? theme = null, Size? size = null, double scale = 1)
     {
-        // The colour theme every time too, so one test's theme never shows up in another's picture.
         Skin.UseTheme(theme ?? ColourThemes.Default);
         ((StudyStash.App.App)Application.Current!).UseSkin(skin);
         var (width, height) = size ?? RefSize(name);
@@ -677,41 +676,6 @@ public class SurfaceShots
         }
         m.Go(step);
         return m;
-    }
-
-    /// <summary>The idle dropdown (or flyout) in every colour theme, five to a row: each cell gets its own theme's
-    /// tokens, so all ten sit in one picture.</summary>
-    static StackPanel ThemeSheet(SkinKind skin, Func<Control> view)
-    {
-        var sheet = new StackPanel { Spacing = 40, HorizontalAlignment = HorizontalAlignment.Left, VerticalAlignment = VerticalAlignment.Top };
-        StackPanel? row = null;
-        foreach (var theme in ColourThemes.All)
-        {
-            if (row is null || row.Children.Count == 5) sheet.Children.Add(row = Shot.Side());
-            row.Spacing = 40;
-            var cell = new StackPanel { Spacing = 12, VerticalAlignment = VerticalAlignment.Top };
-            cell.Resources.MergedDictionaries.Add(Skin.Build(skin, theme));
-            var name = new TextBlock { Text = theme.Name, FontSize = 13, FontWeight = FontWeight.SemiBold };
-            name.Bind(TextBlock.ForegroundProperty, name.GetResourceObservable("Fg"));
-            cell.Children.Add(name);
-            cell.Children.Add(view());
-            row.Children.Add(cell);
-        }
-        return sheet;
-    }
-
-    [AvaloniaFact]
-    public void Mac_themes()
-    {
-        foreach (var t in Themes)
-            Shot.Take("mac-themes", SkinKind.Mac, t, () => ThemeSheet(SkinKind.Mac, () => new MacPanel { DataContext = Demo.Panel(recording: false) }), size: new Size(2090, 1040));
-    }
-
-    [AvaloniaFact]
-    public void Win_themes()
-    {
-        foreach (var t in Themes)
-            Shot.Take("win-themes", SkinKind.Win, t, () => ThemeSheet(SkinKind.Win, () => new WinPanel { DataContext = Demo.Panel(recording: false) }), size: new Size(2090, 1120));
     }
 
     /// <summary>A settings window over a temp home (never a real one), for a section's shot; disposed after.</summary>

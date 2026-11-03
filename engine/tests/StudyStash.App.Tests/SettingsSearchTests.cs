@@ -148,13 +148,10 @@ public class SettingsSearchTests
             Assert.Null(await driver.ChangeAsync(SettingsIndex.ByKey("keep_recordings_days")!, "7"));
             if (model.CanRecordComputerAudio) Assert.Null(await driver.ChangeAsync(SettingsIndex.ByKey("computer_audio")!, "on"));
             Assert.NotNull(await driver.ChangeAsync(SettingsIndex.ByKey("keep_recordings_days")!, "forever"));
-            Assert.NotNull(await driver.ChangeAsync(SettingsIndex.ByKey("colour_theme")!, "no such theme"));
-            Assert.Null(await driver.ChangeAsync(SettingsIndex.ByKey("colour_theme")!, ColourThemes.All[1].Name.ToUpperInvariant()));
 
             var saved = AppSettings.Load(home.Path);
             Assert.Equal(AppAppearance.Dark, saved.Appearance);
             Assert.Equal(7, saved.KeepAudioDays);
-            Assert.Equal(ColourThemes.All[1].Name, saved.Theme);
 
             // The library's own, through its settings routes.
             Assert.Null(await driver.ChangeAsync(SettingsIndex.ByKey("write_notes")!, "off"));

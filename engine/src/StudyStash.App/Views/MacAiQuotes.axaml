@@ -15,7 +15,7 @@
       <Setter Property="Padding" Value="8,2" />
     </Style>
     <Style Selector="Button.quote-chip:pointerover > Border">
-      <Setter Property="Background" Value="#66FFC943" />
+      <Setter Property="Background" Value="{DynamicResource Hl}" />
     </Style>
     <Style Selector="Button.quote-chip TextBlock">
       <Setter Property="FontSize" Value="11" />
