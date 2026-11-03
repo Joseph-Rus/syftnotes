@@ -149,6 +149,7 @@ public static partial class Shell
             splashAtLaunch = SelfTest.Dir is null;
             ShowLibrary();
         }
+        if (host.Settings.SetupDone) AskWhichNotesFolderSoon();
         if (SelfTest.Dir is not null) SelfTest.Run();
     }
 
