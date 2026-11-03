@@ -47,7 +47,7 @@ static class AskScene
         await ask.AskCommand.ExecuteAsync(null);
 
         string[] classes = ["BIO 110", "CHEM 121", "MATH 221", "PSYC 101"];
-        var m = new LibraryModel { Status = "Library on this computer", DrawChrome = false };
+        var m = new LibraryModel { Status = "Library on this computer", DrawChrome = true };
         for (int i = 0; i < classes.Length; i++)
             m.Classes.Add(new ClassItem { Name = classes[i], Dot = Skin.ClassDot(i), Count = 4, Selected = i == 0 });
         m.Note = new NoteModel
