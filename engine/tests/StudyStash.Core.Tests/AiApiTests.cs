@@ -369,9 +369,12 @@ public class AiApiTests
         jobs = new AiJobs(cfg.Home) { Checks = checks };
         await using var site = await Site(cfg, store, jobs);
         var remote = new AiRemote("http://localhost", "pw", site.Client);
+        // Until the setup has ended, done (null) or stopped with words. It's a wait on the real end, so a slow runner only
+        // makes it longer: with 5 seconds, a busy Windows runner read the model's step still going (PR #130's run).
         async Task<PullInfo?> Settled()
         {
-            await Waiting.UntilAsync(async () => (await remote.EnginesAsync())!.Pulling is not { Why.Length: 0 }, 5);
+            Assert.True(await Waiting.UntilAsync(async () => (await remote.EnginesAsync())!.Pulling is not { Why.Length: 0 }, 60),
+                $"the free AI's setup never ended: {(await remote.EnginesAsync())!.Pulling}");
             return (await remote.EnginesAsync())!.Pulling;
         }
 
