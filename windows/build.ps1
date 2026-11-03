@@ -8,7 +8,8 @@
 # again, with windows\sign-release.ps1 (docs/signing.md); -NoInstaller leaves the unsigned Setup.exe out for it.
 # What it makes is a student's copy: no self-test, no demo libraries, no STUDYSTASH_* test switches (TestHelpers=false,
 # engine/Directory.Build.props), and the build stops if one is there anyway. -TestHelpers makes the copy CI self-tests
-# instead; that one is never shipped. -Rids picks the processors (both unless told).
+# instead; that one is never shipped. -Rids picks the processors (both unless told). STUDYSTASH_SKIP_WEB=1 uses web\dist
+# as it is (CI builds it in a step of its own, with no secret in reach of npm).
 param([string]$Out = "dist\windows", [switch]$NoInstaller, [switch]$TestHelpers, [string[]]$Rids = @("win-x64", "win-arm64"))
 $ErrorActionPreference = "Stop"
 $Here = Split-Path -Parent $MyInvocation.MyCommand.Path
@@ -45,14 +46,17 @@ function Remove-UnneededRuntimes([string]$Dir, [string]$Rid) {
 # The phone app (web/) is built first, so each publish carries it beside the app as web/ (the library serves it at
 # /app/). It needs Node and npm; without them the build stops rather than ship a library whose Add a phone leads
 # nowhere.
-if (-not (Get-Command npm -ErrorAction SilentlyContinue)) { throw "npm is needed to build the phone app (web/)" }
-Push-Location (Join-Path $Here "..\web")
-try {
-  npm ci --no-audit --no-fund --silent
-  if ($LASTEXITCODE -ne 0) { throw "npm ci for the phone app failed" }
-  npm run build --silent
-  if ($LASTEXITCODE -ne 0) { throw "building the phone app failed" }
-} finally { Pop-Location }
+if ($env:STUDYSTASH_SKIP_WEB -ne "1") {
+  if (-not (Get-Command npm -ErrorAction SilentlyContinue)) { throw "npm is needed to build the phone app (web/)" }
+  Push-Location (Join-Path $Here "..\web")
+  try {
+    npm ci --no-audit --no-fund --silent
+    if ($LASTEXITCODE -ne 0) { throw "npm ci for the phone app failed" }
+    npm run build --silent
+    if ($LASTEXITCODE -ne 0) { throw "building the phone app failed" }
+  } finally { Pop-Location }
+}
+if (-not (Test-Path (Join-Path $Here "..\web\dist\index.html"))) { throw "the phone app didn't build (web\dist)" }
 
 $Helpers = if ($TestHelpers) { "true" } else { "false" }
 
