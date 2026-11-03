@@ -472,13 +472,12 @@ public class SurfaceShots
         foreach (var t in Themes) Shot.Take("win-04-full-app-answer", SkinKind.Win, t, () => new WinLibrary { DataContext = Demo.Library(answered: true), Width = 1280, Height = 800 });
     }
 
-    /// <summary>Deleting a lecture: the window asks first, then "Deleted · Undo" shows under the list.</summary>
+    /// <summary>Deleting a lecture: "Deleted · Undo" shows under the list (the question before it is ConfirmShots').</summary>
     [AvaloniaFact]
     public void Mac_app_delete()
     {
         foreach (var t in Themes)
         {
-            Shot.Take("mac-04-full-app-delete", SkinKind.Mac, t, () => new MacLibrary { DataContext = Demo.Library(deleting: true), Width = 1280, Height = 800 });
             Shot.Take("mac-04-full-app-deleted", SkinKind.Mac, t, () => new MacLibrary { DataContext = Demo.Library(deleted: true), Width = 1280, Height = 800 });
         }
     }
@@ -488,7 +487,6 @@ public class SurfaceShots
     {
         foreach (var t in Themes)
         {
-            Shot.Take("win-04-full-app-delete", SkinKind.Win, t, () => new WinLibrary { DataContext = Demo.Library(deleting: true), Width = 1280, Height = 800 });
             Shot.Take("win-04-full-app-deleted", SkinKind.Win, t, () => new WinLibrary { DataContext = Demo.Library(deleted: true), Width = 1280, Height = 800 });
         }
     }
@@ -690,7 +688,7 @@ public class SurfaceShots
         // "Recording-after": written down after class (in a window tall enough to show the choice under the models).
         bool after = section == "Recording-after";
         if (after) new Services.AppSettings { SetupDone = true, LiveTranscript = false }.Save(home);
-        // "Recording-remove": switched to the lighter model, asked whether to remove the one before (Whisper small).
+        // "Recording-remove": switched to the lighter model, with the one before still here (Whisper small), its Remove in the list.
         bool removing = section == "Recording-remove";
         if (removing)
         {
@@ -707,19 +705,17 @@ public class SurfaceShots
         // Library page when it doesn't answer.
         var library = new FakeLibrarySettings { Down = section == "Unreachable" };
         if (one) library.Settings["reach"]!["laptops"] = section == "One-computer-on";
-        // "Rename": Settings → Classes with "Use Canvas course names" and its preview open.
+        // "Rename": Settings → Classes with "Use Canvas course names" offered.
         bool renaming = section == "Rename";
         if (renaming) library.Settings = FakeLibrarySettings.CodeNamed();
         var model = Services.SettingsModel.Make(host, library: () => library.Call);
         model.Section = section == "Unreachable" || one ? "Library" : renaming ? "Classes" : heavier || removing || after ? "Recording" : section;
-        if (removing && model.Models.FirstOrDefault(c => c.CanRemove) is { } spare) model.AskRemoveModelCommand.Execute(spare);
         if (heavier)
         {
             model.ModelDownloading = true;
             model.ModelProgress = 0.38;
             model.ModelLine = "Downloading Whisper large-v3 turbo (compact): 218 MB of 574 MB. About a minute left.";
         }
-        if (renaming) model.Lib.ConfirmingCourseNames = true;
         if (section == "One-computer-adding")
         {
             model.Lib.AddLaptopCommand.Execute(null);
