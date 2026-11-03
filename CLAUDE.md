@@ -49,8 +49,9 @@ first time you need it (docs/ARCHITECTURE.md section 3 says how), not inside you
 10. When a change brings a count down, lower its line in `tools/connections-baseline.txt` in the same change.
 
 ## Standing rules
-- **Few tests.** Test what could really break for a student: one focused test per piece. No big fake suites. Never
-  re-run CI to get past a flaky test: fix the cause, or delete the test.
+- **Few tests.** Test what could really break for a student: one focused test per piece. No big fake suites.
+- **A test that fails without a code cause** is fixed or deleted the same day. Never re-run CI to get past it, and no
+  retries or quarantine.
 - **Changing setup's pages?** Update `engine/src/StudyStash.App/SelfTest.cs` too; only CI's self-tests run it.
 - **The repo is public.** No secrets, tokens, passwords, real emails, personal data or home-network names in code,
   tests, logs, commits or PRs. Examples use `@example.com`. Never open `~/.study-stash`, `config.toml` or
