@@ -606,7 +606,7 @@
                                     <ItemsControl.ItemTemplate>
                                       <DataTemplate x:DataType="vm:SetupCourse">
                                         <CheckBox AutomationProperties.Name="{Binding Name}" IsChecked="{Binding Ticked}">
-                                          <TextBlock FontSize="14" FontWeight="SemiBold" TextTrimming="CharacterEllipsis"><Run Text="{Binding Name}" /><Run Text="  " /><Run Text="{Binding Code}" FontWeight="Medium" Foreground="{DynamicResource InkSubtle}" FontSize="12.5" /></TextBlock>
+                                          <TextBlock FontSize="{DynamicResource FontBody}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis"><Run Text="{Binding Name}" /><Run Text="  " /><Run Text="{Binding Code}" FontWeight="Medium" Foreground="{DynamicResource InkSubtle}" FontSize="12.5" /></TextBlock>
                                         </CheckBox>
                                       </DataTemplate>
                                     </ItemsControl.ItemTemplate>

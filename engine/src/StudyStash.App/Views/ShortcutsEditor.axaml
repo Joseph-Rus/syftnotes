@@ -44,10 +44,10 @@
       <Setter Property="Foreground" Value="{DynamicResource Fg2}" />
     </Style>
     <Style Selector=".win TextBlock.sk-title">
-      <Setter Property="FontSize" Value="14" />
+      <Setter Property="FontSize" Value="{DynamicResource FontBody}" />
     </Style>
     <Style Selector=".win TextBlock.sk-sub">
-      <Setter Property="FontSize" Value="12" />
+      <Setter Property="FontSize" Value="{DynamicResource FontCaption}" />
     </Style>
     <Style Selector="Button.sk-keys">
       <Setter Property="Theme" Value="{StaticResource Surface}" />
@@ -104,7 +104,7 @@
                     <TextBlock Text="{Binding Keys}" FontSize="13" FontWeight="Medium" />
                   </Button>
                   <Button Grid.Column="4" Classes="sk-link" Command="{Binding ResetCommand}" IsVisible="{Binding Changed}" VerticalAlignment="Center">
-                    <TextBlock Text="Reset" FontSize="12" />
+                    <TextBlock Text="Reset" FontSize="{DynamicResource FontCaption}" />
                   </Button>
                 </Grid>
               </Border>
@@ -116,7 +116,7 @@
     <TextBlock Classes="sk-sub" Text="{Binding Say}" IsVisible="{Binding HasSay}" TextWrapping="Wrap" Foreground="{DynamicResource Fg}" />
     <TextBlock Classes="sk-sub" Text="{Binding Hint}" TextWrapping="Wrap" />
     <Button Classes="sk-link" Command="{Binding ResetAllCommand}" IsVisible="{Binding AnyChanged}" HorizontalAlignment="Left" Padding="0">
-      <TextBlock Text="Put every shortcut back" FontSize="12" />
+      <TextBlock Text="Put every shortcut back" FontSize="{DynamicResource FontCaption}" />
     </Button>
   </StackPanel>
 </UserControl>

@@ -613,9 +613,9 @@ sealed class DiagramCanvas : Control
     internal DiagramPainter Painter(DiagramScene scene)
     {
         bool dark = ActualThemeVariant == ThemeVariant.Dark;
-        var ink = Solid(Ink, dark ? Colors.White : Color.Parse("#1D1D1F"));
+        var ink = Solid(Ink, (dark ? Skin.Dark : Skin.Light).Ink);
         var line = Line ?? new SolidColorBrush(ink.Color, 0.6);
-        var accent = Solid(Accent, Color.Parse("#0A84A0")).Color;
+        var accent = Solid(Accent, (dark ? Skin.DarkMeans : Skin.LightMeans).Accent).Color;
         Color? tint = AccentTint is ISolidColorBrush t ? t.Color : null;
         var quiet = Quiet ?? Line ?? Brushes.Gray;
         if (painter is { } p && ReferenceEquals(p.Scene, scene) && p.Palette.Dark == dark && p.Palette.Ink.Color == ink.Color

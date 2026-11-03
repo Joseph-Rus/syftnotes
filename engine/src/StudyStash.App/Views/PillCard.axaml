@@ -9,7 +9,7 @@
   <Border Width="280" Padding="12,10" CornerRadius="10" Background="{DynamicResource Surface}" BorderBrush="{DynamicResource Line}" BorderThickness="1"
           BoxShadow="{DynamicResource ShadowFloat}">
     <StackPanel Spacing="6">
-      <TextBlock Text="{Binding HoverTitle}" FontSize="12" FontWeight="Bold" />
+      <TextBlock Text="{Binding HoverTitle}" FontSize="{DynamicResource FontCaption}" FontWeight="Bold" />
       <TextBlock Text="{Binding EarlierLine}" IsVisible="{Binding HasEarlierLine}" FontSize="12.5" Foreground="{DynamicResource Fg2}" TextWrapping="Wrap" />
       <TextBlock Text="{Binding NewestLine}" IsVisible="{Binding !NoLines}" FontSize="12.5" TextWrapping="Wrap" />
       <TextBlock Text="{Binding Waiting}" IsVisible="{Binding NoLines}" FontSize="12.5" Foreground="{DynamicResource Fg2}" TextWrapping="Wrap" />

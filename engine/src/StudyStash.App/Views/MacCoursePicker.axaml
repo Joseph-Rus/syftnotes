@@ -30,7 +30,7 @@
       <Setter Property="TextTrimming" Value="CharacterEllipsis" />
     </Style>
     <Style Selector="TextBlock.pk-why">
-      <Setter Property="FontSize" Value="12" />
+      <Setter Property="FontSize" Value="{DynamicResource FontCaption}" />
       <Setter Property="Foreground" Value="{DynamicResource Fg3}" />
       <Setter Property="VerticalAlignment" Value="Center" />
       <Setter Property="Margin" Value="12,0,0,0" />
@@ -78,7 +78,7 @@
     </Border>
     <!-- Settings: the change, and what saving it does -->
     <Grid ColumnDefinitions="*,Auto" MinHeight="28" Margin="4,0" IsVisible="{Binding ShowSaveBar}">
-      <TextBlock Classes="cv-value" Text="{Binding ChangeLine}" FontSize="12" TextWrapping="Wrap" VerticalAlignment="Center" Margin="0,0,12,0" />
+      <TextBlock Classes="cv-value" Text="{Binding ChangeLine}" FontSize="{DynamicResource FontCaption}" TextWrapping="Wrap" VerticalAlignment="Center" Margin="0,0,12,0" />
       <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
         <Button Classes="cv-pill cv-mini cv-plain" IsEnabled="{Binding !Saving}" Command="{Binding CancelCommand}"><TextBlock Text="Cancel" /></Button>
         <Button Classes="cv-pill cv-mini" IsVisible="{Binding Drops}" IsEnabled="{Binding !Saving}" Command="{Binding RemoveCommand}"><TextBlock Text="Remove them" /></Button>
@@ -86,6 +86,6 @@
         <Button Classes="cv-pill cv-mini cv-primary" IsVisible="{Binding OnlyAdds}" IsEnabled="{Binding !Saving}" Command="{Binding SaveCommand}"><TextBlock Text="Save" /></Button>
       </StackPanel>
     </Grid>
-    <c:PageText Classes="cv-value" FontSize="12" Margin="4,0" TextWrapping="Wrap" Text="{Binding Say}" IsVisible="{Binding HasSay}" />
+    <c:PageText Classes="cv-value" FontSize="{DynamicResource FontCaption}" Margin="4,0" TextWrapping="Wrap" Text="{Binding Say}" IsVisible="{Binding HasSay}" />
   </StackPanel>
 </UserControl>

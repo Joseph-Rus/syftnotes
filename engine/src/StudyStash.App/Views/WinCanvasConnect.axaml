@@ -45,7 +45,7 @@
           </StackPanel>
           <StackPanel Grid.Column="3" Classes="cv-action" IsVisible="{Binding Step1.IsCurrent}">
             <Border Classes="cv-field" Width="220">
-              <TextBox Classes="bare" Text="{Binding SchoolField}" PlaceholderText="school.instructure.com" FontSize="14" />
+              <TextBox Classes="bare" Text="{Binding SchoolField}" PlaceholderText="school.instructure.com" FontSize="{DynamicResource FontBody}" />
             </Border>
             <Button Classes="cv-btn cv-mini cv-primary" IsEnabled="{Binding !SavingSchool}" Command="{Binding ContinueCommand}"><TextBlock Text="Save" /></Button>
           </StackPanel>

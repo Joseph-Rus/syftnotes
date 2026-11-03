@@ -30,16 +30,16 @@
       <Border DockPanel.Dock="Bottom" Background="{DynamicResource Footer}" Padding="24">
         <Grid ColumnDefinitions="*,8,*">
           <Button Name="Confirm" Classes="dialog danger" Command="{Binding ConfirmDeleteCommand}">
-            <TextBlock Text="Delete" FontSize="14" FontWeight="SemiBold" />
+            <TextBlock Text="Delete" FontSize="{DynamicResource FontBody}" FontWeight="SemiBold" />
           </Button>
           <Button Name="Cancel" Grid.Column="2" Classes="dialog" Command="{Binding CancelDeleteCommand}">
-            <TextBlock Text="Cancel" FontSize="14" />
+            <TextBlock Text="Cancel" FontSize="{DynamicResource FontBody}" />
           </Button>
         </Grid>
       </Border>
       <StackPanel Spacing="12" Margin="24,24,24,24">
-        <TextBlock Text="{Binding Deleting.Ask, FallbackValue=''}" FontFamily="{DynamicResource DisplayFont}" FontSize="20" FontWeight="SemiBold" />
-        <TextBlock Text="{Binding Deleting.Warning, FallbackValue=''}" FontSize="14" LineHeight="20" TextWrapping="Wrap" />
+        <TextBlock Text="{Binding Deleting.Ask, FallbackValue=''}" FontFamily="{DynamicResource DisplayFont}" FontSize="{DynamicResource FontTitle}" FontWeight="SemiBold" />
+        <TextBlock Text="{Binding Deleting.Warning, FallbackValue=''}" FontSize="{DynamicResource FontBody}" LineHeight="20" TextWrapping="Wrap" />
       </StackPanel>
     </DockPanel>
   </Border>

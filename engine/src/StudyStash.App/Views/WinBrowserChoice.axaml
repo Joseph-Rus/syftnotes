@@ -10,7 +10,7 @@
     <StyleInclude Source="avares://StudyStash/Views/WinAiStyles.axaml" />
   </UserControl.Styles>
   <StackPanel Spacing="12">
-    <TextBlock Name="Question" Text="{x:Static vm:BrowserChoiceModel.Title}" FontSize="20" FontWeight="SemiBold" TextWrapping="Wrap" />
+    <TextBlock Name="Question" Text="{x:Static vm:BrowserChoiceModel.Title}" FontSize="{DynamicResource FontTitle}" FontWeight="SemiBold" TextWrapping="Wrap" />
     <TextBlock Classes="ai-sub" Text="{Binding Lede}" TextWrapping="Wrap" />
     <ItemsControl Name="Options" ItemsSource="{Binding Options}" Margin="0,6,0,0">
       <ItemsControl.ItemsPanel>
@@ -26,7 +26,7 @@
     </ItemsControl>
     <c:PageText Classes="ai-sub" Foreground="{DynamicResource Warn}" Text="{Binding Problem}" IsVisible="{Binding HasProblem}" TextWrapping="Wrap" />
     <Button Name="Later" Classes="ai-textbtn" Command="{Binding LaterCommand}" HorizontalAlignment="Left">
-      <TextBlock Text="Not now" FontSize="14" />
+      <TextBlock Text="Not now" FontSize="{DynamicResource FontBody}" />
     </Button>
   </StackPanel>
 </UserControl>

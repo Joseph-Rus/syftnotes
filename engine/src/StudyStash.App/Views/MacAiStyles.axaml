@@ -21,7 +21,7 @@
     <Setter Property="FontWeight" Value="SemiBold" />
   </Style>
   <Style Selector="TextBlock.ai-link">
-    <Setter Property="FontSize" Value="12" />
+    <Setter Property="FontSize" Value="{DynamicResource FontCaption}" />
     <Setter Property="Foreground" Value="{DynamicResource AccentText}" />
   </Style>
 
@@ -68,7 +68,7 @@
     <Setter Property="Fill" Value="{DynamicResource Warn}" />
   </Style>
   <Style Selector="TextBlock.ai-state">
-    <Setter Property="FontSize" Value="12" />
+    <Setter Property="FontSize" Value="{DynamicResource FontCaption}" />
     <Setter Property="Foreground" Value="{DynamicResource Fg2}" />
   </Style>
   <Style Selector="TextBlock.ai-state.warn">
@@ -187,7 +187,7 @@
         <ControlTemplate>
           <Border Name="Track" CornerRadius="11" Background="{DynamicResource Fill2}">
             <Border Name="Knob" Width="18" Height="18" CornerRadius="9" Background="White" HorizontalAlignment="Left" Margin="2,0,0,0"
-                    BoxShadow="0 1 3 0 #40000000" />
+                    BoxShadow="{DynamicResource ShadowKnob}" />
           </Border>
         </ControlTemplate>
       </Setter>
@@ -285,7 +285,7 @@
     <Setter Property="VerticalAlignment" Value="Center" />
   </Style>
   <Style Selector="Border.ai-chip TextBlock">
-    <Setter Property="FontSize" Value="12" />
+    <Setter Property="FontSize" Value="{DynamicResource FontCaption}" />
   </Style>
   <Style Selector="Border.ai-chip-engine">
     <Setter Property="Background" Value="{DynamicResource Fill2}" />
@@ -419,7 +419,7 @@
     <Setter Property="HorizontalContentAlignment" Value="Center" />
   </Style>
   <Style Selector="TextBlock.ai-byline">
-    <Setter Property="FontSize" Value="12" />
+    <Setter Property="FontSize" Value="{DynamicResource FontCaption}" />
     <Setter Property="Foreground" Value="{DynamicResource Fg2}" />
   </Style>
   <Style Selector="TextBlock.ai-thinking">
@@ -440,7 +440,7 @@
     <Setter Property="Padding" Value="8,0,6,0" />
   </Style>
   <Style Selector="Border.ai-field-chip TextBlock">
-    <Setter Property="FontSize" Value="12" />
+    <Setter Property="FontSize" Value="{DynamicResource FontCaption}" />
     <Setter Property="VerticalAlignment" Value="Center" />
   </Style>
   <Style Selector="Border.ai-field-chip > StackPanel">
@@ -471,7 +471,7 @@
     <Setter Property="FontWeight" Value="SemiBold" />
   </Style>
   <Style Selector="TextBlock.ai-notes-byline">
-    <Setter Property="FontSize" Value="12" />
+    <Setter Property="FontSize" Value="{DynamicResource FontCaption}" />
     <Setter Property="Foreground" Value="{DynamicResource Fg2}" />
   </Style>
 
@@ -491,7 +491,7 @@
 
   <!-- A compare column's own small heading ("Current notes" / "New notes from …"). -->
   <Style Selector="TextBlock.ai-compare-head">
-    <Setter Property="FontSize" Value="12" />
+    <Setter Property="FontSize" Value="{DynamicResource FontCaption}" />
     <Setter Property="FontWeight" Value="SemiBold" />
     <Setter Property="Foreground" Value="{DynamicResource Fg2}" />
   </Style>
@@ -503,13 +503,13 @@
     <Setter Property="Background" Value="{DynamicResource Group}" />
   </Style>
   <Style Selector="TextBox.ai-editor">
-    <Setter Property="FontSize" Value="14" />
+    <Setter Property="FontSize" Value="{DynamicResource FontBody}" />
     <Setter Property="LineHeight" Value="22" />
     <Setter Property="MinHeight" Value="160" />
     <Setter Property="VerticalContentAlignment" Value="Top" />
   </Style>
   <Style Selector="TextBlock.ai-editor-hint">
-    <Setter Property="FontSize" Value="12" />
+    <Setter Property="FontSize" Value="{DynamicResource FontCaption}" />
     <Setter Property="Foreground" Value="{DynamicResource Fg2}" />
     <Setter Property="TextWrapping" Value="Wrap" />
   </Style>
@@ -542,7 +542,7 @@
     <Setter Property="FontWeight" Value="SemiBold" />
   </Style>
   <Style Selector="TextBlock.ai-problem-message">
-    <Setter Property="FontSize" Value="12" />
+    <Setter Property="FontSize" Value="{DynamicResource FontCaption}" />
     <Setter Property="LineHeight" Value="17.4" />
     <Setter Property="Foreground" Value="{DynamicResource Fg2}" />
     <Setter Property="Margin" Value="0,2,0,0" />

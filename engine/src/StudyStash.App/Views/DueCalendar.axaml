@@ -18,7 +18,7 @@
       <Button Grid.Column="1" Classes="icon-btn" Command="{Binding NextCommand}" ToolTip.Tip="{Binding NextTip}" AutomationProperties.Name="{Binding NextTip}">
         <c:Icon Glyph="chevron_right" Size="18" />
       </Button>
-      <TextBlock Name="Heading" Grid.Column="2" Classes="h2" FontSize="20" Text="{Binding Heading}" MinWidth="140" Margin="10,0,14,0" VerticalAlignment="Center" />
+      <TextBlock Name="Heading" Grid.Column="2" Classes="h2" FontSize="{DynamicResource FontTitle}" Text="{Binding Heading}" MinWidth="140" Margin="10,0,14,0" VerticalAlignment="Center" />
       <Button Name="Today" Grid.Column="3" Classes="btn sm" Content="Today" Command="{Binding GoTodayCommand}" VerticalAlignment="Center" />
       <!-- Which class it's for -->
       <Button Name="Filter" Grid.Column="5" Classes="picker" VerticalAlignment="Center" AutomationProperties.Name="{Binding FilterName}">
@@ -80,7 +80,7 @@
                   <StackPanel Spacing="6">
                     <Grid ColumnDefinitions="*,Auto">
                       <TextBlock Classes="cal-num" Text="{Binding Number}" />
-                      <TextBlock Grid.Column="1" Text="Today" FontSize="12" FontWeight="Bold" Foreground="{DynamicResource Ink}" IsVisible="{Binding IsToday}" VerticalAlignment="Center" />
+                      <TextBlock Grid.Column="1" Text="Today" FontSize="{DynamicResource FontCaption}" FontWeight="Bold" Foreground="{DynamicResource Ink}" IsVisible="{Binding IsToday}" VerticalAlignment="Center" />
                     </Grid>
                     <ItemsControl ItemsSource="{Binding Shown}" ClipToBounds="False">
                       <ItemsControl.ItemsPanel>
@@ -100,7 +100,7 @@
                       </ItemsControl.ItemTemplate>
                     </ItemsControl>
                     <!-- The rest of a full day, in a small list of its own -->
-                    <Button Classes="text-link" FontSize="12" Content="{Binding MoreWords}" IsVisible="{Binding HasMore}">
+                    <Button Classes="text-link" FontSize="{DynamicResource FontCaption}" Content="{Binding MoreWords}" IsVisible="{Binding HasMore}">
                       <Button.Flyout>
                         <Flyout Placement="BottomEdgeAlignedLeft" VerticalOffset="6" FlyoutPresenterClasses="bare">
                           <Border Classes="menu" Width="240" Padding="10">

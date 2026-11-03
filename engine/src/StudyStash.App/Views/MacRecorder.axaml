@@ -82,7 +82,8 @@
                   <c:Icon Glyph="{Binding PauseGlyph}" Filled="True" Size="18" />
                 </Button>
                 <Button AutomationProperties.Name="Stop" Classes="rec-stop" Command="{Binding StopCommand}" ToolTip.Tip="Stop">
-                  <Border Classes="rec-stop-square" />
+                  <!-- Its ink square -->
+                  <c:Icon Glyph="stop" Filled="True" Size="16" Foreground="{DynamicResource OnRecording}" />
                 </Button>
               </StackPanel>
             </Border>

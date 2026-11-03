@@ -30,7 +30,7 @@
     <Style Selector="Button.crumb-link">
       <Setter Property="Theme" Value="{StaticResource Surface}" />
       <Setter Property="Padding" Value="0" />
-      <Setter Property="FontSize" Value="14" />
+      <Setter Property="FontSize" Value="{DynamicResource FontBody}" />
       <Setter Property="FontWeight" Value="Bold" />
       <Setter Property="Foreground" Value="{DynamicResource Ink}" />
     </Style>
@@ -107,9 +107,9 @@
          promised, with a × to put it away sooner -->
     <Border Name="UndoToast" Classes="undo" IsVisible="{Binding HasToast}" VerticalAlignment="Bottom" HorizontalAlignment="Center" Margin="16,0,16,92">
       <Grid ColumnDefinitions="*,10,Auto,Auto" VerticalAlignment="Center">
-        <TextBlock Name="ToastSaid" Text="{Binding ToastSaid}" ToolTip.Tip="{Binding ToastSaid}" c:Tips.WhenCut="True" FontSize="14" FontWeight="Medium" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" MaxWidth="420" />
+        <TextBlock Name="ToastSaid" Text="{Binding ToastSaid}" ToolTip.Tip="{Binding ToastSaid}" c:Tips.WhenCut="True" FontSize="{DynamicResource FontBody}" FontWeight="Medium" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" MaxWidth="420" />
         <Button Grid.Column="2" Name="Undo" Classes="undo" Command="{Binding UndoToastCommand}" VerticalAlignment="Center">
-          <TextBlock Text="Undo" FontSize="14" FontWeight="Bold" />
+          <TextBlock Text="Undo" FontSize="{DynamicResource FontBody}" FontWeight="Bold" />
         </Button>
         <Button Grid.Column="3" Name="DismissToast" Classes="undo" Width="30" Padding="0" Margin="2,0,0,0" HorizontalContentAlignment="Center" VerticalAlignment="Center"
                 IsVisible="{Binding CanDismissToast}" Command="{Binding DismissDeletedCommand}" ToolTip.Tip="Dismiss" AutomationProperties.Name="Dismiss">
