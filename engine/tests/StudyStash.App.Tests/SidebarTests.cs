@@ -81,13 +81,4 @@ public class SidebarTests
         }
     }
 
-    [AvaloniaFact]
-    public void Crowded_shots()
-    {
-        foreach (var t in new[] { ThemeVariant.Light, ThemeVariant.Dark })
-        {
-            Shot.Take("win-04-full-app-crowded", SkinKind.Win, t, () => new WinLibrary { DataContext = Demo.Crowded(), Width = 1280, Height = 800 });
-            Shot.Take("mac-04-full-app-crowded", SkinKind.Mac, t, () => new MacLibrary { DataContext = Demo.Crowded(), Width = 1280, Height = 800 });
-        }
-    }
 }

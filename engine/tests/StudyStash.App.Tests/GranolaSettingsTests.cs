@@ -122,9 +122,9 @@ public class GranolaSettingsTests
         Assert.Equal("A lecture with no title is with your library, which is writing its notes.", NoticeWords.GranolaBrought(" ", null).Text);
     }
 
-    /// <summary>The page in Settings, in both looks: not connected, and connected with two lectures waiting.</summary>
+    /// <summary>The page in Settings, in both looks: not connected, and connected with two lectures waiting, says what it is.</summary>
     [AvaloniaFact]
-    public async Task Granola_settings_shots()
+    public async Task Granola_settings_say_what_they_are()
     {
         foreach (var skin in new[] { SkinKind.Mac, SkinKind.Win })
             foreach (bool signedIn in new[] { false, true })
@@ -139,32 +139,6 @@ public class GranolaSettingsTests
                 using var model = SettingsModel.Make(host);
                 model.Section = "Granola";
                 if (signedIn) await Settle(() => model.Granola.Lectures.Count == 2);
-                string look = skin == SkinKind.Mac ? "mac" : "win";
-                foreach (var t in new[] { ThemeVariant.Light, ThemeVariant.Dark })
-                {
-                    var shot = Shot.Take($"{look}-settings-granola-{(signedIn ? "connected" : "connect")}", skin, t,
-                        () => new SettingsView { DataContext = model, DrawChrome = true }, size: new Size(1700, skin == SkinKind.Mac ? 908 : 988));
-                    Assert.True(shot.PixelSize.Width > 0);
-                }
-                // The notification that offers a lecture, and the one for several.
-                if (signedIn)
-                    foreach (var t in new[] { ThemeVariant.Light, ThemeVariant.Dark })
-                        Shot.Take($"{look}-toast-granola", skin, t, () =>
-                        {
-                            var one = NoticeWords.GranolaHas(["Cell membranes and transport"]);
-                            var two = NoticeWords.GranolaHas(["Osmosis and tonicity", "Cell membranes and transport"]);
-                            var brought = NoticeWords.GranolaBrought("Cell membranes and transport", null);
-                            return new StackPanel
-                            {
-                                Spacing = 10,
-                                Children =
-                                {
-                                    new ToastView { Title = one.Title, Text = one.Text, ActionLabel = one.Action },
-                                    new ToastView { Title = two.Title, Text = two.Text, ActionLabel = two.Action },
-                                    new ToastView { Title = brought.Title, Text = brought.Text },
-                                },
-                            };
-                        }, size: new Size(560, 420));
                 // The page says what it is and what a free Granola plan gives, whichever state it's in.
                 var view = new SettingsView { DataContext = model };
                 var window = new Window { Width = 1100, Height = 800, Content = view };

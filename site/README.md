@@ -29,12 +29,12 @@ Graphs, Diagrams, Due dates, Ask, Connect, each with a big word, a sentence and 
 and dark follow the visitor's system. No gradients anywhere.
 
 **The pictures** are the real app, never redrawn: drawn off-screen by its own views from its demo lectures, light and
-dark, at twice the size they're shown (`engine/tests/StudyStash.App.Tests/SiteShots.cs`), standing on the site's
+dark, at twice the size they're shown (`engine/tests/StudyStash.Pictures/SiteShots.cs`), standing on the site's
 page colour so the sidebar's glass takes the page's tint. `home.webp` is its whole window, cut to its rounded edge;
 each card is a piece of it. To draw them again:
 
 ```sh
-STUDYSTASH_SITE=/tmp/site-shots dotnet test engine/tests/StudyStash.App.Tests --filter SiteShots
+STUDYSTASH_SITE=/tmp/site-shots dotnet test engine/tests/StudyStash.Pictures --filter SiteShots
 python3 tools/site_pictures.py /tmp/site-shots     # rounds the window's corners, writes img/<name>(-dark).webp
 ```
 
