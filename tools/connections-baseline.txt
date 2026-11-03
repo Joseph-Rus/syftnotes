@@ -1,0 +1,10 @@
+# Today's counts for tools/check-connections.sh: each may go down, never up. Lower a line when a change brings it down.
+sleeps 27
+engine-state-strings 83
+shell-in-viewmodels 0
+shell-in-services 17
+windows-by-hand 12
+bare-catches 73
+fire-and-forget-in-shell 81
+mac-views 38
+clients-by-hand 8
