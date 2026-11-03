@@ -17,7 +17,7 @@
           <TextBlock Text="Open in Canvas" />
         </StackPanel>
       </Button>
-      <Button Grid.Column="2" Classes="cv-toolicon" Command="{Binding SearchCommand}">
+      <Button Grid.Column="2" Classes="cv-toolicon" Command="{Binding SearchCommand}" AutomationProperties.Name="Search">
         <c:Icon Glyph="more_horiz" Size="18" />
       </Button>
     </Grid>

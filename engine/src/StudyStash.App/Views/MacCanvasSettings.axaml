@@ -49,7 +49,7 @@
               <Button Classes="cv-pill" Command="{Binding ChangeSchoolCommand}"><TextBlock Text="Change" /></Button>
             </StackPanel>
             <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8" IsVisible="{Binding EditingSchool}">
-              <Border Classes="field" Width="200"><TextBox Classes="bare" Text="{Binding SchoolField}" FontSize="13" /></Border>
+              <Border Classes="field" Width="200"><TextBox Classes="bare" Text="{Binding SchoolField}" FontSize="13" AutomationProperties.Name="Your school's Canvas address" /></Border>
               <Button Classes="cv-pill cv-primary" IsEnabled="{Binding !SavingSchool}" Command="{Binding SaveSchoolCommand}"><TextBlock Text="Save" /></Button>
               <Button Classes="cv-pill cv-plain" Command="{Binding CancelSchoolCommand}"><TextBlock Text="Cancel" /></Button>
             </StackPanel>
