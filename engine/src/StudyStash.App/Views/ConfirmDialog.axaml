@@ -1,0 +1,28 @@
+<!-- The question Confirm.AskAsync puts over a window: what's being asked, what happens, and two buttons, the safe one
+     first and focused. Drawn from the Syft tokens, the same on both systems. Escape answers no. -->
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:kit="using:StudyStash.App.ViewModels.Kit"
+             x:Class="StudyStash.App.Views.ConfirmDialog"
+             x:DataType="kit:ConfirmAsk"
+             Width="400" Focusable="False"
+             AutomationProperties.Name="{Binding Title}">
+  <StackPanel Margin="{DynamicResource Inset6}" Spacing="{DynamicResource Space3}">
+    <TextBlock Name="Question" Text="{Binding Title}" FontSize="{DynamicResource FontSubtitle}" FontWeight="SemiBold" TextWrapping="Wrap" />
+    <TextBlock Text="{Binding Text}" IsVisible="{Binding HasText}" FontSize="{DynamicResource FontBody}" Foreground="{DynamicResource TextMuted}" TextWrapping="Wrap" />
+    <ScrollViewer MaxHeight="180" IsVisible="{Binding HasLines}" HorizontalScrollBarVisibility="Disabled">
+      <ItemsControl ItemsSource="{Binding Lines}">
+        <ItemsControl.ItemsPanel><ItemsPanelTemplate><StackPanel Spacing="{DynamicResource Space1}" /></ItemsPanelTemplate></ItemsControl.ItemsPanel>
+        <ItemsControl.ItemTemplate>
+          <DataTemplate x:DataType="x:String">
+            <TextBlock Text="{Binding}" FontSize="{DynamicResource FontBody}" TextWrapping="Wrap" />
+          </DataTemplate>
+        </ItemsControl.ItemTemplate>
+      </ItemsControl>
+    </ScrollViewer>
+    <StackPanel Orientation="Horizontal" Spacing="{DynamicResource Space2}" HorizontalAlignment="Right" Margin="0,8,0,0">
+      <Button Name="No" Classes="btn sm" Content="{Binding No}" AutomationProperties.Name="{Binding No}" />
+      <Button Name="Yes" Classes="btn sm ink" Content="{Binding Yes}" AutomationProperties.Name="{Binding Yes}" />
+    </StackPanel>
+  </StackPanel>
+</UserControl>
