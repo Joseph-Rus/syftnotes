@@ -276,6 +276,8 @@ public static class Skin
         B("SurfaceRaised", m.SurfaceRaised);
         B("Chip", m.Chip);
         B("Border", p.Line);
+        // The veil over a window while a question waits (Confirm): the window's own ground, three parts in four.
+        B("Scrim", Color.FromArgb(0xBF, p.Canvas.R, p.Canvas.G, p.Canvas.B));
         B("Text", p.Ink);
         B("TextMuted", p.InkMuted);
         B("TextSubtle", p.InkSubtle);
