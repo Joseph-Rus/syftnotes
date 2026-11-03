@@ -80,6 +80,8 @@ public static partial class Shell
         Dispatcher.UIThread.UnhandledException += OnUnhandled;
         // Work started and not waited for that fails unexpectedly is said the same way.
         UiTasks.Use(Program.Log, SayOops);
+        // Every window's Window menu and ⌘, (the library, Settings), and the Dock following which are open.
+        AppWindows.Use(ShowLibrary, SettingsFromAnywhere, UpdateDock);
         desktop.ShutdownMode = ShutdownMode.OnExplicitShutdown;
         // The system quitting the app (logging out, the Dock's Quit): tidy up and let it go on.
         desktop.ShutdownRequested += (_, _) => CleanUp();
@@ -1096,25 +1098,11 @@ public static partial class Shell
     static Window MainWindow()
     {
         if (mainWindow is not null) return mainWindow;
-        var w = new Window
-        {
-            Title = "Syft Notes", Width = 1280, Height = 800, MinWidth = 600, MinHeight = 560, WindowStartupLocation = WindowStartupLocation.CenterScreen,
-            ExtendClientAreaToDecorationsHint = true, ExtendClientAreaTitleBarHeightHint = Skin.Current == SkinKind.Mac ? WindowHeader.MacHeight : 32,
-        };
-        Look.Apply(w);
-        if (Skin.Current == SkinKind.Mac)
-        {
-            w.Content = new MacLibrary { DataContext = library };
-            MacTitleBar.Attach(w);
-        }
-        else
-        {
-            w.Content = new WinLibrary { DataContext = library };
-            WinChrome.Apply(w);
-        }
-        if (!PutWhereLeft(w)) OpenCentred(w, new Size(1280, 800));
+        Control view = Skin.Current == SkinKind.Mac ? new MacLibrary { DataContext = library } : new WinLibrary { DataContext = library };
+        // Where it was left, at the size it was left; the first time, centred at 1280 × 800.
+        var w = AppWindows.Make(new WindowSpec("library", "Syft Notes", view) { Kind = WindowKind.Main, Size = WindowSize.Placed, MinSize = new Size(600, 560) });
+        if (!PutWhereLeft(w)) AppWindows.Centre(w, new Size(1280, 800));
         if (splashAtLaunch) Splash(w);
-        AppMenu.Attach(w, ShowLibrary, SettingsFromAnywhere);
         AddLibraryKeys(w);
         // The menu bar, read back once, so the log shows the app menu really has Settings… ⌘, and Quit ⌘Q.
         if (OperatingSystem.IsMacOS())
@@ -1172,45 +1160,6 @@ public static partial class Shell
         return true;
     }
 
-    /// <summary>The display a window opening now belongs on: on Windows the one the pointer is on, on a Mac the main one.</summary>
-    static ScreenGeometry ScreenFor(Window w) =>
-        Placement.Pick([.. w.Screens.All.Select(s => new ScreenGeometry(s.Bounds, s.WorkingArea, s.Scaling, s.IsPrimary))], OperatingSystem.IsWindows() ? Floating.Pointer() : null);
-
-    /// <summary>Opens <paramref name="w"/> in the middle of the pointer's display, at <paramref name="wanted"/> where
-    /// that fits and smaller where it doesn't (a small screen at 125 or 150%), its title bar always on the screen.
-    /// Returns the most room that display has for a window.</summary>
-    static Size OpenCentred(Window w, Size wanted)
-    {
-        var screen = ScreenFor(w);
-        var (at, size) = Placement.Centred(screen, wanted, new Size(w.MinWidth, w.MinHeight));
-        w.WindowStartupLocation = WindowStartupLocation.Manual;
-        w.Position = at;
-        w.Width = size.Width;
-        w.Height = size.Height;
-        return Placement.Centred(screen, new Size(1e6, 1e6)).Size;
-    }
-
-    /// <summary>A fixed-size window whose view sets its size (setup's steps): no bigger than the display has room for
-    /// (the view scrolls inside), and after it grows, still on the display. <paramref name="showing"/>: only while it's
-    /// the view in the window; <paramref name="open"/> false for a second view that isn't showing yet.</summary>
-    static void FollowView(Window w, Control view, Func<bool>? showing = null, bool open = true)
-    {
-        var room = open ? OpenCentred(w, new Size(view.Width, view.Height)) : Placement.Centred(ScreenFor(w), new Size(1e6, 1e6)).Size;
-        view.MaxWidth = room.Width;
-        view.MaxHeight = room.Height;
-        view.PropertyChanged += (_, e) =>
-        {
-            if (showing?.Invoke() == false) return;
-            if (e.Property == Layoutable.WidthProperty) w.Width = Math.Min(view.Width, room.Width);
-            else if (e.Property == Layoutable.HeightProperty) w.Height = Math.Min(view.Height, room.Height);
-            else return;
-            var screen = ScreenFor(w);
-            var size = new PixelSize((int)(w.Width * screen.Scaling), (int)(w.Height * screen.Scaling));
-            var inside = Placement.KeepInside(screen.WorkingArea, size, w.Position);
-            if (inside != w.Position) w.Position = inside;
-        };
-    }
-
     /// <summary>Remembers where the library window is and its size, so it opens there next time (it's being hidden,
     /// or the app is quitting). Zoomed, it keeps the size it had before, and full screen isn't remembered.</summary>
     static void SaveLibraryPlace()
@@ -1234,7 +1183,7 @@ public static partial class Shell
         library.DrawChrome = false;
         w.Show();
         UpdateDock();
-        Raise(w);
+        AppWindows.Raise(w);
         Desktop.Activate();
         // The library in front: the small pill goes now, not only once macOS says the app is active (it may not, when
         // another app was in front), and comes back when the library is left.
@@ -1281,15 +1230,6 @@ public static partial class Shell
         };
     }
 
-    /// <summary>Brings a window the student asked for to the front. On Windows, activating a minimized window leaves it
-    /// in the taskbar: Open Syft Notes, opening the app again and a click on a lecture seemed to do nothing. So it
-    /// comes back up first, as large as it was.</summary>
-    static void Raise(Window w)
-    {
-        if (w.WindowState == WindowState.Minimized) w.WindowState = WindowState.Normal;
-        w.Activate();
-    }
-
     /// <summary>Settings → General's Run setup again: Settings makes way, and setup opens (guided, straight to the chat
     /// when the AI picked before is still signed in; <paramref name="byHand"/>: setup by hand, on its welcome) with
     /// what's already set up filled in. The computer counts as set up throughout, so closing it part-way changes
@@ -1311,7 +1251,7 @@ public static partial class Shell
     {
         if (setupWindow is { IsVisible: true })
         {
-            Raise(setupWindow);
+            AppWindows.Raise(setupWindow);
             return;
         }
         // A first run on just this computer: one page, one button. Setup by hand (and guided setup from it) stays for
@@ -1335,79 +1275,67 @@ public static partial class Shell
             model.GuidedLabel = "Set up with an AI instead";
         }
         var view = byHand ? manualView : guidedView;
-        var w = new Window
-        {
-            Title = byHand ? setup.HeaderTitle : "Set up Syft Notes", CanResize = false, CanMaximize = false, Content = view,
-            ExtendClientAreaToDecorationsHint = true, ExtendClientAreaTitleBarHeightHint = Skin.Current == SkinKind.Mac ? WindowHeader.MacHeight : 32,
-        };
-        Look.Apply(w);
-        AppMenu.Attach(w, ShowLibrary, SettingsFromAnywhere);
-        if (Skin.Current == SkinKind.Mac) MacTitleBar.Attach(w);
-        WinChrome.Apply(w);
-        var mic = micCheck = new MicCheck();
-        setup.OnFinish = () =>
-        {
-            Setup.Finish(model, host);
-            w.Close();
-            ShowLibrary();
-            // The first run ends by saying where the S. lives (or that a full menu bar hides it).
-            if (!again) DispatcherTimer.RunOnce(SayWhereTheIconIs, TimeSpan.FromSeconds(1));
-        };
-        guided.OnFinish = () => model.OnFinish?.Invoke();
-        setup.OnEnter = step => EnterSetupStep(model, step);
-        setup.OnCopy = text => Run(() => w.Clipboard?.SetTextAsync(text) ?? Task.CompletedTask, "Copy");
-        // Setup by hand's link back to the guided setup, named for the AI when it's ready.
-        setup.OnGuided = () => guided.BackToChatCommand.Execute(null);
-        // The library's setup and the laptop's have their own names: the window's follows the flow.
-        setup.PropertyChanged += (_, e) =>
-        {
-            if (e.PropertyName == nameof(SetupModel.HeaderTitle) && w.Content == manualView) w.Title = model.HeaderTitle;
-        };
-        // The AI and Canvas steps are the design's bigger window, and so is the chat (each view sizes itself): the
-        // window follows whichever is showing.
-        FollowView(w, view, () => w.Content == view);
-        var other = byHand ? guidedView : manualView;
-        FollowView(w, other, () => w.Content == other, open: false);
-        guided.PropertyChanged += (_, e) =>
-        {
-            if (e.PropertyName != nameof(GuidedSetupModel.Screen)) return;
-            var want = guided.Screen == GuidedScreen.Manual ? manualView : guidedView;
-            model.GuidedLabel = guided.AiReady ? $"Set up with {guided.Brand} instead" : "Set up with an AI instead";
-            if (w.Content == want) return;
-            w.Content = want;
-            w.Title = want == manualView ? model.HeaderTitle : "Set up Syft Notes";
-            FitTo(w, want);
-        };
-        // The AI engines step saves its choice before moving on; if it can't, it says why and stays.
-        var leave = setup.LeaveAsync;
-        setup.LeaveAsync = async step =>
-        {
-            if (step != SetupStep.Ai) return leave is null || await leave(step);
-            if (model.Ai is not { } ai) return true;
-            if (!await ai.SaveAsync()) return false;
-            model.NotesSummary = ai.ChoiceWords;
-            return true;
-        };
         SetupMcpHost? door = null;
         bool closed = false;
-        w.Closed += (_, _) =>
+        AppWindows.Open(new WindowSpec("setup", byHand ? setup.HeaderTitle : "Set up Syft Notes", view), w =>
         {
-            closed = true;
-            setupWindow = null;
-            if (setup == model) setup = null;
-            if (guidedSetup == guided) guidedSetup = null;
-            guided.Dispose();
-            if (door is { } doorOpen) Run(() => doorOpen.DisposeAsync().AsTask(), "close the tools door");
-            mic.Close();
-            if (micCheck == mic) micCheck = null;
-            model.Canvas?.Dispose();
-            UpdateDock();
-        };
-        setupWindow = w;
-        w.Show();
-        UpdateDock();
-        w.Activate();
-        Desktop.Activate();
+            var mic = micCheck = new MicCheck();
+            setup.OnFinish = () =>
+            {
+                Setup.Finish(model, host);
+                w.Close();
+                ShowLibrary();
+                // The first run ends by saying where the S. lives (or that a full menu bar hides it).
+                if (!again) DispatcherTimer.RunOnce(SayWhereTheIconIs, TimeSpan.FromSeconds(1));
+            };
+            guided.OnFinish = () => model.OnFinish?.Invoke();
+            setup.OnEnter = step => EnterSetupStep(model, step);
+            setup.OnCopy = text => Run(() => w.Clipboard?.SetTextAsync(text) ?? Task.CompletedTask, "Copy");
+            // Setup by hand's link back to the guided setup, named for the AI when it's ready.
+            setup.OnGuided = () => guided.BackToChatCommand.Execute(null);
+            // The library's setup and the laptop's have their own names: the window's follows the flow.
+            setup.PropertyChanged += (_, e) =>
+            {
+                if (e.PropertyName == nameof(SetupModel.HeaderTitle) && w.Content == manualView) w.Title = model.HeaderTitle;
+            };
+            // The AI and Canvas steps are the design's bigger window, and so is the chat (each view sizes itself): the
+            // window follows whichever is showing (the one it opens on, from the start).
+            var other = byHand ? guidedView : manualView;
+            AppWindows.Follow(w, other, () => w.Content == other, open: false);
+            guided.PropertyChanged += (_, e) =>
+            {
+                if (e.PropertyName != nameof(GuidedSetupModel.Screen)) return;
+                var want = guided.Screen == GuidedScreen.Manual ? manualView : guidedView;
+                model.GuidedLabel = guided.AiReady ? $"Set up with {guided.Brand} instead" : "Set up with an AI instead";
+                if (w.Content == want) return;
+                w.Content = want;
+                w.Title = want == manualView ? model.HeaderTitle : "Set up Syft Notes";
+                AppWindows.FitTo(w, want);
+            };
+            // The AI engines step saves its choice before moving on; if it can't, it says why and stays.
+            var leave = setup.LeaveAsync;
+            setup.LeaveAsync = async step =>
+            {
+                if (step != SetupStep.Ai) return leave is null || await leave(step);
+                if (model.Ai is not { } ai) return true;
+                if (!await ai.SaveAsync()) return false;
+                model.NotesSummary = ai.ChoiceWords;
+                return true;
+            };
+            w.Closed += (_, _) =>
+            {
+                closed = true;
+                setupWindow = null;
+                if (setup == model) setup = null;
+                if (guidedSetup == guided) guidedSetup = null;
+                guided.Dispose();
+                if (door is { } doorOpen) Run(() => doorOpen.DisposeAsync().AsTask(), "close the tools door");
+                mic.Close();
+                if (micCheck == mic) micCheck = null;
+                model.Canvas?.Dispose();
+            };
+            setupWindow = w;
+        });
         Run(() => OpenGuidedAsync(), "OpenGuided");
 
         async Task OpenGuidedAsync()
@@ -1450,46 +1378,34 @@ public static partial class Shell
         model.OnGetStarted = () => FirstRun.AfterLibraryAsync(model, host, Ai(), () => FirstRun.Detect(find, FirstRun.Status), WriteNotesAsync);
         var funnelModel = funnel = new FunnelModel(model, FunnelServices());
         var view = Skin.Current == SkinKind.Mac ? (Control)new MacFunnel { DataContext = funnelModel, DrawChrome = false } : new WinFunnel { DataContext = funnelModel, DrawChrome = false };
-        var w = new Window
+        AppWindows.Open(new WindowSpec("setup", "Syft Notes", view), w =>
         {
-            Title = "Syft Notes", CanResize = false, CanMaximize = false, Content = view,
-            ExtendClientAreaToDecorationsHint = true, ExtendClientAreaTitleBarHeightHint = Skin.Current == SkinKind.Mac ? WindowHeader.MacHeight : 32,
-        };
-        Look.Apply(w);
-        AppMenu.Attach(w, ShowLibrary, SettingsFromAnywhere);
-        if (Skin.Current == SkinKind.Mac) MacTitleBar.Attach(w);
-        WinChrome.Apply(w);
-        funnelModel.OnFinish = end =>
-        {
-            Setup.Finish(model, host);
-            // Home says what's still to do: an AI to connect (Later), classes to add by hand (no Canvas).
-            host.Save(s =>
+            funnelModel.OnFinish = end =>
             {
-                s.SetupAi = end.Ai.Length > 0 ? end.Ai : "later";
-                s.AddClassesOnHome = !end.Canvas;
-            });
-            host.Log($"[setup] done: {(end.Student ? "a student" : "not a student")}, {(end.Canvas ? "classes from Canvas" : "no Canvas")}, "
-                + (end.Ai.Length > 0 ? $"{Core.Ai.Engines.Name(end.Ai)} writes the notes" : "no AI yet (Later)"));
-            w.Close();
-            ShowLibrary();
-            // Home's "Ready when class starts", and the classes Canvas brought in, show at once.
-            RequestRefresh();
-        };
-        w.Closed += (_, _) =>
-        {
-            // Only this window's own: setup by hand may have opened in its place already.
-            if (setupWindow == w) setupWindow = null;
-            if (setup == model) setup = null;
-            if (funnel == funnelModel) funnel = null;
-            funnelModel.Dispose();
-            UpdateDock();
-        };
-        FollowView(w, view);
-        setupWindow = w;
-        w.Show();
-        UpdateDock();
-        w.Activate();
-        Desktop.Activate();
+                Setup.Finish(model, host);
+                // Home says what's still to do: an AI to connect (Later), classes to add by hand (no Canvas).
+                host.Save(s =>
+                {
+                    s.SetupAi = end.Ai.Length > 0 ? end.Ai : "later";
+                    s.AddClassesOnHome = !end.Canvas;
+                });
+                host.Log($"[setup] done: {(end.Student ? "a student" : "not a student")}, {(end.Canvas ? "classes from Canvas" : "no Canvas")}, "
+                    + (end.Ai.Length > 0 ? $"{Core.Ai.Engines.Name(end.Ai)} writes the notes" : "no AI yet (Later)"));
+                w.Close();
+                ShowLibrary();
+                // Home's "Ready when class starts", and the classes Canvas brought in, show at once.
+                RequestRefresh();
+            };
+            w.Closed += (_, _) =>
+            {
+                // Only this window's own: setup by hand may have opened in its place already.
+                if (setupWindow == w) setupWindow = null;
+                if (setup == model) setup = null;
+                if (funnel == funnelModel) funnel = null;
+                funnelModel.Dispose();
+            };
+            setupWindow = w;
+        });
     }
 
     static Core.Canvas.StoreVersions? storeVersions;
@@ -1579,18 +1495,6 @@ public static partial class Shell
         connect.OnFinish = () => model.NextCommand.Execute(null);
         await StartConnectAsync(connect, watch);
         return connect;
-    }
-
-    /// <summary>The window takes the size of the view now showing in it (still on the display).</summary>
-    static void FitTo(Window w, Control view)
-    {
-        var screen = ScreenFor(w);
-        double width = Math.Min(view.Width, view.MaxWidth), height = Math.Min(view.Height, view.MaxHeight);
-        w.Width = width;
-        w.Height = height;
-        var size = new PixelSize((int)(width * screen.Scaling), (int)(height * screen.Scaling));
-        var inside = Placement.KeepInside(screen.WorkingArea, size, w.Position);
-        if (inside != w.Position) w.Position = inside;
     }
 
     /// <summary>Guided setup's model, while its window is open.</summary>
@@ -1735,7 +1639,7 @@ public static partial class Shell
         if (settingsWindow is { IsVisible: true })
         {
             if (section is not null && settingsWindow.Content is Control { DataContext: SettingsModel open }) open.Section = section;
-            Raise(settingsWindow);
+            AppWindows.Raise(settingsWindow);
             return;
         }
         var model = SettingsModel.Make(host, canvas: Canvas(), watch: CanvasPoll());
@@ -1743,67 +1647,53 @@ public static partial class Shell
         model.Canvas.Status.OnConnect = ShowCanvasConnect;
         model.Canvas.Status.OnShowMeHow = ShowCanvasConnect;
         if (section is not null) model.Section = section;
-        var w = new Window
-        {
-            Title = "Syft Notes settings", CanResize = false, CanMaximize = false,
-            Content = new SettingsView { DataContext = model, DrawChrome = false },
-            ExtendClientAreaToDecorationsHint = true, ExtendClientAreaTitleBarHeightHint = Skin.Current == SkinKind.Mac ? WindowHeader.MacHeight : 32,
-        };
-        // The view's own size (900 × 860 on Windows), smaller on a small screen: its pages scroll inside.
-        FollowView(w, (Control)w.Content!);
-        Look.Apply(w);
-        AppMenu.Attach(w, ShowLibrary, SettingsFromAnywhere);
-        model.Lib.Copy = text => Run(() => w.Clipboard?.SetTextAsync(text) ?? Task.CompletedTask, "Copy");
-        // AI tool access's Copy buttons (the web address, a fix link, the setup for another app).
-        model.Access.Copy = text => w.Clipboard?.SetTextAsync(text) ?? Task.CompletedTask;
-        model.Lib.ClassesChanged = LibraryClassesChanged;
-        model.Canvas.OnClassesChanged = LibraryClassesChanged;
-        if (Skin.Current == SkinKind.Mac) MacTitleBar.Attach(w);
-        WinChrome.Apply(w);
-        // Ask your AI's door to the settings tools: opened when it's first asked something, closed with the window.
         SetupMcpHost? door = null;
         bool closed = false;
-        model.Assistant.Services.OpenDoor = async () =>
+        // The view's own size (900 × 860 on Windows), smaller on a small screen: its pages scroll inside.
+        AppWindows.Open(new WindowSpec("settings", "Syft Notes settings", new SettingsView { DataContext = model, DrawChrome = false }), w =>
         {
-            try
+            model.Lib.Copy = text => Run(() => w.Clipboard?.SetTextAsync(text) ?? Task.CompletedTask, "Copy");
+            // AI tool access's Copy buttons (the web address, a fix link, the setup for another app).
+            model.Access.Copy = text => w.Clipboard?.SetTextAsync(text) ?? Task.CompletedTask;
+            model.Lib.ClassesChanged = LibraryClassesChanged;
+            model.Canvas.OnClassesChanged = LibraryClassesChanged;
+            // Ask your AI's door to the settings tools: opened when it's first asked something, closed with the window.
+            model.Assistant.Services.OpenDoor = async () =>
             {
-                var tools = new SettingsTools(model.Driver());
-                var opened = await SetupMcpHost.StartAsync(tools);
-                if (closed)
+                try
                 {
-                    await opened.DisposeAsync();
+                    var tools = new SettingsTools(model.Driver());
+                    var opened = await SetupMcpHost.StartAsync(tools);
+                    if (closed)
+                    {
+                        await opened.DisposeAsync();
+                        return null;
+                    }
+                    door = opened;
+                    return new SetupDoor(opened.Url, opened.Token, tools.NewTurn);
+                }
+                catch (Exception e) when (e is IOException or InvalidOperationException or System.Net.Sockets.SocketException)
+                {
+                    host.Log($"[settings] the helper's tools couldn't start: {e.Message}");
                     return null;
                 }
-                door = opened;
-                return new SetupDoor(opened.Url, opened.Token, tools.NewTurn);
-            }
-            catch (Exception e) when (e is IOException or InvalidOperationException or System.Net.Sockets.SocketException)
+            };
+            w.Closed += (_, _) =>
             {
-                host.Log($"[settings] the helper's tools couldn't start: {e.Message}");
-                return null;
-            }
-        };
-        w.Closed += (_, _) =>
-        {
-            closed = true;
-            if (door is { } doorOpen) Run(() => doorOpen.DisposeAsync().AsTask(), "close the tools door");
-            settingsWindow = null;
-            model.Dispose();
-            UpdateDock();
-        };
-        settingsWindow = w;
-        w.Show();
-        UpdateDock();
-        w.Activate();
-        Desktop.Activate();
+                closed = true;
+                if (door is { } doorOpen) Run(() => doorOpen.DisposeAsync().AsTask(), "close the tools door");
+                settingsWindow = null;
+                model.Dispose();
+            };
+            settingsWindow = w;
+        });
     }
 
-    /// <summary>A Mac shows the app in the Dock (and ⌘Tab) while the library, setup or Settings is open, and keeps it
-    /// to the menu bar otherwise. (Never to the menu bar while one of them is open: macOS hides an app's windows as
+    /// <summary>A Mac shows the app in the Dock (and ⌘Tab) while one of its own windows is open (the library, setup,
+    /// Settings, Connect Canvas, Get ready, the browser question: <see cref="AppWindows"/>), and keeps it to the menu bar
+    /// otherwise. (Never to the menu bar while one of them is open: macOS hides an app's windows as
     /// it goes, the library's with them, which 0.16.7 did while the pill floated over another app.)</summary>
-    static void UpdateDock() =>
-        Desktop.ShowInDock(!quitting && (mainWindow?.IsVisible == true || setupWindow?.IsVisible == true || settingsWindow?.IsVisible == true
-            || canvasConnectWindow?.IsVisible == true || browserChoiceWindow?.IsVisible == true));
+    static void UpdateDock() => Desktop.ShowInDock(!quitting && AppWindows.AnyInDock);
 
     // --- keeping it all up to date ------------------------------------------------------------------------------------
 
