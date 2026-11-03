@@ -561,6 +561,78 @@
     <Setter Property="Height" Value="10" />
     <Setter Property="CornerRadius" Value="2" />
   </Style>
+  <!-- ===== The recorder, open (Mac and Windows alike): the Syft look's recording strip ===== -->
+  <!-- Its controls sit on one strip of the mesh: Make it small and Pause quiet, Stop a coral cell with an ink square. -->
+  <Style Selector="Border.rec-strip">
+    <Setter Property="Background" Value="{DynamicResource SurfaceRaised}" />
+    <Setter Property="Padding" Value="3" />
+    <Setter Property="c:Cell.Round" Value="True" />
+    <Setter Property="VerticalAlignment" Value="Center" />
+  </Style>
+  <Style Selector="Button.rec-quiet, Button.rec-stop">
+    <Setter Property="Theme" Value="{StaticResource Surface}" />
+    <Setter Property="Width" Value="30" />
+    <Setter Property="Height" Value="30" />
+    <Setter Property="c:Cell.Round" Value="True" />
+    <Setter Property="HorizontalContentAlignment" Value="Center" />
+    <Setter Property="Foreground" Value="{DynamicResource InkMuted}" />
+  </Style>
+  <Style Selector="Button.rec-quiet:pointerover">
+    <Setter Property="Foreground" Value="{DynamicResource Ink}" />
+  </Style>
+  <Style Selector="Button.rec-stop">
+    <Setter Property="Background" Value="{DynamicResource Recording}" />
+  </Style>
+  <Style Selector="Button.rec-stop /template/ Border#PART_Wash">
+    <Setter Property="IsVisible" Value="False" />
+  </Style>
+  <Style Selector="Button.rec-stop:pointerover">
+    <Setter Property="Opacity" Value="0.88" />
+  </Style>
+  <Style Selector="Border.rec-stop-square">
+    <Setter Property="Width" Value="10" />
+    <Setter Property="Height" Value="10" />
+    <Setter Property="c:Cell.Round" Value="True" />
+    <Setter Property="Background" Value="{DynamicResource OnRecording}" />
+  </Style>
+  <Style Selector="TextBlock.rec-title">
+    <Setter Property="FontSize" Value="{DynamicResource FontBodyStrong}" />
+    <Setter Property="FontWeight" Value="SemiBold" />
+    <Setter Property="Foreground" Value="{DynamicResource Ink}" />
+    <Setter Property="TextTrimming" Value="CharacterEllipsis" />
+    <Setter Property="VerticalAlignment" Value="Center" />
+  </Style>
+  <Style Selector="TextBlock.rec-time">
+    <Setter Property="FontSize" Value="{DynamicResource FontBody}" />
+    <Setter Property="Foreground" Value="{DynamicResource InkMuted}" />
+    <Setter Property="VerticalAlignment" Value="Center" />
+  </Style>
+  <!-- What's been said: the newest line bold in ink, the older ones fading through three flat greys (no gradient). -->
+  <Style Selector=":is(TextBlock).heard">
+    <Setter Property="FontSize" Value="{DynamicResource FontBody}" />
+    <Setter Property="LineHeight" Value="20" />
+    <Setter Property="TextWrapping" Value="Wrap" />
+    <Setter Property="Foreground" Value="{DynamicResource Ink}" />
+    <Setter Property="FontWeight" Value="SemiBold" />
+  </Style>
+  <Style Selector=":is(TextBlock).heard.fade1, :is(TextBlock).heard.fade2, :is(TextBlock).heard.fade3">
+    <Setter Property="FontWeight" Value="Normal" />
+  </Style>
+  <Style Selector=":is(TextBlock).heard.fade1">
+    <Setter Property="Foreground" Value="{DynamicResource TextFade1}" />
+  </Style>
+  <Style Selector=":is(TextBlock).heard.fade2">
+    <Setter Property="Foreground" Value="{DynamicResource TextFade2}" />
+  </Style>
+  <Style Selector=":is(TextBlock).heard.fade3">
+    <Setter Property="Foreground" Value="{DynamicResource TextFade3}" />
+  </Style>
+  <Style Selector="TextBlock.heard-time">
+    <Setter Property="FontSize" Value="{DynamicResource FontCaption}" />
+    <Setter Property="Foreground" Value="{DynamicResource TextSubtle}" />
+    <Setter Property="Margin" Value="0,3,0,0" />
+  </Style>
+
   <!-- A shortcut's keys beside what they do. -->
   <Style Selector="Border.kbd">
     <Setter Property="BorderBrush" Value="{DynamicResource Line}" />
