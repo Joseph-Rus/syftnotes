@@ -19,7 +19,8 @@ public static class Moves
 
     static bool NamedLikeOurs(string path) =>
         Path.GetFileName(path.Replace('\\', '/').TrimEnd('/')) is { } name
-        && (name.Equals("StudyStash", StringComparison.OrdinalIgnoreCase) || name.Equals("StudyStash.exe", StringComparison.OrdinalIgnoreCase));
+        && (name.Equals("StudyStash", StringComparison.OrdinalIgnoreCase) || name.Equals("StudyStash.exe", StringComparison.OrdinalIgnoreCase)
+            || name.StartsWith("SyftNotes", StringComparison.Ordinal) && name.EndsWith(".AppImage", StringComparison.Ordinal));
 
     /// <summary>True when <paramref name="command"/> is this app's program as it was before it moved, so whatever names
     /// it should name <paramref name="current"/> instead: it's our program by name, it isn't the current one, and it is
