@@ -249,4 +249,4 @@ and inside Mermaid labels, and check none comes out.
   CoreImage detector, from the SVG and from screenshots of Settings in both looks.)
 - App: `PhonesModelTests` (the code, countdown, a new phone noticed, Remove, a refused code, no/unreachable/older
   library), `PhonesViewTests` (both looks, both themes: black on white, filling its card, the code, Remove),
-  `PhonesShots` (shots/mac-settings-phone-*.png, win-settings-phone-*.png).
+  (and `PhonesShots`, since removed, drew shots/mac-settings-phone-*.png, win-settings-phone-*.png).

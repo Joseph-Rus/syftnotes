@@ -141,8 +141,10 @@ public sealed class AgentSignIn : IDisposable
         _ = Task.Run(async () =>
         {
             int code = await t.Exit;
-            // What it showed last, read before it's judged (a refusal for the country comes just before it stops).
-            await Task.WhenAny(t.Ended, Task.Delay(TimeSpan.FromSeconds(2)));
+            // What it showed last, read before it's judged (a refusal for the country comes just before it stops). Its
+            // output ends moments after it does; the limit is only for one whose output something else holds open. Two
+            // seconds was too short for a busy computer: the refusal wasn't read yet, and it was judged "stuck".
+            await Task.WhenAny(t.Ended, Task.Delay(TimeSpan.FromSeconds(15)));
             // Only the sign-in still current, and not one Syft Notes stopped itself: one stopped to be run again, or
             // because the wait was over, isn't one that couldn't start.
             if (ReferenceEquals(child, t) && !ReferenceEquals(stopped, t) && code != 0)

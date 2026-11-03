@@ -46,12 +46,14 @@ def main():
         return 0
     title, paths = sys.argv[1], sys.argv[2:]
     results, failed, unreadable = [], [], []
+    lanes = []  # (file name, tests, seconds): the App tests run as two processes, one .trx each
     for trx in trx_files(paths):
         try:
             root = ET.parse(trx).getroot()
         except ET.ParseError as e:
             unreadable.append(f"{trx.name}: {e}")
             continue
+        before = len(results)
         for r in root.iter(f"{NS}UnitTestResult"):
             name = r.get("testName", "?")
             outcome = r.get("outcome", "?")
@@ -60,6 +62,7 @@ def main():
             if outcome in ("Failed", "Error", "Timeout", "Aborted"):
                 message = r.findtext(f"{NS}Output/{NS}ErrorInfo/{NS}Message") or ""
                 failed.append((name, outcome, took, message))
+        lanes.append((trx.name, len(results) - before, sum(t for _, _, t in results[before:])))
 
     lines = [f"### {title}"]
     if not results:
@@ -75,6 +78,10 @@ def main():
                 lines.append(f"| {cell(name, 160)} | {outcome} | {took:.1f} | {cell(message, 300)} |")
             if len(failed) > 50:
                 lines.append(f"| … and {len(failed) - 50} more | | | |")
+        if len(lanes) > 1:
+            lines += ["", "| Process | Tests | Minutes |", "|---|---:|---:|"]
+            for file, count, took in lanes:
+                lines.append(f"| {cell(file, 60)} | {count} | {took / 60:.1f} |")
         lines += ["", f"<details><summary>The {SLOWEST} slowest</summary>", "", "| Test | Seconds |", "|---|---:|"]
         for name, _, took in sorted(results, key=lambda r: r[2], reverse=True)[:SLOWEST]:
             lines.append(f"| {cell(name, 160)} | {took:.1f} |")
