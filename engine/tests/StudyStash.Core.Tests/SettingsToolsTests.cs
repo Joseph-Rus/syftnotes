@@ -78,8 +78,8 @@ public sealed class SettingsToolsTests : IAsyncLifetime
     [Theory]
     [InlineData("dark mode", "Mode")]
     [InlineData("make it dark", "Mode")]
-    [InlineData("colour", "Colour theme")]
-    [InlineData("color", "Colour theme")]
+    [InlineData("colour", "Mode")]
+    [InlineData("color", "Mode")]
     [InlineData("zoom", "Also record what this computer plays (a lecture on Zoom or Teams)")]
     [InlineData("keep recordings", "Keep recordings")]
     [InlineData("password", "Password")]
@@ -114,7 +114,7 @@ public sealed class SettingsToolsTests : IAsyncLifetime
             var keys = SettingsIndex.All.Where(e => e.Changeable && SettingsIndex.ShownOn(e, records, laptop)).Select(e => e.Key).ToList();
             Assert.Equal(keys.Count, keys.Distinct().Count());
         }
-        Assert.All(SettingsIndex.All.Where(e => e.Changeable && e.Key is not ("colour_theme" or "transcription_model")), e => Assert.NotEmpty(e.Takes));
+        Assert.All(SettingsIndex.All.Where(e => e.Changeable && e.Key is not "transcription_model"), e => Assert.NotEmpty(e.Takes));
         Assert.All(SettingsIndex.All, e => Assert.NotNull(SettingsIndex.Sections.FirstOrDefault(s => s.Id == e.Section).Id));
         Assert.All(SettingsIndex.Sections, s => Assert.Single(SettingsIndex.All, e => e.Section == s.Id && e.IsPage));
     }

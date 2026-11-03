@@ -3,13 +3,12 @@
      hairline round it, a big bold title and a grey sentence under it, a heading per part in the library's weight, and
      the settings themselves on white panels with hairlines between their rows. Its buttons are Styles.axaml's own
      (btn sm, btn sm ink for a part's one main action, text-link), its switches, ticks, radios and choices ink and
-     greys: no accent in Settings, so a colour theme no longer tints Settings' own controls (Skin.NoAccent, set in the
-     code-behind). The code-behind adds "mac" or "win" to the root for the little that still differs, the window's own
+     greys, as everywhere in the Syft look. The code-behind adds "mac" or "win" to the root for the little that still differs, the window's own
      frame. The classes:
        group   a white panel of rows, a hairline round it
        row     one line in a group: title + sub on the left, a control on the right
        row-title / row-sub   its two lines of text
-       section a part's heading over a group ("Colour theme")
+       section a part's heading over a group ("Mode")
        btn sm  a button (Options, Add, Sign in…); "ink" for the part's one main action
        choice  a selectable panel (a model, when it's written down), ringed in ink when chosen
        select  a menu's button: the choice and a chevron in a hairline
@@ -384,25 +383,6 @@
       <Setter Property="HorizontalAlignment" Value="Left" />
     </Style>
 
-    <!-- The colour themes: each a round swatch, a gap of the page's white, and an ink rim round the chosen one. Hovered
-         or pressed, the rim shows in grey; focused from the keyboard, a focus ring goes round the swatch. Never a box
-         round the whole cell. -->
-    <Style Selector="Border.swatchring">
-      <Setter Property="Background" Value="Transparent" />
-    </Style>
-    <Style Selector="Button.swatch:pointerover Border.swatchring, Button.swatch:pressed Border.swatchring">
-      <Setter Property="Background" Value="{DynamicResource InkSubtle}" />
-    </Style>
-    <Style Selector="Border.swatchring.on, Button.swatch:pointerover Border.swatchring.on">
-      <Setter Property="Background" Value="{DynamicResource Ink}" />
-    </Style>
-    <Style Selector="TextBlock.swatchname">
-      <Setter Property="FontSize" Value="12" />
-      <Setter Property="FontWeight" Value="Medium" />
-      <Setter Property="Foreground" Value="{DynamicResource InkMuted}" />
-      <Setter Property="HorizontalAlignment" Value="Center" />
-    </Style>
-
     <!-- An engine's problems sit above the Your AI pane, lined up with its own margins. -->
     <Style Selector="UserControl.problems">
       <Setter Property="Margin" Value="40,30,40,-14" />
@@ -752,32 +732,6 @@
                   </StackPanel>
                 </Border>
                 <TextBlock Classes="say" Text="Light and dark set the whole app at once: the dropdown, quick panel, recorder, library and setup." />
-                <TextBlock Classes="section gap" Text="Colour theme" />
-                <Border Classes="group" Padding="16,18,16,8">
-                  <!-- Unclipped, so a swatch's focus ring shows whole. -->
-                  <ItemsControl ItemsSource="{Binding Themes}" ClipToBounds="False">
-                    <ItemsControl.ItemsPanel><ItemsPanelTemplate><UniformGrid Columns="5" /></ItemsPanelTemplate></ItemsControl.ItemsPanel>
-                    <ItemsControl.ItemTemplate>
-                      <DataTemplate x:DataType="app:ThemeSwatch">
-                        <Button AutomationProperties.Name="{Binding Name}" Classes="quiet swatch" Theme="{StaticResource Surface}" Padding="0" Margin="0,0,0,10"
-                                Command="{Binding $parent[UserControl].((s:SettingsModel)DataContext).PickThemeCommand}" CommandParameter="{Binding Name}">
-                          <StackPanel Spacing="6" HorizontalAlignment="Center">
-                            <Panel Width="52" Height="52" HorizontalAlignment="Center">
-                              <Border Classes="swatchring" Classes.on="{Binding Chosen}" Width="52" Height="52" CornerRadius="26">
-                                <Border Width="48" Height="48" CornerRadius="24" Background="{DynamicResource Surface}" HorizontalAlignment="Center" VerticalAlignment="Center">
-                                  <Ellipse Width="44" Height="44" Fill="{Binding Swatch}" />
-                                </Border>
-                              </Border>
-                              <Border Classes="focusring" Margin="-4" CornerRadius="30" />
-                            </Panel>
-                            <TextBlock Classes="swatchname" Text="{Binding Name}" />
-                          </StackPanel>
-                        </Button>
-                      </DataTemplate>
-                    </ItemsControl.ItemTemplate>
-                  </ItemsControl>
-                </Border>
-                <TextBlock Classes="say" Text="The accent for buttons, the selection and highlights. Your class colours stay the same." />
               </StackPanel>
 
               <!-- Connection: which library this computer uses (and, where it runs one, that library's process) -->

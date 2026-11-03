@@ -116,44 +116,6 @@ public class SettingsHighlightTests
         }
     }
 
-    [AvaloniaTheory]
-    [InlineData(SkinKind.Mac)]
-    [InlineData(SkinKind.Win)]
-    public async Task A_swatch_shows_hover_and_focus_as_rings_round_itself(SkinKind skin)
-    {
-        try
-        {
-            ((App)Application.Current!).UseSkin(skin);
-            var (model, host, home) = await SettingsAsync();
-            using (home)
-            using (host)
-            using (model)
-            {
-                model.Section = "Appearance";
-                var view = new SettingsView { DataContext = model };
-                var window = new Window { Width = 900, Height = 900, Content = view };
-                window.Show();
-                var swatch = view.GetVisualDescendants().OfType<Button>().First(b => b.DataContext is ThemeSwatch { Chosen: false });
-                Border Ring() => swatch.GetVisualDescendants().OfType<Border>().First(x => x.Classes.Contains("swatchring") && x.IsEffectivelyVisible);
-                Border Focus() => swatch.GetVisualDescendants().OfType<Border>().First(x => x.Classes.Contains("focusring") && x.GetVisualParent() is Visual { IsEffectivelyVisible: true });
-                IBrush? RingBrush() => Ring().Background;
-
-                Assert.False(Shows(RingBrush()));
-                Set(swatch, ":pointerover");
-                Assert.True(Shows(RingBrush()), "hover shows no ring");
-                Clear(swatch, ":pointerover");
-                Assert.False(Focus().IsVisible);
-                Set(swatch, ":focus-visible");
-                Assert.True(Focus().IsVisible, "keyboard focus shows no ring");
-                window.Close();
-            }
-        }
-        finally
-        {
-            ((App)Application.Current!).UseSkin(SkinKind.Mac);
-        }
-    }
-
     /// <summary>Marks the first button <paramref name="which"/> picks as hovered (or focused) once the view is laid
     /// out, for a picture of that state.</summary>
     static Control With(Control view, Func<Button, bool> which, string state)
@@ -189,10 +151,8 @@ public class SettingsHighlightTests
                         model.Section = section;
                         return With(new SettingsView { DataContext = model, DrawChrome = true }, which, state);
                     }
-                    // The chosen swatch hovered (the owner's picture), another hovered, another focused from the keyboard.
-                    Shot.Take($"{look}-settings-theme-hover", skin, t, () => Settings("Appearance", b => b.DataContext is ThemeSwatch { Chosen: true }, ":pointerover"), size: size);
-                    Shot.Take($"{look}-settings-theme-hover-other", skin, t, () => Settings("Appearance", b => b.DataContext is ThemeSwatch { Name: "Library" }, ":pointerover"), size: size);
-                    Shot.Take($"{look}-settings-theme-focus", skin, t, () => Settings("Appearance", b => b.DataContext is ThemeSwatch { Name: "Plum" }, ":focus-visible"), size: size);
+                    // Appearance: light, dark or follow the system, its choice hovered.
+                    Shot.Take($"{look}-settings-appearance-hover", skin, t, () => Settings("Appearance", b => b.Classes.Contains("seg-item"), ":pointerover"), size: size);
                     if (skin == SkinKind.Win)
                         Shot.Take($"{look}-settings-appearance-row-hover", skin, t, () => Settings("Appearance", b => b.DataContext is AppearanceOption, ":pointerover"), size: size);
                     Shot.Take($"{look}-settings-model-hover", skin, t, () => Settings("Recording", b => b.DataContext is ModelChoice { Chosen: false }, ":pointerover"), size: size);
