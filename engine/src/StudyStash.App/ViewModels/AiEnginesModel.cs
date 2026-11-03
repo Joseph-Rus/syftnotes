@@ -2,6 +2,8 @@ using System.Collections.ObjectModel;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using StudyStash.App.Services;
+using StudyStash.App.Services.Kit;
+using StudyStash.App.Services.Stores;
 using StudyStash.Core;
 using StudyStash.Core.Ai;
 
@@ -128,73 +130,96 @@ public sealed partial class ApiKeyRow : ObservableObject
 /// <summary>
 /// Settings → AI engines (design 13): who writes the notes and who answers questions, the rich notes switches (diagrams,
 /// formula plots and drawings, and who designs them), Claude Code's speed, every engine's state and what to do about it,
-/// and the Ollama fallback. Reads and drives one library's AI (`IAiLibrary`); the view is just this.
+/// and the Ollama fallback. Reads where the AIs stand from the one <see cref="AiStatusStore"/> (the problem cards above it
+/// read the same one, so a sign-in started from either shows on both) and keeps only its rows; the view is just this.
 /// </summary>
-public sealed partial class AiEnginesModel : ObservableObject
+public sealed partial class AiEnginesModel : ObservableObject, IDisposable
 {
-    readonly IAiLibrary library;
+    readonly AiStatusStore store;
+    /// <summary>Made here for a model given only a library (a test, a picture): disposed with it.</summary>
+    readonly bool ownsStore;
     bool loading;
+    IAiLibrary library => store.Library;
 
-    public AiEnginesModel(IAiLibrary library)
+    public AiEnginesModel(AiStatusStore store)
     {
-        this.library = library;
-        watch = new SignInWatch(library, SignInMovedAsync);
+        this.store = store;
+        store.Changed += OnStoreChanged;
     }
 
-    /// <summary>Keeps asking the library while a sign-in is going, so its row turns ready by itself (also when the
-    /// student left this page and came back to a sign-in still waiting: <see cref="Apply"/> starts it again).</summary>
-    readonly SignInWatch watch;
+    /// <summary>Over a store of its own (a test, a picture, a page with nothing else on it reading the AI).</summary>
+    public AiEnginesModel(IAiLibrary library) : this(new AiStatusStore(library)) => ownsStore = true;
+
     string shown = "";
-
-    /// <summary>Said whenever this pane learns the AIs' state from the library (a sign-in's progress among it), so the
-    /// problem cards on the same page show it too; <see cref="Adopt"/> is the other direction.</summary>
-    public event Action<AiOverview>? Heard;
-    bool adopting;
-
-    /// <summary>Settings' page shows both this pane and the problem cards: each shows what the other learned.</summary>
-    public void ShareWith(AiProblemsModel cards)
-    {
-        Heard += cards.Adopt;
-        cards.Heard += Adopt;
-    }
-
-    /// <summary>Takes the state the problem cards learned, so a sign-in started from a card shows here at once.</summary>
-    public void Adopt(AiOverview overview)
-    {
-        if (SignInWatch.Signature(overview) == shown) return;
-        adopting = true;
-        try
-        {
-            Apply(overview);
-        }
-        finally
-        {
-            adopting = false;
-        }
-    }
+    /// <summary>Above zero while this model's own call to the store is going: it draws the answer itself, with what it
+    /// says of it.</summary>
+    int own;
 
     /// <summary>How often a sign-in that's going is looked at; a test sets it small.</summary>
     public TimeSpan SignInEvery
     {
-        get => watch.Every;
-        set => watch.Every = value;
+        get => store.Every;
+        set => store.Every = value;
     }
 
-    Task SignInMovedAsync(AiOverview now)
+    /// <summary>The store learned something (the library's look at a sign-in, or the problem cards did something): the
+    /// rows follow, and a row that waited for its sign-in says it's signed in.</summary>
+    void OnStoreChanged()
     {
-        if (SignInWatch.Signature(now) == shown) return Task.CompletedTask;
+        if (own > 0 || store.Current is not { } now || store.Signature == shown) return;
         var waiting = Engines.Where(r => r.SignIn == SignInPhase.Waiting).ToList();
         Apply(now);
         foreach (var r in waiting)
-            if (now.Engines.FirstOrDefault(e => e.Id == r.Id) is { State: not "not_signed_in" })
+            if (now.Engines.FirstOrDefault(e => e.Id == r.Id) is { } e && AiStatusStore.StateOf(e) != AiEngineState.NotSignedIn)
                 Say = $"{r.Name} is signed in.";
-        return Task.CompletedTask;
     }
 
-    /// <summary>AIs whose Sign in was pressed: their row's button is Check until it's pressed, since nothing else here
-    /// learns the student has signed in (the library still remembers the AI turning them away). Check that finds it
-    /// still signed out gives Sign in back.</summary>
-    readonly HashSet<string> signingIn = [];
+    async Task<T> Own<T>(Func<Task<T>> call)
+    {
+        own++;
+        try
+        {
+            return await call();
+        }
+        finally
+        {
+            own--;
+        }
+    }
+
+    /// <summary>An overview the library answered a change with: the store keeps it (the cards follow), and it's drawn here.</summary>
+    AiOverview? Kept(AiOverview? overview)
+    {
+        if (overview is null) return null;
+        own++;
+        try
+        {
+            store.Take(overview);
+        }
+        finally
+        {
+            own--;
+        }
+        return overview;
+    }
+
+    /// <summary>What the page does when a call to the library didn't work: the library's refusal is said under the AIs, an
+    /// older library says so instead of the AIs, and one not answering shows the pane's Offline words.</summary>
+    void Failed(Failure failure)
+    {
+        switch (failure.Kind)
+        {
+            case FailureKind.Refused:
+                Say = failure.Words;
+                break;
+            case FailureKind.OlderLibrary:
+                OlderLibrary = true;
+                break;
+            default:
+                Offline = true;
+                break;
+        }
+    }
 
     /// <summary>The line under the pane's title: where the engines run (the library elsewhere, or this computer).</summary>
     public string Lede { get; init; } = "Choose which AI writes your notes and answers your questions. You can change it here any time. It runs on your library, and you can set it up there or from this laptop.";
@@ -426,17 +451,10 @@ public sealed partial class AiEnginesModel : ObservableObject
     public async Task Load()
     {
         await LoadAppsAsync();
-        AiOverview? overview;
-        try
-        {
-            overview = await library.EnginesAsync();
-        }
-        catch
-        {
-            Offline = true;
-            return;
-        }
-        Apply(overview);
+        var asked = await Own(() => store.RefreshAsync());
+        if (asked.Value is { } overview) Apply(overview);
+        else if (asked.Failure!.Kind == FailureKind.OlderLibrary) Apply(null);
+        else Offline = true;
     }
 
     void Apply(AiOverview? overview)
@@ -488,10 +506,11 @@ public sealed partial class AiEnginesModel : ObservableObject
             OnPropertyChanged(nameof(SelectedAskName));
             // A sign-in the press said was going that has stopped since (or never started): the line says so, as its row does.
             if (Say?.StartsWith("Finish signing in to ", StringComparison.Ordinal) == true
-                && overview.Engines.FirstOrDefault(e => e.State == "not_signed_in" && e.SignIn is SignInPhase.GaveUp or SignInPhase.Region or SignInPhase.Stuck) is { } stopped)
+                && overview.Engines.FirstOrDefault(e => AiStatusStore.SignInOf(e) is SignInPhase.GaveUp or SignInPhase.Region or SignInPhase.Stuck) is { } stopped)
                 Say = AiWords.SignInSaid(AiWords.PlainName(stopped.Id, stopped.Name), stopped.SignIn);
             // Or it worked (learned here, or from the problem card on the same page): the line says so, not "Finish…".
-            else if (Say is { } said && overview.Engines.FirstOrDefault(e => said == AiSignIns.StartedWords(e.Id)) is { State: not "not_signed_in" } done)
+            else if (Say is { } said && overview.Engines.FirstOrDefault(e => said == AiSignIns.StartedWords(e.Id)) is { } done
+                     && AiStatusStore.StateOf(done) != AiEngineState.NotSignedIn)
                 Say = $"{AiWords.PlainName(done.Id, done.Name)} is signed in.";
 
             Engines.Clear();
@@ -521,11 +540,9 @@ public sealed partial class AiEnginesModel : ObservableObject
                     Keys.Add(k);
                 }
             OnPropertyChanged(nameof(HasKeys));
-            shown = SignInWatch.Signature(overview);
-            watch.Begin(overview);
+            shown = AiStatusStore.SignatureOf(overview);
             // An app still to be opened again: looked at until it has loaded Syft Notes.
             if (appWatch is null && Engines.Any(r => r.HasNext)) WatchApps();
-            if (!adopting) Heard?.Invoke(overview);
         }
         finally
         {
@@ -572,15 +589,7 @@ public sealed partial class AiEnginesModel : ObservableObject
         try
         {
             row.Draft = "";
-            await AfterAction(await library.KeyAsync(row.Id, key.Trim()));
-        }
-        catch (LibraryRefusedException ex)
-        {
-            Say = ex.Message;
-        }
-        catch
-        {
-            Offline = true;
+            await AfterAction(await LibraryCall.Run(() => library.KeyAsync(row.Id, key.Trim())));
         }
         finally
         {
@@ -605,12 +614,13 @@ public sealed partial class AiEnginesModel : ObservableObject
     AiEngineRow BuildCard(EngineInfo e)
     {
         string name = AiWords.PlainName(e.Id, e.Name);
-        string signIn = e.State == "not_signed_in" ? e.SignIn : "";
+        var status = store.StatusOf(e);
+        string signIn = status.SignIn;
         string? going = settingUp.GetValueOrDefault(e.Id);
         var mine = apps.Where(a => a.Provider == e.Id).ToList();
         var broken = mine.FirstOrDefault(a => a is { Installed: true, Added: true, Good: false } || a.Stale);
         var said = outcomes.GetValueOrDefault(e.Id);
-        bool connected = e.Installed && e.State is "ready" or "limited";
+        bool connected = e.Installed && status.State is AiEngineState.Ready or AiEngineState.Limited;
         string next = connected && broken is null ? NextFor(mine) : "";
         var reopen = next.Length > 0 ? mine.FirstOrDefault(a => a is { Good: true, Running: true, Loaded: false, CanReopen: true }) : null;
 
@@ -622,7 +632,7 @@ public sealed partial class AiEnginesModel : ObservableObject
             about = going ?? AiWords.SignInWaiting;
             if (signIn == SignInPhase.Waiting) link = AiWords.SignInLink(signIn);
         }
-        else if (said is { Ok: false } || signIn.Length > 0 || e.State is "not_signed_in" or "failed" || broken is not null && e.Installed
+        else if (said is { Ok: false } || signIn.Length > 0 || status.State is AiEngineState.NotSignedIn or AiEngineState.Failed || broken is not null && e.Installed
                  || !e.Installed && installStopped.Contains(e.Id))
         {
             state = "Needs attention";
@@ -630,8 +640,8 @@ public sealed partial class AiEnginesModel : ObservableObject
             primary = true;
             about = signIn.Length > 0 ? AiWords.SignInAbout(name, signIn)
                 : said is { Ok: false } ? said.Words
-                : e.State == "not_signed_in" ? $"Signed out of {name}. Fix signs you in again."
-                : e.State == "failed" ? $"{name} didn't work last time. Fix checks it and signs you in if it needs to."
+                : status.State == AiEngineState.NotSignedIn ? $"Signed out of {name}. Fix signs you in again."
+                : status.State == AiEngineState.Failed ? $"{name} didn't work last time. Fix checks it and signs you in if it needs to."
                 : broken is not null ? $"{broken.Words} isn't reading your lectures yet. Fix connects it."
                 : AiWords.ConnectAbout(e.Id);
             action = signIn is SignInPhase.GaveUp or SignInPhase.Stuck || said?.SignIn is SignInPhase.GaveUp or SignInPhase.Stuck ? "Try again"
@@ -645,7 +655,7 @@ public sealed partial class AiEnginesModel : ObservableObject
             action = "Connect";
             primary = true;
         }
-        else if (e.State == "unchecked")
+        else if (status.State == AiEngineState.Unchecked)
         {
             // Here, but nobody knows yet whether it's signed in (a tool installed before Syft Notes, say).
             state = "Not checked yet";
@@ -655,9 +665,10 @@ public sealed partial class AiEnginesModel : ObservableObject
         }
         else
         {
-            state = e.State == "limited" ? AiWords.EngineStateWords(e.State) : next.Length > 0 ? "Almost done" : "Connected";
-            good = e.State != "limited" && next.Length == 0;
-            warn = e.State == "limited";
+            bool limited = status.State == AiEngineState.Limited;
+            state = limited ? status.Words : next.Length > 0 ? "Almost done" : "Connected";
+            good = !limited && next.Length == 0;
+            warn = limited;
             about = ConnectedWords(e, mine);
             options = true;
             action = "Options";
@@ -728,8 +739,9 @@ public sealed partial class AiEnginesModel : ObservableObject
     {
         // A sign-in going from here (the AI's own, hidden, in the student's browser): the row says where it is, and turns
         // ready by itself when it's done.
-        string signIn = e.State == "not_signed_in" ? e.SignIn : "";
-        string name = AiWords.PlainName(e.Id, e.Name);
+        var status = store.StatusOf(e);
+        string signIn = status.SignIn;
+        string name = status.Brand;
         bool cli = e.Id != "ollama";
         string? phase = settingUp.GetValueOrDefault(e.Id);
         var row = new AiEngineRow
@@ -749,7 +761,7 @@ public sealed partial class AiEnginesModel : ObservableObject
             ActionWords = phase is not null ? ""
                 : signIn.Length > 0 ? AiWords.SignInButton(signIn)
                 : !e.Installed && cli && !Here ? "Get it"
-                : e.State == "not_signed_in" && signingIn.Contains(e.Id) ? "Check" : AiWords.RowActionWords(e.State),
+                : status.Action == AiAction.Check && status.State == AiEngineState.NotSignedIn ? "Check" : AiWords.RowActionWords(e.State),
             IsPrimary = AiWords.RowActionPrimary(e.State),
             NeedsOptions = AiWords.NeedsOptions(e.State),
             Model = e.Model,
@@ -771,50 +783,18 @@ public sealed partial class AiEnginesModel : ObservableObject
         Busy = true;
         try
         {
-            AiSaid? said = row.State switch
-            {
-                "not_installed" => await library.SetUpAsync(row.Id),
-                "not_signed_in" when signingIn.Remove(row.Id) => await library.CheckAsync(row.Id),
-                "not_signed_in" => await SignInAsync(row.Id),
-                "not_running" => await library.StartAsync(row.Id),
-                "model_missing" => await library.DownloadAsync(row.Id),
-                "unchecked" => await library.CheckAsync(row.Id),
-                _ => null,
-            };
+            // Not set up · signed out (Sign in, or Check once a Sign in that isn't hidden was pressed) · not running ·
+            // its model missing · not checked yet: the library's own action for it. (Anything else asks nothing.)
+            var action = store.NextAction(row.Id, AiStatusStore.StateOf(row.State));
+            var said = action == AiAction.None ? Outcome<AiSaid>.Failed(Failure.OlderLibrary) : await Own(() => store.ActAsync(row.Id, action));
             await AfterAction(said);
-        }
-        catch (LibraryRefusedException ex)
-        {
-            Say = ex.Message;
             // Sign in from a laptop says where to sign in: the row's button is Check for when that's done.
-            if (signingIn.Contains(row.Id)) await Load();
-        }
-        catch
-        {
-            Offline = true;
+            if (said.Failure?.Kind == FailureKind.Refused && store.ChecksNext(row.Id)) await Load();
         }
         finally
         {
             Busy = false;
         }
-    }
-
-    /// <summary>Sign in: the library starts the AI's own sign-in, hidden, and it opens the student's browser; the row says
-    /// it's waiting and turns ready by itself. (A library from before that opens a terminal to do it in, or says where to,
-    /// from a laptop: the row's button becomes Check for when that's done.)</summary>
-    async Task<AiSaid?> SignInAsync(string id)
-    {
-        signingIn.Add(id);
-        var said = await library.SignInAsync(id);
-        return HiddenOrOld(id, said);
-    }
-
-    /// <summary>A library that signs in hidden says where each sign-in is on the AI's row; one that doesn't leaves the
-    /// student to press Check.</summary>
-    AiSaid? HiddenOrOld(string id, AiSaid? said)
-    {
-        if (said?.Overview?.Engines.FirstOrDefault(e => e.Id == id) is { SignIn.Length: > 0 }) signingIn.Remove(id);
-        return said;
     }
 
     /// <summary>
@@ -835,7 +815,6 @@ public sealed partial class AiEnginesModel : ObservableObject
         if (settingUp.ContainsKey(id)) return new ConnectOutcome(false, "");
         outcomes.Remove(id);
         installStopped.Remove(id);
-        signingIn.Remove(id);
         Say = null;
         settingUp[id] = $"Connecting {AiConnect.Brand(id)}…";
         Redraw();
@@ -844,12 +823,12 @@ public sealed partial class AiEnginesModel : ObservableObject
         try
         {
             // Said on the UI thread (most steps are), it shows at once; from an installer's own thread, it's posted there.
-            outcome = await Connector.ConnectAsync(id, step => (ui is null || SynchronizationContext.Current == ui ? (Action<Action>)(a => a()) : a => ui.Post(_ => a(), null))(() =>
+            outcome = await Own(() => store.ConnectAsync(Connector, id, step => (ui is null || SynchronizationContext.Current == ui ? (Action<Action>)(a => a()) : a => ui.Post(_ => a(), null))(() =>
             {
                 if (!settingUp.ContainsKey(id)) return;
                 settingUp[id] = step.Words;
                 Redraw();
-            }));
+            })));
         }
         finally
         {
@@ -896,17 +875,23 @@ public sealed partial class AiEnginesModel : ObservableObject
 
         async Task LoopAsync()
         {
+            bool first = true;
             try
             {
-                for (int i = 0; i < 100 && !cts.IsCancellationRequested; i++)
+                await Poll.UntilAsync(async _ =>
                 {
-                    await Task.Delay(AppsEvery, cts.Token);
+                    // Looked at after the first wait, as before: the apps were read just now.
+                    if (first)
+                    {
+                        first = false;
+                        return false;
+                    }
                     string before = AppsSignature();
                     await LoadAppsAsync();
                     // Drawn again only when something changed: a menu open on a card stays open meanwhile.
                     if (AppsSignature() != before) Redraw();
-                    if (!Engines.Any(r => r.HasNext)) return;
-                }
+                    return !Engines.Any(r => r.HasNext);
+                }, AppsEvery, AppsEvery * 100, cts.Token);
             }
             catch (OperationCanceledException)
             {
@@ -939,15 +924,7 @@ public sealed partial class AiEnginesModel : ObservableObject
         Busy = true;
         try
         {
-            await AfterAction(await library.SignInAgainAsync(row.Id));
-        }
-        catch (LibraryRefusedException ex)
-        {
-            Say = ex.Message;
-        }
-        catch
-        {
-            Offline = true;
+            await AfterAction(await Own(() => store.ActAsync(row.Id, AiAction.SignInAgain)));
         }
         finally
         {
@@ -960,15 +937,7 @@ public sealed partial class AiEnginesModel : ObservableObject
         Busy = true;
         try
         {
-            await AfterAction(await library.CheckAsync(id));
-        }
-        catch (LibraryRefusedException ex)
-        {
-            Say = ex.Message;
-        }
-        catch
-        {
-            Offline = true;
+            await AfterAction(await Own(() => store.ActAsync(id, AiAction.Check)));
         }
         finally
         {
@@ -981,16 +950,9 @@ public sealed partial class AiEnginesModel : ObservableObject
         Busy = true;
         try
         {
-            var overview = await library.ModelAsync(id, model);
-            Apply(overview);
-        }
-        catch (LibraryRefusedException ex)
-        {
-            Say = ex.Message;
-        }
-        catch
-        {
-            Offline = true;
+            var asked = await LibraryCall.Run(() => library.ModelAsync(id, model));
+            if (asked.Failure is { Kind: not FailureKind.OlderLibrary } failure) Failed(failure);
+            else Apply(Kept(asked.Value));
         }
         finally
         {
@@ -998,15 +960,15 @@ public sealed partial class AiEnginesModel : ObservableObject
         }
     }
 
-    async Task AfterAction(AiSaid? said)
+    async Task AfterAction(Outcome<AiSaid> asked)
     {
-        if (said is null)
+        if (asked.Value is not { } said)
         {
-            OlderLibrary = true;
+            Failed(asked.Failure!);
             return;
         }
         Say = said.Said;
-        if (said.Overview is not null) Apply(said.Overview);
+        if (said.Overview is not null) Apply(Kept(said.Overview));
         else await Load();
     }
 
@@ -1015,16 +977,9 @@ public sealed partial class AiEnginesModel : ObservableObject
         Busy = true;
         try
         {
-            var overview = await library.DefaultsAsync(notes, ask, fallback, diagrams);
-            Apply(overview);
-        }
-        catch (LibraryRefusedException ex)
-        {
-            Say = ex.Message;
-        }
-        catch
-        {
-            Offline = true;
+            var asked = await LibraryCall.Run(() => library.DefaultsAsync(notes, ask, fallback, diagrams));
+            if (asked.Failure is { Kind: not FailureKind.OlderLibrary } failure) Failed(failure);
+            else Apply(Kept(asked.Value));
         }
         finally
         {
@@ -1039,19 +994,20 @@ public sealed partial class AiEnginesModel : ObservableObject
         Busy = true;
         try
         {
-            Apply(await library.RichAsync(on, diagrams, plots, drawings, speed));
-        }
-        catch (LibraryRefusedException ex)
-        {
-            Say = ex.Message;
-        }
-        catch
-        {
-            Offline = true;
+            var asked = await LibraryCall.Run(() => library.RichAsync(on, diagrams, plots, drawings, speed));
+            if (asked.Failure is { Kind: not FailureKind.OlderLibrary } failure) Failed(failure);
+            else Apply(Kept(asked.Value));
         }
         finally
         {
             Busy = false;
         }
+    }
+
+    public void Dispose()
+    {
+        store.Changed -= OnStoreChanged;
+        StopWatchingApps();
+        if (ownsStore) store.Dispose();
     }
 }
