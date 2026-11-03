@@ -74,7 +74,7 @@ public sealed partial class ListenVoicesModel : ObservableObject, IDisposable
         {
             Show(await lib.VoicesAsync());
         }
-        catch
+        catch (Exception e) when (LibraryTrouble.Handled(e))
         {
             // An older library takes "voices" for a lecture it hasn't got, or it isn't answering: nothing shows.
             Info = null;
@@ -101,7 +101,7 @@ public sealed partial class ListenVoicesModel : ObservableObject, IDisposable
         {
             Problem = e.Message;
         }
-        catch
+        catch (Exception e) when (LibraryTrouble.Handled(e))
         {
             Problem = "Your library isn't answering. Try again in a moment.";
         }
@@ -125,7 +125,7 @@ public sealed partial class ListenVoicesModel : ObservableObject, IDisposable
         {
             Problem = e.Message;
         }
-        catch
+        catch (Exception e) when (LibraryTrouble.Handled(e))
         {
             Problem = "Your library isn't answering. Try again in a moment.";
         }
@@ -155,7 +155,7 @@ public sealed partial class ListenVoicesModel : ObservableObject, IDisposable
                 {
                     return;
                 }
-                catch
+                catch (Exception e) when (LibraryTrouble.Handled(e))
                 {
                     // The library didn't answer this time: look again next time.
                 }
