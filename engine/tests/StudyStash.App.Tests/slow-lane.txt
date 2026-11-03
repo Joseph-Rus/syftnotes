@@ -1,0 +1,12 @@
+# The App test classes tools/run-app-tests.sh runs in its first process; every other class (new ones too) runs in the
+# second. Chosen from a run's slowest classes so the two take about as long (the run's page lists each process's
+# minutes). The two that start real servers on this computer's ports (LibraryHereTests, LibraryServiceTests) share a
+# process, so they can't meet themselves in the other.
+EdgeTests
+LibraryServiceTests
+LibraryHereTests
+CutTextTests
+SettingsHighlightTests
+AccessibleNamesTests
+PhoneDriveTests
+GuidedSetupTests
