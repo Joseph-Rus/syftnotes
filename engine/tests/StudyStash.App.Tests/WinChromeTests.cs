@@ -75,28 +75,6 @@ public class WinChromeTests
         return (window, host.Decorations!);
     }
 
-    /// <summary>The library, Settings and setup as a real Windows window shows them: the view without its own drawn
-    /// buttons, Avalonia's caption buttons over it (win-04-full-app-real-light.png and so on).</summary>
-    [AvaloniaFact]
-    public void Real_title_bars()
-    {
-        using var home = new TempHome();
-        using var host = new Services.AppHost(home.Path);
-        foreach (var t in new[] { ThemeVariant.Light, ThemeVariant.Dark })
-        {
-            Shot.Take("win-04-full-app-real", SkinKind.Win, t, () => new DrawnHost(
-                new WinLibrary { DataContext = NoChrome(Demo.Library()), Width = 1280, Height = 800 }, WinChrome.Decorations(), 48) { Width = 1280, Height = 800 });
-            Shot.Take("win-05-setup-real", SkinKind.Win, t, () =>
-            {
-                var view = new WinSetup { DataContext = Demo.Setup(SkinKind.Win), DrawChrome = false };
-                return new DrawnHost(view, WinChrome.Decorations(), 32, resizable: false) { Width = view.Width, Height = view.Height };
-            }, size: new Size(1700, 708));
-            var model = Services.SettingsModel.Make(host);
-            Shot.Take("win-settings-real", SkinKind.Win, t, () => new DrawnHost(new SettingsView { DataContext = model, DrawChrome = false }, WinChrome.Decorations(), 32, resizable: false)
-                { Width = 900, Height = 860 }, size: new Size(1100, 988));
-            model.Dispose();
-        }
-    }
 
     [AvaloniaFact]
     public void Avalonias_own_decorations_draw_a_second_title_which_ours_leave_out()

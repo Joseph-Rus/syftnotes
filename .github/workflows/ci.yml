@@ -284,14 +284,14 @@ jobs:
       - name: Run the App tests
         id: app
         if: ${{ !cancelled() && matrix.app }}
+        shell: bash
+        # Two processes at once (headless Avalonia has one UI thread a process): the slow classes in slow-lane.txt in one,
+        # the rest in the other, each with its own .trx. On Linux this also checks the pictures of the screens
+        # (Snapshots); the other systems skip them.
         run: >-
-          dotnet test engine/tests/StudyStash.App.Tests --logger "trx;LogFileName=App.trx"
-          --results-directory "${{ runner.temp }}/test-results"
+          tools/run-app-tests.sh "$RUNNER_TEMP/test-results"
           --blame-hang-timeout 10m --blame-hang-dump-type mini --blame-crash --blame-crash-dump-type mini
         env:
-          # Windows: the pictures the tests draw are kept, so the notes' formulas and diagrams can be seen as Windows
-          # draws them (its own fonts), in the Windows look, light and dark, at 100% and 150%.
-          STUDYSTASH_SHOTS: ${{ runner.os == 'Windows' && format('{0}\shots', runner.temp) || '' }}
           DOTNET_DbgEnableMiniDump: ${{ runner.os != 'Windows' && '1' || '' }}
           DOTNET_DbgMiniDumpType: ${{ runner.os != 'Windows' && '1' || '' }}
           DOTNET_EnableCrashReport: ${{ runner.os != 'Windows' && '1' || '' }}
@@ -362,28 +362,19 @@ jobs:
             ${{ runner.temp }}/crash
           retention-days: 7
           if-no-files-found: ignore
-      - name: The notes' formulas and diagrams, as Windows draws them
-        if: ${{ always() && runner.os == 'Windows' && matrix.app }}
+      # A picture check that failed: what the screen drew now (*.received.png) beside the picture kept for it
+      # (*.verified.png), so the difference can be looked at. Copy the received one over the verified one if it's meant.
+      - name: Pictures of the screens, if a picture check failed
+        if: ${{ failure() && runner.os == 'Linux' && matrix.app && hashFiles('engine/tests/StudyStash.App.Tests/Snapshots/*.received.png') != '' }}
         uses: actions/upload-artifact@v7
         continue-on-error: true
         with:
-          name: windows-rich-notes
+          name: snapshot-pictures
           path: |
-            ${{ runner.temp }}\shots\richwin-*
-            ${{ runner.temp }}\shots\rich-*-win-*
-          if-no-files-found: error
+            engine/tests/StudyStash.App.Tests/Snapshots/*.received.png
+            engine/tests/StudyStash.App.Tests/Snapshots/*.verified.png
           retention-days: 7
-      - name: Notifications, as Windows draws them, where they land above the taskbar
-        if: ${{ always() && runner.os == 'Windows' && matrix.app }}
-        uses: actions/upload-artifact@v7
-        continue-on-error: true
-        with:
-          name: windows-notifications
-          path: |
-            ${{ runner.temp }}\shots\win-12-notify-*
-            ${{ runner.temp }}\shots\win-12-toast-*
-          if-no-files-found: error
-          retention-days: 7
+          if-no-files-found: ignore
 
   # Only for a run by hand with "real_sign_in_only": the real sign-ins above, alone, and what each showed, every
   # address, email and anything like a code or a key already taken out by the test, kept for a day to write the tests'
