@@ -470,6 +470,16 @@ public sealed partial class AppHost : IDisposable, IProblemSource
         return Settings.Role == AppRole.Both && cc.ServerUrl.Length > 0 ? (cc.ServerUrl, cc.PoolKey) : null;
     }
 
+    LibraryClients? api;
+    Stores.AiStatusStore? aiStatus;
+
+    /// <summary>The library's API clients, made once and again only when its address changes.</summary>
+    public LibraryClients Api => LazyInitializer.EnsureInitialized(ref api, () => new LibraryClients(Client));
+
+    /// <summary>Where the library's AIs stand: the one store every screen showing them reads (Settings' AI rows and its
+    /// problem cards today), with the one loop that follows a sign-in.</summary>
+    public Stores.AiStatusStore AiStatus => LazyInitializer.EnsureInitialized(ref aiStatus, () => new Stores.AiStatusStore(() => Api.Ai));
+
     /// <summary>The library over its API, once one is set up.</summary>
     public RemoteLibrary? Remote()
     {
@@ -1389,6 +1399,7 @@ public sealed partial class AppHost : IDisposable, IProblemSource
     {
         if (disposed) return;
         disposed = true;
+        aiStatus?.Dispose();
         watchdog?.Dispose();
         pruning?.Dispose();
         beat?.Dispose();

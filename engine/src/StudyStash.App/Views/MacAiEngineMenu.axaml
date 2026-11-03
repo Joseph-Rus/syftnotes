@@ -17,7 +17,7 @@
       <ItemsControl ItemsSource="{Binding Items}">
         <ItemsControl.ItemTemplate>
           <DataTemplate x:DataType="vm:EngineMenuItem">
-            <Button Theme="{StaticResource Surface}" CornerRadius="10" HorizontalContentAlignment="Stretch"
+            <Button Classes="ai-menu-row" Theme="{StaticResource Surface}" CornerRadius="10" HorizontalContentAlignment="Stretch"
                     Command="{Binding Command}" IsEnabled="{Binding Enabled}">
               <Border Classes="ai-menu-item" Classes.selected="{Binding Selected}" Classes.disabled="{Binding !Enabled}">
                 <Grid ColumnDefinitions="14,8,Auto,8,*">
