@@ -193,7 +193,7 @@ public class WindowsRichNotesTests
             foreach (var t in Themes)
             {
                 var window = Take("app", t, scale, () => new WinLibrary { DataContext = Scenes.CardiacLibrary(), Width = 1280, Height = 800 },
-                    new Size(1280 + 128, 800 + 128), Scenes.ScrollToDiagrams);
+                    new Size(1280 + 128, 800 + 128), w => Scenes.ScrollToDiagrams(w));
                 AllDrawn(window);
                 window.Close();
             }

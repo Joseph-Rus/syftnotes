@@ -80,7 +80,8 @@ public static partial class Scenes
         if (at is "waiting" or "edge-waiting" or "firefox-waiting" or "folder-waiting") await m.AddToBrowserCommand.ExecuteAsync(null);
         if (at == "firefox-have-it") await m.HaveItCommand.ExecuteAsync(null);
         if (at == "folder-waiting" && mac) m.ExtensionFolder = Path.Combine("~", "Syft Notes", "Chrome extension");
-        for (int i = 0; i < 100 && m.FromStore && m.ConnectionCode.Length == 0; i++) await Task.Delay(10); // the code is asked for as the step opens
+        // The code is asked for as the store step opens (step 2 of a store's copy), and arrives when the library answers.
+        if (m.FromStore && m.Current == 2) await Wait.UntilAsync(() => m.ConnectionCode.Length > 0, "the connection code, asked for as the step opens");
         m.Dispose(); // a still picture: the watch needn't keep asking
         return m;
     }
@@ -193,14 +194,14 @@ public static partial class Scenes
 
     /// <summary>Scrolls the notes column so a diagram shows a little below the top, the way someone reading the
     /// lecture would have scrolled to it.</summary>
-    internal static void ScrollToDiagrams(Window window)
+    internal static void ScrollToDiagrams(Window window, double above = 96)
     {
         DiagramsReady.Wait(window);
         var scroller = window.GetVisualDescendants().OfType<ScrollViewer>().FirstOrDefault(s => s.GetVisualDescendants().OfType<NoteView>().Any());
         var diagram = window.GetVisualDescendants().FirstOrDefault(v => v is DiagramView or SvgView) as Visual;
         if (scroller is null || diagram is null) return;
         var top = diagram.TranslatePoint(new Point(0, 0), scroller)?.Y ?? 0;
-        scroller.Offset = new Vector(0, Math.Max(0, scroller.Offset.Y + top - 40));
+        scroller.Offset = new Vector(0, Math.Max(0, scroller.Offset.Y + top - above));
         Dispatcher.UIThread.RunJobs();
     }
 
@@ -263,6 +264,13 @@ public static partial class Scenes
         foreach (var c in m.Classes) c.Selected = c.Name == selected;
         m.Note = null;
         m.Ask = null;
+        return m;
+    }
+
+    internal static CanvasStatusModel Status(string fixture)
+    {
+        var m = new CanvasStatusModel(CanvasFixtures.Context());
+        m.Show(CanvasFixtures.Load<CanvasApi.State>(fixture));
         return m;
     }
 

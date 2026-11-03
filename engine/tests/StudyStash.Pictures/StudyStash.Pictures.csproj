@@ -34,6 +34,7 @@
     <Compile Include="..\StudyStash.App.Tests\FakeAiLibrary.cs" Link="Shared\FakeAiLibrary.cs" />
     <Compile Include="..\StudyStash.App.Tests\Support\Mirror.cs" Link="Shared\Mirror.cs" />
     <Compile Include="..\StudyStash.App.Tests\Finds.cs" Link="Shared\Finds.cs" />
+    <Compile Include="..\StudyStash.App.Tests\Wait.cs" Link="Shared\Wait.cs" />
     <Compile Include="..\StudyStash.App.Tests\Support\Scenes.cs" Link="Shared\Scenes.cs" />
     <Compile Include="..\StudyStash.App.Tests\Support\CountingLoginItems.cs" Link="Shared\CountingLoginItems.cs" />
     <Compile Include="..\StudyStash.App.Tests\CanvasFakes.cs" Link="Shared\CanvasFakes.cs" />
