@@ -126,6 +126,9 @@ public sealed partial class AiNotesModel : ObservableObject, IDisposable
     public string FailedTitle => AiWords.ProblemTitle("rewrite_failed", EngineName, "");
     public string FailedMessage => AiWords.ProblemMessage("rewrite_failed", EngineName, "", "", 0, Error);
     public string RewritingLead => $"Rewriting with {EngineName}…";
+    /// <summary>What follows the lead: the current notes stay; or, while the library isn't answering the page's checks,
+    /// that it's still trying (the rewrite goes on in the library either way).</summary>
+    public string RewritingDetail => Offline ? " Can't reach your library right now. Still trying." : " Your current notes stay until the new ones are ready.";
     public string ReadyLead => $"New notes from {EngineName} are ready.";
     public string DraftHeading => $"New notes from {EngineName}";
 
@@ -166,6 +169,8 @@ public sealed partial class AiNotesModel : ObservableObject, IDisposable
     }
 
     partial void OnErrorChanged(string value) => OnPropertyChanged(nameof(FailedMessage));
+
+    partial void OnOfflineChanged(bool value) => OnPropertyChanged(nameof(RewritingDetail));
 
     partial void OnMenuOpenChanged(bool value) => OnPropertyChanged(nameof(Dimmed));
 
