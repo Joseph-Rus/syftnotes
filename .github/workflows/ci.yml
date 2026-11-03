@@ -110,6 +110,8 @@ jobs:
       win_signing: ${{ steps.signing.outputs.win_signing }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false  # nothing here pushes; plan.sh's git fetch reads this public repository without a token
       # A run by hand keeps the exact tree it tests, so that merging that branch into main with the very same code
       # (main hadn't moved meanwhile) is known to have passed already (plan.sh).
       # (Not a run of the real sign-ins alone, which tests nothing else.)
@@ -163,6 +165,8 @@ jobs:
     timeout-minutes: 5
     steps:
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false  # nothing here pushes; plan.sh's git fetch reads this public repository without a token
       - run: bash tools/check-connections.sh
 
   # The C# engine (engine/): every test on each system. Golden/ holds fixed expectations the tests compare byte for
@@ -201,6 +205,8 @@ jobs:
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false  # nothing here pushes; plan.sh's git fetch reads this public repository without a token
       - uses: ./.github/actions/dotnet
         with:
           packages: engine-${{ matrix.slug }}
@@ -359,6 +365,8 @@ jobs:
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false  # nothing here pushes; plan.sh's git fetch reads this public repository without a token
       - uses: ./.github/actions/dotnet
         with:
           packages: engine-${{ runner.os == 'Windows' && 'app' || 'all' }}
@@ -418,6 +426,8 @@ jobs:
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false  # nothing here pushes; plan.sh's git fetch reads this public repository without a token
       - uses: ./.github/actions/dotnet
         with:
           packages: mac-app
@@ -430,11 +440,18 @@ jobs:
           node-version: 22
           cache: npm
           cache-dependency-path: web/package-lock.json
+      # The phone app (web/), which the library serves at /app/, in a step of its own: npm's packages run their install
+      # scripts here, where no secret is in reach. The builds after it use web/dist as it is (STUDYSTASH_SKIP_WEB).
+      - name: The phone app (web/), built with no secret in reach
+        shell: bash
+        working-directory: web
+        run: npm ci --no-audit --no-fund && npm run build
       - name: Build Study Stash.app and its one DMG
-        # The laptop's Google sign-in secret (docs/phone-google.md) is built into the app; without it the app builds as
-        # usual and Connect with Google says this copy can't connect.
+        # The laptop's Google sign-in secret (docs/phone-google.md) is built into the app; without it (a pull request has
+        # none) the app builds as usual and Connect with Google says this copy can't connect.
         env:
-          GOOGLE_DESKTOP_CLIENT_SECRET: ${{ secrets.GOOGLE_DESKTOP_CLIENT_SECRET }}
+          GOOGLE_DESKTOP_CLIENT_SECRET: ${{ github.event_name != 'pull_request' && secrets.GOOGLE_DESKTOP_CLIENT_SECRET || '' }}
+          STUDYSTASH_SKIP_WEB: "1"
         run: sh macos/build-app.sh dist/mac
       # Signing, only when the version job planned it. Each step that needs a secret has just its own.
       - name: Signing - the Developer ID certificate, in a keychain made for this run
@@ -467,6 +484,11 @@ jobs:
           STUDYSTASH_LIBRARY_VALIDATION: ${{ vars.STUDYSTASH_LIBRARY_VALIDATION }}
           HOW: ${{ needs.version.outputs.mac_signing == 'rehearsal' && 'rehearsal' || (needs.version.outputs.mac_notarize == 'true' && 'notarized' || 'signed') }}
         run: sh macos/verify-signing.sh "dist/mac/Study Stash.app" dist/mac/Syft-Notes.dmg "$HOW"
+      # As soon as the signature is checked (nothing after this signs), not at the end of the job: the self-tests and
+      # everything else that runs the app never have the certificate or the notary key within reach.
+      - name: Signing - the keychain and keys are removed
+        if: always() && needs.version.outputs.mac_signing != 'off'
+        run: sh macos/signing-setup.sh cleanup
       - name: The app carries the phone app, which the library serves at /app/
         run: |
           for arch in arm64 x64; do
@@ -570,9 +592,6 @@ jobs:
           name: signing-mac-${{ needs.version.outputs.mac_signing }}
           path: ${{ runner.temp }}/mac-signing.txt
           retention-days: 30
-      - name: Signing - the keychain and keys are removed
-        if: always() && needs.version.outputs.mac_signing != 'off'
-        run: sh macos/signing-setup.sh cleanup
 
   # The Intel self-test (D5), for real: a physical Intel Mac, so the x64 tree runs natively (mac-app already checked
   # it runs enough to print its version under Rosetta). A release only.
@@ -584,6 +603,8 @@ jobs:
     runs-on: macos-15-intel
     steps:
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false  # nothing here pushes; plan.sh's git fetch reads this public repository without a token
       - uses: actions/download-artifact@v4
         with:
           name: mac-installers
@@ -646,6 +667,8 @@ jobs:
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false  # nothing here pushes; plan.sh's git fetch reads this public repository without a token
       - uses: ./.github/actions/dotnet
         with:
           packages: windows-app
@@ -684,16 +707,24 @@ jobs:
           node-version: 22
           cache: npm
           cache-dependency-path: web/package-lock.json
+      # The phone app (web/), which the library serves at /app/, in a step of its own: npm's packages run their install
+      # scripts here, where no secret is in reach. The builds after it use web/dist as it is (STUDYSTASH_SKIP_WEB).
+      - name: The phone app (web/), built with no secret in reach
+        shell: bash
+        working-directory: web
+        run: npm ci --no-audit --no-fund && npm run build
+      # No secret: this copy is never shipped.
       - name: Build the copy the self-tests run (win-x64, with the test helpers; never shipped)
         shell: pwsh
         env:
-          GOOGLE_DESKTOP_CLIENT_SECRET: ${{ secrets.GOOGLE_DESKTOP_CLIENT_SECRET }}
+          STUDYSTASH_SKIP_WEB: "1"
         run: .\windows\build.ps1 -Out dist\windows-test -TestHelpers -NoInstaller -Rids win-x64
       - name: Build win-x64 and win-arm64, and Syft-Notes-Setup.exe - the student's copy, with no test helpers
         shell: pwsh
         # The laptop's Google sign-in secret, built into the app as on the Mac.
         env:
-          GOOGLE_DESKTOP_CLIENT_SECRET: ${{ secrets.GOOGLE_DESKTOP_CLIENT_SECRET }}
+          GOOGLE_DESKTOP_CLIENT_SECRET: ${{ github.event_name != 'pull_request' && secrets.GOOGLE_DESKTOP_CLIENT_SECRET || '' }}
+          STUDYSTASH_SKIP_WEB: "1"
         run: .\windows\build.ps1 -Out dist\windows ${{ needs.version.outputs.win_signing != 'off' && '-NoInstaller' || '' }}
       # Signing, only when the version job planned it. The secrets reach just the one step that signs.
       - name: Signing - a throwaway self-signed certificate, for the rehearsal
@@ -1028,6 +1059,8 @@ jobs:
     runs-on: ${{ matrix.runner }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false  # nothing here pushes; plan.sh's git fetch reads this public repository without a token
       - uses: ./.github/actions/dotnet
         with:
           packages: linux-app
@@ -1036,6 +1069,12 @@ jobs:
           node-version: 22
           cache: npm
           cache-dependency-path: web/package-lock.json
+      # The phone app (web/), which the library serves at /app/, in a step of its own: npm's packages run their install
+      # scripts here, where no secret is in reach. The builds after it use web/dist as it is (STUDYSTASH_SKIP_WEB).
+      - name: The phone app (web/), built with no secret in reach
+        shell: bash
+        working-directory: web
+        run: npm ci --no-audit --no-fund && npm run build
       - uses: ./.github/actions/whisper-tiny
       - name: What the app needs from a desktop, on a runner that has none - a virtual display, and fonts
         run: |
@@ -1044,7 +1083,9 @@ jobs:
       - name: Build ${{ matrix.rid }} and Syft-Notes-${{ matrix.rid }}.tar.gz
         env:
           STUDYSTASH_LINUX_RIDS: ${{ matrix.rid }}
-          GOOGLE_DESKTOP_CLIENT_SECRET: ${{ secrets.GOOGLE_DESKTOP_CLIENT_SECRET }}
+          # The laptop's Google sign-in secret, built into the app as on the Mac.
+          GOOGLE_DESKTOP_CLIENT_SECRET: ${{ github.event_name != 'pull_request' && secrets.GOOGLE_DESKTOP_CLIENT_SECRET || '' }}
+          STUDYSTASH_SKIP_WEB: "1"
         run: sh linux/build.sh dist/linux
       - name: The tarball holds one folder that runs, its native code built for this processor, the live words' small Whisper, and no transcription model or debug symbols
         env:
@@ -1165,6 +1206,8 @@ jobs:
       actions: read  # to download the installers a run by hand built
     steps:
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false  # nothing here pushes; plan.sh's git fetch reads this public repository without a token
       # The installers about to be published are signed as this run was told to sign them (a run by hand's, reused, may not
       # have been), and are never a rehearsal's.
       - name: The installers are signed as planned
