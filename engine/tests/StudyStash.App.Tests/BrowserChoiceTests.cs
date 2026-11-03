@@ -224,24 +224,4 @@ public class BrowserChoiceTests
             ((App)Avalonia.Application.Current!).UseSkin(SkinKind.Mac);
         }
     }
-
-    [AvaloniaFact]
-    public void Mac_and_Win_browser_choice()
-    {
-        foreach (var (skin, look) in new[] { (SkinKind.Mac, "mac"), (SkinKind.Win, "win") })
-            foreach (var t in new[] { ThemeVariant.Light, ThemeVariant.Dark })
-            {
-                Skin.UseTheme(ColourThemes.Default);
-                ((App)Avalonia.Application.Current!).UseSkin(skin);
-                var model = new BrowserChoiceModel(["Chrome", "Edge"], _ => Task.FromResult<string?>(null));
-                var w = BrowserChoiceWindow.Make(model);
-                w.RequestedThemeVariant = t;
-                Look.Apply(w);
-                w.Show();
-                Dispatcher.UIThread.RunJobs();
-                RichShots.Save($"{look}-browser-choice", t, w, w.ClientSize);
-                w.Close();
-            }
-        ((App)Avalonia.Application.Current!).UseSkin(SkinKind.Mac);
-    }
 }

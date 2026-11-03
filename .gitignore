@@ -18,3 +18,6 @@ engine/**/obj/
 
 # Firebase CLI deploy cache
 .firebase/
+
+# the picture checks' own drawing when it differs from the verified picture (CI keeps these as an artifact)
+engine/tests/StudyStash.App.Tests/Snapshots/*.received.*

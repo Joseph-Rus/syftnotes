@@ -11,6 +11,7 @@
     <PackageReference Include="Microsoft.AspNetCore.TestHost" Version="10.0.12" />
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.14.1" />
     <PackageReference Include="Microsoft.Extensions.TimeProvider.Testing" Version="10.0.0" />
+    <PackageReference Include="Verify.XunitV3" Version="32.0.1" />
     <PackageReference Include="xunit.v3" Version="3.2.2" />
     <PackageReference Include="xunit.runner.visualstudio" Version="3.1.4" />
   </ItemGroup>
@@ -30,6 +31,8 @@
 
   <ItemGroup>
     <None Include="Fixtures\**" CopyToOutputDirectory="PreserveNewest" LinkBase="Fixtures" />
+    <!-- The verified pictures the picture checks compare with (and the tolerance test reads one). -->
+    <None Include="Snapshots\*.verified.png" CopyToOutputDirectory="PreserveNewest" LinkBase="Snapshots" />
     <None Include="xunit.runner.json" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
