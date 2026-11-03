@@ -906,12 +906,14 @@ public static partial class Shell
     static bool WatchingWords() => ((recorder.Expanded || recorder.Hovered) && recorderWindow?.IsVisible == true) || panelWindow?.IsVisible == true
         || (mainWindow?.IsVisible == true && library.Note is { Live: true } && library.ShowNotePage);
 
-    /// <summary>Windows: the small pill never takes the keyboard from the app you're typing in. The shortcut starts a
-    /// recording from Word or a browser, the pill came up as the window in front, and what was typed next went to it.
-    /// Opened up, it's a window you asked for, with a box to ask in. (A Mac never brings the app forward for it.)</summary>
+    /// <summary>Windows and a Mac: the small pill never takes the keyboard from the app you're typing in. On Windows the
+    /// shortcut starts a recording from Word or a browser, the pill came up as the window in front, and what was typed
+    /// next went to it. On a Mac a window shown activated brings the whole app forward (Avalonia asks macOS to), so the
+    /// student who clicked into their slides found the library back in front of them, the pill over it. Opened up, it's
+    /// a window you asked for, with a box to ask in.</summary>
     static void RecorderTakesKeyboard(bool expanded)
     {
-        if (OperatingSystem.IsWindows() && recorderWindow is { } w) w.ShowActivated = expanded;
+        if ((OperatingSystem.IsWindows() || OperatingSystem.IsMacOS()) && recorderWindow is { } w) w.ShowActivated = expanded;
     }
 
     static void ShowRecorder(bool expanded)
@@ -1112,8 +1114,14 @@ public static partial class Shell
                 DispatcherTimer.RunOnce(() => Program.Log($"[menu] {AppMenu.Describe()}"), TimeSpan.FromMilliseconds(500));
             };
         }
-        // The small recorder floats only while this window isn't the one in front.
-        w.Activated += (_, _) => ShowRecorderIfAway();
+        // The small recorder floats only while this window isn't the one in front. Avalonia says Activated before the
+        // window counts as active (IsActive is set just after), so on a Mac the look waits until it is: made at once,
+        // it found the library behind, and the pill stayed over the library the student had just clicked back into.
+        w.Activated += (_, _) =>
+        {
+            if (OperatingSystem.IsMacOS()) Dispatcher.UIThread.Post(ShowRecorderIfAway);
+            else ShowRecorderIfAway();
+        };
         // Back from another app (the Claude app, a chat in the browser): the note on the page is read again, so notes
         // written for it meanwhile show. (Read the same, the page stays as it is.)
         w.Activated += (_, _) =>
