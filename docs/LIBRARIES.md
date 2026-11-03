@@ -64,6 +64,12 @@ Low risk. Nothing a student sees changes.
    - Tests pass `FakeTimeProvider` and move time forward instead of waiting.
    - Convert the worst flake hotspots first: PhoneDrive*, AskStreaming, CanvasWatch, SetupTests, ExtensionE2E.
 
+**Done (`lib-builtins`), what was and wasn't done:**
+- **`AsyncAction`** is a thin wrapper over the toolkit's `AsyncRelayCommand` (no concurrent runs; `Busy` is its `IsRunning`; `Cancel()` is the command's; `Say`/`Failure` come from the `Outcome`). Public API unchanged. AiSetupModel's `ActAsync` runs on it (its `Busy` follows the action's). AiEnginesModel's actions are not moved yet: they share one `Busy` with key saving and the settings posts, so each needs its own look.
+- **`TimeProvider`:** `Poll` and `AiStatusStore` already took one; `CanvasWatch` and `Paced` (the answer's drawing pace) now do too (optional last parameter, default `TimeProvider.System`, so AppHost and Shell are untouched). Still to do: AppHost holding the one provider and handing it down, and `DriveLink`'s own `DriveTimes`, which should become a `TimeProvider` (the PhoneDrive tests' quiet-period waits wait on it).
+- **Tests:** `Microsoft.Extensions.TimeProvider.Testing` in both test projects. CanvasWatch and Paced tests move a `FakeTimeProvider`; waits on real input or output use `Wait.UntilAsync` (App.Tests) / `Waiting.UntilAsync` (Core.Tests), both over `Poll`. Fixed `Task.Delay`/`Thread.Sleep` calls in the tests: 183 to 117 before the last pass over the rest. Left on purpose: waits that are the thing under test (a quiet period: nothing more is written; file times; Chrome-driven E2E, which are skipped without Chrome), the Real/Hold/film rigs.
+- **Core.Tests is on xunit.v3** (3.2.2): `ValueTask` lifetimes, a `typeof` orderer, `[CallerFilePath]` constructors on the two fact attributes, `TheoryData.Data`, and `xUnit1051` switched off for that project (older tests don't pass `TestContext.Current.CancellationToken` yet). `DisableParallelization` collections are kept.
+
 **Done when:**
 - the `sleeps` and `shell-in-services` counts are lower and their baseline is lowered;
 - the converted tests pass with no real waiting.

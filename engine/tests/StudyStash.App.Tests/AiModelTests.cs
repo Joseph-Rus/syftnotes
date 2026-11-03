@@ -1127,7 +1127,7 @@ public class AiNotesModelTests
         var lib = new FakeAiLibrary { Overview = AiTestData.MixedOverview(), OnRewrite = _ => job ?? new RewriteInfo("lec-1", "none") { Current = Current } };
         // A delay that never fires: these tests check the state right after one call, not a poll picking up a
         // later change — Polling_picks_up_a_job_that_finishes_while_watching below builds its own instant one.
-        var model = new AiNotesModel(lib) { Delay = (_, ct) => Task.Delay(Timeout.InfiniteTimeSpan, ct) };
+        var model = new AiNotesModel(lib) { Delay = (_, ct) => new TaskCompletionSource().Task.WaitAsync(ct) };
         return (model, lib);
     }
 
@@ -1179,7 +1179,7 @@ public class AiNotesModelTests
         var model = new AiNotesModel(lib) { Delay = (_, _) => Task.CompletedTask };
         await model.Load("lec-1", Current.Markdown, "Ollama", Current.At);
 
-        for (int i = 0; i < 50 && model.State != RewriteState.Ready; i++) await Task.Delay(10);
+        await Wait.UntilAsync(() => model.State == RewriteState.Ready, "the rewrite to be ready", TimeSpan.FromSeconds(5));
 
         Assert.Equal(RewriteState.Ready, model.State);
         Assert.Equal("New body.", model.ShownMarkdown);
@@ -1780,8 +1780,7 @@ public class AiAccessModelTests
         model.WebOn = true;
         // FakeAiLibrary's tasks and the stubbed Delay complete synchronously, so the whole poll usually settles before
         // this line runs; the bounded wait is only a safety net if a future change makes any step genuinely async.
-        var deadline1 = DateTime.UtcNow.AddSeconds(2);
-        while (model.WebChecking && DateTime.UtcNow < deadline1) await Task.Delay(5, TestContext.Current.CancellationToken);
+        await Wait.UntilAsync(() => !model.WebChecking, "the web check to end", TimeSpan.FromSeconds(2));
 
         Assert.Equal(2, checks);
         Assert.True(model.WebStatusOk);
@@ -1803,8 +1802,7 @@ public class AiAccessModelTests
         model.Delay = _ => Task.CompletedTask;
 
         model.WebOn = true;
-        var deadline2 = DateTime.UtcNow.AddSeconds(2);
-        while (model.WebChecking && DateTime.UtcNow < deadline2) await Task.Delay(5, TestContext.Current.CancellationToken);
+        await Wait.UntilAsync(() => !model.WebChecking, "the web check to end", TimeSpan.FromSeconds(2));
 
         Assert.Equal(12, lib.Calls.Count(c => c == "check-web"));
         Assert.False(model.WebChecking);

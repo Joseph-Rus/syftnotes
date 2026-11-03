@@ -210,11 +210,6 @@ public class SignInAgainTests
 
     static async Task Until(Func<bool> done)
     {
-        var waited = System.Diagnostics.Stopwatch.StartNew();
-        while (!done())
-        {
-            if (waited.Elapsed > TimeSpan.FromSeconds(20)) throw new TimeoutException("the fake claude didn't start");
-            await Task.Delay(25);
-        }
+        if (!await Waiting.UntilAsync(done, 20)) throw new TimeoutException("the fake claude didn't start");
     }
 }

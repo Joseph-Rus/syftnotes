@@ -12,8 +12,8 @@ using Microsoft.Extensions.Logging;
 using StudyStash.Core.Canvas;
 using StudyStash.Core.Tests.E2E;
 using StudyStash.Library;
-using Xunit.Abstractions;
 using Xunit.Sdk;
+using Xunit.v3;
 
 namespace StudyStash.Core.Tests;
 
@@ -25,8 +25,8 @@ public sealed class ExtensionE2ECollection : ICollectionFixture<ExtensionRig>;
 /// <summary>Runs a class's tests by name, so a story told in steps (S1_…, S2_…) runs in its order.</summary>
 public sealed class ByNameOrderer : ITestCaseOrderer
 {
-    public IEnumerable<TTestCase> OrderTestCases<TTestCase>(IEnumerable<TTestCase> testCases) where TTestCase : ITestCase =>
-        testCases.OrderBy(t => t.TestMethod.Method.Name, StringComparer.Ordinal);
+    public IReadOnlyCollection<TTestCase> OrderTestCases<TTestCase>(IReadOnlyCollection<TTestCase> testCases) where TTestCase : notnull, ITestCase =>
+        [.. testCases.OrderBy(t => t.TestMethodName, StringComparer.Ordinal)];
 }
 
 /// <summary>
@@ -35,7 +35,7 @@ public sealed class ByNameOrderer : ITestCaseOrderer
 /// library made by itself. Skipped unless STUDYSTASH_E2E_CHROME is set (engine/tests/extension-e2e.sh).
 /// </summary>
 [Collection("ExtensionE2E")]
-[TestCaseOrderer("StudyStash.Core.Tests.ByNameOrderer", "StudyStash.Core.Tests")]
+[TestCaseOrderer(typeof(ByNameOrderer))]
 public sealed class ExtensionE2ETests(ExtensionRig rig, ITestOutputHelper output)
 {
     void Note(string what) => output.WriteLine($"[e2e] {what}");
@@ -503,7 +503,7 @@ public sealed class ExtensionRig : IAsyncLifetime
 
     public static string S(JsonNode? v) => v is JsonValue j && j.TryGetValue(out string? s) ? s : "";
 
-    public async Task InitializeAsync()
+    public async ValueTask InitializeAsync()
     {
         if (ChromeRunner.Binary.Length == 0) return;
         Canvas = await CanvasServer.StartAsync(WithBigFile(FakeCanvas.Cs101()).Json("/api/v1/courses", """
@@ -686,7 +686,7 @@ public sealed class ExtensionRig : IAsyncLifetime
         }
     }
 
-    public async Task DisposeAsync()
+    public async ValueTask DisposeAsync()
     {
         chrome?.Dispose();
         Laptop?.Dispose();
