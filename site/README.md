@@ -77,10 +77,8 @@ By hand, from the repository's root, with the Firebase CLI signed in to an owner
 node site/check.mjs && firebase deploy --only hosting
 ```
 
-`.github/workflows/site.yml` runs the check on every pull request that changes `site/**`, and on a push to `main`
-also publishes, when the repository has a `FIREBASE_SERVICE_ACCOUNT` secret (a service account key for the project
-with the **Firebase Hosting Admin** role; `firebase init hosting:github` makes one and adds the secret). Without the
-secret, it only checks.
+`.github/workflows/site.yml` runs the check on every pull request and every push to `main` that changes `site/**`.
+It never publishes: publishing is only by hand, as above.
 
 ## The domain
 

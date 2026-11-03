@@ -3,6 +3,7 @@
 # executable works on Apple silicon and Intel), then the one download, Syft-Notes.dmg. The app has no role of its own:
 # setup asks what the computer is for, and Settings can change it later (docs/one-download.md).
 #   sh macos/build-app.sh [out-dir]      default: dist/mac
+# STUDYSTASH_SKIP_WEB=1 uses web/dist as it is (CI builds it in a step of its own, with no secret in reach of npm).
 # Needs the .NET 10 SDK and the Xcode command line tools (clang, lipo, codesign, hdiutil, PlistBuddy, iconutil,
 # xcrun swift, vtool, ditto, SetFile, osascript). Publishing both architectures downloads their runtime packs on first use.
 # What this makes is signed ad hoc. A release that has an Apple Developer ID then signs it properly, notarizes it and
@@ -24,8 +25,10 @@ mkdir -p "$MACOS" "$APP/Contents/Resources"
 # The phone app (web/) is built first, so each publish carries it beside the app as web/ (the library serves it at
 # /app/). It needs Node and npm; without them the build stops rather than ship a library whose Add a phone leads
 # nowhere.
-command -v npm >/dev/null || { echo "build-app.sh: npm is needed to build the phone app (web/)" >&2; exit 1; }
-(cd "$ROOT/web" && npm ci --no-audit --no-fund --silent && npm run build --silent)
+if [ "${STUDYSTASH_SKIP_WEB:-}" != 1 ]; then
+  command -v npm >/dev/null || { echo "build-app.sh: npm is needed to build the phone app (web/)" >&2; exit 1; }
+  (cd "$ROOT/web" && npm ci --no-audit --no-fund --silent && npm run build --silent)
+fi
 [ -f "$ROOT/web/dist/index.html" ] || { echo "build-app.sh: the phone app didn't build (web/dist)" >&2; exit 1; }
 
 # One self-contained publish per architecture; the two trees can't be lipo-merged (System.Private.CoreLib and the
