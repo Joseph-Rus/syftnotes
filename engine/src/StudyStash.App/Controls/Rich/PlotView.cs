@@ -6,6 +6,7 @@ using Avalonia.Layout;
 using Avalonia.Media;
 using Avalonia.Styling;
 using Avalonia.Threading;
+using StudyStash.App.Windows;
 using StudyStash.Core;
 using StudyStash.Core.Rich;
 
