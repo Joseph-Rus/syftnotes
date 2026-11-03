@@ -5,20 +5,6 @@ using StudyStash.Core;
 
 namespace StudyStash.App.Tests;
 
-/// <summary>Login items as a test sees them: what they say, and every call to change them.</summary>
-public sealed class CountingLoginItems(bool starts = false, bool refuse = false) : ILoginItems
-{
-    public List<bool> Calls { get; } = [];
-
-    public bool StartsAtLogin(string home) => starts;
-
-    public void StartAtLogin(bool on, string home)
-    {
-        Calls.Add(on);
-        if (refuse) throw new InvalidOperationException("Start at login is off here.");
-    }
-}
-
 public class SettingsModelTests
 {
     /// <summary>A folder set up with something other than the defaults everywhere Settings shows.</summary>
