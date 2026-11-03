@@ -291,8 +291,21 @@ public sealed class GuidedSetupShots
             foreach (var (name, make) in States())
                 foreach (var t in Themes)
                     Shot.Take($"{look}-05-setup-guided-{name}", skin, t, () => View(skin, make(skin)), size: new Size(888, 748));
+            // The same box in its own small window (a sign-in started from Settings): waiting, and once the code didn't work.
+            foreach (var t in Themes)
+            {
+                Shot.Take($"{look}-15-sign-in-code", skin, t, () => new SignInCodePage { DataContext = WindowBox(), DrawChrome = true }, size: new Size(608, 420));
+                Shot.Take($"{look}-15-sign-in-code-didnt-work", skin, t, () =>
+                {
+                    var box = WindowBox();
+                    box.Stop(AiWords.CodeDidntWork);
+                    return new SignInCodePage { DataContext = box, DrawChrome = true };
+                }, size: new Size(608, 420));
+            }
         }
     }
+
+    static SignInCodeModel WindowBox() => new("Gemini", "Google", (_, _) => Task.FromResult(Outcome.Done), openAgain: () => { }, tryAgain: () => { });
 
     /// <summary>The chat with each card open, a problem, the AI thinking, and ready to finish.</summary>
     [AvaloniaFact]
