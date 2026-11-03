@@ -158,6 +158,16 @@ jobs:
   # The C# engine (engine/): every test on each system. Golden/ holds fixed expectations the tests compare byte for
   # byte. The two test projects are two jobs per system: they used to run one after the other in one job, and the
   # Windows one needed 12 to 14 minutes for it. Each has a machine of its own, so one is no busier than before.
+  # The desktop app's connection rules (docs/ARCHITECTURE.md), counted: a fixed wait, a screen keeping its own copy of
+  # the AI's state, a window built by hand, an error swallowed. A count that goes up fails; the toolkit is the way instead.
+  connections:
+    name: Connection rules (counts only go down)
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - run: bash tools/check-connections.sh
+
   engine:
     name: Engine ${{ matrix.suite }} tests (${{ matrix.os }})
     needs: [version]
