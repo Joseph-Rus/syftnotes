@@ -73,7 +73,7 @@ public class RecorderChatCloseTests
         lib.OnAskStream = async (_, soFar, stop) =>
         {
             soFar("Recursion traces will");
-            await Task.Delay(Timeout.InfiniteTimeSpan, stop);
+            await new TaskCompletionSource().Task.WaitAsync(stop);
             return null;
         };
         model.Question = "q";

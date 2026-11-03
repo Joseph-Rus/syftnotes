@@ -65,7 +65,7 @@ public class DiagramsArriveTests
 
         landed = true;
         poll.Release();
-        for (int i = 0; i < 200 && model.DiagramsLine != "Diagrams added"; i++) await Task.Delay(10);
+        await Wait.UntilAsync(() => model.DiagramsLine == "Diagrams added", "the diagrams line", TimeSpan.FromSeconds(2));
         DiagramsReady.Wait(window);
         Dispatcher.UIThread.RunJobs();
         DiagramsReady.Wait(window);

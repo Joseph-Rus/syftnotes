@@ -14,13 +14,13 @@ public sealed class SetupToolsTests : IAsyncLifetime
     SetupTools tools = null!;
     SetupMcpHost host = null!;
 
-    public async Task InitializeAsync()
+    public async ValueTask InitializeAsync()
     {
         tools = new SetupTools(driver);
         host = await SetupMcpHost.StartAsync(tools);
     }
 
-    public async Task DisposeAsync() => await host.DisposeAsync();
+    public async ValueTask DisposeAsync() => await host.DisposeAsync();
 
     Task<McpClient> Connect(string? token = null) =>
         McpClient.CreateAsync(new HttpClientTransport(new HttpClientTransportOptions

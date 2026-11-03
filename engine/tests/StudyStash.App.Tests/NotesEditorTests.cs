@@ -24,7 +24,7 @@ public class NotesEditorTests
         string at = new DateTime(2026, 9, 29, 9, 40, 0).ToString("o");
         string notes = "## Summary\n\n" + string.Join("\n\n", Enumerable.Range(1, 30).Select(i => $"Paragraph {i} of the notes."));
         var lib = new FakeAiLibrary { Overview = AiTestData.MixedOverview(), OnRewrite = _ => new RewriteInfo("lec-1", "none") { Current = new NotesVersion(notes, "Claude Code", at) } };
-        var model = new AiNotesModel(lib) { Delay = (_, ct) => Task.Delay(Timeout.InfiniteTimeSpan, ct) };
+        var model = new AiNotesModel(lib) { Delay = (_, ct) => new TaskCompletionSource().Task.WaitAsync(ct) };
         await model.Load("lec-1", notes, "Claude Code", at);
 
         Skin.UseTheme(ColourThemes.Default);
@@ -67,7 +67,7 @@ public class NotesEditorTests
         string at = new DateTime(2026, 9, 29, 9, 40, 0).ToString("o");
         string notes = "## Summary\n\nWhat the lecture was about.";
         var lib = new FakeAiLibrary { Overview = AiTestData.MixedOverview(), OnRewrite = _ => new RewriteInfo("lec-1", "none") { Current = new NotesVersion(notes, "Claude", at) } };
-        var model = new AiNotesModel(lib) { Delay = (_, ct) => Task.Delay(Timeout.InfiniteTimeSpan, ct) };
+        var model = new AiNotesModel(lib) { Delay = (_, ct) => new TaskCompletionSource().Task.WaitAsync(ct) };
         await model.Load("lec-1", notes, "Claude", at);
 
         Skin.UseTheme(ColourThemes.Default);
@@ -90,7 +90,7 @@ public class NotesEditorTests
         // Notes with the student's own words in them: both halves of the line.
         const string mixed = "## ==History==\n\n- ==2017== The transformer paper.";
         lib = new FakeAiLibrary { Overview = AiTestData.MixedOverview(), OnRewrite = _ => new RewriteInfo("lec-1", "none") { Current = new NotesVersion(mixed, "Claude", at) } };
-        model = new AiNotesModel(lib) { Delay = (_, ct) => Task.Delay(Timeout.InfiniteTimeSpan, ct) };
+        model = new AiNotesModel(lib) { Delay = (_, ct) => new TaskCompletionSource().Task.WaitAsync(ct) };
         await model.Load("lec-1", mixed, "Claude", at);
         window = new Window { Width = 660, Height = 400, RequestedThemeVariant = ThemeVariant.Light, Content = page = new MacAiNotes { DataContext = model, Width = 620 } };
         window.Show();

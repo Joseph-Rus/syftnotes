@@ -161,7 +161,7 @@ public class AskChatHistoryTests
         string id = (await lib.AskAsync("Vessels?", "new", new AskPlace("lecture", "v1", "BIO 110"), lecture: "v1"))!.Chat!;
         lib.Claude.Gate = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
         var answering = lib.AskAsync("And the second one?", id, lecture: "v1");
-        while (lib.Claude.Prompts.Count < 2) await Task.Delay(10);
+        await Waiting.UntilAsync(() => lib.Claude.Prompts.Count >= 2);
 
         // Asked in the same chat on another device meanwhile: told so, and nothing is kept of it.
         var refused = await Assert.ThrowsAsync<LibraryRefusedException>(() => lib.AskAsync("And the third?", id, lecture: "v1"));
@@ -183,7 +183,7 @@ public class AskChatHistoryTests
         string id = (await lib.AskAsync("Vessels?", "new", new AskPlace("lecture", "v1", "BIO 110"), lecture: "v1"))!.Chat!;
         lib.Claude.Gate = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
         var answering = lib.AskAsync("And the second one?", id, lecture: "v1"); // on another device, say
-        while (lib.Claude.Prompts.Count < 2) await Task.Delay(10);
+        await Waiting.UntilAsync(() => lib.Claude.Prompts.Count >= 2);
 
         Assert.True(await lib.Remote.DeleteChatAsync(id));
         lib.Claude.Gate.SetResult(true);

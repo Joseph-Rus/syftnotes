@@ -122,7 +122,7 @@ public class WhiteboardPhotosTests
             await using var site = await Site(cfg, store, jobs);
             var remote = new AiRemote("http://localhost", "pw", site.Client);
             await remote.RewriteStartAsync("lec-1", engine);
-            for (int i = 0; i < 250 && ai.Requests.Count == 0; i++) await Task.Delay(20);
+            await Waiting.UntilAsync(() => ai.Requests.Count > 0, 5);
             var request = Assert.Single(ai.Requests);
             Assert.Contains("at 12:34", request.Prompt);
             Assert.Contains("id ph1", request.Prompt);

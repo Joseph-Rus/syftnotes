@@ -184,7 +184,7 @@ public sealed class ScriptedAi(string id, string name = "") : AiProvider
         lock (Prompts) Prompts.Add(req.Prompt);
         lock (Requests) Requests.Add(req);
         if (Throws is not null) throw Throws;
-        if (Hang) await Task.Delay(Timeout.InfiniteTimeSpan, ct);
+        if (Hang) await new TaskCompletionSource().Task.WaitAsync(ct);
         var script = Respond?.Invoke(req.Prompt) ?? Script;
         for (int i = 0; i < script.Count; i++)
         {
