@@ -80,7 +80,7 @@ public static partial class Shell
         }
         if (want && canvasNotifyTimer is null)
         {
-            canvasNotifyTimer = new DispatcherTimer(TimeSpan.FromMinutes(1), DispatcherPriority.Background, (_, _) => Run(() => PollCanvasNotificationsAsync(), "PollCanvasNotifications"));
+            canvasNotifyTimer = new DispatcherTimer(TimeSpan.FromMinutes(1), DispatcherPriority.Background, (_, _) => UiTasks.RunQuietly(() => PollCanvasNotificationsAsync(), "PollCanvasNotifications"));
             canvasNotifyTimer.Start();
             Run(() => PollCanvasNotificationsAsync(), "PollCanvasNotifications");
         }
