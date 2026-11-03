@@ -87,7 +87,7 @@ public static partial class Shell
     {
         if (quitting || found.Count == 0 || !host.Settings.GranolaNotify) return;
         var (title, text, action) = NoticeWords.GranolaHas([.. found.Select(f => f.Title)]);
-        if (found.Count == 1) Toast(title, text, action, () => _ = TransferFromGranolaAsync(found[0]));
+        if (found.Count == 1) Toast(title, text, action, () => Run(() => TransferFromGranolaAsync(found[0]), "TransferFromGranola"));
         else Toast(title, text, action, () => ShowSettings("Granola"));
     }
 
@@ -213,10 +213,10 @@ public static partial class Shell
     {
         if (host.Settings.Brand == BrandRefresh.Current || !Desktop.SameFolder(host.Home, Configs.DefaultHome)) return;
         if (OperatingSystem.IsWindows() && File.Exists(Path.Combine(AppContext.BaseDirectory, "study-stash.ini"))) _ = WindowsNotifications();
-        _ = Task.Run(() =>
+        Run(() => Task.Run(() =>
         {
             if (BrandRefresh.Run(Program.Log)) Dispatcher.UIThread.Post(() => host.Save(s => s.Brand = BrandRefresh.Current));
-        });
+        }), "RefreshBrand");
     }
 
     /// <summary>What the app's own updates say (<see cref="AppUpdates.Tell"/>, from the updater's thread): a new
@@ -231,7 +231,7 @@ public static partial class Shell
             case UpdateNewsKind.Ready:
             {
                 var (title, text, action) = NoticeWords.UpdateReady(v);
-                Notify(new Notice { Title = title, Text = text, ActionLabel = action, Act = () => _ = UpdateNowAsync(), Stay = NoticeTimes.Advice });
+                Notify(new Notice { Title = title, Text = text, ActionLabel = action, Act = () => Run(() => UpdateNowAsync(), "UpdateNow"), Stay = NoticeTimes.Advice });
                 break;
             }
             case UpdateNewsKind.CantInstall:
