@@ -1,3 +1,4 @@
+using StudyStash.App.Services.Stores;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Headless.XUnit;
@@ -266,7 +267,7 @@ public sealed class SignInFilms
         desk.NoPointer();
         desk.Caption($"{brand}'s own sign-in opens your browser · no terminal (a stand-in signs in after 5 s)");
         desk.Hold(1.6);
-        await desk.UntilAsync(() => model.Engines.Engines.Single(r => r.Id == id).State == "ready", $"{brand} ready", TimeSpan.FromSeconds(40));
+        await desk.UntilAsync(() => model.Engines.Engines.Single(r => r.Id == id).State == AiEngineState.Ready, $"{brand} ready", TimeSpan.FromSeconds(40));
         desk.Caption("");
         desk.Hold(1.4);
     }
@@ -295,7 +296,7 @@ public sealed class SignInFilms
         await desk.UntilAsync(() => model.Engines.Engines.Single(r => r.Id == id).SignIn == SignInPhase.Waiting, $"{brand} waiting");
         desk.Caption($"Then {brand}'s own sign-in opens your browser · no terminal (a stand-in signs in after 5 s)");
         desk.Hold(1.6);
-        await desk.UntilAsync(() => model.Engines.Engines.Single(r => r.Id == id).State == "ready", $"{brand} ready", TimeSpan.FromSeconds(40));
+        await desk.UntilAsync(() => model.Engines.Engines.Single(r => r.Id == id).State == AiEngineState.Ready, $"{brand} ready", TimeSpan.FromSeconds(40));
         desk.Caption("");
         desk.Hold(1.4);
     }
@@ -443,7 +444,7 @@ public sealed class SignInFilms
         await desk.UntilAsync(() => Row("claude").SignIn == SignInPhase.Waiting, "Claude waiting again");
         desk.NoPointer();
         desk.Caption("");
-        await desk.UntilAsync(() => Row("claude").State == "ready", "Claude ready", TimeSpan.FromSeconds(40));
+        await desk.UntilAsync(() => Row("claude").State == AiEngineState.Ready, "Claude ready", TimeSpan.FromSeconds(40));
         desk.Hold(1.6);
 
         var codex = Row("codex");
@@ -463,7 +464,7 @@ public sealed class SignInFilms
         desk.Press(Desk.ButtonIn(view, b => b.DataContext == again && b.Command == again.ActCommand));
         await desk.UntilAsync(() => Row("codex").SignIn == SignInPhase.Waiting, "ChatGPT waiting");
         desk.NoPointer();
-        await desk.UntilAsync(() => Row("codex").State == "ready", "ChatGPT ready", TimeSpan.FromSeconds(40));
+        await desk.UntilAsync(() => Row("codex").State == AiEngineState.Ready, "ChatGPT ready", TimeSpan.FromSeconds(40));
         desk.Caption("Try again worked");
         desk.Hold(2.4);
         Assert.Equal([AiWords.HelpPage], pc.Pages);

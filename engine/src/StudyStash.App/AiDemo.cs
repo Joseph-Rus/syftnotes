@@ -1,3 +1,4 @@
+using StudyStash.App.Services.Stores;
 using StudyStash.App.ViewModels;
 using StudyStash.Core.Ai;
 
@@ -7,12 +8,16 @@ namespace StudyStash.App;
 /// installed but not signed in, Gemini not installed. What screenshots and previews of the AI screens show.</summary>
 public static class AiDemo
 {
+    // The library's own words for two states, from the store (the one place they are read and named).
+    static string NotSignedIn => AiStatusStore.Raw(AiEngineState.NotSignedIn);
+    static string NotInstalled => AiStatusStore.Raw(AiEngineState.NotInstalled);
+
     static readonly List<EngineInfo> Engines_ =
     [
         new EngineInfo("ollama", "Ollama", "ready") { Installed = true, Model = "qwen3:30b", Models = [new ModelOption("qwen3:30b", "qwen3:30b (19 GB)")] },
         new EngineInfo("claude", "Claude", "ready") { Installed = true },
-        new EngineInfo("codex", "ChatGPT", "not_signed_in") { Installed = true },
-        new EngineInfo("gemini", "Gemini", "not_installed") { Site = "https://ai.google.dev/gemini-api" },
+        new EngineInfo("codex", "ChatGPT", NotSignedIn) { Installed = true },
+        new EngineInfo("gemini", "Gemini", NotInstalled) { Site = "https://ai.google.dev/gemini-api" },
     ];
 
     public static AiOverview Overview() => new(Engines: Engines_, Notes: "ollama", Ask: "claude", Fallback: true, Problems: [])
@@ -114,7 +119,7 @@ public static class AiDemo
     public static AiSetupModel SetupWith(bool windows, string engine, string state)
     {
         var o = SetupOverview();
-        o = o with { Engines = [.. o.Engines.Select(e => e.Id == engine ? e with { State = state, Installed = state != "not_installed" } : e)] };
+        o = o with { Engines = [.. o.Engines.Select(e => e.Id == engine ? e with { State = state, Installed = state != NotInstalled } : e)] };
         var m = new AiSetupModel(new Library(o))
         {
             Windows = windows,
@@ -131,7 +136,7 @@ public static class AiDemo
     public static AiSetupModel SetupKeyed(bool windows, string engine, string state, string prefer = "")
     {
         var o = SetupOverview();
-        o = o with { Engines = [.. o.Engines.Select(e => e.Id == engine ? e with { State = state, Installed = state != "not_installed" } : e)] };
+        o = o with { Engines = [.. o.Engines.Select(e => e.Id == engine ? e with { State = state, Installed = state != NotInstalled } : e)] };
         var m = new AiSetupModel(new Library(o))
         {
             Windows = windows,
@@ -152,7 +157,7 @@ public static class AiDemo
         var o = SetupOverview();
         o = o with
         {
-            Engines = [.. o.Engines.Select(e => e.Id == "ollama" ? e with { State = state, Installed = state != "not_installed" } : e with { State = "not_installed", Installed = false })],
+            Engines = [.. o.Engines.Select(e => e.Id == "ollama" ? e with { State = state, Installed = state != NotInstalled } : e with { State = NotInstalled, Installed = false })],
             Pulling = pulling,
         };
         var m = new AiSetupModel(new Library(o))
@@ -256,7 +261,7 @@ public static class AiDemo
     /// <summary>Claude signed out while it writes the notes, with nothing standing in: Settings' card, with Sign in.</summary>
     public static AiProblemsModel SignedOut()
     {
-        var overview = Overview() with { Problems = [new AiProblemInfo("not_signed_in:claude", "not_signed_in", "claude", "Claude")] };
+        var overview = Overview() with { Problems = [new AiProblemInfo("not_signed_in:claude", AiProblemKind.NotSignedIn, "claude", "Claude")] };
         var m = new AiProblemsModel(new Library(overview));
         m.Load().GetAwaiter().GetResult();
         return m;
@@ -269,8 +274,8 @@ public static class AiDemo
         var o = Overview();
         return o with
         {
-            Engines = [.. o.Engines.Select(e => e.Id == "claude" ? e with { State = "not_signed_in", SignIn = phase } : e)],
-            Problems = [new AiProblemInfo("not_signed_in:claude", "not_signed_in", "claude", "Claude") { SignIn = phase }],
+            Engines = [.. o.Engines.Select(e => e.Id == "claude" ? e with { State = NotSignedIn, SignIn = phase } : e)],
+            Problems = [new AiProblemInfo("not_signed_in:claude", AiProblemKind.NotSignedIn, "claude", "Claude") { SignIn = phase }],
         };
     }
 
@@ -279,7 +284,7 @@ public static class AiDemo
     /// the notes, and offers Set up on each.</summary>
     public static AiEnginesModel FreshEngines()
     {
-        var none = new AiOverview(Engines_.Select(e => e with { State = "not_installed", Installed = false, Model = "", Models = [] }).ToList(), Notes: "", Ask: "", Fallback: true, Problems: [])
+        var none = new AiOverview(Engines_.Select(e => e with { State = NotInstalled, Installed = false, Model = "", Models = [] }).ToList(), Notes: "", Ask: "", Fallback: true, Problems: [])
         {
             Diagrams = "auto", DiagramsBy = "", Rich = new RichNotesInfo(true, true, true, true), Speed = "standard",
         };
@@ -297,8 +302,8 @@ public static class AiDemo
         {
             new("claude", "Claude", "ready") { Installed = true },
             new("codex", "ChatGPT", "ready") { Installed = true },
-            new("gemini", "Gemini", "not_installed") { Site = "https://antigravity.google" },
-            new("ollama", "Ollama", "not_installed") { SetUpGb = 5.2 },
+            new("gemini", "Gemini", NotInstalled) { Site = "https://antigravity.google" },
+            new("ollama", "Ollama", NotInstalled) { SetUpGb = 5.2 },
         };
         var overview = new AiOverview(engines, Notes: "claude", Ask: "claude", Fallback: false, Problems: [])
         {
@@ -339,7 +344,7 @@ public static class AiDemo
             Problems =
             [
                 new AiProblemInfo("engine-offline", "engine_offline", "ollama", "Ollama"),
-                new AiProblemInfo("not-signed-in", "not_signed_in", "codex", "ChatGPT") { FallbackTo = "claude" },
+                new AiProblemInfo("not-signed-in", AiProblemKind.NotSignedIn, "codex", "ChatGPT") { FallbackTo = "claude" },
                 new AiProblemInfo("model-missing", "model_missing", "ollama", "Ollama") { SizeGb = 40 },
                 new AiProblemInfo("usage-limit", "usage_limit", "claude", "Claude") { Until = DateTime.Today.AddHours(15).ToString("o"), FallbackTo = "ollama" },
             ],

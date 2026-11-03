@@ -311,13 +311,9 @@ public static partial class Shell
     /// <summary>Asks the library which AI writes its notes (when the window is read: it can change in Settings).</summary>
     static async Task HearNotesWriterAsync()
     {
-        try
-        {
-            if (host.Remote() is not null && await Ai().EnginesAsync() is { Notes.Length: > 0 } ai) notesWriter = Core.Ai.Engines.Name(ai.Notes);
-        }
-        catch (Exception e) when (e is HttpRequestException or TaskCanceledException or LibraryRefusedException or System.Text.Json.JsonException)
-        {
-        }
+        if (host.Remote() is null) return;
+        await host.AiStatus.RefreshAsync();
+        if (host.AiStatus.NotesWriter is { Length: > 0 } writer) notesWriter = writer;
     }
 
     // --- what's typed while it records ---------------------------------------------------------------------------------
