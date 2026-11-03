@@ -100,10 +100,14 @@ rm -rf "$APP" "$HOME/Library/Caches/velopack/SyftNotes"
 
 # --- D: this processor's own package
 APP="/Applications/Syft Notes.app"
+if ! ls "$OUT/v1/osx-$ARCH/"*-Portable.zip > /dev/null 2>&1; then
+  fail "D: no osx-$ARCH package (see sizes.txt)"
+else
 ditto -x -k "$(ls "$OUT/v1/osx-$ARCH/"*-Portable.zip)" /Applications/
 say "D: osx-$ARCH bundle (vpk's own --deep signing): codesign $(verify "$APP"); version $("$APP/Contents/MacOS/StudyStash" version 2>&1 | tail -n 1)"
 update "$APP" "$OUT/releases/osx-$ARCH" D "$V2"
 rm -rf "$APP" "$HOME/Library/Caches/velopack/SyftNotes"
+fi
 
 # Nothing of the student's was touched.
 if shasum -a 256 -c "$RES/markers.sha256" > /dev/null; then say "uninstall clean: ~/.study-stash and Documents untouched"; else fail "settings or lectures changed"; fi
