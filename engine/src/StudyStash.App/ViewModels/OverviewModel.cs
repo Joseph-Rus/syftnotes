@@ -162,6 +162,10 @@ public sealed partial class OverviewModel : ObservableObject
 {
     /// <summary>How many notes Home's list shows at a time; scrolling to its end brings the next page.</summary>
     public const int PageSize = 20;
+
+    /// <summary>When the library can't list the notes: a page being read again (not a new opening) that is showing stays
+    /// as it is; anything else says the library can't be reached, never "No notes yet".</summary>
+    public static bool KeepsPageWhenListFails(bool readingAgain, bool pageShowing) => readingAgain && pageShowing;
     /// <summary>How many events Up next shows.</summary>
     public const int UpNextRows = 4;
     /// <summary>How many deadlines a folder's rail shows.</summary>
