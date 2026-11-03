@@ -242,13 +242,16 @@ public class AiApiTests
         var checks = new FakeChecks().Build() with
         {
             OllamaInstalled = () => true,
-            OllamaModels = _ => Task.FromResult<List<(string Name, double SizeGb)>?>(models.ToList()),
+            OllamaModels = _ => { lock (models) return Task.FromResult<List<(string Name, double SizeGb)>?>(models.ToList()); },
             RamGb = () => ram,
             DiskFreeGb = () => disk,
             PullModel = (name, _, _, _) =>
             {
-                pulled.Add(name);
-                models.Add((name, gb));
+                lock (models)
+                {
+                    pulled.Add(name);
+                    models.Add((name, gb));
+                }
                 return Task.FromResult((true, ""));
             },
         };
@@ -261,9 +264,9 @@ public class AiApiTests
         Assert.Equal(("model_missing", gb, small), (free.State, free.SetUpGb, free.Small));
 
         await remote.SetUpAsync("ollama");
-        await Waiting.UntilAsync(async () => (await remote.EnginesAsync())!.Pulling is not { Why.Length: 0 }, 5);
+        Assert.True(await Waiting.UntilAsync(async () => (await remote.EnginesAsync())!.Pulling is not { Why.Length: 0 }, 60), "the free AI's setup never ended");
 
-        Assert.Equal([model], pulled);
+        lock (models) Assert.Equal([model], pulled);
         Assert.Equal("ready", (await remote.EnginesAsync())!.Engines.Single(e => e.Id == "ollama").State);
         Assert.Equal(model, Configs.Load(cfg.Home).EffectiveSummaryModel); // kept: the library writes notes with it from now on
     }
