@@ -42,10 +42,10 @@ APP="$HOME/Applications/SyftNotes.AppImage"
 mkdir -p "$HOME/Applications"
 cp "$OUT/v1/"*.AppImage "$APP"
 chmod +x "$APP"
-if printed=$("$APP" version 2>&1); then say "linux: v1 runs with this runner's FUSE as it is: $printed"; else
+if printed=$("$APP" version 2>&1 | tail -n 1) && [ "$printed" = "$V1" ]; then say "linux: v1 runs with this runner's FUSE as it is: $printed"; else
   say "linux: v1 doesn't run as the runner comes: $(echo "$printed" | tail -n 2 | tr '\n' ' ')"
   sudo apt-get install -y -qq libfuse2t64 > /dev/null
-  printed=$("$APP" version)
+  printed=$("$APP" version | tail -n 1)
   say "linux: with libfuse2t64 installed it runs: $printed"
 fi
 [ "$printed" = "$V1" ] || { say "linux: FAILED - installed version is '$printed', not $V1"; exit 1; }
@@ -60,7 +60,7 @@ $WAIT -Path "$REPORT" -Pattern " relaunched " -Seconds 300 || { cat "$REPORT"; s
 say "linux: update to v2 and relaunch took $(( $(date +%s) - t0 )) s"
 cat "$REPORT" | tee -a "$RESULTS"
 grep -q " relaunched version=$V2 " "$REPORT" || { say "linux: FAILED - the relaunched copy isn't $V2"; exit 1; }
-printed=$("$APP" version)
+printed=$("$APP" version | tail -n 1)
 [ "$printed" = "$V2" ] || { say "linux: FAILED - after the update it says '$printed'"; exit 1; }
 say "linux: after the update the same path runs $printed"
 grep -hi "delta" /tmp/velopack*.log 2>/dev/null | tail -n 5 | sed 's/^/linux log: /' | tee -a "$RESULTS" || true

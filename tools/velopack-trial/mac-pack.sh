@@ -48,23 +48,28 @@ for n in 1 2; do
     find "$pub" -name '*.pdb' -delete
     sed -e "s/__VERSION__/$v/g" -e "s/__MINOS__/$minos/g" "$ROOT/macos/Info.plist" > "$ROOT/dist/Info-$arch.plist"
     t0=$(date +%s)
-    vpk pack --packId SyftNotes --packVersion "$v" --packDir "$pub" --mainExe StudyStash --runtime "osx-$arch" \
+    # A failure here is a finding, not the end of the run: the universal packages above are the main question.
+    if vpk pack --packId SyftNotes --packVersion "$v" --packDir "$pub" --mainExe StudyStash --runtime "osx-$arch" \
       --channel "osx-$arch" --packTitle "Syft Notes" --packAuthors "Syft Notes" --icon "$icns" \
       --bundleId com.study-stash.app --plist "$ROOT/dist/Info-$arch.plist" \
       --signAppIdentity "$STUDYSTASH_SIGN_IDENTITY" --keychain "$STUDYSTASH_SIGN_KEYCHAIN" \
-      --signEntitlements "$ROOT/macos/StudyStash.entitlements" --outputDir "$OUT/releases/osx-$arch"
-    echo "mac pack-seconds osx-$arch v$n $(( $(date +%s) - t0 ))" >> "$OUT/sizes.txt"
+      --signEntitlements "$ROOT/macos/StudyStash.entitlements" --outputDir "$OUT/releases/osx-$arch"; then
+      echo "mac pack-seconds osx-$arch v$n $(( $(date +%s) - t0 ))" >> "$OUT/sizes.txt"
+    else
+      echo "mac FAILED pack osx-$arch v$n" >> "$OUT/sizes.txt"
+    fi
   done
 
   if [ "$n" = 1 ]; then
     for c in osx-universal osx-arm64 osx-x64; do
       mkdir -p "$OUT/v1/$c"
-      cp "$OUT/releases/$c/"*-Setup.pkg "$OUT/releases/$c/"*-Portable.zip "$OUT/v1/$c/"
+      cp "$OUT/releases/$c/"*-Setup.pkg "$OUT/releases/$c/"*-Portable.zip "$OUT/v1/$c/" || echo "mac FAILED no v1 installers for $c" >> "$OUT/sizes.txt"
     done
   fi
 done
 
 for c in osx-universal osx-arm64 osx-x64; do
+  [ -d "$OUT/releases/$c" ] || continue
   for f in "$OUT/releases/$c"/*; do
     echo "mac file $c $(basename "$f") $(size "$f")" >> "$OUT/sizes.txt"
   done

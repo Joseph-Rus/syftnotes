@@ -7,6 +7,10 @@ name: Velopack trial
 
 on:
   workflow_dispatch:
+  # Only for the trial's own branch: GitHub dispatches a workflow by hand only once the file is on main, which this
+  # trial must not change. On main this never fires.
+  push:
+    branches: [velopack-trial]
 
 permissions:
   contents: read
