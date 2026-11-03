@@ -96,7 +96,7 @@
                 <!-- Reset's column keeps its room when there's nothing to reset, so every row's keys line up -->
                 <Grid ColumnDefinitions="*,12,Auto,4,52">
                   <StackPanel Spacing="2" VerticalAlignment="Center">
-                    <TextBlock Classes="sk-title" Text="{Binding Title}" TextTrimming="CharacterEllipsis" />
+                    <TextBlock Classes="sk-title" Text="{Binding Title}" ToolTip.Tip="{Binding Title}" c:Tips.WhenCut="True" TextTrimming="CharacterEllipsis" />
                     <TextBlock Classes="sk-sub" Text="{Binding Where}" />
                   </StackPanel>
                   <Button Grid.Column="2" Classes="sk-keys" Classes.listening="{Binding Listening}" Command="{Binding ChangeCommand}"

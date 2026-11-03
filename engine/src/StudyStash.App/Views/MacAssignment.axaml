@@ -125,7 +125,7 @@
           <TextBlock Text="Open in Canvas" />
         </StackPanel>
       </Button>
-      <Button Classes="cv-toolicon" Command="{Binding SearchCommand}">
+      <Button Classes="cv-toolicon" Command="{Binding SearchCommand}" AutomationProperties.Name="Search">
         <c:Icon Glyph="search" Size="19" />
       </Button>
     </StackPanel>

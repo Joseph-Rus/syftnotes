@@ -53,7 +53,7 @@
           <Border Classes="record-dot mini"><Border /></Border>
         </Button>
         <Panel VerticalAlignment="Center">
-          <TextBlock Name="PillClass" Text="{Binding ShortClass}" FontSize="14" FontWeight="Bold" MaxWidth="150" TextTrimming="CharacterEllipsis"
+          <TextBlock Name="PillClass" Text="{Binding ShortClass}" ToolTip.Tip="{Binding ShortClass}" c:Tips.WhenCut="True" FontSize="14" FontWeight="Bold" MaxWidth="150" TextTrimming="CharacterEllipsis"
                      Opacity="{Binding IsRunning, Converter={x:Static c:Converters.Shown}}" />
           <TextBlock Text="Paused" FontSize="14" FontWeight="Bold" Opacity="{Binding IsPaused, Converter={x:Static c:Converters.Shown}}" />
         </Panel>

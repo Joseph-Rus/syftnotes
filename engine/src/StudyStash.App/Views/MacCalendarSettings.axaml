@@ -59,7 +59,7 @@
                 <Grid ColumnDefinitions="Auto,12,*,12,Auto">
                   <c:Icon Glyph="{Binding Glyph}" Size="18" Foreground="{DynamicResource Fg2}" VerticalAlignment="Center" />
                   <StackPanel Grid.Column="2" Spacing="2" VerticalAlignment="Center">
-                    <TextBlock Classes="row-title" Text="{Binding Name}" TextTrimming="CharacterEllipsis" />
+                    <TextBlock Classes="row-title" Text="{Binding Name}" ToolTip.Tip="{Binding Name}" c:Tips.WhenCut="True" TextTrimming="CharacterEllipsis" />
                     <c:PageText Classes="row-sub" Text="{Binding Problem}" TextWrapping="Wrap" IsVisible="{Binding HasProblem}" Foreground="{DynamicResource Warn}" />
                   </StackPanel>
                   <Button Grid.Column="4" Classes="btn sm" VerticalAlignment="Center" Command="{Binding RemoveCommand}">
@@ -75,7 +75,7 @@
                       <Border Classes="row">
                         <Grid ColumnDefinitions="Auto,10,*,12,Auto">
                           <Ellipse Width="10" Height="10" Fill="{Binding Dot}" VerticalAlignment="Center" />
-                          <TextBlock Grid.Column="2" Classes="row-title" Text="{Binding Name}" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
+                          <TextBlock Grid.Column="2" Classes="row-title" Text="{Binding Name}" ToolTip.Tip="{Binding Name}" c:Tips.WhenCut="True" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
                           <ToggleButton AutomationProperties.Name="{Binding Name}" Grid.Column="4" Classes="switch" IsChecked="{Binding On}" VerticalAlignment="Center" />
                         </Grid>
                       </Border>

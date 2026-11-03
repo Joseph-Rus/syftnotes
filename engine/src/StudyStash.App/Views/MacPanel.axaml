@@ -27,22 +27,22 @@
           <Grid ColumnDefinitions="16,6,*">
             <Ellipse Width="7" Height="7" Classes="status" Classes.warn="{Binding !Library.RunningGood, FallbackValue=False}"
                      HorizontalAlignment="Center" VerticalAlignment="Center" />
-            <TextBlock Grid.Column="2" Text="{Binding Library.Running, FallbackValue=''}" FontSize="12" FontWeight="SemiBold"
+            <TextBlock Grid.Column="2" Text="{Binding Library.Running, FallbackValue=''}" ToolTip.Tip="{Binding Library.Running, FallbackValue=''}" c:Tips.WhenCut="True" FontSize="12" FontWeight="SemiBold"
                        TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
           </Grid>
           <Grid ColumnDefinitions="16,6,*">
             <c:Icon Glyph="notes" Size="13" Foreground="{DynamicResource Fg2}" HorizontalAlignment="Center" VerticalAlignment="Center" />
-            <TextBlock Grid.Column="2" Text="{Binding Library.Lectures, FallbackValue=''}" FontSize="11" Foreground="{DynamicResource Fg2}"
+            <TextBlock Grid.Column="2" Text="{Binding Library.Lectures, FallbackValue=''}" ToolTip.Tip="{Binding Library.Lectures, FallbackValue=''}" c:Tips.WhenCut="True" FontSize="11" Foreground="{DynamicResource Fg2}"
                        TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
           </Grid>
           <Grid ColumnDefinitions="16,6,*" IsVisible="{Binding HasCanvasLine}">
             <c:Icon Glyph="school" Size="13" Foreground="{DynamicResource Fg2}" HorizontalAlignment="Center" VerticalAlignment="Center" />
-            <TextBlock Grid.Column="2" Text="{Binding Library.Canvas, FallbackValue=''}" FontSize="11" Foreground="{DynamicResource Fg2}"
+            <TextBlock Grid.Column="2" Text="{Binding Library.Canvas, FallbackValue=''}" ToolTip.Tip="{Binding Library.Canvas, FallbackValue=''}" c:Tips.WhenCut="True" FontSize="11" Foreground="{DynamicResource Fg2}"
                        TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
           </Grid>
           <Grid ColumnDefinitions="16,6,*" IsVisible="{Binding HasLaptopsLine}">
             <c:Icon Glyph="laptop_mac" Size="13" Foreground="{DynamicResource Fg2}" HorizontalAlignment="Center" VerticalAlignment="Center" />
-            <TextBlock Grid.Column="2" Text="{Binding Library.Laptops, FallbackValue=''}" FontSize="11" Foreground="{DynamicResource Fg2}"
+            <TextBlock Grid.Column="2" Text="{Binding Library.Laptops, FallbackValue=''}" ToolTip.Tip="{Binding Library.Laptops, FallbackValue=''}" c:Tips.WhenCut="True" FontSize="11" Foreground="{DynamicResource Fg2}"
                        TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
           </Grid>
         </StackPanel>
@@ -55,7 +55,7 @@
                   Command="{Binding RecordCommand}" IsEnabled="{Binding CanRecord}">
             <Grid ColumnDefinitions="Auto,8,*,Auto">
               <Ellipse Width="10" Height="10" Fill="{DynamicResource OnAccent}" VerticalAlignment="Center" />
-              <TextBlock Grid.Column="2" Text="{Binding RecordLabel}" FontSize="13" FontWeight="SemiBold"
+              <TextBlock Grid.Column="2" Text="{Binding RecordLabel}" ToolTip.Tip="{Binding RecordLabel}" c:Tips.WhenCut="True" FontSize="13" FontWeight="SemiBold"
                          VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
               <TextBlock Grid.Column="3" Text="{Binding RecordShortcut}" FontSize="11" Opacity="0.7" Margin="8,0,0,0" VerticalAlignment="Center" />
             </Grid>
@@ -73,7 +73,7 @@
                       Command="{Binding $parent[UserControl].((vm:PanelModel)DataContext).PickClassCommand}" CommandParameter="{Binding}">
                 <Grid ColumnDefinitions="7,8,*,8,Auto">
                   <c:Swatch Small="True" Fill="{Binding Dot}" IsVisible="{Binding HasDot}" VerticalAlignment="Center" />
-                  <TextBlock Grid.Column="2" Text="{Binding Label}" FontSize="13" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
+                  <TextBlock Grid.Column="2" Text="{Binding Label}" ToolTip.Tip="{Binding Label}" c:Tips.WhenCut="True" FontSize="13" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
                   <c:Icon Grid.Column="4" Glyph="check" Size="13" Foreground="{DynamicResource Fg}" IsVisible="{Binding Picked}" VerticalAlignment="Center" />
                 </Grid>
               </Button>
@@ -81,7 +81,7 @@
           </ItemsControl.ItemTemplate>
         </ItemsControl>
         <StackPanel Spacing="2" Margin="8,0">
-          <TextBlock Text="{Binding Hint}" IsVisible="{Binding HasHint}" FontSize="11" Foreground="{DynamicResource Fg2}"
+          <TextBlock Text="{Binding Hint}" ToolTip.Tip="{Binding Hint}" c:Tips.WhenCut="True" IsVisible="{Binding HasHint}" FontSize="11" Foreground="{DynamicResource Fg2}"
                      TextTrimming="CharacterEllipsis" />
           <v:MacNextDue DataContext="{Binding NextDue}" IsVisible="{Binding $parent[UserControl].((vm:PanelModel)DataContext).HasNextDue}" />
         </StackPanel>
@@ -92,7 +92,7 @@
         <StackPanel Spacing="6">
           <Grid ColumnDefinitions="Auto,6,*,Auto">
             <c:SyftCell Width="7" Height="7" Fill="{DynamicResource Accent}" VerticalAlignment="Center" />
-            <TextBlock Grid.Column="2" Text="{Binding RecordingLabel}" FontSize="12" FontWeight="SemiBold" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
+            <TextBlock Grid.Column="2" Text="{Binding RecordingLabel}" ToolTip.Tip="{Binding RecordingLabel}" c:Tips.WhenCut="True" FontSize="12" FontWeight="SemiBold" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
             <Button Grid.Column="3" Theme="{StaticResource Surface}" CornerRadius="5" Padding="4,1" Margin="0,-1,-4,-1" Command="{Binding ShowRecorderCommand}">
               <TextBlock Text="Show recorder" FontSize="11" Foreground="{DynamicResource Fg2}" />
             </Button>
@@ -103,7 +103,7 @@
                        c:Typography.Extra="-0.24" VerticalAlignment="Center" />
             <c:Waveform Grid.Column="4" Height="20" Bars="20" Levels="{Binding Levels}" Foreground="{DynamicResource Record}" VerticalAlignment="Center" />
           </Grid>
-          <TextBlock Text="{Binding LastLine}" IsVisible="{Binding HasLastLine}" FontSize="11" LineHeight="15" TextWrapping="Wrap" MaxLines="2"
+          <TextBlock Text="{Binding LastLine}" ToolTip.Tip="{Binding LastLine}" c:Tips.WhenCut="True" IsVisible="{Binding HasLastLine}" FontSize="11" LineHeight="15" TextWrapping="Wrap" MaxLines="2"
                      TextTrimming="CharacterEllipsis" Foreground="{DynamicResource Fg2}" />
           <Grid ColumnDefinitions="*,6,*">
             <Button Classes="fill2" Theme="{StaticResource Surface}" Height="28" CornerRadius="14" HorizontalContentAlignment="Center"
@@ -138,8 +138,8 @@
                 <Grid ColumnDefinitions="7,8,*,8,Auto">
                   <c:Swatch Small="True" Fill="{Binding Dot}" VerticalAlignment="Center"/>
                   <StackPanel Grid.Column="2">
-                    <TextBlock Text="{Binding Title}" FontSize="13" TextTrimming="CharacterEllipsis" />
-                    <TextBlock Text="{Binding Detail}" FontSize="11" Foreground="{DynamicResource Fg2}" Margin="0,1,0,0" TextTrimming="CharacterEllipsis" />
+                    <TextBlock Text="{Binding Title}" ToolTip.Tip="{Binding Title}" c:Tips.WhenCut="True" FontSize="13" TextTrimming="CharacterEllipsis" />
+                    <TextBlock Text="{Binding Detail}" ToolTip.Tip="{Binding Detail}" c:Tips.WhenCut="True" FontSize="11" Foreground="{DynamicResource Fg2}" Margin="0,1,0,0" TextTrimming="CharacterEllipsis" />
                     <Border IsVisible="{Binding HasProgress}" Width="120" Height="3" CornerRadius="1.5" Background="{DynamicResource Fill2}"
                             HorizontalAlignment="Left" Margin="0,4,0,0">
                       <Border Width="{Binding ProgressWidth}" CornerRadius="1.5" Background="{DynamicResource Accent}" HorizontalAlignment="Left" />
@@ -166,7 +166,7 @@
       <StackPanel Spacing="4">
         <Grid ColumnDefinitions="Auto,6,*" Margin="8,0" IsVisible="{Binding ShowStatus}">
           <Ellipse Width="6" Height="6" Classes="status" Classes.warn="{Binding !StatusGood}" VerticalAlignment="Center" />
-          <TextBlock Grid.Column="2" Text="{Binding Status}" FontSize="11" Foreground="{DynamicResource Fg2}" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
+          <TextBlock Grid.Column="2" Text="{Binding Status}" ToolTip.Tip="{Binding Status}" c:Tips.WhenCut="True" FontSize="11" Foreground="{DynamicResource Fg2}" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
         </Grid>
         <Border Height="1" Background="{DynamicResource Sep}" Margin="8,2" />
         <!-- A newer version is out: install it now, from here -->

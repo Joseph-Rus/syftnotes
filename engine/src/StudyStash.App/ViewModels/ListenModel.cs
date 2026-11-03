@@ -134,7 +134,7 @@ public sealed partial class ListenModel : ObservableObject, IDisposable
         {
             info = await library.ListenAsync(LectureId);
         }
-        catch
+        catch (Exception e) when (LibraryTrouble.Handled(e))
         {
             return;
         }
@@ -167,7 +167,7 @@ public sealed partial class ListenModel : ObservableObject, IDisposable
             Problem = e.Message;
             return;
         }
-        catch
+        catch (Exception e) when (LibraryTrouble.Handled(e))
         {
             Problem = "Your library isn't answering. Try again in a moment.";
             return;
@@ -199,7 +199,7 @@ public sealed partial class ListenModel : ObservableObject, IDisposable
                 {
                     return;
                 }
-                catch
+                catch (Exception e) when (LibraryTrouble.Handled(e))
                 {
                     // The library didn't answer this time: look again next time.
                 }
@@ -227,7 +227,7 @@ public sealed partial class ListenModel : ObservableObject, IDisposable
                     return;
                 }
             }
-            catch
+            catch (Exception e) when (LibraryTrouble.Handled(e))
             {
                 Problem = "Your library isn't answering. Try again in a moment.";
                 return;

@@ -119,7 +119,7 @@
                     <!-- A lecture -->
                     <Grid IsVisible="{Binding IsLecture}" Height="40" Margin="14,0" ColumnDefinitions="8,10,*,Auto,10,12">
                       <c:Swatch Classes="dot" Small="True" Fill="{Binding Dot}" VerticalAlignment="Center" />
-                      <TextBlock Grid.Column="2" Text="{Binding Title}" FontSize="13" FontWeight="Medium" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
+                      <TextBlock Grid.Column="2" Text="{Binding Title}" ToolTip.Tip="{Binding Title}" c:Tips.WhenCut="True" FontSize="13" FontWeight="Medium" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
                       <TextBlock Grid.Column="3" Classes="meta" Classes.strong="{Binding Strong}" Text="{Binding Meta}" FontSize="13" VerticalAlignment="Center" Margin="10,0,0,0" />
                       <TextBlock Grid.Column="5" Classes="enter meta" Text="&#x21A9;&#xFE0E;" FontSize="13" HorizontalAlignment="Center" VerticalAlignment="Center" />
                     </Grid>
@@ -129,19 +129,19 @@
                       <StackPanel Grid.Column="2">
                         <c:Marked Source="{Binding Title}" Terms="{Binding $parent[UserControl].((vm:QuickModel)DataContext).Query}" Mark="{DynamicResource Hl}"
                                   MarkRadius="4" MarkPadding="3" FontSize="13" LineHeight="18.2" TextWrapping="Wrap" />
-                        <TextBlock Classes="meta" Text="{Binding Sub}" FontSize="11" Margin="0,2,0,0" TextTrimming="CharacterEllipsis" />
+                        <TextBlock Classes="meta" Text="{Binding Sub}" ToolTip.Tip="{Binding Sub}" c:Tips.WhenCut="True" FontSize="11" Margin="0,2,0,0" TextTrimming="CharacterEllipsis" />
                       </StackPanel>
                     </Grid>
                     <!-- A class -->
                     <Grid IsVisible="{Binding IsClass}" Height="36" Margin="14,0" ColumnDefinitions="8,10,*,Auto">
                       <c:Swatch Classes="dot" Small="True" Fill="{Binding Dot}" VerticalAlignment="Center" />
-                      <TextBlock Grid.Column="2" Text="{Binding Title}" FontSize="13" FontWeight="Medium" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
+                      <TextBlock Grid.Column="2" Text="{Binding Title}" ToolTip.Tip="{Binding Title}" c:Tips.WhenCut="True" FontSize="13" FontWeight="Medium" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
                       <TextBlock Grid.Column="3" Classes="meta" Text="{Binding Meta}" FontSize="13" VerticalAlignment="Center" Margin="10,0,0,0" />
                     </Grid>
                     <!-- A source of an answer -->
                     <Grid IsVisible="{Binding IsSource}" Height="40" Margin="14,0" ColumnDefinitions="18,10,*,Auto">
                       <c:Icon Classes="source" Glyph="play_circle" Size="18" VerticalAlignment="Center" />
-                      <TextBlock Grid.Column="2" Text="{Binding Title}" FontSize="13" FontWeight="Medium" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
+                      <TextBlock Grid.Column="2" Text="{Binding Title}" ToolTip.Tip="{Binding Title}" c:Tips.WhenCut="True" FontSize="13" FontWeight="Medium" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
                       <TextBlock Grid.Column="3" Classes="meta num" Text="{Binding Meta}" FontSize="13" VerticalAlignment="Center" Margin="10,0,0,0" />
                     </Grid>
                   </Panel>
@@ -165,7 +165,7 @@
                       Command="{Binding $parent[UserControl].((vm:QuickModel)DataContext).OpenCommand}" CommandParameter="{Binding}">
                 <StackPanel Orientation="Horizontal" Spacing="8">
                   <c:Icon Classes="chip" Classes.rec="{Binding Glyph, Converter={x:Static c:Converters.Records}}" Glyph="{Binding Glyph}" Size="18" VerticalAlignment="Center" />
-                  <TextBlock Text="{Binding Title}" FontSize="13" VerticalAlignment="Center" MaxWidth="420" TextTrimming="CharacterEllipsis" />
+                  <TextBlock Text="{Binding Title}" ToolTip.Tip="{Binding Title}" c:Tips.WhenCut="True" FontSize="13" VerticalAlignment="Center" MaxWidth="420" TextTrimming="CharacterEllipsis" />
                   <TextBlock Classes="meta" Text="{Binding Meta}" IsVisible="{Binding Meta, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" FontSize="12"
                              VerticalAlignment="Center" />
                 </StackPanel>

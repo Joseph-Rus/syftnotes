@@ -31,7 +31,7 @@
                     <c:Icon Glyph="inbox" Size="16" Foreground="{DynamicResource InkSubtle}" IsVisible="{Binding IsUnsorted}" VerticalAlignment="Center" />
                     <c:Icon Glyph="add" Size="16" IsVisible="{Binding IsNew}" VerticalAlignment="Center" />
                     <c:Swatch Fill="{Binding Dot}" IsVisible="{Binding IsFolder}" VerticalAlignment="Center" Margin="3,0" />
-                    <TextBlock Grid.Column="2" Text="{Binding Shown}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
+                    <TextBlock Grid.Column="2" Text="{Binding Shown}" ToolTip.Tip="{Binding Shown}" c:Tips.WhenCut="True" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
                     <TextBlock Grid.Column="4" Text="{Binding Count}" FontSize="13" FontWeight="Medium" Foreground="{DynamicResource InkSubtle}" IsVisible="{Binding ShowCount}"
                                VerticalAlignment="Center" />
                     <c:Icon Grid.Column="4" Glyph="check" Size="16" Foreground="{DynamicResource InkSubtle}" IsVisible="{Binding Current}" VerticalAlignment="Center" />
