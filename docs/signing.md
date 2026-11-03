@@ -124,10 +124,16 @@ Microsoft's managed signing, called **Trusted Signing** until early 2026: the ce
 hardware and CI asks for each file to be signed, so there is no token and no certificate file to leak. Basic is
 **$9.99 a month** for 5,000 signatures. Microsoft's current terms (checked in October 2026, and they change):
 
-- **Individuals** can sign up only in the **USA and Canada**; **organizations** in the USA, Canada, the EU and the UK.
-  Elsewhere Microsoft points you to an OV certificate (B below). If you're not in one of those places, skip to B.
-- You need a paid Azure subscription and to pass Microsoft's **identity validation** (a photo ID and a check, taking
-  a few business days). It is validated as you, so your legal name is the publisher.
+- **Individuals** can sign up only in the **USA and Canada**; **organizations** in the USA, Canada, the EU, the UK,
+  Australia, New Zealand, Japan, South Korea, Singapore, Switzerland, Norway and Israel. Elsewhere Microsoft points you to an OV certificate (B below). If you're not in one of those places, skip to B.
+- You need a **paid** Azure subscription (free, trial and sponsored ones are refused) and to pass Microsoft's
+  **identity validation**: a government photo ID, a selfie check in the Microsoft Authenticator app, and for an
+  individual an Azure billing account of type *Individual* whose legal name and address match the ID. Microsoft says
+  1 to 20 business days (it can be hours). It is validated as you, so your legal name is the publisher. An
+  organization instead needs a registered business, a website and an email on its own domain. No DNS record is
+  needed for an individual, so a domain host such as Cloudflare plays no part.
+- To press **New identity** your own login needs the *Artifact Signing Identity Verifier* role on the account
+  (Access control (IAM) → Add role assignment).
 - Its certificates last three days and are renewed for you; the timestamp CI adds is what keeps a signature valid
   afterwards.
 
