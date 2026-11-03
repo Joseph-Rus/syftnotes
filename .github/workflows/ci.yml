@@ -2,11 +2,13 @@
 # speeds, one workflow.
 #
 #   A merge (a push to main) proves the code, and nothing it would throw away:
-#     - the engine's two test projects (Core and App) on macOS, Linux and Windows, each in a job of its own, so all six
-#       run side by side (the old single job ran the two one after the other);
+#     - the engine's two test projects (Core and App): in one job on macOS and one on Linux, and in a job each on
+#       Windows, whose App tests are the slowest; then, after the App tests, the real AI sign-ins (reported, but not
+#       counted against the run). The failed tests and the 20 slowest are on the run's page;
 #     - the Mac app, the Windows app and the Linux app (x64 and arm64, each on its own processor) built and self-tested
 #       for real (windows open, the pretend microphone records, Whisper hears it), once as a laptop and once as "just
-#       this computer"; the Mac's two run on two computers.
+#       this computer", both on the one app each job built.
+#     That is two macOS jobs a run: GitHub runs at most five at once, and five a run made runs queue behind each other.
 #     No installers are made for it: no Setup.exe (the build leaves it out), no DMG kept (macos/build-app.sh makes
 #     it as its last step either way), no Intel Mac, no install, update or uninstall, and nothing is published.
 #
@@ -16,27 +18,32 @@
 #   uninstalled cleanly; each Linux tarball installed with its install.sh, self-tested from there and uninstalled), and then
 #   publishes release v<version> with the installers and SHA256SUMS.txt. Installed
 #   copies pick it up within a few hours (auto_update), or right away with Update now. A version already released is
-#   never published again. Nothing is published unless every test and proof above passed.
+#   never published again. Nothing is published unless every job it waits for passed or was skipped (a job that ran out
+#   of time ends "cancelled", and stops it too).
 #
 #   Code that already passed isn't tested twice. A push to main skips the engine tests and the self-tests when it
 #     - changes only the version and files that can't change what the code does (the docs, the website, the
-#       README), on top of a commit whose run passed; or
+#       README, the iPhone app), on top of a commit whose run passed; or
 #     - merges a branch whose run by hand passed on exactly the same code (main hadn't moved meanwhile).
+#   Only ci's own runs in this repository, started by a push or by hand, are believed (plan.sh): never a pull
+#   request's, which runs whatever workflow the pull request brings.
 #   A release that skips the tests still builds and proves its installers, unless that run by hand was a rehearsal of
 #   the release too (below) and still holds its installers: then those very installers, built and proved on exactly
 #   this code, are the ones published, with no rebuilding, and a merged version bump publishes within a minute.
 #   Changes to this workflow are never skipped.
 #
-#   Branches and pull requests aren't tested on their own. A run by hand (Actions → ci → Run workflow, or
-#   `gh workflow run ci --ref <branch>`) is how one is proved before it merges, and it tests as a merge does.
+#   A pull request into main is tested as a merge is, on its own, with no installers, signing or secrets (see "on:").
+#   A run by hand (Actions → ci → Run workflow, or `gh workflow run ci --ref <branch>`) tests a branch as a merge does,
+#   and is what lets the merge skip the tests (above).
 #   On code whose version has no tag yet (a release branch), or with "installers" ticked
 #   (`gh workflow run ci --ref <branch> -f installers=true`), it rehearses the whole release too, down to the checksums,
 #   and publishes nothing, ever. Give it "reuse_run" (an earlier such run's id, on the same code) to rehearse the fast
 #   release above.
 #
-#   Measured when this shape was made, start to finish: a merge 9 to 11 minutes, a full rehearsal of a release 10
-#   (the old workflow took 12 to 16 for every merge and every release alike), and a release that publishes the
-#   installers a rehearsal already proved under a minute.
+#   Measured start to finish in October and November 2026, before the macOS jobs were cut from five to two: a merge 24 to
+#   45 minutes, most of it waiting for a macOS runner (14 to 27 minutes queued behind the run before)
+#   and the macOS App tests (20 to 25 minutes); a release that publishes the installers a rehearsal already proved
+#   under a minute.
 #
 #   Signing is switched on by secrets and costs nothing without them. Only a run that builds installers (a release, or
 #   a rehearsal of one) can sign, and then only if the repository has the secrets in docs/signing.md: the Mac app is
@@ -44,19 +51,37 @@
 #   signed (Azure Artifact Signing). With none of them, the installers are the ad hoc signed Mac app and the unsigned
 #   Setup.exe, exactly as before. Some of a group's secrets but not all of them stops the run at the start. Signing is a
 #   step of its own, after the build (macos/sign-release.sh, windows/sign-release.ps1), so nothing the build runs ever
-#   sees a key. A rehearsal by hand with "test_signing" ticked signs with throwaway self-signed identities that it makes
+#   sees a key, and the Mac's keychain and notary key are removed as soon as the signature is checked. A rehearsal by
+#   hand with "test_signing" ticked signs with throwaway self-signed identities that it makes
 #   on the runners: that proves every signing step but Apple's and Microsoft's, and its installers are never published
-#   (nor reusable by a release). The plan is .github/scripts/signing-plan.sh.
+#   (nor reusable by a release). The plan is .github/scripts/signing-plan.sh. The one other secret,
+#   GOOGLE_DESKTOP_CLIENT_SECRET, reaches only the builds of the copies that ship (never npm, the copy with the test
+#   helpers, or a pull request).
 #
 #   Runs are never cancelled by a later push: each push to main has a group of its own, so a release run isn't
-#   cancelled by the push after it, nor skipped while waiting for the one before. (Runs by hand on one branch
-#   replace each other.) The plan (what is tested, what is built, what is reused) is decided in the first job, by
-#   .github/scripts/plan.sh, and printed on the run's summary.
+#   cancelled by the push after it, nor skipped while waiting for the one before. (Runs by hand on one branch, and runs
+#   of one pull request, replace each other.) The plan (what is tested, what is built, what is reused) is decided in
+#   the first job, by .github/scripts/plan.sh, and printed on the run's summary.
 name: ci
 
 on:
   push:
     branches: [main]
+  # A pull request into main is tested as a merge is (on the code it would merge), with no installers, no signing and
+  # no secrets: a fork's gets none from GitHub, and the steps that would use one are skipped for every pull request.
+  # Never pull_request_target, which would run a fork's code with this repository's token and secrets. A pull request
+  # that changes only words (docs, the website, the iPhone app, which this workflow doesn't build, any .md but the
+  # tests' Golden expectations) isn't run. A pull request's run never counts as proof for its merge (plan.sh).
+  pull_request:
+    branches: [main]
+    paths:
+      - "**"
+      - "!docs/**"
+      - "!site/**"
+      - "!ios/**"
+      - "!.github/ISSUE_TEMPLATE/**"
+      - "!**/*.md"
+      - "engine/tests/**/Golden/**"
   workflow_dispatch:
     inputs:
       installers:
@@ -79,6 +104,8 @@ on:
 permissions:
   contents: read
 
+# A push to main has a group of its own (its commit), so a release is never cancelled by the push after it. A pull
+# request's group is its own (refs/pull/<n>/merge), as is a branch's run by hand: a newer push replaces the older run.
 concurrency:
   group: ci-${{ github.event_name == 'push' && github.sha || github.ref }}
   cancel-in-progress: ${{ github.event_name != 'push' }}
@@ -115,9 +142,9 @@ jobs:
       # A run by hand keeps the exact tree it tests, so that merging that branch into main with the very same code
       # (main hadn't moved meanwhile) is known to have passed already (plan.sh).
       # (Not a run of the real sign-ins alone, which tests nothing else.)
-      - if: github.event_name != 'push' && !inputs.real_sign_in_only
+      - if: github.event_name == 'workflow_dispatch' && !inputs.real_sign_in_only
         run: git rev-parse 'HEAD^{tree}' > tested-tree.txt
-      - if: github.event_name != 'push' && !inputs.real_sign_in_only
+      - if: github.event_name == 'workflow_dispatch' && !inputs.real_sign_in_only
         uses: actions/upload-artifact@v4
         continue-on-error: true
         with:
@@ -1198,7 +1225,7 @@ jobs:
   release:
     name: publish release
     needs: [version, connections, engine, mac-app, mac-intel, windows-app, linux-app]
-    if: ${{ !cancelled() && !contains(needs.*.result, 'failure') && !contains(needs.*.result, 'cancelled') && needs.version.outputs.installers == 'true' && (needs.version.outputs.reuse_run != '' || (needs.mac-app.result == 'success' && needs.mac-intel.result == 'success' && needs.windows-app.result == 'success' && needs.linux-app.result == 'success')) }}
+    if: ${{ github.event_name != 'pull_request' && !cancelled() && !contains(needs.*.result, 'failure') && !contains(needs.*.result, 'cancelled') && needs.version.outputs.installers == 'true' && (needs.version.outputs.reuse_run != '' || (needs.mac-app.result == 'success' && needs.mac-intel.result == 'success' && needs.windows-app.result == 'success' && needs.linux-app.result == 'success')) }}
     timeout-minutes: 10
     runs-on: ubuntu-latest
     permissions:
