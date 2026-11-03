@@ -191,10 +191,10 @@ jobs:
       fail-fast: false  # a flake in one doesn't hide the rest, and re-running a failed job re-runs only it
       matrix:
         include:
-          - { os: ubuntu-latest, suite: Core and App, core: true, app: true }
-          - { os: macos-latest, suite: Core and App, core: true, app: true }
-          - { os: windows-latest, suite: Core, core: true, app: false }
-          - { os: windows-latest, suite: App, core: false, app: true }
+          - { os: ubuntu-latest, suite: Core and App, slug: all, core: true, app: true }
+          - { os: macos-latest, suite: Core and App, slug: all, core: true, app: true }
+          - { os: windows-latest, suite: Core, slug: core, core: true, app: false }
+          - { os: windows-latest, suite: App, slug: app, core: false, app: true }
     # Measured: Linux 2 + 14 to 17 minutes, macOS 4 + 20 to 25, Windows Core 10 to 14, Windows App 16 to 22, and the real
     # sign-ins 2 to 3 more. The limits only bound a hang.
     timeout-minutes: ${{ matrix.suite == 'Core' && 25 || 45 }}
@@ -221,7 +221,12 @@ jobs:
       - name: Run the Core tests
         id: core
         if: matrix.core
-        run: dotnet test engine/tests/StudyStash.Core.Tests
+        # Each test's result goes to a .trx file for the run's page (below), a test that hangs 10 minutes is dumped and
+        # stopped (so the job fails and says which, instead of running out of time), and a crash leaves a dump.
+        run: >-
+          dotnet test engine/tests/StudyStash.Core.Tests --logger "trx;LogFileName=Core.trx"
+          --results-directory "${{ runner.temp }}/test-results"
+          --blame-hang-timeout 10m --blame-hang-dump-type mini --blame-crash --blame-crash-dump-type mini
         env:
           # Linux: record through the PulseAudio started above.
           STUDYSTASH_PULSE_TESTS: ${{ runner.os == 'Linux' && '1' || '' }}
@@ -237,7 +242,10 @@ jobs:
       - name: Run the App tests
         id: app
         if: ${{ !cancelled() && matrix.app }}
-        run: dotnet test engine/tests/StudyStash.App.Tests
+        run: >-
+          dotnet test engine/tests/StudyStash.App.Tests --logger "trx;LogFileName=App.trx"
+          --results-directory "${{ runner.temp }}/test-results"
+          --blame-hang-timeout 10m --blame-hang-dump-type mini --blame-crash --blame-crash-dump-type mini
         env:
           # Windows: the pictures the tests draw are kept, so the notes' formulas and diagrams can be seen as Windows
           # draws them (its own fonts), in the Windows look, light and dark, at 100% and 150%.
@@ -290,13 +298,27 @@ jobs:
             echo '```'
           } >> "$GITHUB_STEP_SUMMARY"
           if [ "$OUTCOME" = failure ]; then echo "::warning::The real sign-ins failed on $RUNNER_OS (not counted against the run): see the step above."; fi
-      - name: Crash reports, if a test process crashed
-        if: ${{ failure() && runner.os != 'Windows' }}
+      # The tests that failed, and the 20 slowest, on the run's page (an in-repo script: no reporter action, no extra
+      # permission).
+      - name: Test results on the run's page
+        if: ${{ !cancelled() }}
+        shell: bash
+        env:
+          TITLE: Engine ${{ matrix.suite }} tests (${{ runner.os }})
+        run: |
+          if [ "$RUNNER_OS" = Windows ]; then py=python; else py=python3; fi
+          "$py" .github/scripts/test-summary.py "$TITLE" "$RUNNER_TEMP/test-results"
+      # Only when something failed: the .trx files, a hung test's dump, a crashed test process's dump and crash report.
+      - name: Test results and dumps, if a test failed, hung or crashed
+        if: failure()
         uses: actions/upload-artifact@v4
         continue-on-error: true
         with:
-          name: crash-${{ matrix.os }}-${{ matrix.suite }}
-          path: ${{ runner.temp }}/crash/*.crashreport.json
+          name: test-results-${{ matrix.os }}-${{ matrix.slug }}
+          path: |
+            ${{ runner.temp }}/test-results
+            ${{ runner.temp }}/crash
+          retention-days: 7
           if-no-files-found: ignore
       - name: The notes' formulas and diagrams, as Windows draws them
         if: ${{ always() && runner.os == 'Windows' && matrix.app }}
