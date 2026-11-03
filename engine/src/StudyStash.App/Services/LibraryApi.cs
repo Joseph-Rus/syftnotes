@@ -15,6 +15,10 @@ public sealed class LibraryClients(Func<ClientConfig> client)
     readonly Lock gate = new();
     AiRemote? ai;
     string aiAddress = "";
+    RemoteLibrary? library;
+    string libraryAddress = "";
+    CanvasClient? canvas;
+    string canvasAddress = "";
 
     /// <summary>The library's AI (/api/v2/ai) at the address client.toml has now.</summary>
     public IAiLibrary Ai
@@ -30,6 +34,44 @@ public sealed class LibraryClients(Func<ClientConfig> client)
                     aiAddress = address;
                 }
                 return ai;
+            }
+        }
+    }
+    /// <summary>The library over its API (/api/v2) at the address client.toml has now; null while no library is set up.
+    /// Shared: nobody disposes it.</summary>
+    public RemoteLibrary? Library
+    {
+        get
+        {
+            string address = client().ServerUrl;
+            if (address.Length == 0) return null;
+            lock (gate)
+            {
+                if (library is null || libraryAddress != address)
+                {
+                    library = new RemoteLibrary(address, () => client().PoolKey);
+                    libraryAddress = address;
+                }
+                return library;
+            }
+        }
+    }
+
+    /// <summary>The library's Canvas API at the address client.toml has now; null while no library is set up.</summary>
+    public CanvasClient? Canvas
+    {
+        get
+        {
+            string address = client().ServerUrl;
+            if (address.Length == 0) return null;
+            lock (gate)
+            {
+                if (canvas is null || canvasAddress != address)
+                {
+                    canvas = new CanvasClient(address, () => client().PoolKey);
+                    canvasAddress = address;
+                }
+                return canvas;
             }
         }
     }

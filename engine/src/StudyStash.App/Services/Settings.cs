@@ -775,7 +775,7 @@ public sealed partial class SettingsModel : ObservableObject, IDisposable
     {
         if (loading) return;
         host.Save(s => s.CountThisCopy = value);
-        if (!value) (host.Counter ?? new DailyCount(host.Home, () => false, new HttpClient(), "")).Forget();
+        if (!value) (host.Counter ?? new DailyCount(host.Home, () => false, AppHost.countHttp, "")).Forget();
     }
 
     partial void OnShortcutsChanged(bool value)

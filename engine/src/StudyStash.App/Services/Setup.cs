@@ -420,8 +420,7 @@ public static class Setup
         m.AddingCourses = true;
         try
         {
-            var cc0 = host.Client();
-            canvas ??= cc0.ServerUrl.Length > 0 ? new CanvasClient(cc0.ServerUrl, cc0.PoolKey) : null;
+            canvas ??= host.Api.Canvas;
             // The library makes the classes itself from the courses chosen, and remembers the choice (only those sync).
             if (canvas is not null && await ChooseCoursesAsync(canvas, ticked.Select(c => c.Id).ToList(), host))
             {
