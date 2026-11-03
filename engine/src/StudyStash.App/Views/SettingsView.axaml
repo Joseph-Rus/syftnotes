@@ -1117,7 +1117,7 @@
                           <Grid ColumnDefinitions="*,Auto">
                             <StackPanel Spacing="2" VerticalAlignment="Center">
                               <TextBlock Classes="row-title" Text="Notes folder" />
-                              <c:PageText Classes="row-sub" Text="{Binding Lib.NotesFolder}" TextTrimming="PrefixCharacterEllipsis" />
+                              <c:PageText Classes="row-sub" Text="{Binding Lib.NotesFolder}" ToolTip.Tip="{Binding Lib.NotesFolder}" c:Tips.WhenCut="True" TextTrimming="PrefixCharacterEllipsis" />
                             </StackPanel>
                             <Button Grid.Column="1" Classes="btn sm act" Command="{Binding Lib.ShowNotesFolderCommand}" IsVisible="{Binding Lib.IsHere}" Margin="12,0,0,0">
                               <TextBlock Text="{Binding Lib.RevealLabel}" />
@@ -1179,8 +1179,8 @@
                                 <Border Classes="row">
                                   <Grid ColumnDefinitions="*,Auto">
                                     <StackPanel Spacing="2" VerticalAlignment="Center">
-                                      <TextBlock Classes="row-title" Text="{Binding To}" TextTrimming="CharacterEllipsis" />
-                                      <TextBlock Classes="row-sub" Text="{Binding Now}" TextTrimming="CharacterEllipsis" />
+                                      <TextBlock Classes="row-title" Text="{Binding To}" ToolTip.Tip="{Binding To}" c:Tips.WhenCut="True" TextTrimming="CharacterEllipsis" />
+                                      <TextBlock Classes="row-sub" Text="{Binding Now}" ToolTip.Tip="{Binding Now}" c:Tips.WhenCut="True" TextTrimming="CharacterEllipsis" />
                                     </StackPanel>
                                     <TextBlock Grid.Column="1" Classes="row-sub act" Text="{Binding Meta}" VerticalAlignment="Center" />
                                   </Grid>
@@ -1207,7 +1207,7 @@
                               <Border Grid.Row="2" Grid.Column="2" Grid.ColumnSpan="3" Classes="field">
                                 <TextBox Classes="bare" Text="{Binding Description}" PlaceholderText="What it covers (it helps the AI sort)" VerticalAlignment="Center" LostFocus="OnClassLostFocus" />
                               </Border>
-                              <TextBlock Grid.Row="4" Grid.Column="2" Grid.ColumnSpan="3" Classes="row-sub" Text="{Binding Meta}" TextTrimming="PrefixCharacterEllipsis" />
+                              <TextBlock Grid.Row="4" Grid.Column="2" Grid.ColumnSpan="3" Classes="row-sub" Text="{Binding Meta}" ToolTip.Tip="{Binding Meta}" c:Tips.WhenCut="True" TextTrimming="PrefixCharacterEllipsis" />
                             </Grid>
                           </Border>
                         </DataTemplate>
@@ -1392,7 +1392,7 @@
                                   <c:Icon Glyph="folder" Size="18" Foreground="{DynamicResource Fg2}" VerticalAlignment="Center" />
                                   <StackPanel Grid.Column="2" Spacing="2" VerticalAlignment="Center">
                                     <TextBlock Classes="row-title" Text="{Binding Name}" />
-                                    <c:PageText Classes="row-sub" Text="{Binding Path}" TextTrimming="PrefixCharacterEllipsis" />
+                                    <c:PageText Classes="row-sub" Text="{Binding Path}" ToolTip.Tip="{Binding Path}" c:Tips.WhenCut="True" TextTrimming="PrefixCharacterEllipsis" />
                                   </StackPanel>
                                   <TextBlock Grid.Column="4" Classes="row-sub" Text="AI reads" VerticalAlignment="Center" />
                                   <ToggleButton AutomationProperties.Name="{Binding Name, StringFormat='AI reads {0}'}" Grid.Column="6" Classes="switch" IsChecked="{Binding Ai}" VerticalAlignment="Center" />
@@ -1468,7 +1468,7 @@
                       <Border Classes="row" IsVisible="{Binding SignedIn}">
                         <Grid ColumnDefinitions="*,16,Auto">
                           <StackPanel Spacing="2" VerticalAlignment="Center">
-                            <c:PageText Classes="row-title" Text="{Binding ConnectedLine}" TextTrimming="CharacterEllipsis" />
+                            <c:PageText Classes="row-title" Text="{Binding ConnectedLine}" ToolTip.Tip="{Binding ConnectedLine}" c:Tips.WhenCut="True" TextTrimming="CharacterEllipsis" />
                             <TextBlock Classes="row-sub" Text="Syft Notes looks for new lectures every few minutes." TextWrapping="Wrap" />
                           </StackPanel>
                           <Button Name="GranolaDisconnect" Grid.Column="2" Classes="btn sm" Command="{Binding DisconnectCommand}" VerticalAlignment="Center">
@@ -1515,7 +1515,7 @@
                             <Border Classes="row">
                               <Grid ColumnDefinitions="*,16,Auto">
                                 <StackPanel Spacing="2" VerticalAlignment="Center">
-                                  <TextBlock Classes="row-title" Text="{Binding Title}" TextTrimming="CharacterEllipsis" />
+                                  <TextBlock Classes="row-title" Text="{Binding Title}" ToolTip.Tip="{Binding Title}" c:Tips.WhenCut="True" TextTrimming="CharacterEllipsis" />
                                   <TextBlock Classes="row-sub" Text="{Binding When}" />
                                 </StackPanel>
                                 <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="12" VerticalAlignment="Center">

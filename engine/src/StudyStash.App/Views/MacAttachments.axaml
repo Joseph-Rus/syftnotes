@@ -80,7 +80,7 @@
                 <c:Icon Glyph="{Binding Icon}" Size="18" Foreground="{DynamicResource AccentText}" VerticalAlignment="Center" />
                 <StackPanel Grid.Column="2">
                   <TextBlock Text="{Binding Name}" FontSize="13" TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding Name}" c:Tips.WhenCut="True" />
-                  <TextBlock Text="{Binding About}" FontSize="11" Foreground="{DynamicResource Fg2}" TextTrimming="CharacterEllipsis" />
+                  <TextBlock Text="{Binding About}" ToolTip.Tip="{Binding About}" c:Tips.WhenCut="True" FontSize="11" Foreground="{DynamicResource Fg2}" TextTrimming="CharacterEllipsis" />
                 </StackPanel>
               </Grid>
             </Button>

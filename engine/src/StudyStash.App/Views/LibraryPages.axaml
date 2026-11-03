@@ -52,7 +52,7 @@
                     AutomationProperties.Name="{Binding CanvasOfShown}">
               <StackPanel Orientation="Horizontal" Spacing="8">
                 <c:Swatch Fill="{Binding CanvasDot}" VerticalAlignment="Center" />
-                <TextBlock Text="{Binding CanvasOfShown}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" MaxWidth="220" />
+                <TextBlock Text="{Binding CanvasOfShown}" ToolTip.Tip="{Binding CanvasOfShown}" c:Tips.WhenCut="True" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" MaxWidth="220" />
               </StackPanel>
             </Button>
             <TextBlock Classes="crumb" Text="On Canvas" />
@@ -107,7 +107,7 @@
          promised, with a × to put it away sooner -->
     <Border Name="UndoToast" Classes="undo" IsVisible="{Binding HasToast}" VerticalAlignment="Bottom" HorizontalAlignment="Center" Margin="16,0,16,92">
       <Grid ColumnDefinitions="*,10,Auto,Auto" VerticalAlignment="Center">
-        <TextBlock Name="ToastSaid" Text="{Binding ToastSaid}" FontSize="14" FontWeight="Medium" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" MaxWidth="420" />
+        <TextBlock Name="ToastSaid" Text="{Binding ToastSaid}" ToolTip.Tip="{Binding ToastSaid}" c:Tips.WhenCut="True" FontSize="14" FontWeight="Medium" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" MaxWidth="420" />
         <Button Grid.Column="2" Name="Undo" Classes="undo" Command="{Binding UndoToastCommand}" VerticalAlignment="Center">
           <TextBlock Text="Undo" FontSize="14" FontWeight="Bold" />
         </Button>
