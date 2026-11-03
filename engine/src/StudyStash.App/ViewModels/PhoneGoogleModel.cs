@@ -192,7 +192,8 @@ public sealed partial class PhoneGoogleModel : ObservableObject, IDisposable
         }
         catch (Exception e) when (e is IOException or UnauthorizedAccessException)
         {
-            Say = $"Syft Notes couldn't keep your Google account on this {Device}: {e.Message}";
+            Program.Log($"[phone-google] couldn't keep the Google account on this {Device}: {e.GetType().Name}: {e.Message}");
+            Say = $"Syft Notes couldn't keep your Google account on this {Device}. Check that it can save files here, then try again.";
         }
         Refresh();
     }

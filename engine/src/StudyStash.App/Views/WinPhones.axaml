@@ -55,7 +55,7 @@
               </Viewbox>
             </Border>
             <StackPanel Grid.Column="2" Spacing="6" VerticalAlignment="Center">
-              <TextBlock Classes="row-title" Text="{Binding Account}" TextTrimming="CharacterEllipsis" />
+              <TextBlock Classes="row-title" Text="{Binding Account}" ToolTip.Tip="{Binding Account}" c:Tips.WhenCut="True" TextTrimming="CharacterEllipsis" />
               <TextBlock Classes="row-sub" Text="{Binding StepOne, StringFormat='1. {0}'}" TextWrapping="Wrap" />
               <TextBlock Classes="row-sub" Text="{Binding StepTwo, StringFormat='2. {0}'}" TextWrapping="Wrap" />
               <TextBlock Classes="row-sub" Text="{Binding HowItWorks}" TextWrapping="Wrap" Margin="0,4,0,0" />
@@ -84,7 +84,7 @@
                   <Grid ColumnDefinitions="Auto,16,*,16,Auto">
                     <c:Icon Glyph="smartphone" Size="20" Foreground="{DynamicResource Fg2}" VerticalAlignment="Center" />
                     <StackPanel Grid.Column="2" Spacing="2" VerticalAlignment="Center">
-                      <TextBlock Classes="row-title" Text="{Binding Name}" TextTrimming="CharacterEllipsis" />
+                      <TextBlock Classes="row-title" Text="{Binding Name}" ToolTip.Tip="{Binding Name}" c:Tips.WhenCut="True" TextTrimming="CharacterEllipsis" />
                       <TextBlock Classes="row-sub" Text="{Binding Meta}" />
                     </StackPanel>
                     <Button Grid.Column="4" Classes="btn sm" VerticalAlignment="Center"
@@ -192,7 +192,7 @@
                 <Grid ColumnDefinitions="Auto,16,*,16,Auto">
                   <c:Icon Glyph="smartphone" Size="20" Foreground="{DynamicResource Fg2}" VerticalAlignment="Center" />
                   <StackPanel Grid.Column="2" Spacing="2" VerticalAlignment="Center">
-                    <TextBlock Classes="row-title" Text="{Binding Name}" TextTrimming="CharacterEllipsis" />
+                    <TextBlock Classes="row-title" Text="{Binding Name}" ToolTip.Tip="{Binding Name}" c:Tips.WhenCut="True" TextTrimming="CharacterEllipsis" />
                     <TextBlock Classes="row-sub" Text="{Binding Meta}" />
                   </StackPanel>
                   <Button Grid.Column="4" Classes="btn sm" VerticalAlignment="Center"

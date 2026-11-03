@@ -1,4 +1,6 @@
 using System.Collections.ObjectModel;
+using System.Runtime.CompilerServices;
+using System.Text.Json;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using StudyStash.Core;
@@ -6,6 +8,27 @@ using StudyStash.Core.Ai;
 using StudyStash.Core.Study;
 
 namespace StudyStash.App.ViewModels;
+
+/// <summary>
+/// What a call to the library may fail with when the library is just away or answers badly: the study pages meet that
+/// with their plain "isn't answering" words. Anything else is a fault in the app, and goes to the log.
+/// </summary>
+internal static class LibraryTrouble
+{
+    public static bool IsExpected(Exception e) =>
+        e is HttpRequestException or TaskCanceledException or LibraryRefusedException or JsonException
+            or IOException or UnauthorizedAccessException or InvalidOperationException or UriFormatException;
+
+    /// <summary>
+    /// For a catch filter: always lets the page show its plain words, and writes down the failures nobody expected
+    /// (so a fault in the app doesn't vanish into "isn't answering").
+    /// </summary>
+    public static bool Handled(Exception e, [CallerMemberName] string? where = null)
+    {
+        if (!IsExpected(e)) Program.Log($"[study] unexpected {e.GetType().Name} in {where}: {e.Message}");
+        return true;
+    }
+}
 
 /// <summary>
 /// A lecture's study tools, under its exam flags: its flashcards in Review (made by the library's AI from its notes on
@@ -56,7 +79,7 @@ public sealed partial class LectureStudyModel(IStudyLibrary library, string lect
                 Available = true;
             }
         }
-        catch
+        catch (Exception e) when (LibraryTrouble.Handled(e))
         {
             Available = false;
         }
@@ -77,7 +100,7 @@ public sealed partial class LectureStudyModel(IStudyLibrary library, string lect
         {
             Problem = e.Message;
         }
-        catch
+        catch (Exception e) when (LibraryTrouble.Handled(e))
         {
             Problem = "Your library isn't answering. Try again in a moment.";
         }
@@ -194,7 +217,7 @@ public sealed partial class ReviewSessionModel(IStudyLibrary library, Func<DateT
             else if (await library.ReviewAsync(className) is { } state)
                 foreach (var c in state.Due) queue.Enqueue(c);
         }
-        catch
+        catch (Exception e) when (LibraryTrouble.Handled(e))
         {
             Problem = "Your library isn't answering. Try again in a moment.";
         }
@@ -219,7 +242,7 @@ public sealed partial class ReviewSessionModel(IStudyLibrary library, Func<DateT
                 NextDue = state.Counts.Total == 0 ? "" : state.Counts.Today > 0 ? $"{state.Counts.Today} more due later today."
                     : "Nothing else is due today. Come back tomorrow.";
         }
-        catch
+        catch (Exception e) when (LibraryTrouble.Handled(e))
         {
         }
     }
@@ -247,7 +270,7 @@ public sealed partial class ReviewSessionModel(IStudyLibrary library, Func<DateT
             // Forgotten: it comes round again before the end, as it's due again in minutes.
             if (grade == Grade.Again && graded is not null) queue.Enqueue(graded);
         }
-        catch
+        catch (Exception e) when (LibraryTrouble.Handled(e))
         {
             Problem = "Your library isn't answering, so that card wasn't saved. Try again in a moment.";
             return;
@@ -264,7 +287,7 @@ public sealed partial class ReviewSessionModel(IStudyLibrary library, Func<DateT
         {
             await library.DeleteCardAsync(card.Id);
         }
-        catch
+        catch (Exception e) when (LibraryTrouble.Handled(e))
         {
             return;
         }
@@ -397,7 +420,7 @@ public sealed partial class StudyModel(IStudyLibrary library, Func<DateTimeOffse
             }
             else Available = false;
         }
-        catch
+        catch (Exception e) when (LibraryTrouble.Handled(e))
         {
             Available = false;
         }
@@ -422,7 +445,7 @@ public sealed partial class StudyModel(IStudyLibrary library, Func<DateTimeOffse
         {
             now = await library.ExamsAsync();
         }
-        catch
+        catch (Exception e) when (LibraryTrouble.Handled(e))
         {
             now = null;
         }
@@ -478,7 +501,7 @@ public sealed partial class StudyModel(IStudyLibrary library, Func<DateTimeOffse
         {
             row.Problem = e.Message;
         }
-        catch
+        catch (Exception e) when (LibraryTrouble.Handled(e))
         {
             row.Problem = "Your library isn't answering. Try again in a moment.";
         }
@@ -509,7 +532,7 @@ public sealed partial class StudyModel(IStudyLibrary library, Func<DateTimeOffse
         {
             NewProblem = e.Message;
         }
-        catch
+        catch (Exception e) when (LibraryTrouble.Handled(e))
         {
             NewProblem = "Your library isn't answering. Try again in a moment.";
         }
@@ -525,7 +548,7 @@ public sealed partial class StudyModel(IStudyLibrary library, Func<DateTimeOffse
         {
             if (await library.PrepAsync(id) is { } prep) Show(prep);
         }
-        catch
+        catch (Exception e) when (LibraryTrouble.Handled(e))
         {
         }
     }

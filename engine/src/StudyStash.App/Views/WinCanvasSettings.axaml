@@ -56,7 +56,7 @@
         <Grid ColumnDefinitions="Auto,*,Auto,Auto" ColumnSpacing="10">
           <c:Icon Glyph="language" Size="20" />
           <Border Grid.Column="1" Classes="cv-field" VerticalAlignment="Center" Margin="16,0,0,0">
-            <TextBox Classes="bare" Text="{Binding SchoolField}" FontSize="14" />
+            <TextBox Classes="bare" Text="{Binding SchoolField}" FontSize="14" AutomationProperties.Name="Your school's Canvas address" />
           </Border>
           <Button Grid.Column="2" Classes="cv-btn cv-primary" VerticalAlignment="Center" IsEnabled="{Binding !SavingSchool}" Command="{Binding SaveSchoolCommand}">
             <TextBlock Text="Save" />
@@ -91,7 +91,7 @@
           </StackPanel>
           <Button Grid.Column="2" Classes="cv-select" Width="160" VerticalAlignment="Center">
             <Grid ColumnDefinitions="*,Auto">
-              <TextBlock Text="{Binding PollLabel}" TextTrimming="CharacterEllipsis" />
+              <TextBlock Text="{Binding PollLabel}" ToolTip.Tip="{Binding PollLabel}" c:Tips.WhenCut="True" TextTrimming="CharacterEllipsis" />
               <c:Icon Grid.Column="1" Glyph="expand_more" Size="16" Foreground="{DynamicResource Fg2}" Margin="6,0,0,0" />
             </Grid>
             <Button.Flyout>
@@ -150,7 +150,7 @@
                 </StackPanel>
                 <Button Grid.Column="2" Classes="cv-select" Width="260" VerticalAlignment="Center">
                   <Grid ColumnDefinitions="*,Auto">
-                    <TextBlock Text="{Binding Selected.Label}" TextTrimming="CharacterEllipsis"
+                    <TextBlock Text="{Binding Selected.Label}" ToolTip.Tip="{Binding Selected.Label}" c:Tips.WhenCut="True" TextTrimming="CharacterEllipsis"
                                Classes.cv-placeholder="{Binding Selected.Id, Converter={x:Static ObjectConverters.IsNull}}" />
                     <c:Icon Grid.Column="1" Glyph="expand_more" Size="16" Foreground="{DynamicResource Fg2}" Margin="6,0,0,0" />
                   </Grid>
