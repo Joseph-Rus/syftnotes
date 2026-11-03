@@ -27,6 +27,10 @@ public static partial class SelfTest
         // A phone linked through Google, standing in: an account in google.json, and a folder for the Drive folder.
         new GoogleAccount("phone@example.com", "stand-in", DateTimeOffset.UtcNow).Save(host.Home);
         await host.Drive.RefreshAsync();
+        // A Mac: a PDF for the background library to read once it starts (reading one with PDFKit checked it in with
+        // Launch Services as the app, and Syft Notes wouldn't open). AfterQuit checks it read it and stayed out of the
+        // way.
+        if (OperatingSystem.IsMacOS()) WriteHandout(Configs.Load(host.Home).PoolDir);
         host.Save(s => s.AnswerPhoneWhenClosed = true);
         await host.SyncBackgroundAsync();
         var lib = host.LocalLibrary ?? throw new InvalidOperationException("no library of the app's own");
@@ -129,6 +133,8 @@ public static partial class SelfTest
                 : $"the phone got its answer with the app closed: {got["status"]} in {(DateTime.UtcNow - asked).TotalSeconds:0} s");
             if ((int?)got?["status"] != 200) throw new InvalidOperationException("the phone wasn't answered with the app closed");
 
+            if (OperatingSystem.IsMacOS()) await MacAppStillOpensAsync(home, dir, Line);
+
             // Taken away: nothing registered, nothing running, the port let go.
             var pids = BackgroundLibrary.ReadPids(home);
             bg.Unregister(home);
@@ -164,6 +170,101 @@ public static partial class SelfTest
         Directory.CreateDirectory(dir);
         await File.WriteAllLinesAsync(Path.Combine(dir, "background.txt"), lines);
         return code;
+    }
+
+    /// <summary>
+    /// A Mac, with the app closed and its background library answering (the app's own executable, run by launchd): it
+    /// has read the handout PDF, Launch Services lists nothing as the app (com.study-stash.app), and opening the app the
+    /// way Finder, the Dock and Spotlight do (`open`, not `open -n`) starts it. What it starts is the app's `version`, so
+    /// no window opens. Throws when any of it fails.
+    /// </summary>
+    static async Task MacAppStillOpensAsync(string home, string dir, Action<string> line)
+    {
+        // The file index's first pass, 20 s after the library starts.
+        string log = Path.Combine(home, "logs", "library.log");
+        bool read = await Until(() => ReadAPdfSinceStarting(log), 60);
+        line(read ? "the background library read the handout PDF" : "the background library didn't read the handout PDF in 60 s");
+        if (!read) throw new InvalidOperationException("the background library didn't read the handout PDF");
+
+        string listed = Machine.Run("/usr/bin/lsappinfo", ["list"], TimeSpan.FromSeconds(20))?.Stdout ?? "";
+        var asApp = Listed(listed, "com.study-stash.app");
+        line(asApp.Count == 0 ? "Launch Services lists nothing as Syft Notes with the app closed"
+            : $"Launch Services lists {string.Join(", ", asApp)} as Syft Notes with the app closed");
+        if (asApp.Count > 0) throw new InvalidOperationException("Launch Services took the background library for the app");
+
+        string bundle = Path.GetFullPath(Path.Combine(Path.GetDirectoryName(Environment.ProcessPath!)!, "..", ".."));
+        string said = Path.Combine(dir, "open-version.txt");
+        File.Delete(said);
+        var opened = Machine.Run("/usr/bin/open", ["-W", "--stdout", said, bundle, "--args", "version"], TimeSpan.FromSeconds(30));
+        string version = File.Exists(said) ? (await File.ReadAllTextAsync(said)).Trim() : "";
+        bool started = version == StudyStash.Core.Engine.Version;
+        line(started ? $"opening Syft Notes with open starts it ({version})"
+            : $"opening Syft Notes with open didn't start it (open: {(opened is null ? "no answer in 30 s" : $"exit {opened.ExitCode}")})");
+        if (!started) throw new InvalidOperationException("opening Syft Notes didn't start it");
+    }
+
+    /// <summary>Whether the library's log says it read a file (the handout PDF) since the background library last
+    /// started.</summary>
+    static bool ReadAPdfSinceStarting(string log)
+    {
+        try
+        {
+            using var f = new FileStream(log, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete);
+            var lines = new StreamReader(f).ReadToEnd().Split('\n');
+            int start = Array.FindLastIndex(lines, l => l.Contains("[background] Syft Notes", StringComparison.Ordinal));
+            return start >= 0 && lines.Skip(start).Any(l => System.Text.RegularExpressions.Regex.IsMatch(l, @"\[files\] [1-9][0-9]* read"));
+        }
+        catch (IOException)
+        {
+            return false;
+        }
+    }
+
+    /// <summary>The processes `lsappinfo list` shows with this bundle identifier, as "pid N".</summary>
+    static List<string> Listed(string lsappinfo, string bundleId)
+    {
+        var found = new List<string>();
+        bool ours = false;
+        foreach (string raw in lsappinfo.Split('\n'))
+        {
+            string l = raw.Trim();
+            if (System.Text.RegularExpressions.Regex.IsMatch(raw, @"^\s*\d+\) ")) ours = false;
+            else if (l.StartsWith("bundleID=", StringComparison.Ordinal)) ours = l == $"bundleID=\"{bundleId}\"";
+            else if (ours && l.StartsWith("pid = ", StringComparison.Ordinal))
+            {
+                found.Add("pid " + l["pid = ".Length..].Split(' ')[0]);
+                ours = false;
+            }
+        }
+        return found;
+    }
+
+    /// <summary>A one-page PDF with typed words, in the library's folder; new words each run, so no reading of it is
+    /// kept from before.</summary>
+    static void WriteHandout(string poolDir)
+    {
+        string content = $"BT /F1 14 Tf 72 720 Td (Self-test handout {Guid.NewGuid():N}: lexers, parsers and grammars.) Tj ET";
+        string[] objects =
+        [
+            "<< /Type /Catalog /Pages 2 0 R >>",
+            "<< /Type /Pages /Kids [3 0 R] /Count 1 >>",
+            "<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Contents 4 0 R /Resources << /Font << /F1 5 0 R >> >> >>",
+            $"<< /Length {content.Length} >>\nstream\n{content}\nendstream",
+            "<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>",
+        ];
+        var pdf = new StringBuilder("%PDF-1.4\n");
+        var offsets = new List<int>();
+        for (int i = 0; i < objects.Length; i++)
+        {
+            offsets.Add(pdf.Length);
+            pdf.Append($"{i + 1} 0 obj\n{objects[i]}\nendobj\n");
+        }
+        int xref = pdf.Length;
+        pdf.Append($"xref\n0 {objects.Length + 1}\n0000000000 65535 f \n");
+        foreach (int at in offsets) pdf.Append($"{at:D10} 00000 n \n");
+        pdf.Append($"trailer\n<< /Size {objects.Length + 1} /Root 1 0 R >>\nstartxref\n{xref}\n%%EOF\n");
+        Directory.CreateDirectory(poolDir);
+        File.WriteAllText(Path.Combine(poolDir, "Self-test handout.pdf"), pdf.ToString(), new UTF8Encoding(false));
     }
 
     static bool Gone(int pid)

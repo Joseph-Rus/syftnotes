@@ -56,9 +56,9 @@ public sealed class SettingsToolsTests : IAsyncLifetime
     readonly FakeSettingsDriver driver = new();
     SetupMcpHost host = null!;
 
-    public async Task InitializeAsync() => host = await SetupMcpHost.StartAsync(new SettingsTools(driver));
+    public async ValueTask InitializeAsync() => host = await SetupMcpHost.StartAsync(new SettingsTools(driver));
 
-    public async Task DisposeAsync() => await host.DisposeAsync();
+    public async ValueTask DisposeAsync() => await host.DisposeAsync();
 
     Task<McpClient> Connect() =>
         McpClient.CreateAsync(new HttpClientTransport(new HttpClientTransportOptions

@@ -139,6 +139,10 @@ public sealed partial class AiTurn : ObservableObject
     partial void OnBylineChanged(string? value) => BylineParts = string.IsNullOrEmpty(value) ? [] : [new BylinePart(value)];
 }
 
+/// <summary>What every ask bar in the app reaches: Settings → Your AI (the "Change defaults" link), and the
+/// notification that says a kept chat was deleted, with Undo.</summary>
+public sealed record AskServices(Action OpenSettings, Action<string, Func<Task>> ToldDeleted);
+
 /// <summary>
 /// The ask bar under a lecture's notes, the recorder's compact chat, and the quick panel's ask (design 16): an
 /// engine picked per question (starting at the library's default and lasting for this model), a scope, and the
@@ -155,6 +159,15 @@ public sealed partial class AiAskModel : ObservableObject
         Highlights.NotesChanged += NotesChanged;
         foreach (var c in ScopeChoices) c.Pick = new RelayCommand(() => Scope = c.Id);
         EngineChoice.Mark(ScopeChoices, Scope);
+    }
+
+    /// <summary>The app's ask bar (made by <see cref="AskFactory"/>): its "Change defaults" link and a deleted chat's
+    /// Undo always go somewhere.</summary>
+    public AiAskModel(IAiLibrary library, AskServices services) : this(library)
+    {
+        ArgumentNullException.ThrowIfNull(services);
+        OpenSettings = services.OpenSettings;
+        ToldDeleted = services.ToldDeleted;
     }
 
     /// <summary>An ask bar with no lecture under it (Home, a class's home): only the scopes that make sense there.</summary>

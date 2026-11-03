@@ -100,7 +100,7 @@ public class SafeSvgTests
         }
     }
 
-    static string Malicious_(string name) => (string)Malicious.Single(row => (string)row[0] == name)[1];
+    static string Malicious_(string name) => (string)Malicious.Single(row => row.Data.Item1 == name).Data.Item2;
 
     /// <summary>Each level copies the one below it ten times: a small file that would draw 10^levels rectangles.</summary>
     static string UseBomb(int levels)

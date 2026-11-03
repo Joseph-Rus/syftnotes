@@ -1,6 +1,8 @@
 using System.Collections.ObjectModel;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using StudyStash.App.Services;
+using StudyStash.App.ViewModels.Kit;
 using StudyStash.Core;
 using StudyStash.Core.Ai;
 
@@ -68,6 +70,10 @@ public sealed partial class AiSetupModel : ObservableObject
     {
         this.library = library;
         watch = new SignInWatch(library, SignInMovedAsync);
+        action.PropertyChanged += (_, e) =>
+        {
+            if (e.PropertyName == nameof(AsyncAction.Busy)) Busy = action.Busy;
+        };
     }
 
     /// <summary>Keeps asking the library while a sign-in started from a row is going, so the row turns ready by itself.</summary>
@@ -135,6 +141,9 @@ public sealed partial class AiSetupModel : ObservableObject
     [ObservableProperty] public partial string SelectedAsk { get; set; } = SameAsNotes;
     [ObservableProperty] public partial string? Say { get; set; }
     [ObservableProperty] public partial bool Busy { get; set; }
+    /// <summary>The library's engine actions (sign in, start Ollama, download its model): one at a time. Its busy is this
+    /// page's <see cref="Busy"/> (the page's other things set that too).</summary>
+    readonly AsyncAction action = new();
     [ObservableProperty] public partial bool OlderLibrary { get; set; }
     [ObservableProperty] public partial bool Offline { get; set; }
     /// <summary>The API key panel is open under the list (the setup window grows to fit it).</summary>
@@ -585,13 +594,12 @@ public sealed partial class AiSetupModel : ObservableObject
 
     /// <summary>One of the library's engine actions (sign in, start Ollama, download its model): what it said, and
     /// the rows as they are after it.</summary>
-    async Task ActAsync(Func<Task<AiSaid?>> act)
+    Task ActAsync(Func<Task<AiSaid?>> act) => action.RunAsync(async _ =>
     {
-        Busy = true;
         try
         {
             var said = await act();
-            if (said is null) { OlderLibrary = true; return; }
+            if (said is null) { OlderLibrary = true; return Outcome.Done; }
             Say = said.Said;
             if (said.Overview is not null) Apply(said.Overview);
             else await Load();
@@ -604,11 +612,8 @@ public sealed partial class AiSetupModel : ObservableObject
         {
             Offline = true;
         }
-        finally
-        {
-            Busy = false;
-        }
-    }
+        return Outcome.Done;
+    });
 
     /// <summary>
     /// The picked AI is saved only when it can write the notes. One that's only installed (never tried: Claude's

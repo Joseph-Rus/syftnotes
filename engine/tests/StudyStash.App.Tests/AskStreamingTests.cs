@@ -5,8 +5,10 @@ using Avalonia.Threading;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Time.Testing;
 using StudyStash.App.Controls;
 using StudyStash.App.Controls.Rich;
+using StudyStash.App.Services.Kit;
 using StudyStash.App.ViewModels;
 using StudyStash.Core;
 using StudyStash.Core.Ai;
@@ -24,15 +26,17 @@ public class AskStreamingTests
     public async Task Pieces_arriving_in_a_burst_are_drawn_at_a_steady_pace_first_at_once_last_for_sure()
     {
         var drawn = new List<string>();
+        var clock = new FakeTimeProvider();
         var paced = new Paced(t =>
         {
             lock (drawn) drawn.Add(t);
-        });
+        }, clock);
 
         for (int i = 1; i <= 100; i++) paced.Show(new string('a', i));
         lock (drawn) Assert.Equal("a", drawn[0]); // the first words go straight up
 
-        await Task.Delay(Paced.Every * 5, TestContext.Current.CancellationToken);
+        clock.Advance(Paced.Every); // the next beat
+        Assert.True(await Poll.UntilAsync(() => { lock (drawn) return drawn[^1].Length == 100; }, TimeSpan.FromMilliseconds(2), TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken));
         lock (drawn)
         {
             Assert.Equal(new string('a', 100), drawn[^1]); // and the latest is always drawn in the end
@@ -40,7 +44,7 @@ public class AskStreamingTests
         }
         Assert.Equal(new string('a', 100), paced.End());
         paced.Show("too late");
-        await Task.Delay(Paced.Every * 3, TestContext.Current.CancellationToken);
+        clock.Advance(Paced.Every * 3);
         lock (drawn) Assert.DoesNotContain("too late", drawn);
     }
 
@@ -91,7 +95,7 @@ public class AskStreamingTests
         lib.OnAskStream = async (_, soFar, stop) =>
         {
             soFar("Recursion traces will");
-            await Task.Delay(Timeout.InfiniteTimeSpan, stop);
+            await new TaskCompletionSource().Task.WaitAsync(stop);
             return null;
         };
         model.Question = "q";
@@ -114,7 +118,7 @@ public class AskStreamingTests
         var (model, lib) = await Loaded();
         lib.OnAskStream = async (_, _, stop) =>
         {
-            await Task.Delay(Timeout.InfiniteTimeSpan, stop);
+            await new TaskCompletionSource().Task.WaitAsync(stop);
             return null;
         };
         model.Question = "q";
@@ -216,7 +220,7 @@ public class AskStreamingTests
             soFar("Osmosis");
             try
             {
-                await Task.Delay(Timeout.InfiniteTimeSpan, stop);
+                await new TaskCompletionSource().Task.WaitAsync(stop);
             }
             catch (OperationCanceledException)
             {
@@ -382,13 +386,6 @@ public class AskStreamingTests
     }
 
     /// <summary>Lets the UI thread run until <paramref name="done"/> holds (or fails after a few seconds).</summary>
-    static async Task WaitFor(Func<bool> done)
-    {
-        var until = DateTime.UtcNow.AddSeconds(10);
-        while (!done())
-        {
-            Assert.True(DateTime.UtcNow < until, "waited too long");
-            await Task.Delay(10, TestContext.Current.CancellationToken);
-        }
-    }
+    static async Task WaitFor(Func<bool> done) =>
+        Assert.True(await Poll.UntilAsync(done, TimeSpan.FromMilliseconds(5), TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken), "waited too long");
 }

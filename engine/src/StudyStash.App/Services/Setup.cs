@@ -1,4 +1,5 @@
 using System.Globalization;
+using CommunityToolkit.Mvvm.Messaging;
 using StudyStash.App.ViewModels;
 using StudyStash.Audio;
 using StudyStash.Core;
@@ -78,7 +79,7 @@ public static class Setup
         if (host.LoginItems.StartsAtLogin(host.Home)) m.StartAtLogin = true;
         m.Keys = new ShortcutsModel(() => host.Settings.Keys, change => host.Save(s => change(s.Keys)), Skin.Current == SkinKind.Mac, !m.IsLibrary)
         {
-            Listening = Shell.PauseShortcuts,
+            Listening = static paused => WeakReferenceMessenger.Default.Send(new ShortcutsPaused(paused)),
         };
         m.ModelName = host.Model.Name;
         m.ModelSize = About(host.Model.Bytes);
