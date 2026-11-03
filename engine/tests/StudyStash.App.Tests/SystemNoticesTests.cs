@@ -108,7 +108,7 @@ public class SystemNoticesTests
     {
         var rig = new Rig();
         int opened = 0, dismissed = 0;
-        var model = new CanvasToastModel(CanvasShots.ToastGallery()[0].Item)
+        var model = new CanvasToastModel(Scenes.ToastGallery()[0].Item)
         {
             OnOpen = _ => { opened++; return Task.CompletedTask; },
             OnDismiss = _ => { dismissed++; return Task.CompletedTask; },

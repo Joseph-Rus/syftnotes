@@ -194,7 +194,7 @@ all words in `Words/`. Each piece has one focused test.
     *Test:* one table of cases.
 12. **Shared views over skin styles.** One view per screen; the look comes from `BySkin` (it already exists) or a
     small `SkinStyles` include (Mac or Win styles file). *First:* the 12 near-identical pairs, starting with GetReady,
-    AiSetup and Funnel. *Test:* the existing shots.
+    AiSetup and Funnel. *Test:* the Snapshots (Funnel is one of them).
 
 ## 4. Connection rules
 
