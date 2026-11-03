@@ -1,5 +1,7 @@
 using System.Collections.ObjectModel;
 using CommunityToolkit.Mvvm.Input;
+using StudyStash.App.Services;
+using StudyStash.App.Services.Stores;
 using StudyStash.Core;
 using StudyStash.Core.Ai;
 
@@ -50,41 +52,35 @@ public sealed class AiProblem
 /// Every AI problem banner (design 18): the library's own (engine offline, not signed in, model missing, a usage
 /// limit) plus the app's (a fell-back answer, the library not answering, a rewrite that failed, an access request —
 /// this last one has no server source yet: nothing asks for approval today, but the shape is here for when
-/// something does). Reads and drives one library's AI (<see cref="IAiLibrary"/>); the view is just this list.
+/// something does). Reads the library's AI from the one <see cref="AiStatusStore"/> (Settings' AI rows read the same
+/// one, so a sign-in started from either shows on both) and keeps only its cards; the view is just this list.
 /// </summary>
-public sealed class AiProblemsModel
+public sealed class AiProblemsModel : IDisposable
 {
-    readonly IAiLibrary library;
-    readonly SignInWatch watch;
+    readonly AiStatusStore store;
+    /// <summary>Made here for a model given only a library (a test, a picture): disposed with it.</summary>
+    readonly bool ownsStore;
     string shown = "";
+    /// <summary>Above zero while this model's own call to the store is going: it draws the answer itself.</summary>
+    int own;
 
     /// <summary>Opens a page in the browser (Get help); null in tests.</summary>
     public Action<string>? OpenUrl { get; set; }
 
-    public AiProblemsModel(IAiLibrary library)
+    public AiProblemsModel(AiStatusStore store)
     {
-        this.library = library;
-        watch = new SignInWatch(library, SignInMovedAsync);
+        this.store = store;
+        store.Changed += OnStoreChanged;
     }
 
-    /// <summary>Said whenever these cards learn the AIs' state from the library (a sign-in's progress among it), so the
-    /// rows on the same page show it too; <see cref="Adopt"/> is the other direction.</summary>
-    public event Action<AiOverview>? Heard;
-
-    /// <summary>Takes the state the AI rows learned, so a sign-in started from a row shows on its card at once.</summary>
-    public void Adopt(AiOverview overview)
-    {
-        if (SignInWatch.Signature(overview) == shown) return;
-        shown = SignInWatch.Signature(overview);
-        Apply(overview.Problems);
-        watch.Begin(overview);
-    }
+    /// <summary>Over a store of its own (a test, a picture, a page with nothing else on it reading the AI).</summary>
+    public AiProblemsModel(IAiLibrary library) : this(new AiStatusStore(library)) => ownsStore = true;
 
     /// <summary>How often a sign-in that's going is looked at; a test sets it small.</summary>
     public TimeSpan SignInEvery
     {
-        get => watch.Every;
-        set => watch.Every = value;
+        get => store.Every;
+        set => store.Every = value;
     }
 
     /// <summary>Whether the library is on this computer (one computer does everything): its cards say "this computer"
@@ -93,38 +89,42 @@ public sealed class AiProblemsModel
 
     public ObservableCollection<AiProblem> Problems { get; } = [];
 
-    /// <summary>A sign-in going from a card: its card turns into "Finish signing in…", and goes by itself once the AI
-    /// says it's signed in (nothing to press).</summary>
-    Task SignInMovedAsync(AiOverview now)
+    /// <summary>The store learned something (a sign-in's progress, or Settings' rows did something): the cards follow,
+    /// a card for a sign-in that worked going by itself (nothing to press).</summary>
+    void OnStoreChanged()
     {
-        if (SignInWatch.Signature(now) == shown) return Task.CompletedTask;
-        shown = SignInWatch.Signature(now);
-        Apply(now.Problems);
-        Heard?.Invoke(now);
-        return Task.CompletedTask;
+        if (own > 0 || store.Current is not { } now || store.Signature == shown) return;
+        Show(now);
+    }
+
+    void Show(AiOverview overview)
+    {
+        shown = AiStatusStore.SignatureOf(overview);
+        Apply(overview.Problems);
+    }
+
+    async Task<T> Own<T>(Func<Task<T>> call)
+    {
+        own++;
+        try
+        {
+            return await call();
+        }
+        finally
+        {
+            own--;
+        }
     }
 
     public async Task Load()
     {
-        AiOverview? overview;
-        try
-        {
-            overview = await library.EnginesAsync();
-        }
-        catch
-        {
-            return;
-        }
-        if (overview is null) return;
-        shown = SignInWatch.Signature(overview);
-        Apply(overview.Problems);
-        watch.Begin(overview);
-        Heard?.Invoke(overview);
+        var asked = await Own(() => store.RefreshAsync());
+        if (asked.Value is { } overview) Show(overview);
     }
 
     void Apply(List<AiProblemInfo> infos)
     {
-        var appOnly = Problems.Where(p => p.Kind is "fell_back" or "library_offline" or "rewrite_failed" or "access_request").ToList();
+        var appOnly = Problems.Where(p => p.Kind is AiProblemKind.FellBack or AiProblemKind.LibraryOffline or AiProblemKind.RewriteFailed or AiProblemKind.AccessRequest).ToList();
         Problems.Clear();
         foreach (var p in infos) Problems.Add(Build(p));
         foreach (var p in appOnly) Problems.Add(p);
@@ -133,8 +133,9 @@ public sealed class AiProblemsModel
     AiProblem Build(AiProblemInfo p)
     {
         string fallbackName = Engines.Name(p.FallbackTo.Length > 0 ? p.FallbackTo : "ollama");
+        bool signedOut = p.Kind == AiProblemKind.NotSignedIn;
         // A sign-in going from this card says where it is, in the card's own words.
-        string signIn = p.Kind == "not_signed_in" ? p.SignIn : "";
+        string signIn = signedOut ? p.SignIn : "";
         var problem = new AiProblem
         {
             Id = p.Id,
@@ -143,13 +144,13 @@ public sealed class AiProblemsModel
             Title = signIn.Length > 0 ? AiWords.SignInTitle(p.EngineName, signIn) : AiWords.ProblemTitle(p.Kind, p.EngineName, fallbackName, Here),
             // A sign-in with no stand-in says so, rather than naming Ollama, which isn't used.
             Message = signIn.Length > 0 ? AiWords.SignInAbout(p.EngineName, signIn)
-                : AiWords.ProblemMessage(p.Kind, p.EngineName, p.Kind == "not_signed_in" && p.FallbackTo.Length == 0 ? "" : fallbackName,
+                : AiWords.ProblemMessage(p.Kind, p.EngineName, signedOut && p.FallbackTo.Length == 0 ? "" : fallbackName,
                     p.Until, p.SizeGb, "", Here),
             Icon = AiWords.ProblemIcon(p.Kind),
             ColorKey = AiWords.ProblemColorKey(p.Kind),
             Severity = AiWords.ProblemSeverity(p.Kind),
             PrimaryWords = signIn.Length > 0 ? AiWords.SignInButton(signIn)
-                : p.Kind == "not_signed_in" && signingIn.Contains(p.Engine) ? "Check" : AiWords.ProblemAction(p.Kind),
+                : signedOut && store.ChecksNext(p.Engine) ? "Check" : AiWords.ProblemAction(p.Kind),
             SecondaryWords = AiWords.SignInLink(signIn),
         };
         problem.PrimaryCommand = new AsyncRelayCommand(() => Act(p));
@@ -167,83 +168,44 @@ public sealed class AiProblemsModel
             OpenUrl?.Invoke(AiWords.HelpPage);
             return;
         }
-        try
-        {
-            var said = await library.SignInAgainAsync(p.Engine);
-            if (said?.Overview is not null) Take(said.Overview);
-        }
-        catch
-        {
-            // The card stays: its link can be pressed again.
-        }
-    }
-
-    /// <summary>The overview an action answered: its cards, and the watch for a sign-in it started.</summary>
-    void Take(AiOverview overview)
-    {
-        shown = SignInWatch.Signature(overview);
-        Apply(overview.Problems);
-        watch.Begin(overview);
-        Heard?.Invoke(overview);
+        // Not answering, or refused: the card stays, and its link can be pressed again.
+        var said = await Own(() => store.ActAsync(p.Engine, AiAction.SignInAgain));
+        if (said.Value?.Overview is { } overview) Show(overview);
     }
 
     async Task Act(AiProblemInfo p)
     {
-        try
+        // Signed in since Sign in was pressed (on a library that doesn't sign in hidden): Check, and the card goes (Sign in
+        // comes back if it's still out).
+        var said = p.Kind switch
         {
-            AiSaid? said = p.Kind switch
-            {
-                "engine_offline" => await library.StartAsync(p.Engine),
-                // Signed in since Sign in was pressed: Check, and the card goes (Sign in comes back if it's still out).
-                "not_signed_in" when signingIn.Remove(p.Engine) => await library.CheckAsync(p.Engine),
-                "not_signed_in" => await SignInAsync(p.Engine),
-                "model_missing" => await library.DownloadAsync(p.Engine),
-                "usage_limit" => await Dismissed(p.Id),
-                _ => null,
-            };
-            if (said?.Overview is not null) Take(said.Overview);
-        }
-        catch (LibraryRefusedException)
-        {
-            // The row stays; its own action can be tried again (Check, once Sign in has said where to sign in).
-            if (signingIn.Contains(p.Engine)) await Load();
-        }
-        catch
-        {
-            // Offline: nothing to update here — the pane that owns "Offline" words shows that.
-        }
+            AiProblemKind.EngineOffline => await Own(() => store.ActAsync(p.Engine, AiAction.Start)),
+            AiProblemKind.NotSignedIn => await Own(() => store.ActAsync(p.Engine, store.ChecksNext(p.Engine) ? AiAction.Check : AiAction.SignIn)),
+            AiProblemKind.ModelMissing => await Own(() => store.ActAsync(p.Engine, AiAction.Download)),
+            AiProblemKind.UsageLimit => await Dismissed(p.Id),
+            _ => null,
+        };
+        if (said?.Value?.Overview is { } overview) Show(overview);
+        // Refused: the card stays; its own action can be tried again (Check, once Sign in has said where to sign in).
+        // Offline: nothing to update here — the pane that owns "Offline" words shows that.
+        else if (said?.Failure?.Kind == FailureKind.Refused && store.ChecksNext(p.Engine)) await Load();
     }
 
-    /// <summary>AIs whose Sign in was pressed on their card: the card's button is Check until it's pressed.</summary>
-    readonly HashSet<string> signingIn = [];
-
-    async Task<AiSaid?> SignInAsync(string engine)
+    async Task<Outcome<AiSaid>> Dismissed(string id)
     {
-        signingIn.Add(engine);
-        var said = await library.SignInAsync(engine);
-        // A library that signs in hidden says so on the card; one that doesn't leaves the student to press Check.
-        if (said?.Overview?.Problems.FirstOrDefault(x => x.Engine == engine && x.Kind == "not_signed_in") is { SignIn.Length: > 0 }
-            || said?.Overview?.Engines.FirstOrDefault(x => x.Id == engine) is { SignIn.Length: > 0 }) signingIn.Remove(engine);
-        return said;
-    }
-
-    async Task<AiSaid?> Dismissed(string id)
-    {
-        var overview = await library.DismissAsync(id);
-        return overview is null ? null : new AiSaid("", overview);
+        var dismissed = await Own(() => store.DismissAsync(id));
+        return dismissed.Value is { } overview ? Outcome<AiSaid>.Answered(new AiSaid("", overview)) : Outcome<AiSaid>.Failed(dismissed.Failure!);
     }
 
     async Task CloseServerAsync(string id)
     {
-        try
+        var dismissed = await Own(() => store.DismissAsync(id));
+        if (dismissed.Value is { } overview)
         {
-            var overview = await library.DismissAsync(id);
-            if (overview is not null) { Apply(overview.Problems); return; }
+            Apply(overview.Problems);
+            return;
         }
-        catch
-        {
-            // Offline or an older library: still drop it from view — Load() will bring it back if it's still true.
-        }
+        // Offline or an older library: still drop it from view — Load() will bring it back if it's still true.
         if (Problems.FirstOrDefault(p => p.Id == id) is { } p) Problems.Remove(p);
     }
 
@@ -295,6 +257,12 @@ public sealed class AiProblemsModel
     public void Remove(string id)
     {
         if (Existing(id) is { } p) Problems.Remove(p);
+    }
+
+    public void Dispose()
+    {
+        store.Changed -= OnStoreChanged;
+        if (ownsStore) store.Dispose();
     }
 }
 

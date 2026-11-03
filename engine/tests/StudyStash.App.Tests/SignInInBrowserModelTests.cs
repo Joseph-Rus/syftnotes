@@ -1,4 +1,5 @@
 using Avalonia.Headless.XUnit;
+using StudyStash.App.Services.Stores;
 using StudyStash.App.ViewModels;
 using StudyStash.Core.Ai;
 
@@ -162,9 +163,9 @@ public class SignInInBrowserModelTests
         // Settings shows the problem cards and the AI rows on one page: whichever started the sign-in, both follow it.
         var lib = new FakeAiLibrary { Overview = Claude("not_signed_in") };
         lib.OnSignIn = _ => new AiSaid("Finish signing in to Claude in the browser page that just opened.", lib.Overview = Claude("not_signed_in", SignInPhase.Waiting));
-        var rows = new AiEnginesModel(lib) { SignInEvery = TimeSpan.FromMilliseconds(20) };
-        var card = new AiProblemsModel(lib) { SignInEvery = TimeSpan.FromMilliseconds(20) };
-        rows.ShareWith(card);
+        var store = new AiStatusStore(lib) { Every = TimeSpan.FromMilliseconds(20) };
+        var rows = new AiEnginesModel(store);
+        var card = new AiProblemsModel(store);
         await rows.Load();
         await card.Load();
         AiEngineRow Row() => rows.Engines.Single(r => r.Id == "claude");

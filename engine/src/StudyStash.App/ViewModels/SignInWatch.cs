@@ -4,6 +4,8 @@ using StudyStash.Core.Ai;
 namespace StudyStash.App.ViewModels;
 
 /// <summary>
+/// Setup's own sign-in watch, until setup's AI step reads <see cref="Services.Stores.AiStatusStore"/> as Settings does
+/// (the next step of the toolkit): Settings' rows and cards no longer use this.
 /// Watches the library while an AI's sign-in is going, so the row or card that started it turns ready by itself: the
 /// library signs in hidden, looks at the AI's own status command, and says <see cref="EngineInfo.SignIn"/> on the AI's
 /// row until it's done. This asks for the overview every <see cref="Every"/> while one waits for the browser and hands
@@ -20,8 +22,7 @@ public sealed class SignInWatch(IAiLibrary library, Func<AiOverview, Task> chang
 
     /// <summary>Whether a sign-in the student can still finish is going on some AI: waiting for the browser. (One that
     /// stopped waits for Try again.)</summary>
-    public static bool Going(AiOverview overview) =>
-        overview.Engines.Any(e => e.State == "not_signed_in" && e.SignIn == SignInPhase.Waiting);
+    public static bool Going(AiOverview overview) => Services.Stores.AiStatusStore.SignInGoing(overview);
 
     /// <summary>Starts watching when the overview shows a sign-in going (and none is being watched yet).</summary>
     public void Begin(AiOverview? overview)
@@ -59,6 +60,5 @@ public sealed class SignInWatch(IAiLibrary library, Func<AiOverview, Task> chang
     }
 
     /// <summary>What a view shows of the AIs, to tell whether an answer changed anything worth drawing again.</summary>
-    public static string Signature(AiOverview overview) =>
-        string.Join('|', overview.Engines.Select(e => $"{e.Id}:{e.State}:{e.SignIn}")) + "#" + string.Join('|', overview.Problems.Select(p => $"{p.Id}:{p.SignIn}"));
+    public static string Signature(AiOverview overview) => Services.Stores.AiStatusStore.SignatureOf(overview);
 }
