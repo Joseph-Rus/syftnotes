@@ -1,5 +1,6 @@
-# The website (site/), published to Firebase Hosting (study-stash-app) when a change to it reaches main. A pull
-# request that changes it is checked (site/check.mjs) but not published. See site/README.md.
+# The website (site/): every page, link and download checked (site/check.mjs) when a change to it reaches main or a pull
+# request. Publishing is by hand (firebase deploy, see site/README.md): the repository has no Firebase key, and the
+# deploy job that waited for one never ran, so it is gone.
 name: Website
 
 on:
@@ -13,41 +14,20 @@ on:
 permissions:
   contents: read
 
-# One publish at a time; a newer push waits rather than cancelling one halfway through.
 concurrency:
-  group: website
-  cancel-in-progress: false
+  group: website-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   check:
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           persist-credentials: false
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: 22
       - name: Check every page, link and download
         run: node site/check.mjs
-
-  deploy:
-    if: github.event_name != 'pull_request'
-    needs: check
-    runs-on: ubuntu-latest
-    env:
-      HAS_KEY: ${{ secrets.FIREBASE_SERVICE_ACCOUNT != '' }}
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          persist-credentials: false
-      - name: Say why nothing is published
-        if: env.HAS_KEY != 'true'
-        run: echo "::notice::No FIREBASE_SERVICE_ACCOUNT secret, so the website was checked but not published (see site/README.md)."
-      - uses: FirebaseExtended/action-hosting-deploy@v0
-        if: env.HAS_KEY == 'true'
-        with:
-          repoToken: ${{ secrets.GITHUB_TOKEN }}
-          firebaseServiceAccount: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
-          projectId: study-stash-app
-          channelId: live

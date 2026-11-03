@@ -11,10 +11,10 @@ inputs:
 runs:
   using: composite
   steps:
-    - uses: actions/setup-dotnet@v4
+    - uses: actions/setup-dotnet@v6
       with:
         dotnet-version: "10.0.x"
-    - uses: actions/cache@v4
+    - uses: actions/cache@v6
       with:
         path: ~/.nuget/packages
         key: nuget-${{ inputs.packages }}-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('engine/**/*.csproj', 'engine/Directory.Build.props', 'engine/global.json') }}
