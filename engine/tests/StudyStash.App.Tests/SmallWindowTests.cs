@@ -58,10 +58,4 @@ public class SmallWindowTests
         }
     }
 
-    [AvaloniaFact]
-    public void Small_window_shots()
-    {
-        foreach (var t in new[] { ThemeVariant.Light, ThemeVariant.Dark })
-            Shot.Take("win-04-full-app-small", SkinKind.Win, t, () => new WinLibrary { DataContext = WithNotes(), Width = 992, Height = 696 });
-    }
 }

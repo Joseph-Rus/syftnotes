@@ -211,42 +211,4 @@ public class SetupCoursesContinueTests
         }
     }
 
-    /// <summary>The Canvas step with the term listed, in the window's own size and a small screen's.</summary>
-    [AvaloniaFact]
-    public async Task Shots()
-    {
-        foreach (var skin in new[] { SkinKind.Mac, SkinKind.Win })
-            foreach (double? room in new double?[] { null, 560 })
-                foreach (var t in new[] { ThemeVariant.Light, ThemeVariant.Dark })
-                {
-                    var m = await OnCanvasWithATermAsync(skin);
-                    string name = $"{(skin == SkinKind.Mac ? "mac" : "win")}-05-setup-canvas-term{(room is null ? "" : "-small")}";
-                    Shot.Take(name, skin, t, () =>
-                    {
-                        var view = View(skin, m);
-                        if (view is MacSetup mac) mac.DrawChrome = true;
-                        if (view is WinSetup win) win.DrawChrome = true;
-                        if (room is { } h) view.Height = h;
-                        return view;
-                    }, size: new Size(1100, 908));
-                }
-        // The connect window from Settings, the term found, at its own size.
-        foreach (var skin in new[] { SkinKind.Mac, SkinKind.Win })
-            foreach (var t in new[] { ThemeVariant.Light, ThemeVariant.Dark })
-            {
-                var handler = new FakeLibrary().Json(HttpMethod.Post, "/api/v2/canvas/courses", ATerm());
-                var context = CanvasFixtures.Context(handler);
-                var m = new CanvasConnectModel(context, new CanvasWatch(context)) { ShowFooter = true, FinishLabel = "Finish", StepLabel = "" };
-                await m.StartAsync(CanvasFixtures.Load<CanvasApi.State>("state-connected"), []);
-                m.Dispose();
-                Shot.Take($"{(skin == SkinKind.Mac ? "mac" : "win")}-07-canvas-connect-term", skin, t, () =>
-                {
-                    Control view = skin == SkinKind.Mac ? new MacCanvasConnect { DataContext = m } : new WinCanvasConnect { DataContext = m };
-                    PickerRoom.Follow(view.FindControl<ScrollViewer>("Page")!);
-                    var frame = new Border { Width = 640, Height = 680, Padding = new Thickness(32, 24, 32, 24), Child = view, CornerRadius = new CornerRadius(12) };
-                    frame.Bind(Border.BackgroundProperty, frame.GetResourceObservable(skin == SkinKind.Mac ? "Win" : "Layer"));
-                    return frame;
-                }, size: new Size(800, 800));
-            }
-    }
 }
