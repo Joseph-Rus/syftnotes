@@ -155,9 +155,6 @@ jobs:
           WINDOWS_CERT_PASSWORD_SET: ${{ secrets.WINDOWS_CERT_PASSWORD != '' }}
         run: bash .github/scripts/signing-plan.sh plan
 
-  # The C# engine (engine/): every test on each system. Golden/ holds fixed expectations the tests compare byte for
-  # byte. The two test projects are two jobs per system: they used to run one after the other in one job, and the
-  # Windows one needed 12 to 14 minutes for it. Each has a machine of its own, so one is no busier than before.
   # The desktop app's connection rules (docs/ARCHITECTURE.md), counted: a fixed wait, a screen keeping its own copy of
   # the AI's state, a window built by hand, an error swallowed. A count that goes up fails; the toolkit is the way instead.
   connections:
@@ -168,6 +165,24 @@ jobs:
       - uses: actions/checkout@v4
       - run: bash tools/check-connections.sh
 
+  # The C# engine (engine/): every test on each system. Golden/ holds fixed expectations the tests compare byte for
+  # byte. macOS and Linux run both test projects (Core, then App) in one job: GitHub runs at most five macOS jobs at
+  # once, and a run that took five made the next one queue. Windows keeps them in two jobs side by side, as its App
+  # tests are the slowest anywhere (about 20 minutes).
+  # Then, in each leg that ran the App tests, every AI sign-in with no terminal, proved with the real CLIs: Claude Code,
+  # Codex and Antigravity CLI (Gemini), each installed the way the app installs it (its maker's installer) in a home of
+  # the run's own, then signed in with the app's own hidden sign-in (a pseudo-terminal nobody sees; ConPTY on Windows)
+  # until it waits for the browser, and stopped (RealCliSignInTests). No account is used and nothing finishes; the app's
+  # browser opener is replaced and the system's are stand-ins, so nothing opens from the app; on Windows no window of
+  # the sign-in's own may show. Then Connect's own step adds Syft Notes to that AI's apps in the run's home, the real CLI
+  # is asked what it sees (claude mcp list, codex mcp list, agy mcp list where it has one), and the server each app's
+  # settings name is started exactly as written there and lists its tools (RealCliConnect.cs); the Claude app's
+  # settings are a copy of each computer's real layout (on Windows the Store build after it moved its data). On
+  # Windows, Git for Windows is out of reach for all of it, as on a student's PC. The log says only yes or no for each
+  # (needed a terminal, prompts answered, waiting for the browser, a window, connected, listed), never an address, a
+  # code or a token. A CLI whose download fails for the network is skipped and said so. It's the makers' CLIs as they
+  # are today, so a failure there is reported (on the step, and on the run's page) but fails neither the job nor a
+  # release.
   engine:
     name: Engine ${{ matrix.suite }} tests (${{ matrix.os }})
     needs: [version]
@@ -175,10 +190,14 @@ jobs:
     strategy:
       fail-fast: false  # a flake in one doesn't hide the rest, and re-running a failed job re-runs only it
       matrix:
-        os: [ubuntu-latest, macos-latest, windows-latest]
-        suite: [Core, App]
-    # A leg takes 2 to 20 minutes; the App tests on a slow Windows runner the most. 15 and 30 only bound a hang.
-    timeout-minutes: ${{ matrix.suite == 'Core' && 15 || 30 }}
+        include:
+          - { os: ubuntu-latest, suite: Core and App, core: true, app: true }
+          - { os: macos-latest, suite: Core and App, core: true, app: true }
+          - { os: windows-latest, suite: Core, core: true, app: false }
+          - { os: windows-latest, suite: App, core: false, app: true }
+    # Measured: Linux 2 + 14 to 17 minutes, macOS 4 + 20 to 25, Windows Core 10 to 14, Windows App 16 to 22, and the real
+    # sign-ins 2 to 3 more. The limits only bound a hang.
+    timeout-minutes: ${{ matrix.suite == 'Core' && 25 || 45 }}
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
@@ -191,7 +210,7 @@ jobs:
         run: mkdir -p "$RUNNER_TEMP/crash"
       # Linux: a real sound server with a stand-in microphone, so the Core tests record through PulseAudio itself.
       - name: PulseAudio, with a microphone that hears silence
-        if: runner.os == 'Linux' && matrix.suite == 'Core'
+        if: runner.os == 'Linux' && matrix.core
         run: |
           sudo apt-get update -qq && sudo apt-get install -y -qq --no-install-recommends pulseaudio pulseaudio-utils libpulse0
           pulseaudio -D --exit-idle-time=-1
@@ -199,22 +218,78 @@ jobs:
           pactl load-module module-null-sink sink_name=mic
           pactl set-default-sink speakers
           pactl set-default-source mic.monitor
-      - name: Run the ${{ matrix.suite }} tests
-        run: dotnet test engine/tests/StudyStash.${{ matrix.suite }}.Tests
+      - name: Run the Core tests
+        id: core
+        if: matrix.core
+        run: dotnet test engine/tests/StudyStash.Core.Tests
         env:
           # Linux: record through the PulseAudio started above.
-          STUDYSTASH_PULSE_TESTS: ${{ runner.os == 'Linux' && matrix.suite == 'Core' && '1' || '' }}
+          STUDYSTASH_PULSE_TESTS: ${{ runner.os == 'Linux' && '1' || '' }}
           # Windows: also run the library as a real background service, from the Startup folder with no window.
-          STUDYSTASH_LIVE_SERVICE: ${{ runner.os == 'Windows' && matrix.suite == 'Core' && '1' || '' }}
-          # Windows: the pictures the tests draw are kept, so the notes' formulas and diagrams can be seen as Windows
-          # draws them (its own fonts), in the Windows look, light and dark, at 100% and 150%.
-          STUDYSTASH_SHOTS: ${{ runner.os == 'Windows' && matrix.suite == 'App' && format('{0}\shots', runner.temp) || '' }}
+          STUDYSTASH_LIVE_SERVICE: ${{ runner.os == 'Windows' && '1' || '' }}
           # A test process that dies in native code leaves a crash report (every thread's stack, native and .NET)
           # instead of only "exit code 139", so a crash that happens once in a while can be traced the first time.
           DOTNET_DbgEnableMiniDump: ${{ runner.os != 'Windows' && '1' || '' }}
           DOTNET_DbgMiniDumpType: ${{ runner.os != 'Windows' && '1' || '' }}
           DOTNET_EnableCrashReport: ${{ runner.os != 'Windows' && '1' || '' }}
           DOTNET_DbgMiniDumpName: ${{ runner.os != 'Windows' && format('{0}/crash/core.%p', runner.temp) || '' }}
+      # After the Core tests even when they failed, so one run shows everything that's wrong.
+      - name: Run the App tests
+        id: app
+        if: ${{ !cancelled() && matrix.app }}
+        run: dotnet test engine/tests/StudyStash.App.Tests
+        env:
+          # Windows: the pictures the tests draw are kept, so the notes' formulas and diagrams can be seen as Windows
+          # draws them (its own fonts), in the Windows look, light and dark, at 100% and 150%.
+          STUDYSTASH_SHOTS: ${{ runner.os == 'Windows' && format('{0}\shots', runner.temp) || '' }}
+          DOTNET_DbgEnableMiniDump: ${{ runner.os != 'Windows' && '1' || '' }}
+          DOTNET_DbgMiniDumpType: ${{ runner.os != 'Windows' && '1' || '' }}
+          DOTNET_EnableCrashReport: ${{ runner.os != 'Windows' && '1' || '' }}
+          DOTNET_DbgMiniDumpName: ${{ runner.os != 'Windows' && format('{0}/crash/core.%p', runner.temp) || '' }}
+      # A student's PC has no Git for Windows: its folder is moved aside and it's taken off the PATH for the sign-ins and
+      # Connect, then put back (the steps after it, and the checkout's own clean-up, use it).
+      - name: Windows - Git for Windows out of reach
+        if: ${{ !cancelled() && matrix.app && runner.os == 'Windows' }}
+        shell: pwsh
+        run: |
+          "GIT_KEPT_PATH=$env:PATH" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          $git = Join-Path $env:ProgramFiles 'Git'
+          if (Test-Path $git) { Rename-Item $git 'Git-out-of-reach' }
+          $path = ($env:PATH -split ';' | Where-Object { $_ -notmatch '\\Git\\' }) -join ';'
+          "PATH=$path" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+      # The App tests above built what this runs.
+      - name: Each real AI's sign-in, in the hidden terminal, then Connect against what each reads (the makers' CLIs as they are today, so not one the run waits for)
+        id: real-sign-in
+        if: ${{ !cancelled() && matrix.app }}
+        continue-on-error: true
+        timeout-minutes: 12
+        shell: pwsh
+        run: dotnet test engine/tests/StudyStash.App.Tests --no-build --filter "FullyQualifiedName~RealCliSignInTests"
+        env:
+          STUDYSTASH_REAL_CLIS: "1"
+          STUDYSTASH_REAL_CLIS_DIR: ${{ runner.temp }}/real-sign-in
+      - name: Windows - Git for Windows back
+        if: always() && matrix.app && runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $kept = Join-Path $env:ProgramFiles 'Git-out-of-reach'
+          if (Test-Path $kept) { Rename-Item $kept 'Git' }
+          if ($env:GIT_KEPT_PATH) { "PATH=$env:GIT_KEPT_PATH" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append }
+      - name: What each real sign-in did
+        if: ${{ !cancelled() && matrix.app }}
+        shell: bash
+        env:
+          OUTCOME: ${{ steps.real-sign-in.outcome }}
+        run: |
+          summary=$(cat "$RUNNER_TEMP/real-sign-in/summary.txt" 2>/dev/null || echo "no summary was written")
+          echo "$summary"
+          {
+            echo "### Real sign-ins and Connect ($RUNNER_OS): $OUTCOME"
+            echo '```'
+            echo "$summary"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+          if [ "$OUTCOME" = failure ]; then echo "::warning::The real sign-ins failed on $RUNNER_OS (not counted against the run): see the step above."; fi
       - name: Crash reports, if a test process crashed
         if: ${{ failure() && runner.os != 'Windows' }}
         uses: actions/upload-artifact@v4
@@ -224,7 +299,7 @@ jobs:
           path: ${{ runner.temp }}/crash/*.crashreport.json
           if-no-files-found: ignore
       - name: The notes' formulas and diagrams, as Windows draws them
-        if: ${{ always() && runner.os == 'Windows' && matrix.suite == 'App' }}
+        if: ${{ always() && runner.os == 'Windows' && matrix.app }}
         uses: actions/upload-artifact@v4
         continue-on-error: true
         with:
@@ -234,7 +309,7 @@ jobs:
             ${{ runner.temp }}\shots\rich-*-win-*
           if-no-files-found: error
       - name: Notifications, as Windows draws them, where they land above the taskbar
-        if: ${{ always() && runner.os == 'Windows' && matrix.suite == 'App' }}
+        if: ${{ always() && runner.os == 'Windows' && matrix.app }}
         uses: actions/upload-artifact@v4
         continue-on-error: true
         with:
@@ -244,23 +319,13 @@ jobs:
             ${{ runner.temp }}\shots\win-12-toast-*
           if-no-files-found: error
 
-  # Every AI sign-in with no terminal, proved with the real CLIs: Claude Code, Codex and Antigravity CLI (Gemini), each
-  # installed the way the app installs it (its maker's installer) in a home of the run's own, then signed in with the
-  # app's own hidden sign-in (a pseudo-terminal nobody sees; ConPTY on Windows) until it waits for the browser, and
-  # stopped (RealCliSignInTests). No account is used and nothing finishes; the app's browser opener is replaced and the
-  # system's are stand-ins, so nothing opens from the app; on Windows no window of the sign-in's own may show. Then
-  # Connect's own step adds Syft Notes to that AI's apps in the run's home, the real CLI is asked what it sees
-  # (claude mcp list, codex mcp list, agy mcp list where it has one), and the server each app's settings name is started
-  # exactly as written there and lists its tools (RealCliConnect.cs); the Claude app's settings are a copy of each
-  # computer's real layout (on Windows the Store build after it moved its data). On Windows, Git for Windows is out of
-  # reach for all of it, as on a student's PC. The log says only yes or no for each (needed a terminal, prompts
-  # answered, waiting for the browser, a window, connected, listed), never an address, a code or a token. A CLI whose
-  # download fails for the network is skipped and said so. It's the makers' CLIs as they are today, so it isn't one a
-  # release waits for.
+  # Only for a run by hand with "real_sign_in_only": the real sign-ins above, alone, and what each showed, every
+  # address, email and anything like a code or a key already taken out by the test, kept for a day to write the tests'
+  # recordings from. Nothing else runs, so the run proves nothing else.
   real-sign-in:
     name: Real sign-ins, hidden, and Connect (${{ matrix.os }})
     needs: [version]
-    if: needs.version.outputs.tested != 'true' || inputs.real_sign_in_only
+    if: inputs.real_sign_in_only
     strategy:
       fail-fast: false
       matrix:
@@ -275,8 +340,6 @@ jobs:
           dotnet-version: "10.0.x"
       - name: Build the app's tests
         run: dotnet build engine/tests/StudyStash.App.Tests
-      # A student's PC has no Git for Windows: its folder is moved aside and it's taken off the PATH for the sign-ins and
-      # Connect, then put back (the steps after it, and the checkout's own clean-up, use it).
       - name: Windows - Git for Windows out of reach
         if: runner.os == 'Windows'
         shell: pwsh
@@ -292,7 +355,7 @@ jobs:
         env:
           STUDYSTASH_REAL_CLIS: "1"
           STUDYSTASH_REAL_CLIS_DIR: ${{ runner.temp }}/real-sign-in
-          STUDYSTASH_REAL_CLIS_RECORD: ${{ inputs.real_sign_in_only && '1' || '' }}
+          STUDYSTASH_REAL_CLIS_RECORD: "1"
       - name: Windows - Git for Windows back
         if: always() && runner.os == 'Windows'
         shell: pwsh
@@ -304,10 +367,8 @@ jobs:
         if: always()
         shell: bash
         run: cat "$RUNNER_TEMP/real-sign-in/summary.txt" 2>/dev/null || echo "no summary was written"
-      # Only for a run of the real sign-ins alone: what each showed, every address, email and anything like a code or a
-      # key already taken out by the test, kept for a day to write the tests' recordings from.
       - name: What each showed, addresses taken out
-        if: always() && inputs.real_sign_in_only
+        if: always()
         uses: actions/upload-artifact@v4
         continue-on-error: true
         with:
@@ -322,13 +383,14 @@ jobs:
   # the microphone entitlement; the DMG (D2). Proved with the real self-test (D5): real windows open, the pretend
   # microphone records, Whisper (Metal) hears the speech from inside the bundle. Only a release uploads the DMG.
   # With the signing secrets (docs/signing.md) the app is signed with a Developer ID, notarized and stapled right after
-  # the build, and the DMG made again around it; the self-test then runs the signed app, with library validation on.
+  # the build, and the DMG made again around it; the self-tests then run the signed app, with library validation on.
+  # Both self-tests (as a laptop, and as just this computer) run here, one after the other, on the one app built.
   mac-app:
     name: Mac app (self-test, DMG)
     needs: [version]
     if: needs.version.outputs.tested != 'true' || (needs.version.outputs.installers == 'true' && needs.version.outputs.reuse_run == '')
     # Notarization usually answers within minutes, but Apple's first answers for a new account can take much longer.
-    timeout-minutes: ${{ needs.version.outputs.mac_signing == 'real' && 120 || (needs.version.outputs.mac_signing == 'rehearsal' && 40 || 25) }}
+    timeout-minutes: ${{ needs.version.outputs.mac_signing == 'real' && 120 || (needs.version.outputs.mac_signing == 'rehearsal' && 45 || 30) }}
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v4
@@ -412,7 +474,20 @@ jobs:
           [ "$(env -u DOTNET_ROOT arch -x86_64 "$APP/Contents/MacOS/StudyStash" version)" = "$V" ]
       - name: Self-test (D5) - real windows, the pretend mic, Whisper from inside the bundle
         if: needs.version.outputs.tested != 'true'
-        run: sh macos/selftest.sh "dist/mac/Study Stash.app" "$RUNNER_TEMP/selftest"
+        run: sh macos/selftest.sh "dist/mac/Study Stash.app" "$RUNNER_TEMP/selftest/laptop"
+      # The second self-test, on the same app (it used to build it again on a Mac of its own): Just this computer.
+      # Then "Answer your phone when Syft Notes is closed" goes on with a stand-in phone (a real LaunchAgent, on this
+      # throwaway Mac only), the app quits, and the library must still answer the phone, and leave nothing once removed.
+      - name: Self-test, just this computer - setup makes the app's own library, the notes are written here, and the phone is answered with the app closed
+        if: ${{ !cancelled() && needs.version.outputs.tested != 'true' }}
+        env:
+          STUDYSTASH_SELFTEST_FLOW: one-computer
+          STUDYSTASH_SELFTEST_BACKGROUND: "1"
+        run: |
+          sh macos/selftest.sh "dist/mac/Study Stash.app" "$RUNNER_TEMP/selftest/one-computer"
+          grep -q "^background library registered" "$RUNNER_TEMP/selftest/one-computer/selftest.txt" || { echo "the self-test didn't turn on answering with the app closed"; exit 1; }
+          grep -q "^the phone got its answer with the app closed" "$RUNNER_TEMP/selftest/one-computer/background.txt" || { echo "the phone wasn't answered with the app closed"; exit 1; }
+          [ ! -e "$HOME/Library/LaunchAgents/"com.study-stash.background.*.plist ] || { echo "a LaunchAgent was left behind"; ls "$HOME/Library/LaunchAgents"; exit 1; }
       - name: The DMG holds the app with no role of its own (setup asks), and no model is bundled (D6)
         run: |
           mnt="$RUNNER_TEMP/mnt-dmg"
@@ -457,45 +532,6 @@ jobs:
       - name: Signing - the keychain and keys are removed
         if: always() && needs.version.outputs.mac_signing != 'off'
         run: sh macos/signing-setup.sh cleanup
-
-  # The Mac app's second self-test, on a computer of its own so it runs beside the first: Just this computer, where
-  # setup makes the app's own library and the notes are written here.
-  mac-one-computer:
-    name: Mac app self-test (just this computer)
-    needs: [version]
-    if: needs.version.outputs.tested != 'true'
-    timeout-minutes: 25
-    runs-on: macos-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-dotnet@v4
-        with:
-          dotnet-version: "10.0.x"
-      - uses: ./.github/actions/whisper-tiny
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 22
-          cache: npm
-          cache-dependency-path: web/package-lock.json
-      - name: Build Study Stash.app
-        run: sh macos/build-app.sh dist/mac
-      # Then "Answer your phone when Syft Notes is closed" goes on with a stand-in phone (a real LaunchAgent, on this
-      # throwaway Mac only), the app quits, and the library must still answer the phone, and leave nothing once removed.
-      - name: Self-test, just this computer - setup makes the app's own library, the notes are written here, and the phone is answered with the app closed
-        env:
-          STUDYSTASH_SELFTEST_FLOW: one-computer
-          STUDYSTASH_SELFTEST_BACKGROUND: "1"
-        run: |
-          sh macos/selftest.sh "dist/mac/Study Stash.app" "$RUNNER_TEMP/selftest/one-computer"
-          grep -q "^background library registered" "$RUNNER_TEMP/selftest/one-computer/selftest.txt" || { echo "the self-test didn't turn on answering with the app closed"; exit 1; }
-          grep -q "^the phone got its answer with the app closed" "$RUNNER_TEMP/selftest/one-computer/background.txt" || { echo "the phone wasn't answered with the app closed"; exit 1; }
-          [ ! -e "$HOME/Library/LaunchAgents/"com.study-stash.background.*.plist ] || { echo "a LaunchAgent was left behind"; ls "$HOME/Library/LaunchAgents"; exit 1; }
-      - uses: actions/upload-artifact@v4
-        continue-on-error: true
-        if: always()
-        with:
-          name: mac-one-computer-selftest
-          path: ${{ runner.temp }}/selftest
 
   # The Intel self-test (D5), for real: a physical Intel Mac, so the x64 tree runs natively (mac-app already checked
   # it runs enough to print its version under Rosetta). A release only.
@@ -1027,7 +1063,7 @@ jobs:
   # !failure() alone let a release through after Windows' Core tests timed out (run 41495152314).
   release:
     name: publish release
-    needs: [version, connections, engine, mac-app, mac-one-computer, mac-intel, windows-app, linux-app]
+    needs: [version, connections, engine, mac-app, mac-intel, windows-app, linux-app]
     if: ${{ !cancelled() && !contains(needs.*.result, 'failure') && !contains(needs.*.result, 'cancelled') && needs.version.outputs.installers == 'true' && (needs.version.outputs.reuse_run != '' || (needs.mac-app.result == 'success' && needs.mac-intel.result == 'success' && needs.windows-app.result == 'success' && needs.linux-app.result == 'success')) }}
     timeout-minutes: 10
     runs-on: ubuntu-latest
