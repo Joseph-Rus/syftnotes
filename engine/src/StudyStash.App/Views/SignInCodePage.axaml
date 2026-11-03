@@ -1,0 +1,30 @@
+<!-- A sign-in started from Settings or an AI card, whose page ends on a code (Gemini's), in a small window of its own
+     (both looks): the box to paste it into. It closes by itself once the AI is signed in. -->
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:kit="using:StudyStash.App.ViewModels.Kit"
+             xmlns:c="using:StudyStash.App.Controls"
+             xmlns:v="using:StudyStash.App.Views"
+             x:Class="StudyStash.App.Views.SignInCodePage"
+             x:DataType="kit:SignInCodeModel"
+             Classes="in-setup"
+             Width="480">
+  <UserControl.Styles>
+    <StyleInclude Source="avares://StudyStash/Views/SetupStyles.axaml" />
+    <Style Selector="Border#Chrome.chrome">
+      <Setter Property="CornerRadius" Value="10" />
+      <Setter Property="BoxShadow" Value="{DynamicResource ShadowLg}" />
+    </Style>
+  </UserControl.Styles>
+  <Border Name="Chrome" Background="{DynamicResource Canvas}" ClipToBounds="True">
+    <DockPanel>
+      <c:WindowHeader Name="Header" DockPanel.Dock="Top" CanResize="False" Title="{Binding WindowTitle}" />
+      <StackPanel Margin="28,4,28,26" Spacing="14">
+        <v:SignInCode Name="Box" />
+        <!-- It stopped (the code didn't work, or it waited too long): Try again gives a new page and a new code. -->
+        <Button Name="TryAgain" Classes="btn sm" HorizontalAlignment="Left" Command="{Binding TryAgainCommand}"
+                IsVisible="{Binding CanTryAgain}" Content="Try again" />
+      </StackPanel>
+    </DockPanel>
+  </Border>
+</UserControl>

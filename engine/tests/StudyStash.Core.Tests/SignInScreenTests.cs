@@ -36,6 +36,24 @@ public class SignInScreenTests
         + "Waiting for authentication (timeout 60s)...\r\n"
         + "Or, paste the authorization code here and press Enter: ";
 
+    // Plain agy's page, as agy 1.4.12 opened it: Google's own sign-in, sent back to a page on antigravity.google that
+    // shows the code to paste ("Paste this code into your application"), never to this computer.
+    const string AgyPage = "https://accounts.google.com/o/oauth2/auth?access_type=offline&client_id=CLIENT.apps.googleusercontent.com&code_challenge=CHALLENGE"
+        + "&code_challenge_method=S256&prompt=consent&redirect_uri=https%3A%2F%2Fagy.example.com%2Foauth-callback&response_type=code&scope=openid&state=STATE";
+
+    /// <summary>Plain `agy` (Antigravity CLI 1.4.12), signed out, in a pseudo-terminal on a Mac: its login method asked,
+    /// then, once Enter takes Google, the page as a link (OSC 8) wrapped over lines, and a field for the code. It waits
+    /// there as long as it's left open.</summary>
+    static readonly string AgyInteractive = "\x1b[?2026$p\x1b[?2027$p\x1b[>4m\r\n\n Welcome to the \x1b[38;5;69mAntigravity CLI\x1b[m. You are currently not signed in.\r\n\n"
+        + " \u28f7  Signing in...\r Select login method:\r\n > 1. Google OAuth\n\x1b[4G2. Use a Google Cloud project\n\n\x1b[4G\x1b[94;1m\u2191/\u2193\x1b[90;22m Navigate \u00b7 \x1b[94;1menter\x1b[90;22m Select\x1b[m"
+        + "\x1b[8;2HYour browser should open automatically. If not:\x1b[K\r\n\n"
+        + $" \x1b[34;4m\x1b]8;id=jk1;{AgyPage}\a{AgyPage[..60]}\x1b[m\x1b]8;;\a\r\n"
+        + $" \x1b[34;4m\x1b]8;id=jk1;{AgyPage}\a{AgyPage[60..]}\x1b[m\x1b]8;;\a\r\n\n"
+        + " \x1b[90mCopy and paste the URL or click on the link below:\x1b[m\r\n"
+        + $" \x1b[34;1;4m\x1b]8;id=jk2;{AgyPage}\a\u2192\x1b[22m \x1b[1mClick\x1b[22m \x1b[1mhere\x1b[22m \x1b[1mto\x1b[22m \x1b[1mauthenticate\x1b[m\x1b]8;;\a\r\n\n"
+        + " If you aren't automatically redirected, paste the authorization code below:\r\n\n"
+        + " \x1b[37;7ma\x1b[38;5;240;27muthorization code...\x1b[m\r\n\n\n  \x1b[94;1mshift+up/down\x1b[90;22m Navigate\x1b[m\r\x1b[3A";
+
     /// <summary>Codex on the Windows runner: the console host draws the screen, with its own title, colours, cursor moves
     /// and runs of spaces as cursor-right.</summary>
     static readonly string CodexOnWindows = "\x1b[?9001h\x1b[?1004h\x1b[?25l\x1b[2J\x1b[m\x1b[H\x1b]0;C:\\Users\\runneradmin\\AppData\\Local\\Programs\\OpenAI\\Codex\\bin\\codex.exe\a\x1b[?25h"
@@ -73,6 +91,42 @@ public class SignInScreenTests
             Assert.Equal(finishesByItself, screen.PageFinishesByItself);
         }
     }
+
+    [Fact]
+    public void Plain_agy_is_answered_with_Google_once_and_then_asks_for_the_code_its_page_ends_on()
+    {
+        foreach (int size in new[] { 1, 7, 4096 })
+        {
+            var screen = new SignInScreen { AnswersQueries = true };
+            // One Enter, for "Google OAuth" (highlighted), and nothing else, however the screen comes.
+            Assert.Equal("\r", Feed(screen, AgyInteractive, size));
+            Assert.Equal(["which login method: Google account"], screen.Answered);
+            Assert.True(screen.Waiting);
+            Assert.True(screen.AsksForCode);
+            Assert.False(screen.CodeRefused);
+            Assert.False(screen.WantsTerminal);
+            // Its page, whole, from the link (it's wrapped on the screen); one that doesn't come back to this computer.
+            Assert.Equal(AgyPage, screen.Page);
+            Assert.False(screen.PageFinishesByItself);
+
+            // A code Google turned down: it says so, and waits for a key that nobody presses.
+            Assert.Equal("", Feed(screen, "\r\x1b[7d\x1b[17M\x1b[K\n \u28df  Signing in...\r \u287f \r\n\x1b[2L\x1bM \x1b[31mGot an error:\x1b[m token exchange failed: "
+                + "oauth2: \"invalid_grant\" \"Bad Request\"\r\n\n Press any key to go back.", size));
+            Assert.True(screen.CodeRefused);
+        }
+        // The other login method highlighted instead: nothing is pressed.
+        var other = new SignInScreen();
+        Assert.Equal("", Feed(other, " Select login method:\r\n   1. Google OAuth\r\n > 2. Use a Google Cloud project\r\n"));
+    }
+
+    [Theory]
+    [InlineData("4/0AbCdEf-123_xyz", "4/0AbCdEf-123_xyz")]
+    [InlineData("  4/0AbCdEf\n-123_xyz \r\n", "4/0AbCdEf-123_xyz")]
+    [InlineData("", null)]
+    [InlineData("abc", null)]
+    [InlineData("4/0Ab\u0007Cd", null)]
+    public void A_pasted_code_is_cleaned_of_spaces_and_line_breaks_and_anything_else_is_refused(string pasted, string? code) =>
+        Assert.Equal(code, AgentSignIn.CleanCode(pasted));
 
     [Fact]
     public void Claude_Codes_kind_of_account_is_answered_with_the_subscription_only_while_it_is_highlighted()

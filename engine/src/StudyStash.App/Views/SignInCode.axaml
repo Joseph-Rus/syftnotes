@@ -1,0 +1,40 @@
+<!-- The box a sign-in's code is pasted into (both looks), for an AI whose sign-in page ends on one: Gemini's Google page
+     says "Paste this code into your application". Shown on guided setup's sign-in step, in the Get-ready window, and on
+     its own in a small window for a sign-in started from Settings. Paste, then Finish signing in (or Return); it says
+     it's signing in, and the screen around it turns ready by itself. -->
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:kit="using:StudyStash.App.ViewModels.Kit"
+             xmlns:c="using:StudyStash.App.Controls"
+             x:Class="StudyStash.App.Views.SignInCode"
+             x:DataType="kit:SignInCodeModel">
+  <UserControl.Styles>
+    <StyleInclude Source="avares://StudyStash/Views/SetupStyles.axaml" />
+  </UserControl.Styles>
+  <StackPanel Spacing="10">
+    <TextBlock Name="CodeTitle" Classes="say" FontWeight="Bold" Text="{Binding Title}" TextWrapping="Wrap" />
+    <TextBlock Classes="hint" Text="{Binding Lede}" TextWrapping="Wrap" />
+    <Grid ColumnDefinitions="*,8,Auto" Margin="0,4,0,0">
+      <Border Classes="field">
+        <TextBox Name="CodeField" Classes="bare" Text="{Binding Code}" PlaceholderText="Paste the code" VerticalAlignment="Center"
+                 c:OneLinePaste.IsOn="True" IsEnabled="{Binding !Sent}">
+          <TextBox.KeyBindings>
+            <KeyBinding Gesture="Enter" Command="{Binding Send.Command}" />
+          </TextBox.KeyBindings>
+        </TextBox>
+      </Border>
+      <Button Name="FinishSignIn" Grid.Column="2" Classes="btn sm ink" VerticalAlignment="Center" Command="{Binding Send.Command}"
+              IsEnabled="{Binding CanSend}" Content="Finish signing in" />
+    </Grid>
+    <StackPanel Orientation="Horizontal" Spacing="8" IsVisible="{Binding Sent}">
+      <c:SyftLoader Kind="HoppingBits" Size="16" VerticalAlignment="Center" />
+      <TextBlock Classes="say" Text="{Binding Sending}" VerticalAlignment="Center" />
+    </StackPanel>
+    <Grid ColumnDefinitions="Auto,8,*" IsVisible="{Binding Problem, Converter={x:Static c:Converters.NotEmpty}}">
+      <c:Icon Classes="warn" Size="16" VerticalAlignment="Top" Margin="0,1,0,0" />
+      <TextBlock Name="CodeProblem" Grid.Column="2" Classes="say" Text="{Binding Problem}" TextWrapping="Wrap" />
+    </Grid>
+    <Button Classes="text-link small" HorizontalAlignment="Left" Command="{Binding OpenAgainCommand}" IsVisible="{Binding HasOpenAgain}"
+            Content="{Binding OpenAgainLabel}" />
+  </StackPanel>
+</UserControl>

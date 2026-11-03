@@ -98,7 +98,7 @@ public sealed partial class AiSetupModel : ObservableObject
             var e = now.Engines.FirstOrDefault(x => x.Id == id);
             if (e is { State: not "not_signed_in" }) await CheckAgainAsync(id);
             // It stopped without being signed in: said plainly, and its button tries again.
-            else if (e is { SignIn: SignInPhase.GaveUp or SignInPhase.Region or SignInPhase.Stuck })
+            else if (e is not null && SignInPhase.Stopped(e.SignIn))
                 Say = $"{AiWords.SignInTitle(AiWords.PlainName(e.Id, e.Name), e.SignIn)}. {AiWords.SignInAbout(AiWords.PlainName(e.Id, e.Name), e.SignIn)}";
         }
     }

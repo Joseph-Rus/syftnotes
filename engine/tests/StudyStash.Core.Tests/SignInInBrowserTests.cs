@@ -108,6 +108,40 @@ public class SignInInBrowserTests
     }
 
     [Fact]
+    public async Task Geminis_sign_in_waits_for_the_code_its_page_ends_on_and_the_code_pasted_in_the_app_signs_in()
+    {
+        // Google's page for agy ends on a code to paste ("Paste this code into your application"); nothing comes back by itself.
+        await using var rig = await Rig.StartAsync(["gemini"], bin =>
+        {
+            File.WriteAllText(Path.Combine(bin, "wants-code"), "");
+            File.WriteAllText(Path.Combine(bin, "good-code"), "4/0good-code");
+        });
+        await rig.Remote.SignInAsync("gemini");
+        var waiting = await rig.UntilAsync("gemini", e => e.PasteCode);
+        Assert.Equal(("not_signed_in", SignInPhase.Waiting), (waiting.State, waiting.SignIn));
+
+        // A code that isn't the one: Google turns it down, and the sign-in says so (Try again gives a new page).
+        var wrong = await rig.Remote.SendSignInCodeAsync("gemini", "4/0wrong-code");
+        Assert.Equal("Signing in to Gemini…", wrong!.Said);
+        var refused = await rig.UntilAsync("gemini", e => e.SignIn == SignInPhase.BadCode);
+        Assert.False(refused.PasteCode);
+        Assert.Equal("4/0wrong-code", File.ReadAllText(Path.Combine(rig.Bin, "code.txt")));
+        // Nothing waits for a code any more: one pasted now is told so, in plain words.
+        var late = await Assert.ThrowsAsync<LibraryRefusedException>(() => rig.Remote.SendSignInCodeAsync("gemini", "4/0good-code"));
+        Assert.StartsWith("That sign-in has stopped. Press Sign in", late.Message);
+
+        // Sign in again, and the code copied with a line break after it (as a page's often is): signed in, ready.
+        await rig.Remote.SignInAsync("gemini");
+        await rig.UntilAsync("gemini", e => e.PasteCode && FakeAgents.Logins(rig.Bin) == 2);
+        await rig.Remote.SendSignInCodeAsync("gemini", " 4/0good-code\r\n");
+        var ready = await rig.UntilAsync("gemini", e => e.State == "ready");
+        Assert.Equal(("", false), (ready.SignIn, ready.PasteCode));
+        // The code went to agy alone: it's nowhere in what the library says.
+        Assert.DoesNotContain("good-code", System.Text.Json.JsonSerializer.Serialize(await rig.Remote.EnginesAsync(), AiRemote.Options));
+        Assert.Equal(0, rig.Fake.SignInCalls);
+    }
+
+    [Fact]
     public async Task Open_the_page_again_runs_the_sign_in_once_more_and_never_reads_what_it_prints()
     {
         await using var rig = await Rig.StartAsync(["claude"], bin => File.WriteAllText(Path.Combine(bin, "login-delay"), "120"));
