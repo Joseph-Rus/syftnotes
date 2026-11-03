@@ -1,49 +1,41 @@
-# The build and release pipeline for Syft Notes (C# on .NET 10, one app for both roles, on a Mac, Windows and Linux). Two
-# speeds, one workflow.
+# The build and release pipeline for Syft Notes (C# on .NET 10, one app for both roles, on a Mac, Windows and Linux).
+# Three levels, one workflow:
 #
-#   A merge (a push to main) proves the code, and nothing it would throw away:
-#     - the engine's two test projects (Core and App): in one job on macOS and one on Linux, and in a job each on
-#       Windows, whose App tests are the slowest; then, after the App tests, the real AI sign-ins (reported, but not
-#       counted against the run). The failed tests and the 20 slowest are on the run's page;
+#   1. A pull request into main: the connection rules, and the engine's Core and App tests on Linux (which build every
+#      project). No Mac, no Windows, no self-tests, no installers, no real sign-ins, no secrets. It never counts as proof
+#      for a merge or a release (plan.sh).
+#
+#   2. A push to main (a merge) runs everything, on every system, nothing it would throw away:
+#     - the engine's Core and App tests: in one job on macOS and one on Linux, and in a job each on Windows, whose App
+#       tests are the slowest; then, after the App tests, the real AI sign-ins (reported, but not counted against the
+#       run). The failed tests and the 20 slowest are on the run's page;
 #     - the Mac app, the Windows app and the Linux app (x64 and arm64, each on its own processor) built and self-tested
 #       for real (windows open, the pretend microphone records, Whisper hears it), once as a laptop and once as "just
 #       this computer", both on the one app each job built.
-#     That is two macOS jobs a run: GitHub runs at most five at once, and five a run made runs queue behind each other.
-#     No installers are made for it: no Setup.exe (the build leaves it out), no DMG kept (macos/build-app.sh makes
-#     it as its last step either way), no Intel Mac, no install, update or uninstall, and nothing is published.
+#     No installers are made for it, and nothing is published. It blocks nothing (the code is merged): a failure here
+#     is fixed straight away.
+#     A push to main with a StudyStashVersion in engine/Directory.Build.props that has no tag yet is a release. On top
+#     of all of the above it builds the installers, proves them where they will really run (the Mac app natively on an
+#     Intel Mac; Setup.exe installed, self-tested from the installed copy, updated in place with a silent Setup.exe and
+#     uninstalled cleanly; each Linux tarball installed with its install.sh, self-tested from there and uninstalled),
+#     and then publishes release v<version> with the installers and SHA256SUMS.txt. Installed copies pick it up within a
+#     few hours (auto_update), or right away with Update now. A version already released is never published again.
+#     Nothing is published unless every job it waits for passed or was skipped (a job that ran out of time ends
+#     "cancelled", and stops it too).
 #
-#   A release is a push to main with a StudyStashVersion in engine/Directory.Build.props that has no tag yet. On top of
-#   all of the above it builds the installers, proves them where they will really run (the Mac app natively on an
-#   Intel Mac; Setup.exe installed, self-tested from the installed copy, updated in place with a silent Setup.exe and
-#   uninstalled cleanly; each Linux tarball installed with its install.sh, self-tested from there and uninstalled), and then
-#   publishes release v<version> with the installers and SHA256SUMS.txt. Installed
-#   copies pick it up within a few hours (auto_update), or right away with Update now. A version already released is
-#   never published again. Nothing is published unless every job it waits for passed or was skipped (a job that ran out
-#   of time ends "cancelled", and stops it too).
+#   3. A run by hand (Actions → ci → Run workflow, or `gh workflow run ci --ref <branch>`) tests a branch as a merge
+#      does. On code whose version has no tag yet (a release branch), or with "installers" ticked, it rehearses the
+#      whole release too, down to the checksums, and publishes nothing, ever. Give it "reuse_run" (an earlier such
+#      run's id, on the same code) to rehearse the fast release below.
 #
 #   Code that already passed isn't tested twice. A push to main skips the engine tests and the self-tests when it
 #     - changes only the version and files that can't change what the code does (the docs, the website, the
 #       README, the iPhone app), on top of a commit whose run passed; or
 #     - merges a branch whose run by hand passed on exactly the same code (main hadn't moved meanwhile).
-#   Only ci's own runs in this repository, started by a push or by hand, are believed (plan.sh): never a pull
-#   request's, which runs whatever workflow the pull request brings.
-#   A release that skips the tests still builds and proves its installers, unless that run by hand was a rehearsal of
-#   the release too (below) and still holds its installers: then those very installers, built and proved on exactly
-#   this code, are the ones published, with no rebuilding, and a merged version bump publishes within a minute.
-#   Changes to this workflow are never skipped.
-#
-#   A pull request into main is tested as a merge is, on its own, with no installers, signing or secrets (see "on:").
-#   A run by hand (Actions → ci → Run workflow, or `gh workflow run ci --ref <branch>`) tests a branch as a merge does,
-#   and is what lets the merge skip the tests (above).
-#   On code whose version has no tag yet (a release branch), or with "installers" ticked
-#   (`gh workflow run ci --ref <branch> -f installers=true`), it rehearses the whole release too, down to the checksums,
-#   and publishes nothing, ever. Give it "reuse_run" (an earlier such run's id, on the same code) to rehearse the fast
-#   release above.
-#
-#   Measured start to finish in October and November 2026, before the macOS jobs were cut from five to two: a merge 24 to
-#   45 minutes, most of it waiting for a macOS runner (14 to 27 minutes queued behind the run before)
-#   and the macOS App tests (20 to 25 minutes); a release that publishes the installers a rehearsal already proved
-#   under a minute.
+#   Only ci's own runs in this repository, started by a push or by hand, are believed (plan.sh). A release that skips
+#   the tests still builds and proves its installers, unless that run by hand was a rehearsal and still holds its
+#   installers: then those very installers are the ones published, and a merged version bump publishes within a
+#   minute. Changes to this workflow are never skipped.
 #
 #   Signing is switched on by secrets and costs nothing without them. Only a run that builds installers (a release, or
 #   a rehearsal of one) can sign, and then only if the repository has the secrets in docs/signing.md: the Mac app is
@@ -55,8 +47,8 @@
 #   hand with "test_signing" ticked signs with throwaway self-signed identities that it makes
 #   on the runners: that proves every signing step but Apple's and Microsoft's, and its installers are never published
 #   (nor reusable by a release). The plan is .github/scripts/signing-plan.sh. The one other secret,
-#   GOOGLE_DESKTOP_CLIENT_SECRET, reaches only the builds of the copies that ship (never npm, the copy with the test
-#   helpers, or a pull request).
+#   GOOGLE_DESKTOP_CLIENT_SECRET, reaches only the builds of the copies that ship (never npm, or the copy with the test
+#   helpers).
 #
 #   Runs are never cancelled by a later push: each push to main has a group of its own, so a release run isn't
 #   cancelled by the push after it, nor skipped while waiting for the one before. (Runs by hand on one branch, and runs
@@ -67,11 +59,9 @@ name: ci
 on:
   push:
     branches: [main]
-  # A pull request into main is tested as a merge is (on the code it would merge), with no installers, no signing and
-  # no secrets: a fork's gets none from GitHub, and the steps that would use one are skipped for every pull request.
-  # Never pull_request_target, which would run a fork's code with this repository's token and secrets. A pull request
-  # that changes only words (docs, the website, the iPhone app, which this workflow doesn't build, any .md but the
-  # tests' Golden expectations) isn't run. A pull request's run never counts as proof for its merge (plan.sh).
+  # Level 1 above: Linux tests only, no secrets. Never pull_request_target, which would run a fork's code with this
+  # repository's token and secrets. A pull request that changes only words (docs, the website, the iPhone app, any .md
+  # but the tests' Golden expectations) isn't run.
   pull_request:
     branches: [main]
     paths:
@@ -232,12 +222,15 @@ jobs:
     if: needs.version.outputs.tested != 'true'
     strategy:
       fail-fast: false  # a flake in one doesn't hide the rest, and re-running a failed job re-runs only it
+      # A pull request runs the Linux leg alone; a push to main and a run by hand run all four.
       matrix:
-        include:
-          - { os: ubuntu-latest, suite: Core and App, slug: all, core: true, app: true }
-          - { os: macos-latest, suite: Core and App, slug: all, core: true, app: true }
-          - { os: windows-latest, suite: Core, slug: core, core: true, app: false }
-          - { os: windows-latest, suite: App, slug: app, core: false, app: true }
+        include: >-
+          ${{ fromJSON(github.event_name == 'pull_request'
+          && '[{"os":"ubuntu-latest","suite":"Core and App","slug":"all","core":true,"app":true}]'
+          || '[{"os":"ubuntu-latest","suite":"Core and App","slug":"all","core":true,"app":true},
+          {"os":"macos-latest","suite":"Core and App","slug":"all","core":true,"app":true},
+          {"os":"windows-latest","suite":"Core","slug":"core","core":true,"app":false},
+          {"os":"windows-latest","suite":"App","slug":"app","core":false,"app":true}]') }}
     # Measured: Linux 2 + 14 to 17 minutes, macOS 4 + 20 to 25, Windows Core 10 to 14, Windows App 16 to 22, and the real
     # sign-ins 2 to 3 more. The limits only bound a hang.
     timeout-minutes: ${{ matrix.suite == 'Core' && 25 || 45 }}
@@ -255,7 +248,7 @@ jobs:
         run: mkdir -p "$RUNNER_TEMP/crash"
       # Linux: a real sound server with a stand-in microphone, so the Core tests record through PulseAudio itself.
       - name: PulseAudio, with a microphone that hears silence
-        if: runner.os == 'Linux' && matrix.core
+        if: runner.os == 'Linux'
         run: |
           sudo apt-get update -qq && sudo apt-get install -y -qq --no-install-recommends pulseaudio pulseaudio-utils libpulse0
           pulseaudio -D --exit-idle-time=-1
@@ -285,20 +278,20 @@ jobs:
           DOTNET_DbgMiniDumpName: ${{ runner.os != 'Windows' && format('{0}/crash/core.%p', runner.temp) || '' }}
       # The App tests ran on a Linux runner with no sound server of the Core tests' own: stopped, so they still do.
       - name: Linux - the Core tests' PulseAudio stopped
-        if: ${{ !cancelled() && runner.os == 'Linux' && matrix.core && matrix.app }}
+        if: ${{ !cancelled() && runner.os == 'Linux' }}
         run: pulseaudio --kill || true
       # After the Core tests even when they failed, so one run shows everything that's wrong.
       - name: Run the App tests
         id: app
         if: ${{ !cancelled() && matrix.app }}
+        shell: bash
+        # Two processes at once (headless Avalonia has one UI thread a process): the slow classes in slow-lane.txt in one,
+        # the rest in the other, each with its own .trx. On Linux this also checks the pictures of the screens
+        # (Snapshots); the other systems skip them.
         run: >-
-          dotnet test engine/tests/StudyStash.App.Tests --logger "trx;LogFileName=App.trx"
-          --results-directory "${{ runner.temp }}/test-results"
+          tools/run-app-tests.sh "$RUNNER_TEMP/test-results"
           --blame-hang-timeout 10m --blame-hang-dump-type mini --blame-crash --blame-crash-dump-type mini
         env:
-          # Windows: the pictures the tests draw are kept, so the notes' formulas and diagrams can be seen as Windows
-          # draws them (its own fonts), in the Windows look, light and dark, at 100% and 150%.
-          STUDYSTASH_SHOTS: ${{ runner.os == 'Windows' && format('{0}\shots', runner.temp) || '' }}
           DOTNET_DbgEnableMiniDump: ${{ runner.os != 'Windows' && '1' || '' }}
           DOTNET_DbgMiniDumpType: ${{ runner.os != 'Windows' && '1' || '' }}
           DOTNET_EnableCrashReport: ${{ runner.os != 'Windows' && '1' || '' }}
@@ -317,7 +310,7 @@ jobs:
       # The App tests above built what this runs.
       - name: Each real AI's sign-in, in the hidden terminal, then Connect against what each reads (the makers' CLIs as they are today, so not one the run waits for)
         id: real-sign-in
-        if: ${{ !cancelled() && matrix.app }}
+        if: ${{ !cancelled() && matrix.app && github.event_name != 'pull_request' }}
         continue-on-error: true
         timeout-minutes: 12
         shell: pwsh
@@ -333,7 +326,7 @@ jobs:
           if (Test-Path $kept) { Rename-Item $kept 'Git' }
           if ($env:GIT_KEPT_PATH) { "PATH=$env:GIT_KEPT_PATH" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append }
       - name: What each real sign-in did
-        if: ${{ !cancelled() && matrix.app }}
+        if: ${{ !cancelled() && matrix.app && github.event_name != 'pull_request' }}
         shell: bash
         env:
           OUTCOME: ${{ steps.real-sign-in.outcome }}
@@ -369,28 +362,19 @@ jobs:
             ${{ runner.temp }}/crash
           retention-days: 7
           if-no-files-found: ignore
-      - name: The notes' formulas and diagrams, as Windows draws them
-        if: ${{ always() && runner.os == 'Windows' && matrix.app }}
+      # A picture check that failed: what the screen drew now (*.received.png) beside the picture kept for it
+      # (*.verified.png), so the difference can be looked at. Copy the received one over the verified one if it's meant.
+      - name: Pictures of the screens, if a picture check failed
+        if: ${{ failure() && runner.os == 'Linux' && matrix.app && hashFiles('engine/tests/StudyStash.App.Tests/Snapshots/*.received.png') != '' }}
         uses: actions/upload-artifact@v7
         continue-on-error: true
         with:
-          name: windows-rich-notes
+          name: snapshot-pictures
           path: |
-            ${{ runner.temp }}\shots\richwin-*
-            ${{ runner.temp }}\shots\rich-*-win-*
-          if-no-files-found: error
+            engine/tests/StudyStash.App.Tests/Snapshots/*.received.png
+            engine/tests/StudyStash.App.Tests/Snapshots/*.verified.png
           retention-days: 7
-      - name: Notifications, as Windows draws them, where they land above the taskbar
-        if: ${{ always() && runner.os == 'Windows' && matrix.app }}
-        uses: actions/upload-artifact@v7
-        continue-on-error: true
-        with:
-          name: windows-notifications
-          path: |
-            ${{ runner.temp }}\shots\win-12-notify-*
-            ${{ runner.temp }}\shots\win-12-toast-*
-          if-no-files-found: error
-          retention-days: 7
+          if-no-files-found: ignore
 
   # Only for a run by hand with "real_sign_in_only": the real sign-ins above, alone, and what each showed, every
   # address, email and anything like a code or a key already taken out by the test, kept for a day to write the tests'
@@ -463,7 +447,7 @@ jobs:
   mac-app:
     name: Mac app (self-test, DMG)
     needs: [version]
-    if: needs.version.outputs.tested != 'true' || (needs.version.outputs.installers == 'true' && needs.version.outputs.reuse_run == '')
+    if: github.event_name != 'pull_request' && (needs.version.outputs.tested != 'true' || (needs.version.outputs.installers == 'true' && needs.version.outputs.reuse_run == ''))
     # Notarization usually answers within minutes, but Apple's first answers for a new account can take much longer.
     timeout-minutes: ${{ needs.version.outputs.mac_signing == 'real' && 120 || (needs.version.outputs.mac_signing == 'rehearsal' && 45 || 30) }}
     runs-on: macos-latest
@@ -488,10 +472,10 @@ jobs:
         working-directory: web
         run: npm ci --no-audit --no-fund && npm run build
       - name: Build Study Stash.app and its one DMG
-        # The laptop's Google sign-in secret (docs/phone-google.md) is built into the app; without it (a pull request has
-        # none) the app builds as usual and Connect with Google says this copy can't connect.
+        # The laptop's Google sign-in secret (docs/phone-google.md) is built into the app; without it the app builds as
+        # usual and Connect with Google says this copy can't connect.
         env:
-          GOOGLE_DESKTOP_CLIENT_SECRET: ${{ github.event_name != 'pull_request' && secrets.GOOGLE_DESKTOP_CLIENT_SECRET || '' }}
+          GOOGLE_DESKTOP_CLIENT_SECRET: ${{ secrets.GOOGLE_DESKTOP_CLIENT_SECRET }}
           STUDYSTASH_SKIP_WEB: "1"
         run: sh macos/build-app.sh dist/mac
       # Signing, only when the version job planned it. Each step that needs a secret has just its own.
@@ -708,7 +692,7 @@ jobs:
   windows-app:
     name: Windows app (self-test, Setup.exe)
     needs: [version]
-    if: needs.version.outputs.tested != 'true' || (needs.version.outputs.installers == 'true' && needs.version.outputs.reuse_run == '')
+    if: github.event_name != 'pull_request' && (needs.version.outputs.tested != 'true' || (needs.version.outputs.installers == 'true' && needs.version.outputs.reuse_run == ''))
     timeout-minutes: ${{ needs.version.outputs.win_signing != 'off' && 40 || 25 }}
     runs-on: windows-latest
     steps:
@@ -755,7 +739,7 @@ jobs:
         shell: pwsh
         # The laptop's Google sign-in secret, built into the app as on the Mac.
         env:
-          GOOGLE_DESKTOP_CLIENT_SECRET: ${{ github.event_name != 'pull_request' && secrets.GOOGLE_DESKTOP_CLIENT_SECRET || '' }}
+          GOOGLE_DESKTOP_CLIENT_SECRET: ${{ secrets.GOOGLE_DESKTOP_CLIENT_SECRET }}
           STUDYSTASH_SKIP_WEB: "1"
         run: .\windows\build.ps1 -Out dist\windows ${{ needs.version.outputs.win_signing != 'off' && '-NoInstaller' || '' }}
       # Signing, only when the version job planned it. The secrets reach just the one step that signs.
@@ -1076,7 +1060,7 @@ jobs:
     name: Linux app (${{ matrix.rid }}, self-test, tarball)
     needs: [version]
     # As the Mac and Windows apps: a release that reuses a rehearsal's installers doesn't build them again.
-    if: needs.version.outputs.tested != 'true' || (needs.version.outputs.installers == 'true' && needs.version.outputs.reuse_run == '')
+    if: github.event_name != 'pull_request' && (needs.version.outputs.tested != 'true' || (needs.version.outputs.installers == 'true' && needs.version.outputs.reuse_run == ''))
     strategy:
       fail-fast: false
       matrix:
@@ -1116,7 +1100,7 @@ jobs:
         env:
           STUDYSTASH_LINUX_RIDS: ${{ matrix.rid }}
           # The laptop's Google sign-in secret, built into the app as on the Mac.
-          GOOGLE_DESKTOP_CLIENT_SECRET: ${{ github.event_name != 'pull_request' && secrets.GOOGLE_DESKTOP_CLIENT_SECRET || '' }}
+          GOOGLE_DESKTOP_CLIENT_SECRET: ${{ secrets.GOOGLE_DESKTOP_CLIENT_SECRET }}
           STUDYSTASH_SKIP_WEB: "1"
         run: sh linux/build.sh dist/linux
       - name: The tarball holds one folder that runs, its native code built for this processor, the live words' small Whisper, and no transcription model or debug symbols
@@ -1234,7 +1218,7 @@ jobs:
   release:
     name: publish release
     needs: [version, connections, engine, mac-app, mac-intel, windows-app, linux-app]
-    if: ${{ github.event_name != 'pull_request' && !cancelled() && !contains(needs.*.result, 'failure') && !contains(needs.*.result, 'cancelled') && needs.version.outputs.installers == 'true' && (needs.version.outputs.reuse_run != '' || (needs.mac-app.result == 'success' && needs.mac-intel.result == 'success' && needs.windows-app.result == 'success' && needs.linux-app.result == 'success')) }}
+    if: ${{ !cancelled() && !contains(needs.*.result, 'failure') && !contains(needs.*.result, 'cancelled') && needs.version.outputs.installers == 'true' && (needs.version.outputs.reuse_run != '' || (needs.mac-app.result == 'success' && needs.mac-intel.result == 'success' && needs.windows-app.result == 'success' && needs.linux-app.result == 'success')) }}
     timeout-minutes: 10
     runs-on: ubuntu-latest
     permissions:
