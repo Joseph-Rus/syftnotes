@@ -330,6 +330,7 @@ jobs:
             ${{ runner.temp }}\shots\richwin-*
             ${{ runner.temp }}\shots\rich-*-win-*
           if-no-files-found: error
+          retention-days: 7
       - name: Notifications, as Windows draws them, where they land above the taskbar
         if: ${{ always() && runner.os == 'Windows' && matrix.app }}
         uses: actions/upload-artifact@v4
@@ -340,6 +341,7 @@ jobs:
             ${{ runner.temp }}\shots\win-12-notify-*
             ${{ runner.temp }}\shots\win-12-toast-*
           if-no-files-found: error
+          retention-days: 7
 
   # Only for a run by hand with "real_sign_in_only": the real sign-ins above, alone, and what each showed, every
   # address, email and anything like a code or a key already taken out by the test, kept for a day to write the tests'
@@ -534,12 +536,29 @@ jobs:
           name: mac-installers
           path: dist/mac/Syft-Notes.dmg
           retention-days: 30
-      - uses: actions/upload-artifact@v4
+      # What the self-test said and drew, every time; the whole folder (its home, recordings and a copy of the model:
+      # 80 to 150 MB) only when something failed.
+      - name: The self-test's words, logs and pictures
+        uses: actions/upload-artifact@v4
         continue-on-error: true
         if: always() && needs.version.outputs.tested != 'true'
         with:
           name: mac-selftest
-          path: ${{ runner.temp }}/selftest
+          path: |
+            ${{ runner.temp }}/selftest/**/*.txt
+            ${{ runner.temp }}/selftest/**/*.log
+            ${{ runner.temp }}/selftest/*.png
+            ${{ runner.temp }}/selftest/*/*.png
+          retention-days: 7
+      - name: The self-test's whole folder, as something failed
+        uses: actions/upload-artifact@v4
+        continue-on-error: true
+        if: failure()
+        with:
+          name: mac-selftest-full
+          path: |
+            ${{ runner.temp }}/selftest
+          retention-days: 7
       # How this run signed the installer, as the name of an artifact: a rehearsal's is never published or reused.
       - name: How the Mac installer was signed
         if: needs.version.outputs.installers == 'true'
@@ -586,12 +605,29 @@ jobs:
         run: sh macos/verify-signing.sh "$RUNNER_TEMP/Study Stash.app" dist/mac/Syft-Notes.dmg "$HOW"
       - name: Self-test, natively on Intel
         run: sh macos/selftest.sh "$RUNNER_TEMP/Study Stash.app" "$RUNNER_TEMP/selftest"
-      - uses: actions/upload-artifact@v4
+      # What the self-test said and drew, every time; the whole folder (its home, recordings and a copy of the model:
+      # 80 to 150 MB) only when something failed.
+      - name: The self-test's words, logs and pictures
+        uses: actions/upload-artifact@v4
         continue-on-error: true
         if: always()
         with:
           name: mac-intel-selftest
-          path: ${{ runner.temp }}/selftest
+          path: |
+            ${{ runner.temp }}/selftest/**/*.txt
+            ${{ runner.temp }}/selftest/**/*.log
+            ${{ runner.temp }}/selftest/*.png
+            ${{ runner.temp }}/selftest/*/*.png
+          retention-days: 7
+      - name: The self-test's whole folder, as something failed
+        uses: actions/upload-artifact@v4
+        continue-on-error: true
+        if: failure()
+        with:
+          name: mac-intel-selftest-full
+          path: |
+            ${{ runner.temp }}/selftest
+          retention-days: 7
 
   # The Windows app: one Setup.exe with no role of its own (setup asks). What ships is a student's copy, with no
   # self-test, demo libraries or test switches in it (windows\build.ps1 stops if they are); the self-tests (D5), as just
@@ -926,12 +962,30 @@ jobs:
           name: windows-installers
           path: dist\windows\Syft-Notes-Setup.exe
           retention-days: 30
-      - uses: actions/upload-artifact@v4
+      # What the self-test said and drew, every time; the whole folder (its home, recordings and a copy of the model:
+      # 80 to 150 MB) only when something failed.
+      - name: The self-test's words, logs and pictures
+        uses: actions/upload-artifact@v4
         continue-on-error: true
         if: always()
         with:
           name: windows-selftest
-          path: ${{ runner.temp }}\selftest
+          path: |
+            ${{ runner.temp }}\selftest\**\*.txt
+            ${{ runner.temp }}\selftest\**\*.log
+            ${{ runner.temp }}\selftest\*.png
+            ${{ runner.temp }}\selftest\*\*.png
+          retention-days: 7
+      - name: The self-test's whole folder, as something failed
+        uses: actions/upload-artifact@v4
+        continue-on-error: true
+        if: failure()
+        with:
+          name: windows-selftest-full
+          path: |
+            ${{ runner.temp }}\selftest
+            ${{ runner.temp }}\selftest-home*\**\*.log
+          retention-days: 7
       # How this run signed the installer, as the name of an artifact: a rehearsal's is never published or reused.
       - name: How Setup.exe was signed
         if: needs.version.outputs.installers == 'true'
@@ -1069,12 +1123,29 @@ jobs:
           name: linux-installers-${{ matrix.rid }}
           path: dist/linux/Syft-Notes-${{ matrix.rid }}.tar.gz
           retention-days: 30
-      - uses: actions/upload-artifact@v4
+      # What the self-test said and drew, every time; the whole folder (its home, recordings and a copy of the model:
+      # 80 to 150 MB) only when something failed.
+      - name: The self-test's words, logs and pictures
+        uses: actions/upload-artifact@v4
         continue-on-error: true
         if: always()
         with:
           name: linux-selftest-${{ matrix.rid }}
-          path: ${{ runner.temp }}/selftest
+          path: |
+            ${{ runner.temp }}/selftest/**/*.txt
+            ${{ runner.temp }}/selftest/**/*.log
+            ${{ runner.temp }}/selftest/*.png
+            ${{ runner.temp }}/selftest/*/*.png
+          retention-days: 7
+      - name: The self-test's whole folder, as something failed
+        uses: actions/upload-artifact@v4
+        continue-on-error: true
+        if: failure()
+        with:
+          name: linux-selftest-${{ matrix.rid }}-full
+          path: |
+            ${{ runner.temp }}/selftest
+          retention-days: 7
 
   # Publish v<version> the first time it passes everything above, with the one download per system, the four old role
   # names as byte-for-byte copies of them (0.8.x and older copies update themselves by those names, and old libraries'
