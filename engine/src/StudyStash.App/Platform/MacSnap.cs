@@ -12,7 +12,7 @@ public static class MacSnap
     public const string Variable = "STUDYSTASH_SNAPS";
 
     /// <summary>Where pictures go, or null when they're off.</summary>
-    public static string? Folder => Environment.GetEnvironmentVariable(Variable) is { Length: > 0 } dir ? dir : null;
+    public static string? Folder => StudyStash.Core.TestSwitches.Get(Variable) is { Length: > 0 } dir ? dir : null;
 
     /// <summary>A picture's name: letters, digits and dashes, so it can't reach outside the folder.</summary>
     public static bool IsName(string name) => name.Length is > 0 and <= 40 && name.All(c => char.IsAsciiLetterOrDigit(c) || c == '-');

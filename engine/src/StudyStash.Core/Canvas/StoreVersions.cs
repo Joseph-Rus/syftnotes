@@ -94,7 +94,7 @@ public sealed class StoreVersions
     }
 
     /// <summary>STUDYSTASH_ADDON_FINDS_CANVAS: true for 1, false for 0, null when unset.</summary>
-    public static bool? Override() => Environment.GetEnvironmentVariable("STUDYSTASH_ADDON_FINDS_CANVAS") switch
+    public static bool? Override() => TestSwitches.Get("STUDYSTASH_ADDON_FINDS_CANVAS") switch
     {
         "1" => true,
         "0" => false,

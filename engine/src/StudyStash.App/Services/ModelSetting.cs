@@ -15,7 +15,7 @@ public sealed record ModelSetting(WhisperModel? Model = null, string? File = nul
     public static readonly ModelSetting None = new();
 
     /// <summary>What this process's environment asks for.</summary>
-    public static ModelSetting FromEnvironment() => FromEnvironment(Environment.GetEnvironmentVariable, System.IO.File.Exists);
+    public static ModelSetting FromEnvironment() => FromEnvironment(StudyStash.Core.TestSwitches.Get, System.IO.File.Exists);
 
     /// <summary>What an environment asks for: <paramref name="env"/> reads a variable, <paramref name="exists"/> says
     /// whether a file is there (a path to nothing is ignored).</summary>

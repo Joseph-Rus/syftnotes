@@ -87,7 +87,7 @@ public static class Desktop
     /// <summary>Tests and the self-test: nothing here changes this computer. Starting at login refuses, and whether it
     /// starts at login reads "no" without looking. On when STUDYSTASH_SELFTEST is set; the app's tests turn it on as
     /// they load.</summary>
-    internal static bool SystemChangesOff { get; set; } = Environment.GetEnvironmentVariable("STUDYSTASH_SELFTEST") is { Length: > 0 };
+    internal static bool SystemChangesOff { get; set; } = StudyStash.Core.TestSwitches.Get("STUDYSTASH_SELFTEST") is { Length: > 0 };
 
     /// <summary>The program to start: the app bundle's executable (a Mac), or StudyStash.exe.</summary>
     public static string Program => Environment.ProcessPath ?? "StudyStash";
