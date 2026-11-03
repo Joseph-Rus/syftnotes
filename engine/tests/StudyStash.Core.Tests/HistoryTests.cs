@@ -14,7 +14,11 @@ public class HistoryTests
         Directory.CreateDirectory(Path.Combine(lib, "CS 101"));
         string lecture = Path.Combine(lib, "CS 101", "2026-09-24 Recursion.md");
         File.WriteAllText(lecture, "# Recursion\n");
-        var h = new History(lib);
+        // Real git, with all the time it needs. On a busy Windows runner (its Core tests take three times as long as the
+        // other systems') one git call went past History's 30-second limit, History gave up on it, and Commit came back
+        // with no change, which is exactly CI's failure (run 41701504791). Three minutes is still a limit, so a git that
+        // hangs fails the test instead of holding up the run.
+        var h = new History(lib, (exe, args, _) => Machine.Run(exe, args, TimeSpan.FromMinutes(3)));
 
         // A turn: the lecture as it was is kept first, so undoing an edit restores it instead of deleting it.
         h.Baseline();
