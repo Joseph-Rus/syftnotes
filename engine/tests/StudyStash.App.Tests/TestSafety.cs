@@ -16,7 +16,8 @@ static class TestSafety
         // The daily count never asks the real Firestore from a test; its own tests give it a fake handler.
         Services.DailyCount.Off = true;
         // The app's home, and so its log, is a folder of the tests' own: nothing a test logs reaches the real one.
-        Program.Home = System.IO.Path.Combine(System.IO.Path.GetTempPath(), "studystash-app-tests", "home");
+        // (The App tests run as two processes at once, tools/run-app-tests.sh: each has a home of its own.)
+        Program.Home = System.IO.Path.Combine(System.IO.Path.GetTempPath(), "studystash-app-tests", "home" + (Environment.GetEnvironmentVariable("STUDYSTASH_TEST_LANE") is { Length: > 0 } lane ? "-" + lane : ""));
         Directory.CreateDirectory(System.IO.Path.Combine(Program.Home, "logs"));
         Controls.Rich.SceneCache.Log = _ => { };
         // Codex's own config.toml is the student's: no test reads the real one.
