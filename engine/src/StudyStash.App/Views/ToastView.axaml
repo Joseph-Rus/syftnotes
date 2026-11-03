@@ -78,12 +78,12 @@
       <Grid>
         <StackPanel Name="Words" Spacing="1">
           <Grid ColumnDefinitions="*,Auto" MinHeight="18">
-            <TextBlock Name="TitleText" Text="{Binding #Root.Title}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis"
+            <TextBlock Name="TitleText" Text="{Binding #Root.Title}" ToolTip.Tip="{Binding #Root.Title}" c:Tips.WhenCut="True" FontWeight="SemiBold" TextTrimming="CharacterEllipsis"
                        VerticalAlignment="Center" />
             <TextBlock Name="WhenText" Grid.Column="1" Margin="8,0,0,0" Text="{Binding #Root.When}" IsVisible="{Binding #Root.When, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"
                        FontSize="12" Foreground="{DynamicResource Fg3}" HorizontalAlignment="Right" VerticalAlignment="Center" />
           </Grid>
-          <TextBlock Name="BodyText" Text="{Binding #Root.Text}" IsVisible="{Binding #Root.Text, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"
+          <TextBlock Name="BodyText" Text="{Binding #Root.Text}" ToolTip.Tip="{Binding #Root.Text}" c:Tips.WhenCut="True" IsVisible="{Binding #Root.Text, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"
                      Foreground="{DynamicResource Fg2}" TextWrapping="Wrap" MaxLines="4" TextTrimming="CharacterEllipsis" />
           <Grid Name="Actions" Margin="0,8,0,0">
             <Button Name="ActionButton" Classes="toast-btn">

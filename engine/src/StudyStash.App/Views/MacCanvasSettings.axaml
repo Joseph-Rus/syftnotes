@@ -68,7 +68,7 @@
             <TextBlock Classes="cv-label" Text="Sync" />
             <Button Grid.Column="1" Classes="cv-select" Width="140" VerticalAlignment="Center">
               <Grid ColumnDefinitions="*,Auto">
-                <TextBlock Text="{Binding PollLabel}" TextTrimming="CharacterEllipsis" />
+                <TextBlock Text="{Binding PollLabel}" ToolTip.Tip="{Binding PollLabel}" c:Tips.WhenCut="True" TextTrimming="CharacterEllipsis" />
                 <c:Icon Grid.Column="1" Glyph="unfold_more" Size="15" Foreground="{DynamicResource Fg2}" Margin="6,0,0,0" />
               </Grid>
               <Button.Flyout>
@@ -134,7 +134,7 @@
                   </StackPanel>
                   <Button Grid.Column="1" Classes="cv-select" Width="280" VerticalAlignment="Center">
                     <Grid ColumnDefinitions="*,Auto">
-                      <TextBlock Text="{Binding Selected.Label}" TextTrimming="CharacterEllipsis"
+                      <TextBlock Text="{Binding Selected.Label}" ToolTip.Tip="{Binding Selected.Label}" c:Tips.WhenCut="True" TextTrimming="CharacterEllipsis"
                                  Classes.cv-placeholder="{Binding Selected.Id, Converter={x:Static ObjectConverters.IsNull}}" />
                       <c:Icon Grid.Column="1" Glyph="unfold_more" Size="15" Foreground="{DynamicResource Fg2}" Margin="6,0,0,0" />
                     </Grid>
