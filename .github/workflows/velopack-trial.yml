@@ -1,0 +1,211 @@
+# The Velopack trial (docs/LIBRARIES.md, phase 5, step 1): whether Velopack can install, update and uninstall Syft
+# Notes on Windows, macOS and Linux, and move today's Inno Setup installs over. Run by hand only; it publishes nothing,
+# reads no release secrets (every signature is a throwaway self-signed one), and no release depends on it. What it
+# installs it installs on the runners it starts, which are thrown away. The app it packs is built with the test helpers
+# (engine/src/StudyStash.App/VelopackTrial.cs), never a student's copy.
+name: Velopack trial
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  VPK_VERSION: "1.2.161"
+  DOTNET_NOLOGO: "1"
+  DOTNET_CLI_TELEMETRY_OPTOUT: "1"
+
+jobs:
+  windows-pack:
+    name: Windows - pack two versions (x64, arm64), signed through sign.ps1
+    runs-on: windows-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "10.0.x"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - name: vpk
+        shell: pwsh
+        run: |
+          dotnet tool install -g vpk --version $env:VPK_VERSION
+          Add-Content $env:GITHUB_PATH "$env:USERPROFILE\.dotnet\tools"
+      - name: Signing - a throwaway self-signed certificate (as ci.yml's rehearsal)
+        shell: pwsh
+        run: .\windows\signing-setup.ps1 -SelfSigned
+      - name: Build, sign and pack
+        shell: pwsh
+        run: .\tools\velopack-trial\win-pack.ps1
+      - name: Signing - the certificate is removed
+        if: always()
+        shell: pwsh
+        run: .\windows\signing-setup.ps1 -Cleanup
+      - uses: actions/upload-artifact@v4
+        with:
+          name: velopack-windows
+          path: out
+          retention-days: 14
+
+  windows-install:
+    name: Windows - install, update, uninstall (${{ matrix.rid }})
+    needs: windows-pack
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - rid: win-x64
+            os: windows-latest
+          - rid: win-arm64
+            os: windows-11-arm
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: velopack-windows
+          path: out
+      - name: Install, update and uninstall
+        shell: pwsh
+        run: .\tools\velopack-trial\win-install.ps1 -Rid ${{ matrix.rid }}
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: results-${{ matrix.rid }}
+          path: results
+
+  windows-bridge:
+    name: Windows - today's Inno install moves to Velopack
+    needs: windows-pack
+    runs-on: windows-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "10.0.x"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - name: Inno Setup 6, if this image lacks it
+        shell: pwsh
+        run: |
+          if (-not (Test-Path "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe")) { choco install innosetup -y --no-progress }
+      - name: Today's Syft-Notes-Setup.exe (the student's copy, unsigned)
+        shell: pwsh
+        run: |
+          .\windows\build.ps1 -Out dist\inno
+          Add-Content out-sizes.txt "windows today-inno-setup $((Get-Item dist\inno\Syft-Notes-Setup.exe).Length)"
+      - uses: actions/download-artifact@v4
+        with:
+          name: velopack-windows
+          path: out
+      - name: Install it, set it up as a student's, and bridge it to Velopack
+        shell: pwsh
+        run: |
+          .\tools\velopack-trial\win-bridge.ps1
+          Copy-Item out-sizes.txt results\
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: results-bridge
+          path: results
+
+  mac-pack:
+    name: Mac - pack two versions (universal, arm64, x64), self-signed
+    runs-on: macos-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "10.0.x"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - name: vpk
+        run: |
+          dotnet tool install -g vpk --version "$VPK_VERSION"
+          echo "$HOME/.dotnet/tools" >> "$GITHUB_PATH"
+      - name: Signing - a throwaway self-signed identity (as ci.yml's rehearsal)
+        run: sh macos/signing-setup.sh selfsigned
+      - name: Build, sign and pack
+        run: sh tools/velopack-trial/mac-pack.sh
+      - name: Signing - the keychain is removed
+        if: always()
+        run: sh macos/signing-setup.sh cleanup
+      - uses: actions/upload-artifact@v4
+        with:
+          name: velopack-mac
+          path: out
+          retention-days: 14
+
+  mac-install:
+    name: Mac - install, update, uninstall (${{ matrix.arch }})
+    needs: mac-pack
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: arm64
+            os: macos-latest
+          - arch: x64
+            os: macos-15-intel
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: velopack-mac
+          path: out
+      - name: Rosetta, so the universal app's Intel half can be tried on Apple silicon
+        if: matrix.arch == 'arm64'
+        run: softwareupdate --install-rosetta --agree-to-license > /dev/null 2>&1 || echo "no Rosetta"
+      - name: Install, update and uninstall
+        run: sh tools/velopack-trial/mac-install.sh ${{ matrix.arch }}
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: results-mac-${{ matrix.arch }}
+          path: results
+
+  linux:
+    name: Linux - pack two versions (AppImage), install, update, uninstall
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "10.0.x"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - name: vpk, and mksquashfs for the AppImage
+        run: |
+          dotnet tool install -g vpk --version "$VPK_VERSION"
+          echo "$HOME/.dotnet/tools" >> "$GITHUB_PATH"
+          command -v mksquashfs > /dev/null || sudo apt-get install -y -qq squashfs-tools > /dev/null
+      - name: Pack, install, update and uninstall
+        run: sh tools/velopack-trial/linux.sh
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: velopack-linux
+          path: |
+            out/*.txt
+            out/logs
+            out/releases/linux-x64/*.json

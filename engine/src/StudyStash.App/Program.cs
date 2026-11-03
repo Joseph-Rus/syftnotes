@@ -25,6 +25,10 @@ static class Program
     [STAThread]
     public static int Main(string[] args)
     {
+#if TEST_HELPERS
+        // The Velopack trial (docs/LIBRARIES.md, phase 5): its hooks and test commands. Never in a student's copy.
+        if (VelopackTrial.Run(args) is int trial) return trial;
+#endif
         if (StudyStash.Library.Cli.IsCommand(args))
         {
             // The library this app runs starts at login the way the app does: its login item, only when asked.
