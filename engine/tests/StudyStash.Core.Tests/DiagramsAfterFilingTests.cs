@@ -355,6 +355,33 @@ public class DiagramsAfterFilingTests
     }
 
     [Fact]
+    public async Task Rewritten_notes_still_get_their_diagrams_when_the_queue_cant_save_its_job_file()
+    {
+        // Seen on a Windows runner: the job file was held by another program just as the new notes' job replaced the old
+        // one, the save threw, and the older pass was never stopped, so the new pass never ran.
+        using var rig = new Rig();
+        var oldPass = new TaskCompletionSource<string>(TaskCreationOptions.RunContinuationsAsynchronously);
+        rig.Claude.Design = (_, ct) => oldPass.Task.WaitAsync(ct);
+        await rig.FileAsync();
+        var running = rig.Jobs.RunPendingAsync();
+        await rig.AskedAsync();
+
+        // The job's file can't be replaced (a folder stands where it goes: the same IOException a locked file gives).
+        string file = Directory.EnumerateFiles(Path.Combine(rig.Cfg.Home, "diagram-jobs"), "*.json").Single();
+        File.Delete(file);
+        Directory.CreateDirectory(file);
+
+        var newPass = new TaskCompletionSource<string>(TaskCreationOptions.RunContinuationsAsynchronously);
+        rig.Claude.Design = (_, _) => newPass.Task;
+        rig.Jobs.Queue("lec-1", "claude");
+        await rig.AskedAsync();
+        newPass.SetResult(Reply(("Key points", "The renin chain")));
+        Assert.Equal(2, await running);
+        Assert.Equal(DiagramDesign.Insert(Notes, [Designed("Key points")]), rig.Row().SummaryMd);
+        oldPass.SetResult("");
+    }
+
+    [Fact]
     public async Task Rewritten_notes_show_at_once_and_their_diagrams_follow_once_theyre_used()
     {
         using var rig = new Rig();
