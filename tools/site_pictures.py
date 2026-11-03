@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
-"""The website's pictures of the app, from what SiteShots drew (engine/tests/StudyStash.App.Tests/SiteShots.cs).
+"""The website's pictures of the app, from what SiteShots drew (engine/tests/StudyStash.Pictures/SiteShots.cs).
 
-    STUDYSTASH_SITE=/tmp/site-shots dotnet test engine/tests/StudyStash.App.Tests --filter SiteShots
+    STUDYSTASH_SITE=/tmp/site-shots dotnet test engine/tests/StudyStash.Pictures --filter SiteShots
     python3 tools/site_pictures.py /tmp/site-shots
 
 Rounds the whole window's corners (the Mac's 18 points, 36 pixels at 2x) so the page shows round them, and writes
