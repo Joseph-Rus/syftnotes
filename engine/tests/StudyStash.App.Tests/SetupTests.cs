@@ -649,7 +649,7 @@ public sealed class SetupTests
 
     static CanvasConnectModel FoundCourses(FakeLibrary? handler = null)
     {
-        handler ??= new FakeLibrary().Json(HttpMethod.Post, "/api/v2/canvas/courses", CanvasShots.FoundCourses);
+        handler ??= new FakeLibrary().Json(HttpMethod.Post, "/api/v2/canvas/courses", Scenes.FoundCourses);
         var context = CanvasFixtures.Context(handler);
         return new CanvasConnectModel(context, new CanvasWatch(context), forSetup: true);
     }
