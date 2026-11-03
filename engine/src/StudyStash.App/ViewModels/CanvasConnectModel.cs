@@ -46,6 +46,14 @@ public sealed partial class BrowserChoice(Browser browser) : ObservableObject
     [ObservableProperty] public partial bool Current { get; set; }
 }
 
+/// <summary>What Connect Canvas's own footer does (Skip for now, Back, Finish): in its own window, the window's. Inside
+/// setup or the first run the footer is hidden and the flow's own buttons move on (<see cref="InFlow"/>).</summary>
+public sealed record CanvasConnectExits(Action Skip, Action Back, Action Finish)
+{
+    /// <summary>Inside a flow with buttons of its own: the footer isn't shown, so its buttons do nothing.</summary>
+    public static CanvasConnectExits InFlow { get; } = new(static () => { }, static () => { }, static () => { });
+}
+
 /// <summary>
 /// Connecting Canvas (design 07): the school address, adding the extension to the student's browser, finding your
 /// courses, and — in Settings' own window — matching each class to a course and the first sync; one step open at a
@@ -71,6 +79,16 @@ public sealed partial class CanvasConnectModel : ObservableObject, IDisposable
     /// <summary>What to say about the student's usual browser, when the extension can't go in it; null when it can.</summary>
     BrowserAdvice? advice;
     static readonly ConnectStep Hidden = new() { Number = 0, Title = "" };
+
+    /// <summary>The app's Connect Canvas (made by <see cref="CanvasModels"/>): its footer's Skip for now, Back and
+    /// Finish always do something.</summary>
+    public CanvasConnectModel(CanvasContext context, CanvasWatch watch, CanvasConnectExits exits, bool forSetup) : this(context, watch, forSetup)
+    {
+        ArgumentNullException.ThrowIfNull(exits);
+        OnSkip = exits.Skip;
+        OnBack = exits.Back;
+        OnFinish = exits.Finish;
+    }
 
     public CanvasConnectModel(CanvasContext context, CanvasWatch watch, bool forSetup = false)
     {

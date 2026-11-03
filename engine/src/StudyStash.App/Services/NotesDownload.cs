@@ -3,6 +3,7 @@ using System.Text.Json.Nodes;
 using Avalonia.Controls;
 using Avalonia.Media;
 using Avalonia.Platform.Storage;
+using CommunityToolkit.Mvvm.Messaging;
 using StudyStash.Core;
 using StudyStash.Core.Rich;
 
@@ -18,6 +19,10 @@ namespace StudyStash.App.Services;
 public static class NotesDownload
 {
     static string S(JsonNode? n) => n is JsonValue v && v.TryGetValue(out string? s) ? s ?? "" : "";
+
+    /// <summary>A notification for the student: the app shows it (a message, since a service never calls the shell).</summary>
+    static void Say(string title, string text, string? action = null, Action? run = null) =>
+        WeakReferenceMessenger.Default.Send(new ToastRequested(title, text, action, run));
 
     /// <summary>UTF-8 with no byte-order mark, as Markdown and SVG are kept everywhere: a mark before the front
     /// matter's first "---" hides it from some readers, and <see cref="Encoding.UTF8"/> writes one.</summary>
@@ -50,7 +55,7 @@ public static class NotesDownload
         }
         catch (Exception e) when (e is HttpRequestException or TaskCanceledException or LibraryRefusedException)
         {
-            Shell.Toast("Couldn't download it", e.Message, null, null);
+            Say("Couldn't download it", e.Message);
             return;
         }
         if (lecture is null) return;
@@ -88,7 +93,7 @@ public static class NotesDownload
         }
         catch (Exception e) when (e is HttpRequestException or TaskCanceledException or LibraryRefusedException)
         {
-            Shell.Toast("Couldn't download it", e.Message, null, null);
+            Say("Couldn't download it", e.Message);
             return;
         }
         if (lecture is null) return;
@@ -101,7 +106,7 @@ public static class NotesDownload
         catch (Exception e) when (e is not OutOfMemoryException)
         {
             Program.Log($"[export] couldn't make a PDF of {lectureId}: {e.GetType().Name}: {e.Message}");
-            Shell.Toast("Couldn't make the PDF", "Syft Notes couldn't lay these notes out on paper.", null, null);
+            Say("Couldn't make the PDF", "Syft Notes couldn't lay these notes out on paper.");
             return;
         }
         await using var stream = await open();
@@ -125,7 +130,7 @@ public static class NotesDownload
         string? chosen = await pick();
         if (chosen is not { Length: > 0 })
         {
-            if (chosen is not null) Shell.Toast("Couldn't download it", "Choose a folder on this computer.", null, null);
+            if (chosen is not null) Say("Couldn't download it", "Choose a folder on this computer.");
             return;
         }
         string classDir = UniqueClassDir(chosen, className);
@@ -137,7 +142,7 @@ public static class NotesDownload
         }
         catch (Exception e) when (e is HttpRequestException or TaskCanceledException or LibraryRefusedException)
         {
-            Shell.Toast("Couldn't download it", e.Message, null, null);
+            Say("Couldn't download it", e.Message);
             return;
         }
         Directory.CreateDirectory(classDir);
@@ -167,13 +172,13 @@ public static class NotesDownload
 
         if (saved == 0 && failed > 0)
         {
-            Shell.Toast("Couldn't download it", "Your library couldn't be reached.", null, null);
+            Say("Couldn't download it", "Your library couldn't be reached.");
             return;
         }
         string title = $"Saved {saved} lecture{(saved == 1 ? "" : "s")}" + (failed > 0 ? $" of {saved + failed}" : "");
         string text = failed == 0 ? $"In {className}"
             : failed == 1 ? "One couldn't be read from your library." : $"{failed} couldn't be read from your library.";
-        Shell.Toast(title, text, "Show", () => Machine.Open(classDir));
+        Say(title, text, "Show", () => Machine.Open(classDir));
     }
 
     /// <summary>A class's own folder under <paramref name="parent"/>: its name, or "Name (2)" when a folder of that

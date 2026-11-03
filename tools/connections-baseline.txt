@@ -2,7 +2,7 @@
 sleeps 25
 engine-state-strings 58
 shell-in-viewmodels 0
-shell-in-services 17
+shell-in-services 0
 windows-by-hand 6
 bare-catches 42
 fire-and-forget-in-shell 0
