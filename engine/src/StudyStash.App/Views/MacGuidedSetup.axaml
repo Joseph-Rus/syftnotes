@@ -255,6 +255,10 @@
                           <TextBlock Classes="hint" Text="Didn't open?" VerticalAlignment="Center" />
                           <Button Classes="text-link small" VerticalAlignment="Center" Command="{Binding OpenAgainCommand}" Content="Open it again" />
                         </StackPanel>
+                        <!-- Gemini's page ends on a code ("Paste this code into your application"): the box for it. -->
+                        <Panel Margin="0,10,0,0" IsVisible="{Binding ShowCodeBox}">
+                          <v:SignInCode Name="CodeBox" DataContext="{Binding CodeBox}" />
+                        </Panel>
                       </StackPanel>
                       <StackPanel Orientation="Horizontal" Spacing="8" Margin="0,24,0,0" IsVisible="{Binding ShowCheckingPlan}">
                         <c:Icon Classes="ok" Size="18" />

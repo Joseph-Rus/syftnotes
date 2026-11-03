@@ -14,11 +14,16 @@ namespace StudyStash.Core.Ai;
 /// highlighted, is taken with Enter. It's the one a student's Pro or Max plan signs in with; the others (the Anthropic
 /// Console's pay-per-use billing, a company's cloud platform) are for developers and companies, and would leave a
 /// student billed by the token or unable to sign in.</item>
+/// <item>Antigravity CLI (Gemini) asking which login method: "Google OAuth", the first choice, already highlighted, is
+/// taken with Enter. It's the personal Google account a student signs in with; the other (a Google Cloud project) is
+/// for developers.</item>
 /// <item>"Press Enter to open the browser", "Press Enter to continue": Enter, as any person would.</item>
 /// <item>"Open the browser? (Y/n)": Enter, the default, yes.</item>
 /// </list>
-/// Nothing else is ever typed: no code, no address, no password, no "yes" to terms. A question that isn't one of these
-/// is left unanswered (the sign-in gives up by itself, or Syft Notes stops waiting).
+/// Nothing else is ever typed by itself: no address, no password, no "yes" to terms. The one thing typed that isn't an
+/// answer is the code a student pastes into Syft Notes' own box for a sign-in that takes one (<see cref="AsksForCode"/>,
+/// <see cref="AgentSignIn.SendCodeAsync"/>). A question that isn't one of these is left unanswered (the sign-in gives up
+/// by itself, or Syft Notes stops waiting).
 /// <para>
 /// The sign-in page's address is kept (<see cref="Page"/>) only for <see cref="AgentSignIn"/> to hand to the system's
 /// browser opener: it is never shown, logged or saved. Nothing else of what was shown is kept beyond the last few lines.
@@ -54,6 +59,12 @@ public sealed partial class SignInScreen
     public bool Region { get; private set; }
     /// <summary>It said the sign-in worked (its status command still decides).</summary>
     public bool SaysSignedIn { get; private set; }
+    /// <summary>It asks for the code its sign-in page ends on ("paste the authorization code below").</summary>
+    public bool AsksForCode { get; private set; }
+    /// <summary>The code it was given didn't work (its maker turned it down); it waits for a key to go back.</summary>
+    public bool CodeRefused { get; private set; }
+    /// <summary>The line being shown now, plain (what's typed into its code field shows there).</summary>
+    internal string Current => line.ToString();
     /// <summary>The questions it asked that were answered, in plain words ("which kind of account: Claude subscription").</summary>
     public IReadOnlyList<string> Answered => answered;
     /// <summary>Whether the page it showed finishes signing in by itself (it sends the browser back to this computer),
@@ -197,12 +208,16 @@ public sealed partial class SignInScreen
         if (TerminalWords().IsMatch(text)) WantsTerminal = true;
         if (AgentCli.LooksLikeRegion(text)) Region = true;
         if (SignedInWords().IsMatch(text)) SaysSignedIn = true;
+        if (AsksForCodeWords().IsMatch(text)) AsksForCode = true;
+        if (AsksForCode && CodeRefusedWords().IsMatch(text)) CodeRefused = true;
 
         // Each line is answered once at most, however many times it's looked at as it comes.
         if (lineAnswered) return;
         // Claude Code's "Select login method": Enter only while the Claude subscription is the highlighted choice.
         if (Highlighted().IsMatch(text) && SubscriptionChoice().IsMatch(text) && recent.Any(r => LoginMethodWords().IsMatch(r)))
             Answer("which kind of account: Claude subscription", "\r", reply);
+        else if (Highlighted().IsMatch(text) && GoogleAccountChoice().IsMatch(text) && recent.Any(r => LoginMethodWords().IsMatch(r)))
+            Answer("which login method: Google account", "\r", reply);
         else if (PressEnterWords().IsMatch(text))
             Answer("press Enter", "\r", reply, times: 2);
         else if (!finished && OpenBrowserQuestion().IsMatch(text))
@@ -279,6 +294,18 @@ public sealed partial class SignInScreen
 
     [GeneratedRegex(@"Claude account with subscription|Claude (Pro|Max)? ?subscription", RegexOptions.IgnoreCase)]
     private static partial Regex SubscriptionChoice();
+
+    [GeneratedRegex(@"^\s*[❯›>▶►]?\s*1\. Google OAuth\s*$", RegexOptions.IgnoreCase)]
+    private static partial Regex GoogleAccountChoice();
+
+    // Antigravity's "If you aren't automatically redirected, paste the authorization code below:", and its print mode's
+    // "Or, paste the authorization code here and press Enter:".
+    [GeneratedRegex(@"paste the authori[sz]ation code", RegexOptions.IgnoreCase)]
+    private static partial Regex AsksForCodeWords();
+
+    // What Antigravity says when Google turns the code down: "Got an error: token exchange failed: oauth2: "invalid_grant"".
+    [GeneratedRegex(@"token exchange failed|invalid_grant|invalid (authori[sz]ation )?code", RegexOptions.IgnoreCase)]
+    private static partial Regex CodeRefusedWords();
 
     [GeneratedRegex(@"press (enter|return)( key)? to (continue|open|sign in|log ?in|launch|authenticate)", RegexOptions.IgnoreCase)]
     private static partial Regex PressEnterWords();
