@@ -33,9 +33,10 @@ How a few things in the spec are done here:
 - **A class's lists on Canvas** (Assignments, Modules, Announcements) open in the app from the
   folder page's rail: the one place with a list beside what's opened from it.
 
-To lay pictures of the app over the spec's: `STUDYSTASH_SHOTS=<folder> dotnet test
-engine/tests/StudyStash.App.Tests --filter Design_shots` draws every screen with the spec's own
-sample, the size of its `screenshots/` at 1x, light and dark.
+The app's own pictures of these screens are checked on CI's Linux job (`engine/tests/StudyStash.App.Tests/Snapshots`:
+Home, a class page, notes, Due, Settings, the first-run funnel, the recorder, the menu-bar dropdown, a notification
+and Ask, drawn with the spec's own sample). The tool that laid every screen over the spec's `screenshots/` was
+removed with the other picture-only tests.
 
 `semester-ui-pictures/` has the app's own pictures of the new screens (drawn off screen with the spec's
 sample) and three short films of them in use, for the pull request that brought the design in.

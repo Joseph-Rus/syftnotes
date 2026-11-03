@@ -60,7 +60,8 @@ first time you need it (docs/ARCHITECTURE.md section 3 says how), not inside you
 - **Words** are plain, for a student who isn't technical. Claude and ChatGPT by name; "Your AI" and "AI apps" in
   Settings.
 - **When the owner is using the Mac,** work off-screen only: no windows, focus or clicks on his screen. Pictures come
-  from the app's off-screen drawing (the `*Shots` tests), never from capturing the screen.
+  from the app's off-screen drawing (the picture checks in `App.Tests/Snapshots`, or the `StudyStash.Pictures` project
+  for the README, site and films), never from capturing the screen.
 - **The two-computer setup** (a library on another computer) is frozen: no features, fixes or tests for it.
 - **Git:** one branch per change. Commits carry no AI attribution. The owner merges PRs; release PRs only after a
   green rehearsal.
