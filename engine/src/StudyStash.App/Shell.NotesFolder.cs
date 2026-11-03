@@ -10,9 +10,9 @@ using StudyStash.Core;
 namespace StudyStash.App;
 
 /// <summary>
-/// "Which notes folder should Syft Notes use?", asked at start only when this computer has two or more library folders
-/// the student hasn't answered for (<see cref="LibraryFolderPick"/>). Closing the window keeps the folder in use, and
-/// it's asked again next time.
+/// "You have Syft Notes folders in two places", asked at start only when this computer has two or more library folders
+/// the student hasn't answered for (<see cref="LibraryFolderPick"/>): use one, and bring the others' notes into it if
+/// they want. Closing the window keeps the folder in use, and it's asked again next time.
 /// </summary>
 public static partial class Shell
 {
@@ -30,11 +30,12 @@ public static partial class Shell
 
     static void AskWhichNotesFolder(IReadOnlyList<LibraryFolder> found)
     {
-        var model = new NotesFolderPickModel(found, Py.UserHome(), picked => UseNotesFolderAsync(picked, found), dir => Machine.Open(dir));
+        var model = new NotesFolderPickModel(found, Py.UserHome(), (picked, bringIn) => UseNotesFolderAsync(picked, found, bringIn),
+            picked => LibraryFolderPick.PlanAsync(host, picked, found), dir => Machine.Open(dir));
         var view = new NotesFolderPick { DataContext = model, Height = model.WantedHeight };
         // Come up by itself at a login start, it leaves the keyboard where it was.
         bool asked = !Program.Background;
-        AppWindows.Open(new WindowSpec("notes-folder", NotesFolderPickModel.Title, view) { Activate = asked, AppForward = asked }, w =>
+        AppWindows.Open(new WindowSpec("notes-folder", model.Title, view) { Activate = asked, AppForward = asked }, w =>
         {
             if (Skin.Current == SkinKind.Mac) w.Bind(Window.BackgroundProperty, w.GetResourceObservable("Win"));
             model.OnDone = w.Close;
@@ -46,10 +47,10 @@ public static partial class Shell
         });
     }
 
-    static async Task<Outcome> UseNotesFolderAsync(LibraryFolder picked, IReadOnlyList<LibraryFolder> shown)
+    static async Task<Outcome<List<BringInCount>>> UseNotesFolderAsync(LibraryFolder picked, IReadOnlyList<LibraryFolder> shown, bool bringIn)
     {
-        var outcome = await LibraryFolderPick.UseAsync(host, picked, shown);
-        if (outcome.Ok && !picked.InUse) RequestLibraryReload(whole: true);
+        var outcome = await LibraryFolderPick.UseAsync(host, picked, shown, bringIn);
+        if (outcome.Ok && (bringIn || !picked.InUse)) RequestLibraryReload(whole: true);
         return outcome;
     }
 }

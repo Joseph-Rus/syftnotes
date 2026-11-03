@@ -594,10 +594,16 @@ public sealed partial class Store : IDisposable
         lock (gate)
         {
             if (Get(m.Id) is not null) return false;
-            string path = Save(m, c, summaryMd, summaryModel, error);
-            if (!string.IsNullOrEmpty(noteText)) File.WriteAllText(path, noteText, new System.Text.UTF8Encoding(false));
+            Save(m, c, summaryMd, summaryModel, error, keepText: string.IsNullOrEmpty(noteText) ? null : noteText);
             return true;
         }
+    }
+
+    /// <summary>A lecture's note file is now <paramref name="path"/> (a copy of it, brought into this library's folder
+    /// from another, <see cref="LibraryBringIn"/>): only where the row looks for it changes. False for no such lecture.</summary>
+    public bool Refile(string noteId, string path)
+    {
+        lock (gate) return Exec("UPDATE notes SET md_path=? WHERE id=?", Py.NormPath(path), noteId) > 0;
     }
 
     public string ClassDir(string? className)
@@ -624,14 +630,21 @@ public sealed partial class Store : IDisposable
     }
 
     /// <summary>Write the Markdown file and mark the note done. New notes are a version (<see cref="NotesVersions"/>)
-    /// made by <paramref name="versionKind"/>: the library writing them, unless said otherwise.</summary>
+    /// made by <paramref name="versionKind"/>: the library writing them, unless said otherwise. <paramref name="at"/>
+    /// files it at that path instead of the one its class, day and title give; <paramref name="keepText"/> is the note
+    /// file exactly as another library or folder had it (edits kept), written instead of one made afresh.</summary>
     public string Save(Meeting m, Classification c, string summaryMd = "", string summaryModel = "", string error = "",
-        string versionKind = NotesChangeKind.Written)
+        string versionKind = NotesChangeKind.Written, string? at = null, string? keepText = null)
     {
         lock (gate)
         {
-            string path = TargetPath(m, c.ClassName);
-            Py.WriteText(path, Notes.Render(m, c, summaryMd, summaryModel));
+            string path = at is null ? TargetPath(m, c.ClassName) : Py.NormPath(at);
+            if (keepText is null) Py.WriteText(path, Notes.Render(m, c, summaryMd, summaryModel));
+            else if (!File.Exists(path) || File.ReadAllText(path, new System.Text.UTF8Encoding(false)) != keepText)
+            {
+                Directory.CreateDirectory(Py.Parent(path));
+                File.WriteAllText(path, keepText, new System.Text.UTF8Encoding(false));
+            }
             string now = Now();
             string? oldPath = null, firstSeen = null;
             (string Markdown, string Model, string At) before = ("", "", "");
