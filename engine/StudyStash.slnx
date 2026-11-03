@@ -9,5 +9,6 @@
   <Folder Name="/tests/">
     <Project Path="tests/StudyStash.App.Tests/StudyStash.App.Tests.csproj" />
     <Project Path="tests/StudyStash.Core.Tests/StudyStash.Core.Tests.csproj" />
+    <Project Path="tests/StudyStash.Pictures/StudyStash.Pictures.csproj" />
   </Folder>
 </Solution>

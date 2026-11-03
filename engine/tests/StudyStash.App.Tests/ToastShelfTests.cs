@@ -404,7 +404,7 @@ public class ToastShelfTests
     {
         using var rig = new Rig(mac: true);
         int opened = 0, dismissed = 0;
-        var model = new CanvasToastModel(CanvasShots.ToastGallery()[0].Item)
+        var model = new CanvasToastModel(Scenes.ToastGallery()[0].Item)
         {
             When = "now", Expanded = true,
             OnOpen = _ => { opened++; return Task.CompletedTask; },

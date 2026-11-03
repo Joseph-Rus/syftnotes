@@ -1,3 +1,4 @@
+using Avalonia.Threading;
 using Avalonia.Controls;
 using Avalonia.Headless;
 using Avalonia.Headless.XUnit;
@@ -71,6 +72,7 @@ public class ConfirmTests
 
         var asking = ConfirmLayer.For(behind)!.AskAsync(new ConfirmAsk("Delete this lecture?", "", "Delete"));
         var dialog = await DialogShowingAsync(behind);
+        Dispatcher.UIThread.RunJobs(); // the activation the question asked for is posted; let it land before looking
 
         Assert.True(behind.IsActive); // where the student can see the question
         behind.KeyPressQwerty(PhysicalKey.Escape, RawInputModifiers.None);

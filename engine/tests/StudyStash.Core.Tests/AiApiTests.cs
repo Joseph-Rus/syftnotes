@@ -242,13 +242,16 @@ public class AiApiTests
         var checks = new FakeChecks().Build() with
         {
             OllamaInstalled = () => true,
-            OllamaModels = _ => Task.FromResult<List<(string Name, double SizeGb)>?>(models.ToList()),
+            OllamaModels = _ => { lock (models) return Task.FromResult<List<(string Name, double SizeGb)>?>(models.ToList()); },
             RamGb = () => ram,
             DiskFreeGb = () => disk,
             PullModel = (name, _, _, _) =>
             {
-                pulled.Add(name);
-                models.Add((name, gb));
+                lock (models)
+                {
+                    pulled.Add(name);
+                    models.Add((name, gb));
+                }
                 return Task.FromResult((true, ""));
             },
         };
@@ -261,9 +264,9 @@ public class AiApiTests
         Assert.Equal(("model_missing", gb, small), (free.State, free.SetUpGb, free.Small));
 
         await remote.SetUpAsync("ollama");
-        await Waiting.UntilAsync(async () => (await remote.EnginesAsync())!.Pulling is not { Why.Length: 0 }, 5);
+        Assert.True(await Waiting.UntilAsync(async () => (await remote.EnginesAsync())!.Pulling is not { Why.Length: 0 }, 60), "the free AI's setup never ended");
 
-        Assert.Equal([model], pulled);
+        lock (models) Assert.Equal([model], pulled);
         Assert.Equal("ready", (await remote.EnginesAsync())!.Engines.Single(e => e.Id == "ollama").State);
         Assert.Equal(model, Configs.Load(cfg.Home).EffectiveSummaryModel); // kept: the library writes notes with it from now on
     }
@@ -349,7 +352,8 @@ public class AiApiTests
                 installed = appComes;
                 return Task.FromResult(appComes);
             },
-            OllamaModels = _ => Task.FromResult(running ? models.ToList() : null),
+            // Read by the library's answers (on its request threads) while the setup adds to it in the background.
+            OllamaModels = _ => { lock (models) return Task.FromResult(running ? models.ToList() : null); },
             StartOllama = _ =>
             {
                 did.Add("start");
@@ -362,16 +366,19 @@ public class AiApiTests
                 did.Add("model " + model);
                 progress?.Invoke(1, 4);
                 seen.Add($"{jobs!.Pulling?.Step} {jobs.Pulling?.Fraction}");
-                models.Add((model, 5.2));
+                lock (models) models.Add((model, 5.2));
                 return Task.FromResult((true, ""));
             },
         };
         jobs = new AiJobs(cfg.Home) { Checks = checks };
         await using var site = await Site(cfg, store, jobs);
         var remote = new AiRemote("http://localhost", "pw", site.Client);
+        // Until the setup has ended, done (null) or stopped with words. It's a wait on the real end, so a slow runner only
+        // makes it longer: with 5 seconds, a busy Windows runner read the model's step still going (PR #130's run).
         async Task<PullInfo?> Settled()
         {
-            await Waiting.UntilAsync(async () => (await remote.EnginesAsync())!.Pulling is not { Why.Length: 0 }, 5);
+            Assert.True(await Waiting.UntilAsync(async () => (await remote.EnginesAsync())!.Pulling is not { Why.Length: 0 }, 60),
+                $"the free AI's setup never ended: {(await remote.EnginesAsync())!.Pulling}");
             return (await remote.EnginesAsync())!.Pulling;
         }
 
