@@ -83,7 +83,7 @@ public sealed class LocalLibrary(LibraryReader reader, Canvas.CanvasSync? canvas
         path = path.Trim();
         // "<class>/<path in its folder>": how class_files and get_assignment name what Syft Notes saved.
         if (!Path.IsPathFullyQualified(path) && path.IndexOf('/') is > 0 and var slash)
-            path = Path.GetFullPath(Path.Combine(reader.Store.PoolDir, Notes.Slugify(path[..slash], 60), path[(slash + 1)..]));
+            path = Path.GetFullPath(Path.Combine(reader.Store.PoolDir, Notes.FolderName(path[..slash]), path[(slash + 1)..]));
         if (path.Length == 0 || !Path.IsPathFullyQualified(path)) return NotHere;
         if (files.RootOf(path) is not { } root) return NotHere;
         if (root.Private) return "That file is in a private folder: AI tools see its name only.";
@@ -601,15 +601,36 @@ public static class ClaudeTools
         if (classes.Count == 0) sb.Append("No classes yet.\n");
         foreach (var c in classes) sb.Append($"- {S(c["name"])} ({c["lectures"]} lecture{(c["lectures"]?.GetValue<int>() == 1 ? "" : "s")})\n");
         if (o["unsorted"]?.GetValue<int>() is int u and > 0) sb.Append($"Unsorted: {u} lecture{(u == 1 ? "" : "s")} not yet in a class\n");
+        sb.Append(Unfiled(o));
         return sb.ToString().TrimEnd();
+    }
+
+    /// <summary>Lectures no class lists because they aren't filed yet (waiting for their notes) or couldn't be (with the
+    /// reason), one line each; empty when there are none.</summary>
+    static string Unfiled(JsonObject o)
+    {
+        var sb = new StringBuilder();
+        if (o["writing"]?.GetValue<int>() is int w and > 0)
+            sb.Append($"{w} lecture{(w == 1 ? " is" : "s are")} waiting for {(w == 1 ? "its" : "their")} notes and will be listed when {(w == 1 ? "it's" : "they're")} filed\n");
+        if (o["stuck"]?.GetValue<int>() is int k and > 0)
+            sb.Append($"{k} lecture{(k == 1 ? "" : "s")} couldn't be filed{(S(o["stuck_why"]) is { Length: > 0 } why ? ": " + why : "")}\n");
+        return sb.ToString();
     }
 
     public static async Task<string> ListLecturesAsync(ILibrarySource lib, string? className, int limit, string? before)
     {
         var list = await lib.LecturesAsync(string.IsNullOrWhiteSpace(className) ? null : className, Math.Clamp(limit, 1, 100), before);
-        if (list.Count == 0) return className is null ? "No lectures yet." : $"No lectures in {className}.";
+        if (list.Count == 0)
+        {
+            // Not "none": lectures can be waiting in Unsorted or unfiled, and the student has them.
+            var o = await lib.OverviewAsync();
+            string where = o["unsorted"]?.GetValue<int>() is int u and > 0 && !string.Equals(className, Configs.Unsorted, StringComparison.OrdinalIgnoreCase)
+                ? $" {u} lecture{(u == 1 ? " isn't" : "s aren't")} in a class yet: list_lectures with class_name \"{Configs.Unsorted}\" has {(u == 1 ? "it" : "them")}." : "";
+            return ((className is null ? "No lectures yet." : $"No lectures in {className}.") + where + "\n" + Unfiled(o)).TrimEnd();
+        }
         string more = list.Count >= limit ? $"\n(More: call again with before=\"{S(list[^1]?["date"])}\".)" : "";
-        return string.Join("\n", list.OfType<JsonObject>().Select(Line)) + more;
+        string lines = string.Join("\n", list.OfType<JsonObject>().Select(Line)) + more;
+        return string.IsNullOrWhiteSpace(className) && before is null ? (lines + "\n" + Unfiled(await lib.OverviewAsync())).TrimEnd() : lines;
     }
 
     public static async Task<string> SearchAsync(ILibrarySource lib, string query, string? className, int limit)
