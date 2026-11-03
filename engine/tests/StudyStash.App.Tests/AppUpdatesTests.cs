@@ -22,7 +22,8 @@ public class AppUpdatesTests
         bool automatic = true,
         bool installerRelaunches = false,
         Action? quit = null,
-        List<UpdateNews>? told = null)
+        List<UpdateNews>? told = null,
+        Func<Release, bool>? moves = null)
     {
         log ??= [];
         return new AppUpdates
@@ -34,12 +35,40 @@ public class AppUpdatesTests
             OnDiskVersion = onDiskNow ?? (() => onDisk),
             Apply = apply ?? ((_, _, _, _) => Task.FromResult(true)),
             InstallerRelaunches = installerRelaunches,
+            Moves = moves ?? (_ => false),
             RelaunchAndQuit = relaunchAndQuit ?? (() => { }),
             Quit = quit ?? (() => { }),
             Tell = n => told?.Add(n),
             Log = s => log.Add(s),
             Home = "unused",
         };
+    }
+
+    [Fact]
+    public async Task A_copy_installed_the_old_way_moves_to_its_own_version_once_idle_and_the_move_reopens_it()
+    {
+        // The bridge release (Bridge.cs): an Inno-era or tarball copy moves over to Velopack's install even when the
+        // release is the version it already runs, waits for the lecture like any update, and leaves reopening the app
+        // to what does the move (relaunching it here too would open the old copy the move is uninstalling).
+        bool idle = false, relaunched = false, quit = false;
+        int applied = 0;
+        var same = Release(Engine.Version);
+        var updates = Updates_(
+            onDisk: Engine.Version, idleNow: () => idle,
+            latest: () => Task.FromResult<Release?>(same),
+            moves: r => r == same,
+            apply: (_, _, _, _) => { applied++; return Task.FromResult(true); },
+            relaunchAndQuit: () => relaunched = true, quit: () => quit = true);
+
+        Assert.Equal("waiting until you're done recording", await updates.RoundAsync());
+        Assert.Equal(0, applied);
+        idle = true;
+        Assert.Equal("handed off", await updates.RoundAsync());
+        Assert.Equal(1, applied);
+        Assert.True(quit);
+        Assert.False(relaunched);
+        // Without the move, the same version is just up to date.
+        Assert.Equal("up to date", await Updates_(onDisk: Engine.Version, latest: () => Task.FromResult<Release?>(same)).RoundAsync());
     }
 
     [Fact]
