@@ -2,6 +2,7 @@ using System.Collections.ObjectModel;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using StudyStash.App.Services;
+using StudyStash.Core.Canvas;
 
 namespace StudyStash.App.ViewModels;
 
@@ -12,21 +13,39 @@ namespace StudyStash.App.ViewModels;
 /// student's Canvas from their own sign-in and tells the library. Each shows here as it happens, read from the library's
 /// own state through the shared <see cref="CanvasWatch"/> (every three seconds while the step shows), and when both
 /// have happened the step is done (<see cref="OnDone"/>). No school address, no code, no word the student wouldn't use.
+/// The store's add-on may turn out older than 1.8 (a stale answer, a store that rolled back): one that checks in with an
+/// older version sends the student to the step that asks for the school's address at once (<see cref="OnTypeInstead"/>),
+/// and when nothing has come a minute and a half after the store's page opened, that step is offered right there
+/// (<see cref="OfferTyping"/>).
 /// </summary>
 public sealed partial class AddOnModel : ObservableObject, IDisposable
 {
     readonly CanvasContext context;
     readonly CanvasWatch watch;
+    readonly Func<DateTimeOffset> clock;
     IDisposable? hurry;
     bool told;
+    DateTimeOffset? addedAt;
 
-    public AddOnModel(CanvasContext context, CanvasWatch watch)
+    /// <summary>How long after the store's page opened, with no add-on heard from, the typing way is offered.</summary>
+    public static readonly TimeSpan SlowAfter = TimeSpan.FromSeconds(90);
+
+    public AddOnModel(CanvasContext context, CanvasWatch watch, Func<DateTimeOffset>? clock = null)
     {
         this.context = context;
         this.watch = watch;
+        this.clock = clock ?? (() => DateTimeOffset.UtcNow);
         watch.Changed += OnWatchChanged;
         OfferBrowsers();
     }
+
+    /// <summary>The add-on that checked in is older than 1.8 (it needs the school's address and a code): the funnel moves
+    /// to the step that asks for it.</summary>
+    public Action? OnTypeInstead { get; set; }
+
+    /// <summary>Nothing has come since the store's page opened (a store still serving an older add-on, or the student
+    /// stuck): "Type your school's Canvas address instead" shows in the step.</summary>
+    [ObservableProperty] public partial bool OfferTyping { get; set; }
 
     /// <summary>Both are done: the add-on checked in, and the library knows the student's Canvas.</summary>
     public Action? OnDone { get; set; }
@@ -145,6 +164,17 @@ public sealed partial class AddOnModel : ObservableObject, IDisposable
         Asking = s.Extension?.Asking ?? "";
         if (s.Extension?.Connected == true) Connected = true;
         if (s.Url.Length > 0) CanvasUrl = s.Url;
+        // An add-on that says its version and it's older than 1.8 can't find Canvas: the typing way, at once.
+        // Only a check-in after the store's page opened counts: a version the library kept from an earlier install says
+        // nothing about the add-on being added now.
+        if (!told && !IsDone && addedAt is { } opened && s.Extension is { LastSeen: { } heard, Version: { Length: > 0 } v } && heard >= opened
+            && Extension.IsOlder(v, StoreVersions.FindsCanvasFrom))
+        {
+            told = true;
+            OnTypeInstead?.Invoke();
+            return;
+        }
+        if (Waiting && !IsAsking && addedAt is { } at && clock() - at >= SlowAfter) OfferTyping = true;
         if (IsDone && !told)
         {
             told = true;
@@ -168,6 +198,8 @@ public sealed partial class AddOnModel : ObservableObject, IDisposable
                 return;
             }
             context.Actions.RememberBrowser(Browser);
+            addedAt = clock();
+            OfferTyping = false;
             Added = true;
         }
         catch (Exception e) when (e is CanvasLibraryException or HttpRequestException or TaskCanceledException or System.Text.Json.JsonException)
@@ -204,6 +236,15 @@ public sealed partial class AddOnModel : ObservableObject, IDisposable
         {
             Problem = "Your library didn't answer. Try again in a moment.";
         }
+    }
+
+    /// <summary>"Type your school's Canvas address instead": the step that asks for it, with the code the add-on takes.</summary>
+    [RelayCommand]
+    void TypeInstead()
+    {
+        if (told) return;
+        told = true;
+        OnTypeInstead?.Invoke();
     }
 
     /// <summary>"Open the page again", for a student who closed it.</summary>
@@ -246,6 +287,18 @@ public sealed partial class AddOnModel : ObservableObject, IDisposable
     /// <summary>Whether a browser here can have the add-on from its store (else setup asks for the school's address, the
     /// way a pasted code needs it).</summary>
     public static bool AnyFromStore(CanvasContext context) => context.Actions.Browsers().Any(b => Browsers.StorePage(b).Length > 0);
+
+    /// <summary>The store the student's browser gets the add-on from (the first browser here that has one, as the step
+    /// picks it); null with none.</summary>
+    public static AddOnStore? StoreOf(CanvasContext context) =>
+        context.Actions.Browsers().FirstOrDefault(b => Browsers.StorePage(b).Length > 0) is { } b
+            ? b.Family == BrowserFamily.Firefox ? AddOnStore.Firefox : AddOnStore.Chrome
+            : null;
+
+    /// <summary>Whether the store this student's browser gets the add-on from serves one that finds Canvas by itself
+    /// right now; false with no such browser, or when the store can't be asked and was never heard.</summary>
+    public static async Task<bool> FindsCanvasAsync(CanvasContext context, StoreVersions stores) =>
+        StoreOf(context) is { } store && await stores.FindsCanvasAsync(store);
 
     public void Dispose()
     {

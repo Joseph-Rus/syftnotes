@@ -36,6 +36,10 @@ public sealed class FunnelServices
     /// <summary>Connect your classes with nothing typed (the add-on finds the library and Canvas); null where it can't
     /// (the stores' add-on is older than that, or no browser here has one), and the step asks for the school instead.</summary>
     public Func<AddOnModel?> MakeAddOn { get; init; } = () => null;
+    /// <summary>Whether the add-on in this student's browser store finds Canvas by itself right now (the store's own
+    /// answer, asked when the step opens); false takes the step that asks for the school's address. Always true by
+    /// default, so a test of the other flow gives its own.</summary>
+    public Func<Task<bool>> AddOnFindsCanvas { get; init; } = () => Task.FromResult(true);
     /// <summary>Canvas's connect flow (school, browser, courses), started at the step the library's state needs.</summary>
     public Func<Task<CanvasConnectModel?>> MakeCanvas { get; init; } = () => Task.FromResult<CanvasConnectModel?>(null);
     /// <summary>The sync screen's model over that flow.</summary>
@@ -250,25 +254,18 @@ public sealed partial class FunnelModel : ObservableObject, IDisposable
             case FunnelStep.Classes:
                 if (AddOn is null && Canvas is null)
                 {
-                    if (services.MakeAddOn() is { } addOn)
+                    if (await services.AddOnFindsCanvas() && services.MakeAddOn() is { } addOn)
                     {
                         addOn.OnDone = () =>
                         {
                             if (OnClasses) Step = FunnelStep.Sync;
                         };
+                        // The add-on turned out older than 1.8 (or the student chose to type): the school's address instead.
+                        addOn.OnTypeInstead = () => _ = TypeSchoolInsteadAsync();
                         AddOn = addOn;
                         await addOn.StartAsync();
                     }
-                    else if (await services.MakeCanvas() is { } canvas)
-                    {
-                        canvas.PropertyChanged += (_, e) =>
-                        {
-                            // The browser checked in: the courses are found next, on the sync screen.
-                            if (e.PropertyName == nameof(CanvasConnectModel.Current) && canvas.Current >= 3 && OnClasses) Step = FunnelStep.Sync;
-                        };
-                        Canvas = canvas;
-                        if (canvas.Current >= 3) Step = FunnelStep.Sync;
-                    }
+                    else await StartTypingAsync();
                 }
                 else if (AddOn is { IsDone: true } || AddOn is null && Canvas is { Current: >= 3 })
                 {
@@ -284,6 +281,30 @@ public sealed partial class FunnelModel : ObservableObject, IDisposable
                 }
                 break;
         }
+    }
+
+    /// <summary>The step that asks for the school's address once and gives the code the add-on takes.</summary>
+    async Task StartTypingAsync()
+    {
+        if (await services.MakeCanvas() is { } canvas)
+        {
+            canvas.PropertyChanged += (_, e) =>
+            {
+                // The browser checked in: the courses are found next, on the sync screen.
+                if (e.PropertyName == nameof(CanvasConnectModel.Current) && canvas.Current >= 3 && OnClasses) Step = FunnelStep.Sync;
+            };
+            Canvas = canvas;
+            if (canvas.Current >= 3) Step = FunnelStep.Sync;
+        }
+    }
+
+    /// <summary>From the no-typing step to the typing one, in the same place.</summary>
+    async Task TypeSchoolInsteadAsync()
+    {
+        if (AddOn is not { } addOn || !OnClasses) return;
+        AddOn = null;
+        addOn.Dispose();
+        await StartTypingAsync();
     }
 
     /// <summary>Continue on a step that's done (back on it after Back): the next one.</summary>

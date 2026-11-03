@@ -3,6 +3,7 @@ using Avalonia.Headless.XUnit;
 using StudyStash.App.Services;
 using StudyStash.App.ViewModels;
 using StudyStash.Core.Ai;
+using StudyStash.Core.Canvas;
 
 namespace StudyStash.App.Tests;
 
@@ -157,6 +158,127 @@ public class FunnelTests
         Assert.True(f.OnSync);
         Assert.DoesNotContain(handler.Requests, r => r.Path == "/api/v2/canvas" && r.Method == "POST"); // no school typed, ever
         f.Dispose();
+    }
+
+    /// <summary>What the stores serve, as <see cref="StoreVersions"/> asks it: Google's update check and Mozilla's API.</summary>
+    sealed class FakeStores(string chrome, string firefox) : HttpMessageHandler
+    {
+        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken ct)
+        {
+            string body = request.RequestUri!.Host.Contains("google", StringComparison.Ordinal)
+                ? "<gupdate><app status=\"ok\"><updatecheck status=\"ok\" version=\"" + chrome + "\"/></app></gupdate>"
+                : "{\"current_version\":{\"version\":\"" + firefox + "\"}}";
+            return Task.FromResult(new HttpResponseMessage { Content = new StringContent(body) });
+        }
+    }
+
+    /// <summary>The funnel's classes step for a student whose browser is <paramref name="browser"/>, with the stores
+    /// serving these versions: true when it finds Canvas with nothing typed, false when it asks for the school.</summary>
+    static async Task<bool> NothingTypedAsync(Browser browser, string chrome, string firefox)
+    {
+        var context = CanvasFixtures.Context(new FakeLibrary(), browsers: [browser]);
+        var stores = new StoreVersions(new HttpClient(new FakeStores(chrome, firefox)), Path.Combine(Directory.CreateTempSubdirectory("ss-stores-").FullName, "s.json"));
+        var (f, _) = Make(new FunnelServices
+        {
+            AddOnFindsCanvas = () => AddOnModel.FindsCanvasAsync(context, stores),
+            MakeAddOn = () => new AddOnModel(context, new CanvasWatch(context)),
+            MakeCanvas = () => Task.FromResult<CanvasConnectModel?>(new CanvasConnectModel(context, new CanvasWatch(context), forSetup: true)),
+        });
+        await f.GetStartedCommand.ExecuteAsync(null);
+        await f.IAmAStudentCommand.ExecuteAsync(null);
+        bool finds = f.FindsItself;
+        Assert.NotEqual(finds, f.AsksSchool);
+        f.Dispose();
+        return finds;
+    }
+
+    [AvaloniaFact]
+    public async Task A_firefox_student_finds_canvas_with_nothing_typed_when_the_add_ons_site_serves_1_8_and_a_chrome_student_types_it_while_the_web_store_serves_1_6()
+    {
+        Assert.True(await NothingTypedAsync(Browsers.Firefox, chrome: "1.6", firefox: "1.8"));
+        Assert.False(await NothingTypedAsync(Browsers.Chrome, chrome: "1.6", firefox: "1.8"));
+        Assert.True(await NothingTypedAsync(Browsers.Chrome, chrome: "1.8", firefox: "1.8")); // the day Google approves it, no app release
+        Assert.False(await NothingTypedAsync(Browsers.Firefox, chrome: "1.8", firefox: "1.7"));
+    }
+
+    [AvaloniaFact]
+    public async Task An_older_add_on_heard_from_sends_the_student_to_the_address_step_at_once()
+    {
+        var handler = new FakeLibrary()
+            .Json(HttpMethod.Post, "/api/v2/canvas/pair", """{"until":"2025-09-25T17:44:00Z"}""")
+            .Json(HttpMethod.Get, "/api/v2/canvas/state", """{"state": "not_set_up", "url": "", "extension": {"connected": false}}""");
+        var context = CanvasFixtures.Context(handler);
+        var watch = new CanvasWatch(context);
+        var (f, _) = Make(new FunnelServices
+        {
+            MakeAddOn = () => new AddOnModel(context, watch),
+            MakeCanvas = () => Task.FromResult<CanvasConnectModel?>(new CanvasConnectModel(context, watch, forSetup: true)),
+        });
+        await f.GetStartedCommand.ExecuteAsync(null);
+        await f.IAmAStudentCommand.ExecuteAsync(null);
+        Assert.True(f.FindsItself);
+        var addOn = f.AddOn!;
+        await addOn.AddCommand.ExecuteAsync(null);
+
+        // The store gave 1.6 after all: it checks in saying so, and the step becomes the one that asks for the school.
+        handler.Json(HttpMethod.Get, "/api/v2/canvas/state", """{"state": "not_set_up", "url": "", "extension": {"connected": true, "version": "1.6", "browser": "Chrome", "last_seen": "2999-01-01T00:00:00Z"}}""");
+        await watch.RefreshAsync();
+        Assert.False(f.FindsItself);
+        f.Dispose();
+    }
+
+    [AvaloniaFact]
+    public async Task A_version_the_library_heard_yesterday_changes_nothing_until_a_fresh_check_in_says_it_is_older()
+    {
+        var now = DateTimeOffset.Parse("2026-11-02T09:00:00Z");
+        var handler = new FakeLibrary()
+            .Json(HttpMethod.Post, "/api/v2/canvas/pair", """{"until":"2026-11-02T09:05:00Z"}""")
+            .Json(HttpMethod.Get, "/api/v2/canvas/state", """{"state": "not_set_up", "url": "", "extension": {"connected": false, "version": "1.6", "last_seen": "2026-11-01T09:00:00Z"}}""");
+        var context = CanvasFixtures.Context(handler, browsers: [Browsers.Firefox]);
+        var watch = new CanvasWatch(context);
+        var stores = new StoreVersions(new HttpClient(new FakeStores("1.6", "1.8")), Path.Combine(Directory.CreateTempSubdirectory("ss-stores-").FullName, "s.json"));
+        var (f, _) = Make(new FunnelServices
+        {
+            AddOnFindsCanvas = () => AddOnModel.FindsCanvasAsync(context, stores),
+            MakeAddOn = () => new AddOnModel(context, watch, () => now),
+            MakeCanvas = () => Task.FromResult<CanvasConnectModel?>(new CanvasConnectModel(context, watch, forSetup: true)),
+        });
+        await f.GetStartedCommand.ExecuteAsync(null);
+        await f.IAmAStudentCommand.ExecuteAsync(null);
+        Assert.True(f.FindsItself);
+        await f.AddOn!.StartAsync();
+        await f.AddOn.AddCommand.ExecuteAsync(null);
+        await watch.RefreshAsync();
+        Assert.True(f.FindsItself); // yesterday's 1.6 is ignored
+
+        now += TimeSpan.FromSeconds(30);
+        handler.Json(HttpMethod.Get, "/api/v2/canvas/state", """{"state": "not_set_up", "url": "", "extension": {"connected": true, "version": "1.6", "last_seen": "2026-11-02T09:00:30Z"}}""");
+        await watch.RefreshAsync();
+        Assert.True(f.AsksSchool); // a check-in since Add says 1.6
+        f.Dispose();
+    }
+
+    [AvaloniaFact]
+    public async Task With_nothing_heard_a_minute_and_a_half_after_the_store_opened_the_typing_way_is_offered_in_the_same_step()
+    {
+        var handler = new FakeLibrary()
+            .Json(HttpMethod.Post, "/api/v2/canvas/pair", """{"until":"2025-09-25T17:44:00Z"}""")
+            .Json(HttpMethod.Get, "/api/v2/canvas/state", """{"state": "not_set_up", "url": "", "extension": {"connected": false}}""");
+        var context = CanvasFixtures.Context(handler);
+        var watch = new CanvasWatch(context);
+        var now = DateTimeOffset.Parse("2026-11-02T09:00:00Z");
+        using var addOn = new AddOnModel(context, watch, () => now);
+        bool typing = false;
+        addOn.OnTypeInstead = () => typing = true;
+        await addOn.AddCommand.ExecuteAsync(null);
+        await watch.RefreshAsync();
+        Assert.False(addOn.OfferTyping);
+        now += AddOnModel.SlowAfter;
+        await watch.RefreshAsync();
+        Assert.True(addOn.OfferTyping);
+        Assert.False(typing); // offered, not forced
+        addOn.TypeInsteadCommand.Execute(null);
+        Assert.True(typing);
     }
 
     [AvaloniaFact]

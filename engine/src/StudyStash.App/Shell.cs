@@ -163,7 +163,7 @@ public static partial class Shell
         public static ViewModels.SetupModel? SetupModel => setup;
         /// <summary>Guided setup's model, while setup's window is open.</summary>
         public static ViewModels.GuidedSetupModel? Guided => guidedSetup;
-        /// <summary>The first run's funnel, while its window is open.</summary>
+            /// <summary>The first run's funnel, while its window is open.</summary>
         public static ViewModels.FunnelModel? Funnel => funnel;
         /// <summary>Home's "Ready when class starts", while it shows.</summary>
         public static ViewModels.WelcomeCardModel? WelcomeCard => library.Welcome;
@@ -1461,6 +1461,12 @@ public static partial class Shell
         Desktop.Activate();
     }
 
+    static Core.Canvas.StoreVersions? storeVersions;
+
+    /// <summary>What the browsers' stores serve of the add-on, kept under the app's home for a few hours.</summary>
+    static Core.Canvas.StoreVersions StoreVersionsOfApp() =>
+        storeVersions ??= new Core.Canvas.StoreVersions(new HttpClient { Timeout = TimeSpan.FromSeconds(10) }, Path.Combine(Program.Home, "store-versions.json"));
+
     /// <summary>The first run's funnel, while its window is open.</summary>
     static FunnelModel? funnel;
 
@@ -1468,9 +1474,11 @@ public static partial class Shell
     /// for getting an AI ready, and the library's AI choice. Nothing here is real in a self-test (no CLI is found).</summary>
     static FunnelServices FunnelServices() => new()
     {
-        // The add-on from the stores finds the library and Canvas by itself (1.8 on): nothing to type. Until it's live,
-        // or with no browser here that gets it from a store, the step asks for the school's address and gives a code.
-        MakeAddOn = () => host.Remote() is not null && Core.Canvas.Extension.FindsCanvas && AddOnModel.AnyFromStore(Canvas()) ? new AddOnModel(Canvas(), CanvasPoll()) : null,
+        // The add-on from the stores finds the library and Canvas by itself (1.8 on): nothing to type. While the student's
+        // store (asked when the step opens) serves an older one, or can't be asked, or no browser here gets it from a
+        // store, the step asks for the school's address and gives a code.
+        AddOnFindsCanvas = () => AddOnModel.FindsCanvasAsync(Canvas(), StoreVersionsOfApp()),
+        MakeAddOn = () => host.Remote() is not null && AddOnModel.AnyFromStore(Canvas()) ? new AddOnModel(Canvas(), CanvasPoll()) : null,
         MakeCanvas = () =>
         {
             if (host.Remote() is null) return Task.FromResult<CanvasConnectModel?>(null);

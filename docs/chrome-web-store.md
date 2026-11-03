@@ -249,10 +249,13 @@ update without being turned off. The sites are still optional and asked for at A
 all instructure.com sites, inscloudgate.net and 127.0.0.1". That's wider than 1.6's one school, but it's one prompt and
 no typing. Nothing reads history or every site's cookies.
 
-**Until 1.8 is live:** `Extension.StoreFindsCanvas` is false, so the app's step asks for the school's address once and
-shows the code, as before (both stores serve 1.6). To publish: pack 1.8 for both stores (`extension-zip`, and
-`extension-zip --firefox`), submit, and once both are live set `StoreFindsCanvas` to true. `STUDYSTASH_ADDON_FINDS_CANVAS=1`
-tries the new step before then. A 1.6 copy that updates to 1.8 keeps its pasted connection and its school.
+**No app release when a store approves 1.8:** when setup's Canvas step opens, the app asks the student's own store which
+version it serves now (`StoreVersions`: Google's update service for Chrome, Edge, Brave, Arc and Vivaldi, Mozilla's add-ons
+API for Firefox; kept three hours under the app's home, the last answer kept offline). From 1.8 the step finds Canvas with
+nothing typed; with an older one, or no answer, it asks for the school's address once and shows the code, which every
+version takes. A student whose store turns out older than it said (a rollback, a stale answer) is moved to the address
+step by the add-on's own version once it checks in, or offered "Type your school's Canvas address instead" after a minute
+and a half. `STUDYSTASH_ADDON_FINDS_CANVAS=1` (or `0`) overrides the answer, to try either step. A 1.6 copy that updates to 1.8 keeps its pasted connection and its school.
 
 ## Keep "Load unpacked"
 
