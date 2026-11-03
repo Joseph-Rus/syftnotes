@@ -36,13 +36,13 @@
           <Border Classes="record-dot mini"><Border /></Border>
         </Button>
         <Panel VerticalAlignment="Center">
-          <TextBlock Name="PillClass" Text="{Binding ShortClass}" ToolTip.Tip="{Binding ShortClass}" c:Tips.WhenCut="True" FontSize="14" FontWeight="Bold" MaxWidth="150" TextTrimming="CharacterEllipsis"
+          <TextBlock Name="PillClass" Text="{Binding ShortClass}" ToolTip.Tip="{Binding ShortClass}" c:Tips.WhenCut="True" FontSize="{DynamicResource FontBody}" FontWeight="Bold" MaxWidth="150" TextTrimming="CharacterEllipsis"
                      Opacity="{Binding IsRunning, Converter={x:Static c:Converters.Shown}}" />
-          <TextBlock Text="Paused" FontSize="14" FontWeight="Bold" Opacity="{Binding IsPaused, Converter={x:Static c:Converters.Shown}}" />
+          <TextBlock Text="Paused" FontSize="{DynamicResource FontBody}" FontWeight="Bold" Opacity="{Binding IsPaused, Converter={x:Static c:Converters.Shown}}" />
         </Panel>
         <c:Waveform Bars="3" Height="16" Lively="True" Levels="{Binding Levels}" Foreground="{DynamicResource Record}" VerticalAlignment="Center"
                     Opacity="{Binding IsRunning, Converter={x:Static c:Converters.Shown}}" />
-        <TextBlock Name="PillTime" Text="{Binding Elapsed}" FontSize="14" FontWeight="Medium" Foreground="{DynamicResource InkMuted}" MinWidth="40"
+        <TextBlock Name="PillTime" Text="{Binding Elapsed}" FontSize="{DynamicResource FontBody}" FontWeight="Medium" Foreground="{DynamicResource InkMuted}" MinWidth="40"
                    VerticalAlignment="Center" Margin="0,0,6,0" />
       </StackPanel>
     </Border>
@@ -67,8 +67,9 @@
                 <c:Icon Glyph="{Binding PauseGlyph}" Filled="True" Size="17" />
               </Button>
               <Button AutomationProperties.Name="Stop" Classes="rec-stop" Command="{Binding StopCommand}" ToolTip.Tip="Stop">
-                <Border Classes="rec-stop-square" />
-              </Button>
+                  <!-- Its ink square -->
+                  <c:Icon Glyph="stop" Filled="True" Size="16" Foreground="{DynamicResource OnRecording}" />
+                </Button>
             </StackPanel>
           </Border>
         </Grid>

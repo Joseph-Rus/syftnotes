@@ -23,7 +23,7 @@
       <Setter Property="Height" Value="32" />
       <Setter Property="CornerRadius" Value="4" />
       <Setter Property="Padding" Value="12,0" />
-      <Setter Property="FontSize" Value="14" />
+      <Setter Property="FontSize" Value="{DynamicResource FontBody}" />
     </Style>
     <Style Selector="Button.ask-tip">
       <Setter Property="Background" Value="{DynamicResource Ctrl}" />
@@ -36,8 +36,8 @@
   </UserControl.Styles>
   <Border Classes="tip-ask">
     <StackPanel>
-      <TextBlock Text="{x:Static s:SupportAsk.Title}" FontSize="14" FontWeight="SemiBold" />
-      <TextBlock Text="{x:Static s:SupportAsk.Text}" FontSize="12" LineHeight="16.8" Foreground="{DynamicResource Fg2}" TextWrapping="Wrap" Margin="0,2,0,0" />
+      <TextBlock Text="{x:Static s:SupportAsk.Title}" FontSize="{DynamicResource FontBody}" FontWeight="SemiBold" />
+      <TextBlock Text="{x:Static s:SupportAsk.Text}" FontSize="{DynamicResource FontCaption}" LineHeight="16.8" Foreground="{DynamicResource Fg2}" TextWrapping="Wrap" Margin="0,2,0,0" />
       <Button Name="Tip" Classes="ask ask-tip" Command="{Binding TipCommand}" HorizontalAlignment="Left" Margin="0,12,0,0">
         <TextBlock Text="{x:Static s:SupportAsk.Button}" />
       </Button>

@@ -32,8 +32,8 @@
               <MenuFlyout.ItemTemplate>
                 <DataTemplate x:DataType="vm:AiEngineRow">
                       <StackPanel Spacing="2">
-                        <TextBlock Text="{Binding Name, StringFormat='Get {0}'}" FontSize="14" />
-                        <TextBlock Text="{Binding About}" FontSize="12" Foreground="{DynamicResource Fg2}" />
+                        <TextBlock Text="{Binding Name, StringFormat='Get {0}'}" FontSize="{DynamicResource FontBody}" />
+                        <TextBlock Text="{Binding About}" FontSize="{DynamicResource FontCaption}" Foreground="{DynamicResource Fg2}" />
                       </StackPanel>
                 </DataTemplate>
               </MenuFlyout.ItemTemplate>
@@ -148,7 +148,7 @@
               <TextBlock Classes="ai-row-sub" Text="{Binding RichAbout}" TextWrapping="Wrap" />
             </StackPanel>
             <StackPanel Grid.Column="3" Orientation="Horizontal" Spacing="12" VerticalAlignment="Center">
-              <TextBlock Text="{Binding RichOn, Converter={x:Static c:Converters.OnOff}}" FontSize="14" />
+              <TextBlock Text="{Binding RichOn, Converter={x:Static c:Converters.OnOff}}" FontSize="{DynamicResource FontBody}" />
               <ToggleButton AutomationProperties.Name="Rich notes" Classes="switch" IsChecked="{Binding RichOn}" />
             </StackPanel>
           </Grid>
@@ -162,7 +162,7 @@
               <TextBlock Classes="ai-row-sub" Text="Flowcharts, state and sequence diagrams, timelines and mind maps" TextWrapping="Wrap" />
             </StackPanel>
             <StackPanel Grid.Column="3" Orientation="Horizontal" Spacing="12" VerticalAlignment="Center">
-              <TextBlock Text="{Binding RichDiagrams, Converter={x:Static c:Converters.OnOff}}" FontSize="14" />
+              <TextBlock Text="{Binding RichDiagrams, Converter={x:Static c:Converters.OnOff}}" FontSize="{DynamicResource FontBody}" />
               <ToggleButton AutomationProperties.Name="Diagrams" Classes="switch" IsChecked="{Binding RichDiagrams}" />
             </StackPanel>
           </Grid>
@@ -175,7 +175,7 @@
               <TextBlock Classes="ai-row-sub" Text="A curve or distribution drawn from the lecturer's formula, with sliders" TextWrapping="Wrap" />
             </StackPanel>
             <StackPanel Grid.Column="3" Orientation="Horizontal" Spacing="12" VerticalAlignment="Center">
-              <TextBlock Text="{Binding RichPlots, Converter={x:Static c:Converters.OnOff}}" FontSize="14" />
+              <TextBlock Text="{Binding RichPlots, Converter={x:Static c:Converters.OnOff}}" FontSize="{DynamicResource FontBody}" />
               <ToggleButton AutomationProperties.Name="Formula plots" Classes="switch" IsChecked="{Binding RichPlots}" />
             </StackPanel>
           </Grid>
@@ -188,7 +188,7 @@
               <TextBlock Classes="ai-row-sub" Text="Labelled figures of what a lecture describes (not on Ollama)" TextWrapping="Wrap" />
             </StackPanel>
             <StackPanel Grid.Column="3" Orientation="Horizontal" Spacing="12" VerticalAlignment="Center">
-              <TextBlock Text="{Binding RichDrawings, Converter={x:Static c:Converters.OnOff}}" FontSize="14" />
+              <TextBlock Text="{Binding RichDrawings, Converter={x:Static c:Converters.OnOff}}" FontSize="{DynamicResource FontBody}" />
               <ToggleButton AutomationProperties.Name="Drawings" Classes="switch" IsChecked="{Binding RichDrawings}" />
             </StackPanel>
           </Grid>
@@ -263,7 +263,7 @@
             <TextBlock Classes="ai-row-sub" Text="So notes and answers never stall" />
           </StackPanel>
           <StackPanel Grid.Column="3" Orientation="Horizontal" Spacing="12" VerticalAlignment="Center">
-            <TextBlock Text="{Binding Fallback, Converter={x:Static c:Converters.OnOff}}" FontSize="14" />
+            <TextBlock Text="{Binding Fallback, Converter={x:Static c:Converters.OnOff}}" FontSize="{DynamicResource FontBody}" />
             <ToggleButton AutomationProperties.Name="Use Ollama instead" Classes="switch" IsChecked="{Binding Fallback}" />
           </StackPanel>
         </Grid>
@@ -285,7 +285,7 @@
                   </StackPanel>
                   <StackPanel Grid.Column="3" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
                     <Border Width="200" Height="30" CornerRadius="{DynamicResource RadiusControl}" BorderThickness="1" Padding="9,0" Background="{DynamicResource Ctrl}" BorderBrush="{DynamicResource CtrlBorder}">
-                      <TextBox Classes="bare" VerticalAlignment="Center" Text="{Binding Draft}" PasswordChar="•" FontSize="14"
+                      <TextBox Classes="bare" VerticalAlignment="Center" Text="{Binding Draft}" PasswordChar="•" FontSize="{DynamicResource FontBody}"
                                PlaceholderText="{Binding HasKey, Converter={x:Static vm:KeyWords.Placeholder}}"
                                AutomationProperties.Name="{Binding Name, StringFormat='{}{0} API key'}">
                         <TextBox.KeyBindings>

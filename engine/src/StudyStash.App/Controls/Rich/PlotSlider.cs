@@ -167,13 +167,13 @@ public sealed class PlotSlider : Control
             // A white knob with a soft shadow and a hairline edge.
             double r = Dragging ? 8.5 : 8;
             context.DrawEllipse(new SolidColorBrush(Color.FromArgb(40, 0, 0, 0)), null, new Point(x, cy + 0.8), r + 0.6, r + 0.6);
-            context.DrawEllipse(dark ? new SolidColorBrush(Color.Parse("#D8D8DC")) : Brushes.White,
+            context.DrawEllipse(dark ? new SolidColorBrush(Skin.Dark.InkMuted) : Brushes.White,
                 new Pen(new SolidColorBrush(Color.FromArgb(dark ? (byte)0 : (byte)30, 0, 0, 0)), 0.5), new Point(x, cy), r, r);
         }
         else
         {
             // Windows 11: the accent dot in a white ring, which grows as it's held.
-            context.DrawEllipse(dark ? new SolidColorBrush(Color.Parse("#454545")) : Brushes.White,
+            context.DrawEllipse(dark ? new SolidColorBrush(Skin.DarkMeans.Chip) : Brushes.White,
                 new Pen(new SolidColorBrush(Color.FromArgb(30, 0, 0, 0)), 1), new Point(x, cy), 10, 10);
             double inner = Dragging ? 7 : IsPointerOver ? 7 : 5.5;
             context.DrawEllipse(Accent ?? Brushes.SteelBlue, null, new Point(x, cy), inner, inner);

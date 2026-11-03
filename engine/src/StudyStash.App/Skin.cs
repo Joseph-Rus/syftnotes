@@ -294,6 +294,8 @@ public static class Skin
         r["LineRing"] = Shadows([Outer(0, 0, 0, 1, p.Line)]);
         r["SubtleRing"] = Shadows([Outer(0, 0, 0, 1, p.InkSubtle)]);
         r["RecordRing"] = Shadows([Outer(0, 0, 0, 1.5, p.Record)]);
+        // A switch's knob: lifted a hair off its track.
+        r["ShadowKnob"] = Shadows([new BoxShadow { OffsetY = 1, Blur = 2, Color = Black(0.25) }]);
         // The dot's ring on a highlighted row: the page's own colour round it.
         r["OnAccentRing"] = Shadows([Outer(0, 0, 0, 1.5, p.Surface)]);
     }
@@ -434,7 +436,7 @@ public static class Skin
         "Progress", "ProgressTrack", "Highlight", "OnHighlight", "Hl", "SurfaceRaised", "Chip", "Border", "Text", "TextMuted", "TextSubtle",
         "TextFade1", "TextFade2", "TextFade3", "IcInfo",
     ];
-    static readonly string[] SemesterShadows = ["ShadowToday", "ShadowFloat", "ShadowFloatFocus", "LineRing", "SubtleRing", "RecordRing", "OnAccentRing"];
+    static readonly string[] SemesterShadows = ["ShadowToday", "ShadowFloat", "ShadowFloatFocus", "LineRing", "SubtleRing", "RecordRing", "OnAccentRing", "ShadowKnob"];
     static readonly string[] MacBrushes =
     [
         "Glass", "GlassSolid", "Win", "Raised", "Group", "Fg", "Fg2", "Fg3", "Sep", "Fill", "Fill2", "Mini", "Warn", "Ok", "Rec", "Good",
