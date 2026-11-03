@@ -1,4 +1,3 @@
-using System.Diagnostics;
 
 namespace StudyStash.App.ViewModels;
 
@@ -7,15 +6,16 @@ namespace StudyStash.App.ViewModels;
 /// text at most every <see cref="Every"/>, so a fast engine reads smoothly instead of redrawing the answer on every
 /// word. Each <see cref="Show"/> is all of the text so far; only the latest is ever drawn.
 /// </summary>
-public sealed class Paced(Action<string> draw)
+public sealed class Paced(Action<string> draw, TimeProvider? time = null)
 {
+    readonly TimeProvider clock = time ?? TimeProvider.System;
     /// <summary>About two frames: often enough to read as flowing, rarely enough that laying out the answer again
     /// never gets in the way.</summary>
     public static readonly TimeSpan Every = TimeSpan.FromMilliseconds(40);
 
     readonly Lock gate = new();
     string? waiting;
-    long drawnAt;
+    long? drawnAt;
     bool scheduled, over;
 
     /// <summary>The text so far: drawn now, or with the next beat.</summary>
@@ -27,7 +27,7 @@ public sealed class Paced(Action<string> draw)
             if (over) return;
             waiting = text;
             if (scheduled) return;
-            wait = drawnAt == 0 ? TimeSpan.Zero : Every - Stopwatch.GetElapsedTime(drawnAt);
+            wait = drawnAt is not { } at ? TimeSpan.Zero : Every - clock.GetElapsedTime(at);
             if (wait > TimeSpan.Zero) scheduled = true;
         }
         if (wait > TimeSpan.Zero) _ = DrawLater(wait);
@@ -47,7 +47,7 @@ public sealed class Paced(Action<string> draw)
 
     async Task DrawLater(TimeSpan wait)
     {
-        await Task.Delay(wait); // back on the thread it was shown on (the UI's), where drawing belongs
+        await Task.Delay(wait, clock); // back on the thread it was shown on (the UI's), where drawing belongs
         lock (gate) scheduled = false;
         Draw();
     }
@@ -58,7 +58,7 @@ public sealed class Paced(Action<string> draw)
         lock (gate)
         {
             if (over || waiting is null) return;
-            drawnAt = Stopwatch.GetTimestamp();
+            drawnAt = clock.GetTimestamp();
             draw(waiting);
         }
     }

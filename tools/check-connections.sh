@@ -31,6 +31,11 @@ measure() {
   echo "fire-and-forget-in-shell $(grep -Eo '_ = [A-Za-z_.()]*Async\(' Shell*.cs | wc -l | tr -d ' ')"
   # Rule 8: Mac and Windows share one view where the layout is the same.
   echo "mac-views $(ls Views/Mac*.axaml | wc -l | tr -d ' ')"
+  # Look: colours come from the Syft look's tokens (Skin.cs, and the brand's own in Controls/Syft/Syft.cs), never a
+  # #RRGGBB or #AARRGGBB written into a view or a control.
+  echo "literal-colours $( { grep -rEo '#([0-9A-Fa-f]{8}|[0-9A-Fa-f]{6})\b' --include='*.axaml' Views; grep -rEo '#([0-9A-Fa-f]{8}|[0-9A-Fa-f]{6})\b' --include='*.cs' Controls | grep -v '^Controls/Syft/Syft.cs:'; } | wc -l | tr -d ' ')"
+  # Look: text sizes come from the type scale ({DynamicResource FontBody}…), not a number written into a view.
+  echo "literal-font-sizes $(grep -rEo 'FontSize="[0-9]|Property="FontSize" Value="[0-9]' --include='*.axaml' Views | wc -l | tr -d ' ')"
   # Rule 3: one way to reach the library and the AI; nobody makes their own client.
   echo "clients-by-hand $(grep -rEo 'new (HttpClient|AiRemote|RemoteLibrary|CanvasClient)\(' --include='*.cs' . | grep -v 'LibraryApi' | wc -l | tr -d ' ')"
 }

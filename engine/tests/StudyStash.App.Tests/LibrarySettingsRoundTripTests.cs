@@ -47,12 +47,8 @@ public sealed class LibrarySettingsRoundTripTests
     }
 
     /// <summary>A change sent in the background (a switch) has reached the library once <paramref name="done"/> holds.</summary>
-    static async Task Until(Func<bool> done)
-    {
-        // Up to 30 s: a busy CI machine can take a few seconds to save a switch; it's quick when all is well.
-        for (int i = 0; i < 1200 && !done(); i++) await Task.Delay(25);
-        Assert.True(done());
-    }
+    // Up to 30 s: a busy CI machine can take a few seconds to save a switch; it's quick when all is well.
+    static Task Until(Func<bool> done) => Wait.UntilAsync(done, "the change to reach the library", TimeSpan.FromSeconds(30));
 
     /// <summary>Logs in to the library's web page from a browser of its own: where it lands, and its Settings page.</summary>
     static async Task<(bool In, string Settings)> WebPageAsync(string url, string password)

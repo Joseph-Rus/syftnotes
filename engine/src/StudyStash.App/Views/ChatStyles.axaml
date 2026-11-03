@@ -1,0 +1,80 @@
+<!-- The quick chat (the recorder's and the quick panel's), the same on Mac and Windows and the same as the Ask panel's:
+     the student's words on an ink bubble (paper in dark), the AI's answer on the mesh, the ask bar on the mesh with a
+     send cell that is ink on paper (paper on ink in dark). Included after the look's own AI styles, so it wins. -->
+<Styles xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:c="using:StudyStash.App.Controls">
+  <Style Selector="Border.ai-bubble-q">
+    <Setter Property="CornerRadius" Value="{DynamicResource RadiusCard}" />
+    <Setter Property="Padding" Value="12,8" />
+    <Setter Property="Background" Value="{DynamicResource Accent}" />
+    <Setter Property="BorderThickness" Value="0" />
+    <Setter Property="BoxShadow" Value="none" />
+    <Setter Property="HorizontalAlignment" Value="Right" />
+  </Style>
+  <Style Selector="Border.ai-bubble-q TextBlock">
+    <Setter Property="FontSize" Value="{DynamicResource FontBody}" />
+    <Setter Property="LineHeight" Value="20" />
+    <Setter Property="Foreground" Value="{DynamicResource OnAccent}" />
+    <Setter Property="TextWrapping" Value="Wrap" />
+  </Style>
+  <Style Selector="Border.ai-bubble-a">
+    <Setter Property="CornerRadius" Value="{DynamicResource RadiusCard}" />
+    <Setter Property="Padding" Value="12,10" />
+    <Setter Property="Background" Value="{DynamicResource SurfaceRaised}" />
+    <Setter Property="BorderThickness" Value="0" />
+    <Setter Property="BoxShadow" Value="none" />
+    <Setter Property="HorizontalAlignment" Value="Left" />
+  </Style>
+  <Style Selector="TextBlock.ai-byline, TextBlock.ai-asked">
+    <Setter Property="FontSize" Value="{DynamicResource FontCaption}" />
+    <Setter Property="Foreground" Value="{DynamicResource InkMuted}" />
+  </Style>
+  <Style Selector="TextBlock.ai-thinking">
+    <Setter Property="FontSize" Value="{DynamicResource FontBody}" />
+    <Setter Property="Foreground" Value="{DynamicResource InkMuted}" />
+  </Style>
+  <!-- The ask bar: a cell-cornered field on the mesh, no hairline, no shadow. -->
+  <Style Selector="Border.ai-field">
+    <Setter Property="Height" Value="44" />
+    <Setter Property="c:Cell.Round" Value="True" />
+    <Setter Property="Background" Value="{DynamicResource SurfaceRaised}" />
+    <Setter Property="BorderThickness" Value="0" />
+    <Setter Property="BoxShadow" Value="none" />
+    <Setter Property="Padding" Value="14,0,6,0" />
+  </Style>
+  <Style Selector="Border.ai-field TextBox">
+    <Setter Property="FontSize" Value="{DynamicResource FontBody}" />
+    <Setter Property="Foreground" Value="{DynamicResource Ink}" />
+  </Style>
+  <Style Selector="Border.ai-field-chip">
+    <Setter Property="Height" Value="28" />
+    <Setter Property="c:Cell.Round" Value="True" />
+    <Setter Property="Background" Value="{DynamicResource Fill2}" />
+    <Setter Property="Padding" Value="8,0,6,0" />
+  </Style>
+  <Style Selector="Border.ai-field-chip TextBlock">
+    <Setter Property="FontSize" Value="{DynamicResource FontCaption}" />
+    <Setter Property="Foreground" Value="{DynamicResource Ink}" />
+    <Setter Property="VerticalAlignment" Value="Center" />
+  </Style>
+  <Style Selector="Border.ai-field-chip > StackPanel">
+    <Setter Property="VerticalAlignment" Value="Center" />
+  </Style>
+  <!-- Send: the main colour, as the main buttons are. -->
+  <Style Selector="Border.ai-field-send">
+    <Setter Property="Width" Value="32" />
+    <Setter Property="Height" Value="32" />
+    <Setter Property="c:Cell.Round" Value="True" />
+    <Setter Property="Background" Value="{DynamicResource Accent}" />
+  </Style>
+  <Style Selector="Border.ai-field-send Button.ai-send">
+    <Setter Property="Width" Value="32" />
+    <Setter Property="Height" Value="32" />
+    <Setter Property="c:Cell.Round" Value="True" />
+    <Setter Property="Foreground" Value="{DynamicResource OnAccent}" />
+  </Style>
+  <Style Selector="Border.ai-field-send c|Icon">
+    <Setter Property="Foreground" Value="{DynamicResource OnAccent}" />
+  </Style>
+</Styles>

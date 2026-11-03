@@ -16,13 +16,9 @@ public class HiddenTerminalTests
 
     static async Task<string> UntilShownAsync(StringBuilder shown, string words)
     {
-        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
-        while (true)
-        {
-            lock (shown)
-                if (shown.ToString().Contains(words, StringComparison.Ordinal)) return shown.ToString();
-            await Task.Delay(20, cts.Token);
-        }
+        Assert.True(await Waiting.UntilAsync(() => { lock (shown) return shown.ToString().Contains(words, StringComparison.Ordinal); }, 30),
+            $"never showed: {words}");
+        lock (shown) return shown.ToString();
     }
 
     [Fact]
@@ -63,8 +59,7 @@ public class HiddenTerminalTests
         int child = int.Parse(File.ReadAllText(pids).Trim(), System.Globalization.CultureInfo.InvariantCulture);
         t.Dispose();
         await t.Exit.WaitAsync(TimeSpan.FromSeconds(30));
-        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
-        while (Alive(child)) await Task.Delay(50, cts.Token);
+        await Waiting.UntilAsync(() => !Alive(child), 30);
     }
 
     static bool Alive(int pid)

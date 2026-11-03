@@ -12,7 +12,7 @@
   <UserControl.Styles>
     <!-- The library's two lines at the sidebar's foot; when something's wrong they say so in the late red. -->
     <Style Selector="TextBlock.side-foot">
-      <Setter Property="FontSize" Value="12" />
+      <Setter Property="FontSize" Value="{DynamicResource FontCaption}" />
       <Setter Property="FontWeight" Value="Medium" />
       <Setter Property="LineHeight" Value="20" />
       <Setter Property="Foreground" Value="{DynamicResource InkSubtle}" />

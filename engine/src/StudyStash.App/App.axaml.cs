@@ -1,6 +1,7 @@
 using Avalonia;
 using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Markup.Xaml;
+using CommunityToolkit.Mvvm.Messaging;
 
 namespace StudyStash.App;
 
@@ -10,7 +11,8 @@ public partial class App : Application
     {
         AvaloniaXamlLoader.Load(this);
         // Before the menu bar first reads it: otherwise a Mac shows Avalonia's own "About Avalonia" menu.
-        if (OperatingSystem.IsMacOS()) Platform.AppMenu.Use(this, Platform.AppMenu.ShowAbout, Shell.SettingsFromMenu);
+        if (OperatingSystem.IsMacOS())
+            Platform.AppMenu.Use(this, Platform.AppMenu.ShowAbout, static () => WeakReferenceMessenger.Default.Send(new SettingsRequested()));
         Platform.MacPopupShadow.Use();
         Platform.WinPopupCorners.Use();
         Controls.Tips.Use();

@@ -103,6 +103,8 @@ build it here, as described, the first time a change needs it, instead of making
 | `CanvasWatch` (the one shared Canvas store), `Tips.WhenCut`, `BySkin`, `Icon`, `AppMark`/`SyftMark`, `SyftLoader`, `ConfirmCard` | exist |
 | `UiTasks.Run` / `RunQuietly` (work started without waiting: logged, and the student told), `Windows/AppWindows` (every window), `PageState` (which page is open) | in review: branch `toolkit-shell` |
 | `Poll`, `LibraryApi` + `Outcome`, `AsyncAction`, `AiStatusStore` (items 1–4) | in review: branch `toolkit-ai-status` |
+| **DI**: `AppServices` (AppServices.cs, Microsoft.Extensions.DependencyInjection) is the composition root: `AppStart`, `TimeProvider`, `IMessenger`, `AppHost` and what it owns (`LibraryClients`, `AiStatusStore`), `CanvasLink` (the one Canvas context and watch, made again for a new library), `ToolkitHooks` (connects `UiTasks` and `AppWindows`), and the view-model factories `AskFactory` and `CanvasModels`. Built once with `AppServices.Checked` (ValidateOnBuild, ValidateScopes) in `Shell.Start`; `AppServicesTests` resolves every registration | in review: branch `app-di` |
+| **Messenger**: `IMessenger` (`WeakReferenceMessenger.Default`) with the message records in Messages.cs (`ToastRequested`, `QuitRequested`, `SettingsRequested`, `SetupAgainRequested`, `CanvasConnectRequested`, `ShortcutsPaused`, `ShortcutsWordsRequest`…); Shell listens in Shell.Messages.cs. Services send instead of calling Shell | in review: branch `app-di` |
 | `StepFlow`, `Words/` catalogue, `StatusRow`, `AppActions`, `Confirm`, `Format`, shared Mac/Win views (items 5–12) | to build (section 5) |
 
 
@@ -194,8 +196,8 @@ all words in `Words/`. Each piece has one focused test.
 ## 4. Connection rules
 
 `tools/check-connections.sh` counts the patterns behind these rules (fixed waits, engine-state strings outside the store,
-Shell in services, windows built by hand, bare catches, fire-and-forget calls in Shell, Mac views, clients made by
-hand). CI's "Connection rules" job fails when a count rises above `tools/connections-baseline.txt`; when a change
+Shell in services, windows built by hand, bare catches, fire-and-forget calls in Shell, Mac views, literal colours
+and text sizes in views, clients made by hand). CI's "Connection rules" job fails when a count rises above `tools/connections-baseline.txt`; when a change
 brings one down, lower its line in the same change. Rules without a count are kept by review.
 
 1. **One owner per shared thing.** AI state, Canvas state, recording state and settings live in a store on
@@ -208,7 +210,8 @@ brings one down, lower its line in the same change. Rules without a count are ke
    outside `LibraryApi`.
 4. **Views and controls don't call services.** No `Shell.`, `Dialogs.`, `Process.`, `host.` or `Machine.` in
    `Views/` or `Controls/`; links go through `AppActions`. *Check:* grep (NoteView.cs:97 is the one to move).
-5. **Services never call Shell.** They return results or raise events. *Check:* no `Shell.` in `Services/` (16 today, in 4 files).
+5. **Services never call Shell.** They return results, raise events, or send a message (Messages.cs) that Shell
+   listens for. *Check:* no `Shell.` in `Services/` (0 since `app-di`; keep it there).
 6. **Shell only opens windows and connects stores to the top-level models.** No JSON parsing, no library calls, no
    page building in Shell. *Check:* the counts of `Remote()`, `JsonObject` and `JsonNode` in Shell*.cs only go down.
 7. **Windows open through `AppWindows`.** *Check:* no `new Window` or `new Floating` outside `Windows/`.
@@ -222,6 +225,15 @@ brings one down, lower its line in the same change. Rules without a count are ke
     `Thread.Sleep` outside `Kit/Poll.cs` and an allow-list of animation controls.
 12. **Every action a student starts goes through `AsyncAction`.** No bare `catch { }`, no `Busy = true` by hand.
     *Check:* grep.
+13. **The look comes from the Syft look's tokens (`Skin.cs`).** Colours by meaning (`Accent`/`OnAccent` ink on paper,
+    paper on ink in dark; `Recording` coral, only for recording; `Selected`/`OnSelected` lilac with ink; `Progress`
+    sky on `ProgressTrack`; `Highlight` mustard; `SurfaceRaised` the mesh; `Border`, `TextMuted`, `TextFade1`–`3`),
+    text by the type scale (`FontCaption` 12, `FontBody`/`FontBodyStrong` 14, `FontSubtitle` 16, `FontTitle` 20,
+    `FontDisplay` 28), gaps by `Space1`–`Space8` and `Inset1`–`Inset8` (4-point), corners by `RadiusCell`,
+    `RadiusControl`, `RadiusCard`, `RadiusPanel`, and every button's corners by `c:Cell.Round` (the logo's cell, 27 % of
+    its height). No colour themes; light, dark or the system's. *Check:* the `literal-colours` (#hex in Views and
+    Controls, outside Syft.cs) and `literal-font-sizes` (a number in a view's `FontSize`) counts only go down;
+    ThemeTests checks every token exists light and dark and every text and fill pair reads at 4.5:1.
 
 ## 5. Migration order
 

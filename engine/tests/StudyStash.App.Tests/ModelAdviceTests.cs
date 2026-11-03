@@ -55,12 +55,7 @@ public class ModelAdviceTests
         return (host, mirror);
     }
 
-    static async Task Until(Func<bool> done)
-    {
-        var took = Stopwatch.StartNew();
-        while (!done() && took.Elapsed < Soon) await Task.Delay(20, TestContext.Current.CancellationToken);
-        Assert.True(done(), "it didn't happen in time");
-    }
+    static Task Until(Func<bool> done) => Wait.UntilAsync(done, "it to happen", Soon);
 
     [Fact]
     public void A_new_install_uses_the_model_for_its_computer()

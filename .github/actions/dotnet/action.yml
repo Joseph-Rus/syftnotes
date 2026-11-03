@@ -1,0 +1,21 @@
+# The .NET 10 SDK, and NuGet's packages from the last run that restored the same ones. Restoring took 4 to 46 seconds a
+# job (the most on Windows). The cache is one per kind of job ("packages"), as each restores its own set: the
+# tests' packages, or the runtime packs of the systems an app build publishes for. Its key changes with any project
+# file, Directory.Build.props (the version too) or global.json; until a new one is saved, the last one is the start.
+name: .NET with NuGet's packages cached
+description: Set up the .NET 10 SDK and restore ~/.nuget/packages from the cache.
+inputs:
+  packages:
+    description: Which job's packages these are (each kind of job keeps a cache of its own).
+    required: true
+runs:
+  using: composite
+  steps:
+    - uses: actions/setup-dotnet@v6
+      with:
+        dotnet-version: "10.0.x"
+    - uses: actions/cache@v6
+      with:
+        path: ~/.nuget/packages
+        key: nuget-${{ inputs.packages }}-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('engine/**/*.csproj', 'engine/Directory.Build.props', 'engine/global.json') }}
+        restore-keys: nuget-${{ inputs.packages }}-${{ runner.os }}-${{ runner.arch }}-
