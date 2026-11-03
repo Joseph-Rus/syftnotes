@@ -40,6 +40,7 @@
 
   <ItemGroup>
     <InternalsVisibleTo Include="StudyStash.App.Tests" />
+    <InternalsVisibleTo Include="StudyStash.Pictures" />
   </ItemGroup>
 
   <!-- A student's copy (TestHelpers=false, see engine/Directory.Build.props) leaves out the self-test and the demo

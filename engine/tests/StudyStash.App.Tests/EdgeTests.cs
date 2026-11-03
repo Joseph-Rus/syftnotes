@@ -82,11 +82,11 @@ public class EdgeTests
                 : new WinLibrary { DataContext = model(), Width = 1280, Height = 860 };
             foreach (var page in Enum.GetValues<Demo.Page>())
                 yield return ($"library {page}", skin, () => Library(() => Demo.Semester(page)));
-            yield return ("library assignment", skin, () => Library(AppShots.DueApp));
-            yield return ("library class on Canvas", skin, () => Library(() => AppShots.ClassApp(false)));
-            yield return ("library lecture with AI", skin, () => Library(AppShots.LectureApp));
-            yield return ("setup AI", skin, () => skin == SkinKind.Mac ? new MacSetup { DataContext = AppShots.SetupAi(skin) } : new WinSetup { DataContext = AppShots.SetupAi(skin) });
-            yield return ("guided setup", skin, () => GuidedSetupShots.View(skin, GuidedSetupShots.Guided(skin)));
+            yield return ("library assignment", skin, () => Library(Scenes.DueApp));
+            yield return ("library class on Canvas", skin, () => Library(() => Scenes.ClassApp(false)));
+            yield return ("library lecture with AI", skin, () => Library(Scenes.LectureApp));
+            yield return ("setup AI", skin, () => skin == SkinKind.Mac ? new MacSetup { DataContext = Scenes.SetupAi(skin) } : new WinSetup { DataContext = Scenes.SetupAi(skin) });
+            yield return ("guided setup", skin, () => Scenes.View(skin, Scenes.Guided(skin)));
             yield return ("panel", skin, () => skin == SkinKind.Mac ? new MacPanel { DataContext = Demo.Panel(recording: false) } : new WinPanel { DataContext = Demo.Panel(recording: false) });
         }
     }
@@ -106,7 +106,7 @@ public class EdgeTests
         foreach (var skin in new[] { SkinKind.Mac, SkinKind.Win })
             foreach (var section in new[] { "General", "Appearance", "Recording", "Classes", "Notes", "Folders", "One-computer-adding" })
             {
-                var (model, host, home) = SurfaceShots.MakeSettings(section, skin);
+                var (model, host, home) = Scenes.MakeSettings(section, skin);
                 try { Audit($"settings {section}", skin, () => new SettingsView { DataContext = model }); }
                 finally
                 {
@@ -140,7 +140,7 @@ public class EdgeTests
                 ("Appearance", v => v.GetVisualDescendants().OfType<Button>().Single(b => b.Classes.Contains("seg-item") && b.Classes.Contains("on") && b.IsEffectivelyVisible)),
             })
             {
-                var (model, host, home) = SurfaceShots.MakeSettings(section, SkinKind.Mac);
+                var (model, host, home) = Scenes.MakeSettings(section, SkinKind.Mac);
                 try
                 {
                     var window = Show(SkinKind.Mac, t, () => new SettingsView { DataContext = model }, 1060, 760, scale: 2);
