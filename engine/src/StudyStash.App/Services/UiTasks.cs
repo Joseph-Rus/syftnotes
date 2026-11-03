@@ -23,10 +23,16 @@ internal static class UiTasks
 
     /// <summary>Starts <paramref name="work"/> on the UI thread (at once when already on it) and watches it to the end.
     /// <paramref name="what"/> names it in the log ("show Home").</summary>
-    public static void Run(Func<Task> work, string what)
+    public static void Run(Func<Task> work, string what) => Start(work, what, oops);
+
+    /// <summary><see cref="Run"/> for work on a timer that the student didn't ask for (a poll every minute): a failure is
+    /// written down but not said, since a message the student can do nothing about would come back on every turn.</summary>
+    public static void RunQuietly(Func<Task> work, string what) => Start(work, what, () => { });
+
+    static void Start(Func<Task> work, string what, Action say)
     {
-        if (Dispatcher.UIThread.CheckAccess()) _ = Guard(work, what, log, oops);
-        else Dispatcher.UIThread.Post(() => _ = Guard(work, what, log, oops));
+        if (Dispatcher.UIThread.CheckAccess()) _ = Guard(work, what, log, say);
+        else Dispatcher.UIThread.Post(() => _ = Guard(work, what, log, say));
     }
 
     /// <summary>Runs <paramref name="work"/> to the end and never throws: a failure goes to <paramref name="write"/> and
