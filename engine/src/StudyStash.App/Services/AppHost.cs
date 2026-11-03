@@ -382,8 +382,8 @@ public sealed partial class AppHost : IDisposable, IProblemSource
     /// 8) plays it that many times faster than real time.</summary>
     public static Func<IAudioSource>? MicFromEnvironment()
     {
-        if (Environment.GetEnvironmentVariable("STUDYSTASH_MIC_FILE") is not { Length: > 0 } wav || !File.Exists(wav)) return null;
-        int speed = MicSpeed(Environment.GetEnvironmentVariable("STUDYSTASH_MIC_SPEED"));
+        if (StudyStash.Core.TestSwitches.Get("STUDYSTASH_MIC_FILE") is not { Length: > 0 } wav || !File.Exists(wav)) return null;
+        int speed = MicSpeed(StudyStash.Core.TestSwitches.Get("STUDYSTASH_MIC_SPEED"));
         return () => new FileMicrophone(wav, speed);
     }
 
@@ -434,7 +434,7 @@ public sealed partial class AppHost : IDisposable, IProblemSource
     BackgroundPlan MakeBackgroundPlan()
     {
         // The self-test's stand-in for Google Drive goes along, so its phone is answered with the app closed too.
-        IReadOnlyList<string>? extra = SelfTest.Dir is not null && Environment.GetEnvironmentVariable("STUDYSTASH_DRIVE_FOLDER") is { Length: > 0 } folder
+        IReadOnlyList<string>? extra = SelfTest.Dir is not null && StudyStash.Core.TestSwitches.Get("STUDYSTASH_DRIVE_FOLDER") is { Length: > 0 } folder
             ? ["--drive-folder", folder] : null;
         return new BackgroundPlan(Background, () => BackgroundWanted, Desktop.Program, extra);
     }

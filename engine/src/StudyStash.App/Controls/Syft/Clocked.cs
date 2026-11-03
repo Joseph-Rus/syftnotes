@@ -51,7 +51,7 @@ public abstract class Clocked : Control
     /// <summary>Starts or stops the clock to match: call when <see cref="Moves"/> may have changed.</summary>
     protected void Sync()
     {
-        bool turn = seen.InView && ticker is not null && Moves && At is null && Environment.GetEnvironmentVariable("STUDYSTASH_STILL") != "1";
+        bool turn = seen.InView && ticker is not null && Moves && At is null && StudyStash.Core.TestSwitches.Get("STUDYSTASH_STILL") != "1";
         if (turn == turning) return;
         turning = turn;
         if (!turn) moment.Seconds = StillAt;

@@ -257,7 +257,7 @@ public static class Extension
     /// STUDYSTASH_FIREFOX_ADDON says instead (another web address), for trying a copy that isn't the published one.
     /// "" when there's nowhere.</summary>
     public static string FirefoxAddOn =>
-        Environment.GetEnvironmentVariable("STUDYSTASH_FIREFOX_ADDON") is { Length: > 0 } tried ? tried : FirefoxPublishedAt;
+        TestSwitches.Get("STUDYSTASH_FIREFOX_ADDON") is { Length: > 0 } tried ? tried : FirefoxPublishedAt;
 
     /// <summary>The oldest Firefox the add-on installs in: 140 (June 2025, also an extended-support release) has
     /// everything the extension uses, and shows what it sends where before the student adds it.</summary>

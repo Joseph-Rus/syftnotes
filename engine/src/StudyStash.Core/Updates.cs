@@ -134,7 +134,7 @@ public static partial class Updates
     /// <see cref="LatestVariable"/> can turn the check off or pretend an answer.</summary>
     public static async Task<Release?> LatestAsync(HttpClient? http = null)
     {
-        if (http is null && Pretend(Environment.GetEnvironmentVariable(LatestVariable)) is (true, var pretend)) return pretend;
+        if (http is null && Pretend(TestSwitches.Get(LatestVariable)) is (true, var pretend)) return pretend;
         using var request = new HttpRequestMessage(HttpMethod.Get, LatestApi);
         request.Headers.TryAddWithoutValidation("Accept", "application/vnd.github+json");
         using var r = await (http ?? Http).SendAsync(request);

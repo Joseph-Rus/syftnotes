@@ -67,7 +67,7 @@ public static class Antigravity
     /// <summary>The agy home for a Syft Notes home: its <c>gemini</c> folder, or STUDYSTASH_AGY_HOME when that's set
     /// (an app and its library pointed at one signed-in home, as the off-screen films are).</summary>
     public static string For(string studyStashHome) =>
-        Environment.GetEnvironmentVariable("STUDYSTASH_AGY_HOME") is { Length: > 0 } set ? set : Path.Combine(studyStashHome, "gemini");
+        TestSwitches.Get("STUDYSTASH_AGY_HOME") is { Length: > 0 } set ? set : Path.Combine(studyStashHome, "gemini");
 
     /// <summary>The empty folder the setup chat's agy works in: nothing in it to read, no instructions to pick up.</summary>
     public static string SetupWorkspace(string workDir) => Path.Combine(workDir, "gemini-workspace");

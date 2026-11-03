@@ -25,7 +25,7 @@ public sealed class DailyCount
 #if DEBUG
         return true;
 #else
-        return Environment.GetEnvironmentVariable("STUDYSTASH_SELFTEST") is { Length: > 0 }
+        return StudyStash.Core.TestSwitches.Get("STUDYSTASH_SELFTEST") is { Length: > 0 }
             || Environment.GetEnvironmentVariable("CI") is { Length: > 0 }
             || Environment.GetEnvironmentVariable("GITHUB_ACTIONS") is { Length: > 0 };
 #endif

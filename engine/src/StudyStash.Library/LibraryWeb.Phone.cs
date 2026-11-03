@@ -34,7 +34,7 @@ public sealed partial class LibraryWeb
     /// beside the app. Null when there's no index.html there: this copy was built without the phone app.</summary>
     string? PhoneAppDir()
     {
-        string? env = Environment.GetEnvironmentVariable("STUDYSTASH_WEB_DIR");
+        string? env = StudyStash.Core.TestSwitches.Get("STUDYSTASH_WEB_DIR");
         string dir = options.PhoneApp ?? (string.IsNullOrWhiteSpace(env) ? Path.Combine(AppContext.BaseDirectory, "web") : env);
         return File.Exists(Path.Combine(dir, "index.html")) ? Path.TrimEndingDirectorySeparator(Path.GetFullPath(dir)) : null;
     }

@@ -35,7 +35,7 @@ public static class Skin
 
     /// <summary>STUDYSTASH_SKIN=mac|win shows the other system's look (for screenshots, or to compare).</summary>
     public static SkinKind FromEnvironment() =>
-        Environment.GetEnvironmentVariable("STUDYSTASH_SKIN")?.ToLowerInvariant() switch
+        StudyStash.Core.TestSwitches.Get("STUDYSTASH_SKIN")?.ToLowerInvariant() switch
         {
             "win" or "windows" => SkinKind.Win,
             "mac" or "macos" => SkinKind.Mac,
