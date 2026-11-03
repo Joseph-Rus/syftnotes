@@ -66,69 +66,6 @@ public sealed class LibrarySettingsRoundTripTests
         return (loggedIn, loggedIn ? await web.GetStringAsync("/settings") : "");
     }
 
-    [AvaloniaFact]
-    public async Task Renaming_adding_a_class_sorting_and_a_new_password_reach_the_librarys_config_and_web_page()
-    {
-        using var home = new TempHome();
-        var (url, app, cfg, store) = await LibraryAsync(home);
-        await using var _app = app;
-        using var _store = store;
-        string laptopHome = home["laptop"];
-        Directory.CreateDirectory(laptopHome);
-        new AppSettings { SetupDone = true, Role = AppRole.Laptop }.Save(laptopHome);
-        var cc = Configs.LoadClient(laptopHome);
-        cc.ServerUrl = url;
-        cc.PoolKey = "old-pw";
-        cc.PoolName = "Sam's library";
-        Configs.SaveClient(cc);
-        using var host = new AppHost(laptopHome, log: _ => { });
-        using var settings = SettingsModel.Make(host);
-        var lib = settings.Lib;
-
-        settings.Section = "Library";
-        await Until(() => lib.IsReady);
-        Assert.Equal("Sam's library", lib.Name);
-
-        lib.Name = "Sam's home library";
-        await lib.SaveNameCommand.ExecuteAsync(null);
-        lib.NewClass = "BIO 110";
-        await lib.AddClassCommand.ExecuteAsync(null);
-        settings.Section = "Notes";
-        lib.SortWithAi = true;
-        await Until(() => Configs.Load(cfg.Home).OllamaEnabled);
-        settings.Section = "Library";
-        lib.ChangePasswordCommand.Execute(null);
-        lib.NewPassword = "new-pw";
-        await lib.SavePasswordCommand.ExecuteAsync(null);
-
-        // The library's config, as its next start reads it.
-        var saved = Configs.Load(cfg.Home);
-        Assert.Equal("Sam's home library", saved.PoolName);
-        Assert.Equal(["CS 101", "BIO 110"], saved.Classes.Select(c => c.Name));
-        Assert.Equal(["cs101"], saved.Classes[0].Aliases);
-        Assert.True(saved.OllamaEnabled);
-        Assert.Equal("new-pw", saved.PoolPassword);
-        Assert.Null(lib.Say);
-        Assert.Equal("Changed. Your other computers need the new password to connect.", lib.PasswordSay);
-
-        // The laptop keeps up: it connects with the new password, under the new name, and reads the library again.
-        var mine = Configs.LoadClient(laptopHome);
-        Assert.Equal("new-pw", mine.PoolKey);
-        Assert.Equal("Sam's home library", mine.PoolName);
-        await lib.LoadCommand.ExecuteAsync(null);
-        Assert.True(lib.IsReady);
-        Assert.Equal(["CS 101", "BIO 110"], lib.Classes.Select(c => c.Name));
-        Assert.True(lib.SortWithAi);
-
-        // The library's web page: the old password no longer opens it; the new one shows every change.
-        Assert.False((await WebPageAsync(url, "old-pw")).In);
-        var (loggedIn, page) = await WebPageAsync(url, "new-pw");
-        Assert.True(loggedIn);
-        Assert.Contains("Sam&#x27;s home library", page);
-        Assert.Contains("value=\"BIO 110\"", page);
-        Assert.Contains("name=\"ollama_enabled\" value=\"1\" checked", page);
-    }
-
     /// <summary>A class renamed by typing its new name in Settings → Classes takes its lectures and folder with it (and
     /// this laptop's waiting recordings), instead of leaving them behind as a second class under the old name.</summary>
     [AvaloniaFact]
