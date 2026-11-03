@@ -215,6 +215,9 @@ public sealed partial class SettingsModel : ObservableObject, IDisposable
 
     // AI engines, AI tool access and Canvas: each is its own pane over its own model, read when it's opened.
     public AiEnginesModel Engines { get; }
+    /// <summary>Where the AIs stand, for <see cref="Engines"/> and <see cref="AiProblems"/> alike.</summary>
+    readonly Stores.AiStatusStore aiStatus;
+    readonly bool ownsAiStatus;
     /// <summary>What's wrong with an engine right now (offline, signed out, a model missing, a usage limit), above
     /// the engines.</summary>
     public AiProblemsModel AiProblems { get; }
@@ -419,14 +422,22 @@ public sealed partial class SettingsModel : ObservableObject, IDisposable
         // Settings opens on General, which reads the library; a library-only computer opens on its library.
         Section = records ? "General" : "Library";
         var cc = host.Client();
-        // The password as it is at each request: it can change while Settings is open (Add a laptop, Password → Change).
-        ai ??= new AiRemote(cc.ServerUrl, () => host.Client().PoolKey);
+        // Where the AIs stand: the app's one store (the rows and the cards below both read it, so a sign-in started from
+        // either shows on both), or, given a library of its own (a test, a picture), a store over that. The password is
+        // read at each request: it can change while Settings is open (Add a laptop, Password → Change).
+        if (ai is null) aiStatus = host.AiStatus;
+        else
+        {
+            aiStatus = new Stores.AiStatusStore(ai);
+            ownsAiStatus = true;
+        }
+        ai = aiStatus.Library;
         // One computer (Both) has the library on it: the AI's words say this computer, not "your library".
         bool libraryHere = host.Settings.Role != AppRole.Laptop;
         // The AI apps on this computer, which each AI's Connect adds Syft Notes to (in a test or a self-test nothing real:
         // ClaudeSetup.ThisComputer sees to that).
         var aiApps = ClaudeSetup.ThisComputer(host.Home);
-        Engines = new AiEnginesModel(ai)
+        Engines = new AiEnginesModel(aiStatus)
         {
             Here = libraryHere,
             AiApps = aiApps,
@@ -442,9 +453,7 @@ public sealed partial class SettingsModel : ObservableObject, IDisposable
                 ? "It runs on your library, and you can set it up there or from this laptop."
                 : $"It runs on this {device}, as part of your library."),
         };
-        AiProblems = new AiProblemsModel(ai) { Here = libraryHere, OpenUrl = url => Dialogs.OpenUrl(url) };
-        // A sign-in started from a problem card shows on its AI's row below, and the other way round.
-        Engines.ShareWith(AiProblems);
+        AiProblems = new AiProblemsModel(aiStatus) { Here = libraryHere, OpenUrl = url => Dialogs.OpenUrl(url) };
         Access = MakeAccess(ai, host, aiApps);
         Canvas = new CanvasSettingsModel(canvas ?? CanvasContext.For(host), watch) { OnSetUpExtension = () => Shell.ShowCanvasConnect(), OnChooseBrowser = Shell.ChooseBrowser };
         Calendars = new CalendarSettingsModel(host.Home, wake: () => host.Calendars.Wake());
@@ -518,8 +527,8 @@ public sealed partial class SettingsModel : ObservableObject, IDisposable
         switch (section)
         {
             case "AI":
+                // One look at the library for both: the problem cards hear it from the store.
                 _ = Engines.Load();
-                _ = AiProblems.Load();
                 // Advanced settings, folded away under the cards: what AI apps may read, and the terminal a class opens in.
                 _ = Access.Load();
                 _ = Lib.Load();
@@ -1154,7 +1163,9 @@ public sealed partial class SettingsModel : ObservableObject, IDisposable
         Canvas.Dispose();
         Granola.Dispose();
         Phones.Google?.Dispose();
-        // Settings has closed: nobody is waiting to see an AI's card turn to Connected.
-        Engines.StopWatchingApps();
+        // Settings has closed: nobody is waiting to see an AI's card turn to Connected, and the app's store forgets these.
+        Engines.Dispose();
+        AiProblems.Dispose();
+        if (ownsAiStatus) aiStatus.Dispose();
     }
 }
