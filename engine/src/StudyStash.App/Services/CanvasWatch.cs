@@ -5,10 +5,11 @@ namespace StudyStash.App.Services;
 /// Settings → Canvas, and (T5) the connect flow, all share one of these rather than each keeping their own. Polls
 /// faster while there's something worth catching up to (syncing, or waiting for the Chrome extension to check in
 /// for the first time); a minute otherwise. Nothing here touches the UI thread — a host marshals <see cref="Changed"/>
-/// back to it if it needs to.
+/// back to it if it needs to. Its wait is on a <see cref="TimeProvider"/> (the system's unless a test gives its own).
 /// </summary>
-public sealed class CanvasWatch(CanvasContext context)
+public sealed class CanvasWatch(CanvasContext context, TimeProvider? clock = null)
 {
+    readonly TimeProvider clock = clock ?? TimeProvider.System;
     static readonly TimeSpan Fast = TimeSpan.FromSeconds(5);
     static readonly TimeSpan Slow = TimeSpan.FromSeconds(60);
     static readonly TimeSpan Waiting = TimeSpan.FromSeconds(3);
@@ -114,7 +115,7 @@ public sealed class CanvasWatch(CanvasContext context)
             nap = wake;
             try
             {
-                await Task.Delay(NextDelay, wake.Token);
+                await Task.Delay(NextDelay, clock, wake.Token);
             }
             catch (TaskCanceledException)
             {
