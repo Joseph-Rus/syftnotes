@@ -63,15 +63,9 @@ public class SignInInBrowserTests
         /// that ends unmet says where the sign-in was.</summary>
         public async Task<EngineInfo> UntilAsync(string id, Func<EngineInfo, bool> condition)
         {
-            var until = DateTime.UtcNow.AddSeconds(30);
-            while (true)
-            {
-                var row = await RowAsync(id);
-                if (condition(row)) return row;
-                if (DateTime.UtcNow > until)
-                    throw new TimeoutException($"{id}'s row stayed {row.State}, sign-in \"{row.SignIn}\", {FakeAgents.Logins(Bin)} sign-in(s) started");
-                await Task.Delay(50);
-            }
+            EngineInfo row = null!;
+            if (await Waiting.UntilAsync(async () => condition(row = await RowAsync(id)), 30)) return row;
+            throw new TimeoutException($"{id}'s row stayed {row.State}, sign-in \"{row.SignIn}\", {FakeAgents.Logins(Bin)} sign-in(s) started");
         }
 
         public async ValueTask DisposeAsync()
@@ -175,8 +169,7 @@ public class SignInInBrowserTests
         using var signIns = ai.SignIns;
         signIns.Start("claude");
         Assert.Equal(SignInPhase.Waiting, signIns.State("claude"));
-        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
-        while (signIns.State("claude") != SignInPhase.GaveUp) await Task.Delay(50, cts.Token);
+        Assert.True(await Waiting.UntilAsync(() => signIns.State("claude") == SignInPhase.GaveUp, 30), "never gave up");
 
         // Pressed again, it's a new sign-in that waits.
         signIns.Start("claude");
