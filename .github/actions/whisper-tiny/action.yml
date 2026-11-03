@@ -1,18 +1,31 @@
 # Whisper's smallest model (about 75 MB), so the live tests and the self-tests hear real speech on each system (the
 # app itself uses large-v3). Cached, so the download is only the first time; STUDYSTASH_WHISPER_MODEL points at it for
-# the steps after.
+# the steps after. The download is pinned to one revision of Hugging Face's ggerganov/whisper.cpp and its sha256 is
+# checked, the cached copy's too: a model that changed under the same name, or a cache that went wrong, stops here.
 name: Whisper tiny
-description: Fetch Whisper's tiny model (cached) and point STUDYSTASH_WHISPER_MODEL at it.
+description: Fetch Whisper's tiny model (pinned, checked, cached) and point STUDYSTASH_WHISPER_MODEL at it.
 runs:
   using: composite
   steps:
-    - uses: actions/cache@v4
+    - uses: actions/cache@v6
       with:
         path: ${{ runner.temp }}/whisper
         key: whisper-ggml-tiny-v1
     - shell: bash
+      env:
+        REVISION: 5359861c739e955e79d9a303bcbc70fb988958b1
+        SHA256: be07e048e1e599ad46341c8d2a135645097a538221678b7acdd1b1919c6e1b21
       run: |
+        model="$RUNNER_TEMP/whisper/ggml-tiny.bin"
         mkdir -p "$RUNNER_TEMP/whisper"
-        [ -f "$RUNNER_TEMP/whisper/ggml-tiny.bin" ] || curl -fsSL --retry 3 --retry-delay 5 -o "$RUNNER_TEMP/whisper/ggml-tiny.bin" \
-          https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-tiny.bin
-        echo "STUDYSTASH_WHISPER_MODEL=$RUNNER_TEMP/whisper/ggml-tiny.bin" >> "$GITHUB_ENV"
+        sum() { if command -v sha256sum > /dev/null; then sha256sum "$1"; else shasum -a 256 "$1"; fi | cut -d' ' -f1; }
+        if [ -f "$model" ] && [ "$(sum "$model")" != "$SHA256" ]; then
+          echo "the cached ggml-tiny.bin isn't the pinned one; downloading it again"
+          rm -f "$model"
+        fi
+        if [ ! -f "$model" ]; then
+          curl -fsSL --retry 3 --retry-delay 5 -o "$model" "https://huggingface.co/ggerganov/whisper.cpp/resolve/$REVISION/ggml-tiny.bin"
+          got=$(sum "$model")
+          [ "$got" = "$SHA256" ] || { echo "::error::ggml-tiny.bin's sha256 is $got, not $SHA256"; rm -f "$model"; exit 1; }
+        fi
+        echo "STUDYSTASH_WHISPER_MODEL=$model" >> "$GITHUB_ENV"

@@ -136,7 +136,7 @@ jobs:
       mac_notarize: ${{ steps.signing.outputs.mac_notarize }}
       win_signing: ${{ steps.signing.outputs.win_signing }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           persist-credentials: false  # nothing here pushes; plan.sh's git fetch reads this public repository without a token
       # A run by hand keeps the exact tree it tests, so that merging that branch into main with the very same code
@@ -145,7 +145,7 @@ jobs:
       - if: github.event_name == 'workflow_dispatch' && !inputs.real_sign_in_only
         run: git rev-parse 'HEAD^{tree}' > tested-tree.txt
       - if: github.event_name == 'workflow_dispatch' && !inputs.real_sign_in_only
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         continue-on-error: true
         with:
           name: tested-tree
@@ -186,15 +186,27 @@ jobs:
 
   # The desktop app's connection rules (docs/ARCHITECTURE.md), counted: a fixed wait, a screen keeping its own copy of
   # the AI's state, a window built by hand, an error swallowed. A count that goes up fails; the toolkit is the way instead.
+  # And the scripts a student or a release runs but no other job here does parse: the one-line installers (install.sh,
+  # install.ps1) and the Windows build and signing scripts (PowerShell 7, which this Linux runner has).
   connections:
-    name: Connection rules (counts only go down)
+    name: Connection rules (counts only go down), and the scripts parse
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           persist-credentials: false  # nothing here pushes; plan.sh's git fetch reads this public repository without a token
       - run: bash tools/check-connections.sh
+      - name: install.sh, install.ps1 and windows/*.ps1 parse
+        shell: pwsh
+        run: |
+          sh -n install.sh
+          if ($LASTEXITCODE -ne 0) { throw "install.sh doesn't parse" }
+          foreach ($file in @(Get-Item install.ps1) + @(Get-ChildItem windows -Filter *.ps1)) {
+            $errors = $null
+            [System.Management.Automation.Language.Parser]::ParseFile($file.FullName, [ref]$null, [ref]$errors) | Out-Null
+            if ($errors.Count -gt 0) { throw "$($file.Name) doesn't parse: $errors" }
+          }
 
   # The C# engine (engine/): every test on each system. Golden/ holds fixed expectations the tests compare byte for
   # byte. macOS and Linux run both test projects (Core, then App) in one job: GitHub runs at most five macOS jobs at
@@ -231,7 +243,7 @@ jobs:
     timeout-minutes: ${{ matrix.suite == 'Core' && 25 || 45 }}
     runs-on: ${{ matrix.os }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           persist-credentials: false  # nothing here pushes; plan.sh's git fetch reads this public repository without a token
       - uses: ./.github/actions/dotnet
@@ -344,7 +356,7 @@ jobs:
       # Only when something failed: the .trx files, a hung test's dump, a crashed test process's dump and crash report.
       - name: Test results and dumps, if a test failed, hung or crashed
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         continue-on-error: true
         with:
           name: test-results-${{ matrix.os }}-${{ matrix.slug }}
@@ -355,7 +367,7 @@ jobs:
           if-no-files-found: ignore
       - name: The notes' formulas and diagrams, as Windows draws them
         if: ${{ always() && runner.os == 'Windows' && matrix.app }}
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         continue-on-error: true
         with:
           name: windows-rich-notes
@@ -366,7 +378,7 @@ jobs:
           retention-days: 7
       - name: Notifications, as Windows draws them, where they land above the taskbar
         if: ${{ always() && runner.os == 'Windows' && matrix.app }}
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         continue-on-error: true
         with:
           name: windows-notifications
@@ -391,7 +403,7 @@ jobs:
     timeout-minutes: 20
     runs-on: ${{ matrix.os }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           persist-credentials: false  # nothing here pushes; plan.sh's git fetch reads this public repository without a token
       - uses: ./.github/actions/dotnet
@@ -428,7 +440,7 @@ jobs:
         run: cat "$RUNNER_TEMP/real-sign-in/summary.txt" 2>/dev/null || echo "no summary was written"
       - name: What each showed, addresses taken out
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         continue-on-error: true
         with:
           name: real-sign-in-${{ matrix.os }}
@@ -452,7 +464,7 @@ jobs:
     timeout-minutes: ${{ needs.version.outputs.mac_signing == 'real' && 120 || (needs.version.outputs.mac_signing == 'rehearsal' && 45 || 30) }}
     runs-on: macos-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           persist-credentials: false  # nothing here pushes; plan.sh's git fetch reads this public repository without a token
       - uses: ./.github/actions/dotnet
@@ -460,9 +472,7 @@ jobs:
           packages: mac-app
       - uses: ./.github/actions/whisper-tiny
         if: needs.version.outputs.tested != 'true'
-      - name: install.sh parses
-        run: sh -n install.sh
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: 22
           cache: npm
@@ -579,7 +589,7 @@ jobs:
             exit 1
           fi
           hdiutil detach -quiet "$mnt"
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         if: needs.version.outputs.installers == 'true'
         with:
           name: mac-installers
@@ -588,7 +598,7 @@ jobs:
       # What the self-test said and drew, every time; the whole folder (its home, recordings and a copy of the model:
       # 80 to 150 MB) only when something failed.
       - name: The self-test's words, logs and pictures
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         continue-on-error: true
         if: always() && needs.version.outputs.tested != 'true'
         with:
@@ -600,7 +610,7 @@ jobs:
             ${{ runner.temp }}/selftest/*/*.png
           retention-days: 7
       - name: The self-test's whole folder, as something failed
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         continue-on-error: true
         if: failure()
         with:
@@ -612,7 +622,7 @@ jobs:
       - name: How the Mac installer was signed
         if: needs.version.outputs.installers == 'true'
         run: echo "${{ needs.version.outputs.mac_signing }}" > "$RUNNER_TEMP/mac-signing.txt"
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         continue-on-error: true
         if: needs.version.outputs.installers == 'true'
         with:
@@ -629,10 +639,10 @@ jobs:
     timeout-minutes: 20
     runs-on: macos-15-intel
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           persist-credentials: false  # nothing here pushes; plan.sh's git fetch reads this public repository without a token
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with:
           name: mac-installers
           path: dist/mac
@@ -656,7 +666,7 @@ jobs:
       # What the self-test said and drew, every time; the whole folder (its home, recordings and a copy of the model:
       # 80 to 150 MB) only when something failed.
       - name: The self-test's words, logs and pictures
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         continue-on-error: true
         if: always()
         with:
@@ -668,7 +678,7 @@ jobs:
             ${{ runner.temp }}/selftest/*/*.png
           retention-days: 7
       - name: The self-test's whole folder, as something failed
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         continue-on-error: true
         if: failure()
         with:
@@ -693,7 +703,7 @@ jobs:
     timeout-minutes: ${{ needs.version.outputs.win_signing != 'off' && 40 || 25 }}
     runs-on: windows-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           persist-credentials: false  # nothing here pushes; plan.sh's git fetch reads this public repository without a token
       - uses: ./.github/actions/dotnet
@@ -715,21 +725,7 @@ jobs:
             if ($exe -and (Test-Path $exe)) { Write-Host "putting $exe aside"; Rename-Item $exe "$(Split-Path -Leaf $exe).aside" }
           }
       - uses: ./.github/actions/whisper-tiny
-      - name: install.ps1 parses
-        shell: pwsh
-        run: |
-          $errors = $null
-          [System.Management.Automation.Language.Parser]::ParseFile("install.ps1", [ref]$null, [ref]$errors) | Out-Null
-          if ($errors.Count -gt 0) { throw "install.ps1 doesn't parse: $errors" }
-      - name: The signing scripts parse
-        shell: pwsh
-        run: |
-          foreach ($script in "sign", "sign-release", "signing-setup", "verify-signing") {
-            $errors = $null
-            [System.Management.Automation.Language.Parser]::ParseFile("windows\$script.ps1", [ref]$null, [ref]$errors) | Out-Null
-            if ($errors.Count -gt 0) { throw "windows\$script.ps1 doesn't parse: $errors" }
-          }
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: 22
           cache: npm
@@ -760,7 +756,7 @@ jobs:
         run: .\windows\signing-setup.ps1 -SelfSigned
       - name: Signing - .NET 8, which Azure Artifact Signing's signtool plugin runs on
         if: needs.version.outputs.win_signing == 'real'
-        uses: actions/setup-dotnet@v4
+        uses: actions/setup-dotnet@v6
         with:
           dotnet-version: "8.0.x"
       - name: Sign the app's files, then make Setup.exe again, signed with its uninstaller
@@ -1014,7 +1010,7 @@ jobs:
           if (Test-Path "$env:APPDATA\Microsoft\Windows\Start Menu\Programs\Syft Notes.lnk") { throw "the Start Menu entry survived" }
           if (-not (Test-Path $settingsKeep)) { throw "settings outside the app folder were deleted" }
           if (-not (Test-Path $lectureKeep)) { throw "a lecture outside the app folder was deleted" }
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         if: needs.version.outputs.installers == 'true'
         with:
           name: windows-installers
@@ -1023,7 +1019,7 @@ jobs:
       # What the self-test said and drew, every time; the whole folder (its home, recordings and a copy of the model:
       # 80 to 150 MB) only when something failed.
       - name: The self-test's words, logs and pictures
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         continue-on-error: true
         if: always()
         with:
@@ -1035,7 +1031,7 @@ jobs:
             ${{ runner.temp }}\selftest\*\*.png
           retention-days: 7
       - name: The self-test's whole folder, as something failed
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         continue-on-error: true
         if: failure()
         with:
@@ -1050,7 +1046,7 @@ jobs:
         shell: pwsh
         run: |
           "${{ needs.version.outputs.win_signing }}" | Set-Content "$env:RUNNER_TEMP\windows-signing.txt"
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         continue-on-error: true
         if: needs.version.outputs.installers == 'true'
         with:
@@ -1085,13 +1081,13 @@ jobs:
     timeout-minutes: 30
     runs-on: ${{ matrix.runner }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           persist-credentials: false  # nothing here pushes; plan.sh's git fetch reads this public repository without a token
       - uses: ./.github/actions/dotnet
         with:
           packages: linux-app
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: 22
           cache: npm
@@ -1185,7 +1181,7 @@ jobs:
           for f in "$app" "$HOME/.local/bin/syft-notes" "$HOME/.local/share/applications/syft-notes.desktop"; do
             [ ! -e "$f" ] || { echo "$f survived uninstalling"; exit 1; }
           done
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         if: needs.version.outputs.installers == 'true'
         with:
           name: linux-installers-${{ matrix.rid }}
@@ -1194,7 +1190,7 @@ jobs:
       # What the self-test said and drew, every time; the whole folder (its home, recordings and a copy of the model:
       # 80 to 150 MB) only when something failed.
       - name: The self-test's words, logs and pictures
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         continue-on-error: true
         if: always()
         with:
@@ -1206,7 +1202,7 @@ jobs:
             ${{ runner.temp }}/selftest/*/*.png
           retention-days: 7
       - name: The self-test's whole folder, as something failed
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         continue-on-error: true
         if: failure()
         with:
@@ -1232,7 +1228,7 @@ jobs:
       contents: write
       actions: read  # to download the installers a run by hand built
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           persist-credentials: false  # nothing here pushes; plan.sh's git fetch reads this public repository without a token
       # The installers about to be published are signed as this run was told to sign them (a run by hand's, reused, may not
@@ -1247,19 +1243,19 @@ jobs:
           EXPECT_MAC: ${{ needs.version.outputs.mac_signing }}
           EXPECT_WIN: ${{ needs.version.outputs.win_signing }}
         run: bash .github/scripts/signing-plan.sh release
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with:
           name: mac-installers
           path: dist
           run-id: ${{ needs.version.outputs.reuse_run || github.run_id }}
           github-token: ${{ github.token }}
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with:
           name: windows-installers
           path: dist
           run-id: ${{ needs.version.outputs.reuse_run || github.run_id }}
           github-token: ${{ github.token }}
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with:
           pattern: linux-installers-*
           merge-multiple: true
