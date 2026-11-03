@@ -85,6 +85,8 @@ jobs:
 
   mac:
     name: Mac - 0.22.1's Study Stash.app becomes Syft Notes.app on Velopack, updates, uninstalls
+    # Mac runners are few: a push whose message says "[no mac]" leaves this one out while other runs need them.
+    if: github.event_name != 'push' || !contains(github.event.head_commit.message, '[no mac]')
     runs-on: macos-latest
     timeout-minutes: 120
     steps:
