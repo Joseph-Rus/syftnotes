@@ -54,9 +54,10 @@ dotnet test engine/StudyStash.slnx
 - **Pictures of the app's screens** (`engine/tests/StudyStash.App.Tests/Snapshots`): about ten screens (Home in
   light and dark, a class page, notes with a formula and a diagram, Due, Settings → Your AI, the first-run funnel,
   the recorder, the menu-bar dropdown, a notification, Ask beside the notes) are drawn off screen from demo data and
-  compared with their `*.verified.png` (SSIM, so a letter's edge may differ but a moved line may not). Only the Linux
-  job checks them; `STUDYSTASH_SNAPSHOTS=1` runs them elsewhere. When one fails, CI keeps the received and verified
-  pictures as an artifact. The README's, the website's and the promo films' pictures are drawn by
+  compared with their `*.verified.png` (strictly: more than 30 pixels off by more than 16 in a channel fails, so a changed word, colour or line shows). Only the Linux
+  job checks them, against pictures taken from a Linux run (`STUDYSTASH_SNAPSHOTS=1` runs them elsewhere, where every
+  picture will differ). When one fails, CI keeps the received and verified pictures as the `snapshot-pictures`
+  artifact; to change one on purpose, commit the received picture as the verified one. The README's, the website's and the promo films' pictures are drawn by
   `engine/tests/StudyStash.Pictures` instead (not run by CI).
 
 ### Live tests (need something real; CI runs them, your own computer shouldn't)
