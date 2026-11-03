@@ -12,7 +12,7 @@
   <UserControl.Styles>
     <StyleInclude Source="avares://StudyStash/Views/SetupStyles.axaml" />
     <Style Selector="Border#Chrome.chrome">
-      <Setter Property="CornerRadius" Value="10" />
+      <Setter Property="CornerRadius" Value="{DynamicResource RadiusPanel}" />
       <Setter Property="BoxShadow" Value="{DynamicResource ShadowLg}" />
     </Style>
   </UserControl.Styles>
