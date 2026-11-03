@@ -437,22 +437,22 @@
 
   <!-- ===== Progress, problems, details ===== -->
 
-  <!-- How far along: a grey track, filled in ink. -->
+  <!-- How far along: sky on the mesh's track (the Syft look's progress). -->
   <Style Selector="Border.track">
     <Setter Property="Height" Value="6" />
-    <Setter Property="CornerRadius" Value="3" />
-    <Setter Property="Background" Value="{DynamicResource Line}" />
+    <Setter Property="CornerRadius" Value="2" />
+    <Setter Property="Background" Value="{DynamicResource ProgressTrack}" />
   </Style>
   <Style Selector="Border.track Border.bar">
-    <Setter Property="CornerRadius" Value="3" />
-    <Setter Property="Background" Value="{DynamicResource Ink}" />
+    <Setter Property="CornerRadius" Value="2" />
+    <Setter Property="Background" Value="{DynamicResource Progress}" />
   </Style>
   <Style Selector="ProgressBar.work">
     <Setter Property="Height" Value="6" />
     <Setter Property="MinHeight" Value="6" />
-    <Setter Property="CornerRadius" Value="3" />
-    <Setter Property="Background" Value="{DynamicResource Line}" />
-    <Setter Property="Foreground" Value="{DynamicResource Ink}" />
+    <Setter Property="CornerRadius" Value="2" />
+    <Setter Property="Background" Value="{DynamicResource ProgressTrack}" />
+    <Setter Property="Foreground" Value="{DynamicResource Progress}" />
     <Setter Property="HorizontalAlignment" Value="Stretch" />
   </Style>
   <!-- Something went wrong: its words beside the warning icon on the sunken grey, what to do under them. -->
@@ -513,17 +513,17 @@
     <Setter Property="FontSize" Value="14" />
     <Setter Property="Foreground" Value="{DynamicResource InkMuted}" />
   </Style>
-  <!-- The student's own words: on the sunken grey, at the right. -->
+  <!-- The student's own words: an ink bubble (paper in dark) at the right, as in the recorder's and quick panel's chat. -->
   <Style Selector="Border.ai-bubble-q">
-    <Setter Property="CornerRadius" Value="{DynamicResource RadiusPanel}" />
+    <Setter Property="CornerRadius" Value="{DynamicResource RadiusCard}" />
     <Setter Property="Padding" Value="14,9" />
-    <Setter Property="Background" Value="{DynamicResource SurfaceSunken}" />
+    <Setter Property="Background" Value="{DynamicResource Accent}" />
     <Setter Property="HorizontalAlignment" Value="Right" />
   </Style>
   <Style Selector="Border.ai-bubble-q TextBlock">
     <Setter Property="FontSize" Value="15" />
     <Setter Property="LineHeight" Value="21" />
-    <Setter Property="Foreground" Value="{DynamicResource Ink}" />
+    <Setter Property="Foreground" Value="{DynamicResource OnAccent}" />
     <Setter Property="TextWrapping" Value="Wrap" />
   </Style>
   <Style Selector="Border.ai-bubble-q.queued">

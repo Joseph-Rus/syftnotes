@@ -210,37 +210,49 @@
   <Style Selector="FlyoutPresenter Border.ai-menu">
     <Setter Property="BoxShadow" Value="none" />
   </Style>
+  <!-- The picker's rows (Syft look, the same in both systems): the picked one lilac with ink words, a row that can't
+       be picked in the muted ink at full strength (never faded to 1.5:1). -->
   <Style Selector="TextBlock.ai-menu-header">
-    <Setter Property="FontSize" Value="12" />
+    <Setter Property="FontSize" Value="{DynamicResource FontCaption}" />
     <Setter Property="FontWeight" Value="SemiBold" />
-    <Setter Property="Foreground" Value="{DynamicResource Fg2}" />
-    <Setter Property="Padding" Value="12,8,12,4" />
+    <Setter Property="Foreground" Value="{DynamicResource InkMuted}" />
+    <Setter Property="Padding" Value="10,6,10,4" />
   </Style>
   <Style Selector="Border.ai-menu-item">
     <Setter Property="MinHeight" Value="36" />
-    <Setter Property="CornerRadius" Value="4" />
-    <Setter Property="Padding" Value="12,6" />
+    <Setter Property="CornerRadius" Value="{DynamicResource RadiusControl}" />
+    <Setter Property="Padding" Value="10,6" />
   </Style>
   <Style Selector="Border.ai-menu-item.selected">
-    <Setter Property="Background" Value="{DynamicResource Subtle2}" />
+    <Setter Property="Background" Value="{DynamicResource Selected}" />
   </Style>
-  <!-- A row that can't be picked: its words in the secondary ink and its mark dimmed, rather than the whole row faded
-       (the button's own disabled fade on top of a faded row left it at about 1.5:1). -->
+  <Style Selector="Border.ai-menu-item.selected c|Icon">
+    <Setter Property="Foreground" Value="{DynamicResource OnSelected}" />
+  </Style>
   <Style Selector="Button.ai-menu-row:disabled">
     <Setter Property="Opacity" Value="1" />
   </Style>
   <Style Selector="Border.ai-menu-item.disabled c|Icon">
-    <Setter Property="Opacity" Value="0.5" />
+    <Setter Property="Opacity" Value="0.6" />
   </Style>
   <Style Selector="TextBlock.ai-menu-title">
-    <Setter Property="FontSize" Value="14" />
+    <Setter Property="FontSize" Value="{DynamicResource FontBody}" />
+    <Setter Property="Foreground" Value="{DynamicResource Ink}" />
   </Style>
   <Style Selector="TextBlock.ai-menu-sub">
-    <Setter Property="FontSize" Value="12" />
-    <Setter Property="Foreground" Value="{DynamicResource Fg2}" />
+    <Setter Property="FontSize" Value="{DynamicResource FontCaption}" />
+    <Setter Property="Foreground" Value="{DynamicResource InkMuted}" />
+  </Style>
+  <!-- After the lines above, so they win: the picked row's words ink, its second line the darker grey that reads on
+       lilac. -->
+  <Style Selector="Border.ai-menu-item.selected TextBlock">
+    <Setter Property="Foreground" Value="{DynamicResource OnSelected}" />
+  </Style>
+  <Style Selector="Border.ai-menu-item.selected TextBlock.ai-menu-sub">
+    <Setter Property="Foreground" Value="{DynamicResource SelectedMuted}" />
   </Style>
   <Style Selector="Border.ai-menu-item.disabled TextBlock">
-    <Setter Property="Foreground" Value="{DynamicResource Fg2}" />
+    <Setter Property="Foreground" Value="{DynamicResource InkMuted}" />
   </Style>
   <Style Selector="Button.ai-menu-footer">
     <Setter Property="Theme" Value="{StaticResource Surface}" />
@@ -342,19 +354,23 @@
     <Setter Property="FontWeight" Value="Medium" />
     <Setter Property="Foreground" Value="{DynamicResource Fg}" />
   </Style>
-  <!-- A question in the conversation: the student's own words, on the right on a quiet fill, never the whole width -->
+  <!-- A question in the conversation: the student's own words, on the right on an ink bubble, never the whole width -->
   <Style Selector="Border.ai-asked-q">
     <Setter Property="HorizontalAlignment" Value="Right" />
     <Setter Property="Margin" Value="40,0,0,0" />
     <Setter Property="Padding" Value="14,9" />
-    <Setter Property="CornerRadius" Value="8" />
-    <Setter Property="Background" Value="{DynamicResource Fill}" />
+    <Setter Property="CornerRadius" Value="{DynamicResource RadiusCard}" />
+    <Setter Property="Background" Value="{DynamicResource Accent}" />
   </Style>
   <Style Selector="TextBlock.ai-q">
     <Setter Property="FontSize" Value="14.5" />
     <Setter Property="LineHeight" Value="22" />
     <Setter Property="Foreground" Value="{DynamicResource Fg}" />
     <Setter Property="TextWrapping" Value="Wrap" />
+  </Style>
+  <!-- The student's words on their ink bubble (paper in dark), as in every chat in the app. -->
+  <Style Selector="Border.ai-asked-q :is(TextBlock).ai-q">
+    <Setter Property="Foreground" Value="{DynamicResource OnAccent}" />
   </Style>
   <!-- Why an answer didn't come -->
   <Style Selector="TextBlock.ai-failed">

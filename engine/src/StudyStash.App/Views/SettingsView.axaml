@@ -372,14 +372,14 @@
     <!-- How far along: a grey track, filled in ink. -->
     <Style Selector="Border.track">
       <Setter Property="Height" Value="6" />
-      <Setter Property="CornerRadius" Value="3" />
-      <Setter Property="Background" Value="{DynamicResource Line}" />
+      <Setter Property="CornerRadius" Value="2" />
+      <Setter Property="Background" Value="{DynamicResource ProgressTrack}" />
       <Setter Property="Width" Value="480" />
       <Setter Property="HorizontalAlignment" Value="Left" />
     </Style>
     <Style Selector="Border.track > Border">
-      <Setter Property="CornerRadius" Value="3" />
-      <Setter Property="Background" Value="{DynamicResource Ink}" />
+      <Setter Property="CornerRadius" Value="2" />
+      <Setter Property="Background" Value="{DynamicResource Progress}" />
       <Setter Property="HorizontalAlignment" Value="Left" />
     </Style>
 

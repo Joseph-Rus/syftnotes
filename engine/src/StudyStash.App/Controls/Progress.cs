@@ -6,10 +6,10 @@ using StudyStash.App.Platform;
 namespace StudyStash.App.Controls;
 
 /// <summary>
-/// A progress bar in the Syft look: sky on the mesh's track (the <c>Progress</c> and <c>ProgressTrack</c> tokens), its
-/// ends the cell's corners. When <see cref="Value"/> moves on, the sky glides there in a quarter of a second (eased
-/// out), so a sync or a download creeps rather than jumps; with less motion asked for (or in the tests' pictures) it
-/// just goes there. <c>&lt;c:Progress Value="{Binding Progress}" Height="4" /&gt;</c>, 0 to 1.
+/// A progress bar in the Syft look: sky on the mesh's track (the <c>Progress</c> and <c>ProgressTrack</c> tokens, given
+/// by Styles.axaml so a view's own style can change them), its ends the cell's corners. When <see cref="Value"/> moves
+/// on, the sky glides there in a quarter of a second (eased out), so a sync or a download creeps rather than jumps; with
+/// less motion asked for (or in the tests' pictures) it just goes there. <c>&lt;c:Progress Value="{Binding Progress}" Height="4" /&gt;</c>, 0 to 1.
 /// </summary>
 public sealed class Progress : Control
 {
@@ -40,13 +40,6 @@ public sealed class Progress : Control
     IDisposable? gliding;
 
     static Progress() => AffectsRender<Progress>(FillProperty, TrackProperty);
-
-    public Progress()
-    {
-        this.Bind(FillProperty, this.GetResourceObservable("Progress"));
-        this.Bind(TrackProperty, this.GetResourceObservable("ProgressTrack"));
-        Height = 4;
-    }
 
     protected override void OnPropertyChanged(AvaloniaPropertyChangedEventArgs change)
     {
