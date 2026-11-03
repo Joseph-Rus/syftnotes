@@ -4,6 +4,7 @@ using Avalonia.Media;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using StudyStash.App.Services;
+using StudyStash.App.ViewModels.Kit;
 using StudyStash.Core;
 
 namespace StudyStash.App.ViewModels;
@@ -300,10 +301,6 @@ public sealed record NoteMove(string Id, string From, string To)
     public string Said => $"Moved to {(To.Length == 0 || To == Configs.Unsorted ? "Unsorted" : ClassNames.Display(To))}.";
 }
 
-/// <summary>A question over the window with two answers: "Stop recording Data Mining and start Capstone team sync?"
-/// (Stop and start, or Cancel).</summary>
-public sealed record ConfirmAsk(string Title, string Text, string Yes, Action Act);
-
 /// <summary>
 /// The full app: one sidebar (Home, Due, the folders under Classes, Clubs and Work, and what's coming up), and beside
 /// it one page that fills the pane. The page is Home, Due's calendar or a folder's page (<see cref="Overview"/>); a
@@ -440,6 +437,9 @@ public sealed partial class LibraryModel : ObservableObject
     /// <summary>Where the page sits: beside the list, or in its place when there's none (or no room for both).</summary>
     public int DetailColumn => ShowCanvasLists && !Narrow ? 2 : 1;
     public int ColumnSpan => ShowCanvasLists && !Narrow ? 1 : 2;
+
+    /// <summary>Asks "Delete this lecture?" and the like over the window (the app's; a test gives its own).</summary>
+    public IConfirm Confirmer { get; init; } = Confirm.Default;
 
     public LibraryModel()
     {
@@ -579,20 +579,6 @@ public sealed partial class LibraryModel : ObservableObject
     public Action? OnOpenRecording { get; set; }
     [RelayCommand] void OpenRecording() => OnOpenRecording?.Invoke();
 
-    /// <summary>A question over the window, while it's asked ("Stop recording Data Mining and start Capstone team
-    /// sync?"); null when nothing is.</summary>
-    [ObservableProperty] public partial ConfirmAsk? Confirming { get; set; }
-    public bool AskingConfirm => Confirming is not null;
-    partial void OnConfirmingChanged(ConfirmAsk? value) => OnPropertyChanged(nameof(AskingConfirm));
-    [RelayCommand] void CancelConfirm() => Confirming = null;
-    [RelayCommand]
-    void Confirm()
-    {
-        if (Confirming is not { } ask) return;
-        Confirming = null;
-        ask.Act();
-    }
-
     // --- the ask for a tip ------------------------------------------------------------------------------------------
 
     /// <summary>The one gentle ask for a tip, on Home (<see cref="SupportAsk"/> says when); null when it isn't asking.</summary>
@@ -629,7 +615,6 @@ public sealed partial class LibraryModel : ObservableObject
 
     // --- deleting a lecture ---------------------------------------------------------------------------------------
 
-    /// <summary>The lecture being deleted, while the window asks "Delete this lecture?"; null when it isn't asking.</summary>
     /// <summary>A new sidebar folder being named for a class; null when nobody's asking.</summary>
     [ObservableProperty] public partial NewFolderAsk? NamingFolder { get; set; }
     public bool AskingFolder => NamingFolder is not null;
@@ -645,10 +630,8 @@ public sealed partial class LibraryModel : ObservableObject
         if (OnMoveToFolder is { } move) await move(ask.ClassName, ask.Name.Trim());
     }
 
-    [ObservableProperty] public partial LectureDeletion? Deleting { get; set; }
     /// <summary>The lecture just deleted, while the "Deleted · Undo" toast shows.</summary>
     [ObservableProperty] public partial LectureDeletion? Deleted { get; set; }
-    public bool AskingDelete => Deleting is not null;
     public bool HasDeleted => Deleted is not null;
     /// <summary>How long "Moved to… · Undo" stays.</summary>
     public TimeSpan UndoShows { get; set; } = TimeSpan.FromSeconds(10);
@@ -664,23 +647,23 @@ public sealed partial class LibraryModel : ObservableObject
     /// <summary>Brings the lecture back from the library's trash (the host calls its API and lists it again).</summary>
     public Func<LectureDeletion, Task>? OnUndo { get; set; }
 
-    partial void OnDeletingChanged(LectureDeletion? value) => OnPropertyChanged(nameof(AskingDelete));
     partial void OnDeletedChanged(LectureDeletion? value)
     {
         OnPropertyChanged(nameof(HasDeleted));
         ToastChanged();
     }
 
-    /// <summary>Asks before deleting a note: a row's (its menu) or, with none, the open one (the toolbar).</summary>
-    [RelayCommand]
-    void Delete(NoteItem? row)
+    /// <summary>Asks before deleting a note, then deletes it: a row's (its menu) or, with none, the open one (the
+    /// toolbar). Cancel, Escape or a click outside leaves it where it is.</summary>
+    [RelayCommand(AllowConcurrentExecutions = true)]
+    async Task Delete(NoteItem? row)
     {
-        if (row is not null) Deleting = new LectureDeletion(row.Id, row.Title, row.Folder, row.Noun);
-        else if (Note is { CanMove: true } n) Deleting = new LectureDeletion(n.Id, n.Title, n.ClassName, n.Noun);
+        LectureDeletion d;
+        if (row is not null) d = new LectureDeletion(row.Id, row.Title, row.Folder, row.Noun);
+        else if (Note is { CanMove: true } n) d = new LectureDeletion(n.Id, n.Title, n.ClassName, n.Noun);
+        else return;
+        if (await Confirmer.AskAsync(new ConfirmAsk(d.Ask, d.Warning, "Delete"))) await DeleteAsync(d);
     }
-
-    [RelayCommand]
-    void CancelDelete() => Deleting = null;
 
     /// <summary>Leaves a note's page for where the student came from (it was deleted): the host goes back.</summary>
     public Action? OnLeaveNote { get; set; }
@@ -692,11 +675,8 @@ public sealed partial class LibraryModel : ObservableObject
     /// <summary>Delete, confirmed: the note leaves the page at once (its own page gives way to where the student came
     /// from), the library deletes it, and "Deleted · Undo" shows for a few minutes. If the library refuses, the host
     /// reads the page again.</summary>
-    [RelayCommand(AllowConcurrentExecutions = true)]
-    async Task ConfirmDelete()
+    async Task DeleteAsync(LectureDeletion d)
     {
-        if (Deleting is not { } d) return;
-        Deleting = null;
         gone.Add(d.Id);
         bool open = Remove(d);
         Moved = null;

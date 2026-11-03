@@ -86,6 +86,14 @@ Low risk. Nothing a student sees changes.
 
 **Test:** one test that Escape answers false and that a yes runs the action once.
 
+**Done (`lib-dialoghost`), what was and wasn't done:**
+- **DialogHost.Avalonia 0.12.3** (latest stable, MIT, needs Avalonia ≥ 12.0.0; we're on 12.1.3), pinned in `StudyStash.App.csproj`. `<dialogHost:DialogHostStyles />` is in App.axaml; `Styles.axaml` styles `DialogHost.confirm` with the `Scrim`, `PopupBg`, `RadiusPanel` and `ShadowFloat` tokens (no gradients; the control's own 56 % veil is switched to the token's strength).
+- **`Confirm.AskAsync(ConfirmAsk)`:** `IConfirm` in the constructor (`Confirm.Default` when a model is made without one). `AppWindows.Make` wraps each window's view in a dialog layer (`ConfirmLayer`); the question opens over the window the student is in (else the last one, else it brings the library up first, for the menu bar's "Stop and start"). One question at a time per window. Safe button focused, Escape and a click outside answer no, every button has its words as its accessible name. `ConfirmLayer.ViewOf/SetView` replace reading `window.Content` where a window's view is wanted.
+- **Moved:** Settings' model Remove, Use just this computer, Use a library on another computer (these two are the frozen two-computer setup: moved, not changed), Use Canvas course names (the preview is the dialog's list), Rewrite every summary, Disconnect from Google, Remove Kokoro voices, the library window's "Stop recording … and start …?" (two places), and Delete this lecture. `ConfirmCard`, `MacDeleteLecture` and `WinDeleteLecture` are gone (`mac-views` 38 → 37; `literal-font-sizes` 246 → 240).
+- **Words:** the Remove-voices question and the Rewrite-all question are new; the others keep their old words.
+- **Left alone:** the new-folder naming card (`NamingFolder`), which asks for a name rather than a yes or no; windows made by hand (the browser question, floating panels) have no layer.
+- **Test:** `ConfirmTests` (a real window: Escape answers no and runs nothing; Yes pressed twice runs once). `ConfirmShots` draws the question off-screen over the library, both looks, light and dark. View-model tests use `FakeConfirm`.
+
 ## Phase 3: real picture checks, fewer test lines (`lib-verify`, then `lib-xunit3`)
 1. **Add Verify.XunitV3 and Verify.Avalonia to App.Tests.** Snapshot about 10 screens:
    - Home, a class page, a lecture's notes with a formula and a diagram, Due;

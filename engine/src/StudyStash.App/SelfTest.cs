@@ -884,12 +884,15 @@ public static partial class SelfTest
 
     // --- settings ------------------------------------------------------------------------------------------------
 
+    /// <summary>The open Settings window's model, if it is showing.</summary>
+    static object? SettingsOpen() => Shell.Windows.Settings is { } w ? Controls.ConfirmLayer.ViewOf(w)?.DataContext : null;
+
     static async Task RunSettingsAsync()
     {
         Shell.ShowSettings();
         await Settle();
         Shot(Shell.Windows.Settings, "settings-library");
-        if (OneComputer && (Shell.Windows.Settings?.Content as Control)?.DataContext is SettingsModel lib)
+        if (OneComputer && SettingsOpen() is SettingsModel lib)
         {
             // Your library, on this computer: Add a laptop, for later.
             lib.Section = "Library";
@@ -897,7 +900,7 @@ public static partial class SelfTest
             Say($"settings: your library here, laptops can connect: {lib.Lib.LaptopsCanConnect}, add a laptop offered: {lib.Lib.CanChangeLaptops}");
             Shot(Shell.Windows.Settings, "settings-your-library");
         }
-        if ((Shell.Windows.Settings?.Content as Control)?.DataContext is SettingsModel sm)
+        if (SettingsOpen() is SettingsModel sm)
         {
             sm.Section = "Recording";
             await Settle();
