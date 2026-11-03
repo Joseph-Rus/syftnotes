@@ -10,7 +10,7 @@
   <UserControl.Styles>
     <!-- The pen's mustard, flat: the chip is a small piece of the highlight it points at. -->
     <Style Selector="Button.quote-chip > Border">
-      <Setter Property="Background" Value="#33FFC943" />
+      <Setter Property="Background" Value="{DynamicResource Hl}" />
       <Setter Property="CornerRadius" Value="4" />
       <Setter Property="Padding" Value="8,3" />
     </Style>

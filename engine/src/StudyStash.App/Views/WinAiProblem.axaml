@@ -29,7 +29,8 @@
         <Button Grid.Column="6" Classes="ai-pillbtn" Command="{Binding PrimaryCommand}" IsVisible="{Binding HasWinPrimaryButton}">
           <Border Classes="ai-pill" Classes.primary="{Binding PrimaryIsAccent}"><TextBlock Text="{Binding PrimaryWords}" /></Border>
         </Button>
-        <Button Grid.Column="8" Classes="ai-close" Command="{Binding CloseCommand}" IsVisible="{Binding CanClose}">
+        <Button Grid.Column="8" Classes="ai-close" Command="{Binding CloseCommand}" IsVisible="{Binding CanClose}"
+                AutomationProperties.Name="Close">
           <c:Icon Glyph="close" Size="16" />
         </Button>
       </Grid>
