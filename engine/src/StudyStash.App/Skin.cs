@@ -96,14 +96,16 @@ public static class Skin
 
     public static readonly Meanings LightMeans = new(
         Accent: Controls.Syft.Ink, OnAccent: Controls.Syft.Paper, Selected: Controls.Syft.Lilac, OnSelected: Controls.Syft.Ink,
-        SelectedMuted: Color.Parse("#3D3849"), Progress: Controls.Syft.Sky, ProgressTrack: Controls.Syft.MeshLight,
+        // Progress is the logo's sky a step deeper, so a bar reads at a glance on the light mesh (the owner's pick, 2026-11-03).
+        SelectedMuted: Color.Parse("#3D3849"), Progress: Controls.Syft.SkyDeep, ProgressTrack: Controls.Syft.MeshLight,
         Highlight: Controls.Syft.Mustard, OnHighlight: Controls.Syft.Ink, SurfaceRaised: Controls.Syft.MeshLight, Chip: Controls.Syft.MeshLight,
         TextFade1: Color.Parse("#46444E"), TextFade2: Controls.Syft.Muted, TextFade3: Color.Parse("#706E77"),
         TextHighlight: Controls.Syft.Mustard);
 
     public static readonly Meanings DarkMeans = new(
         Accent: Controls.Syft.Paper, OnAccent: Controls.Syft.Ink, Selected: Controls.Syft.Lilac, OnSelected: Controls.Syft.Ink,
-        SelectedMuted: Color.Parse("#3D3849"), Progress: Controls.Syft.Sky, ProgressTrack: Controls.Syft.MeshDark,
+        // The same step deeper in dark, still bright enough on the dark mesh.
+        SelectedMuted: Color.Parse("#3D3849"), Progress: Controls.Syft.SkyDeepDark, ProgressTrack: Controls.Syft.MeshDark,
         Highlight: Controls.Syft.Mustard, OnHighlight: Controls.Syft.Ink, SurfaceRaised: Controls.Syft.MeshDark, Chip: Controls.Syft.GhostDark,
         TextFade1: Color.Parse("#C9C6D0"), TextFade2: Color.Parse("#A8A5B0"), TextFade3: Color.Parse("#8A8794"),
         // Selected text in dark keeps its paper letters, so its mustard is a deep one.
