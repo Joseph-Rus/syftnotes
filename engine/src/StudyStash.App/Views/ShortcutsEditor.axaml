@@ -57,7 +57,7 @@
     <!-- A hairline inside it, as Settings' pills have (one round it would be cut off by the button). -->
     <Style Selector=".mac Button.sk-keys">
       <Setter Property="Height" Value="30" />
-      <Setter Property="CornerRadius" Value="15" />
+      <Setter Property="c:Cell.Round" Value="True" />
       <Setter Property="Padding" Value="14,0" />
       <Setter Property="Background" Value="{DynamicResource Raised}" />
       <Setter Property="BorderBrush" Value="{DynamicResource Line}" />

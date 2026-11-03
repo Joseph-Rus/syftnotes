@@ -17,7 +17,7 @@
     <Style Selector="Button.chip">
       <Setter Property="Theme" Value="{StaticResource Surface}" />
       <Setter Property="Height" Value="36" />
-      <Setter Property="CornerRadius" Value="18" />
+      <Setter Property="c:Cell.Round" Value="True" />
       <Setter Property="Padding" Value="12,0,14,0" />
     </Style>
     <Style Selector="TextBlock.header">
