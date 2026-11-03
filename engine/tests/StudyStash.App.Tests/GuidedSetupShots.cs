@@ -4,6 +4,7 @@ using Avalonia.Headless.XUnit;
 using Avalonia.Styling;
 using StudyStash.App.Services;
 using StudyStash.App.ViewModels;
+using StudyStash.App.ViewModels.Kit;
 using StudyStash.App.Views;
 using StudyStash.Core.Ai;
 using StudyStash.App.Tests;
@@ -131,15 +132,11 @@ public sealed class GuidedSetupShots
             g.Screen = GuidedScreen.Install;
             return g;
         });
-        yield return ("sign-in-gemini-waiting", skin =>
-        {
-            var g = Guided(skin);
-            g.GeminiFound = GeminiHere;
-            g.Picked = "gemini";
-            g.Screen = GuidedScreen.SignIn;
-            g.WaitingSignIn = true;
-            return g;
-        });
+        // Google's page ends on a code ("Paste this code into your application"): the box for it, empty, then with
+        // the code in, and once it's sent.
+        yield return ("sign-in-gemini-waiting", skin => GeminiCode(skin, ""));
+        yield return ("sign-in-gemini-code", skin => GeminiCode(skin, "4/0AVGzR1Bx-example-code"));
+        yield return ("sign-in-gemini-code-sent", skin => GeminiCode(skin, "", sent: true));
         yield return ("sign-in-gemini-ready", skin =>
         {
             var g = Guided(skin);
@@ -260,6 +257,26 @@ public sealed class GuidedSetupShots
         }
         g.Refresh();
         return g;
+    }
+
+    /// <summary>Gemini's sign-in waiting for Google's code, the box holding <paramref name="code"/>.</summary>
+    static GuidedSetupModel GeminiCode(SkinKind skin, string code, bool sent = false)
+    {
+        var g = Guided(skin);
+        g.GeminiFound = GeminiHere;
+        g.Picked = "gemini";
+        g.Screen = GuidedScreen.SignIn;
+        g.CodeBox = CodeBox(code, sent);
+        g.WaitingSignIn = true;
+        return g;
+    }
+
+    /// <summary>The box for Google's code, with <paramref name="code"/> in it, or sent.</summary>
+    static SignInCodeModel CodeBox(string code, bool sent = false)
+    {
+        var box = new SignInCodeModel("Gemini", "Google", (_, _) => Task.FromResult(Outcome.Done)) { Code = sent ? "4/0AVGzR1Bx-example-code" : code };
+        if (sent) box.Send.Command.Execute(null);
+        return box;
     }
 
     internal static Control View(SkinKind skin, GuidedSetupModel g) =>
