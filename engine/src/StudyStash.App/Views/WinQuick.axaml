@@ -101,7 +101,7 @@
                   <!-- A lecture -->
                   <Grid IsVisible="{Binding IsLecture}" Height="40" Margin="12,0" ColumnDefinitions="Auto,12,*,Auto">
                     <c:Swatch Classes="dot" Small="True" Fill="{Binding Dot}" VerticalAlignment="Center" />
-                    <TextBlock Grid.Column="2" Text="{Binding Title}" FontSize="14" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
+                    <TextBlock Grid.Column="2" Text="{Binding Title}" ToolTip.Tip="{Binding Title}" c:Tips.WhenCut="True" FontSize="14" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
                     <TextBlock Grid.Column="3" Classes="meta lecture" Classes.strong="{Binding Strong}" Text="{Binding Meta}" FontSize="12" VerticalAlignment="Center" Margin="12,0,0,0" />
                   </Grid>
                   <!-- A passage from notes -->
@@ -110,7 +110,7 @@
                     <StackPanel Grid.Column="2">
                       <c:Marked Source="{Binding Title}" Terms="{Binding $parent[UserControl].((vm:QuickModel)DataContext).Query}" Mark="{DynamicResource Hl}"
                                 MarkWeight="SemiBold" FontSize="14" LineHeight="19.6" TextWrapping="Wrap" />
-                      <TextBlock Classes="meta" Text="{Binding Sub}" FontSize="12" Foreground="{DynamicResource Fg2}" Margin="0,2,0,0" TextTrimming="CharacterEllipsis" />
+                      <TextBlock Classes="meta" Text="{Binding Sub}" ToolTip.Tip="{Binding Sub}" c:Tips.WhenCut="True" FontSize="12" Foreground="{DynamicResource Fg2}" Margin="0,2,0,0" TextTrimming="CharacterEllipsis" />
                     </StackPanel>
                   </Grid>
                   <!-- A class -->
@@ -128,7 +128,7 @@
                   <!-- A source of an answer -->
                   <Grid IsVisible="{Binding IsSource}" Height="40" Margin="12,0" ColumnDefinitions="Auto,12,*,Auto">
                     <c:Icon Classes="source" Glyph="play_circle" Size="18" Foreground="{DynamicResource Fg2}" />
-                    <TextBlock Grid.Column="2" Text="{Binding Title}" FontSize="14" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
+                    <TextBlock Grid.Column="2" Text="{Binding Title}" ToolTip.Tip="{Binding Title}" c:Tips.WhenCut="True" FontSize="14" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
                     <TextBlock Grid.Column="3" Classes="meta num" Text="{Binding Meta}" FontSize="12" Foreground="{DynamicResource Fg2}" VerticalAlignment="Center" />
                   </Grid>
                 </Panel>

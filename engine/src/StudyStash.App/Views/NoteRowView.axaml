@@ -33,7 +33,7 @@
                 <c:Icon Classes="chevron" Glyph="expand_more" Size="14" VerticalAlignment="Center" />
               </StackPanel>
             </Button>
-            <TextBlock Classes="lecture-summary" Classes.pending="{Binding Pending}" Text="{Binding Summary}" IsVisible="{Binding HasSummary}" />
+            <TextBlock Classes="lecture-summary" Classes.pending="{Binding Pending}" Text="{Binding Summary}" ToolTip.Tip="{Binding Summary}" c:Tips.WhenCut="True" IsVisible="{Binding HasSummary}" />
           </StackPanel>
           <!-- As wide as it needs: "1 h 12 min" is wider than the 64 the design gives "52 min", and was cut short. -->
           <TextBlock Grid.Column="4" Classes="lecture-length" Text="{Binding Length}" MinWidth="64" TextAlignment="Right" />

@@ -80,11 +80,11 @@
                 <c:Icon Glyph="{Binding Icon}" Size="18" Foreground="{DynamicResource AccentText}" VerticalAlignment="Center" />
                 <StackPanel Grid.Column="2">
                   <TextBlock Text="{Binding Name}" FontSize="14" TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding Name}" c:Tips.WhenCut="True" />
-                  <TextBlock Text="{Binding About}" FontSize="11" Foreground="{DynamicResource Fg2}" TextTrimming="CharacterEllipsis" />
+                  <TextBlock Text="{Binding About}" ToolTip.Tip="{Binding About}" c:Tips.WhenCut="True" FontSize="11" Foreground="{DynamicResource Fg2}" TextTrimming="CharacterEllipsis" />
                 </StackPanel>
               </Grid>
             </Button>
-            <Button Grid.Column="2" Classes="remove" VerticalAlignment="Center" ToolTip.Tip="Remove"
+            <Button Grid.Column="2" Classes="remove" VerticalAlignment="Center" ToolTip.Tip="Remove" AutomationProperties.Name="Remove this file"
                     Command="{Binding $parent[UserControl].((vm:AttachmentsModel)DataContext).RemoveCommand}" CommandParameter="{Binding}">
               <c:Icon Glyph="close" Size="14" Foreground="{DynamicResource Fg2}" />
             </Button>
