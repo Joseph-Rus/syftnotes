@@ -9,6 +9,7 @@ using Avalonia.LogicalTree;
 using Avalonia.VisualTree;
 using StudyStash.App.Controls;
 using StudyStash.App.Controls.Rich;
+using StudyStash.App.Windows;
 using StudyStash.Core.Rich;
 
 namespace StudyStash.App.Tests;
