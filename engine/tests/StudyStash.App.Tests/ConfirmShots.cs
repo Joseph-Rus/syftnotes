@@ -34,6 +34,14 @@ public class ConfirmShots
         var asking = Confirm.Default.AskAsync(ask);
         await Wait.UntilAsync(() => window.GetVisualDescendants().OfType<ConfirmDialog>().FirstOrDefault() is { IsEffectivelyVisible: true } d && d.FindControl<Button>("No")!.IsFocused,
             "the question to show");
+        // The question opens with a short fade and the veil comes down with it: draw once both have finished.
+        var dialog = window.GetVisualDescendants().OfType<ConfirmDialog>().Single();
+        var cover = ConfirmLayer.Pick()!.Host.GetVisualDescendants().OfType<Avalonia.Controls.Shapes.Rectangle>().Single(r => r.Name == "PART_ContentCover");
+        await Wait.UntilAsync(() =>
+        {
+            AvaloniaHeadlessPlatform.ForceRenderTimerTick();
+            return cover.Opacity >= 1 && dialog.GetVisualAncestors().All(a => a.Opacity >= 1);
+        }, "the question to finish opening");
         DiagramsReady.Wait(window);
         var frame = window.CaptureRenderedFrame() ?? throw new InvalidOperationException("nothing rendered");
         using (var file = File.Create(Path.Combine(Shot.Dir, $"confirm-{name}-{(skin == SkinKind.Mac ? "mac" : "win")}-{(variant == ThemeVariant.Dark ? "dark" : "light")}.png")))
