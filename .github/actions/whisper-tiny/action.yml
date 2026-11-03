@@ -18,7 +18,7 @@ runs:
       run: |
         model="$RUNNER_TEMP/whisper/ggml-tiny.bin"
         mkdir -p "$RUNNER_TEMP/whisper"
-        sum() { if command -v sha256sum > /dev/null; then sha256sum "$1"; else shasum -a 256 "$1"; fi | cut -d' ' -f1; }
+        sum() { if command -v sha256sum > /dev/null; then sha256sum < "$1"; else shasum -a 256 < "$1"; fi | cut -d' ' -f1; }
         if [ -f "$model" ] && [ "$(sum "$model")" != "$SHA256" ]; then
           echo "the cached ggml-tiny.bin isn't the pinned one; downloading it again"
           rm -f "$model"
