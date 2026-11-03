@@ -23,7 +23,7 @@
       <Setter Property="Height" Value="32" />
       <Setter Property="CornerRadius" Value="4" />
       <Setter Property="Padding" Value="10,0,11,0" />
-      <Setter Property="FontSize" Value="14" />
+      <Setter Property="FontSize" Value="{DynamicResource FontBody}" />
       <Setter Property="Background" Value="{DynamicResource Ctrl}" />
       <Setter Property="BorderBrush" Value="{DynamicResource CtrlBorder}" />
       <Setter Property="BorderThickness" Value="1" />
@@ -44,7 +44,7 @@
         <Grid ColumnDefinitions="Auto,*,Auto">
           <c:Icon Glyph="language" Size="20" />
           <StackPanel Grid.Column="1" Spacing="0" Margin="16,0,0,0" VerticalAlignment="Center" MinWidth="0">
-            <TextBlock Text="School" FontSize="14" />
+            <TextBlock Text="School" FontSize="{DynamicResource FontBody}" />
             <c:PageText Classes="cv-value" Text="{Binding School}" />
           </StackPanel>
           <Button Grid.Column="2" Classes="cv-btn" VerticalAlignment="Center" Command="{Binding ChangeSchoolCommand}">
@@ -56,7 +56,7 @@
         <Grid ColumnDefinitions="Auto,*,Auto,Auto" ColumnSpacing="10">
           <c:Icon Glyph="language" Size="20" />
           <Border Grid.Column="1" Classes="cv-field" VerticalAlignment="Center" Margin="16,0,0,0">
-            <TextBox Classes="bare" Text="{Binding SchoolField}" FontSize="14" AutomationProperties.Name="Your school's Canvas address" />
+            <TextBox Classes="bare" Text="{Binding SchoolField}" FontSize="{DynamicResource FontBody}" AutomationProperties.Name="Your school's Canvas address" />
           </Border>
           <Button Grid.Column="2" Classes="cv-btn cv-primary" VerticalAlignment="Center" IsEnabled="{Binding !SavingSchool}" Command="{Binding SaveSchoolCommand}">
             <TextBlock Text="Save" />
@@ -72,7 +72,7 @@
         <Grid ColumnDefinitions="Auto,*,Auto,Auto">
           <c:Icon Glyph="extension" Size="20" />
           <StackPanel Grid.Column="1" Spacing="0" Margin="16,0,0,0" VerticalAlignment="Center" MinWidth="0">
-            <TextBlock Text="{Binding ExtensionLabel}" FontSize="14" />
+            <TextBlock Text="{Binding ExtensionLabel}" FontSize="{DynamicResource FontBody}" />
             <c:PageText Classes="cv-value" Text="{Binding ExtensionLine}" />
           </StackPanel>
           <Button Name="ChooseBrowser" Grid.Column="2" Classes="cv-btn" VerticalAlignment="Center" Margin="0,0,8,0" Command="{Binding ChooseBrowserCommand}"
@@ -86,7 +86,7 @@
         <Grid ColumnDefinitions="Auto,*,Auto">
           <c:Icon Glyph="sync" Size="20" />
           <StackPanel Grid.Column="1" Spacing="0" Margin="16,0,0,0" VerticalAlignment="Center" MinWidth="0">
-            <TextBlock Text="Sync" FontSize="14" />
+            <TextBlock Text="Sync" FontSize="{DynamicResource FontBody}" />
             <TextBlock Classes="cv-value" Text="{Binding SyncRuns}" />
           </StackPanel>
           <Button Grid.Column="2" Classes="cv-select" Width="160" VerticalAlignment="Center">

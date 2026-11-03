@@ -172,7 +172,7 @@
       <Setter Property="Padding" Value="8,4,8,5" />
       <Setter Property="Foreground" Value="{DynamicResource Fg}" />
       <Setter Property="FontFamily" Value="{DynamicResource TextFont}" />
-      <Setter Property="FontSize" Value="12" />
+      <Setter Property="FontSize" Value="{DynamicResource FontCaption}" />
       <Setter Property="MaxWidth" Value="320" />
       <Setter Property="Opacity" Value="0" />
       <Setter Property="Transitions">
@@ -232,7 +232,7 @@
     <Setter Property="Padding" Value="10,5" />
   </Style>
 
-  <!-- A ticked box takes the colour theme's accent, not the system's blue. -->
+  <!-- A ticked box takes the look's ink (paper in dark), not the system's blue. -->
   <Style Selector="CheckBox:checked /template/ Border#NormalRectangle, CheckBox:checked:pointerover /template/ Border#NormalRectangle, CheckBox:checked:pressed /template/ Border#NormalRectangle">
     <Setter Property="Background" Value="{DynamicResource Accent}" />
     <Setter Property="BorderBrush" Value="{DynamicResource Accent}" />
@@ -241,6 +241,17 @@
     <Setter Property="Fill" Value="{DynamicResource OnAccent}" />
   </Style>
 
+  <!-- Every progress bar (a download, a sync, a transcript being written): sky on the mesh's track, small corners. -->
+  <Style Selector="ProgressBar">
+    <Setter Property="Foreground" Value="{DynamicResource Progress}" />
+    <Setter Property="Background" Value="{DynamicResource ProgressTrack}" />
+    <Setter Property="CornerRadius" Value="2" />
+  </Style>
+  <Style Selector="c|Progress">
+    <Setter Property="Fill" Value="{DynamicResource Progress}" />
+    <Setter Property="Track" Value="{DynamicResource ProgressTrack}" />
+    <Setter Property="Height" Value="4" />
+  </Style>
   <!-- One face everywhere (a marked-up or selectable line of text is a TextBlock too), its figures all one width so
        times and counts line up. -->
   <Style Selector=":is(TextBlock)">
@@ -292,10 +303,10 @@
 
   <!-- Status by class, so it follows the look, light and dark: a dot that's green when all is well and amber when
        something needs you, and a result line that says whether it worked. -->
-  <Style Selector="Ellipse.status">
+  <Style Selector="Ellipse.status, c|SyftCell.status">
     <Setter Property="Fill" Value="{DynamicResource Good}" />
   </Style>
-  <Style Selector="Ellipse.status.warn">
+  <Style Selector="Ellipse.status.warn, c|SyftCell.status.warn">
     <Setter Property="Fill" Value="{DynamicResource Warn}" />
   </Style>
   <Style Selector="TextBlock.result">
@@ -371,7 +382,7 @@
     <Setter Property="Theme" Value="{StaticResource Surface}" />
     <Setter Property="Width" Value="32" />
     <Setter Property="Height" Value="32" />
-    <Setter Property="CornerRadius" Value="{DynamicResource RadiusControl}" />
+    <Setter Property="c:Cell.Round" Value="True" />
     <Setter Property="HorizontalContentAlignment" Value="Center" />
     <Setter Property="Foreground" Value="{DynamicResource InkMuted}" />
   </Style>
@@ -400,7 +411,7 @@
   <Style Selector="Button.nav-item.class">
     <Setter Property="Height" Value="32" />
     <Setter Property="Foreground" Value="{DynamicResource Ink}" />
-    <Setter Property="FontSize" Value="14" />
+    <Setter Property="FontSize" Value="{DynamicResource FontBody}" />
     <Setter Property="FontWeight" Value="Normal" />
   </Style>
   <Style Selector="Button.nav-item.selected">
@@ -433,7 +444,7 @@
     <Setter Property="TextWrapping" Value="Wrap" />
   </Style>
   <Style Selector="TextBlock.page-lede">
-    <Setter Property="FontSize" Value="16" />
+    <Setter Property="FontSize" Value="{DynamicResource FontSubtitle}" />
     <Setter Property="LineHeight" Value="24" />
     <Setter Property="Foreground" Value="{DynamicResource InkMuted}" />
     <Setter Property="TextWrapping" Value="Wrap" />
@@ -447,7 +458,7 @@
     <Setter Property="LetterSpacing" Value="-0.17" />
   </Style>
   <Style Selector="TextBlock.empty">
-    <Setter Property="FontSize" Value="16" />
+    <Setter Property="FontSize" Value="{DynamicResource FontSubtitle}" />
     <Setter Property="LineHeight" Value="24" />
     <Setter Property="Foreground" Value="{DynamicResource InkMuted}" />
     <Setter Property="TextWrapping" Value="Wrap" />
@@ -459,7 +470,7 @@
   <Style Selector="Button.text-link">
     <Setter Property="Theme" Value="{StaticResource Surface}" />
     <Setter Property="Foreground" Value="{DynamicResource InkMuted}" />
-    <Setter Property="FontSize" Value="14" />
+    <Setter Property="FontSize" Value="{DynamicResource FontBody}" />
     <Setter Property="FontWeight" Value="Bold" />
     <Setter Property="Padding" Value="0,0,0,2" />
     <Setter Property="HorizontalAlignment" Value="Left" />
@@ -485,7 +496,7 @@
   <Style Selector="Button.record">
     <Setter Property="Theme" Value="{StaticResource Surface}" />
     <Setter Property="Height" Value="48" />
-    <Setter Property="CornerRadius" Value="24" />
+    <Setter Property="c:Cell.Round" Value="True" />
     <Setter Property="Padding" Value="4,4,18,4" />
     <Setter Property="Background" Value="{DynamicResource Surface}" />
     <Setter Property="Foreground" Value="{DynamicResource Ink}" />
@@ -561,6 +572,78 @@
     <Setter Property="Height" Value="10" />
     <Setter Property="CornerRadius" Value="2" />
   </Style>
+  <!-- ===== The recorder, open (Mac and Windows alike): the Syft look's recording strip ===== -->
+  <!-- Its controls sit on one strip of the mesh: Make it small and Pause quiet, Stop a coral cell with an ink square. -->
+  <Style Selector="Border.rec-strip">
+    <Setter Property="Background" Value="{DynamicResource SurfaceRaised}" />
+    <Setter Property="Padding" Value="3" />
+    <Setter Property="c:Cell.Round" Value="True" />
+    <Setter Property="VerticalAlignment" Value="Center" />
+  </Style>
+  <Style Selector="Button.rec-quiet, Button.rec-stop">
+    <Setter Property="Theme" Value="{StaticResource Surface}" />
+    <Setter Property="Width" Value="30" />
+    <Setter Property="Height" Value="30" />
+    <Setter Property="c:Cell.Round" Value="True" />
+    <Setter Property="HorizontalContentAlignment" Value="Center" />
+    <Setter Property="Foreground" Value="{DynamicResource InkMuted}" />
+  </Style>
+  <Style Selector="Button.rec-quiet:pointerover">
+    <Setter Property="Foreground" Value="{DynamicResource Ink}" />
+  </Style>
+  <Style Selector="Button.rec-stop">
+    <Setter Property="Background" Value="{DynamicResource Recording}" />
+  </Style>
+  <Style Selector="Button.rec-stop /template/ Border#PART_Wash">
+    <Setter Property="IsVisible" Value="False" />
+  </Style>
+  <Style Selector="Button.rec-stop:pointerover">
+    <Setter Property="Opacity" Value="0.88" />
+  </Style>
+  <Style Selector="Border.rec-stop-square">
+    <Setter Property="Width" Value="10" />
+    <Setter Property="Height" Value="10" />
+    <Setter Property="c:Cell.Round" Value="True" />
+    <Setter Property="Background" Value="{DynamicResource OnRecording}" />
+  </Style>
+  <Style Selector="TextBlock.rec-title">
+    <Setter Property="FontSize" Value="{DynamicResource FontBodyStrong}" />
+    <Setter Property="FontWeight" Value="SemiBold" />
+    <Setter Property="Foreground" Value="{DynamicResource Ink}" />
+    <Setter Property="TextTrimming" Value="CharacterEllipsis" />
+    <Setter Property="VerticalAlignment" Value="Center" />
+  </Style>
+  <Style Selector="TextBlock.rec-time">
+    <Setter Property="FontSize" Value="{DynamicResource FontBody}" />
+    <Setter Property="Foreground" Value="{DynamicResource InkMuted}" />
+    <Setter Property="VerticalAlignment" Value="Center" />
+  </Style>
+  <!-- What's been said: the newest line bold in ink, the older ones fading through three flat greys (no gradient). -->
+  <Style Selector=":is(TextBlock).heard">
+    <Setter Property="FontSize" Value="{DynamicResource FontBody}" />
+    <Setter Property="LineHeight" Value="20" />
+    <Setter Property="TextWrapping" Value="Wrap" />
+    <Setter Property="Foreground" Value="{DynamicResource Ink}" />
+    <Setter Property="FontWeight" Value="SemiBold" />
+  </Style>
+  <Style Selector=":is(TextBlock).heard.fade1, :is(TextBlock).heard.fade2, :is(TextBlock).heard.fade3">
+    <Setter Property="FontWeight" Value="Normal" />
+  </Style>
+  <Style Selector=":is(TextBlock).heard.fade1">
+    <Setter Property="Foreground" Value="{DynamicResource TextFade1}" />
+  </Style>
+  <Style Selector=":is(TextBlock).heard.fade2">
+    <Setter Property="Foreground" Value="{DynamicResource TextFade2}" />
+  </Style>
+  <Style Selector=":is(TextBlock).heard.fade3">
+    <Setter Property="Foreground" Value="{DynamicResource TextFade3}" />
+  </Style>
+  <Style Selector="TextBlock.heard-time">
+    <Setter Property="FontSize" Value="{DynamicResource FontCaption}" />
+    <Setter Property="Foreground" Value="{DynamicResource TextSubtle}" />
+    <Setter Property="Margin" Value="0,3,0,0" />
+  </Style>
+
   <!-- A shortcut's keys beside what they do. -->
   <Style Selector="Border.kbd">
     <Setter Property="BorderBrush" Value="{DynamicResource Line}" />
@@ -614,7 +697,7 @@
     <Setter Property="Foreground" Value="{DynamicResource Late}" />
   </Style>
   <Style Selector="TextBlock.micro">
-    <Setter Property="FontSize" Value="12" />
+    <Setter Property="FontSize" Value="{DynamicResource FontCaption}" />
     <Setter Property="LineHeight" Value="16" />
     <Setter Property="Foreground" Value="{DynamicResource InkSubtle}" />
   </Style>
@@ -639,7 +722,7 @@
     <Setter Property="Background" Value="Transparent" />
   </Style>
   <Style Selector="Button.deadline c|Highlight">
-    <Setter Property="FontSize" Value="14" />
+    <Setter Property="FontSize" Value="{DynamicResource FontBody}" />
     <Setter Property="FontWeight" Value="Bold" />
     <Setter Property="LineHeight" Value="19" />
     <Setter Property="TextWrapping" Value="Wrap" />
@@ -677,7 +760,7 @@
     <Setter Property="Background" Value="Transparent" />
   </Style>
   <Style Selector="TextBlock.lecture-date">
-    <Setter Property="FontSize" Value="14" />
+    <Setter Property="FontSize" Value="{DynamicResource FontBody}" />
     <Setter Property="FontWeight" Value="Bold" />
     <Setter Property="LineHeight" Value="18" />
     <Setter Property="Foreground" Value="{DynamicResource InkMuted}" />
@@ -715,7 +798,7 @@
     <Setter Property="FontStyle" Value="Italic" />
   </Style>
   <Style Selector="TextBlock.lecture-length">
-    <Setter Property="FontSize" Value="14" />
+    <Setter Property="FontSize" Value="{DynamicResource FontBody}" />
     <Setter Property="FontWeight" Value="Medium" />
     <Setter Property="LineHeight" Value="18" />
     <Setter Property="Foreground" Value="{DynamicResource InkSubtle}" />
@@ -732,12 +815,12 @@
     <Setter Property="Theme" Value="{StaticResource Surface}" />
     <Setter Property="Height" Value="34" />
     <Setter Property="Padding" Value="12,0" />
-    <Setter Property="CornerRadius" Value="{DynamicResource RadiusControl}" />
+    <Setter Property="c:Cell.Round" Value="True" />
     <Setter Property="Background" Value="{DynamicResource Surface}" />
     <Setter Property="BorderBrush" Value="{DynamicResource Line}" />
     <Setter Property="BorderThickness" Value="1" />
     <Setter Property="Foreground" Value="{DynamicResource Ink}" />
-    <Setter Property="FontSize" Value="14" />
+    <Setter Property="FontSize" Value="{DynamicResource FontBody}" />
     <Setter Property="FontWeight" Value="Bold" />
     <Setter Property="ClipToBounds" Value="False" />
   </Style>
@@ -756,9 +839,9 @@
   <Style Selector="Button.ask-scope">
     <Setter Property="Theme" Value="{StaticResource Surface}" />
     <Setter Property="Padding" Value="8,6" />
-    <Setter Property="CornerRadius" Value="{DynamicResource RadiusControl}" />
+    <Setter Property="c:Cell.Round" Value="True" />
     <Setter Property="Foreground" Value="{DynamicResource InkMuted}" />
-    <Setter Property="FontSize" Value="14" />
+    <Setter Property="FontSize" Value="{DynamicResource FontBody}" />
     <Setter Property="FontWeight" Value="Bold" />
     <Setter Property="VerticalAlignment" Value="Center" />
   </Style>
@@ -769,7 +852,7 @@
     <Setter Property="Theme" Value="{StaticResource Surface}" />
     <Setter Property="Width" Value="34" />
     <Setter Property="Height" Value="34" />
-    <Setter Property="CornerRadius" Value="17" />
+    <Setter Property="c:Cell.Round" Value="True" />
     <Setter Property="Background" Value="{DynamicResource Ink}" />
     <Setter Property="Foreground" Value="{DynamicResource Surface}" />
     <Setter Property="HorizontalContentAlignment" Value="Center" />
@@ -782,7 +865,7 @@
   <Style Selector="Button.btn">
     <Setter Property="Theme" Value="{StaticResource Surface}" />
     <Setter Property="Height" Value="48" />
-    <Setter Property="CornerRadius" Value="24" />
+    <Setter Property="c:Cell.Round" Value="True" />
     <Setter Property="Padding" Value="18,0" />
     <Setter Property="Background" Value="{DynamicResource Surface}" />
     <Setter Property="Foreground" Value="{DynamicResource Ink}" />
@@ -801,9 +884,9 @@
   </Style>
   <Style Selector="Button.btn.sm">
     <Setter Property="Height" Value="34" />
-    <Setter Property="CornerRadius" Value="17" />
+    <Setter Property="c:Cell.Round" Value="True" />
     <Setter Property="Padding" Value="14,0" />
-    <Setter Property="FontSize" Value="14" />
+    <Setter Property="FontSize" Value="{DynamicResource FontBody}" />
   </Style>
   <Style Selector="Button.btn.ink">
     <Setter Property="Background" Value="{DynamicResource Ink}" />
@@ -821,9 +904,9 @@
     <Setter Property="Theme" Value="{StaticResource Surface}" />
     <Setter Property="Height" Value="32" />
     <Setter Property="Padding" Value="10,0" />
-    <Setter Property="CornerRadius" Value="{DynamicResource RadiusControl}" />
+    <Setter Property="c:Cell.Round" Value="True" />
     <Setter Property="Foreground" Value="{DynamicResource InkMuted}" />
-    <Setter Property="FontSize" Value="14" />
+    <Setter Property="FontSize" Value="{DynamicResource FontBody}" />
     <Setter Property="FontWeight" Value="Bold" />
     <Setter Property="ClipToBounds" Value="False" />
   </Style>
@@ -850,7 +933,7 @@
     <Setter Property="Height" Value="32" />
     <Setter Property="Padding" Value="10,0" />
     <Setter Property="CornerRadius" Value="{DynamicResource RadiusControl}" />
-    <Setter Property="FontSize" Value="14" />
+    <Setter Property="FontSize" Value="{DynamicResource FontBody}" />
     <Setter Property="Foreground" Value="{DynamicResource Ink}" />
   </Style>
   <Style Selector="Button.menu-item.active">
@@ -880,13 +963,13 @@
     <Setter Property="CornerRadius" Value="{DynamicResource RadiusControl}" />
   </Style>
   <Style Selector="TextBlock.event-when">
-    <Setter Property="FontSize" Value="14" />
+    <Setter Property="FontSize" Value="{DynamicResource FontBody}" />
     <Setter Property="FontWeight" Value="Bold" />
     <Setter Property="LineHeight" Value="18" />
     <Setter Property="Foreground" Value="{DynamicResource InkMuted}" />
   </Style>
   <Style Selector="TextBlock.event-day">
-    <Setter Property="FontSize" Value="12" />
+    <Setter Property="FontSize" Value="{DynamicResource FontCaption}" />
     <Setter Property="FontWeight" Value="Medium" />
     <Setter Property="LineHeight" Value="16" />
     <Setter Property="Foreground" Value="{DynamicResource InkSubtle}" />
@@ -900,13 +983,13 @@
     <Setter Property="CornerRadius" Value="{DynamicResource RadiusControl}" />
   </Style>
   <Style Selector="TextBlock.coming-title">
-    <Setter Property="FontSize" Value="14" />
+    <Setter Property="FontSize" Value="{DynamicResource FontBody}" />
     <Setter Property="FontWeight" Value="Bold" />
     <Setter Property="LineHeight" Value="20" />
     <Setter Property="TextTrimming" Value="CharacterEllipsis" />
   </Style>
   <Style Selector="TextBlock.coming-when">
-    <Setter Property="FontSize" Value="12" />
+    <Setter Property="FontSize" Value="{DynamicResource FontCaption}" />
     <Setter Property="FontWeight" Value="Medium" />
     <Setter Property="LineHeight" Value="16" />
     <Setter Property="Foreground" Value="{DynamicResource InkSubtle}" />
@@ -969,7 +1052,7 @@
     <Setter Property="TextWrapping" Value="Wrap" />
   </Style>
   <Style Selector="TextBlock.rail-due-when">
-    <Setter Property="FontSize" Value="12" />
+    <Setter Property="FontSize" Value="{DynamicResource FontCaption}" />
     <Setter Property="FontWeight" Value="Medium" />
     <Setter Property="LineHeight" Value="16" />
     <Setter Property="Foreground" Value="{DynamicResource InkSubtle}" />
@@ -999,7 +1082,7 @@
     <Setter Property="TextDecorations" Value="Underline" />
   </Style>
   <Style Selector="TextBlock.rail-text">
-    <Setter Property="FontSize" Value="14" />
+    <Setter Property="FontSize" Value="{DynamicResource FontBody}" />
     <Setter Property="LineHeight" Value="21" />
     <Setter Property="Foreground" Value="{DynamicResource InkMuted}" />
     <Setter Property="TextWrapping" Value="Wrap" />
@@ -1090,7 +1173,7 @@
     <Setter Property="Theme" Value="{StaticResource Surface}" />
     <Setter Property="Height" Value="28" />
     <Setter Property="Padding" Value="12,0" />
-    <Setter Property="CornerRadius" Value="6" />
+    <Setter Property="c:Cell.Round" Value="True" />
     <Setter Property="FontSize" Value="13.5" />
     <Setter Property="FontWeight" Value="Bold" />
     <Setter Property="Foreground" Value="{DynamicResource InkMuted}" />
@@ -1103,7 +1186,7 @@
   <!-- A note's page: where it's filed and when, its title (typed over to change it), Notes | Transcript under a
        hairline with the chosen one underlined in ink. -->
   <Style Selector="TextBlock.crumb">
-    <Setter Property="FontSize" Value="14" />
+    <Setter Property="FontSize" Value="{DynamicResource FontBody}" />
     <Setter Property="FontWeight" Value="Medium" />
     <Setter Property="LineHeight" Value="18" />
     <Setter Property="Foreground" Value="{DynamicResource InkMuted}" />
@@ -1185,7 +1268,7 @@
   </Style>
   <!-- The line over a note's words that says whose are whose. -->
   <Style Selector="TextBlock.legend">
-    <Setter Property="FontSize" Value="12" />
+    <Setter Property="FontSize" Value="{DynamicResource FontCaption}" />
     <Setter Property="FontWeight" Value="Medium" />
     <Setter Property="LineHeight" Value="16" />
     <Setter Property="Foreground" Value="{DynamicResource InkMuted}" />
@@ -1250,7 +1333,7 @@
     <Setter Property="BoxShadow" Value="{DynamicResource LineRing}" />
   </Style>
   <Style Selector="TextBox.paste-box">
-    <Setter Property="FontSize" Value="14" />
+    <Setter Property="FontSize" Value="{DynamicResource FontBody}" />
     <Setter Property="LineHeight" Value="21" />
     <Setter Property="MinHeight" Value="180" />
     <Setter Property="MaxHeight" Value="360" />
@@ -1293,7 +1376,7 @@
     <Setter Property="BoxShadow" Value="{DynamicResource LineRing}" />
   </Style>
   <Style Selector="TextBlock.version-words">
-    <Setter Property="FontSize" Value="14" />
+    <Setter Property="FontSize" Value="{DynamicResource FontBody}" />
     <Setter Property="FontWeight" Value="SemiBold" />
     <Setter Property="Foreground" Value="{DynamicResource Ink}" />
   </Style>

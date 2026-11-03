@@ -8,8 +8,6 @@ public partial class WinFunnel : UserControl
     public WinFunnel()
     {
         InitializeComponent();
-        // The library window's look: no accent anywhere, so the tick box gets ink.
-        Resources.MergedDictionaries.Add(Skin.NoAccent());
     }
 
     /// <summary>A real window has the system's own title-bar buttons, corners and shadow; screenshots draw them (the

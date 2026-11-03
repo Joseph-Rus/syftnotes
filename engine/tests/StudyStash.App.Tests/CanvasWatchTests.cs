@@ -1,9 +1,18 @@
+using Microsoft.Extensions.Time.Testing;
 using StudyStash.App.Services;
+using StudyStash.App.Services.Kit;
 
 namespace StudyStash.App.Tests;
 
 public class CanvasWatchTests
 {
+    static readonly TimeSpan Tick = TimeSpan.FromMilliseconds(2);
+    static readonly TimeSpan Limit = TimeSpan.FromSeconds(10);
+
+    /// <summary>Waits (on the real clock, for the library's answer to come back) until <paramref name="seen"/> is true.</summary>
+    static async Task Until(Func<bool> seen) =>
+        Assert.True(await Poll.UntilAsync(seen, Tick, Limit, TestContext.Current.CancellationToken), "it never happened");
+
     [Fact]
     public async Task RefreshAsync_reads_the_state_and_raises_Changed()
     {
@@ -54,30 +63,34 @@ public class CanvasWatchTests
     public async Task Start_polls_until_Stop()
     {
         var fake = new FakeLibrary().Json(HttpMethod.Get, "/api/v2/canvas/state", "state-connected");
-        var watch = new CanvasWatch(CanvasFixtures.Context(fake));
+        var clock = new FakeTimeProvider();
+        var watch = new CanvasWatch(CanvasFixtures.Context(fake), clock);
 
         watch.Start();
-        await Task.Delay(80, TestContext.Current.CancellationToken); // one immediate refresh, then it waits out NextDelay (60 s)
+        await Until(() => fake.Requests.Count >= 1); // one immediate refresh, then it waits out NextDelay (60 s)
         int afterStart = fake.Requests.Count;
-        Assert.True(afterStart >= 1);
+        clock.Advance(TimeSpan.FromSeconds(59));
+        Assert.Equal(afterStart, fake.Requests.Count); // not yet
+        clock.Advance(TimeSpan.FromSeconds(1));
+        await Until(() => fake.Requests.Count > afterStart); // the minute is up: asked again
+        int afterMinute = fake.Requests.Count;
 
         watch.Stop();
-        await Task.Delay(80, TestContext.Current.CancellationToken);
-        Assert.Equal(afterStart, fake.Requests.Count); // stopped before the next poll, not after it
+        clock.Advance(TimeSpan.FromMinutes(5));
+        Assert.Equal(afterMinute, fake.Requests.Count); // stopped before the next poll, not after it
     }
 
     [Fact]
     public async Task Hurry_asks_now_and_every_3_seconds_then_the_watch_goes_back_to_its_own_pace()
     {
         var fake = new FakeLibrary().Json(HttpMethod.Get, "/api/v2/canvas/state", "state-connected");
-        var watch = new CanvasWatch(CanvasFixtures.Context(fake));
+        var watch = new CanvasWatch(CanvasFixtures.Context(fake), new FakeTimeProvider());
         watch.Start();
-        await Task.Delay(80, TestContext.Current.CancellationToken);
+        await Until(() => fake.Requests.Count >= 1);
         int before = fake.Requests.Count;
 
         var hurry = watch.Hurry(); // wakes the 60 s wait: asks again straight away
-        await Task.Delay(80, TestContext.Current.CancellationToken);
-        Assert.True(fake.Requests.Count > before);
+        await Until(() => fake.Requests.Count > before);
         Assert.Equal(TimeSpan.FromSeconds(3), watch.NextDelay);
 
         hurry.Dispose();
@@ -91,13 +104,12 @@ public class CanvasWatchTests
     public async Task Hurry_starts_a_watch_nothing_else_had_and_stops_it_when_done()
     {
         var fake = new FakeLibrary().Json(HttpMethod.Get, "/api/v2/canvas/state", "state-no-extension");
-        var watch = new CanvasWatch(CanvasFixtures.Context(fake));
+        var watch = new CanvasWatch(CanvasFixtures.Context(fake), new FakeTimeProvider());
 
         using (watch.Hurry())
         {
-            await Task.Delay(80, TestContext.Current.CancellationToken);
+            await Until(() => fake.Requests.Count > 0);
             Assert.True(watch.Running);
-            Assert.NotEmpty(fake.Requests);
         }
 
         Assert.False(watch.Running);

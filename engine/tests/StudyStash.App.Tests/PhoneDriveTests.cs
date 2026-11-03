@@ -34,15 +34,8 @@ public class PhoneDriveTests
             Times = Quick,
         };
 
-    static async Task Until(Func<bool> done, string what, double seconds = 20)
-    {
-        var until = DateTime.UtcNow.AddSeconds(seconds);
-        while (!done())
-        {
-            if (DateTime.UtcNow > until) Assert.Fail($"waited {seconds} s for {what}");
-            await Task.Delay(25, Test);
-        }
-    }
+    static Task Until(Func<bool> done, string what, double seconds = 20) =>
+        Wait.UntilAsync(done, what, TimeSpan.FromSeconds(seconds));
 
     static Meeting Lecture(string id, string title, string date) => new(id)
     {
@@ -675,13 +668,8 @@ public sealed class FakePhone(FakeDrive drive, string id = "7f3e2a10-phone", str
     public async Task<JsonObject> DoneAsync(string rid, double seconds = 20)
     {
         string answer = (string)requests.First(r => (string?)r!["id"] == rid)!["answer"]!;
-        var until = DateTime.UtcNow.AddSeconds(seconds);
-        while (DateTime.UtcNow < until)
-        {
-            if (drive.Json(answer) is { } a && a["done"]?.GetValue<bool>() == true) return a;
-            await Task.Delay(25, TestContext.Current.CancellationToken);
-        }
-        Assert.Fail($"no answer to {rid} in {seconds} s");
-        return null!;
+        JsonObject? done = null;
+        await Wait.UntilAsync(() => (done = drive.Json(answer)) is { } a && a["done"]?.GetValue<bool>() == true, $"an answer to {rid}", TimeSpan.FromSeconds(seconds));
+        return done!;
     }
 }

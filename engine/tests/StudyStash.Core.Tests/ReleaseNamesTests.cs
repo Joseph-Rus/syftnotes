@@ -92,7 +92,8 @@ public class ReleaseNamesTests
         string ci = Read(".github", "workflows", "ci.yml");
         foreach (string retired in new[]
         {
-            "Study-Stash-engine-", "Study-Stash-mac.zip", "helper-windows", "App-preview", "python", "pytest", "uv ",
+            // The Python engine is retired; Python itself is fine as a runner tool (the test summary script).
+            "Study-Stash-engine-", "Study-Stash-mac.zip", "helper-windows", "App-preview", "pytest", "uv ", "pip install", "python -m",
         })
             Assert.DoesNotContain(retired, ci, StringComparison.OrdinalIgnoreCase);
     }

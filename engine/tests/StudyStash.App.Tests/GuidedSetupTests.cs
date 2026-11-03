@@ -34,12 +34,7 @@ public sealed class GuidedSetupTests
         return Path.Combine(engineDir, OperatingSystem.IsWindows() ? "studystash.exe" : "studystash");
     }
 
-    internal static async Task Until(Func<bool> done, string what)
-    {
-        var took = Stopwatch.StartNew();
-        while (!done() && took.Elapsed < Soon) await Task.Delay(25, TestContext.Current.CancellationToken);
-        Assert.True(done(), $"waited {Soon.TotalSeconds:0} s for {what}");
-    }
+    internal static Task Until(Func<bool> done, string what) => Wait.UntilAsync(done, what, Soon);
 
     internal static string Init(string session = "s-1") => new JsonObject
     {

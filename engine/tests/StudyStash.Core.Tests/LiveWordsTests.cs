@@ -92,9 +92,7 @@ public class LiveWordsTests
     /// (35 s of sound once took a Linux runner more than the 5 s this allowed).</summary>
     static void WaitFor(Func<bool> done)
     {
-        var until = DateTime.UtcNow.AddSeconds(60);
-        while (!done() && DateTime.UtcNow < until) Thread.Sleep(10);
-        Assert.True(done());
+        Assert.True(Waiting.UntilAsync(done, 60).GetAwaiter().GetResult());
     }
 
     /// <summary>Words show a second in, for a lecture written down as it records, once the recorder is open (closed,

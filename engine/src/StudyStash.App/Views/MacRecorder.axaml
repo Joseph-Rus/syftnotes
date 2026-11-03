@@ -1,5 +1,6 @@
 <!-- The floating recorder (Mac): small, an upright pill of the pixel s and a level meter (Stop and a card on hover); open,
-     360 × 520, the transcript fading upward and a chat below whose answers link to moments in the recording. -->
+     360 × 520 in the Syft look (Styles.axaml's rec-* classes, shared with Windows): the recording cell, the class and
+     a cell meter, one strip of controls, the transcript in three greys, and a chat whose answers link to moments. -->
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="using:StudyStash.App.ViewModels"
@@ -13,17 +14,10 @@
     <KeyBinding Gesture="Escape" Command="{Binding Ask.CloseChatCommand}" />
   </UserControl.KeyBindings>
   <UserControl.Styles>
-    <Style Selector="Button.small">
-      <Setter Property="Theme" Value="{StaticResource Surface}" />
-      <Setter Property="Width" Value="32" />
-      <Setter Property="Height" Value="32" />
-      <Setter Property="CornerRadius" Value="16" />
-      <Setter Property="HorizontalContentAlignment" Value="Center" />
-    </Style>
     <!-- The red dot that's Stop (and Resume in its place) is one of the s's cells: its corners a cell's, 27 % of its side. -->
     <Style Selector="Button.stop, Button.resume">
       <Setter Property="Theme" Value="{StaticResource Surface}" />
-      <Setter Property="CornerRadius" Value="6.5" />
+      <Setter Property="c:Cell.Round" Value="True" />
       <Setter Property="HorizontalContentAlignment" Value="Center" />
       <Setter Property="VerticalContentAlignment" Value="Center" />
     </Style>
@@ -37,12 +31,6 @@
     </Style>
     <Style Selector="Button.stop /template/ Border#PART_Bg">
       <Setter Property="Background" Value="{DynamicResource Record}" />
-    </Style>
-    <Style Selector="TextBlock.old">
-      <Setter Property="Foreground" Value="{DynamicResource Fg2}" />
-    </Style>
-    <Style Selector="TextBlock.paused">
-      <Setter Property="Foreground" Value="{DynamicResource Fg2}" />
     </Style>
   </UserControl.Styles>
   <Panel>
@@ -72,26 +60,30 @@
       </StackPanel>
     </Border>
 
-    <!-- Expanded: the glass keeps its shadow outside; the Border inside cuts what scrolls to its corners. -->
+    <!-- Open: the page's own colour (ink in dark, paper in light), its controls on one strip of the mesh, what's been
+         said fading upward in three greys, and the chat with its ask bar below. -->
     <c:Glass IsVisible="{Binding Expanded}" Width="360" Height="520" CornerRadius="{DynamicResource RadiusPane}">
       <Border CornerRadius="{DynamicResource RadiusPane}" ClipToBounds="True">
         <DockPanel>
-          <Grid DockPanel.Dock="Top" Height="60" Margin="20,0,12,0" ColumnDefinitions="Auto,10,Auto,10,Auto,*,Auto">
-            <c:SyftCell Width="8" Height="8" Fill="{DynamicResource Rec}" VerticalAlignment="Center" IsVisible="{Binding IsRunning}" />
-            <c:SyftCell Width="8" Height="8" Fill="{DynamicResource Fg3}" VerticalAlignment="Center" IsVisible="{Binding IsPaused}" />
-            <TextBlock Grid.Column="2" Text="{Binding DisplayClass}" FontSize="13" FontWeight="SemiBold" VerticalAlignment="Center" />
-            <TextBlock Grid.Column="4" Classes="num" Text="{Binding Elapsed}" FontSize="13" Foreground="{DynamicResource Fg2}" VerticalAlignment="Center" />
-            <!-- Make it small, pause, stop: one pill of three round buttons -->
-            <Border Grid.Column="6" Classes="fill" CornerRadius="19" Padding="3" VerticalAlignment="Center">
+          <!-- The coral cell (grey while paused), the class, a small cell meter while it records, the time; then the strip -->
+          <Grid DockPanel.Dock="Top" Height="60" Margin="20,0,12,0" ColumnDefinitions="Auto,10,Auto,10,Auto,10,Auto,*,Auto">
+            <c:SyftCell Width="10" Height="10" Fill="{DynamicResource Recording}" VerticalAlignment="Center" IsVisible="{Binding IsRunning}" />
+            <c:SyftCell Width="10" Height="10" Fill="{DynamicResource InkSubtle}" VerticalAlignment="Center" IsVisible="{Binding IsPaused}" />
+            <TextBlock Grid.Column="2" Classes="rec-title" Text="{Binding DisplayClass}" MaxWidth="120" ToolTip.Tip="{Binding DisplayClass}" c:Tips.WhenCut="True" />
+            <c:Waveform Grid.Column="4" Bars="3" Height="18" Lively="True" Levels="{Binding Levels}" Foreground="{DynamicResource Recording}"
+                        VerticalAlignment="Center" IsVisible="{Binding IsRunning}" AutomationProperties.AccessibilityView="Raw" />
+            <TextBlock Grid.Column="6" Classes="num rec-time" Text="{Binding Elapsed}" />
+            <Border Grid.Column="8" Classes="rec-strip">
               <StackPanel Orientation="Horizontal" Spacing="2">
-                <Button AutomationProperties.Name="Make it small" Classes="small" Command="{Binding ToggleCommand}" ToolTip.Tip="Make it small">
-                  <c:Icon Glyph="close_fullscreen" Size="18" Foreground="{DynamicResource Fg2}" />
+                <Button AutomationProperties.Name="Make it small" Classes="rec-quiet" Command="{Binding ToggleCommand}" ToolTip.Tip="Make it small">
+                  <c:Icon Glyph="close_fullscreen" Size="17" />
                 </Button>
-                <Button AutomationProperties.Name="{Binding PauseTip}" Classes="small" Command="{Binding PauseCommand}" ToolTip.Tip="{Binding PauseTip}">
-                  <c:Icon Glyph="{Binding PauseGlyph}" Filled="True" Size="18" Foreground="{DynamicResource Fg}" />
+                <Button AutomationProperties.Name="{Binding PauseTip}" Classes="rec-quiet" Command="{Binding PauseCommand}" ToolTip.Tip="{Binding PauseTip}">
+                  <c:Icon Glyph="{Binding PauseGlyph}" Filled="True" Size="18" />
                 </Button>
-                <Button AutomationProperties.Name="Stop" Classes="small" Background="{DynamicResource Record}" Command="{Binding StopCommand}" ToolTip.Tip="Stop">
-                  <c:Icon Glyph="stop" Filled="True" Size="12" Foreground="{DynamicResource OnRecord}" />
+                <Button AutomationProperties.Name="Stop" Classes="rec-stop" Command="{Binding StopCommand}" ToolTip.Tip="Stop">
+                  <!-- Its ink square -->
+                  <c:Icon Glyph="stop" Filled="True" Size="16" Foreground="{DynamicResource OnRecording}" />
                 </Button>
               </StackPanel>
             </Border>
@@ -101,16 +93,10 @@
           <v:MacAiAskChat Name="AskChat" DockPanel.Dock="Bottom" Margin="12,4,12,12" DataContext="{Binding Ask}"
                           IsVisible="{Binding $parent[UserControl].((vm:RecorderModel)DataContext).Live}" />
 
-          <!-- What's been said, newest at the bottom, fading out toward the top -->
+          <!-- What's been said, newest at the bottom: bold in ink, the older lines in three steps of grey -->
           <ScrollViewer Name="Heard" Padding="20,0,20,16" VerticalScrollBarVisibility="Hidden">
-            <ScrollViewer.OpacityMask>
-              <LinearGradientBrush StartPoint="0%,0%" EndPoint="0%,100%">
-                <GradientStop Color="Transparent" Offset="0" />
-                <GradientStop Color="Black" Offset="0.55" />
-              </LinearGradientBrush>
-            </ScrollViewer.OpacityMask>
             <Panel VerticalAlignment="Bottom">
-              <TextBlock IsVisible="{Binding NoLines}" Text="{Binding Waiting}" FontSize="13" Foreground="{DynamicResource Fg2}" TextWrapping="Wrap" />
+              <TextBlock IsVisible="{Binding NoLines}" Text="{Binding Waiting}" FontSize="{DynamicResource FontBody}" Foreground="{DynamicResource InkMuted}" TextWrapping="Wrap" />
               <!-- One drag selects from line to line (a line copied from its start keeps its time); the room between
                    them is left to the recorder's background, which moves it. -->
               <ItemsControl ItemsSource="{Binding Lines}" Background="{x:Null}" c:TextSelection.Area="True">
@@ -119,10 +105,10 @@
                 </ItemsControl.ItemsPanel>
                 <ItemsControl.ItemTemplate>
                   <DataTemplate x:DataType="vm:HeardLine">
-                    <Grid ColumnDefinitions="34,10,*">
-                      <TextBlock Classes="num" Text="{Binding Time}" FontSize="11" Foreground="{DynamicResource Fg2}" Margin="0,2,0,0" />
-                      <c:PageText Grid.Column="2" Text="{Binding Text}" CopyLead="{Binding CopyLead}" FontSize="13" LineHeight="18.85" TextWrapping="Wrap"
-                                 Classes.old="{Binding !Latest}" />
+                    <Grid ColumnDefinitions="36,10,*">
+                      <TextBlock Classes="num heard-time" Text="{Binding Time}" />
+                      <c:PageText Grid.Column="2" Classes="heard" Text="{Binding Text}" CopyLead="{Binding CopyLead}"
+                                 Classes.old="{Binding !Latest}" Classes.fade1="{Binding Fade1}" Classes.fade2="{Binding Fade2}" Classes.fade3="{Binding Fade3}" />
                     </Grid>
                   </DataTemplate>
                 </ItemsControl.ItemTemplate>

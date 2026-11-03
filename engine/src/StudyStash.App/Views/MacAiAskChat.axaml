@@ -11,13 +11,14 @@
              ClipToBounds="False">
   <UserControl.Styles>
     <StyleInclude Source="avares://StudyStash/Views/MacAiStyles.axaml" />
+    <StyleInclude Source="avares://StudyStash/Views/ChatStyles.axaml" />
   </UserControl.Styles>
   <!-- Esc closes the chat, the same as its close button -->
   <UserControl.KeyBindings>
     <KeyBinding Gesture="Escape" Command="{Binding CloseChatCommand}" />
   </UserControl.KeyBindings>
 
-  <c:Glass Name="Card" CornerRadius="28" Padding="14,12,12,12" Width="360" ClipToBounds="False">
+  <c:Glass Name="Card" CornerRadius="{DynamicResource RadiusPane}" Padding="14,12,12,12" Width="360" ClipToBounds="False">
     <StackPanel Spacing="10">
       <!-- The conversation, with a close button (and Esc) that gives the transcript its room back; kept for this
            lecture, so asking again or "Show the chat" brings it back. A long one scrolls, newest at the bottom. -->
@@ -55,7 +56,7 @@
                   <c:SyftMark Size="24" Bits="False" VerticalAlignment="Top" Margin="0,4,0,0" />
                   <Border Classes="ai-bubble-a" Grid.Column="2" MaxWidth="285">
                     <StackPanel Spacing="6">
-                      <c:NoteView Compact="True" BodySize="13" BodyLineHeight="18.85" Markdown="{Binding Answer}" IsVisible="{Binding Answer, Converter={x:Static c:Converters.NotEmpty}}" />
+                      <c:NoteView Compact="True" BodySize="{DynamicResource FontBody}" BodyLineHeight="20" Markdown="{Binding Answer}" IsVisible="{Binding Answer, Converter={x:Static c:Converters.NotEmpty}}" />
                       <c:PageText Classes="ai-answer" Text="{Binding Failed}" Foreground="{DynamicResource Warn}"
                                  IsVisible="{Binding Failed, Converter={x:Static c:Converters.NotEmpty}}" />
                       <v:AiByline HorizontalAlignment="Left" IsVisible="{Binding Byline, Converter={x:Static c:Converters.NotEmpty}}" />
@@ -80,7 +81,7 @@
 
       <Border Classes="ai-field">
         <Grid ColumnDefinitions="*,6,Auto,6,Auto" VerticalAlignment="Center">
-          <TextBox Name="ChatInput" Classes="bare" Text="{Binding Question}" c:OneLinePaste.IsOn="True" PlaceholderText="{Binding Placeholder}" FontSize="13" VerticalAlignment="Center">
+          <TextBox Name="ChatInput" Classes="bare" Text="{Binding Question}" c:OneLinePaste.IsOn="True" PlaceholderText="{Binding Placeholder}" VerticalAlignment="Center">
             <TextBox.KeyBindings>
               <KeyBinding Gesture="Enter" Command="{Binding AskCommand}" />
             </TextBox.KeyBindings>
@@ -108,11 +109,11 @@
           <Border Grid.Column="4" Classes="ai-field-send">
             <Panel>
               <Button AutomationProperties.Name="Send question" Classes="ai-send" Command="{Binding AskCommand}" IsVisible="{Binding !Busy}">
-                <c:Icon Glyph="arrow_upward" Size="18" Foreground="{DynamicResource Fg}" />
+                <c:Icon Glyph="arrow_upward" Size="18" />
               </Button>
               <!-- While an answer is being written, the same place stops it -->
               <Button Classes="ai-send" Command="{Binding StopCommand}" IsVisible="{Binding Busy}" ToolTip.Tip="Stop" AutomationProperties.Name="Stop the answer">
-                <c:Icon Glyph="stop" Filled="True" Size="18" Foreground="{DynamicResource Fg}" />
+                <c:Icon Glyph="stop" Filled="True" Size="16" />
               </Button>
             </Panel>
           </Border>

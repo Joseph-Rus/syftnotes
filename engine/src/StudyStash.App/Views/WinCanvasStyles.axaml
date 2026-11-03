@@ -11,7 +11,7 @@
     <ControlTheme x:Key="CvBrowserItem" TargetType="MenuItem" BasedOn="{StaticResource {x:Type MenuItem}}" x:DataType="vm:BrowserChoice">
       <Setter Property="CornerRadius" Value="4" />
       <Setter Property="Padding" Value="12,6" />
-      <Setter Property="FontSize" Value="14" />
+      <Setter Property="FontSize" Value="{DynamicResource FontBody}" />
       <Setter Property="Header" Value="{Binding Name}" />
       <Setter Property="Command" Value="{Binding Pick}" />
       <Setter Property="Icon">
@@ -70,7 +70,7 @@
   </Style>
 
   <Style Selector="TextBlock.cv-msg">
-    <Setter Property="FontSize" Value="14" />
+    <Setter Property="FontSize" Value="{DynamicResource FontBody}" />
     <Setter Property="LineHeight" Value="20.3" />
     <Setter Property="TextWrapping" Value="Wrap" />
     <Setter Property="Margin" Value="0,1,0,0" />
@@ -98,7 +98,7 @@
     <Setter Property="Height" Value="32" />
     <Setter Property="CornerRadius" Value="4" />
     <Setter Property="Padding" Value="12,0" />
-    <Setter Property="FontSize" Value="14" />
+    <Setter Property="FontSize" Value="{DynamicResource FontBody}" />
     <Setter Property="Background" Value="{DynamicResource Ctrl}" />
     <Setter Property="BorderBrush" Value="{DynamicResource CtrlBorder}" />
     <Setter Property="BorderThickness" Value="1" />
@@ -124,17 +124,17 @@
   <!-- design 06: Settings -> Canvas -->
   <Style Selector="TextBlock.cv-h1">
     <Setter Property="FontFamily" Value="{DynamicResource DisplayFont}" />
-    <Setter Property="FontSize" Value="28" />
+    <Setter Property="FontSize" Value="{DynamicResource FontDisplay}" />
     <Setter Property="FontWeight" Value="SemiBold" />
   </Style>
   <Style Selector="TextBlock.cv-intro">
-    <Setter Property="FontSize" Value="14" />
+    <Setter Property="FontSize" Value="{DynamicResource FontBody}" />
     <Setter Property="Foreground" Value="{DynamicResource Fg2}" />
     <Setter Property="TextWrapping" Value="Wrap" />
     <Setter Property="Margin" Value="0,12,0,0" />
   </Style>
   <Style Selector="TextBlock.cv-h2">
-    <Setter Property="FontSize" Value="14" />
+    <Setter Property="FontSize" Value="{DynamicResource FontBody}" />
     <Setter Property="FontWeight" Value="SemiBold" />
     <Setter Property="Margin" Value="0,18,0,8" />
   </Style>
@@ -152,11 +152,11 @@
   </Style>
   <Style Selector="TextBlock.cv-value">
     <Setter Property="Foreground" Value="{DynamicResource Fg2}" />
-    <Setter Property="FontSize" Value="12" />
+    <Setter Property="FontSize" Value="{DynamicResource FontCaption}" />
   </Style>
   <Style Selector="TextBlock.cv-dot-label">
     <Setter Property="FontWeight" Value="SemiBold" />
-    <Setter Property="FontSize" Value="14" />
+    <Setter Property="FontSize" Value="{DynamicResource FontBody}" />
   </Style>
   <Style Selector="Ellipse.cv-dot">
     <Setter Property="Width" Value="10" />
@@ -173,14 +173,14 @@
     <Setter Property="Foreground" Value="{DynamicResource Warn}" />
   </Style>
   <Style Selector="TextBlock.cv-scout">
-    <Setter Property="FontSize" Value="12" />
+    <Setter Property="FontSize" Value="{DynamicResource FontCaption}" />
     <Setter Property="Foreground" Value="{DynamicResource Fg2}" />
   </Style>
   <Style Selector="TextBlock.cv-placeholder">
     <Setter Property="Foreground" Value="{DynamicResource Fg3}" />
   </Style>
   <Style Selector="TextBlock.cv-change">
-    <Setter Property="FontSize" Value="14" />
+    <Setter Property="FontSize" Value="{DynamicResource FontBody}" />
   </Style>
   <Style Selector="c|Icon.cv-change">
     <Setter Property="Size" Value="18" />
@@ -190,22 +190,22 @@
     <Setter Property="Theme" Value="{StaticResource Surface}" />
     <Setter Property="Height" Value="30" />
     <Setter Property="Padding" Value="12,0" />
-    <Setter Property="FontSize" Value="14" />
+    <Setter Property="FontSize" Value="{DynamicResource FontBody}" />
     <Setter Property="HorizontalContentAlignment" Value="Left" />
   </Style>
 
   <!-- design 09: the Due list -->
   <Style Selector="TextBlock.cv-due-title">
     <Setter Property="FontFamily" Value="{DynamicResource DisplayFont}" />
-    <Setter Property="FontSize" Value="20" />
+    <Setter Property="FontSize" Value="{DynamicResource FontTitle}" />
     <Setter Property="FontWeight" Value="SemiBold" />
   </Style>
   <Style Selector="TextBlock.cv-due-sub">
-    <Setter Property="FontSize" Value="12" />
+    <Setter Property="FontSize" Value="{DynamicResource FontCaption}" />
     <Setter Property="Foreground" Value="{DynamicResource Fg2}" />
   </Style>
   <Style Selector="TextBlock.cv-group-label">
-    <Setter Property="FontSize" Value="12" />
+    <Setter Property="FontSize" Value="{DynamicResource FontCaption}" />
     <Setter Property="FontWeight" Value="SemiBold" />
     <Setter Property="Foreground" Value="{DynamicResource Fg2}" />
     <Setter Property="Padding" Value="20,14,20,4" />
@@ -233,11 +233,11 @@
     <Setter Property="VerticalAlignment" Value="Center" />
   </Style>
   <Style Selector="TextBlock.cv-row-title">
-    <Setter Property="FontSize" Value="14" />
+    <Setter Property="FontSize" Value="{DynamicResource FontBody}" />
     <Setter Property="FontWeight" Value="SemiBold" />
   </Style>
   <Style Selector="TextBlock.cv-row-right">
-    <Setter Property="FontSize" Value="12" />
+    <Setter Property="FontSize" Value="{DynamicResource FontCaption}" />
     <Setter Property="Foreground" Value="{DynamicResource Fg2}" />
   </Style>
   <Style Selector="TextBlock.cv-row-right.cv-strong">
@@ -245,7 +245,7 @@
     <Setter Property="FontWeight" Value="SemiBold" />
   </Style>
   <Style Selector="TextBlock.cv-row-sub">
-    <Setter Property="FontSize" Value="12" />
+    <Setter Property="FontSize" Value="{DynamicResource FontCaption}" />
     <Setter Property="Foreground" Value="{DynamicResource Fg2}" />
   </Style>
   <Style Selector="Ellipse.cv-row-dot">
@@ -255,12 +255,12 @@
 
   <!-- design 09: an assignment's detail -->
   <Style Selector="TextBlock.cv-meta">
-    <Setter Property="FontSize" Value="12" />
+    <Setter Property="FontSize" Value="{DynamicResource FontCaption}" />
     <Setter Property="Foreground" Value="{DynamicResource Fg2}" />
   </Style>
   <Style Selector="TextBlock.cv-detail-title">
     <Setter Property="FontFamily" Value="{DynamicResource DisplayFont}" />
-    <Setter Property="FontSize" Value="28" />
+    <Setter Property="FontSize" Value="{DynamicResource FontDisplay}" />
     <Setter Property="FontWeight" Value="SemiBold" />
     <Setter Property="LineHeight" Value="35" />
   </Style>
@@ -275,7 +275,7 @@
     <Setter Property="Background" Value="{DynamicResource Sep}" />
   </Style>
   <Style Selector="TextBlock.cv-tile-label">
-    <Setter Property="FontSize" Value="12" />
+    <Setter Property="FontSize" Value="{DynamicResource FontCaption}" />
     <Setter Property="Foreground" Value="{DynamicResource Fg2}" />
   </Style>
   <Style Selector="TextBlock.cv-tile-value">
@@ -284,7 +284,7 @@
   </Style>
   <Style Selector="TextBlock.cv-h3">
     <Setter Property="FontFamily" Value="{DynamicResource DisplayFont}" />
-    <Setter Property="FontSize" Value="20" />
+    <Setter Property="FontSize" Value="{DynamicResource FontTitle}" />
     <Setter Property="FontWeight" Value="SemiBold" />
   </Style>
   <Style Selector="Border.cv-rule">
@@ -292,15 +292,15 @@
     <Setter Property="Background" Value="{DynamicResource Sep}" />
   </Style>
   <Style Selector="TextBlock.cv-rubric-crit">
-    <Setter Property="FontSize" Value="14" />
+    <Setter Property="FontSize" Value="{DynamicResource FontBody}" />
     <Setter Property="FontWeight" Value="SemiBold" />
   </Style>
   <Style Selector="TextBlock.cv-rubric-pts">
-    <Setter Property="FontSize" Value="14" />
+    <Setter Property="FontSize" Value="{DynamicResource FontBody}" />
     <Setter Property="Foreground" Value="{DynamicResource Fg2}" />
   </Style>
   <Style Selector="TextBlock.cv-rubric-comment">
-    <Setter Property="FontSize" Value="14" />
+    <Setter Property="FontSize" Value="{DynamicResource FontBody}" />
     <Setter Property="Foreground" Value="{DynamicResource Fg2}" />
     <Setter Property="TextWrapping" Value="Wrap" />
   </Style>
@@ -312,7 +312,7 @@
     <Setter Property="Padding" Value="16" />
   </Style>
   <Style Selector="TextBlock.cv-sub-status">
-    <Setter Property="FontSize" Value="14" />
+    <Setter Property="FontSize" Value="{DynamicResource FontBody}" />
     <Setter Property="FontWeight" Value="SemiBold" />
   </Style>
   <Style Selector="TextBlock.cv-sub-detail">
@@ -320,12 +320,12 @@
     <Setter Property="Foreground" Value="{DynamicResource Fg2}" />
   </Style>
   <Style Selector="TextBlock.cv-comment">
-    <Setter Property="FontSize" Value="14" />
+    <Setter Property="FontSize" Value="{DynamicResource FontBody}" />
     <Setter Property="LineHeight" Value="20.3" />
     <Setter Property="TextWrapping" Value="Wrap" />
   </Style>
   <Style Selector="TextBlock.cv-comment-author">
-    <Setter Property="FontSize" Value="12" />
+    <Setter Property="FontSize" Value="{DynamicResource FontCaption}" />
     <Setter Property="Foreground" Value="{DynamicResource Fg2}" />
   </Style>
   <Style Selector="Button.cv-hand-in">
@@ -349,7 +349,7 @@
     <Setter Property="FontSize" Value="13" />
   </Style>
   <Style Selector="TextBlock.cv-chip-size">
-    <Setter Property="FontSize" Value="12" />
+    <Setter Property="FontSize" Value="{DynamicResource FontCaption}" />
     <Setter Property="Foreground" Value="{DynamicResource Fg2}" />
   </Style>
   <Style Selector="Button.cv-toolbtn">
@@ -357,7 +357,7 @@
     <Setter Property="Height" Value="32" />
     <Setter Property="CornerRadius" Value="4" />
     <Setter Property="Padding" Value="10,0" />
-    <Setter Property="FontSize" Value="14" />
+    <Setter Property="FontSize" Value="{DynamicResource FontBody}" />
   </Style>
   <Style Selector="Button.cv-toolicon">
     <Setter Property="Theme" Value="{StaticResource Surface}" />
@@ -403,7 +403,7 @@
     <Setter Property="BorderBrush" Value="{DynamicResource Sep}" />
   </Style>
   <Style Selector="TextBlock.cv-section-title">
-    <Setter Property="FontSize" Value="14" />
+    <Setter Property="FontSize" Value="{DynamicResource FontBody}" />
     <Setter Property="FontWeight" Value="SemiBold" />
   </Style>
   <Style Selector="c|Icon.cv-tree-icon">
@@ -418,7 +418,7 @@
 
   <!-- a module: its own small label, an open module's items, a collapsed module's summary row -->
   <Style Selector="TextBlock.cv-mod-label">
-    <Setter Property="FontSize" Value="12" />
+    <Setter Property="FontSize" Value="{DynamicResource FontCaption}" />
     <Setter Property="Foreground" Value="{DynamicResource Fg2}" />
   </Style>
   <Style Selector="Button.cv-mod-item.cv-on">
@@ -432,10 +432,10 @@
     <Setter Property="HorizontalContentAlignment" Value="Stretch" />
   </Style>
   <Style Selector="TextBlock.cv-mod-title">
-    <Setter Property="FontSize" Value="14" />
+    <Setter Property="FontSize" Value="{DynamicResource FontBody}" />
   </Style>
   <Style Selector="TextBlock.cv-mod-right">
-    <Setter Property="FontSize" Value="12" />
+    <Setter Property="FontSize" Value="{DynamicResource FontCaption}" />
     <Setter Property="Foreground" Value="{DynamicResource Fg2}" />
   </Style>
   <Style Selector="Button.cv-mod-collapsed">
@@ -446,7 +446,7 @@
     <Setter Property="HorizontalContentAlignment" Value="Stretch" />
   </Style>
   <Style Selector="TextBlock.cv-mod-collapsed-text">
-    <Setter Property="FontSize" Value="14" />
+    <Setter Property="FontSize" Value="{DynamicResource FontBody}" />
     <Setter Property="Foreground" Value="{DynamicResource Fg2}" />
   </Style>
 
@@ -459,12 +459,12 @@
     <Setter Property="HorizontalContentAlignment" Value="Stretch" />
   </Style>
   <Style Selector="TextBlock.cv-lecture-title">
-    <Setter Property="FontSize" Value="14" />
+    <Setter Property="FontSize" Value="{DynamicResource FontBody}" />
   </Style>
 
   <!-- a reader (a page or an announcement) -->
   <Style Selector="TextBlock.cv-reader-body">
-    <Setter Property="FontSize" Value="14" />
+    <Setter Property="FontSize" Value="{DynamicResource FontBody}" />
     <Setter Property="LineHeight" Value="20.3" />
     <Setter Property="TextWrapping" Value="Wrap" />
   </Style>
@@ -476,7 +476,7 @@
     <Setter Property="Height" Value="32" />
     <Setter Property="CornerRadius" Value="4" />
     <Setter Property="Padding" Value="10,0" />
-    <Setter Property="FontSize" Value="14" />
+    <Setter Property="FontSize" Value="{DynamicResource FontBody}" />
     <Setter Property="Background" Value="{DynamicResource Ctrl}" />
     <Setter Property="BorderBrush" Value="{DynamicResource CtrlBorder}" />
     <Setter Property="BorderThickness" Value="1" />
@@ -518,7 +518,7 @@
     <Setter Property="Foreground" Value="{DynamicResource AccentText}" />
   </Style>
   <Style Selector="TextBlock.cv-step-title">
-    <Setter Property="FontSize" Value="14" />
+    <Setter Property="FontSize" Value="{DynamicResource FontBody}" />
   </Style>
   <Style Selector="TextBlock.cv-step-title.cv-current">
     <Setter Property="FontWeight" Value="SemiBold" />
@@ -665,11 +665,11 @@
     <Setter Property="CornerRadius" Value="4" />
   </Style>
   <Style Selector="TextBlock.cv-caption">
-    <Setter Property="FontSize" Value="12" />
+    <Setter Property="FontSize" Value="{DynamicResource FontCaption}" />
     <Setter Property="Foreground" Value="{DynamicResource Fg2}" />
   </Style>
   <Style Selector="TextBlock.cv-caption-num">
-    <Setter Property="FontSize" Value="12" />
+    <Setter Property="FontSize" Value="{DynamicResource FontCaption}" />
     <Setter Property="FontWeight" Value="SemiBold" />
     <Setter Property="Foreground" Value="{DynamicResource AccentText}" />
   </Style>
@@ -683,7 +683,7 @@
   </Style>
   <Style Selector="Border.cv-code SelectableTextBlock">
     <Setter Property="FontFamily" Value="Cascadia Mono, Consolas, SF Mono, Menlo, monospace" />
-    <Setter Property="FontSize" Value="12" />
+    <Setter Property="FontSize" Value="{DynamicResource FontCaption}" />
     <Setter Property="LineHeight" Value="16" />
     <Setter Property="TextWrapping" Value="Wrap" />
     <Setter Property="VerticalAlignment" Value="Center" />

@@ -13,7 +13,7 @@ namespace StudyStash.App;
 /// The self-test's pictures of the screen itself on Windows: what the student sees, as Windows composes it — the
 /// window's real title bar and caption buttons, Mica or the colour behind it, its corners and edge — where
 /// <see cref="Shot"/> draws only Avalonia's own content. And the looks: the library, Settings, the quick panel and
-/// Connect Canvas, light and dark and in another colour theme, each pictured and its ground colour reported.
+/// Connect Canvas, light and dark, each pictured and its ground colour reported.
 /// </summary>
 public static partial class SelfTest
 {
@@ -134,28 +134,20 @@ public static partial class SelfTest
         }
     }
 
-    /// <summary>The Windows looks, pictured on the real screen: the library (a lecture open) light, dark, and dark in
-    /// Plum; Settings and the quick panel dark; Connect Canvas light. Then back to light and the default theme.</summary>
+    /// <summary>The Windows looks, pictured on the real screen: the library (a lecture open) light and dark; Settings
+    /// and the quick panel dark; Connect Canvas light. Then back to light.</summary>
     static async Task RunLooksAsync()
     {
         if (!OperatingSystem.IsWindows()) return;
         Shell.ShowLibrary();
         await Settle();
-        foreach (var (appearance, theme, name) in new[]
-                 {
-                     (AppAppearance.Light, ColourThemes.Default, "looks-library-light"),
-                     (AppAppearance.Dark, ColourThemes.Default, "looks-library-dark"),
-                     (AppAppearance.Dark, ColourThemes.Find("Plum"), "looks-library-plum-dark"),
-                     (AppAppearance.Light, ColourThemes.Find("Plum"), "looks-library-plum-light"),
-                 })
+        foreach (var (appearance, name) in new[] { (AppAppearance.Light, "looks-library-light"), (AppAppearance.Dark, "looks-library-dark") })
         {
-            Skin.UseTheme(theme);
             Skin.UseAppearance(appearance);
             Shell.Windows.Main?.Activate();
             await Settle();
             Shot(Shell.Windows.Main, name);
         }
-        Skin.UseTheme(ColourThemes.Default);
         Skin.UseAppearance(AppAppearance.Dark);
         Shell.ShowSettings();
         await Settle();

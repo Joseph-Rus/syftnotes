@@ -10,6 +10,8 @@ using Avalonia.Media;
 using Avalonia.Media.Imaging;
 using Avalonia.Threading;
 using Avalonia.VisualTree;
+using CommunityToolkit.Mvvm.Messaging;
+using Microsoft.Extensions.DependencyInjection;
 using StudyStash.App.Controls;
 using StudyStash.App.Platform;
 using StudyStash.App.Services;
@@ -31,7 +33,13 @@ public static partial class Shell
 {
     static App app = null!;
     static IClassicDesktopStyleApplicationLifetime life = null!;
+    /// <summary>The app's container (<see cref="AppServices"/>): what the shell uses, it resolves from here.</summary>
+    static ServiceProvider services = null!;
     static AppHost host = null!;
+    /// <summary>Makes the ask bars, already connected to Settings and the notifications.</summary>
+    static AskFactory asks = null!;
+    /// <summary>Makes Connect Canvas, the first run's sync and its add-on step over the one Canvas link.</summary>
+    static CanvasModels canvasModels = null!;
     static TrayIcon? tray;
     static bool trayRecording;
     static readonly CancellationTokenSource stop = new();
@@ -75,13 +83,16 @@ public static partial class Shell
         app = application;
         life = desktop;
         string home = Program.Home;
+        // Built and checked before anything else: a registration that can't be made stops the app here, not later.
+        services = AppServices.Build(new AppStart(home, Program.Log));
         // First, so a copy started a moment after this one finds it listening (what it says waits for the UI thread).
         Desktop.Listen(home, OnHandOff, stop.Token);
         Dispatcher.UIThread.UnhandledException += OnUnhandled;
-        // Work started and not waited for that fails unexpectedly is said the same way.
-        UiTasks.Use(Program.Log, SayOops);
-        // Every window's Window menu and ⌘, (the library, Settings), and the Dock following which are open.
-        AppWindows.Use(ShowLibrary, SettingsFromAnywhere, UpdateDock);
+        // What services, view models and the toolkit ask of the app comes as messages: listened for before any is sent.
+        Listen(services.GetRequiredService<IMessenger>());
+        // Work started and not waited for that fails unexpectedly is said the same way; every window's Window menu and
+        // ⌘, (the library, Settings), and the Dock following which are open.
+        services.GetRequiredService<ToolkitHooks>().Connect();
         desktop.ShutdownMode = ShutdownMode.OnExplicitShutdown;
         // The system quitting the app (logging out, the Dock's Quit): tidy up and let it go on.
         desktop.ShutdownRequested += (_, _) => CleanUp();
@@ -103,7 +114,11 @@ public static partial class Shell
             Program.Log("[app] this Mac doesn't say when the app is opened again; a second copy still hands off");
         // The library's dropdown names the laptops that reach it.
         RemoteLibrary.Computer = Environment.MachineName;
-        host = new AppHost(home, laptop: new LaptopHost(), log: Program.Log);
+        host = services.GetRequiredService<AppHost>();
+        asks = services.GetRequiredService<AskFactory>();
+        canvasModels = services.GetRequiredService<CanvasModels>();
+        canvasLink = services.GetRequiredService<CanvasLink>();
+        canvasLink.Made += OnCanvasMade;
         Skin.UseTheme(ColourThemes.Find(host.Settings.Theme));
         // Before any window shows, so it never opens in the wrong mode and then flips.
         Skin.UseAppearance(host.Settings.Appearance);
@@ -392,7 +407,8 @@ public static partial class Shell
         {
             try
             {
-                host.Dispose();
+                // The container owns the host (and the stores it made): this stops them.
+                services.Dispose();
             }
             catch (Exception e)
             {
@@ -830,24 +846,21 @@ public static partial class Shell
     static AiAskModel LiveAsk()
     {
         string cls = host.Recorder.Current?.ClassName is { Length: > 0 } c && c != Configs.Unsorted ? c : "";
-        var ask = new AiAskModel(Ai())
+        var ask = asks.Create();
+        // What's been said so far: the transcript as far as it has got, and the live words after it.
+        ask.Live = host.LiveTranscript;
+        ask.LiveTitle = $"{(cls.Length > 0 ? cls : "This lecture")}, now";
+        // The scope's "This lecture" is this recording and nothing else in the library; its folder and All notes look
+        // further, as they do under a note.
+        ask.LectureId = liveId;
+        ask.ClassName = cls.Length > 0 ? cls : null;
+        // Kept under the recording's own id, the lecture's once it's filed: after Stop it's on the lecture's page.
+        ask.Place = new Core.Ai.AskPlace("lecture", liveId, cls.Length > 0 ? cls : null);
+        ask.OnSource = s =>
         {
-            // What's been said so far: the transcript as far as it has got, and the live words after it.
-            Live = host.LiveTranscript,
-            LiveTitle = $"{(cls.Length > 0 ? cls : "This lecture")}, now",
-            // The scope's "This lecture" is this recording and nothing else in the library; its folder and All notes
-            // look further, as they do under a note.
-            LectureId = liveId, ClassName = cls.Length > 0 ? cls : null,
-            // Kept under the recording's own id, the lecture's once it's filed: after Stop it's on the lecture's page.
-            Place = new Core.Ai.AskPlace("lecture", liveId, cls.Length > 0 ? cls : null),
-            ToldDeleted = ChatDeleted,
-            OpenSettings = () => ShowSettings("AI"),
-            OnSource = s =>
-            {
-                Play(s.Id ?? liveId, s.At ?? 0);
-                // A moment of this recording, with its page in the window: what's been heard so far shows at that line.
-                if ((s.Id ?? liveId) == liveId && s.At is double at && library.ShowNotePage && library.Note is { Live: true } page && page.Id == liveId) page.ShowAt(at);
-            },
+            Play(s.Id ?? liveId, s.At ?? 0);
+            // A moment of this recording, with its page in the window: what's been heard so far shows at that line.
+            if ((s.Id ?? liveId) == liveId && s.At is double at && library.ShowNotePage && library.Note is { Live: true } page && page.Id == liveId) page.ShowAt(at);
         };
         // A recording in no folder has no folder to ask about.
         if (cls.Length == 0) ask.OnlyScopes("lecture", "all");
@@ -1426,24 +1439,18 @@ public static partial class Shell
         // store (asked when the step opens) serves an older one, or can't be asked, or no browser here gets it from a
         // store, the step asks for the school's address and gives a code.
         AddOnFindsCanvas = () => AddOnModel.FindsCanvasAsync(Canvas(), StoreVersionsOfApp()),
-        MakeAddOn = () => host.Remote() is not null && AddOnModel.AnyFromStore(Canvas()) ? new AddOnModel(Canvas(), CanvasPoll()) : null,
+        MakeAddOn = () => host.Remote() is not null && AddOnModel.AnyFromStore(Canvas()) ? canvasModels.AddOn() : null,
         MakeCanvas = () =>
         {
             if (host.Remote() is null) return Task.FromResult<CanvasConnectModel?>(null);
             var watch = CanvasPoll();
-            var connect = new CanvasConnectModel(Canvas(), watch, forSetup: true) { ShowFooter = false };
+            // The first run's own Next and Skip move on.
+            var connect = canvasModels.ForSetup(CanvasConnectExits.InFlow);
             // Started, not waited for: finding the courses can take a while, and the sync screen shows it as it goes.
             Run(() => StartConnectAsync(connect, watch), "StartConnect");
             return Task.FromResult<CanvasConnectModel?>(connect);
         },
-        MakeSync = connect => new FirstSyncModel(connect, Canvas(), CanvasPoll())
-        {
-            ClassesChanged = async () =>
-            {
-                await host.CheckLibraryAsync();
-                LibraryClassesChanged();
-            },
-        },
+        MakeSync = canvasModels.Sync,
         MakeReady = () => MakeGuided(SetupModel.For(Skin.Current, AppRole.Both)),
         UseAi = UseAiAsync,
         SetUses = async uses =>
@@ -1491,12 +1498,14 @@ public static partial class Shell
     {
         if (host.Remote() is null) return null;
         var watch = CanvasPoll();
-        var connect = new CanvasConnectModel(Canvas(), watch, forSetup: true) { ShowFooter = false, FinishLabel = model.ContinueLabel };
-        connect.OnSkip = () => model.SkipCommand.Execute(null);
-        connect.OnFinish = () => model.NextCommand.Execute(null);
+        var connect = canvasModels.ForSetup(SetupExits(model), model.ContinueLabel);
         await StartConnectAsync(connect, watch);
         return connect;
     }
+
+    /// <summary>Connect Canvas inside setup: Skip for now and Finish are setup's Skip and Next (Back stays on the step).</summary>
+    static CanvasConnectExits SetupExits(SetupModel model) =>
+        new(Skip: () => model.SkipCommand.Execute(null), Back: static () => { }, Finish: () => model.NextCommand.Execute(null));
 
     /// <summary>Guided setup's model, while its window is open.</summary>
     static GuidedSetupModel? guidedSetup;
@@ -1547,9 +1556,7 @@ public static partial class Shell
                 break;
             case SetupStep.Canvas when model.Canvas is null:
                 var watch = CanvasPoll();
-                var connect = new CanvasConnectModel(Canvas(), watch, forSetup: true) { ShowFooter = false, FinishLabel = model.ContinueLabel };
-                connect.OnSkip = () => model.SkipCommand.Execute(null);
-                connect.OnFinish = () => model.NextCommand.Execute(null);
+                var connect = canvasModels.ForSetup(SetupExits(model), model.ContinueLabel);
                 model.Canvas = connect;
                 Run(() => StartConnectAsync(connect, watch), "StartConnect");
                 break;

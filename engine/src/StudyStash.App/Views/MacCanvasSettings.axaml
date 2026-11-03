@@ -21,7 +21,7 @@
         <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8" HorizontalAlignment="Right" VerticalAlignment="Center"
                     IsVisible="{Binding Status.IsCompact}">
           <Ellipse Width="7" Height="7" Fill="{DynamicResource Good}" VerticalAlignment="Center" />
-          <TextBlock Text="{Binding Status.CompactLine}" FontSize="12" Foreground="{DynamicResource Fg2}" VerticalAlignment="Center" />
+          <TextBlock Text="{Binding Status.CompactLine}" FontSize="{DynamicResource FontCaption}" Foreground="{DynamicResource Fg2}" VerticalAlignment="Center" />
         </StackPanel>
         <Button Grid.Column="2" Classes="cv-pill" Margin="12,0,0,0" VerticalAlignment="Center"
                 IsVisible="{Binding Status.IsCompact}" Command="{Binding Status.ActCommand}">

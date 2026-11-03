@@ -8,9 +8,6 @@ public partial class WinSetup : UserControl
     public WinSetup()
     {
         InitializeComponent();
-        // The library window's look: no accent anywhere, so whatever inside asks for it (Canvas's steps, a ticked box,
-        // the shortcuts) gets ink.
-        Resources.MergedDictionaries.Add(Skin.NoAccent());
         PickerRoom.Follow(Page);
         DataContextChanged += (_, _) =>
         {

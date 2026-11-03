@@ -109,7 +109,7 @@ public class SettingsModelTests
 
         model.KeepAudio = "7";
 
-        for (int i = 0; i < 200 && File.Exists(store.AudioPath("rec-old")); i++) await Task.Delay(25);
+        await Wait.UntilAsync(() => !File.Exists(store.AudioPath("rec-old")), "the old audio to go", TimeSpan.FromSeconds(5));
         Assert.False(File.Exists(store.AudioPath("rec-old")));
         Assert.NotNull(host.Lectures.Get("rec-old"));
     }

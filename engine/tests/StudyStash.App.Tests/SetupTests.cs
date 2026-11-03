@@ -428,7 +428,7 @@ public sealed class SetupTests
         Assert.DoesNotContain(m.Steps, s => s.Step is SetupStep.Microphone or SetupStep.Model);
         Assert.False(host.ModelReady);
         Assert.Null(host.Downloading);
-        await Task.Delay(50, TestContext.Current.CancellationToken); // nothing was ever scheduled to start
+        await Task.Yield(); // nothing was ever scheduled to start
         Assert.Null(host.Downloading);
     }
 
@@ -444,8 +444,7 @@ public sealed class SetupTests
         m.Password = "correct-horse";
 
         m.Go(SetupStep.Done);
-        var deadline = DateTime.UtcNow + TimeSpan.FromSeconds(5);
-        while (m.Addresses.Count < 2 && DateTime.UtcNow < deadline) await Task.Delay(10, TestContext.Current.CancellationToken);
+        await Wait.UntilAsync(() => m.Addresses.Count >= 2, "both addresses");
 
         Assert.Equal([new SetupAddress("At home", "http://mac-mini.local:8787"), new SetupAddress("With Tailscale", "http://mac-mini.example.ts.net:8787")],
             m.Addresses);
@@ -465,7 +464,7 @@ public sealed class SetupTests
         using var host = Host(home);
         var m = Setup.Make(host, AppRole.Library, tailscale: () => new TailscaleInfo(), hostName: () => "mac-mini.local");
         m.Go(SetupStep.Done);
-        await Task.Delay(100, TestContext.Current.CancellationToken);
+        await Wait.UntilAsync(() => m.Addresses.Count >= 1, "the home address");
         Assert.Equal([new SetupAddress("At home", "http://mac-mini.local:8787")], m.Addresses);
     }
 
@@ -730,7 +729,7 @@ public sealed class SetupTests
 
             // Each ticked course is a class named as on Canvas, which says what it covers (the library's AI sorts by it).
             Assert.Equal(["Cell Biology", "Intro to Programming"], posted.Order());
-            for (int i = 0; i < 50 && bodies.Count < 2; i++) await Task.Delay(20, TestContext.Current.CancellationToken); // the sync is asked for without waiting
+            await Wait.UntilAsync(() => { lock (bodies) return bodies.Count >= 2; }, "the sync to be asked for"); // it is asked for without waiting
             Assert.Equal("{\"courses\":{\"Intro to Programming\":4201,\"Cell Biology\":4202}}", bodies[0]);
             Assert.Equal("{\"sync\":true}", bodies[1]);
             Assert.False(m.AddingCourses);
@@ -749,8 +748,7 @@ public sealed class SetupTests
         check.Open(() => new FileMicrophone(wav, speed: 4));
         try
         {
-            var deadline = DateTime.UtcNow + TimeSpan.FromSeconds(2);
-            while (!check.Heard && DateTime.UtcNow < deadline) await Task.Delay(20, TestContext.Current.CancellationToken);
+            await Wait.UntilAsync(() => check.Heard, "the mic check to hear speech", TimeSpan.FromSeconds(2));
             Assert.True(check.Heard);
             Assert.Equal(MicCheck.Bars, check.Levels().Length);
         }

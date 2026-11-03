@@ -67,7 +67,7 @@ public class AttachmentToolsTests
         {
             ListModels = _ => Task.FromResult<List<(string, double)>?>([]), Latest = _ => Task.FromResult<Release?>(null),
             // The one still being read stays that way.
-            ReadDocument = (_, ct) => Task.Delay(Timeout.Infinite, ct).ContinueWith(_ => (string?)null),
+            ReadDocument = (_, ct) => new TaskCompletionSource().Task.WaitAsync(ct).ContinueWith(_ => (string?)null),
         }));
         await Check(new RemoteLibrary("http://localhost", "pw", site.Client));
     }
