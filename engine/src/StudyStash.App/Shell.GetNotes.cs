@@ -6,6 +6,7 @@ using StudyStash.App.Platform;
 using StudyStash.App.Services;
 using StudyStash.App.ViewModels;
 using StudyStash.App.Views;
+using StudyStash.App.Windows;
 using StudyStash.Core;
 
 namespace StudyStash.App;
@@ -29,7 +30,7 @@ public static partial class Shell
     {
         if (readyWindow is { IsVisible: true } open)
         {
-            Raise(open);
+            AppWindows.Raise(open);
             return;
         }
         // Guided setup's model, for its install and sign-in screens alone (no chat, no setup tools' door): over a setup
@@ -37,61 +38,52 @@ public static partial class Shell
         var guided = MakeGuided(SetupModel.For(Skin.Current, AppRole.Both));
         bool done = false;
         var view = Skin.Current == SkinKind.Mac ? (Control)new MacGetReady { DataContext = guided, DrawChrome = false } : new WinGetReady { DataContext = guided, DrawChrome = false };
-        var w = new Window
+        // Opened from the library, it doesn't bring the app forward by itself.
+        AppWindows.Open(new WindowSpec("get-ready", guided.ReadyTitle, view) { AppForward = false }, w =>
         {
-            Title = guided.ReadyTitle, CanResize = false, CanMaximize = false, Content = view,
-            ExtendClientAreaToDecorationsHint = true, ExtendClientAreaTitleBarHeightHint = Skin.Current == SkinKind.Mac ? WindowHeader.MacHeight : 32,
-        };
-        Look.Apply(w);
-        if (Skin.Current == SkinKind.Mac) MacTitleBar.Attach(w);
-        WinChrome.Apply(w);
-        guided.ReadyForNotes = ready =>
-        {
-            done = true;
-            w.Close();
-            _ = UseForNotesAsync(ready, lectureId);
-        };
-        guided.PropertyChanged += (_, e) =>
-        {
-            // Back (or "Carry on without it"): the window goes, nothing changed. Ready also passes through here first,
-            // which ReadyForNotes, said straight after, tells apart.
-            if (e.PropertyName == nameof(GuidedSetupModel.Screen) && guided.Screen == GuidedScreen.Manual)
-                Dispatcher.UIThread.Post(() =>
+            guided.ReadyForNotes = ready =>
+            {
+                done = true;
+                w.Close();
+                Run(() => UseForNotesAsync(ready, lectureId), "UseForNotes");
+            };
+            guided.PropertyChanged += (_, e) =>
+            {
+                // Back (or "Carry on without it"): the window goes, nothing changed. Ready also passes through here first,
+                // which ReadyForNotes, said straight after, tells apart.
+                if (e.PropertyName == nameof(GuidedSetupModel.Screen) && guided.Screen == GuidedScreen.Manual)
+                    Dispatcher.UIThread.Post(() =>
+                    {
+                        if (!done) w.Close();
+                    });
+                if (e.PropertyName == nameof(GuidedSetupModel.Picked)) w.Title = guided.ReadyTitle;
+                if (e.PropertyName != nameof(GuidedSetupModel.PlanProblem) || guided.Cli.Id != "gemini" || done) return;
+                if (guided.PlanProblem == Core.Ai.ChatProblem.Plan)
                 {
-                    if (!done) w.Close();
-                });
-            if (e.PropertyName == nameof(GuidedSetupModel.Picked)) w.Title = guided.ReadyTitle;
-            if (e.PropertyName != nameof(GuidedSetupModel.PlanProblem) || guided.Cli.Id != "gemini" || done) return;
-            if (guided.PlanProblem == Core.Ai.ChatProblem.Plan)
+                    // Google turned the account down (a school or work one): the card says to use a personal one, and
+                    // offers copy and paste.
+                    done = true;
+                    w.Close();
+                    if (lectureId is not null) ShowNotesFallback(lectureId, NotesFallback.GoogleAccount);
+                    else Toast("Use a personal Google account", "Google doesn't let school and work accounts use Gemini from other apps. Continue with a personal one (like Gmail), or connect Claude or ChatGPT in Settings.", null, null);
+                }
+                else if (guided.PlanProblem == Core.Ai.ChatProblem.Limit)
+                {
+                    // Signed in, with this week's allowance used up: Gemini writes the notes all the same, once it's back
+                    // (the lecture says when).
+                    done = true;
+                    w.Close();
+                    Run(() => UseForNotesAsync("gemini", lectureId), "UseForNotes");
+                }
+            };
+            w.Closed += (_, _) =>
             {
-                // Google turned the account down (a school or work one): the card says to use a personal one, and
-                // offers copy and paste.
-                done = true;
-                w.Close();
-                if (lectureId is not null) ShowNotesFallback(lectureId, NotesFallback.GoogleAccount);
-                else Toast("Use a personal Google account", "Google doesn't let school and work accounts use Gemini from other apps. Continue with a personal one (like Gmail), or connect Claude or ChatGPT in Settings.", null, null);
-            }
-            else if (guided.PlanProblem == Core.Ai.ChatProblem.Limit)
-            {
-                // Signed in, with this week's allowance used up: Gemini writes the notes all the same, once it's back
-                // (the lecture says when).
-                done = true;
-                w.Close();
-                _ = UseForNotesAsync("gemini", lectureId);
-            }
-        };
-        w.Closed += (_, _) =>
-        {
-            guided.Dispose();
-            if (readyWindow == w) readyWindow = null;
-            UpdateDock();
-        };
-        FollowView(w, view);
-        readyWindow = w;
-        w.Show();
-        UpdateDock();
-        w.Activate();
-        _ = guided.GetReadyForNotesAsync(engine);
+                guided.Dispose();
+                if (readyWindow == w) readyWindow = null;
+            };
+            readyWindow = w;
+        });
+        Run(() => guided.GetReadyForNotesAsync(engine), "guided.GetReadyForNotes");
     }
 
     /// <summary>
@@ -106,7 +98,7 @@ public static partial class Shell
             Toast("Your library didn't answer", "Nothing changed. Try again in a moment.", null, null);
             return;
         }
-        if (lectureId is not null && openLecture == lectureId) _ = ShowLectureAsync(lectureId, library.Note?.ShowTranscript == true);
+        if (lectureId is not null && pageState.Lecture == lectureId) Run(() => ShowLectureAsync(lectureId, library.Note?.ShowTranscript == true), "ShowLecture");
         else RequestRefresh(); // Home's "Notes need an AI" goes
     }
 
