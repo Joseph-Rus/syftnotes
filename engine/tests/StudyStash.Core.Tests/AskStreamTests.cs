@@ -128,22 +128,30 @@ public class AskStreamTests
         using var dir = new TempDir();
         var cfg = Cfg(dir);
         using var store = new Store(cfg.DbPath, cfg.PoolDir);
-        var claude = new ScriptedAi("claude") { Script = [.. Pieces.Select(p => new AiEvent("text", p))], Pause = TimeSpan.FromSeconds(4) };
+        // Claude says its first words at once, then goes quiet for twice the time an AI gets to start answering. The
+        // first words arrive in milliseconds against a 3 s limit (it used to wait 4 s of a 10 s limit before its first
+        // words, and a busy CI runner went past the limit and fell back to Ollama).
+        var gate = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var claude = new ScriptedAi("claude") { Script = [.. Pieces.Select(p => new AiEvent("text", p))], Gate = gate, GateAfter = 1 };
         var ollama = new ScriptedAi("ollama") { Script = [new AiEvent("final", """{"answer":"From Ollama.","sources":[]}""")] };
         var ai = new AiJobs(cfg.Home)
         {
             Providers = id => id switch { "claude" => claude, "ollama" => ollama, _ => new ScriptedAi(id) },
             Checks = new FakeChecks().Installed("claude").Build(),
-            // The whole answer (12 s) takes longer; its first words (4 s) don't, with 6 s to spare for a slow test
-            // machine (at 1 s and 2.5 s a CI runner fell back to Ollama).
-            AskTimeout = TimeSpan.FromSeconds(10),
+            AskTimeout = TimeSpan.FromSeconds(3),
         };
         await using var site = await TestSite.StartAsync(b => LibraryWeb.Build(b, cfg, store, new Pipeline(cfg, store, log: _ => { }), Options(ai)));
         var remote = new AiRemote("http://localhost", "pw", site.Client);
+        var started = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
 
-        var reply = await remote.AskAsync(Question(), _ => { }, CancellationToken.None);
+        var asking = remote.AskAsync(Question(), soFar => { if (soFar.Length > 0) started.TrySetResult(); }, CancellationToken.None);
+        await started.Task.WaitAsync(TimeSpan.FromSeconds(30));
+        await Task.Delay(ai.AskTimeout * 2); // Claude's silence after its first words: longer than the limit, on purpose
+        gate.SetResult(true);
+        var reply = await asking;
 
         Assert.Equal(("claude", false, "Cells have membranes that let water through."), (reply!.Engine, reply.FellBack, reply.Answer));
+        Assert.Empty(ollama.Prompts);
     }
 
     [Fact]
