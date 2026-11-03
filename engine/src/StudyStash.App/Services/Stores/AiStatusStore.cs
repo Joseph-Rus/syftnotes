@@ -272,6 +272,9 @@ public sealed class AiStatusStore : IDisposable
                 || o.Problems.FirstOrDefault(p => p.Engine == id && p.Kind == AiProblemKind.NotSignedIn) is { SignIn.Length: > 0 }))
             checkNext.Remove(id);
         if (said.Value?.Overview is { } now) Take(now);
+        // Pressed again while its sign-in still waits for the code (the box's window was closed, or lost behind
+        // another): nothing changed on the library, so the box is asked for again.
+        if (action is AiAction.SignIn or AiAction.SignInAgain && WantsCode == id) WantsCodeChanged?.Invoke(id);
         return said;
     }
 

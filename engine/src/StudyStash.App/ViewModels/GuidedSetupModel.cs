@@ -150,6 +150,9 @@ public sealed partial class GuidedSetupModel : ObservableObject, IDisposable
     /// come back to the computer by itself); null for an AI whose page does.</summary>
     [ObservableProperty] public partial SignInCodeModel? CodeBox { get; set; }
     public bool ShowCodeBox => WaitingSignIn && CodeBox is not null;
+    /// <summary>"Waiting for you to sign in…" and "Didn't open?": not once the code is sent, when the box says it's
+    /// signing in instead.</summary>
+    public bool ShowWaitingLine => WaitingSignIn && CodeBox is not { Sent: true };
     [ObservableProperty] public partial ChatProblem PlanProblem { get; set; }
     [ObservableProperty] public partial string PlanProblemTitle { get; set; } = "";
     [ObservableProperty] public partial string PlanProblemText { get; set; } = "";
@@ -390,8 +393,18 @@ public sealed partial class GuidedSetupModel : ObservableObject, IDisposable
     partial void OnInstalledChanged(bool value) => Notify(nameof(ShowInstallButton), nameof(CanContinue), nameof(ShowInstalled));
     partial void OnInstallProblemChanged(string? value) => Notify(nameof(ShowInstallButton), nameof(HasInstallProblem));
     partial void OnInstallFailureChanged(InstallFailure value) => Notify(nameof(InstallRegion), nameof(InstallOther));
-    partial void OnWaitingSignInChanged(bool value) => Notify(nameof(ShowOpenSignIn), nameof(ShowCodeBox));
-    partial void OnCodeBoxChanged(SignInCodeModel? value) => Notify(nameof(ShowCodeBox));
+    partial void OnWaitingSignInChanged(bool value) => Notify(nameof(ShowOpenSignIn), nameof(ShowCodeBox), nameof(ShowWaitingLine));
+    partial void OnCodeBoxChanged(SignInCodeModel? oldValue, SignInCodeModel? newValue)
+    {
+        if (oldValue is not null) oldValue.PropertyChanged -= CodeBoxMoved;
+        if (newValue is not null) newValue.PropertyChanged += CodeBoxMoved;
+        Notify(nameof(ShowCodeBox), nameof(ShowWaitingLine));
+    }
+
+    void CodeBoxMoved(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName == nameof(SignInCodeModel.Sent)) Notify(nameof(ShowWaitingLine));
+    }
     partial void OnSignedInChanged(bool value) => Notify(nameof(ShowOpenSignIn), nameof(SignInTitle), nameof(SignInLede));
     partial void OnCheckingPlanChanged(bool value) => Notify(nameof(ShowCheckingPlan));
     partial void OnCheckingSignInChanged(bool value) => Notify(nameof(ShowOpenSignIn));

@@ -35,8 +35,8 @@ public static partial class Shell
         }
         if (open is not null && codeBox is { } same && same.Id == id)
         {
-            // Try again (or Sign in pressed again): the same window, ready for the new code.
-            same.Box.Reset();
+            // Sign in pressed again while it waits: the same window, in front. After Try again: ready for the new code.
+            if (same.Box.Stopped) same.Box.Reset();
             AppWindows.Raise(open);
             return;
         }
