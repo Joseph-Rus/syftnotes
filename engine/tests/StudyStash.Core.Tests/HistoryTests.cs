@@ -14,7 +14,16 @@ public class HistoryTests
         Directory.CreateDirectory(Path.Combine(lib, "CS 101"));
         string lecture = Path.Combine(lib, "CS 101", "2026-09-24 Recursion.md");
         File.WriteAllText(lecture, "# Recursion\n");
-        var h = new History(lib);
+        // Each git call, as History made it (with History's own limit), so a failure says which call went wrong and how.
+        var calls = new List<string>();
+        var h = new History(lib, (exe, args, limit) =>
+        {
+            var took = System.Diagnostics.Stopwatch.StartNew();
+            var r = Machine.Run(exe, args, limit);
+            lock (calls) calls.Add($"{string.Join(' ', args.SkipWhile(a => a != "-C").Skip(2).Take(3))}: {took.Elapsed.TotalSeconds:0.0} s, {(r is null ? "no answer" : $"exit {r.ExitCode}, {r.Stdout.Length} chars")}");
+            return r;
+        });
+        string Calls() { lock (calls) return string.Join("; ", calls); }
 
         // A turn: the lecture as it was is kept first, so undoing an edit restores it instead of deleting it.
         h.Baseline();
@@ -24,7 +33,7 @@ public class HistoryTests
         var changed = h.ChangedSince(before);
         Assert.Equal(["CS 101/2026-09-24 Recursion.md", "CS 101/Cheat sheet.md"], changed);
         string sha = h.Commit(changed, "Make me a cheat sheet", "Claude");
-        Assert.NotEqual("", sha);
+        Assert.True(sha.Length > 0, $"the change wasn't kept. git: {Calls()}");
 
         var log = h.Log();
         Assert.Equal(("Make me a cheat sheet", "Claude"), (log[0].Title, log[0].By));
