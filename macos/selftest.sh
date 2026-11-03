@@ -1,8 +1,8 @@
 #!/bin/sh
-# Proves a built "Study Stash.app" actually works (D5): its windows open, the pretend microphone records, and
+# Proves a built "Syft Notes.app" actually works (D5): its windows open, the pretend microphone records, and
 # Whisper (Metal on Apple silicon, from inside the bundle) hears the speech. Also what CI runs on Windows, against
 # StudyStash.exe directly, to the same contract.
-#   sh macos/selftest.sh "<path>/Study Stash.app" [out-dir]
+#   sh macos/selftest.sh "<path>/Syft Notes.app" [out-dir]
 # STUDYSTASH_WHISPER_MODEL must already be set, to a small model file (the tiny one, so this stays fast and needs no
 # download). STUDYSTASH_ARCH=x86_64 runs the bundle's Intel tree through Rosetta instead of natively.
 # STUDYSTASH_SELFTEST_FLOW=one-computer proves a first run as a student has it: the one-button welcome's Get started
@@ -15,7 +15,7 @@
 # still starts it, then takes the LaunchAgent away and checks nothing is left (background.txt).
 set -eu
 
-APP=${1:?"usage: sh macos/selftest.sh \"<path>/Study Stash.app\" [out-dir]"}
+APP=${1:?"usage: sh macos/selftest.sh \"<path>/Syft Notes.app\" [out-dir]"}
 HERE=$(cd "$(dirname "$0")" && pwd)
 OUT=${2:-"${TMPDIR:-/tmp}/study-stash-selftest-$(date +%s)"}
 : "${STUDYSTASH_WHISPER_MODEL:?"selftest.sh: set STUDYSTASH_WHISPER_MODEL to a Whisper model file (the tiny one, for speed)"}"
