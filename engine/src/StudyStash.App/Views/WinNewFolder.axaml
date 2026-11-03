@@ -27,17 +27,17 @@
       <Border DockPanel.Dock="Bottom" Background="{DynamicResource Footer}" Padding="24">
         <Grid ColumnDefinitions="*,8,*">
           <Button Classes="dialog" Command="{Binding ConfirmFolderCommand}">
-            <TextBlock Text="Create" FontSize="14" FontWeight="SemiBold" />
+            <TextBlock Text="Create" FontSize="{DynamicResource FontBody}" FontWeight="SemiBold" />
           </Button>
           <Button Grid.Column="2" Classes="dialog" Command="{Binding CancelFolderCommand}">
-            <TextBlock Text="Cancel" FontSize="14" />
+            <TextBlock Text="Cancel" FontSize="{DynamicResource FontBody}" />
           </Button>
         </Grid>
       </Border>
       <StackPanel Spacing="12" Margin="24">
-        <TextBlock Text="{Binding NamingFolder.Title, FallbackValue=''}" FontFamily="{DynamicResource DisplayFont}" FontSize="20" FontWeight="SemiBold" TextWrapping="Wrap" />
-        <TextBlock Text="A group in the sidebar, beside Classes, Clubs and Work: for projects or research. What's recorded in its folders are meetings." FontSize="14" LineHeight="20" TextWrapping="Wrap" />
-        <TextBox Name="FolderName" Text="{Binding NamingFolder.Name, FallbackValue=''}" PlaceholderText="Projects" FontSize="14" MaxLength="40">
+        <TextBlock Text="{Binding NamingFolder.Title, FallbackValue=''}" FontFamily="{DynamicResource DisplayFont}" FontSize="{DynamicResource FontTitle}" FontWeight="SemiBold" TextWrapping="Wrap" />
+        <TextBlock Text="A group in the sidebar, beside Classes, Clubs and Work: for projects or research. What's recorded in its folders are meetings." FontSize="{DynamicResource FontBody}" LineHeight="20" TextWrapping="Wrap" />
+        <TextBox Name="FolderName" Text="{Binding NamingFolder.Name, FallbackValue=''}" PlaceholderText="Projects" FontSize="{DynamicResource FontBody}" MaxLength="40">
           <TextBox.KeyBindings>
             <KeyBinding Gesture="Enter" Command="{Binding ConfirmFolderCommand}" />
           </TextBox.KeyBindings>

@@ -395,7 +395,8 @@ sealed class SvgCanvas : Control
         context.FillRectangle(Brushes.Transparent, new Rect(Bounds.Size));
         if (source is null || Written is not { Svg: not null } drawing || Bounds.Width <= 0) return;
         bool dark = ActualThemeVariant == ThemeVariant.Dark;
-        var palette = DiagramColours.Svg(dark, Colour(Ink, dark ? Colors.White : Color.Parse("#1D1D1F")), Colour(Secondary, Color.Parse("#6E6E73")), Colour(Faint, Color.Parse("#C7C7CC")));
+        var inks = dark ? Skin.Dark : Skin.Light;
+        var palette = DiagramColours.Svg(dark, Colour(Ink, inks.Ink), Colour(Secondary, inks.InkMuted), Colour(Faint, inks.Line));
         // The colours live in the SVG's text, so a new look (or light and dark) is a new clean, and a new picture.
         string key = $"{dark}\u0001{SvgView.Font}\u0001{palette.Ink}\u0001{palette.Secondary}\u0001{palette.LightLines}\u0001{source}";
         if (key != heldFor)
@@ -469,9 +470,9 @@ sealed class SvgCanvas : Control
         bool nameShows = lit is not null && (!l.Recall || l.Shown.Contains(lit));
         var label = nameShows ? Keep(Variant("callout:" + lit, s => Illustration.CalloutOf(s, lit!))) : null;
         var shownAgain = l.Recall ? l.Shown.Where(s => s != lit).Select(s => Keep(Variant("callout:" + s, v => Illustration.CalloutOf(v, s)))).OfType<PictureHold>().ToList() : [];
-        var accent = Colour(Accent, Color.Parse("#0A84A0"));
-        var blank = Colour(Blank, dark ? Color.Parse("#3A3A3C") : Color.Parse("#EDEDF0"));
-        var faint = Colour(Faint, Color.Parse("#C7C7CC"));
+        var accent = Colour(Accent, (dark ? Skin.DarkMeans : Skin.LightMeans).Accent);
+        var blank = Colour(Blank, (dark ? Skin.DarkMeans : Skin.LightMeans).SurfaceRaised);
+        var faint = Colour(Faint, (dark ? Skin.Dark : Skin.Light).Line);
         var pills = l.Recall ? l.Blanks.Select(b => x.Callouts.TryGetValue(b, out var c) ? c.Words : (Bounds?)null).OfType<Bounds>().ToList() : [];
         Bounds? ringBox = l.Ring is { } r && x.Map?.Of(r) is { } rb ? rb : null;
         double dim = l.Dim;

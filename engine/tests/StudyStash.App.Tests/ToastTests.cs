@@ -49,8 +49,11 @@ public class ToastTests
         return w;
     }
 
+    /// <summary>One of the Syft look's greys: paper, the meshes, the ghost (warm or violet, a few steps apart at most).</summary>
+    static bool Neutral(Color c) => Math.Abs(c.R - c.G) <= 8 && Math.Abs(c.G - c.B) <= 16 && Math.Abs(c.R - c.B) <= 18;
+
     [AvaloniaTheory]
-    [InlineData(SkinKind.Mac, 16)]
+    [InlineData(SkinKind.Mac, 12)]
     [InlineData(SkinKind.Win, 8)]
     public void A_toast_is_one_plain_panel_with_no_picture_on_it(SkinKind skin, double radius)
     {
@@ -64,7 +67,7 @@ public class ToastTests
             Assert.Equal(new CornerRadius(radius), card.CornerRadius);
             var bg = Assert.IsAssignableFrom<ISolidColorBrush>(card.Background).Color;
             Assert.Equal(255, bg.A);
-            Assert.True(bg.R == bg.G && bg.G == bg.B, $"the panel is {bg}, not a grey");
+            Assert.True(Neutral(bg), $"the panel is {bg}, not one of the look's greys");
             foreach (var s in card.BoxShadow)
                 Assert.True(s.Color.R == s.Color.G && s.Color.G == s.Color.B, $"shadow {s.Color} is coloured");
             // No picture on it, the app's icon included (the system puts its own on its notifications; these are the
@@ -233,7 +236,7 @@ public class ToastTests
             Assert.Equal(((ISolidColorBrush)bg!).Color, ((ISolidColorBrush)menu.Background!).Color);
             Assert.Equal(new CornerRadius(radius), menu.CornerRadius);
             var c = ((ISolidColorBrush)menu.Background!).Color;
-            Assert.True(c.A == 255 && c.R == c.G && c.G == c.B, $"the menu is {c}");
+            Assert.True(c.A == 255 && Neutral(c), $"the menu is {c}");
         }
         finally
         {
