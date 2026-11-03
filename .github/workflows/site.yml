@@ -23,6 +23,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
       - uses: actions/setup-node@v4
         with:
           node-version: 22
@@ -37,6 +39,8 @@ jobs:
       HAS_KEY: ${{ secrets.FIREBASE_SERVICE_ACCOUNT != '' }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
       - name: Say why nothing is published
         if: env.HAS_KEY != 'true'
         run: echo "::notice::No FIREBASE_SERVICE_ACCOUNT secret, so the website was checked but not published (see site/README.md)."
