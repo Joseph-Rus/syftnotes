@@ -52,16 +52,4 @@ public partial class MacLibrary : UserControl
         SideTools.Margin = new Thickness(full ? FullScreenInset - 8 : LightsRoom, 2, 6, 22);
         PaneNav.Margin = new Thickness(full ? 0 : LightsRoom - 12, 0, 0, 0);
     }
-
-    /// <summary>A click beside "Delete this lecture?" is Cancel.</summary>
-    void OnDeleteAskPressed(object? sender, PointerPressedEventArgs e)
-    {
-        if (ReferenceEquals(e.Source, sender) && DataContext is LibraryModel m) m.CancelDeleteCommand.Execute(null);
-    }
-
-    /// <summary>A click beside "Stop recording … and start …?" is Cancel.</summary>
-    void OnConfirmAskPressed(object? sender, PointerPressedEventArgs e)
-    {
-        if (ReferenceEquals(e.Source, sender) && DataContext is LibraryModel m) m.CancelConfirmCommand.Execute(null);
-    }
 }

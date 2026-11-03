@@ -5,6 +5,7 @@ using Avalonia.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using StudyStash.App.Services;
+using StudyStash.App.ViewModels.Kit;
 using StudyStash.Core.PhoneDrive;
 
 namespace StudyStash.App.ViewModels;
@@ -27,11 +28,13 @@ public sealed partial class PhoneGoogleModel : ObservableObject, IDisposable
     readonly PhoneBackgroundSwitch? background;
     readonly Func<DateTimeOffset> now;
     readonly Action<Action> ui;
+    readonly IConfirm confirm;
     bool reading;
 
-    public PhoneGoogleModel(PhoneDrive drive, Func<DateTimeOffset>? now = null, Action<Action>? ui = null, PhoneBackgroundSwitch? background = null)
+    public PhoneGoogleModel(PhoneDrive drive, Func<DateTimeOffset>? now = null, Action<Action>? ui = null, PhoneBackgroundSwitch? background = null, IConfirm? confirm = null)
     {
         this.drive = drive;
+        this.confirm = confirm ?? Confirm.Default;
         this.background = background;
         this.now = now ?? (() => DateTimeOffset.UtcNow);
         this.ui = ui ?? (a => Dispatcher.UIThread.Post(a));
@@ -62,7 +65,6 @@ public sealed partial class PhoneGoogleModel : ObservableObject, IDisposable
     /// <summary>What the link is doing (the first copy) or what's wrong with it.</summary>
     [ObservableProperty] public partial string? Status { get; set; }
     [ObservableProperty] public partial bool SignedOut { get; set; }
-    [ObservableProperty] public partial bool ConfirmingDisconnect { get; set; }
     [ObservableProperty] public partial bool Busy { get; set; }
     public ObservableCollection<DrivePhoneRow> Phones { get; } = [];
 
@@ -202,16 +204,11 @@ public sealed partial class PhoneGoogleModel : ObservableObject, IDisposable
     [RelayCommand]
     void CancelConnect() => drive.CancelConnect();
 
-    [RelayCommand]
-    void AskDisconnect() => ConfirmingDisconnect = true;
-
-    [RelayCommand]
-    void KeepConnected() => ConfirmingDisconnect = false;
-
+    /// <summary>Disconnect…, after asking: their phone stops getting notes, and the folder in their Drive is emptied.</summary>
     [RelayCommand]
     async Task Disconnect()
     {
-        ConfirmingDisconnect = false;
+        if (!await confirm.AskAsync(new ConfirmAsk("Disconnect from Google?", ConfirmWords, "Disconnect"))) return;
         Busy = true;
         try
         {
