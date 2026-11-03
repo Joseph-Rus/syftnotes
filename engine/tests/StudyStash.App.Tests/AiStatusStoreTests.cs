@@ -46,11 +46,35 @@ public class AiStatusStoreTests
 
         Assert.Equal(asked + 1, lib.Calls.Count(c => c == "engines"));
         Assert.Empty(cards.Problems);
-        Assert.Equal(("ready", "Connected"), (Row().State, Row().StateWords));
+        Assert.Equal((AiEngineState.Ready, "Connected"), (Row().State, Row().StateWords));
         Assert.Equal(AiEngineState.Ready, store.For("claude")!.State);
         // Nothing left to watch: the one loop has ended by itself, and nothing else asks.
         Assert.Equal((1, false), (store.Loops, store.Running));
         Assert.Equal(0, clock.Waiting);
         Assert.DoesNotContain(lib.Calls, c => c.StartsWith("check", StringComparison.Ordinal));
     }, TestContext.Current.CancellationToken);
+
+    [Theory]
+    [InlineData(AiEngineState.NotSignedIn)]
+    [InlineData(AiEngineState.NotInstalled)]
+    [InlineData(AiEngineState.Unchecked)]
+    [InlineData(AiEngineState.Ready)]
+    public async Task A_settings_row_and_a_problem_card_agree_on_the_same_state(AiEngineState state)
+    {
+        var overview = Claude(AiStatusStore.Raw(state));
+        var lib = new FakeAiLibrary { Overview = overview with { Engines = [.. overview.Engines.Select(e => e.Id == "claude" ? e with { Installed = state != AiEngineState.NotInstalled } : e)] } };
+        using var store = new AiStatusStore(lib, new ManualClock());
+        using var rows = new AiEnginesModel(store) { Here = true };
+        using var cards = new AiProblemsModel(store) { Here = true };
+        await rows.Load();
+        var row = rows.Engines.Single(r => r.Id == "claude");
+        bool signedOut = state == AiEngineState.NotSignedIn;
+
+        // The store says one thing; the row shows it, and the card is there exactly when the AI is signed out.
+        Assert.Equal(state, store.For("claude")!.State);
+        Assert.Equal(state, row.State);
+        Assert.Equal(signedOut, cards.Problems.Count == 1);
+        Assert.Equal(signedOut, row.Warn);
+        Assert.Equal(state == AiEngineState.Ready, row.Good);
+    }
 }
