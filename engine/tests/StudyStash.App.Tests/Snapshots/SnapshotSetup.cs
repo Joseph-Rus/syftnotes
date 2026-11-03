@@ -15,8 +15,11 @@ namespace StudyStash.App.Tests.Snapshots;
 /// (<see cref="Differences"/>): a few stray pixels are allowed, a changed word, colour or line is not (an SSIM score over
 /// the whole picture let a changed word and a changed colour token through). A failure leaves the picture it drew as
 /// <c>*.received.png</c> (CI keeps those, with the verified ones, as an artifact).
-/// <para>On another system, <c>STUDYSTASH_SNAPSHOTS=1</c> runs them too, to look at a change; keep what a Mac or
-/// Windows draws out of git.</para>
+/// <para>The verified pictures are Linux's, taken from the <c>snapshot-pictures</c> artifact of a CI run (a Mac or
+/// Windows draws letters a pixel differently, so its pictures never match them). To change one on purpose: let CI fail,
+/// look at the artifact's <c>*.received.png</c>, and commit it as the <c>*.verified.png</c>.
+/// <c>STUDYSTASH_SNAPSHOTS=1</c> runs the checks on another system to look at a change, but a Mac will report every
+/// picture as different.</para>
 /// </summary>
 public static class SnapshotSetup
 {
