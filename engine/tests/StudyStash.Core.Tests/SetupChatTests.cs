@@ -261,7 +261,7 @@ public class SetupChatTests
 
     static async Task Eventually(Func<bool> ok)
     {
-        for (int i = 0; i < 100 && !ok(); i++) await Task.Delay(100);
+        await Waiting.UntilAsync(ok, 10);
         Assert.True(ok());
     }
 

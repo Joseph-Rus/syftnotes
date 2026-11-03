@@ -103,6 +103,8 @@ build it here, as described, the first time a change needs it, instead of making
 | `CanvasWatch` (the one shared Canvas store), `Tips.WhenCut`, `BySkin`, `Icon`, `AppMark`/`SyftMark`, `SyftLoader`, `ConfirmCard` | exist |
 | `UiTasks.Run` / `RunQuietly` (work started without waiting: logged, and the student told), `Windows/AppWindows` (every window), `PageState` (which page is open) | in review: branch `toolkit-shell` |
 | `Poll`, `LibraryApi` + `Outcome`, `AsyncAction`, `AiStatusStore` (items 1–4) | in review: branch `toolkit-ai-status` |
+| **DI**: `AppServices` (AppServices.cs, Microsoft.Extensions.DependencyInjection) is the composition root: `AppStart`, `TimeProvider`, `IMessenger`, `AppHost` and what it owns (`LibraryClients`, `AiStatusStore`), `CanvasLink` (the one Canvas context and watch, made again for a new library), `ToolkitHooks` (connects `UiTasks` and `AppWindows`), and the view-model factories `AskFactory` and `CanvasModels`. Built once with `AppServices.Checked` (ValidateOnBuild, ValidateScopes) in `Shell.Start`; `AppServicesTests` resolves every registration | in review: branch `app-di` |
+| **Messenger**: `IMessenger` (`WeakReferenceMessenger.Default`) with the message records in Messages.cs (`ToastRequested`, `QuitRequested`, `SettingsRequested`, `SetupAgainRequested`, `CanvasConnectRequested`, `ShortcutsPaused`, `ShortcutsWordsRequest`…); Shell listens in Shell.Messages.cs. Services send instead of calling Shell | in review: branch `app-di` |
 | `StepFlow`, `Words/` catalogue, `StatusRow`, `AppActions`, `Confirm`, `Format`, shared Mac/Win views (items 5–12) | to build (section 5) |
 
 
@@ -208,7 +210,8 @@ brings one down, lower its line in the same change. Rules without a count are ke
    outside `LibraryApi`.
 4. **Views and controls don't call services.** No `Shell.`, `Dialogs.`, `Process.`, `host.` or `Machine.` in
    `Views/` or `Controls/`; links go through `AppActions`. *Check:* grep (NoteView.cs:97 is the one to move).
-5. **Services never call Shell.** They return results or raise events. *Check:* no `Shell.` in `Services/` (16 today, in 4 files).
+5. **Services never call Shell.** They return results, raise events, or send a message (Messages.cs) that Shell
+   listens for. *Check:* no `Shell.` in `Services/` (0 since `app-di`; keep it there).
 6. **Shell only opens windows and connects stores to the top-level models.** No JSON parsing, no library calls, no
    page building in Shell. *Check:* the counts of `Remote()`, `JsonObject` and `JsonNode` in Shell*.cs only go down.
 7. **Windows open through `AppWindows`.** *Check:* no `new Window` or `new Floating` outside `Windows/`.

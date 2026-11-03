@@ -35,7 +35,10 @@ Runtime APIs a plain .NET program can't reach directly).
   the order they'd play, each followed by its own speaker notes. A file with no words in it (a title slide, an
   empty template) reads as null, not an error.
 - **PDF**: read page by page, blank pages left out. On a Mac, by PDFKit — the same reading Preview and Quick Look
-  use, through direct calls, not a third-party library. Everywhere else, by PdfPig. A page with fewer than 40
+  use, through direct calls, not a third-party library — but only in the app's own process: the library, the
+  background library and MCP read typed text with PdfPig too (`DocumentText.UsePdfKit`), because PDFKit opening a
+  document checks the process in with Launch Services as the app, and a library taken for the app kept Syft Notes
+  from opening. Everywhere else, by PdfPig. A page with fewer than 40
   letters typed on it (an iPad page whose only typed text is a title or page number) is treated as untyped:
   drawn as a picture and read by text recognition instead, up to `MaxOcrPages` (60) pages and `TimeLimit` (2
   minutes) per file; pages that didn't get read that way keep whatever was typed on them, so a time-limited PDF

@@ -279,7 +279,7 @@ public class ReachTests
             Resolve = Dns("198.51.99.7"), Wait = TimeSpan.FromMilliseconds(200),
             Handler = _ => new Answering(async (_, ct) =>
             {
-                await Task.Delay(Timeout.Infinite, ct);
+                await new TaskCompletionSource().Task.WaitAsync(ct);
                 return new HttpResponseMessage(HttpStatusCode.OK);
             }),
         };

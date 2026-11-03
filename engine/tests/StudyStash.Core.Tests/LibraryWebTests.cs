@@ -323,7 +323,7 @@ public class LibraryWebTests
         Assert.Contains("v9.9.9 is out", settings);
         Assert.Contains("Update now", settings);
         Assert.Contains("Updating", await (await c.PostForm("/settings/update")).Content.ReadAsStringAsync());
-        for (int i = 0; i < 50 && applied is null; i++) await Task.Delay(20);
+        await Waiting.UntilAsync(() => applied is not null, 1);
         Assert.Same(rel, applied);
 
         // An engine that can't install updates yet links to the release instead of offering a button.

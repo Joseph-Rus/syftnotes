@@ -564,7 +564,8 @@ jobs:
         run: sh macos/selftest.sh "dist/mac/Study Stash.app" "$RUNNER_TEMP/selftest/laptop"
       # The second self-test, on the same app (it used to build it again on a Mac of its own): Just this computer.
       # Then "Answer your phone when Syft Notes is closed" goes on with a stand-in phone (a real LaunchAgent, on this
-      # throwaway Mac only), the app quits, and the library must still answer the phone, and leave nothing once removed.
+      # throwaway Mac only), the app quits, and the library must still answer the phone, never be taken for the app
+      # (opening Syft Notes still starts it), and leave nothing once removed.
       - name: Self-test, just this computer - setup makes the app's own library, the notes are written here, and the phone is answered with the app closed
         if: ${{ !cancelled() && needs.version.outputs.tested != 'true' }}
         env:
@@ -574,6 +575,8 @@ jobs:
           sh macos/selftest.sh "dist/mac/Study Stash.app" "$RUNNER_TEMP/selftest/one-computer"
           grep -q "^background library registered" "$RUNNER_TEMP/selftest/one-computer/selftest.txt" || { echo "the self-test didn't turn on answering with the app closed"; exit 1; }
           grep -q "^the phone got its answer with the app closed" "$RUNNER_TEMP/selftest/one-computer/background.txt" || { echo "the phone wasn't answered with the app closed"; exit 1; }
+          # The background library is never taken for the app: with it running, opening the app still starts it.
+          grep -q "^opening Syft Notes with open starts it" "$RUNNER_TEMP/selftest/one-computer/background.txt" || { echo "with the background library running, opening Syft Notes didn't start it"; exit 1; }
           for agent in "$HOME/Library/LaunchAgents/"com.study-stash.background.*.plist; do
             [ ! -e "$agent" ] || { echo "a LaunchAgent was left behind"; ls "$HOME/Library/LaunchAgents"; exit 1; }
           done

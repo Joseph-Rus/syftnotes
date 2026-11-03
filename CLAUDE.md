@@ -18,6 +18,9 @@ first time you need it (docs/ARCHITECTURE.md section 3 says how), not inside you
 ## The toolkit: what to use
 | You need | Use |
 |---|---|
+| Something long-lived (a store, a client, a factory) | Register it in `AppServices.Register` (AppServices.cs) and take it in your constructor; `AppServicesTests` checks it can be made. Never `new` it in Shell |
+| A view model Shell makes at runtime | A factory registered in `AppServices` (`AskFactory`, `CanvasModels`) that passes every hook its buttons need in the constructor (`AskServices`, `CanvasConnectExits`), not `Action?` properties filled in afterwards |
+| A service or view model asking the app to do something (a notification, Settings, quit…) | Send a message from Messages.cs on `IMessenger` (`WeakReferenceMessenger.Default` in a static service); Shell listens in Shell.Messages.cs. Never call `Shell.` |
 | To start work without waiting for it (a page load, a click's errand) | `UiTasks.Run(work, what)`; `RunQuietly` for work on a timer. Never a bare `_ = SomethingAsync()` |
 | A window | `AppWindows.Open(new WindowSpec { ... })`. Never `new Window` |
 | Which page is open | `PageState` (one record, swapped in one assignment) |

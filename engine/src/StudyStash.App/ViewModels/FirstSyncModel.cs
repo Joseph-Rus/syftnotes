@@ -77,6 +77,14 @@ public sealed partial class FirstSyncModel : ObservableObject, IDisposable
     /// <summary>Bringing the courses in didn't work: Try again does that again.</summary>
     bool bringInFailed;
 
+    /// <summary>The first run's sync (made by <see cref="CanvasModels"/>): once the courses are classes, the app reads
+    /// its classes again (<paramref name="classesChanged"/>), so the sidebar shows them.</summary>
+    public FirstSyncModel(CanvasConnectModel connect, CanvasContext context, CanvasWatch watch, Func<Task> classesChanged) : this(connect, context, watch)
+    {
+        ArgumentNullException.ThrowIfNull(classesChanged);
+        ClassesChanged = classesChanged;
+    }
+
     public FirstSyncModel(CanvasConnectModel connect, CanvasContext context, CanvasWatch watch)
     {
         this.connect = connect;

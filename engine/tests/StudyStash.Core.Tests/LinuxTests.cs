@@ -35,13 +35,7 @@ public class LinuxTests
 
     static async Task<bool> Until(Func<bool> done, double seconds = 5)
     {
-        var clock = Stopwatch.StartNew();
-        while (!done())
-        {
-            if (clock.Elapsed.TotalSeconds > seconds) return false;
-            await Task.Delay(10);
-        }
-        return true;
+        return await Waiting.UntilAsync(done, seconds);
     }
 
     [Fact]

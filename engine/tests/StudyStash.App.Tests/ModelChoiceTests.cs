@@ -36,7 +36,7 @@ sealed class Mirror : HttpMessageHandler
             Held.TrySetResult();
             try
             {
-                await Task.Delay(Timeout.Infinite, cancellationToken);
+                await new TaskCompletionSource().Task.WaitAsync(cancellationToken);
             }
             finally
             {
@@ -64,12 +64,7 @@ public class ModelChoiceTests
         new(home.Path, () => throw new InvalidOperationException("no microphone in this test"), log: _ => { }, loginItems: new CountingLoginItems(),
             models: new ModelSetting(model, Mirror: MirrorUrl), http: new HttpClient(mirror));
 
-    static async Task Until(Func<bool> done)
-    {
-        var took = Stopwatch.StartNew();
-        while (!done() && took.Elapsed < Soon) await Task.Delay(20, TestContext.Current.CancellationToken);
-        Assert.True(done(), "it didn't happen in time");
-    }
+    static Task Until(Func<bool> done) => Wait.UntilAsync(done, "it to happen", Soon);
 
     [Fact]
     public void Cactus_Whistle_is_listed_as_coming_with_the_app_not_as_a_download_of_17_MB()
