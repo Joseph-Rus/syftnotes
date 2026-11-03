@@ -26,7 +26,7 @@ public static class LibraryPanelWords
     }
 
     /// <summary>"128 lectures in 6 classes", "1 lecture in 1 class", "No lectures yet", with "· writing 2" while notes
-    /// are being written (or "· filing 2" by a library that writes none).</summary>
+    /// are being written (or "· filing 2" by a library that writes none) and "· 1 couldn't be filed" for one that failed.</summary>
     public static string Lectures(JsonObject? overview)
     {
         if (overview is null) return "Reading your library…";
@@ -37,7 +37,10 @@ public static class LibraryPanelWords
             : $"{total} {(total == 1 ? "lecture" : "lectures")} in {classes.Count} {(classes.Count == 1 ? "class" : "classes")}";
         // (A library that writes no notes, after setup's "No AI for now", is only filing them.)
         bool off = overview.ContainsKey("notes_model") && overview["notes_model"] is null;
-        return writing > 0 ? $"{words} · {(off ? "filing" : "writing")} {writing}" : words;
+        if (writing > 0) words = $"{words} · {(off ? "filing" : "writing")} {writing}";
+        // Lectures that arrived and couldn't be filed are in no class's list: say so here instead of "No lectures yet".
+        int stuck = Int(overview["stuck"]);
+        return stuck > 0 ? $"{words} · {stuck} couldn't be filed" : words;
     }
 
     /// <summary>"Canvas synced 10 min ago", "Canvas syncing…", or what it's waiting for.</summary>
