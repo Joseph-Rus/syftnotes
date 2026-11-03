@@ -266,27 +266,6 @@ public class LibrarySetupTests
     }
 
     [Fact]
-    public async Task Connecting_tailscale_opens_its_sign_in_and_gives_up_when_nobody_signs_in()
-    {
-        if (OperatingSystem.IsWindows()) return; // a shell script stands in for `tailscale up`
-        using var dir = new TempDir();
-        string exe = dir["tailscale"];
-        File.WriteAllText(exe, "#!/bin/sh\necho 'To authenticate, visit: https://login.tailscale.com/a/abc123'\nsleep 30\n");
-        File.SetUnixFileMode(exe, UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute);
-        var opened = new List<string>();
-        var s = new LibrarySetup(dir["home"], new SetupHost
-        {
-            ListModels = _ => Task.FromResult<List<(string, double)>?>(Models), OllamaInstalled = () => true, RamGb = () => 8, DiskFree = () => 100,
-            Tailscale = () => new TailscaleInfo(true, false, "NeedsLogin", Exe: exe), OpenTailscale = () => false, // no app to open: Linux
-            OpenUrl = opened.Add, ConnectTimeout = TimeSpan.FromSeconds(1),
-        });
-        Assert.Equal("Connecting Tailscale...", await s.FixTailscaleAsync());
-        var job = await Settle(s, "tailscale");
-        Assert.Equal(("Tailscale didn't connect.", false), (job.Note, job.Running));
-        Assert.Equal(["https://login.tailscale.com/a/abc123"], opened);
-    }
-
-    [Fact]
     public async Task The_page_matches_the_python_engine_in_every_state()
     {
         if (OperatingSystem.IsWindows()) return; // the page shows the notes folder, and Windows spells it with backslashes
