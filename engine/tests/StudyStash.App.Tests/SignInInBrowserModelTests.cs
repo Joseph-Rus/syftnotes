@@ -19,11 +19,7 @@ public class SignInInBrowserModelTests
         Problems = problem && state == "not_signed_in" ? [new AiProblemInfo("not_signed_in:claude", "not_signed_in", "claude", "Claude") { SignIn = signIn }] : [],
     };
 
-    static async Task Until(Func<bool> done)
-    {
-        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(20));
-        while (!done()) await Task.Delay(20, cts.Token);
-    }
+    static Task Until(Func<bool> done) => Wait.UntilAsync(done, "it to happen", TimeSpan.FromSeconds(20));
 
     [AvaloniaFact]
     public async Task The_row_waits_for_the_browser_and_turns_ready_by_itself_with_nothing_to_press()

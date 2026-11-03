@@ -87,7 +87,7 @@ public class KitTests
     [Fact]
     public async Task AsyncAction_cancel_ends_quietly_and_the_command_runs_the_work()
     {
-        var action = new AsyncAction(async ct => { await Task.Delay(Timeout.Infinite, ct); return Outcome.Done; });
+        var action = new AsyncAction(async ct => { await new TaskCompletionSource().Task.WaitAsync(ct); return Outcome.Done; });
         var run = action.Command.ExecuteAsync(null);
         Assert.True(action.Busy);
         action.Cancel();
