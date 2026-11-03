@@ -140,22 +140,16 @@ public static partial class Shell
         var model = new BrowserChoiceModel(ask.Browsers, browser => ChooseBrowserAsync(where, browser));
         var w = BrowserChoiceWindow.Make(model);
         browserChoiceWindow = w;
+        // Asked for, it takes the keyboard like any window the student opens. Come up by itself, it doesn't.
+        AppWindows.Dress(w, "browser-choice", activate: byHand, appForward: false);
         w.Closed += (_, _) =>
         {
             if (browserChoiceWindow == w) browserChoiceWindow = null;
-            UpdateDock();
         };
         // In the middle of the pointer's display. It sets its own height (as tall as what it says).
         w.WindowStartupLocation = WindowStartupLocation.Manual;
-        w.Position = Placement.Centred(ScreenFor(w), BrowserChoiceWindow.Wanted).Position;
-        Look.Apply(w);
-        WinChrome.Apply(w);
-        AppMenu.Attach(w, ShowLibrary, SettingsFromAnywhere);
-        if (Skin.Current == SkinKind.Mac) MacTitleBar.Attach(w);
-        w.Show();
-        UpdateDock();
-        // Asked for, it takes the keyboard like any window the student opens. Come up by itself, it doesn't.
-        if (byHand) w.Activate();
+        w.Position = Placement.Centred(AppWindows.ScreenFor(w), BrowserChoiceWindow.Wanted).Position;
+        AppWindows.Show(w);
     }
 
     /// <summary>The student's pick: the library is told, the app opens Canvas in that browser from now on, and the
@@ -352,7 +346,7 @@ public static partial class Shell
     {
         if (canvasConnectWindow is { IsVisible: true })
         {
-            Raise(canvasConnectWindow);
+            AppWindows.Raise(canvasConnectWindow);
             return;
         }
         var watch = CanvasPoll();
@@ -371,41 +365,32 @@ public static partial class Shell
             body.Bind(Border.BorderBrushProperty, body.GetResourceObservable("LayerStroke"));
             body.BorderThickness = new Avalonia.Thickness(0, 1, 0, 0);
         }
-        var w = new Window
+        var spec = new WindowSpec("canvas-connect", "Canvas", new DockPanel { Children = { header, body } })
         {
-            Title = "Canvas",
-            ExtendClientAreaToDecorationsHint = true, ExtendClientAreaTitleBarHeightHint = Skin.Current == SkinKind.Mac ? WindowHeader.MacHeight : 32,
-            Content = new DockPanel { Children = { header, body } },
+            Kind = WindowKind.Main, Size = WindowSize.Centred, Centred = new Avalonia.Size(640, 680),
         };
-        if (Skin.Current == SkinKind.Mac) w.Bind(Window.BackgroundProperty, w.GetResourceObservable("Win"));
-        OpenCentred(w, new Avalonia.Size(640, 680));
-        Look.Apply(w);
-        WinChrome.Apply(w);
-        AppMenu.Attach(w, ShowLibrary, SettingsFromAnywhere);
-        if (Skin.Current == SkinKind.Mac) MacTitleBar.Attach(w);
-        model.Picker.OnSaved = () =>
+        AppWindows.Open(spec, w =>
         {
-            LibraryClassesChanged();
-            return Task.CompletedTask;
-        };
-        model.OnSkip = w.Close;
-        model.OnBack = w.Close;
-        model.OnFinish = () =>
-        {
-            w.Close();
-            Run(() => CanvasSyncedAsync(), "CanvasSynced");
-        };
-        w.Closed += (_, _) =>
-        {
-            if (canvasConnectWindow == w) canvasConnectWindow = null;
-            model.Dispose();
-            UpdateDock();
-        };
-        canvasConnectWindow = w;
-        w.Show();
-        UpdateDock();
-        w.Activate();
-        Desktop.Activate();
+            if (Skin.Current == SkinKind.Mac) w.Bind(Window.BackgroundProperty, w.GetResourceObservable("Win"));
+            model.Picker.OnSaved = () =>
+            {
+                LibraryClassesChanged();
+                return Task.CompletedTask;
+            };
+            model.OnSkip = w.Close;
+            model.OnBack = w.Close;
+            model.OnFinish = () =>
+            {
+                w.Close();
+                Run(() => CanvasSyncedAsync(), "CanvasSynced");
+            };
+            w.Closed += (_, _) =>
+            {
+                if (canvasConnectWindow == w) canvasConnectWindow = null;
+                model.Dispose();
+            };
+            canvasConnectWindow = w;
+        });
         Run(() => StartConnectAsync(model, watch), "StartConnect");
     }
 
