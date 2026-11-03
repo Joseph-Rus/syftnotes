@@ -14,7 +14,7 @@
         <Grid ColumnDefinitions="Auto,8,*">
           <c:Icon Glyph="{Binding SearchGlyph}" Size="16" Foreground="{DynamicResource InkSubtle}" VerticalAlignment="Center" />
           <TextBox Name="Search" Grid.Column="2" Classes="bare" Height="30" Text="{Binding Query}" PlaceholderText="{Binding Placeholder}"
-                   PlaceholderForeground="{DynamicResource InkSubtle}" FontSize="14" VerticalContentAlignment="Center" AutomationProperties.Name="Search folders" />
+                   PlaceholderForeground="{DynamicResource InkSubtle}" FontSize="{DynamicResource FontBody}" VerticalContentAlignment="Center" AutomationProperties.Name="Search folders" />
         </Grid>
       </Border>
       <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">

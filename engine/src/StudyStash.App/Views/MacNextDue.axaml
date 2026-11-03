@@ -8,8 +8,8 @@
              x:DataType="vm:NextDueModel">
   <Button Theme="{StaticResource Surface}" Padding="0" HorizontalContentAlignment="Left" Click="OnClick">
     <StackPanel Orientation="Horizontal" Spacing="6">
-      <c:Icon Glyph="event_upcoming" Size="13" Foreground="{DynamicResource Fg2}" VerticalAlignment="Center" />
-      <TextBlock Text="{Binding Text}" ToolTip.Tip="{Binding Text}" c:Tips.WhenCut="True" FontSize="11" Foreground="{DynamicResource Fg2}" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
+      <c:Icon Glyph="event_upcoming" Size="13" Foreground="{DynamicResource InkMuted}" VerticalAlignment="Center" />
+      <TextBlock Text="{Binding Text}" ToolTip.Tip="{Binding Text}" c:Tips.WhenCut="True" Classes="drop-hint" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
     </StackPanel>
   </Button>
 </UserControl>

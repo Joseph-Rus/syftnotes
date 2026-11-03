@@ -35,7 +35,7 @@
       <Setter Property="Padding" Value="14,9" />
       <Setter Property="BorderThickness" Value="1" />
       <Setter Property="BorderBrush" Value="{DynamicResource Line}" />
-      <Setter Property="FontSize" Value="14" />
+      <Setter Property="FontSize" Value="{DynamicResource FontBody}" />
       <Setter Property="Foreground" Value="{DynamicResource Ink}" />
     </Style>
     <Style Selector="Button.choice:pointerover">
@@ -110,7 +110,7 @@
                       <StackPanel Spacing="2" VerticalAlignment="Center">
                         <TextBlock Classes="free-ai-lead" Text="{Binding Title}" />
                         <TextBlock Text="{Binding Line}" FontSize="13" Foreground="{DynamicResource InkMuted}" />
-                        <TextBlock Text="{Binding Score}" FontSize="12" Foreground="{DynamicResource InkSubtle}" IsVisible="{Binding HasScore}" />
+                        <TextBlock Text="{Binding Score}" FontSize="{DynamicResource FontCaption}" Foreground="{DynamicResource InkSubtle}" IsVisible="{Binding HasScore}" />
                       </StackPanel>
                       <Button Grid.Column="1" Classes="btn sm" Classes.ink="{Binding !HasPrep}" Command="{Binding Go}" VerticalAlignment="Center" Margin="16,0,0,0"
                               AutomationProperties.Name="{Binding ActionSaid}">
@@ -144,7 +144,7 @@
                 </ItemsControl.ItemTemplate>
               </ItemsControl>
               <Grid ColumnDefinitions="*,10,Auto">
-                <TextBox Name="NewTitle" Text="{Binding NewTitle}" PlaceholderText="The exam's name, like Midterm 2" FontSize="14" VerticalAlignment="Center"
+                <TextBox Name="NewTitle" Text="{Binding NewTitle}" PlaceholderText="The exam's name, like Midterm 2" FontSize="{DynamicResource FontBody}" VerticalAlignment="Center"
                          AutomationProperties.Name="The exam's name">
                   <TextBox.KeyBindings>
                     <KeyBinding Gesture="Enter" Command="{Binding MakeNewPrepCommand}" />
@@ -176,7 +176,7 @@
           </Button>
         </Grid>
         <TextBlock Classes="page-title" Text="{Binding Title}" Margin="0,18,0,0" TextWrapping="Wrap" />
-        <TextBlock Text="{Binding Line}" FontSize="14" Foreground="{DynamicResource InkMuted}" Margin="0,6,0,0" />
+        <TextBlock Text="{Binding Line}" FontSize="{DynamicResource FontBody}" Foreground="{DynamicResource InkMuted}" Margin="0,6,0,0" />
         <c:PageText Text="{Binding Covers}" FontSize="13" LineHeight="19" Foreground="{DynamicResource InkSubtle}" TextWrapping="Wrap" Margin="0,4,0,0" />
 
         <StackPanel Orientation="Horizontal" Margin="0,22,0,0">
@@ -186,13 +186,13 @@
 
         <StackPanel IsVisible="{Binding ShowGuide}" Margin="0,18,0,0" Spacing="10">
           <c:NoteView Name="Guide" Markdown="{Binding Guide}" />
-          <TextBlock Text="{Binding By}" FontSize="12" Foreground="{DynamicResource InkSubtle}" />
+          <TextBlock Text="{Binding By}" FontSize="{DynamicResource FontCaption}" Foreground="{DynamicResource InkSubtle}" />
         </StackPanel>
 
         <StackPanel IsVisible="{Binding ShowTest}" Margin="0,18,0,0" Spacing="14">
           <Grid ColumnDefinitions="*,Auto">
             <TextBlock Name="Score" Text="{Binding Score}" FontSize="13" FontWeight="Medium" Foreground="{DynamicResource InkMuted}" VerticalAlignment="Center" />
-            <TextBlock Grid.Column="1" Text="{Binding LastScore}" IsVisible="{Binding HasLastScore}" FontSize="12" Foreground="{DynamicResource InkSubtle}" VerticalAlignment="Center" />
+            <TextBlock Grid.Column="1" Text="{Binding LastScore}" IsVisible="{Binding HasLastScore}" FontSize="{DynamicResource FontCaption}" Foreground="{DynamicResource InkSubtle}" VerticalAlignment="Center" />
           </Grid>
           <ItemsControl Name="Questions" ItemsSource="{Binding Questions}">
             <ItemsControl.ItemsPanel>
@@ -327,7 +327,7 @@
         <!-- Done -->
         <StackPanel Name="Finished" IsVisible="{Binding Finished}" Spacing="10" Margin="0,56,0,0" HorizontalAlignment="Center">
           <c:SyftMark Look="OddOneOut" Size="96" HorizontalAlignment="Center" />
-          <TextBlock Text="{Binding FinishedTitle}" FontSize="20" FontWeight="Bold" HorizontalAlignment="Center" Margin="0,8,0,0" />
+          <TextBlock Text="{Binding FinishedTitle}" FontSize="{DynamicResource FontTitle}" FontWeight="Bold" HorizontalAlignment="Center" Margin="0,8,0,0" />
           <c:PageText Classes="free-ai-more" Text="{Binding FinishedMore}" HorizontalAlignment="Center" TextAlignment="Center" MaxWidth="440" />
           <Button Classes="btn" HorizontalAlignment="Center" Margin="0,10,0,0" Content="Back to Study" Command="{Binding CloseCommand}" />
         </StackPanel>

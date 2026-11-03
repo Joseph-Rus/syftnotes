@@ -8,9 +8,6 @@ public partial class WinGuidedSetup : UserControl
     public WinGuidedSetup()
     {
         InitializeComponent();
-        // The library window's look: no accent anywhere, so whatever inside asks for it (the browser card's pictures, a
-        // ticked box, the shortcuts) gets ink.
-        Resources.MergedDictionaries.Add(Skin.NoAccent());
         DataContextChanged += (_, _) =>
         {
             if (DataContext is not GuidedSetupModel g) return;

@@ -56,7 +56,7 @@
       <Setter Property="Width" Value="48" />
       <Setter Property="Margin" Value="0,3,12,0" />
       <Setter Property="Padding" Value="0" />
-      <Setter Property="FontSize" Value="12" />
+      <Setter Property="FontSize" Value="{DynamicResource FontCaption}" />
       <Setter Property="FontWeight" Value="Medium" />
       <Setter Property="Foreground" Value="{DynamicResource InkSubtle}" />
       <Setter Property="HorizontalContentAlignment" Value="Left" />
@@ -72,7 +72,7 @@
     <Style Selector="Button.crumb-link">
       <Setter Property="Theme" Value="{StaticResource Surface}" />
       <Setter Property="Padding" Value="0" />
-      <Setter Property="FontSize" Value="14" />
+      <Setter Property="FontSize" Value="{DynamicResource FontBody}" />
       <Setter Property="FontWeight" Value="Bold" />
       <Setter Property="Foreground" Value="{DynamicResource Ink}" />
     </Style>
@@ -167,7 +167,7 @@
             </Button>
             <StackPanel Orientation="Horizontal" Spacing="6" IsVisible="{Binding IsUnsorted}" Margin="0,0,10,0" VerticalAlignment="Center">
               <c:Icon Glyph="inbox" Size="15" Foreground="{DynamicResource InkSubtle}" VerticalAlignment="Center" />
-              <TextBlock Classes="unsorted" FontSize="14" Text="Unsorted" VerticalAlignment="Center" />
+              <TextBlock Classes="unsorted" FontSize="{DynamicResource FontBody}" Text="Unsorted" VerticalAlignment="Center" />
             </StackPanel>
             <Button Name="ChangeFolder" Classes="icon-btn sm" IsVisible="{Binding CanMove}" Margin="-4,0,6,0" VerticalAlignment="Center" Click="OnPickFolder"
                     ToolTip.Tip="Change folder" AutomationProperties.Name="Change folder">
@@ -262,7 +262,7 @@
                       </ItemsControl.ItemTemplate>
                     </ItemsControl>
                     <StackPanel Spacing="6" IsVisible="{Binding HasNotOnExam}">
-                      <TextBlock Text="Said you can skip" FontSize="12" FontWeight="Medium" Foreground="{DynamicResource InkSubtle}" Margin="0,4,0,0" />
+                      <TextBlock Text="Said you can skip" FontSize="{DynamicResource FontCaption}" FontWeight="Medium" Foreground="{DynamicResource InkSubtle}" Margin="0,4,0,0" />
                       <ItemsControl Name="NotOnExamLines" ItemsSource="{Binding NotOnExam}">
                         <ItemsControl.ItemsPanel>
                           <ItemsPanelTemplate><StackPanel Spacing="6" /></ItemsPanelTemplate>
@@ -339,7 +339,7 @@
                       </Button>
                       <ProgressBar Grid.Column="4" Minimum="0" Maximum="1" Value="{Binding Progress}" VerticalAlignment="Center" Height="4" MinHeight="4"
                                    Foreground="{DynamicResource Ink}" Background="{DynamicResource Line}" CornerRadius="2" />
-                      <TextBlock Grid.Column="6" Text="{Binding Time}" FontSize="12" Classes="num" Foreground="{DynamicResource InkSubtle}" VerticalAlignment="Center" />
+                      <TextBlock Grid.Column="6" Text="{Binding Time}" FontSize="{DynamicResource FontCaption}" Classes="num" Foreground="{DynamicResource InkSubtle}" VerticalAlignment="Center" />
                       <Button Grid.Column="8" Classes="link-btn" Command="{Binding ToggleScriptCommand}" Content="{Binding ScriptToggleSaid}" VerticalAlignment="Center" />
                     </Grid>
                     <ItemsControl ItemsSource="{Binding Script}" IsVisible="{Binding ScriptOpen}">
@@ -349,8 +349,8 @@
                       <ItemsControl.ItemTemplate>
                         <DataTemplate x:DataType="vm:ScriptRow">
                           <Grid ColumnDefinitions="78,*">
-                            <TextBlock Text="{Binding Who}" FontSize="12" FontWeight="Bold" Foreground="{DynamicResource InkSubtle}" Margin="0,2,0,0" />
-                            <c:PageText Grid.Column="1" Text="{Binding Text}" FontSize="14" LineHeight="21" TextWrapping="Wrap" />
+                            <TextBlock Text="{Binding Who}" FontSize="{DynamicResource FontCaption}" FontWeight="Bold" Foreground="{DynamicResource InkSubtle}" Margin="0,2,0,0" />
+                            <c:PageText Grid.Column="1" Text="{Binding Text}" FontSize="{DynamicResource FontBody}" LineHeight="21" TextWrapping="Wrap" />
                           </Grid>
                         </DataTemplate>
                       </ItemsControl.ItemTemplate>
@@ -367,7 +367,7 @@
                   <Grid ColumnDefinitions="200,10,Auto" IsVisible="{Binding Downloading}">
                     <ProgressBar Minimum="0" Maximum="1" Value="{Binding Fraction}" VerticalAlignment="Center" Height="4" MinHeight="4"
                                  Foreground="{DynamicResource Ink}" Background="{DynamicResource Line}" CornerRadius="2" />
-                    <TextBlock Grid.Column="2" FontSize="12" Classes="num" Foreground="{DynamicResource InkSubtle}" VerticalAlignment="Center"
+                    <TextBlock Grid.Column="2" FontSize="{DynamicResource FontCaption}" Classes="num" Foreground="{DynamicResource InkSubtle}" VerticalAlignment="Center"
                                Text="{Binding ProgressSaid, StringFormat='Downloading Kokoro: {0}'}" />
                   </Grid>
                   <c:PageText Classes="free-ai-problem" Text="{Binding Problem}" IsVisible="{Binding HasProblem}" />
@@ -565,7 +565,7 @@
                     <Grid ColumnDefinitions="Auto,*">
                       <Button Classes="heard-time num" Content="{Binding Time}" IsVisible="{Binding Time, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" Click="OnTime"
                               AutomationProperties.Name="{Binding Time}" />
-                      <c:PageText Grid.Column="1" Text="{Binding Text}" CopyLead="{Binding CopyLead}" FontSize="16" LineHeight="26.4" TextWrapping="Wrap" />
+                      <c:PageText Grid.Column="1" Text="{Binding Text}" CopyLead="{Binding CopyLead}" FontSize="{DynamicResource FontSubtitle}" LineHeight="26.4" TextWrapping="Wrap" />
                     </Grid>
                   </Border>
                 </DataTemplate>

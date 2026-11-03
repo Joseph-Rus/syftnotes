@@ -283,7 +283,7 @@
                         <StackPanel Grid.Column="2" Spacing="4" VerticalAlignment="Center">
                           <TextBlock Classes="num hint" Text="{Binding ChosenModel.Size}" HorizontalAlignment="Right" />
                           <Border BorderBrush="{DynamicResource Line}" BorderThickness="0,0,0,2" HorizontalAlignment="Right">
-                            <TextBlock Text="Change" FontSize="14" FontWeight="Bold" Foreground="{DynamicResource InkMuted}" Margin="0,0,0,1" />
+                            <TextBlock Text="Change" FontSize="{DynamicResource FontBody}" FontWeight="Bold" Foreground="{DynamicResource InkMuted}" Margin="0,0,0,1" />
                           </Border>
                         </StackPanel>
                       </Grid>
@@ -365,8 +365,8 @@
                             <Grid ColumnDefinitions="20,10,*" Height="46">
                               <CheckBox AutomationProperties.Name="{Binding Name}" Classes="tick" IsChecked="{Binding Ticked}" VerticalAlignment="Center" />
                               <StackPanel Grid.Column="2" VerticalAlignment="Center" Spacing="1">
-                                <TextBlock Text="{Binding Name}" FontSize="14" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
-                                <TextBlock Text="{Binding Code}" IsVisible="{Binding HasCode}" FontSize="12" FontWeight="Medium" Foreground="{DynamicResource InkSubtle}" TextTrimming="CharacterEllipsis"
+                                <TextBlock Text="{Binding Name}" FontSize="{DynamicResource FontBody}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+                                <TextBlock Text="{Binding Code}" IsVisible="{Binding HasCode}" FontSize="{DynamicResource FontCaption}" FontWeight="Medium" Foreground="{DynamicResource InkSubtle}" TextTrimming="CharacterEllipsis"
                                            ToolTip.Tip="{Binding Code}" c:Tips.WhenCut="True" />
                               </StackPanel>
                             </Grid>
@@ -379,7 +379,7 @@
                         <DataTemplate x:DataType="vm:SetupClass">
                           <Grid ColumnDefinitions="20,10,150,12,*" Height="34">
                             <c:Swatch Fill="{Binding Dot}" VerticalAlignment="Center" HorizontalAlignment="Center" />
-                            <TextBlock Grid.Column="2" Text="{Binding Name}" FontSize="14" FontWeight="SemiBold" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
+                            <TextBlock Grid.Column="2" Text="{Binding Name}" FontSize="{DynamicResource FontBody}" FontWeight="SemiBold" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
                             <TextBlock Grid.Column="4" Classes="hint" Text="{Binding About}" TextWrapping="NoWrap" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
                           </Grid>
                         </DataTemplate>
@@ -535,11 +535,11 @@
                               <c:DashedBox Width="28" Height="28" Stroke="{DynamicResource Ink}" />
                               <c:Icon Glyph="wifi" Size="16" Foreground="{DynamicResource Ink}" />
                               <c:Icon Glyph="volume_up" Size="16" Foreground="{DynamicResource Ink}" />
-                              <TextBlock Classes="num" Text="12:34" FontSize="12" FontWeight="Medium" VerticalAlignment="Center" />
+                              <TextBlock Classes="num" Text="12:34" FontSize="{DynamicResource FontCaption}" FontWeight="Medium" VerticalAlignment="Center" />
                             </StackPanel>
                           </Border>
                         </StackPanel>
-                        <TextBlock Grid.Column="2" Classes="hint" Text="Select ^ in the taskbar corner, then drag the Syft Notes icon down beside the clock." FontSize="14" LineHeight="21"
+                        <TextBlock Grid.Column="2" Classes="hint" Text="Select ^ in the taskbar corner, then drag the Syft Notes icon down beside the clock." FontSize="{DynamicResource FontBody}" LineHeight="21"
                                    MaxWidth="240" HorizontalAlignment="Left" VerticalAlignment="Bottom" />
                       </Grid>
                     </Border>

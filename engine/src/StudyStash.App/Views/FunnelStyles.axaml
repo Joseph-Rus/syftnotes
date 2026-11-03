@@ -59,7 +59,7 @@
     <Setter Property="FontWeight" Value="Medium" />
   </Style>
   <Style Selector="Grid.line TextBlock.line-detail">
-    <Setter Property="FontSize" Value="14" />
+    <Setter Property="FontSize" Value="{DynamicResource FontBody}" />
     <Setter Property="Foreground" Value="{DynamicResource InkMuted}" />
     <Setter Property="VerticalAlignment" Value="Center" />
     <Setter Property="TextWrapping" Value="Wrap" />
@@ -99,17 +99,17 @@
     <Setter Property="Foreground" Value="{DynamicResource Warn}" />
     <Setter Property="VerticalAlignment" Value="Center" />
   </Style>
-  <!-- How much of a line is done: a thin grey track, filled in ink. -->
+  <!-- How much of a line is done: sky on the mesh's track (the Syft look's progress). -->
   <Style Selector="Border.thin">
     <Setter Property="Height" Value="4" />
     <Setter Property="Width" Value="360" />
     <Setter Property="CornerRadius" Value="2" />
-    <Setter Property="Background" Value="{DynamicResource Line}" />
+    <Setter Property="Background" Value="{DynamicResource ProgressTrack}" />
     <Setter Property="HorizontalAlignment" Value="Left" />
   </Style>
   <Style Selector="Border.thin Border">
     <Setter Property="CornerRadius" Value="2" />
-    <Setter Property="Background" Value="{DynamicResource Ink}" />
+    <Setter Property="Background" Value="{DynamicResource Progress}" />
     <Setter Property="HorizontalAlignment" Value="Left" />
   </Style>
 
@@ -137,7 +137,7 @@
     <Setter Property="IsVisible" Value="False" />
   </Style>
   <Style Selector="Button.ai TextBlock">
-    <Setter Property="FontSize" Value="14" />
+    <Setter Property="FontSize" Value="{DynamicResource FontBody}" />
     <Setter Property="FontWeight" Value="SemiBold" />
     <Setter Property="HorizontalAlignment" Value="Center" />
   </Style>
