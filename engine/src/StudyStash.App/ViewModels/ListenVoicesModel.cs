@@ -1,5 +1,6 @@
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using StudyStash.App.Services.Kit;
 using StudyStash.Core;
 using StudyStash.Core.Study;
 
@@ -138,29 +139,29 @@ public sealed partial class ListenVoicesModel : ObservableObject, IDisposable
     {
         if (watching is { IsCancellationRequested: false }) return;
         var stop = watching = new CancellationTokenSource();
-        _ = Task.Run(async () =>
+        // Started off the UI thread, so the looking and waiting stay off it.
+        _ = Task.Run(() => Poll.Every(LookEvery, async _ =>
         {
-            while (!stop.IsCancellationRequested)
+            try
             {
-                try
+                if (library() is not { } lib || await lib.VoicesAsync() is not { } info || stop.IsCancellationRequested)
                 {
-                    await Task.Delay(LookEvery, stop.Token);
-                    if (library() is not { } lib || await lib.VoicesAsync() is not { } info || stop.IsCancellationRequested) return;
-                    bool done = info.State != VoicesInfo.Downloading;
-                    if (done) stop.Cancel();
-                    Post(() => Show(info));
-                    if (done) return;
-                }
-                catch (OperationCanceledException)
-                {
+                    stop.Cancel();
                     return;
                 }
-                catch (Exception e) when (LibraryTrouble.Handled(e))
-                {
-                    // The library didn't answer this time: look again next time.
-                }
+                bool done = info.State != VoicesInfo.Downloading;
+                if (done) stop.Cancel();
+                Post(() => Show(info));
             }
-        });
+            catch (OperationCanceledException)
+            {
+                stop.Cancel();
+            }
+            catch (Exception e) when (LibraryTrouble.Handled(e))
+            {
+                // The library didn't answer this time: look again next time.
+            }
+        }, stop: stop.Token));
     }
 
     /// <summary>On the UI thread when there is one (tests have none).</summary>

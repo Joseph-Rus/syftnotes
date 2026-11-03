@@ -3,6 +3,7 @@ using System.Linq;
 using System.Text.Json.Nodes;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using StudyStash.App.Services.Kit;
 using StudyStash.Core;
 
 namespace StudyStash.App.ViewModels;
@@ -109,18 +110,8 @@ public sealed partial class AttachmentsModel(IAttachmentLibrary library, string?
     public async Task LoadAsync()
     {
         await RefreshAsync();
-        while (Reading && !stop.IsCancellationRequested)
-        {
-            try
-            {
-                await Task.Delay(PollEvery, stop.Token);
-            }
-            catch (OperationCanceledException)
-            {
-                return;
-            }
-            await RefreshAsync();
-        }
+        if (!Reading || stop.IsCancellationRequested) return;
+        await Poll.Every(PollEvery, _ => RefreshAsync(), () => Reading, stop: stop.Token).Done;
     }
 
     async Task RefreshAsync()
