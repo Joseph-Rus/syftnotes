@@ -736,19 +736,22 @@ public sealed class AiJobs(string home, Func<string>? ollamaHost = null)
     {
         if (Pulling is { Why.Length: 0 } already && already.Model == model) return Task.CompletedTask;
         Pulling = new PullInfo(model, 0, "");
-        return Task.Run(async () =>
+        return Task.Run(() => PullAsync(model, host, ct), ct);
+    }
+
+    /// <summary>The download itself, with <see cref="Pulling"/> already saying it's on its way.</summary>
+    async Task PullAsync(string model, string host, CancellationToken ct)
+    {
+        try
         {
-            try
-            {
-                var (ok, why) = await Checks.PullModel(model, host,
-                    (done, total) => Pulling = new PullInfo(model, total > 0 ? (double)done / total : 0, ""), ct);
-                Pulling = ok ? null : new PullInfo(model, 0, why);
-            }
-            catch (Exception e) when (e is HttpRequestException or OperationCanceledException)
-            {
-                Pulling = new PullInfo(model, 0, e.Message);
-            }
-        }, ct);
+            var (ok, why) = await Checks.PullModel(model, host,
+                (done, total) => Pulling = new PullInfo(model, total > 0 ? (double)done / total : 0, ""), ct);
+            Pulling = ok ? null : new PullInfo(model, 0, why);
+        }
+        catch (Exception e) when (e is HttpRequestException or OperationCanceledException)
+        {
+            Pulling = new PullInfo(model, 0, e.Message);
+        }
     }
 
     /// <summary>
@@ -798,8 +801,10 @@ public sealed class AiJobs(string home, Func<string>? ollamaHost = null)
                     Pulling = null;
                     return;
                 }
-                Pulling = null; // the download says where it is itself
-                await DownloadAsync(model, host, ct);
+                // Straight on to the model's step, never through "done" (null) on the way: a look at that moment read
+                // the free AI as ready while its model hadn't even started coming.
+                Pulling = new PullInfo(model, 0, "");
+                await PullAsync(model, host, ct);
             }
             catch (Exception e) when (e is HttpRequestException or OperationCanceledException or IOException)
             {
