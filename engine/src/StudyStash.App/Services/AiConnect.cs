@@ -1,3 +1,5 @@
+using StudyStash.App.Services.Kit;
+using StudyStash.App.Services.Stores;
 using StudyStash.Core;
 using StudyStash.Core.Ai;
 
@@ -58,6 +60,8 @@ public sealed class AiConnect(IAiLibrary library)
     /// <summary>How often the library is asked while the student signs in, and how long that's waited for.</summary>
     public TimeSpan Every { get; init; } = TimeSpan.FromSeconds(2);
     public TimeSpan SignInWait { get; init; } = TimeSpan.FromMinutes(15);
+    /// <summary>The clock those are measured on (a test's moves by hand).</summary>
+    public TimeProvider Clock { get; init; } = TimeProvider.System;
     /// <summary>Whether Connect waits for the student to finish signing in, in their browser (setup's AI step does); Settings'
     /// card doesn't need to: its own watch turns it ready by itself, and the library makes the first AI signed in the one
     /// that writes the notes.</summary>
@@ -103,7 +107,7 @@ public sealed class AiConnect(IAiLibrary library)
                 overview = await library.EnginesAsync();
                 engine = overview?.Engines.FirstOrDefault(e => e.Id == id);
                 // Just installed: nothing to check, it can only be signed out (its sign-in comes straight after).
-                if (engine is { State: "unchecked" }) engine = engine with { State = "not_signed_in" };
+                if (engine is not null && Is(engine, AiEngineState.Unchecked)) engine = engine with { State = AiStatusStore.Raw(AiEngineState.NotSignedIn) };
             }
             if (engine is { Installed: false } && Install is null)
                 return new ConnectOutcome(false, $"Install {brand} on your library's computer, then connect it here.") { Overview = overview };
@@ -115,13 +119,13 @@ public sealed class AiConnect(IAiLibrary library)
 
             // 3 · Signed in: checked when that isn't known yet (or after a sign-in somewhere Syft Notes can't see), and the
             // hidden sign-in when it isn't.
-            if (engine is { State: "unchecked" or "failed" } || engine is { State: "not_signed_in" } && checkFirst.Remove(id))
+            if (Is(engine, AiEngineState.Unchecked, AiEngineState.Failed) || Is(engine, AiEngineState.NotSignedIn) && checkFirst.Remove(id))
             {
                 Say(ConnectStep.Checking, $"Checking {brand}…");
                 overview = (await library.CheckAsync(id))?.Overview ?? await library.EnginesAsync();
                 engine = overview?.Engines.FirstOrDefault(e => e.Id == id);
             }
-            if (engine is { State: "not_signed_in" })
+            if (Is(engine, AiEngineState.NotSignedIn))
             {
                 Say(ConnectStep.SigningIn, $"Signing in to {brand}… finish in your browser.");
                 var started = await library.SignInAsync(id);
@@ -129,18 +133,18 @@ public sealed class AiConnect(IAiLibrary library)
                 engine = overview?.Engines.FirstOrDefault(e => e.Id == id);
                 // A library from before sign-ins were hidden opens a terminal for it (or says where to, from a laptop):
                 // nothing here learns when that's done, so the next Connect checks first.
-                if (engine is { State: "not_signed_in", SignIn: "" })
+                if (Is(engine, AiEngineState.NotSignedIn) && engine!.SignIn.Length == 0)
                 {
                     checkFirst.Add(id);
                     return new ConnectOutcome(false, started?.Said is { Length: > 0 } words ? words : $"Sign in to {brand}, then press Fix.") { Apps = apps, Overview = overview };
                 }
-                if (!WaitForSignIn && engine is { State: "not_signed_in", SignIn: SignInPhase.Waiting })
+                if (!WaitForSignIn && Waiting(engine))
                     return new ConnectOutcome(true, AiSignIns.StartedWords(id)) { SignIn = SignInPhase.Waiting, Apps = apps, Overview = overview, Next = Apps is null ? "" : NextStep(id) };
                 overview = await SignedInAsync(id, overview, ct);
                 engine = overview?.Engines.FirstOrDefault(e => e.Id == id);
-                if (engine is { State: "not_signed_in" })
+                if (Is(engine, AiEngineState.NotSignedIn))
                 {
-                    string phase = engine.SignIn.Length > 0 ? engine.SignIn : SignInPhase.GaveUp;
+                    string phase = engine!.SignIn.Length > 0 ? engine.SignIn : SignInPhase.GaveUp;
                     return new ConnectOutcome(false, ViewModels.AiWords.SignInSaid(brand, phase) is { Length: > 0 } w ? w : $"{brand} isn't signed in yet. Try again.")
                     {
                         SignIn = phase, Apps = apps, Overview = overview,
@@ -148,14 +152,14 @@ public sealed class AiConnect(IAiLibrary library)
                 }
             }
 
-            if (engine is { State: "failed" })
-                return new ConnectOutcome(false, engine.Why.Length > 0 ? $"{brand} didn't work: {engine.Why.TrimEnd('.')}." : $"{brand} didn't work. Try again.")
+            if (Is(engine, AiEngineState.Failed))
+                return new ConnectOutcome(false, engine!.Why.Length > 0 ? $"{brand} didn't work: {engine.Why.TrimEnd('.')}." : $"{brand} didn't work. Try again.")
                 {
                     Apps = apps, Overview = overview,
                 };
 
             // 4 · The AI that writes the notes, when none is chosen yet.
-            if (overview is { Notes: "" } && engine is { Installed: true, State: "ready" or "unchecked" })
+            if (overview is { Notes: "" } && engine is { Installed: true } && Is(engine, AiEngineState.Ready, AiEngineState.Unchecked))
                 overview = await library.DefaultsAsync(notes: id, ask: overview.Ask.Length == 0 ? id : null) ?? overview;
 
             string next = Apps is null ? "" : NextStep(id);
@@ -206,14 +210,20 @@ public sealed class AiConnect(IAiLibrary library)
     /// stopped (gave up, couldn't start, not offered here), or <see cref="SignInWait"/> is up.</summary>
     async Task<AiOverview?> SignedInAsync(string id, AiOverview? overview, CancellationToken ct)
     {
-        var until = DateTime.UtcNow + SignInWait;
-        while (overview?.Engines.FirstOrDefault(e => e.Id == id) is { State: "not_signed_in", SignIn: SignInPhase.Waiting } && DateTime.UtcNow < until)
+        bool first = true;
+        await Poll.UntilAsync(async _ =>
         {
-            await Task.Delay(Every, ct);
-            overview = await library.EnginesAsync() ?? overview;
-        }
+            if (!first) overview = await library.EnginesAsync() ?? overview;
+            first = false;
+            return !Waiting(overview?.Engines.FirstOrDefault(e => e.Id == id));
+        }, Every, SignInWait, ct, Clock);
         return overview;
     }
+
+    static bool Is(EngineInfo? engine, params AiEngineState[] states) => engine is not null && states.Contains(AiStatusStore.StateOf(engine));
+
+    /// <summary>Its sign-in waits for the student in their browser.</summary>
+    static bool Waiting(EngineInfo? engine) => Is(engine, AiEngineState.NotSignedIn) && engine!.SignIn == SignInPhase.Waiting;
 
     /// <summary>The one thing left for the student: a desktop app of this AI that is open, and hasn't loaded Syft Notes
     /// since it was added, reads its settings only when it starts.</summary>
