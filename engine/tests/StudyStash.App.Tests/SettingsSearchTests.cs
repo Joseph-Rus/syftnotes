@@ -23,7 +23,7 @@ public class SettingsSearchTests
         new AppSettings { SetupDone = true, Role = role }.Save(home.Path);
         var host = new AppHost(home.Path, log: _ => { });
         var library = new FakeLibrarySettings();
-        var model = SettingsModel.Make(host, ai: AiDemo.DemoLibrary(), canvas: CanvasFixtures.Context(CanvasShots.ConnectedLibrary()), library: () => library.Call);
+        var model = SettingsModel.Make(host, ai: AiDemo.DemoLibrary(), canvas: CanvasFixtures.Context(Scenes.ConnectedLibrary()), library: () => library.Call);
         await model.Engines.Load();
         await model.Access.Load();
         await model.Canvas.LoadAsync();
