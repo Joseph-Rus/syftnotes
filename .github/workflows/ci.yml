@@ -195,7 +195,7 @@ jobs:
     steps:
       - uses: actions/checkout@v7
         with:
-          persist-credentials: false  # nothing here pushes; plan.sh's git fetch reads this public repository without a token
+          persist-credentials: false
       - run: bash tools/check-connections.sh
       - name: install.sh, install.ps1 and windows/*.ps1 parse
         shell: pwsh
@@ -245,7 +245,7 @@ jobs:
     steps:
       - uses: actions/checkout@v7
         with:
-          persist-credentials: false  # nothing here pushes; plan.sh's git fetch reads this public repository without a token
+          persist-credentials: false
       - uses: ./.github/actions/dotnet
         with:
           packages: engine-${{ matrix.slug }}
@@ -283,6 +283,10 @@ jobs:
           DOTNET_DbgMiniDumpType: ${{ runner.os != 'Windows' && '1' || '' }}
           DOTNET_EnableCrashReport: ${{ runner.os != 'Windows' && '1' || '' }}
           DOTNET_DbgMiniDumpName: ${{ runner.os != 'Windows' && format('{0}/crash/core.%p', runner.temp) || '' }}
+      # The App tests ran on a Linux runner with no sound server of the Core tests' own: stopped, so they still do.
+      - name: Linux - the Core tests' PulseAudio stopped
+        if: ${{ !cancelled() && runner.os == 'Linux' && matrix.core && matrix.app }}
+        run: pulseaudio --kill || true
       # After the Core tests even when they failed, so one run shows everything that's wrong.
       - name: Run the App tests
         id: app
@@ -405,7 +409,7 @@ jobs:
     steps:
       - uses: actions/checkout@v7
         with:
-          persist-credentials: false  # nothing here pushes; plan.sh's git fetch reads this public repository without a token
+          persist-credentials: false
       - uses: ./.github/actions/dotnet
         with:
           packages: engine-${{ runner.os == 'Windows' && 'app' || 'all' }}
@@ -466,7 +470,7 @@ jobs:
     steps:
       - uses: actions/checkout@v7
         with:
-          persist-credentials: false  # nothing here pushes; plan.sh's git fetch reads this public repository without a token
+          persist-credentials: false
       - uses: ./.github/actions/dotnet
         with:
           packages: mac-app
@@ -643,7 +647,7 @@ jobs:
     steps:
       - uses: actions/checkout@v7
         with:
-          persist-credentials: false  # nothing here pushes; plan.sh's git fetch reads this public repository without a token
+          persist-credentials: false
       - uses: actions/download-artifact@v8
         with:
           name: mac-installers
@@ -707,7 +711,7 @@ jobs:
     steps:
       - uses: actions/checkout@v7
         with:
-          persist-credentials: false  # nothing here pushes; plan.sh's git fetch reads this public repository without a token
+          persist-credentials: false
       - uses: ./.github/actions/dotnet
         with:
           packages: windows-app
@@ -1085,7 +1089,7 @@ jobs:
     steps:
       - uses: actions/checkout@v7
         with:
-          persist-credentials: false  # nothing here pushes; plan.sh's git fetch reads this public repository without a token
+          persist-credentials: false
       - uses: ./.github/actions/dotnet
         with:
           packages: linux-app
@@ -1236,7 +1240,7 @@ jobs:
     steps:
       - uses: actions/checkout@v7
         with:
-          persist-credentials: false  # nothing here pushes; plan.sh's git fetch reads this public repository without a token
+          persist-credentials: false
       # The installers about to be published are signed as this run was told to sign them (a run by hand's, reused, may not
       # have been), and are never a rehearsal's.
       - name: The installers are signed as planned
