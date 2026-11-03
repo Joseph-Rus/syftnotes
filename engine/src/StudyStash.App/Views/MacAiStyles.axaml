@@ -80,7 +80,7 @@
        less, so its words stay where they were). -->
   <Style Selector="Border.ai-pill">
     <Setter Property="Height" Value="30" />
-    <Setter Property="CornerRadius" Value="15" />
+    <Setter Property="c:Cell.Round" Value="True" />
     <Setter Property="Padding" Value="13,0" />
     <Setter Property="Background" Value="{DynamicResource Raised}" />
     <Setter Property="BorderBrush" Value="{DynamicResource Line}" />
@@ -108,7 +108,7 @@
   </Style>
   <Style Selector="Button.ai-pillbtn">
     <Setter Property="Theme" Value="{StaticResource Surface}" />
-    <Setter Property="CornerRadius" Value="15" />
+    <Setter Property="c:Cell.Round" Value="True" />
   </Style>
   <Style Selector="Button.ai-textbtn">
     <Setter Property="Theme" Value="{StaticResource Surface}" />
@@ -119,7 +119,7 @@
   <Style Selector="Border.ai-select">
     <Setter Property="Height" Value="28" />
     <Setter Property="Width" Value="180" />
-    <Setter Property="CornerRadius" Value="14" />
+    <Setter Property="c:Cell.Round" Value="True" />
     <Setter Property="Background" Value="{DynamicResource Raised}" />
     <Setter Property="BorderBrush" Value="{DynamicResource Line}" />
     <Setter Property="BorderThickness" Value="1" />
@@ -134,7 +134,7 @@
   </Style>
   <Style Selector="Button.ai-select-btn">
     <Setter Property="Theme" Value="{StaticResource Surface}" />
-    <Setter Property="CornerRadius" Value="14" />
+    <Setter Property="c:Cell.Round" Value="True" />
     <Setter Property="HorizontalContentAlignment" Value="Stretch" />
   </Style>
 
@@ -272,7 +272,7 @@
   <!-- The ask bar (16): glass 560×48 r24, an engine chip, a scope chip and a round send button. -->
   <Style Selector="Border.ai-chip">
     <Setter Property="Height" Value="30" />
-    <Setter Property="CornerRadius" Value="15" />
+    <Setter Property="c:Cell.Round" Value="True" />
     <Setter Property="BoxShadow" Value="{DynamicResource EdgeSoft}" />
   </Style>
   <!-- The chip's words and icons sit on its middle line, whatever the host's own alignment. -->
@@ -298,19 +298,19 @@
   </Style>
   <Style Selector="Button.ai-chipbtn">
     <Setter Property="Theme" Value="{StaticResource Surface}" />
-    <Setter Property="CornerRadius" Value="15" />
+    <Setter Property="c:Cell.Round" Value="True" />
   </Style>
   <Style Selector="Button.ai-send">
     <Setter Property="Theme" Value="{StaticResource Surface}" />
     <Setter Property="Width" Value="32" />
     <Setter Property="Height" Value="32" />
-    <Setter Property="CornerRadius" Value="16" />
+    <Setter Property="c:Cell.Round" Value="True" />
     <Setter Property="HorizontalContentAlignment" Value="Center" />
   </Style>
   <Style Selector="Border.ai-send">
     <Setter Property="Width" Value="32" />
     <Setter Property="Height" Value="32" />
-    <Setter Property="CornerRadius" Value="16" />
+    <Setter Property="c:Cell.Round" Value="True" />
     <Setter Property="Background" Value="{DynamicResource Fill2}" />
   </Style>
 
@@ -354,7 +354,7 @@
     <Setter Property="Theme" Value="{StaticResource Surface}" />
     <Setter Property="Height" Value="32" />
     <Setter Property="Padding" Value="8,0,10,0" />
-    <Setter Property="CornerRadius" Value="16" />
+    <Setter Property="c:Cell.Round" Value="True" />
   </Style>
   <Style Selector="TextBlock.ai-head">
     <Setter Property="FontSize" Value="13" />
@@ -398,7 +398,7 @@
     <Setter Property="Theme" Value="{StaticResource Surface}" />
     <Setter Property="Height" Value="28" />
     <Setter Property="Padding" Value="6,0,9,0" />
-    <Setter Property="CornerRadius" Value="14" />
+    <Setter Property="c:Cell.Round" Value="True" />
   </Style>
   <Style Selector="TextBlock.ai-asked">
     <Setter Property="FontSize" Value="11" />
@@ -409,7 +409,7 @@
     <Setter Property="Theme" Value="{StaticResource Surface}" />
     <Setter Property="Width" Value="28" />
     <Setter Property="Height" Value="28" />
-    <Setter Property="CornerRadius" Value="14" />
+    <Setter Property="c:Cell.Round" Value="True" />
     <Setter Property="HorizontalContentAlignment" Value="Center" />
   </Style>
   <Style Selector="TextBlock.ai-byline">
@@ -422,14 +422,14 @@
   </Style>
   <Style Selector="Border.ai-field">
     <Setter Property="Height" Value="44" />
-    <Setter Property="CornerRadius" Value="22" />
+    <Setter Property="c:Cell.Round" Value="True" />
     <Setter Property="Background" Value="{DynamicResource Fill}" />
     <Setter Property="BoxShadow" Value="{DynamicResource EdgeSoft}" />
     <Setter Property="Padding" Value="16,0,6,0" />
   </Style>
   <Style Selector="Border.ai-field-chip">
     <Setter Property="Height" Value="28" />
-    <Setter Property="CornerRadius" Value="14" />
+    <Setter Property="c:Cell.Round" Value="True" />
     <Setter Property="Background" Value="{DynamicResource Fill2}" />
     <Setter Property="Padding" Value="8,0,6,0" />
   </Style>
@@ -443,14 +443,14 @@
   <Style Selector="Border.ai-field-send">
     <Setter Property="Width" Value="32" />
     <Setter Property="Height" Value="32" />
-    <Setter Property="CornerRadius" Value="16" />
+    <Setter Property="c:Cell.Round" Value="True" />
     <Setter Property="Background" Value="{DynamicResource Fill2}" />
   </Style>
 
   <!-- A borderless pill (Keep old / Dismiss / Deny): text only, no fill, unlike Border.ai-pill. -->
   <Style Selector="Border.ai-pill-plain">
     <Setter Property="Height" Value="30" />
-    <Setter Property="CornerRadius" Value="15" />
+    <Setter Property="c:Cell.Round" Value="True" />
     <Setter Property="Padding" Value="14,0" />
   </Style>
   <Style Selector="Border.ai-pill-plain > TextBlock">

@@ -23,7 +23,7 @@
       <Setter Property="Height" Value="24" />
       <Setter Property="MinWidth" Value="64" />
       <Setter Property="Padding" Value="12,0" />
-      <Setter Property="CornerRadius" Value="12" />
+      <Setter Property="c:Cell.Round" Value="True" />
       <Setter Property="HorizontalContentAlignment" Value="Center" />
       <Setter Property="Background" Value="{DynamicResource Fill2}" />
     </Style>

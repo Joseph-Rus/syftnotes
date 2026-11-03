@@ -113,7 +113,7 @@
   <Style Selector=".in-setup Button.cv-pill, .in-setup Button.cv-btn">
     <Setter Property="Height" Value="34" />
     <Setter Property="MinWidth" Value="0" />
-    <Setter Property="CornerRadius" Value="17" />
+    <Setter Property="c:Cell.Round" Value="True" />
     <Setter Property="Padding" Value="14,0" />
     <Setter Property="Background" Value="{DynamicResource Surface}" />
     <Setter Property="Foreground" Value="{DynamicResource Ink}" />
@@ -147,7 +147,7 @@
   </Style>
   <Style Selector=".in-setup Button.cv-pill.cv-mini, .in-setup Button.cv-btn.cv-mini">
     <Setter Property="Height" Value="34" />
-    <Setter Property="CornerRadius" Value="17" />
+    <Setter Property="c:Cell.Round" Value="True" />
     <Setter Property="Padding" Value="14,0" />
   </Style>
   <Style Selector=".in-setup Button.cv-pill:focus-visible /template/ Border#PART_Wash, .in-setup Button.cv-btn:focus-visible /template/ Border#PART_Wash">
@@ -156,7 +156,6 @@
     <Setter Property="BorderBrush" Value="{DynamicResource Focus}" />
     <Setter Property="BorderThickness" Value="2" />
     <Setter Property="Margin" Value="-4" />
-    <Setter Property="CornerRadius" Value="21" />
   </Style>
 
   <!-- The school's address: setup's field. -->

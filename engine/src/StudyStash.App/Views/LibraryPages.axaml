@@ -23,7 +23,7 @@
     <Style Selector="Button.undo">
       <Setter Property="Theme" Value="{StaticResource Surface}" />
       <Setter Property="Height" Value="30" />
-      <Setter Property="CornerRadius" Value="{DynamicResource RadiusControl}" />
+      <Setter Property="c:Cell.Round" Value="True" />
       <Setter Property="Padding" Value="10,0" />
     </Style>
     <!-- The line over a class's Canvas lists: its name, a link back to its page. -->

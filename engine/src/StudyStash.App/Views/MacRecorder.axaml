@@ -17,13 +17,13 @@
       <Setter Property="Theme" Value="{StaticResource Surface}" />
       <Setter Property="Width" Value="32" />
       <Setter Property="Height" Value="32" />
-      <Setter Property="CornerRadius" Value="16" />
+      <Setter Property="c:Cell.Round" Value="True" />
       <Setter Property="HorizontalContentAlignment" Value="Center" />
     </Style>
     <!-- The red dot that's Stop (and Resume in its place) is one of the s's cells: its corners a cell's, 27 % of its side. -->
     <Style Selector="Button.stop, Button.resume">
       <Setter Property="Theme" Value="{StaticResource Surface}" />
-      <Setter Property="CornerRadius" Value="6.5" />
+      <Setter Property="c:Cell.Round" Value="True" />
       <Setter Property="HorizontalContentAlignment" Value="Center" />
       <Setter Property="VerticalContentAlignment" Value="Center" />
     </Style>

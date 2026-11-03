@@ -554,12 +554,6 @@
     <Setter Property="Margin" Value="-4" />
     <Setter Property="IsHitTestVisible" Value="False" />
   </Style>
-  <Style Selector="Button.btn:focus-visible /template/ Border#PART_Wash">
-    <Setter Property="CornerRadius" Value="28" />
-  </Style>
-  <Style Selector="Button.btn.sm:focus-visible /template/ Border#PART_Wash">
-    <Setter Property="CornerRadius" Value="21" />
-  </Style>
   <Style Selector="Button.choice:focus-visible /template/ Border#PART_Wash">
     <Setter Property="CornerRadius" Value="16" />
   </Style>
