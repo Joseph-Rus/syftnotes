@@ -25,6 +25,10 @@ static class Program
     [STAThread]
     public static int Main(string[] args)
     {
+        // Velopack's installer and updater hooks first, as it asks (they end the process); nothing else is applied here.
+        VelopackHooks.Run();
+        // Linux: an AppImage copy takes itself off this account (it has no uninstaller of its own).
+        if (args is ["--uninstall"]) return VelopackHooks.LinuxUninstall(Console.WriteLine);
         if (StudyStash.Library.Cli.IsCommand(args))
         {
             // No window here: nothing may check this process in with Launch Services as the app (a Mac), or opening Syft
@@ -56,6 +60,9 @@ static class Program
         };
         // A Mac copy opened from its DMG or Downloads offers once to move into Applications; moved, it opens there.
         if (MoveSheet.Run(Home, Background)) return 0;
+        // The bundle's own name is Syft Notes.app now: one an older copy's updater left as Study Stash.app renames
+        // itself, and opens again from there (MacRename.cs).
+        if (MoveSheet.Rename(args)) return 0;
         // One copy at a time: a second one asks the first to show itself (or record), then goes. One started at login
         // has nothing to show, so it just goes.
         if (!Desktop.Claim(Home))

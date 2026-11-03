@@ -85,6 +85,10 @@ public sealed class AppUpdates
     /// update the app only quits (<see cref="Quit"/>). A copy of its own reopened meanwhile would hold the files
     /// Setup is replacing, and the install would stop half done.</summary>
     public bool InstallerRelaunches { get; init; }
+    /// <summary>An Inno-era (Windows) or tarball (Linux) copy, and a release that carries Velopack's install for this
+    /// computer: the copy moves over to it (Bridge.cs), even at its own version, and what does the move opens the app
+    /// again itself, as Setup.exe does (docs/LIBRARIES.md, phase 5).</summary>
+    public Func<Release, bool> Moves { get; init; } = _ => false;
     /// <summary>Get the app running again on the version now on disk, then quit this process. Called instead of a
     /// plain quit because nothing else is watching to reopen the app: unlike a service under launchd or Setup.exe's
     /// own `/relaunch`, an ordinary quit here would just leave the student without a menu bar icon.</summary>
@@ -163,11 +167,12 @@ public sealed class AppUpdates
             Log($"[update] check failed: {e.Message}");
             return CheckFailed;
         }
-        if (release is null || !Updates.IsNewer(release))
+        if (release is null || !(Updates.IsNewer(release) || Moves(release)))
         {
             Saw(null);
             return UpToDate;
         }
+        bool moving = Moves(release);
         if (CantInstall() is { } why)
         {
             Once(new(UpdateNewsKind.CantInstall, release, why));
@@ -213,7 +218,7 @@ public sealed class AppUpdates
             return Failed;
         }
         asked = false;
-        if (InstallerRelaunches)
+        if (InstallerRelaunches || moving)
         {
             Tell(new(UpdateNewsKind.Restarting, release));
             Quit();
@@ -251,7 +256,7 @@ public sealed class AppUpdates
             Log($"[update] check failed: {e.Message}");
             return new(CheckFailed);
         }
-        if (release is null || !Updates.IsNewer(release))
+        if (release is null || !(Updates.IsNewer(release) || Moves(release)))
         {
             Saw(null);
             return new(UpToDate);
@@ -407,19 +412,29 @@ public sealed class AppUpdates
                        && !host.Lectures.All().Any(l => l.State is LectureState.Recording or LectureState.Paused or LectureState.Transcribing)
                        && !WritingHere(host)
                        && busy?.Invoke() != true;
+        // Velopack installed this copy: only the download and install are Velopack's (VelopackUpdates.cs); when, and what
+        // the student is told, stay as below. A copy installed the old way (Inno Setup, the tarball) moves over to it.
+        bool velopack = VelopackUpdates.Installed;
+        void StopBackground() => Updates.StopBackground(Platform.Desktop.Program, updateHost);
         var updates = new AppUpdates
         {
             Latest = () => Updates.CachedLatestAsync(),
             LatestNow = () => Updates.LatestAsync(),
             Idle = Idle,
-            Enabled = () => (updateHost.AppDir.Length > 0 || updateHost.CantReplace) && !Desktop.SystemChangesOff,
+            Enabled = () => (velopack || updateHost.AppDir.Length > 0 || updateHost.CantReplace) && !Desktop.SystemChangesOff,
             Automatic = () => AutoUpdateOn(host),
-            CantInstall = () => Updates.WhyNotUpdatable(updateHost),
+            // A Mac bundle Velopack swaps in place needs a folder this account can change, as before: never a password.
+            CantInstall = () => velopack && updateHost.System != "Darwin" ? null : Updates.WhyNotUpdatable(updateHost),
             OnDiskVersion = () => updateHost.AppDir.Length > 0 ? Updates.InstalledVersion(updateHost.AppDir, updateHost.System) : Engine.Version,
             // Services running from the old bundle (an old-style library LaunchAgent) restart onto the new one rather
             // than run on from a deleted folder.
-            Apply = (release, home, log, restart) => Updates.ApplyAsync(release, home, updateHost, log, restart, ready: Idle),
-            InstallerRelaunches = updateHost.System == "Windows",
+            Apply = (release, home, log, restart) =>
+                velopack ? VelopackUpdates.ApplyAsync(release, Idle, StopBackground, relaunchArgs, log)
+                : Bridge.Offers(release, updateHost) ? Bridge.ApplyAsync(release, home, updateHost, Idle, log, Environment.ProcessId, relaunchArgs)
+                : Updates.ApplyAsync(release, home, updateHost, log, restart, ready: Idle),
+            // Velopack's updater, like Setup.exe, opens the app again itself once it has swapped the new version in.
+            InstallerRelaunches = velopack || updateHost.System == "Windows",
+            Moves = release => !velopack && Bridge.Offers(release, updateHost),
             RelaunchAndQuit = () =>
             {
                 SpawnWaiter(updateHost, relaunchArgs);

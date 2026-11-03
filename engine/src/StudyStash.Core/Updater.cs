@@ -64,6 +64,12 @@ public sealed class UpdateHost
         else if (system == "Windows")
         {
             appDir = Apps.WindowsInstallOf(baseDir) ?? "";
+            if (appDir.Length == 0 && Apps.VelopackInstalled(baseDir)) reason = "Syft Notes updates itself from the app.";
+        }
+        else if (system == "Linux" && Apps.VelopackInstalled(baseDir))
+        {
+            // The AppImage: the app updates it through Velopack (the app's AppUpdates), never this.
+            reason = "Syft Notes updates itself from the app.";
         }
         else if (system == "Linux")
         {
@@ -131,6 +137,15 @@ public static partial class Updates
         var psi = new ProcessStartInfo(args[0]) { UseShellExecute = false, CreateNoWindow = true };
         foreach (string a in args.Skip(1)) psi.ArgumentList.Add(a);
         using var _ = Process.Start(psi);
+    }
+
+    /// <summary>Whether <paramref name="file"/> is the release's <paramref name="asset"/>, by its SHA256SUMS.txt.</summary>
+    public static bool ChecksumMatches(string file, string asset, IReadOnlyDictionary<string, string>? checksums) => ChecksumOk(file, asset, checksums);
+
+    /// <summary>Stops the background libraries running <paramref name="exe"/> (they start again from the new copy).</summary>
+    public static void StopBackground(string exe, UpdateHost host)
+    {
+        foreach (string h in BackgroundRunning(exe, host)) host.Background!.Stop(h);
     }
 
     static bool ChecksumOk(string file, string asset, IReadOnlyDictionary<string, string>? checksums)

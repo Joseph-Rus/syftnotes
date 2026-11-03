@@ -17,6 +17,12 @@
     <EmbeddedResource Include="../../../extension/*" LogicalName="extension/%(Filename)%(Extension)" />
   </ItemGroup>
 
+  <!-- The move from an Inno Setup install to Velopack's (Bridge.cs, docs/LIBRARIES.md phase 5): written out and run
+       by Windows PowerShell once the app has quit. -->
+  <ItemGroup>
+    <EmbeddedResource Include="../../../windows/bridge.ps1" LogicalName="bridge.ps1" />
+  </ItemGroup>
+
   <!-- The ready-made parts illustrations are composed from (built by tools/PartsImport; see docs/parts-sources.md). -->
   <ItemGroup>
     <EmbeddedResource Include="Rich/PartsLibrary.xml" LogicalName="StudyStash.Core.Rich.PartsLibrary.xml" />

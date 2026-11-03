@@ -183,6 +183,24 @@ public static class Desktop
         return false;
     }
 
+    /// <summary>The program the login item for this settings folder starts, or null when there's none (or it can't be
+    /// read): a LaunchAgent's first argument, a Run value's first word, an autostart entry's Exec.</summary>
+    public static string? LoginProgram(string home)
+    {
+        if (SystemChangesOff) return null;
+        var (label, value) = LoginName(home);
+        try
+        {
+            if (OperatingSystem.IsMacOS()) return File.Exists(LaunchAgent(label)) ? Moves.PlistProgram(File.ReadAllText(LaunchAgent(label))) : null;
+            if (OperatingSystem.IsWindows()) return Moves.RunProgram(Registry.CurrentUser.OpenSubKey(RunKey)?.GetValue(value) as string);
+            if (OperatingSystem.IsLinux()) return File.Exists(AutostartEntry(label)) ? Moves.ExecProgram(File.ReadAllText(AutostartEntry(label))) : null;
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException or System.Security.SecurityException)
+        {
+        }
+        return null;
+    }
+
     /// <summary>Start (or stop starting) when you log in, quietly: to the menu bar or tray, no window. Only when the
     /// student turns it on.</summary>
     public static void StartAtLogin(bool on, string home)

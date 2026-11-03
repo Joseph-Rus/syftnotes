@@ -108,6 +108,9 @@ public static partial class Updates
 
     static readonly HttpClient Http = CreateHttp();
 
+    /// <summary>The one client the updater asks GitHub with (it has the User-Agent GitHub wants).</summary>
+    internal static HttpClient SharedHttp => Http;
+
     static HttpClient CreateHttp()
     {
         var http = new HttpClient { Timeout = TimeSpan.FromSeconds(10) };
