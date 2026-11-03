@@ -68,6 +68,8 @@ public sealed record AiEngineStatus(string Id, string Brand, AiEngineState State
     public required EngineInfo Engine { get; init; }
     /// <summary>A sign-in is going, waiting for the student in their browser.</summary>
     public bool SigningIn => State == AiEngineState.NotSignedIn && SignIn == SignInPhase.Waiting;
+    /// <summary>That sign-in's page ends on a code the student pastes into the app (Gemini's Google page does).</summary>
+    public bool WantsCode => SigningIn && Engine.PasteCode;
 }
 
 /// <summary>
@@ -168,7 +170,18 @@ public sealed class AiStatusStore : IDisposable
 
     /// <summary>What a view shows of the AIs, to tell whether an answer changed anything worth drawing again.</summary>
     public static string SignatureOf(AiOverview overview) =>
-        string.Join('|', overview.Engines.Select(e => $"{e.Id}:{e.State}:{e.SignIn}")) + "#" + string.Join('|', overview.Problems.Select(p => $"{p.Id}:{p.SignIn}"));
+        string.Join('|', overview.Engines.Select(e => $"{e.Id}:{e.State}:{e.SignIn}:{e.PasteCode}")) + "#" + string.Join('|', overview.Problems.Select(p => $"{p.Id}:{p.SignIn}"));
+
+    /// <summary>The AI whose sign-in waits for the code its page ends on, pasted into the app; null when none does.</summary>
+    public static string? CodeWantedBy(AiOverview overview) =>
+        overview.Engines.FirstOrDefault(e => StateOf(e) == AiEngineState.NotSignedIn && e.SignIn == SignInPhase.Waiting && e.PasteCode)?.Id;
+
+    /// <summary>The AI whose sign-in waits for a pasted code now (<see cref="CodeWantedBy"/>); null when none does.</summary>
+    public string? WantsCode { get; private set; }
+
+    /// <summary>Raised when <see cref="WantsCode"/> changes: a sign-in started waiting for its code (the app shows the box
+    /// for it, whichever button started it), or it isn't waiting any more.</summary>
+    public event Action<string?>? WantsCodeChanged;
 
     /// <summary>One AI as the library last said it; null when it didn't mention it (or hasn't been asked).</summary>
     public AiEngineStatus? For(string id) => Current?.Engines.FirstOrDefault(e => e.Id == id) is { } e ? StatusOf(e) : null;
@@ -217,7 +230,23 @@ public sealed class AiStatusStore : IDisposable
         Reach = Reach.Ok;
         Signature = SignatureOf(overview);
         Changed?.Invoke();
+        if (CodeWantedBy(overview) is var wanted && wanted != WantsCode)
+        {
+            WantsCode = wanted;
+            WantsCodeChanged?.Invoke(wanted);
+        }
         if (SignInGoing(overview)) Watch();
+    }
+
+    /// <summary>The code the student pasted from <paramref name="id"/>'s sign-in page, handed to its sign-in on the
+    /// library, which then finishes by itself (the store follows it to ready). The code goes nowhere else.</summary>
+    public async Task<Outcome<AiSaid>> SendCodeAsync(string id, string code, CancellationToken ct = default)
+    {
+        var ai = Library;
+        var said = await LibraryCall.Run(() => ai.SendSignInCodeAsync(id, code), ct);
+        if (said.Value?.Overview is { } now) Take(now);
+        Watch();
+        return said;
     }
 
     /// <summary>Asks the library to move one AI on. Its answer's overview is taken (so every view follows), and a sign-in
@@ -259,6 +288,8 @@ public sealed class AiStatusStore : IDisposable
     public async Task<ConnectOutcome> ConnectAsync(AiConnect connector, string id, Action<ConnectProgress>? progress = null, CancellationToken ct = default)
     {
         checkNext.Remove(id);
+        // Asked meanwhile, so a sign-in Connect starts that waits for a pasted code (Gemini's) gets its box.
+        using var watching = Hurry();
         var outcome = await connector.ConnectAsync(id, progress, ct);
         if (outcome.Overview is { } overview) Take(overview);
         return outcome;

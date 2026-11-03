@@ -252,6 +252,8 @@ public sealed partial class LibraryWeb
             {
                 // The last resort, once the hidden sign-in couldn't start or stopped at once: a terminal, as it always was.
                 if (Asked("terminal")) said = Jobs.Checks.OpenSignIn(cfg.Home, AiSettings.Load(cfg.Home).Terminal, id);
+                // The code the student pasted from the sign-in's page (Gemini's), typed into the sign-in going now.
+                else if (body?["code"] is JsonValue c && c.TryGetValue(out string? code)) said = await Jobs.SignIns.SendCodeAsync(id, code);
                 // Otherwise the AI's own sign-in, hidden: it opens the student's browser itself, and the engine's row says
                 // "waiting" until its status command says signed in (then it's ready by itself).
                 else if (Jobs.SignIns.Can(id)) said = Asked("again") ? Jobs.SignIns.Again(id) : Jobs.SignIns.Start(id);

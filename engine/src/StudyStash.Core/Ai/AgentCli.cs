@@ -43,15 +43,19 @@ public sealed record AgentCliInfo
     public required string PlansUrl { get; init; }
     public required AgentInstaller MacInstaller { get; init; }
     public required AgentInstaller WindowsInstaller { get; init; }
-    /// <summary>Signs in (it opens the browser itself): `claude auth login`, `codex login`; `agy -p=/usage`, which signs
-    /// in first when it isn't, then says how much is left (no turn, nothing spent).</summary>
+    /// <summary>Signs in (it opens the browser itself): `claude auth login`, `codex login`; plain `agy`, whose sign-in
+    /// waits for the code Google's page ends on as long as it's left open (its print mode, `agy -p=/usage`, gave up
+    /// after a minute, too soon to sign in, copy the code and come back).</summary>
     public required IReadOnlyList<string> SignInArgs { get; init; }
+    /// <summary>Its sign-in page ends on a code to paste back into the app, and nothing comes back to the computer by
+    /// itself (Gemini's: Google's page on antigravity.google says "Paste this code into your application"). Syft Notes
+    /// shows a box for it on the sign-in step and types it into the sign-in (<see cref="AgentSignIn.SendCodeAsync"/>).</summary>
+    public bool TakesCode { get; init; }
+    /// <summary>Its sign-in stays open once it's signed in (plain `agy` goes on to its chat): Syft Notes stops it.</summary>
+    public bool StaysOpen { get; init; }
     /// <summary>Says whether it's signed in, by its exit code: `claude auth status`, `codex login status`, `agy models`
     /// (which says "Please sign in" and stops when it isn't, never opening the browser).</summary>
     public required IReadOnlyList<string> StatusArgs { get; init; }
-    /// <summary>The sign-in waits for the browser this long and then gives up by itself (agy's print mode: a minute);
-    /// null when it waits as long as it's left running.</summary>
-    public TimeSpan? SignInGivesUp { get; init; }
     /// <summary>What its commands' environment needs besides the app's own: agy's home of Syft Notes' own
     /// (<see cref="Antigravity.Home"/>). Asked each time (the tests move that home).</summary>
     public Func<IReadOnlyDictionary<string, string>> Env { get; init; } = () => new Dictionary<string, string>();
@@ -110,9 +114,10 @@ public static partial class AgentCli
         Plans = "a Google account", PlanName = "Google AI Pro", PlansUrl = "https://antigravity.google/pricing",
         MacInstaller = Mac("curl -fsSL https://antigravity.google/cli/install.sh | bash", GeminiDocs),
         WindowsInstaller = Windows("irm https://antigravity.google/cli/install.ps1 | iex", GeminiDocs),
-        SignInArgs = ["-p=/usage", "--output-format", "json"],
+        SignInArgs = [],
         StatusArgs = ["models"],
-        SignInGivesUp = TimeSpan.FromSeconds(60),
+        TakesCode = true,
+        StaysOpen = true,
         Env = () => Antigravity.HomeEnv(),
     };
 

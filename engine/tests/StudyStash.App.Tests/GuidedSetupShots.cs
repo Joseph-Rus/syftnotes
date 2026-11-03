@@ -4,6 +4,7 @@ using Avalonia.Headless.XUnit;
 using Avalonia.Styling;
 using StudyStash.App.Services;
 using StudyStash.App.ViewModels;
+using StudyStash.App.ViewModels.Kit;
 using StudyStash.App.Views;
 using StudyStash.Core.Ai;
 using StudyStash.App.Tests;
@@ -131,15 +132,11 @@ public sealed class GuidedSetupShots
             g.Screen = GuidedScreen.Install;
             return g;
         });
-        yield return ("sign-in-gemini-waiting", skin =>
-        {
-            var g = Guided(skin);
-            g.GeminiFound = GeminiHere;
-            g.Picked = "gemini";
-            g.Screen = GuidedScreen.SignIn;
-            g.WaitingSignIn = true;
-            return g;
-        });
+        // Google's page ends on a code ("Paste this code into your application"): the box for it, empty, then with
+        // the code in, and once it's sent.
+        yield return ("sign-in-gemini-waiting", skin => GeminiCode(skin, ""));
+        yield return ("sign-in-gemini-code", skin => GeminiCode(skin, "4/0AVGzR1Bx-example-code"));
+        yield return ("sign-in-gemini-code-sent", skin => GeminiCode(skin, "", sent: true));
         yield return ("sign-in-gemini-ready", skin =>
         {
             var g = Guided(skin);
@@ -260,6 +257,47 @@ public sealed class GuidedSetupShots
         }
         g.Refresh();
         return g;
+    }
+
+    /// <summary>Gemini's sign-in waiting for Google's code, the box holding <paramref name="code"/>.</summary>
+    static GuidedSetupModel GeminiCode(SkinKind skin, string code, bool sent = false)
+    {
+        var g = Guided(skin);
+        g.GeminiFound = GeminiHere;
+        g.Picked = "gemini";
+        g.Screen = GuidedScreen.SignIn;
+        g.CodeBox = CodeBox(code, sent);
+        g.WaitingSignIn = true;
+        return g;
+    }
+
+    /// <summary>The box for Google's code, with <paramref name="code"/> in it, or sent.</summary>
+    internal static SignInCodeModel CodeBox(string code, bool sent = false, Action? tryAgain = null, Action? openAgain = null)
+    {
+        var box = new SignInCodeModel("Gemini", "Google", (_, _) => Task.FromResult(Outcome.Done), openAgain, tryAgain) { Code = sent ? "4/0AVGzR1Bx-example-code" : code };
+        if (sent) box.Send.Command.Execute(null);
+        return box;
+    }
+
+    /// <summary>The small window for a sign-in started from Settings: waiting for the code, and once the code didn't work.</summary>
+    [AvaloniaFact]
+    public void The_code_box_in_its_own_window()
+    {
+        foreach (var skin in new[] { SkinKind.Mac, SkinKind.Win })
+        {
+            string look = skin == SkinKind.Mac ? "mac" : "win";
+            foreach (var t in Themes)
+            {
+                Shot.Take($"{look}-15-sign-in-code", skin, t, () => new SignInCodePage { DataContext = CodeBox("", openAgain: () => { }, tryAgain: () => { }), DrawChrome = true },
+                    size: new Size(608, 420));
+                Shot.Take($"{look}-15-sign-in-code-didnt-work", skin, t, () =>
+                {
+                    var box = CodeBox("", openAgain: () => { }, tryAgain: () => { });
+                    box.Stop(AiWords.CodeDidntWork);
+                    return new SignInCodePage { DataContext = box, DrawChrome = true };
+                }, size: new Size(608, 420));
+            }
+        }
     }
 
     internal static Control View(SkinKind skin, GuidedSetupModel g) =>

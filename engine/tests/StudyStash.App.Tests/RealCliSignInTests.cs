@@ -5,6 +5,7 @@ using System.Text;
 using System.Text.RegularExpressions;
 using StudyStash.App.Platform;
 using StudyStash.App.Services;
+using StudyStash.App.Services.Kit;
 using StudyStash.Core;
 using StudyStash.Core.Ai;
 
@@ -139,6 +140,16 @@ public sealed partial class RealCliSignInTests
         bool alive = signIn.Running, shown = signIn.Waiting, wanted = signIn.WantedTerminal, stuck = signIn.Stuck, region = signIn.Region;
         bool finishes = signIn.PageFinishesByItself;
         var answered = signIn.Answered;
+        // A sign-in whose page ends on a code (Gemini's): it asks for one, and a made-up code typed in the way the app's
+        // box types it reaches its maker, who turns it down (no account is used, nothing is signed in).
+        bool asksCode = false, codeTurnedDown = false;
+        if (cli.TakesCode && alive)
+        {
+            // It waits for the field to show, as it does in the app.
+            bool typed = await signIn.SendCodeAsync("4/0NOT-A-REAL-CODE-for-ci_0000000000");
+            asksCode = signIn.AsksForCode;
+            codeTurnedDown = typed && await Poll.UntilAsync(() => signIn.CodeRefused || !signIn.Running, TimeSpan.FromMilliseconds(250), TimeSpan.FromSeconds(40)) && signIn.CodeRefused;
+        }
         await watching.CancelAsync();
         await watcher;
         signIn.Dispose();
@@ -155,9 +166,14 @@ public sealed partial class RealCliSignInTests
             $"waiting for the browser: {Yes(waiting)}",
             $"its callback listening: {Yes(listens)}",
             $"page finishes by itself: {Yes(finishes)}",
+        };
+        if (cli.TakesCode)
+            parts.AddRange([$"asks for the page's code: {Yes(asksCode)}", $"a made-up code typed in reached {cli.Maker}, who turned it down: {Yes(codeTurnedDown)}"]);
+        parts.AddRange(
+        [
             $"Syft Notes opened the page: {Yes(Volatile.Read(ref pages) > 0)}",
             $"system opener called: {Yes(File.Exists(opened))}",
-        };
+        ]);
         if (OperatingSystem.IsWindows())
         {
             parts.Add($"window: {(windows.Count == 0 ? "none" : string.Join(", ", windows))}");
@@ -165,7 +181,7 @@ public sealed partial class RealCliSignInTests
             if (browsers.Count > 0) parts.Add($"browser it opened: {string.Join(", ", browsers)}");
         }
         if (region) parts.Add("refused for the country");
-        return new Result(cli.Brand, string.Join("; ", parts)) { Failed = !waiting || wanted || stuck || windows.Count > 0 };
+        return new Result(cli.Brand, string.Join("; ", parts)) { Failed = !waiting || wanted || stuck || windows.Count > 0 || cli.TakesCode && !codeTurnedDown };
     }
 
     static string Yes(bool b) => b ? "yes" : "no";

@@ -2,21 +2,30 @@ namespace StudyStash.Core.Ai;
 
 /// <summary>Where an AI's sign-in is, as the library says it to the app: <see cref="Waiting"/> for the student to finish
 /// in the browser page that opened, <see cref="GaveUp"/> (it stopped waiting, or took too long), <see cref="Region"/> (its
-/// maker doesn't offer it in this country) or <see cref="Stuck"/> (Syft Notes couldn't start it, or it stopped at once:
-/// Try again, and Get help). "" when none is going.</summary>
+/// maker doesn't offer it in this country), <see cref="Stuck"/> (Syft Notes couldn't start it, or it stopped at once:
+/// Try again, and Get help) or <see cref="BadCode"/> (the code pasted from its page didn't work: Try again gives a new
+/// one). "" when none is going.</summary>
 public static class SignInPhase
 {
     public const string Waiting = "waiting";
     public const string GaveUp = "gave_up";
     public const string Region = "region";
     public const string Stuck = "stuck";
+    public const string BadCode = "bad_code";
+
+    /// <summary>A sign-in that has stopped without signing in (Try again starts a new one, unless it's the country).</summary>
+    public static bool Stopped(string phase) => phase is GaveUp or Region or Stuck or BadCode;
+
+    /// <summary>A sign-in that stopped where Try again may work (any but a country that isn't served).</summary>
+    public static bool TryAgain(string? phase) => phase is GaveUp or Stuck or BadCode;
 }
 
 /// <summary>
 /// Every Sign in button in Syft Notes (Settings → Your AI, the AI problems card, setup's rows) starts the AI's own
 /// sign-in here, hidden: <c>claude auth login</c>, <c>codex login</c> or Gemini's <c>agy</c> in Syft Notes' own home
 /// run in a terminal nobody sees, and the provider opens the student's browser itself (<see cref="AgentSignIn"/>). Syft Notes never
-/// sees the password, a token or the code the page ends on, and no field asks for it. One sign-in runs at a time per AI
+/// sees the password or a token. Gemini's page ends on a code: the student pastes it into the app, which hands it here
+/// (<see cref="SendCodeAsync"/>) to be typed into the sign-in, and it's kept nowhere. One sign-in runs at a time per AI
 /// (pressing again does nothing), it's looked at every few seconds with the AI's own status command, and the moment it
 /// says signed in the AI is marked ready, so rows and cards turn ready by themselves. A sign-in that gives up or isn't
 /// offered in the student's country stays said in <see cref="State"/> until they try again.
@@ -91,6 +100,26 @@ public sealed class AiSignIns(EngineChecks checks, Action<string> signedIn) : ID
         }
     }
 
+    /// <summary>The code the student pasted from <paramref name="id"/>'s sign-in page, typed into its sign-in, which
+    /// then finishes by itself (its row turns ready). What to tell the student; throws
+    /// <see cref="InvalidOperationException"/> in plain words when no sign-in of its own waits for one.</summary>
+    public async Task<string> SendCodeAsync(string id, string code)
+    {
+        Entry? entry;
+        lock (gate) entry = entries.GetValueOrDefault(id);
+        if (entry is null || entry.Over || !entry.SignIn.Running || !entry.SignIn.TakesCode)
+            throw new InvalidOperationException($"That sign-in has stopped. Press Sign in to get a new code from {Engines.Name(id)}'s page.");
+        if (AgentSignIn.CleanCode(code) is null) throw new InvalidOperationException("That doesn't look like the code. Copy it from the page again, and paste it here.");
+        if (!await entry.SignIn.SendCodeAsync(code)) throw new InvalidOperationException($"That sign-in has stopped. Press Sign in to get a new code from {Engines.Name(id)}'s page.");
+        return $"Signing in to {Engines.Name(id)}…";
+    }
+
+    /// <summary>Whether <paramref name="id"/>'s sign-in, going now, ends on a code to paste back into the app.</summary>
+    public bool TakesCode(string id)
+    {
+        lock (gate) return entries.TryGetValue(id, out var e) && !e.Over && e.SignIn.TakesCode;
+    }
+
     async Task WatchAsync(string id, Entry entry)
     {
         bool done = false;
@@ -123,7 +152,7 @@ public sealed class AiSignIns(EngineChecks checks, Action<string> signedIn) : ID
         {
             if (!entries.TryGetValue(id, out var e)) return "";
             if (!e.Over) return e.SignIn.Stuck ? SignInPhase.Stuck : SignInPhase.Waiting;
-            return e.SignIn.Region ? SignInPhase.Region : e.SignIn.Stuck ? SignInPhase.Stuck : SignInPhase.GaveUp;
+            return e.SignIn.Region ? SignInPhase.Region : e.SignIn.CodeRefused ? SignInPhase.BadCode : e.SignIn.Stuck ? SignInPhase.Stuck : SignInPhase.GaveUp;
         }
     }
 
@@ -133,7 +162,7 @@ public sealed class AiSignIns(EngineChecks checks, Action<string> signedIn) : ID
     public AiOverview Annotate(AiOverview overview) => overview with
     {
         Engines = [.. overview.Engines.Select(e => State(e.Id) is { Length: > 0 } s
-            ? e with { SignIn = s, State = e.State == "unchecked" ? "not_signed_in" : e.State } : e)],
+            ? e with { SignIn = s, PasteCode = s == SignInPhase.Waiting && TakesCode(e.Id), State = e.State == "unchecked" ? "not_signed_in" : e.State } : e)],
         Problems = [.. overview.Problems.Select(p => p.Kind == "not_signed_in" && State(p.Engine) is { Length: > 0 } s ? p with { SignIn = s } : p)],
     };
 

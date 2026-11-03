@@ -2,9 +2,11 @@ namespace StudyStash.Core.Ai;
 
 /// <summary>
 /// Signing in to Claude Code, Codex or Antigravity CLI, for guided setup and for every Sign in button in Syft Notes, with
-/// the provider's own sign-in: <c>claude auth login</c>, <c>codex login</c> or <c>agy -p=/usage</c> runs in a terminal
+/// the provider's own sign-in: <c>claude auth login</c>, <c>codex login</c> or <c>agy</c> runs in a terminal
 /// nobody sees (<see cref="HiddenTerminal"/>), so a sign-in made for a terminal works without one ever showing, and it
-/// opens the browser itself. Syft Notes never sees the password, a token or a code. What the sign-in shows is read the
+/// opens the browser itself. Syft Notes never sees the password or a token. Gemini's page ends on a code to paste
+/// (<see cref="AgentCliInfo.TakesCode"/>): the student pastes it into Syft Notes' box, which types it into the sign-in
+/// (<see cref="SendCodeAsync"/>) and keeps it nowhere. What the sign-in shows is read the
 /// way a person would read it (<see cref="SignInScreen"/>), its few simple questions answered the safe way; whether it's
 /// worked is read from the status command's exit code (<see cref="AgentCli.ReadStatus"/>), every three seconds while
 /// it waits and whenever the sign-in stops.
@@ -15,9 +17,10 @@ namespace StudyStash.Core.Ai;
 /// </para>
 /// <para>
 /// The sign-in page's address goes one place only: the system's browser opener, here (<see cref="OpenPage"/>), and only
-/// for a page that finishes by itself (<see cref="SignInScreen.FinishesByItself"/>), when the sign-in said it couldn't
-/// open the browser, or the student asked for the page again. It is never shown, logged, saved or put in the overview.
-/// Claude Code's printed page ends on a code to paste, which Syft Notes never relays: its sign-in is run again instead.
+/// for a page that finishes by itself (<see cref="SignInScreen.FinishesByItself"/>) or one whose code the student pastes
+/// back into Syft Notes (Gemini's), when the sign-in said it couldn't open the browser, or the student asked for the
+/// page again. It is never shown, logged, saved or put in the overview. Claude Code's printed page ends on a code to
+/// paste, which Syft Notes doesn't take: its sign-in is run again instead.
 /// </para>
 /// </summary>
 public sealed class AgentSignIn : IDisposable
@@ -57,6 +60,13 @@ public sealed class AgentSignIn : IDisposable
     public bool Stuck { get; private set; }
     /// <summary>The sign-in waited for the browser as long as it does and stopped without being signed in.</summary>
     public bool GaveUp { get; private set; }
+    /// <summary>The code the student pasted didn't work (its maker turned it down), so the sign-in was stopped: a new one
+    /// gives a new page and a new code.</summary>
+    public bool CodeRefused { get; private set; }
+    /// <summary>Its page ends on a code the student pastes back into Syft Notes (<see cref="AgentCliInfo.TakesCode"/>).</summary>
+    public bool TakesCode => cli.TakesCode;
+    /// <summary>It's waiting for that code now (it showed where to paste it).</summary>
+    public bool AsksForCode => screen?.AsksForCode ?? false;
     /// <summary>The sign-in stopped because its maker doesn't offer it in this country (what it showed said so; the
     /// words themselves are never kept or logged).</summary>
     public bool Region { get; private set; }
@@ -93,6 +103,7 @@ public sealed class AgentSignIn : IDisposable
         Stuck = false;
         GaveUp = false;
         Region = false;
+        CodeRefused = false;
         // A fresh end to wait on, unless "again" made one already (so a wait never takes the old one's end for this one's).
         if (exited.Task.IsCompleted) exited = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         var launch = OperatingSystem.IsWindows() ? WindowsCommand.For([exe, .. cli.SignInArgs]) : new Launch(exe, [.. cli.SignInArgs]);
@@ -152,8 +163,95 @@ public sealed class AgentSignIn : IDisposable
         string reply;
         lock (s) reply = s.Read(text);
         if (reply.Length > 0) t.Type(reply);
-        if (s.NoBrowser && s.PageFinishesByItself && s.Page is { } page && Interlocked.CompareExchange(ref opened, 1, 0) == 0)
+        if (s.NoBrowser && MayOpen(s) && s.Page is { } page && Interlocked.CompareExchange(ref opened, 1, 0) == 0)
             _ = Task.Run(() => OpenPage(page));
+        // A code turned down: the sign-in waits for a key to go back to its start, with a new page. It's stopped
+        // instead, and the student is told to try again.
+        if (s.CodeRefused && !CodeRefused)
+        {
+            CodeRefused = true;
+            Stop();
+        }
+        if (echo is { } e && s.Current.Contains(e.Tail, StringComparison.Ordinal)) e.Shown.TrySetResult();
+    }
+
+    /// <summary>A page Syft Notes may open: one that finishes by itself, or one whose code the student pastes into Syft Notes.</summary>
+    bool MayOpen(SignInScreen s) => s.PageFinishesByItself || (cli.TakesCode && s.Page is not null);
+
+    /// <summary>The end of a code being typed in, and when it showed in the sign-in's field.</summary>
+    sealed record Echo(string Tail, TaskCompletionSource Shown);
+    volatile Echo? echo;
+
+    /// <summary>What a student pasted as the code, cleaned: spaces and line breaks taken out (a code copied from a page
+    /// often brings one along). Null when it can't be a code: empty, very long, or not plain text.</summary>
+    public static string? CleanCode(string pasted)
+    {
+        string code = string.Concat(pasted.Where(c => !char.IsWhiteSpace(c)));
+        if (code.Length is < 4 or > 1024) return null;
+        return code.All(c => c is > ' ' and < '\x7f') ? code : null;
+    }
+
+    /// <summary>
+    /// The code the student pasted into Syft Notes' box, typed into the sign-in that asked for it, then Enter (once the
+    /// field shows what was typed, or after a couple of seconds). Only for a sign-in that takes a code
+    /// (<see cref="AgentCliInfo.TakesCode"/>), while it runs; it waits a little for the sign-in to show its field.
+    /// The code goes nowhere else: it isn't kept, logged or shown. False when there was nothing to type it into, or
+    /// it can't be a code (<see cref="CleanCode"/>).
+    /// </summary>
+    public async Task<bool> SendCodeAsync(string pasted, CancellationToken ct = default)
+    {
+        if (!cli.TakesCode || CleanCode(pasted) is not { } code) return false;
+        HiddenTerminal? t;
+        SignInScreen? s;
+        lock (gate)
+        {
+            t = child;
+            s = screen;
+        }
+        if (t is null || s is null || t.HasExited) return false;
+        // Its field may not be showing yet (the student was quick): it's waited for, as it's drawn.
+        var asked = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        if (!s.AsksForCode)
+        {
+            void Look(string _)
+            {
+                if (s.AsksForCode) asked.TrySetResult();
+            }
+            s.Line += Look;
+            try
+            {
+                if (!s.AsksForCode) await Task.WhenAny(asked.Task, t.Exit).WaitAsync(TimeSpan.FromSeconds(15), ct);
+            }
+            catch (TimeoutException)
+            {
+            }
+            finally
+            {
+                s.Line -= Look;
+            }
+            if (!s.AsksForCode || t.HasExited) return false;
+        }
+        var shown = new Echo(code[Math.Max(0, code.Length - 6)..], new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously));
+        echo = shown;
+        try
+        {
+            t.Type(code);
+            // Enter only once the field has it all: pressed while it's still drawing, it went in short.
+            try
+            {
+                await shown.Shown.Task.WaitAsync(TimeSpan.FromSeconds(3), ct);
+            }
+            catch (TimeoutException)
+            {
+            }
+            if (t.HasExited) return false;
+            t.Type("\r");
+            return true;
+        }
+        finally
+        {
+            echo = null;
+        }
     }
 
     /// <summary>"Open the page again": a page that finishes by itself (Codex's) opens once more while its sign-in still
@@ -161,7 +259,8 @@ public sealed class AgentSignIn : IDisposable
     /// Code's printed page ends on a code to paste, which setup has no field for). False when it didn't start.</summary>
     public bool OpenAgain()
     {
-        if (Running && screen is { PageFinishesByItself: true, Page: { } page })
+        // Gemini's page too: the code it ends on is for this sign-in, so it's the same page again, not a new sign-in.
+        if (Running && screen is { Page: { } page } s && MayOpen(s))
         {
             Interlocked.Increment(ref opened);
             _ = Task.Run(() => OpenPage(page));
@@ -198,7 +297,12 @@ public sealed class AgentSignIn : IDisposable
         {
             var now = await Task.Run(Check, CancellationToken.None);
             changed?.Invoke(now);
-            if (now.SignedIn) return true;
+            if (now.SignedIn)
+            {
+                // Plain agy goes on to its chat once it's signed in: nothing more is wanted from it.
+                if (cli.StaysOpen) Stop();
+                return true;
+            }
             var waitingOn = exited;
             try
             {
@@ -214,7 +318,7 @@ public sealed class AgentSignIn : IDisposable
             var last = await Task.Run(Check, CancellationToken.None);
             changed?.Invoke(last);
             if (last.SignedIn) return true;
-            if (!Region && !Stuck) GaveUp = true;
+            if (!Region && !Stuck && !CodeRefused) GaveUp = true;
             return false;
         }
         return false;

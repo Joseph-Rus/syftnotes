@@ -4,6 +4,7 @@ using Avalonia.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using StudyStash.App.Services;
+using StudyStash.App.ViewModels.Kit;
 using StudyStash.Core;
 using StudyStash.Core.Ai;
 using StudyStash.Core.Setup;
@@ -145,6 +146,10 @@ public sealed partial class GuidedSetupModel : ObservableObject, IDisposable
     /// <summary>Signed in, and the plan check passed: the AI is ready.</summary>
     [ObservableProperty] public partial bool AiReady { get; set; }
     [ObservableProperty] public partial string? SignInProblem { get; set; }
+    /// <summary>The box the code Google's page ends on is pasted into, while Gemini's sign-in waits (its page doesn't
+    /// come back to the computer by itself); null for an AI whose page does.</summary>
+    [ObservableProperty] public partial SignInCodeModel? CodeBox { get; set; }
+    public bool ShowCodeBox => WaitingSignIn && CodeBox is not null;
     [ObservableProperty] public partial ChatProblem PlanProblem { get; set; }
     [ObservableProperty] public partial string PlanProblemTitle { get; set; } = "";
     [ObservableProperty] public partial string PlanProblemText { get; set; } = "";
@@ -272,7 +277,7 @@ public sealed partial class GuidedSetupModel : ObservableObject, IDisposable
         : Cli.Id switch
         {
             "codex" => "Your browser will open ChatGPT's sign-in page. Sign in with the account that has your Plus plan (or higher), then come back here.",
-            "gemini" => "Your browser will open Google's sign-in page. Sign in with your personal Google account, then come back here.",
+            "gemini" => "Your browser will open Google's sign-in page. Sign in with your personal Google account, then copy the code it shows and paste it here.",
             _ => "Your browser will open Claude's sign-in page. Sign in with the account that has your Pro or Max plan, then come back here.",
         };
     public string Privacy => Cli.Id == "gemini"
@@ -385,7 +390,8 @@ public sealed partial class GuidedSetupModel : ObservableObject, IDisposable
     partial void OnInstalledChanged(bool value) => Notify(nameof(ShowInstallButton), nameof(CanContinue), nameof(ShowInstalled));
     partial void OnInstallProblemChanged(string? value) => Notify(nameof(ShowInstallButton), nameof(HasInstallProblem));
     partial void OnInstallFailureChanged(InstallFailure value) => Notify(nameof(InstallRegion), nameof(InstallOther));
-    partial void OnWaitingSignInChanged(bool value) => Notify(nameof(ShowOpenSignIn));
+    partial void OnWaitingSignInChanged(bool value) => Notify(nameof(ShowOpenSignIn), nameof(ShowCodeBox));
+    partial void OnCodeBoxChanged(SignInCodeModel? value) => Notify(nameof(ShowCodeBox));
     partial void OnSignedInChanged(bool value) => Notify(nameof(ShowOpenSignIn), nameof(SignInTitle), nameof(SignInLede));
     partial void OnCheckingPlanChanged(bool value) => Notify(nameof(ShowCheckingPlan));
     partial void OnCheckingSignInChanged(bool value) => Notify(nameof(ShowOpenSignIn));
@@ -711,6 +717,7 @@ public sealed partial class GuidedSetupModel : ObservableObject, IDisposable
         SignedIn = false;
         AiReady = false;
         WaitingSignIn = false;
+        CodeBox = null;
         SignInStuck = false;
         CheckingPlan = false;
         SignInProblem = null;
@@ -773,6 +780,8 @@ public sealed partial class GuidedSetupModel : ObservableObject, IDisposable
         var s = signIn;
         SignInStuck = false;
         s.Start();
+        // Gemini's page ends on a code: the box for it shows while the sign-in waits, and hands it to this sign-in.
+        CodeBox = Cli.TakesCode ? new SignInCodeModel(Brand, Cli.Maker, (code, ct) => SendCodeAsync(s, code, ct)) : null;
         WaitingSignIn = true;
         var cts = Fresh();
         bool done = await s.WaitAsync(cts.Token);
@@ -785,11 +794,16 @@ public sealed partial class GuidedSetupModel : ObservableObject, IDisposable
             SignInStuck = true;
             SignInProblem = AiWords.SignInStuckWords(Brand);
         }
+        else if (!done && s.CodeRefused && !cts.IsCancellationRequested) SignInProblem = AiWords.CodeDidntWork;
         else if (!done && s.GaveUp && !cts.IsCancellationRequested) SignInProblem = "The sign-in stopped waiting before you'd finished. Try again.";
         if (!done) return;
         SignedIn = true;
         await CheckPlanAsync();
     }
+
+    /// <summary>The code pasted into <see cref="CodeBox"/>, typed into the sign-in waiting for it.</summary>
+    static async Task<Outcome> SendCodeAsync(AgentSignIn s, string code, CancellationToken ct) =>
+        await s.SendCodeAsync(code, ct) ? Outcome.Done : Outcome.Failed(new Failure(FailureKind.Refused, AiWords.CodeSignInStopped));
 
     /// <summary>"Didn't open? Open it again": a page that finishes signing in by itself (Codex's) opens again; Claude
     /// Code's ends on a code to paste (there's no field for it here), so its sign-in runs once more and opens the page
