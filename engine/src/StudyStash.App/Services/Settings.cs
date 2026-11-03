@@ -3,6 +3,7 @@ using System.Text.Json.Nodes;
 using Avalonia.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using CommunityToolkit.Mvvm.Messaging;
 using StudyStash.Audio;
 using StudyStash.Core;
 using StudyStash.Core.Ai;
@@ -80,6 +81,8 @@ public sealed partial class AppearanceOption : ObservableObject
 public sealed partial class SettingsModel : ObservableObject, IDisposable
 {
     readonly AppHost host;
+    /// <summary>What Settings asks of the app (open Connect Canvas, run setup again, quit…) goes out here.</summary>
+    readonly IMessenger messages;
 
     /// <summary>The page shown; Settings opens on General (a library-only computer on its library).</summary>
     [ObservableProperty] public partial string Section { get; set; } = "";
@@ -338,10 +341,11 @@ public sealed partial class SettingsModel : ObservableObject, IDisposable
 
     /// <summary>Settings over <paramref name="host"/>. The AI panes read <paramref name="ai"/> (the connected library's
     /// AI when not given); Canvas reads <paramref name="canvas"/> and follows <paramref name="watch"/>, the app's one
-    /// shared Canvas poll (none in a test or a shot, so nothing there polls).</summary>
+    /// shared Canvas poll (none in a test or a shot, so nothing there polls). What it asks of the app goes out on
+    /// <paramref name="messages"/> (the app's one messenger when not given).</summary>
     public static SettingsModel Make(AppHost host, IAiLibrary? ai = null, CanvasContext? canvas = null, CanvasWatch? watch = null,
-        Func<LibrarySettingsModel.Call?>? library = null) =>
-        new(host, ai, canvas, watch, library);
+        Func<LibrarySettingsModel.Call?>? library = null, IMessenger? messages = null) =>
+        new(host, ai, canvas, watch, library, messages ?? WeakReferenceMessenger.Default);
 
     /// <summary>True while the constructor fills in what's already set: nothing is saved, and starting at login isn't
     /// touched, until the student changes something.</summary>
@@ -349,9 +353,10 @@ public sealed partial class SettingsModel : ObservableObject, IDisposable
     /// <summary>Putting the box back after the login item couldn't be changed.</summary>
     bool settingLogin;
 
-    SettingsModel(AppHost host, IAiLibrary? ai, CanvasContext? canvas, CanvasWatch? watch, Func<LibrarySettingsModel.Call?>? library)
+    SettingsModel(AppHost host, IAiLibrary? ai, CanvasContext? canvas, CanvasWatch? watch, Func<LibrarySettingsModel.Call?>? library, IMessenger messages)
     {
         this.host = host;
+        this.messages = messages;
         bool records = host.Settings.Role != AppRole.Library;
         // Not for school (what the library is for says so): Folders, and no Canvas.
         bool school = host.Overview?["for_school"] is not System.Text.Json.Nodes.JsonValue fs || !fs.TryGetValue(out bool sc) || sc;
@@ -455,7 +460,11 @@ public sealed partial class SettingsModel : ObservableObject, IDisposable
         };
         AiProblems = new AiProblemsModel(aiStatus) { Here = libraryHere, OpenUrl = url => Dialogs.OpenUrl(url) };
         Access = MakeAccess(ai, host, aiApps);
-        Canvas = new CanvasSettingsModel(canvas ?? CanvasContext.For(host), watch) { OnSetUpExtension = () => Shell.ShowCanvasConnect(), OnChooseBrowser = Shell.ChooseBrowser };
+        Canvas = new CanvasSettingsModel(canvas ?? CanvasContext.For(host), watch)
+        {
+            OnSetUpExtension = () => messages.Send(new CanvasConnectRequested()),
+            OnChooseBrowser = ask => messages.Send(new BrowserChoiceRequested(ask)),
+        };
         Calendars = new CalendarSettingsModel(host.Home, wake: () => host.Calendars.Wake());
         Granola = new ViewModels.GranolaSettingsModel(host.Granola, () => host.Settings.GranolaNotify, on => host.Save(x => x.GranolaNotify = on));
         Phones = new PhonesModel(() => host.Remote() is { } phonesLib ? (m, path, body) => phonesLib.DevicesAsync(m, path, body) : null);
@@ -474,7 +483,7 @@ public sealed partial class SettingsModel : ObservableObject, IDisposable
             Preferred = () => host.Settings.SetupAi,
             Computer = () => RoleWords,
             Log = host.Log,
-            RunSetup = () => Shell.RunSetupAgain(),
+            RunSetup = () => messages.Send(new SetupAgainRequested()),
         });
         Address = cc.ServerUrl;
         DisplayName = cc.DisplayName;
@@ -598,7 +607,8 @@ public sealed partial class SettingsModel : ObservableObject, IDisposable
         OnPropertyChanged(nameof(IsLibraryRole));
         OnPropertyChanged(nameof(CanStartLibrary));
         OnPropertyChanged(nameof(CanStopLibrary));
-        ShortcutsSay = Shell.ShortcutsSay();
+        var shortcuts = messages.Send(new ShortcutsWordsRequest());
+        ShortcutsSay = shortcuts.HasReceivedResponse ? shortcuts.Response : null;
         ModelLine = ModelWords(host);
         SpeakersLine = SpeakersWords(host);
         LiveTranscriptLine = LiveTranscriptWords(host.Recorder.Current, host.Settings.LiveTranscript);
@@ -1150,11 +1160,11 @@ public sealed partial class SettingsModel : ObservableObject, IDisposable
     [RelayCommand] void RedownloadModel() => _ = host.RedownloadModel();
 
     /// <summary>Setup's steps again, from the welcome, with this computer's role kept.</summary>
-    [RelayCommand] static void RunSetupAgain() => Shell.RunSetupAgain();
+    [RelayCommand] void RunSetupAgain() => messages.Send(new SetupAgainRequested());
     /// <summary>The row's quiet link: setup by hand, as it was before guided setup.</summary>
-    [RelayCommand] static void RunSetupByHand() => Shell.RunSetupAgain(byHand: true);
+    [RelayCommand] void RunSetupByHand() => messages.Send(new SetupAgainRequested(ByHand: true));
 
-    [RelayCommand] static void Quit() => Shell.Quit();
+    [RelayCommand] void Quit() => messages.Send(new QuitRequested());
 
     public void Dispose()
     {

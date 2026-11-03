@@ -32,14 +32,13 @@ public class AiRewriteTests
     /// of a fixed sleep — the job runs on its own background Task.</summary>
     static async Task<RewriteInfo> UntilAsync(AiRemote remote, string id, Func<RewriteInfo, bool> matches)
     {
-        var deadline = DateTime.UtcNow.AddSeconds(5);
-        while (true)
+        RewriteInfo? info = null;
+        if (await Waiting.UntilAsync(async () =>
         {
-            var info = await remote.RewriteAsync(id) ?? throw new InvalidOperationException("the library doesn't know /rewrite");
-            if (matches(info)) return info;
-            if (DateTime.UtcNow > deadline) throw new TimeoutException($"never got there — last state was '{info.State}'");
-            await Task.Delay(20);
-        }
+            info = await remote.RewriteAsync(id) ?? throw new InvalidOperationException("the library doesn't know /rewrite");
+            return matches(info);
+        }, 5)) return info!;
+        throw new TimeoutException($"never got there — last state was '{info!.State}'");
     }
 
     [Fact]
@@ -266,12 +265,7 @@ public class AiRewriteTests
         var rewrites1 = new Rewrites(cfg, store, new AiJobs(cfg.Home) { Providers = _ => claude, Checks = checks });
 
         rewrites1.Start("lec-1", "claude");
-        var deadline = DateTime.UtcNow.AddSeconds(5);
-        while (rewrites1.Get("lec-1").State != "ready")
-        {
-            if (DateTime.UtcNow > deadline) throw new TimeoutException("the draft never became ready");
-            await Task.Delay(20);
-        }
+        if (!await Waiting.UntilAsync(() => rewrites1.Get("lec-1").State == "ready", 5)) throw new TimeoutException("the draft never became ready");
 
         // A fresh Rewrites over the same home — as if the library had just restarted — reads the same job back.
         var rewrites2 = new Rewrites(cfg, store, new AiJobs(cfg.Home) { Checks = checks });
@@ -293,12 +287,7 @@ public class AiRewriteTests
         var rewrites1 = new Rewrites(cfg, store, new AiJobs(cfg.Home) { Providers = _ => claude, Checks = checks });
 
         rewrites1.Start("lec-1", "claude");
-        var deadline = DateTime.UtcNow.AddSeconds(5);
-        while (rewrites1.Get("lec-1").State != "working")
-        {
-            if (DateTime.UtcNow > deadline) throw new TimeoutException("never reached working");
-            await Task.Delay(20);
-        }
+        if (!await Waiting.UntilAsync(() => rewrites1.Get("lec-1").State == "working", 5)) throw new TimeoutException("never reached working");
 
         var rewrites2 = new Rewrites(cfg, store, new AiJobs(cfg.Home) { Checks = checks });
         var info = rewrites2.Get("lec-1");

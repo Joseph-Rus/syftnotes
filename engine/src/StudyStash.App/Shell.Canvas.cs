@@ -16,10 +16,12 @@ namespace StudyStash.App;
 /// Canvas's notifications and the window that connects Canvas.</summary>
 public static partial class Shell
 {
-    static CanvasContext? canvas;
-    /// <summary>The library (address and key) <see cref="canvas"/> was built for: a new one gets a new context.</summary>
-    static string canvasFor = "";
-    static CanvasWatch? canvasWatch;
+    /// <summary>The one Canvas context and watch, for the library the app is connected to now (a new library makes
+    /// both again: <see cref="OnCanvasMade"/>).</summary>
+    static CanvasLink canvasLink = null!;
+    /// <summary>The library (address and key) the Canvas context was made for.</summary>
+    static string canvasFor => canvasLink.MadeFor;
+    static CanvasWatch? canvasWatch => canvasLink?.Current;
     static CanvasNotifier? canvasNotifier;
     static DispatcherTimer? canvasNotifyTimer;
     static bool canvasWatching;
@@ -31,36 +33,21 @@ public static partial class Shell
     static Window? canvasConnectWindow;
 
     /// <summary>The Canvas context every Canvas screen shares, for the library the app is connected to now.</summary>
-    static CanvasContext Canvas()
-    {
-        var cc = host.Client();
-        string key = cc.ServerUrl + "\n" + cc.PoolKey;
-        if (canvas is not null && key == canvasFor) return canvas;
-        if (canvasWatch is not null)
-        {
-            canvasWatch.Stop();
-            canvasWatch.Changed -= OnCanvasChanged;
-        }
-        canvasWatching = false;
-        canvasFor = key;
-        var context = canvas = CanvasContext.For(host);
-        canvasWatch = new CanvasWatch(context)
-        {
-            Extension = new ExtensionKeeper(host.Home, () => context.Client, host.Log),
-            OnError = e => host.Log($"[canvas] asking the library about Canvas: {e.GetType().Name}: {e.Message}"),
-        };
-        canvasWatch.Changed += OnCanvasChanged;
-        canvasFeed?.Dispose();
-        canvasFeed = new CanvasFeed(context, canvasWatch);
-        canvasFeed.Updated += () => Dispatcher.UIThread.Post(() => Run(() => CanvasUpdatedAsync(), "CanvasUpdated"));
-        canvasNotifier = new CanvasNotifier(canvas) { OnOpen = OpenCanvasNotification };
-        return canvas;
-    }
+    static CanvasContext Canvas() => canvasLink.Context;
 
-    static CanvasWatch CanvasPoll()
+    static CanvasWatch CanvasPoll() => canvasLink.Watch;
+
+    /// <summary>A new library, so a new Canvas context and watch: the old watch (already stopped) is let go, and the
+    /// status line, what's due and Canvas's notifications follow the new one.</summary>
+    static void OnCanvasMade(CanvasWatch? old, CanvasContext context, CanvasWatch watch)
     {
-        Canvas();
-        return canvasWatch!;
+        if (old is not null) old.Changed -= OnCanvasChanged;
+        canvasWatching = false;
+        watch.Changed += OnCanvasChanged;
+        canvasFeed?.Dispose();
+        canvasFeed = new CanvasFeed(context, watch);
+        canvasFeed.Updated += () => Dispatcher.UIThread.Post(() => Run(() => CanvasUpdatedAsync(), "CanvasUpdated"));
+        canvasNotifier = new CanvasNotifier(context) { OnOpen = OpenCanvasNotification };
     }
 
     /// <summary>Canvas is watched while the app has a library that answers, and not otherwise.</summary>
@@ -347,7 +334,11 @@ public static partial class Shell
             return;
         }
         var watch = CanvasPoll();
-        var model = new CanvasConnectModel(Canvas(), watch) { ShowFooter = true, FinishLabel = "Finish", StepLabel = "" };
+        var model = canvasModels.ForWindow(new CanvasConnectExits(Skip: CloseCanvasConnect, Back: CloseCanvasConnect, Finish: () =>
+        {
+            CloseCanvasConnect();
+            Run(() => CanvasSyncedAsync(), "CanvasSynced");
+        }));
         Control view = Skin.Current == SkinKind.Mac ? new MacCanvasConnect { DataContext = model } : new WinCanvasConnect { DataContext = model };
         // The course list takes the room the steps leave above the footer.
         if (view.FindControl<ScrollViewer>("Page") is { } page) PickerRoom.Follow(page);
@@ -369,18 +360,6 @@ public static partial class Shell
         AppWindows.Open(spec, w =>
         {
             if (Skin.Current == SkinKind.Mac) w.Bind(Window.BackgroundProperty, w.GetResourceObservable("Win"));
-            model.Picker.OnSaved = () =>
-            {
-                LibraryClassesChanged();
-                return Task.CompletedTask;
-            };
-            model.OnSkip = w.Close;
-            model.OnBack = w.Close;
-            model.OnFinish = () =>
-            {
-                w.Close();
-                Run(() => CanvasSyncedAsync(), "CanvasSynced");
-            };
             w.Closed += (_, _) =>
             {
                 if (canvasConnectWindow == w) canvasConnectWindow = null;
@@ -390,6 +369,9 @@ public static partial class Shell
         });
         Run(() => StartConnectAsync(model, watch), "StartConnect");
     }
+
+    /// <summary>Connect Canvas's own window closes (its Skip for now, Back and Finish).</summary>
+    static void CloseCanvasConnect() => canvasConnectWindow?.Close();
 
     static async Task StartConnectAsync(CanvasConnectModel model, CanvasWatch watch)
     {

@@ -84,5 +84,21 @@ public class KitTests
         Assert.Equal(AiWords.NotAnswering, action.Say);
     }
 
+    [Fact]
+    public async Task AsyncAction_cancel_ends_quietly_and_the_command_runs_the_work()
+    {
+        var action = new AsyncAction(async ct => { await new TaskCompletionSource().Task.WaitAsync(ct); return Outcome.Done; });
+        var run = action.Command.ExecuteAsync(null);
+        Assert.True(action.Busy);
+        action.Cancel();
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => run);
+        Assert.False(action.Busy);
+        Assert.Null(action.Say);
+
+        var once = new AsyncAction(_ => Task.FromResult(Outcome.Failed(Failure.Offline)));
+        await once.Command.ExecuteAsync(null);
+        Assert.Equal(AiWords.NotAnswering, once.Say);
+    }
+
     public sealed class AiSaidStub;
 }

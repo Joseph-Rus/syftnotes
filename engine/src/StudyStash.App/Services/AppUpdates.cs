@@ -1,5 +1,6 @@
 using System.Globalization;
 using Avalonia.Threading;
+using CommunityToolkit.Mvvm.Messaging;
 using StudyStash.App.Platform;
 using StudyStash.Core;
 
@@ -422,9 +423,9 @@ public sealed class AppUpdates
             RelaunchAndQuit = () =>
             {
                 SpawnWaiter(updateHost, relaunchArgs);
-                Dispatcher.UIThread.Post(() => Shell.Quit(0));
+                Dispatcher.UIThread.Post(static () => WeakReferenceMessenger.Default.Send(new QuitRequested()));
             },
-            Quit = () => Dispatcher.UIThread.Post(() => Shell.Quit(0)),
+            Quit = () => Dispatcher.UIThread.Post(static () => WeakReferenceMessenger.Default.Send(new QuitRequested())),
             Tell = tell,
             Log = Program.Log,
             Home = host.Home,

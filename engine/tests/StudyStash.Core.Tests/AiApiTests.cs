@@ -218,8 +218,7 @@ public class AiApiTests
         var downloaded = await remote.DownloadAsync("ollama");
         Assert.NotNull(downloaded?.Overview);
 
-        var deadline = DateTime.UtcNow.AddSeconds(5);
-        while (DateTime.UtcNow < deadline && (await remote.EnginesAsync())!.Pulling is not null) await Task.Delay(20);
+        await Waiting.UntilAsync(async () => (await remote.EnginesAsync())!.Pulling is null, 5);
         Assert.Equal(1, checks.PullCalls);
         Assert.Null((await remote.EnginesAsync())!.Pulling);
     }
@@ -262,8 +261,7 @@ public class AiApiTests
         Assert.Equal(("model_missing", gb, small), (free.State, free.SetUpGb, free.Small));
 
         await remote.SetUpAsync("ollama");
-        var deadline = DateTime.UtcNow.AddSeconds(5);
-        while (DateTime.UtcNow < deadline && (await remote.EnginesAsync())!.Pulling is { Why.Length: 0 }) await Task.Delay(20);
+        await Waiting.UntilAsync(async () => (await remote.EnginesAsync())!.Pulling is not { Why.Length: 0 }, 5);
 
         Assert.Equal([model], pulled);
         Assert.Equal("ready", (await remote.EnginesAsync())!.Engines.Single(e => e.Id == "ollama").State);
@@ -373,8 +371,7 @@ public class AiApiTests
         var remote = new AiRemote("http://localhost", "pw", site.Client);
         async Task<PullInfo?> Settled()
         {
-            var deadline = DateTime.UtcNow.AddSeconds(5);
-            while (DateTime.UtcNow < deadline && (await remote.EnginesAsync())!.Pulling is { Why.Length: 0 }) await Task.Delay(20);
+            await Waiting.UntilAsync(async () => (await remote.EnginesAsync())!.Pulling is not { Why.Length: 0 }, 5);
             return (await remote.EnginesAsync())!.Pulling;
         }
 

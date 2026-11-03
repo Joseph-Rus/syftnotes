@@ -178,7 +178,7 @@ public class AppHostTests
         host.Start();
         host.Recorder.Start("CS 101");
         var took = Stopwatch.StartNew();
-        while (host.Recorder.Current?.State != LectureState.Paused && took.Elapsed < TimeSpan.FromSeconds(15)) await Task.Delay(100, TestContext.Current.CancellationToken);
+        await Wait.UntilAsync(() => host.Recorder.Current?.State == LectureState.Paused, "the recording to pause", TimeSpan.FromSeconds(15));
         Assert.Equal(LectureState.Paused, host.Recorder.Current?.State);
         Assert.InRange(took.Elapsed.TotalSeconds, 4, 15);
         lock (said) Assert.Contains(("Recording paused", RecordingWords.CantHear), said);

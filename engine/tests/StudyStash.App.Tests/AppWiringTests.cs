@@ -118,11 +118,7 @@ public class AppWiringTests
         Assert.True(model.OnCanvas);
     }
 
-    static async Task Until(Func<bool> done)
-    {
-        for (int i = 0; i < 100 && !done(); i++) await Task.Delay(10, TestContext.Current.CancellationToken);
-        Assert.True(done());
-    }
+    static Task Until(Func<bool> done) => Wait.UntilAsync(done, "it to happen", TimeSpan.FromSeconds(10));
 
     [Fact]
     public void The_dropdown_shows_next_due_only_when_something_is()
