@@ -265,7 +265,7 @@ public static class LibraryBringIn
         {
             return null;
         }
-        var front = Front(text);
+        var front = Front(text.Replace("\r\n", "\n"));
         if (!front.TryGetValue("id", out var idNode) || Py.AsString(idNode) is not { Length: > 0 and <= 200 } id) return null;
         string folderName = Path.GetFileName(Py.Parent(path));
         return new NoteFile(path, text, id, front, Py.AsString(front.GetValueOrDefault("class")) is { Length: > 0 } c ? c : folderName);
@@ -297,13 +297,16 @@ public static class LibraryBringIn
         return front;
     }
 
+    /// <param name="Text">The file exactly as it is (a Windows one keeps its "\r\n"): what a copy is written with.</param>
     sealed record NoteFile(string Path, string Text, string Id, Dictionary<string, JsonNode?> Fields, string Class)
     {
+        /// <summary>The text with every line ending a "\n", as the library reads a note file.</summary>
+        string Plain => Text.Replace("\r\n", "\n");
         string S(string key) => Py.AsString(Fields.GetValueOrDefault(key)) ?? "";
         public string Title => S("title");
         public string LectureTitle => S("lecture_title");
         public List<string> Topics => (Fields.GetValueOrDefault("topics") as JsonArray ?? []).Select(Py.AsString).OfType<string>().ToList();
-        public string Summary => Notes.SummaryInFile(Text) ?? "";
+        public string Summary => Notes.SummaryInFile(Plain) ?? "";
         public string SummaryBy => Summary.Length > 0 ? S("summary_by") : "";
 
         /// <summary>"human (1.00)": who sorted it, and how sure.</summary>
@@ -327,9 +330,9 @@ public static class LibraryBringIn
                 Title = Title.Length > 0 ? Title : System.IO.Path.GetFileNameWithoutExtension(Path),
                 Date = S("date"), Owner = S("source"), Folder = S("folder"),
                 Attendees = (Fields.GetValueOrDefault("attendees") as JsonArray ?? []).Select(Py.AsString).OfType<string>().ToList(),
-                NotesMarkdown = Notes.Section(Text, "Notes"),
-                PrivateNotes = Notes.Section(Text, "Private notes"),
-                Transcript = Notes.Section(Text, "Transcript"),
+                NotesMarkdown = Notes.Section(Plain, "Notes"),
+                PrivateNotes = Notes.Section(Plain, "Private notes"),
+                Transcript = Notes.Section(Plain, "Transcript"),
             };
             if (LectureTitle.Length > 0 && LectureTitle != m.Title) m.Raw[Core.Meeting.TitleBy] = Core.Meeting.Kept;
             return m;
@@ -340,25 +343,27 @@ public static class LibraryBringIn
         public NoteFile Beside(string id, string from)
         {
             string title = $"{Title} (from {from})", lecture = $"{(LectureTitle.Length > 0 ? LectureTitle : Title)} (from {from})";
+            // Line by line in the file as it is, each line keeping its own ending.
             var lines = Text.Split('\n');
-            bool inFront = lines.Length > 0 && lines[0] == "---";
+            bool inFront = lines.Length > 0 && lines[0].TrimEnd('\r') == "---";
             string heading = $"# {(LectureTitle.Length > 0 ? LectureTitle : Title)}";
             for (int i = 1; i < lines.Length; i++)
             {
-                if (inFront && lines[i] == "---")
+                string line = lines[i].TrimEnd('\r'), end = lines[i].EndsWith('\r') ? "\r" : "";
+                if (inFront && line == "---")
                 {
                     inFront = false;
                     continue;
                 }
                 if (inFront)
                 {
-                    if (lines[i].StartsWith("id: ", StringComparison.Ordinal)) lines[i] = $"id: {PyJson.Dumps(id)}";
-                    else if (lines[i].StartsWith("title: ", StringComparison.Ordinal)) lines[i] = $"title: {PyJson.Dumps(title)}";
-                    else if (lines[i].StartsWith("lecture_title: ", StringComparison.Ordinal)) lines[i] = $"lecture_title: {PyJson.Dumps(lecture)}";
+                    if (line.StartsWith("id: ", StringComparison.Ordinal)) lines[i] = $"id: {PyJson.Dumps(id)}{end}";
+                    else if (line.StartsWith("title: ", StringComparison.Ordinal)) lines[i] = $"title: {PyJson.Dumps(title)}{end}";
+                    else if (line.StartsWith("lecture_title: ", StringComparison.Ordinal)) lines[i] = $"lecture_title: {PyJson.Dumps(lecture)}{end}";
                 }
-                else if (lines[i] == heading)
+                else if (line == heading)
                 {
-                    lines[i] = $"# {lecture}";
+                    lines[i] = $"# {lecture}{end}";
                     break;
                 }
             }
@@ -367,8 +372,8 @@ public static class LibraryBringIn
         }
     }
 
-    /// <summary>A note file's text, any line ending read as "\n".</summary>
-    static string Text(string path) => Py.ReadText(path);
+    /// <summary>A note file's text exactly as it is (compared with <see cref="Same"/>, which ignores line endings).</summary>
+    static string Text(string path) => File.ReadAllText(path, new UTF8Encoding(false));
 
     static bool Same(string a, string b) => a.Replace("\r\n", "\n").TrimEnd() == b.Replace("\r\n", "\n").TrimEnd();
 
