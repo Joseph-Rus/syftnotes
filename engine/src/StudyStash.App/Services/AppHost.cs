@@ -1,3 +1,4 @@
+using StudyStash.App.Services.Kit;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using System.Text.Json.Serialization;
@@ -841,7 +842,7 @@ public sealed partial class AppHost : IDisposable, IProblemSource
             }
             try
             {
-                await Task.Delay(TimeSpan.FromSeconds(Library == LibraryState.Connected ? 20 : 10), stop.Token);
+                await Poll.AfterAsync(TimeSpan.FromSeconds(Library == LibraryState.Connected ? 20 : 10), stop.Token);
             }
             catch (OperationCanceledException)
             {
@@ -1385,7 +1386,7 @@ public sealed partial class AppHost : IDisposable, IProblemSource
         Changed?.Invoke();
         using (var waiting = CancellationTokenSource.CreateLinkedTokenSource(cts.Token))
         {
-            await Task.WhenAny(Task.Delay(wait, waiting.Token), now.Task);
+            await Task.WhenAny(Poll.AfterAsync(wait, waiting.Token), now.Task);
             await waiting.CancelAsync();
         }
         cts.Token.ThrowIfCancellationRequested();
