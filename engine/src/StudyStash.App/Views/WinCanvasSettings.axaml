@@ -56,7 +56,7 @@
         <Grid ColumnDefinitions="Auto,*,Auto,Auto" ColumnSpacing="10">
           <c:Icon Glyph="language" Size="20" />
           <Border Grid.Column="1" Classes="cv-field" VerticalAlignment="Center" Margin="16,0,0,0">
-            <TextBox Classes="bare" Text="{Binding SchoolField}" FontSize="14" />
+            <TextBox Classes="bare" Text="{Binding SchoolField}" FontSize="14" AutomationProperties.Name="Your school's Canvas address" />
           </Border>
           <Button Grid.Column="2" Classes="cv-btn cv-primary" VerticalAlignment="Center" IsEnabled="{Binding !SavingSchool}" Command="{Binding SaveSchoolCommand}">
             <TextBlock Text="Save" />
