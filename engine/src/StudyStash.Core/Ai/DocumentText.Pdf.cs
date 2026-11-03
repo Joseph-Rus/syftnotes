@@ -55,10 +55,18 @@ public static partial class DocumentText
     static PageReaderFn? PageReader =>
         MacVision.Available ? MacVision.PdfPageText : WindowsOcr.Available ? WindowsOcr.PdfPageText : null;
 
+    /// <summary>Whether a Mac reads a PDF's typed text with PDFKit. Off in every process that isn't the app's window
+    /// (the library, the background library, MCP): PDFKit opening a document checks the process in with Launch Services
+    /// as the app bundle it runs from, and a background library taken for the app kept Syft Notes from opening. Those
+    /// read it with PdfPig, as Windows and Linux do; reading pages as pictures (Core Graphics and Vision) checks nothing
+    /// in, so it stays.</summary>
+    public static bool UsePdfKit { get; set; } = true;
+
     /// <summary>The typed text on each of a PDF's first <paramref name="max"/> pages ("" for a page with none);
-    /// null when it isn't a PDF that opens. A Mac reads it with PDFKit, as Preview does; elsewhere PdfPig reads it.</summary>
+    /// null when it isn't a PDF that opens. The app on a Mac reads it with PDFKit, as Preview does; elsewhere PdfPig
+    /// reads it.</summary>
     internal static List<string>? PdfPages(string path, int max, CancellationToken ct) =>
-        MacVision.Available ? MacVision.PdfPages(path, max, ct) : PdfPigPages(path, max, ct);
+        UsePdfKit && MacVision.Available ? MacVision.PdfPages(path, max, ct) : PdfPigPages(path, max, ct);
 
     /// <summary>PdfPig's reading of a PDF's text, in the order it would be read.</summary>
     internal static List<string>? PdfPigPages(string path, int max, CancellationToken ct)
