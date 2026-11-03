@@ -570,7 +570,9 @@ jobs:
           sh macos/selftest.sh "dist/mac/Study Stash.app" "$RUNNER_TEMP/selftest/one-computer"
           grep -q "^background library registered" "$RUNNER_TEMP/selftest/one-computer/selftest.txt" || { echo "the self-test didn't turn on answering with the app closed"; exit 1; }
           grep -q "^the phone got its answer with the app closed" "$RUNNER_TEMP/selftest/one-computer/background.txt" || { echo "the phone wasn't answered with the app closed"; exit 1; }
-          [ ! -e "$HOME/Library/LaunchAgents/"com.study-stash.background.*.plist ] || { echo "a LaunchAgent was left behind"; ls "$HOME/Library/LaunchAgents"; exit 1; }
+          for agent in "$HOME/Library/LaunchAgents/"com.study-stash.background.*.plist; do
+            [ ! -e "$agent" ] || { echo "a LaunchAgent was left behind"; ls "$HOME/Library/LaunchAgents"; exit 1; }
+          done
       - name: The DMG holds the app with no role of its own (setup asks), and no model is bundled (D6)
         run: |
           mnt="$RUNNER_TEMP/mnt-dmg"
@@ -1155,8 +1157,12 @@ jobs:
           ! ls "${XDG_CONFIG_HOME:-$HOME/.config}"/systemd/user/syft-notes-background*.service "${XDG_CONFIG_HOME:-$HOME/.config}"/autostart/syft-notes-background*.desktop 2>/dev/null || { echo "a registration was left behind"; exit 1; }
           # The library ran as the app's own child (StudyStash serve): quitting the app stops it too, and the background one
           # is gone once the self-test took it away.
-          for i in $(seq 20); do pgrep -f "dist/linux/$RID/syft-notes/StudyStash" >/dev/null || break; sleep 1; done
-          if pgrep -fa "dist/linux/$RID/syft-notes/StudyStash"; then echo "the app's library was still running 20 s after the app quit"; exit 1; fi
+          # pidwait blocks until every process whose command line matches has gone (no polling), timeout bounds it; the
+          # [S] keeps the pattern from matching timeout's and pidwait's own command lines.
+          app_processes="dist/linux/$RID/syft-notes/[S]tudyStash"
+          command -v pidwait > /dev/null || { echo "::error::this runner has no pidwait (procps)"; exit 1; }
+          timeout 20 pidwait -f "$app_processes" || true
+          if pgrep -fa "$app_processes"; then echo "the app's library was still running 20 s after the app quit"; exit 1; fi
       - name: install.sh puts Syft Notes on an account of its own (the app, its menu entry, its icon, syft-notes on the PATH), the installed copy self-tests as a laptop, and uninstall.sh takes it off again
         timeout-minutes: 12
         env:
