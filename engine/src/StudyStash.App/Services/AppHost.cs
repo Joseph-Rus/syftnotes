@@ -250,6 +250,9 @@ public sealed partial class AppHost : IDisposable, IProblemSource
     /// <summary>Starting the app at login (the real login items unless a test gives its own).</summary>
     public ILoginItems LoginItems { get; }
 
+    /// <summary>The time the stores wait on: the system's, or a test's own.</summary>
+    public TimeProvider Clock { get; }
+
     /// <summary>
     /// The app's engine room for a settings folder. <paramref name="microphone"/> stands in for the microphone; without
     /// one, STUDYSTASH_MIC_FILE (a WAV) does, and only with neither is the real microphone ever opened.
@@ -259,13 +262,15 @@ public sealed partial class AppHost : IDisposable, IProblemSource
     /// <paramref name="hardware"/> says what this computer has, which picks its model (a test's pretend computer).
     /// <paramref name="voices"/> tells a lecture's voices apart (a test's pretend one).
     /// <paramref name="phoneDrive"/> makes the phone's Google Drive link (a test's, over a folder kept in memory).
+    /// <paramref name="clock"/> is the time the stores wait on (the system's unless a test gives its own).
     /// </summary>
     public AppHost(string home, Func<IAudioSource>? microphone = null, Func<ITranscriber>? whisper = null, LaptopHost? laptop = null,
         Action<string>? log = null, ILoginItems? loginItems = null, ModelSetting? models = null, HttpClient? http = null,
         Func<LibraryService>? localLibrary = null, IMicPermissions? micPermissions = null, IHardwareProbe? hardware = null,
         Func<ISpeakerLabeler>? voices = null, Func<GranolaOAuth, ILectureSource>? granola = null, Func<AppHost, PhoneDrive>? phoneDrive = null,
-        IBackgroundLibrary? background = null)
+        IBackgroundLibrary? background = null, TimeProvider? clock = null)
     {
+        Clock = clock ?? TimeProvider.System;
         this.voices = voices;
         var probe = hardware ?? HardwareProbe.System;
         this.hardware = Task.Run(probe.Probe);
@@ -478,7 +483,7 @@ public sealed partial class AppHost : IDisposable, IProblemSource
 
     /// <summary>Where the library's AIs stand: the one store every screen showing them reads (Settings' AI rows and its
     /// problem cards today), with the one loop that follows a sign-in.</summary>
-    public Stores.AiStatusStore AiStatus => LazyInitializer.EnsureInitialized(ref aiStatus, () => new Stores.AiStatusStore(() => Api.Ai));
+    public Stores.AiStatusStore AiStatus => LazyInitializer.EnsureInitialized(ref aiStatus, () => new Stores.AiStatusStore(() => Api.Ai, Clock));
 
     /// <summary>The library over its API, once one is set up.</summary>
     public RemoteLibrary? Remote()
