@@ -61,6 +61,9 @@ public sealed class AppUpdates
     public const string Relaunching = "relaunching";
     public const string HandedOff = "handed off";
 
+    /// <summary><see cref="UpdateNews.Why"/> for a Ready that is only the move to Velopack's install, at this version.</summary>
+    public const string MoveOnly = "move";
+
     /// <summary>The app's own updater, once it has started: Settings' Update now and the notification's Update use it.</summary>
     public static AppUpdates? Current { get; private set; }
 
@@ -185,7 +188,8 @@ public sealed class AppUpdates
         Saw(release);
         if (!asked && !Automatic())
         {
-            Once(new(UpdateNewsKind.Ready, release));
+            // A move to the same version isn't a new version, and says so (NoticeWords.MoveReady).
+            Once(new(UpdateNewsKind.Ready, release, moving && !Updates.IsNewer(release) ? MoveOnly : null));
             return Available;
         }
         if (!Idle())

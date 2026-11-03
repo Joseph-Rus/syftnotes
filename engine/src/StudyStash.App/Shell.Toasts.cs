@@ -230,7 +230,7 @@ public static partial class Shell
         {
             case UpdateNewsKind.Ready:
             {
-                var (title, text, action) = NoticeWords.UpdateReady(v);
+                var (title, text, action) = news.Why == AppUpdates.MoveOnly ? NoticeWords.MoveReady() : NoticeWords.UpdateReady(v);
                 Notify(new Notice { Title = title, Text = text, ActionLabel = action, Act = () => Run(() => UpdateNowAsync(), "UpdateNow"), Stay = NoticeTimes.Advice });
                 break;
             }

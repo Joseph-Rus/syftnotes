@@ -111,6 +111,11 @@ public static class NoticeWords
     public static (string Title, string Text, string Action) UpdateReady(string version) =>
         ($"Syft Notes {Plain(version)} is out", "Installing takes about a minute, then Syft Notes opens again by itself.", "Update");
 
+    /// <summary>Not a new version: this copy moves to the app's new way of installing updates (Velopack, the bridge
+    /// release), with auto-updates off so it waits to be asked.</summary>
+    public static (string Title, string Text, string Action) MoveReady() =>
+        ("Syft Notes has one more step to finish updating", "It moves to its new way of updating. That takes about a minute, then Syft Notes opens again by itself.", "Finish");
+
     /// <summary>A new version is out but this copy can't replace itself: <paramref name="why"/> says what to do, and
     /// the button gets the download.</summary>
     public static (string Title, string Text, string Action) UpdateBlocked(string version, string why) =>
