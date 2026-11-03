@@ -87,7 +87,7 @@ flowchart LR
 | Self-test route | hard-coded `NextCommand` order | SelfTest.cs:314–411, 422–470 |
 | Windows built by hand | 7 `new Window` blocks + a hand-kept Dock list | Shell.cs:1086,1315,1430,1723; Shell.Canvas.cs:374; Shell.GetNotes.cs:40. `UpdateDock` (Shell.cs:1781) leaves out the Get-ready window |
 | Mac/Win copies | 38 pairs; 12 differ in under 15% of lines (2,814 lines each side) | MacGuidedSetup 699 lines / 34 differ, MacFunnel 377/16, MacSetup 534/65, MacGetReady 154/14 |
-| Confirmations | 1 shared `ConfirmCard` (library only), 7 hand-made `Confirming*` flags, own delete dialogs | LibraryModel.cs:305; Settings.cs:138,140,189; LibrarySettingsModel.cs:219,247 |
+| Confirmations (before `lib-dialoghost`) | 1 shared `ConfirmCard` (library only), 7 hand-made `Confirming*` flags, own delete dialogs | LibraryModel.cs:305; Settings.cs:138,140,189; LibrarySettingsModel.cs:219,247 |
 | Copy / open URL hooks | 5 `Copy` hooks, 12 `OpenUrl` hooks, 2 ways to reveal a folder | SetupModel.cs:795, AiAccessModel.cs:149; CanvasContext.cs:72 vs `Machine.Open` |
 | Wording spread | 1,034 literal strings in 71 .axaml files; "library offline" in 24 files with two wordings; "No AI for now" in 11 files; brand names mapped in ~8 places | AiConnect.cs:70, AiWords.cs:155,179 |
 | Time/count formatting | ~10 "when/ago" helpers, 17 inline plurals | Shell.cs:2057, Shell.Library.cs:366, CanvasWords.cs:38–59, OverviewModel.cs:514 |
@@ -100,7 +100,7 @@ build it here, as described, the first time a change needs it, instead of making
 
 | Piece | Status |
 |---|---|
-| `CanvasWatch` (the one shared Canvas store), `Tips.WhenCut`, `BySkin`, `Icon`, `AppMark`/`SyftMark`, `SyftLoader`, `ConfirmCard` | exist |
+| `CanvasWatch` (the one shared Canvas store), `Tips.WhenCut`, `BySkin`, `Icon`, `AppMark`/`SyftMark`, `SyftLoader` | exist |
 | `UiTasks.Run` / `RunQuietly` (work started without waiting: logged, and the student told), `Windows/AppWindows` (every window), `PageState` (which page is open) | in review: branch `toolkit-shell` |
 | `Poll`, `LibraryApi` + `Outcome`, `AsyncAction`, `AiStatusStore` (items 1–4) | in review: branch `toolkit-ai-status` |
 | **DI**: `AppServices` (AppServices.cs, Microsoft.Extensions.DependencyInjection) is the composition root: `AppStart`, `TimeProvider`, `IMessenger`, `AppHost` and what it owns (`LibraryClients`, `AiStatusStore`), `CanvasLink` (the one Canvas context and watch, made again for a new library), `ToolkitHooks` (connects `UiTasks` and `AppWindows`), and the view-model factories `AskFactory` and `CanvasModels`. Built once with `AppServices.Checked` (ValidateOnBuild, ValidateScopes) in `Shell.Start`; `AppServicesTests` resolves every registration | in review: branch `app-di` |
