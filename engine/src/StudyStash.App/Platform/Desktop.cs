@@ -89,8 +89,10 @@ public static class Desktop
     /// they load.</summary>
     internal static bool SystemChangesOff { get; set; } = StudyStash.Core.TestSwitches.Get("STUDYSTASH_SELFTEST") is { Length: > 0 };
 
-    /// <summary>The program to start: the app bundle's executable (a Mac), or StudyStash.exe.</summary>
-    public static string Program => Environment.ProcessPath ?? "StudyStash";
+    /// <summary>The program to start: the app bundle's executable (a Mac), StudyStash.exe, or on Linux the AppImage
+    /// itself ($APPIMAGE), never the folder it's mounted on while it runs, which is gone once it quits.</summary>
+    public static string Program => OperatingSystem.IsLinux() && Environment.GetEnvironmentVariable("APPIMAGE") is { Length: > 0 } image
+        ? image : Environment.ProcessPath ?? "StudyStash";
 
     /// <summary>The login item's name for a settings folder: the usual folder is "com.study-stash.app" (a LaunchAgent)
     /// and "Study Stash" (the Run key); any other folder gets its own, so a second profile never replaces the real one.</summary>

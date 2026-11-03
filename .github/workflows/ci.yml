@@ -197,12 +197,18 @@ jobs:
         with:
           persist-credentials: false
       - run: bash tools/check-connections.sh
-      - name: install.sh, install.ps1 and windows/*.ps1 parse
+      - name: install.sh, install.ps1, windows/*.ps1 and the Velopack scripts parse
         shell: pwsh
         run: |
-          sh -n install.sh
-          if ($LASTEXITCODE -ne 0) { throw "install.sh doesn't parse" }
-          foreach ($file in @(Get-Item install.ps1) + @(Get-ChildItem windows -Filter *.ps1)) {
+          foreach ($sh in @("install.sh") + @(Get-ChildItem macos, linux, tools/velopack -Filter *.sh | ForEach-Object FullName)) {
+            sh -n $sh
+            if ($LASTEXITCODE -ne 0) { throw "$sh doesn't parse" }
+          }
+          foreach ($py in @(Get-ChildItem tools/velopack -Filter *.py)) {
+            python3 -m py_compile $py.FullName
+            if ($LASTEXITCODE -ne 0) { throw "$($py.Name) doesn't parse" }
+          }
+          foreach ($file in @(Get-Item install.ps1) + @(Get-ChildItem windows -Filter *.ps1) + @(Get-ChildItem tools/velopack -Filter *.ps1)) {
             $errors = $null
             [System.Management.Automation.Language.Parser]::ParseFile($file.FullName, [ref]$null, [ref]$errors) | Out-Null
             if ($errors.Count -gt 0) { throw "$($file.Name) doesn't parse: $errors" }
