@@ -520,7 +520,7 @@
                         <c:Icon Glyph="{Binding Glyph}" Size="17" Foreground="{DynamicResource InkMuted}" VerticalAlignment="Top" Margin="0,1,0,0" />
                         <StackPanel Grid.Column="2" Spacing="1">
                           <TextBlock Classes="hit-title" Text="{Binding Title}" />
-                          <TextBlock Classes="hit-where" Text="{Binding Where}" />
+                          <TextBlock Classes="hit-where" Text="{Binding Where}" ToolTip.Tip="{Binding Where}" c:Tips.WhenCut="True" />
                         </StackPanel>
                       </Grid>
                     </Button>
@@ -1257,7 +1257,7 @@
                             </StackPanel>
                             <Button Grid.Column="1" Classes="select act" MaxWidth="260">
                               <Grid ColumnDefinitions="*,6,Auto">
-                                <TextBlock Classes="plain" Text="{Binding Lib.SortEngineLabel}" VerticalAlignment="Center" />
+                                <TextBlock Classes="plain" Text="{Binding Lib.SortEngineLabel}" ToolTip.Tip="{Binding Lib.SortEngineLabel}" c:Tips.WhenCut="True" VerticalAlignment="Center" />
                                 <c:Icon Grid.Column="2" Glyph="unfold_more" Size="15" Foreground="{DynamicResource Fg2}" />
                               </Grid>
                               <Button.Flyout>
@@ -1298,7 +1298,7 @@
                             </StackPanel>
                             <Button Grid.Column="1" Classes="select act" MaxWidth="260">
                               <Grid ColumnDefinitions="*,6,Auto">
-                                <TextBlock Classes="plain" Text="{Binding Lib.SummaryLabel}" VerticalAlignment="Center" />
+                                <TextBlock Classes="plain" Text="{Binding Lib.SummaryLabel}" ToolTip.Tip="{Binding Lib.SummaryLabel}" c:Tips.WhenCut="True" VerticalAlignment="Center" />
                                 <c:Icon Grid.Column="2" Glyph="unfold_more" Size="15" Foreground="{DynamicResource Fg2}" />
                               </Grid>
                               <Button.Flyout>
@@ -1316,7 +1316,7 @@
                             </StackPanel>
                             <Button Grid.Column="1" Classes="select act" MaxWidth="260">
                               <Grid ColumnDefinitions="*,6,Auto">
-                                <TextBlock Classes="plain" Text="{Binding Lib.SortLabel}" VerticalAlignment="Center" />
+                                <TextBlock Classes="plain" Text="{Binding Lib.SortLabel}" ToolTip.Tip="{Binding Lib.SortLabel}" c:Tips.WhenCut="True" VerticalAlignment="Center" />
                                 <c:Icon Grid.Column="2" Glyph="unfold_more" Size="15" Foreground="{DynamicResource Fg2}" />
                               </Grid>
                               <Button.Flyout>
