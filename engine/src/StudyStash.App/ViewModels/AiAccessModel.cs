@@ -197,7 +197,7 @@ public sealed partial class AiAccessModel : ObservableObject
         {
             info = await library.AccessAsync();
         }
-        catch
+        catch (Exception e) when (LibraryCall.Handled(e, "[ai-access] Load"))
         {
             Offline = true;
             return;
@@ -330,7 +330,7 @@ public sealed partial class AiAccessModel : ObservableObject
                 }
                 return;
             }
-            catch
+            catch (Exception e) when (LibraryCall.Handled(e, "[ai-access] SetWebAsync"))
             {
                 Offline = true;
                 return;
@@ -369,7 +369,7 @@ public sealed partial class AiAccessModel : ObservableObject
             var info = await library.CheckWebAsync();
             if (info is not null) Apply(info);
         }
-        catch
+        catch (Exception e) when (LibraryCall.Handled(e, "[ai-access] CheckWebAgain"))
         {
             Offline = true;
         }
@@ -446,7 +446,7 @@ public sealed partial class AiAccessModel : ObservableObject
                 {
                     info = await library.CheckWebAsync();
                 }
-                catch
+                catch (Exception e) when (LibraryCall.Handled(e, "[ai-access] PollAsync"))
                 {
                     return;
                 }
@@ -491,7 +491,7 @@ public sealed partial class AiAccessModel : ObservableObject
         {
             Say = ex.Message;
         }
-        catch
+        catch (Exception e) when (LibraryCall.Handled(e, "[ai-access] PostAsync"))
         {
             Offline = true;
         }

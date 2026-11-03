@@ -1899,4 +1899,33 @@ public class AiAccessModelTests
 
         Assert.True(model.Offline);
     }
+
+    [AvaloniaFact]
+    public async Task A_rewrite_keeps_being_checked_after_one_failed_check_and_the_new_notes_arrive()
+    {
+        int checks = 0;
+        var lib = new FakeAiLibrary
+        {
+            Overview = AiTestData.MixedOverview(),
+            OnRewrite = _ => ++checks switch
+            {
+                1 => new RewriteInfo("lec-1", "working"),
+                2 => throw new HttpRequestException("down for a moment"),
+                _ => new RewriteInfo("lec-1", "ready") { Draft = new NotesVersion("## Summary\nNew notes.", "Claude Code", "2026-09-29T09:40:00") },
+            },
+        };
+        var ticks = new SemaphoreSlim(0);
+        var model = new AiNotesModel(lib) { Delay = (_, ct) => ticks.WaitAsync(ct) };
+        await model.Load("lec-1", "## Summary\nOld notes.", "Claude Code", "2026-09-29T09:00:00");
+        Assert.Equal(RewriteState.Rewriting, model.State);
+
+        ticks.Release();
+        await Wait.UntilAsync(() => model.Offline, "offline after the failed check", TimeSpan.FromSeconds(2));
+        Assert.Equal(RewriteState.Rewriting, model.State);
+
+        ticks.Release();
+        await Wait.UntilAsync(() => model.State == RewriteState.Ready, "the new notes", TimeSpan.FromSeconds(2));
+        Assert.False(model.Offline);
+        model.Dispose();
+    }
 }
