@@ -19,10 +19,6 @@ namespace StudyStash.App;
 /// beside it (Home, Due, a folder's page, Canvas's lists) are in Shell.Overview.cs.</summary>
 public static partial class Shell
 {
-    /// <summary>The folder in mind: the one whose page showed last, or whose note is open.</summary>
-    static string? openClass;
-    /// <summary>The note whose page is open; null when another page is.</summary>
-    static string? openLecture;
     static int searchTurn;
     /// <summary>Every whole load of the library window takes the next turn: one that's no longer the latest by the
     /// time it's back stops instead of clobbering what a later one already drew.</summary>
@@ -134,9 +130,14 @@ public static partial class Shell
             }
         }
         // A folder removed (in Settings, say) isn't left in mind.
-        if (openClass is not null && library.Classes.All(c => c.Name != openClass)) openClass = null;
-        if (overviewOf is { Length: > 0 } over && over != DueHome && library.Classes.All(c => c.Name != over)) overviewOf = "";
-        if (openCanvasClass is { } canvas && library.Classes.All(c => c.Name != canvas)) openCanvasClass = null;
+        bool Gone(string? name) => name is not null && library.Classes.All(c => c.Name != name);
+        var was = pageState;
+        pageState = was with
+        {
+            Class = Gone(was.Class) ? null : was.Class,
+            Overview = was.Overview is { Length: > 0 } over && over != DueHome && Gone(over) ? "" : was.Overview,
+            CanvasClass = Gone(was.CanvasClass) ? null : was.CanvasClass,
+        };
     }
 
     static async Task LoadLibraryAsync()
@@ -156,7 +157,7 @@ public static partial class Shell
         {
             // A recording can still be taken (and its notes typed) with the library away: its page stays.
             if (library.Note is { Live: true }) return;
-            ++pageTurn;
+            pageState = pageState with { Turn = pageState.Turn + 1 };
             ClearPane();
             library.Overview = null;
             SelectInSidebar(null, home: true);
@@ -211,9 +212,8 @@ public static partial class Shell
             ShowRecordingPage();
             return;
         }
-        int turn = ++pageTurn;
-        LeavePage();
-        openLecture = id;
+        pageState = pageState.Next() with { Lecture = id };
+        int turn = pageState.Turn;
         bool showing = library.Overview is null && library.Assignment is null && library.CanvasClass is null && library.Note is { Live: false } on && on.Id == id;
         // Its notes are being edited: the page stays as it is under the student's typing, however it came to be shown
         // again (a new note was filed, a file was attached).
@@ -236,7 +236,7 @@ public static partial class Shell
             }
         }
         // Another page was asked for while this one loaded (a notification's Open note, a click): that one shows.
-        if (turn != pageTurn) return;
+        if (turn != pageState.Turn) return;
         if (l is null)
         {
             // Not in the library (yet): one recorded here that's still being written down or sent shows what it has.
@@ -250,8 +250,8 @@ public static partial class Shell
         // The library gives a note its folder when it files it. Until then one recorded here is in the folder it was
         // recorded in, as its page said while it recorded: not "Unsorted", with its folder left unselected.
         if (cls.Length == 0 && writing && host.Lectures.Get(id) is { ClassName: { Length: > 0 } recordedIn } && recordedIn != Configs.Unsorted) cls = recordedIn;
-        openClass = cls.Length > 0 ? cls : null;
-        SelectInSidebar(openClass);
+        pageState = pageState with { Class = cls.Length > 0 ? cls : null };
+        SelectInSidebar(pageState.Class);
         string notes = S(l["notes"]), typed = S(l["typed"]), noun = Nouns.For(cls, cls.Length > 0 ? host.GroupOf(cls) : "");
         string stamp = string.Join("\u0001", S(l["title"]), cls, status, notes, typed, S(l["error"]), S(l["transcript"]).Length, S(l["updated"]), S(l["no_notes"]));
         // Read again and nothing changed: the page stays as it is (where it's scrolled to, what's typed in Ask).
@@ -337,7 +337,7 @@ public static partial class Shell
             };
             free.Saved += () => Avalonia.Threading.Dispatcher.UIThread.Post(() =>
             {
-                if (openLecture == id) Run(() => ShowLectureAsync(id, library.Note?.ShowTranscript == true), "ShowLecture");
+                if (pageState.Lecture == id) Run(() => ShowLectureAsync(id, library.Note?.ShowTranscript == true), "ShowLecture");
             });
         }
         free.HasNotes = has;
@@ -418,8 +418,8 @@ public static partial class Shell
         string stamp = LocalStamp(l);
         bool showing = library.Overview is null && library.Assignment is null && library.CanvasClass is null && library.Note is { Live: false } on && on.Id == l.Id;
         if (showing && library.Note!.Stamp == stamp) return;
-        openClass = cls.Length > 0 ? cls : null;
-        SelectInSidebar(openClass);
+        pageState = pageState with { Class = cls.Length > 0 ? cls : null };
+        SelectInSidebar(pageState.Class);
         string id = l.Id;
         var keepRecording = ContinueFor(id);
         var note = new NoteModel
@@ -512,7 +512,7 @@ public static partial class Shell
                 notes.NotesChanged += () => Avalonia.Threading.Dispatcher.UIThread.Post(() =>
                 {
                     KeepOwnNotes(note.Id, made);
-                    if (openLecture == note.Id) Run(() => ShowLectureAsync(note.Id, library.Note?.ShowTranscript == true), "ShowLecture");
+                    if (pageState.Lecture == note.Id) Run(() => ShowLectureAsync(note.Id, library.Note?.ShowTranscript == true), "ShowLecture");
                 });
             }
         }
@@ -648,11 +648,11 @@ public static partial class Shell
     {
         if (at is not double t)
         {
-            if (id != openLecture) OpenLecture(id);
+            if (id != pageState.Lecture) OpenLecture(id);
             return;
         }
         if (File.Exists(host.Lectures.AudioPath(id))) Play(id, t);
-        if (id != openLecture) OpenAt(id, t);
+        if (id != pageState.Lecture) OpenAt(id, t);
         else library.Note?.ShowAt(t);
     }
 
@@ -663,12 +663,12 @@ public static partial class Shell
         void Shown(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
         {
             if (e.PropertyName != nameof(LibraryModel.Note)) return;
-            if (openLecture == id && (library.Note is not { Live: false } n || n.Id != id)) return; // still on its way
+            if (pageState.Lecture == id && (library.Note is not { Live: false } n || n.Id != id)) return; // still on its way
             library.PropertyChanged -= Shown;
             // (Somewhere else was opened meanwhile: nothing to show.) After the page has finished being put up.
-            if (openLecture == id) Avalonia.Threading.Dispatcher.UIThread.Post(() =>
+            if (pageState.Lecture == id) Avalonia.Threading.Dispatcher.UIThread.Post(() =>
             {
-                if (openLecture != id || library.Note is not { Live: false } now || now.Id != id) return;
+                if (pageState.Lecture != id || library.Note is not { Live: false } now || now.Id != id) return;
                 // It opens at its transcript: there were no notes being read here to offer a way back to.
                 now.ShowTranscript = true;
                 now.ShowAt(at);
@@ -683,8 +683,7 @@ public static partial class Shell
     {
         // The note that's already on the page isn't a place to go back to from itself.
         if (Here() != new Place(Lecture: id)) Remember();
-        LeavePage();
-        openLecture = id;
+        pageState = pageState.Left() with { Lecture = id };
         bool loaded = mainWindow?.IsVisible == true && host.Library == LibraryState.Connected && library.Classes.Count > 0;
         ShowLibrary();
         // The window is already up and read: the note opens now, not after the whole window is read again.
@@ -697,7 +696,7 @@ public static partial class Shell
     {
         if (mainWindow?.Content is not Control anchor) return;
         var menu = Menu();
-        string? cls = overviewOf == DueHome || overviewOf == "" ? null : openClass is { } o && o != Configs.Unsorted ? o : null;
+        string? cls = pageState.Overview == DueHome || pageState.Overview == "" ? null : pageState.Class is { } o && o != Configs.Unsorted ? o : null;
         if (host.Remote() is { } lib && Uri.TryCreate(lib.ServerUrl, UriKind.Absolute, out var u) && (u.IsLoopback || host.Settings.LibraryHere))
         {
             var term = new MenuItem { Header = cls is null ? "Open the library in Claude Code" : $"Open {cls} in Claude Code" };
@@ -950,8 +949,7 @@ public static partial class Shell
     {
         quickWindow?.Hide();
         Remember();
-        LeavePage();
-        overviewOf = DueHome;
+        pageState = pageState.Left() with { Overview = DueHome };
         dueOnly = null;
         ShowLibrary();
     }
@@ -1040,16 +1038,15 @@ public static partial class Shell
         {
             case QuickKind.Class when row.ClassName is { } c:
                 Remember();
-                LeavePage();
                 // Unsorted is no folder: its notes are Home's, filtered.
                 homeUnsorted = c == Configs.Unsorted;
-                overviewOf = c == Configs.Unsorted ? "" : c;
+                pageState = pageState.Left() with { Overview = c == Configs.Unsorted ? "" : c };
                 ShowLibrary();
                 break;
             case QuickKind.Source or QuickKind.Passage when row.LectureId is { } id && row.At is double at:
                 // Said at a moment (an answer's source, or a passage found in a transcript): the note opens at its
                 // transcript there, the line marked. The note already on the page only needs its window brought up.
-                if (id == openLecture) ShowLibrary();
+                if (id == pageState.Lecture) ShowLibrary();
                 PlaySource(id, at);
                 break;
             case QuickKind.Lecture or QuickKind.Passage or QuickKind.Source when row.LectureId is { } id:

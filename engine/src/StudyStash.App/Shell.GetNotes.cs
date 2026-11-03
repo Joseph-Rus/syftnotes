@@ -98,7 +98,7 @@ public static partial class Shell
             Toast("Your library didn't answer", "Nothing changed. Try again in a moment.", null, null);
             return;
         }
-        if (lectureId is not null && openLecture == lectureId) Run(() => ShowLectureAsync(lectureId, library.Note?.ShowTranscript == true), "ShowLecture");
+        if (lectureId is not null && pageState.Lecture == lectureId) Run(() => ShowLectureAsync(lectureId, library.Note?.ShowTranscript == true), "ShowLecture");
         else RequestRefresh(); // Home's "Notes need an AI" goes
     }
 

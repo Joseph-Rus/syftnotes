@@ -653,7 +653,7 @@ public static partial class Shell
     {
         // What was typed in its notes goes with it.
         FlushTyped();
-        bool onPage = library.Note is { Live: true } && openLecture is not null;
+        bool onPage = library.Note is { Live: true } && pageState.Lecture is not null;
         string? id = host.Recorder.Current?.Id;
         var l = host.StopRecording(out var how);
         chosenClass = "";

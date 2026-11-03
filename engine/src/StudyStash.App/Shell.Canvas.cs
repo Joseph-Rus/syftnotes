@@ -191,8 +191,8 @@ public static partial class Shell
         Run(() => PollCanvasNotificationsAsync(), "PollCanvasNotifications");
         termAssignments = null;
         if (mainWindow?.IsVisible != true) return;
-        if (overviewOf is { } over) await ShowOverviewAsync(over);
-        else if (openCanvasClass is { } name && library.CanvasClass is { } cls && CanvasClassRow(name) is { } row) await cls.LoadAsync(row);
+        if (pageState.Overview is { } over) await ShowOverviewAsync(over);
+        else if (pageState.CanvasClass is { } name && library.CanvasClass is { } cls && CanvasClassRow(name) is { } row) await cls.LoadAsync(row);
     }
 
     /// <summary>Asks the library what's due and which classes are linked. False when it couldn't (no library, an
@@ -263,7 +263,7 @@ public static partial class Shell
             if (item is not null) library.Classes.Remove(item);
             return;
         }
-        if (item is null) library.Classes.Insert(0, new ClassItem { Name = "Due", IsDue = true, Count = canvasDue.ToHandIn, Selected = overviewOf == DueHome });
+        if (item is null) library.Classes.Insert(0, new ClassItem { Name = "Due", IsDue = true, Count = canvasDue.ToHandIn, Selected = pageState.Overview == DueHome });
         else item.Count = canvasDue.ToHandIn;
     }
 
@@ -273,8 +273,7 @@ public static partial class Shell
         Remember();
         panelWindow?.Hide();
         quickWindow?.Hide();
-        LeavePage();
-        openAssignment = (cls, id);
+        pageState = pageState.Left() with { Assignment = (cls, id) };
         ShowLibrary();
     }
 
@@ -319,15 +318,13 @@ public static partial class Shell
             // An announcement opens in its class's reader, once the class's Canvas lists have loaded.
             Remember();
             announcementToOpen = n.AnnouncementId;
-            LeavePage();
-            openCanvasClass = c;
+            pageState = pageState.Left() with { CanvasClass = c };
             canvasTab = ClassTab.Announcements;
             ShowLibrary();
             return;
         }
         Remember();
-        LeavePage();
-        overviewOf = DueHome;
+        pageState = pageState.Left() with { Overview = DueHome };
         ShowLibrary();
     }
 
