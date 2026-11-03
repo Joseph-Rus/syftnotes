@@ -1,6 +1,7 @@
 using System.Globalization;
 using Avalonia;
 using Avalonia.Media;
+using Avalonia.Threading;
 using StudyStash.Core.Rich;
 
 namespace StudyStash.App.Controls.Rich;
@@ -65,6 +66,7 @@ static class SceneCache
                 return new Lookup(hit.Value.Scene, null);
             }
             if (running.TryGetValue(key, out var busy)) return new Lookup(null, busy);
+            FindFonts(family);
             var measure = Measurer(family);
             var job = queue.ContinueWith(_ => Lay(key, chart, measure, direction, owner), CancellationToken.None,
                 TaskContinuationOptions.None, TaskScheduler.Default);
@@ -165,6 +167,20 @@ static class SceneCache
     /// Text widths in the look's own font: box words in its medium weight, group titles (12 px) in semibold, the
     /// words on arrows in regular. Safe away from the UI thread: Avalonia shapes text on any thread.
     /// </summary>
+    /// <summary>
+    /// The family's fonts in each weight <see cref="Measurer"/> uses, found here on the UI thread before a layout
+    /// measures words with them away from it. The first look at the app's own font folder loads it, and a layout
+    /// loading it at the same moment as the window's first words could be told a file in it wasn't there (once in
+    /// three runs of a test whose app had just started): the chart was then remembered as one that can't be drawn.
+    /// Away from the UI thread (a download), nothing: the window found them when it showed the chart.
+    /// </summary>
+    static void FindFonts(FontFamily family)
+    {
+        if (!Dispatcher.UIThread.CheckAccess()) return;
+        foreach (var weight in (FontWeight[])[FontWeight.Normal, FontWeight.Medium, FontWeight.SemiBold])
+            _ = new Typeface(family, FontStyle.Normal, weight).GlyphTypeface;
+    }
+
     public static Func<string, double, bool, double> Measurer(FontFamily family) => (text, size, bold) =>
     {
         var weight = !bold ? FontWeight.Normal : size <= DiagramLayout.TitleSize ? FontWeight.SemiBold : FontWeight.Medium;

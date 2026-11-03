@@ -158,6 +158,8 @@
                             <TextBlock Classes="say" Text="{Binding AddOn.StoreSteps, FallbackValue=''}" />
                             <TextBlock Classes="say" Text="{Binding AddOn.AllowStep, FallbackValue=''}" />
                             <Button Classes="text-link small" HorizontalAlignment="Left" Command="{Binding AddOn.OpenAgainCommand, FallbackValue={x:Null}}" Content="Open the page again" />
+                            <Button Name="TypeSchoolInstead" Classes="text-link small" HorizontalAlignment="Left" IsVisible="{Binding AddOn.OfferTyping, FallbackValue=False}"
+                                    Command="{Binding AddOn.TypeInsteadCommand, FallbackValue={x:Null}}" Content="Type your school's Canvas address instead" />
                           </StackPanel>
                           <Border Classes="sep" />
                           <Grid Classes="line" ColumnDefinitions="20,12,*">

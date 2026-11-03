@@ -182,7 +182,7 @@ public static partial class CourseChoices
             if (File.Exists(p)) File.Delete(p);
         var all = Assignments.Load(home);
         if (all.Any(a => a.ClassName == cls)) Assignments.Save(home, all.Where(a => a.ClassName != cls));
-        (crawl ?? new Crawl(home, name => Path.Combine(cfg.PoolDir, Notes.Slugify(name, 60)), () => DateTimeOffset.UtcNow, () => TimeZoneInfo.Local))
+        (crawl ?? new Crawl(home, name => Path.Combine(cfg.PoolDir, Notes.FolderName(name)), () => DateTimeOffset.UtcNow, () => TimeZoneInfo.Local))
             .ForgetClass(cls);
     }
 
