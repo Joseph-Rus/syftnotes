@@ -20,7 +20,7 @@ public static partial class Shell
             // Once the library is writing them again, the lecture shows that it is.
             Rewriting = () => Avalonia.Threading.Dispatcher.UIThread.Post(() =>
             {
-                if (openLecture == note.Id) Run(() => ShowLectureAsync(note.Id), "ShowLecture");
+                if (pageState.Lecture == note.Id) Run(() => ShowLectureAsync(note.Id), "ShowLecture");
             }),
         };
         library.LectureFiles = files;

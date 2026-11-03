@@ -17,8 +17,7 @@ public static partial class Shell
     /// <summary>The Study page, in the pane: what's due in Review, by class.</summary>
     static async Task ShowStudyAsync(string? reviewLecture = null)
     {
-        ++pageTurn;
-        LeavePage();
+        pageState = pageState.Next();
         SelectInSidebar(null);
         library.StudySelected = true;
         if (host.Remote() is null) return;
