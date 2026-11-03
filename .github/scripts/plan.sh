@@ -45,7 +45,7 @@ fi
 # a commit that passed has nothing new to test. The workflow itself is never one of them: a change to ci is tested.
 trivial() {
   case "$1" in
-    "$props" | README.md | SECURITY.md | LICENSE | engine/README.md | docs/* | site/* | firebase.json | .firebaserc | .github/FUNDING.yml | .github/workflows/site.yml) return 0 ;;
+    "$props" | README.md | SECURITY.md | LICENSE | engine/README.md | docs/* | site/* | ios/* | firebase.json | .firebaserc | .github/FUNDING.yml | .github/workflows/site.yml) return 0 ;;
   esac
   return 1
 }
@@ -55,9 +55,24 @@ tested=false
 reuse=""
 why=""
 
+# Only ci's own runs in this repository, started by a push or by hand (both need write access), are believed: a pull
+# request's run, a fork's above all, runs whatever workflow that pull request brings, and could leave a tested-tree it
+# never tested or installers it never proved.
+trust="(.event == \"push\" or .event == \"workflow_dispatch\") and .head_repository.full_name == \"$REPO\" and .path == \".github/workflows/ci.yml\""
+# The ids of the runs to believe that passed on a commit.
+trusted_runs() {
+  gh api "repos/$REPO/actions/workflows/ci.yml/runs?head_sha=$1&status=success&per_page=100" \
+    --jq ".workflow_runs[] | select($trust) | .id" 2> /dev/null
+}
+# Is this a run to believe, and did it pass?
+trusted_run() {
+  [ "$(gh api "repos/$REPO/actions/runs/$1" --jq "($trust) and .conclusion == \"success\"" 2> /dev/null)" = true ]
+}
+
 # Does this run (by hand, on a branch) have every installer still to download (the Mac's, Windows', and Linux's two)?
 has_installers() {
   local names
+  trusted_run "$1" || return 1
   names=$(gh api "repos/$REPO/actions/runs/$1/artifacts" --paginate --jq '.artifacts[] | select(.expired == false) | .name' 2>/dev/null) || return 1
   # Installers signed by a rehearsal's throwaway identities (signing-plan.sh) are never published, so never reused.
   if printf '%s\n' "$names" | grep -qxE 'signing-(mac|windows)-rehearsal'; then return 1; fi
@@ -67,6 +82,7 @@ has_installers() {
 
 # Did this run (which passed) test exactly this tree? Runs by hand leave the tree they tested as an artifact.
 tested_this_tree() {
+  trusted_run "$1" || { echo "run $1 isn't one of ci's own runs here, by a push or by hand, that passed"; return 1; }
   rm -rf prior
   gh run download "$1" -R "$REPO" -n tested-tree -D prior > /dev/null 2>&1 || return 1
   echo "run $1 tested tree $(cat prior/tested-tree.txt); this is tree $tree"
@@ -83,7 +99,7 @@ if [ "$main_push" = true ] && [ -n "$BEFORE" ] && [ "$BEFORE" != "$ZEROS" ]; the
     done <<< "$changed"
     # engine/Directory.Build.props holds more than the version: only a changed StudyStashVersion line is trivial.
     beyond=$(git diff -U0 "$BEFORE" "$SHA" -- "$props" | grep -E '^[+-]' | grep -vE '^(\+\+\+|---)' | grep -vc '<StudyStashVersion>')
-    passed=$(gh run list -R "$REPO" --workflow ci --commit "$BEFORE" --status success --json databaseId --jq length 2> /dev/null || echo 0)
+    passed=$(trusted_runs "$BEFORE" | grep -c .)
     echo "changed since $BEFORE: $(echo "$changed" | tr '\n' ' '); other files: $others; other lines of $props: $beyond; ci passed there: $passed"
     if [ "$others" = 0 ] && [ "${beyond:-1}" = 0 ] && [ "${passed:-0}" -gt 0 ]; then
       tested=true
@@ -99,7 +115,7 @@ fi
 #    to publish.
 if [ "$main_push" = true ] && { [ "$tested" = false ] || [ "$installers" = true ]; }; then
   for head in $(gh api "repos/$REPO/commits/$SHA/pulls" --jq '.[].head.sha' 2> /dev/null); do
-    for run in $(gh run list -R "$REPO" --workflow ci --commit "$head" --status success --json databaseId --jq '.[].databaseId' 2> /dev/null); do
+    for run in $(trusted_runs "$head"); do
       tested_this_tree "$run" || continue
       if [ "$tested" = false ]; then
         tested=true
@@ -117,7 +133,7 @@ fi
 # A rehearsal of that fast path, by hand: the run named must have passed on exactly this tree and still hold its
 # installers; nothing is guessed, so a wrong id stops here.
 if [ "$EVENT_NAME" = workflow_dispatch ] && [ -n "$REUSE_RUN" ]; then
-  [ "$(gh run view "$REUSE_RUN" -R "$REPO" --json conclusion --jq .conclusion 2> /dev/null)" = success ] || fail "run $REUSE_RUN didn't pass"
+  trusted_run "$REUSE_RUN" || fail "run $REUSE_RUN didn't pass, or isn't one of ci's own runs here (by a push or by hand)"
   tested_this_tree "$REUSE_RUN" || fail "run $REUSE_RUN tested other code than this"
   has_installers "$REUSE_RUN" || fail "run $REUSE_RUN has no installers left to reuse (or they were signed by a rehearsal of signing, which are never published)"
   tested=true
