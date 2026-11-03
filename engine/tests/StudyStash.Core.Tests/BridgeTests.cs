@@ -25,6 +25,20 @@ public class BridgeTests
     }
 
     [Fact]
+    public void A_move_that_failed_here_waits_a_week_and_a_newer_release_is_tried_at_once()
+    {
+        using var t = new TempDir();
+        var inno = new UpdateHost { System = "Windows", AppDir = @"C:\Users\sam\AppData\Local\Programs\Study Stash" };
+        var release = With("0.23.0", "SyftNotes-win-x64-Setup.exe");
+        Assert.True(Bridge.Offers(release, inno, "0.23.0", Architecture.X64, t.Path));
+        Bridge.Failed(t.Path, release.Tag);
+        Assert.False(Bridge.Offers(release, inno, "0.23.0", Architecture.X64, t.Path));
+        Assert.True(Bridge.Offers(With("0.23.1", "SyftNotes-win-x64-Setup.exe"), inno, "0.23.0", Architecture.X64, t.Path));
+        File.SetLastWriteTimeUtc(Bridge.FailedFile(t.Path), DateTime.UtcNow - Bridge.RetryAfter - TimeSpan.FromHours(1));
+        Assert.True(Bridge.Offers(release, inno, "0.23.0", Architecture.X64, t.Path));
+    }
+
+    [Fact]
     public void The_Windows_move_script_is_in_the_app()
     {
         using var s = typeof(Bridge).Assembly.GetManifestResourceStream("bridge.ps1");

@@ -423,6 +423,7 @@ public sealed class AppUpdates
         // Velopack installed this copy: only the download and install are Velopack's (VelopackUpdates.cs); when, and what
         // the student is told, stay as below. A copy installed the old way (Inno Setup, the tarball) moves over to it.
         bool velopack = VelopackUpdates.Installed;
+        Program.Log(velopack ? "[update] updates come through Velopack" : $"[update] updates the old way ({(updateHost.AppDir.Length > 0 ? updateHost.AppDir : "not installed")})");
         void StopBackground() => Updates.StopBackground(Platform.Desktop.Program, updateHost);
         var updates = new AppUpdates
         {
@@ -438,11 +439,11 @@ public sealed class AppUpdates
             // than run on from a deleted folder.
             Apply = (release, home, log, restart) =>
                 velopack ? VelopackUpdates.ApplyAsync(release, Idle, StopBackground, relaunchArgs, log)
-                : Bridge.Offers(release, updateHost) ? Bridge.ApplyAsync(release, home, updateHost, Idle, log, Environment.ProcessId, relaunchArgs)
+                : Bridge.Offers(release, updateHost, home: host.Home) ? Bridge.ApplyAsync(release, home, updateHost, Idle, log, Environment.ProcessId, relaunchArgs)
                 : Updates.ApplyAsync(release, home, updateHost, log, restart, ready: Idle),
             // Velopack's updater, like Setup.exe, opens the app again itself once it has swapped the new version in.
             InstallerRelaunches = velopack || updateHost.System == "Windows",
-            Moves = release => !velopack && Bridge.Offers(release, updateHost),
+            Moves = release => !velopack && Bridge.Offers(release, updateHost, home: host.Home),
             RelaunchAndQuit = () =>
             {
                 SpawnWaiter(updateHost, relaunchArgs);
