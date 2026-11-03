@@ -625,10 +625,15 @@ public sealed class ClaudeSetup
         {
             return TomlSerializer.Deserialize<TomlTable>(text);
         }
-#pragma warning disable CA1031 // whatever the parser throws, the answer is the same: not TOML Syft Notes can rewrite
-        catch (Exception)
+        catch (TomlException)
+        {
+            return null;
+        }
+#pragma warning disable CA1031 // whatever else the parser throws, the answer is the same: not TOML Syft Notes can rewrite
+        catch (Exception e)
 #pragma warning restore CA1031
         {
+            StudyStash.App.Program.Log($"[claude-setup] config.toml wouldn't parse: {e.GetType().Name}");
             return null;
         }
     }
