@@ -25,8 +25,8 @@ using Inline = Avalonia.Controls.Documents.Inline;
 namespace StudyStash.App.Controls;
 
 /// <summary>
-/// A lecture's notes, from their Markdown, in the design's type: section headings (SF Pro Display 17, or Segoe UI
-/// Display 20), reading text (New York 16/1.6 on a Mac, Segoe UI 15/1.6 on Windows), bullets and numbered questions
+/// A lecture's notes, from their Markdown, in the type scale both systems share: section headings at 20, reading text
+/// at 16/1.6, bullets and numbered questions
 /// with their markers in the tertiary color, and the Definitions section as two columns with a rule above each term.
 /// Diagrams are drawn (a ```mermaid flowchart, a ```svg drawing), in a bullet too; one that can't be drawn shows its
 /// source calmly instead. On screen its text can be selected with a drag from paragraph to paragraph and copied
@@ -261,9 +261,10 @@ public sealed partial class NoteView : StackPanel
 
     bool Mac => Skin.Current == SkinKind.Mac;
 
-    /// <summary>The reading body's size in the design's own type: 16 on a Mac (New York), 15 on Windows (Segoe UI).
-    /// A compact answer uses <see cref="BodySize"/> instead (<see cref="EffectiveBodySize"/>).</summary>
-    double DefaultBodySize => Mac ? 16 : 15;
+    /// <summary>The reading body's size: the type scale's Subtitle step (<see cref="Skin.TypeScale"/>), 16 on both
+    /// systems, with headings a Title (20) over it and a minor heading the body's size in its weight. A compact answer
+    /// uses <see cref="BodySize"/> instead (<see cref="EffectiveBodySize"/>).</summary>
+    const double DefaultBodySize = 16, HeadingSize = 20, MinorHeadingSize = 16, CaptionSize = 12, SmallSize = 14;
 
     /// <summary>What a display formula's size follows: the caller's <see cref="BodySize"/> in a compact answer, the
     /// design's reading size in a lecture's notes.</summary>
@@ -347,7 +348,7 @@ public sealed partial class NoteView : StackPanel
         lead = null;
         listDepth = 0;
         Children.Clear();
-        Spacing = Compact ? 8 : Mac ? 14 : 12;
+        Spacing = Compact ? 8 : 14;
         previous = diagrams;
         diagrams = [];
         var kept = blocks;
@@ -391,11 +392,11 @@ public sealed partial class NoteView : StackPanel
                 case HeadingBlock h:
                     section = Plain(h.Inline);
                     // A heading three levels under the notes' sections (a student's own ###, written one level down) is smaller.
-                    var head = h.Level >= 4 ? Text("DisplayFont", Mac ? 15 : 17, 1.3) : Text("DisplayFont", Mac ? 17 : 20, 1.25);
+                    var head = h.Level >= 4 ? Text("DisplayFont", MinorHeadingSize, 1.3) : Text("DisplayFont", HeadingSize, 1.25);
                     head.FontWeight = Provenance ? FontWeight.ExtraBold : FontWeight.SemiBold;
                     head.Classes.Add(HeadingClass);
                     Fill(head, h.Inline);
-                    head.Margin = Compact ? default : Provenance ? new Thickness(0, first ? 8 : 12, 0, -4) : new Thickness(0, first ? (Mac ? 18 : 16) : (Mac ? 14 : 12), 0, 0);
+                    head.Margin = Compact ? default : Provenance ? new Thickness(0, first ? 8 : 12, 0, -4) : new Thickness(0, first ? 18 : 14, 0, 0);
                     control = head;
                     break;
                 case ListBlock list when IsDefinitions(section, list):
@@ -575,7 +576,7 @@ public sealed partial class NoteView : StackPanel
     /// the source in mono — the same shape as <see cref="DiagramCard"/>'s, one Border and no nested background.</summary>
     Control DisplayFallback(string source)
     {
-        var note = Text("TextFont", Mac ? 12 : 13, 1.4);
+        var note = Text("TextFont", CaptionSize, 1.4);
         note.Text = "Couldn't typeset this formula.";
         note.Bind(TextBlock.ForegroundProperty, note.GetResourceObservable("Fg3"));
         var code = new TextBlock
@@ -584,7 +585,7 @@ public sealed partial class NoteView : StackPanel
             TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 6, 0, 0),
         };
         code.Bind(TextBlock.ForegroundProperty, code.GetResourceObservable("Fg"));
-        var card = new Border { Padding = new Thickness(12, 10), CornerRadius = new CornerRadius(Mac ? 8 : 4), Child = new StackPanel { Children = { note, code } } };
+        var card = new Border { Padding = new Thickness(12, 10), CornerRadius = new CornerRadius(8), Child = new StackPanel { Children = { note, code } } };
         card.Bind(Border.BackgroundProperty, card.GetResourceObservable("Fill2"));
         return card;
     }
@@ -677,7 +678,7 @@ public sealed partial class NoteView : StackPanel
     /// <summary>A diagram or formula whose fence hasn't closed yet: a quiet line until the rest arrives.</summary>
     Control Pending(string words)
     {
-        var t = Text("TextFont", Mac ? 13 : 14, 1.4);
+        var t = Text("TextFont", SmallSize, 1.4);
         t.Text = words;
         t.Bind(TextBlock.ForegroundProperty, t.GetResourceObservable("Fg3"));
         return t;
@@ -702,7 +703,7 @@ public sealed partial class NoteView : StackPanel
     Control Photo(string id, string alt)
     {
         var picture = new Image { Stretch = Stretch.Uniform, MaxHeight = 440, HorizontalAlignment = HorizontalAlignment.Left, IsVisible = false };
-        var caption = Text("TextFont", Mac ? 12 : 13, 1.4);
+        var caption = Text("TextFont", CaptionSize, 1.4);
         caption.Text = alt;
         caption.Bind(TextBlock.ForegroundProperty, caption.GetResourceObservable("Fg2"));
         AutomationProperties.SetName(picture, alt.Length > 0 ? alt : "Whiteboard photo");
@@ -904,7 +905,7 @@ public sealed partial class NoteView : StackPanel
         t.LineHeight = 19.5;
         t.TextWrapping = TextWrapping.Wrap;
         t.Bind(TextBlock.ForegroundProperty, t.GetResourceObservable(TextInk));
-        var box = new Border { Padding = new Thickness(12, 10), CornerRadius = new CornerRadius(Mac ? 8 : 4), Child = t };
+        var box = new Border { Padding = new Thickness(12, 10), CornerRadius = new CornerRadius(8), Child = t };
         box.Bind(Border.BackgroundProperty, box.GetResourceObservable("Fill2"));
         return box;
     }
