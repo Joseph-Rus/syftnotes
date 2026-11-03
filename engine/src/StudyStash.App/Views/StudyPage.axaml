@@ -288,7 +288,7 @@
                     ToolTip.Tip="Open the lecture there" AutomationProperties.Name="{Binding Source, StringFormat='Open {0}'}">
               <StackPanel Orientation="Horizontal" Spacing="6">
                 <c:Icon Glyph="notes" Size="14" VerticalAlignment="Center" />
-                <TextBlock Text="{Binding Source}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
+                <TextBlock Text="{Binding Source}" ToolTip.Tip="{Binding Source}" c:Tips.WhenCut="True" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
               </StackPanel>
             </Button>
             <Button Grid.Column="2" Classes="icon-btn sm" Command="{Binding DeleteCardCommand}" ToolTip.Tip="Delete this card" AutomationProperties.Name="Delete this card">

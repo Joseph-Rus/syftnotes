@@ -238,7 +238,7 @@ public sealed partial class SettingsChatModel(SettingsChatServices services) : O
             ChatProblem.NoAnswer => $"{Brand} didn't answer. Try again.",
             ChatProblem.Guard => $"Syft Notes stopped {Brand}: it tried to use a tool it isn't allowed here.",
             ChatProblem.Tools => $"Syft Notes couldn't connect {Brand} to Settings.",
-            _ => $"{Brand} stopped: {Py.Head(said, 160).TrimEnd('.')}.",
+            _ => $"{Brand} stopped before it could answer. Try again.",
         };
     }
 

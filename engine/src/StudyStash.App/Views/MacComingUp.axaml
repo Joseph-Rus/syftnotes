@@ -33,8 +33,8 @@
             <Grid ColumnDefinitions="7,8,*,8,Auto">
               <c:Swatch Small="True" Fill="{Binding Dot}" VerticalAlignment="Center"/>
               <StackPanel Grid.Column="2">
-                <TextBlock Text="{Binding Title}" FontSize="13" TextTrimming="CharacterEllipsis" />
-                <TextBlock IsVisible="{Binding HasDetail}" Text="{Binding Detail}" FontSize="11" Foreground="{DynamicResource Fg2}" Margin="0,1,0,0" TextTrimming="CharacterEllipsis" />
+                <TextBlock Text="{Binding Title}" ToolTip.Tip="{Binding Title}" c:Tips.WhenCut="True" FontSize="13" TextTrimming="CharacterEllipsis" />
+                <TextBlock IsVisible="{Binding HasDetail}" Text="{Binding Detail}" ToolTip.Tip="{Binding Detail}" c:Tips.WhenCut="True" FontSize="11" Foreground="{DynamicResource Fg2}" Margin="0,1,0,0" TextTrimming="CharacterEllipsis" />
               </StackPanel>
               <TextBlock Grid.Column="4" Classes="num" Text="{Binding When}" FontSize="11" Foreground="{DynamicResource Fg2}" VerticalAlignment="Center" />
             </Grid>

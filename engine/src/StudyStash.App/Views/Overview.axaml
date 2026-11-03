@@ -199,7 +199,7 @@
                               <Grid ColumnDefinitions="Auto,*,10,Auto">
                                 <c:Icon Glyph="inbox" Size="16" Foreground="{DynamicResource InkSubtle}" IsVisible="{Binding IsUnsorted}" Margin="0,0,10,0" VerticalAlignment="Center" />
                                 <c:Swatch Fill="{Binding Dot}" IsVisible="{Binding IsFolder}" Margin="3,0,13,0" VerticalAlignment="Center" />
-                                <TextBlock Grid.Column="1" Text="{Binding Name}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
+                                <TextBlock Grid.Column="1" Text="{Binding Name}" ToolTip.Tip="{Binding Name}" c:Tips.WhenCut="True" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
                                 <c:Icon Grid.Column="3" Glyph="check" Size="16" Foreground="{DynamicResource InkSubtle}" IsVisible="{Binding Checked}" VerticalAlignment="Center" />
                                 <TextBlock Grid.Column="3" Text="{Binding Count}" FontSize="13" FontWeight="Medium" Foreground="{DynamicResource InkSubtle}"
                                            IsVisible="{Binding ShowCount}" VerticalAlignment="Center" />
@@ -319,8 +319,8 @@
                       </ContextMenu>
                     </Button.ContextMenu>
                     <StackPanel Spacing="2">
-                      <TextBlock Classes="rail-due-title" Text="{Binding Name}" TextTrimming="CharacterEllipsis" />
-                      <TextBlock Classes="rail-due-when" Text="{Binding Detail}" TextTrimming="CharacterEllipsis" />
+                      <TextBlock Classes="rail-due-title" Text="{Binding Name}" ToolTip.Tip="{Binding Name}" c:Tips.WhenCut="True" TextTrimming="CharacterEllipsis" />
+                      <TextBlock Classes="rail-due-when" Text="{Binding Detail}" ToolTip.Tip="{Binding Detail}" c:Tips.WhenCut="True" TextTrimming="CharacterEllipsis" />
                     </StackPanel>
                   </Button>
                 </DataTemplate>

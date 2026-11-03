@@ -21,6 +21,7 @@ public static class AttachmentWords
     public const string NoWords = "No words to read in it";
     public const string OlderLibrary = "Your library runs an older Syft Notes: update it to attach files.";
     public const string Unreachable = "Can't reach your library right now.";
+    public const string Unreadable = "Couldn't read that file. Check that it's still there and that Syft Notes may open it, then try again.";
 
     /// <summary>"Slides · 2.4 MB", "The student's own notes · 830 KB · Reading your handwriting…" (said as "Your notes").</summary>
     public static string About(string name, string type, long size, bool reading, bool hasText)
@@ -265,7 +266,8 @@ public sealed partial class AttachmentsModel(IAttachmentLibrary library, string?
         }
         catch (Exception e) when (e is HttpRequestException or TaskCanceledException or IOException or UnauthorizedAccessException)
         {
-            problem = stop.IsCancellationRequested ? null : e is IOException or UnauthorizedAccessException ? $"Couldn't read that file: {e.Message}" : AttachmentWords.Unreachable;
+            if (e is IOException or UnauthorizedAccessException) Program.Log($"[attachments] couldn't read a file to attach: {e.GetType().Name}: {e.Message}");
+            problem = stop.IsCancellationRequested ? null : e is IOException or UnauthorizedAccessException ? AttachmentWords.Unreadable : AttachmentWords.Unreachable;
         }
         finally
         {
