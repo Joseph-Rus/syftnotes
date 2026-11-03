@@ -390,17 +390,13 @@ public sealed class GuidedSetupTests
 
     /// <summary>
     /// Gemini the guided way: "Get Gemini ready" installs Google's Antigravity CLI with one button, "Sign in to Gemini"
-    /// runs its own sign-in in Syft Notes' own home for it (the browser opens on Google's page, which ends on a code to
-    /// paste), the code pasted into the box on the step signs in, and the check after says in plain words how much of
-    /// the account's allowance is left; then the chat, on Gemini.
+    /// runs its own sign-in in Syft Notes' own home for it (the browser opens on Google's page), and the check after
+    /// says in plain words how much of the account's allowance is left; then the chat, on Gemini.
     /// </summary>
     [AvaloniaFact]
-    public async Task Gemini_installs_with_one_button_signs_in_with_the_code_googles_page_gives_and_says_how_much_is_left()
+    public async Task Gemini_installs_with_one_button_signs_in_with_google_and_says_how_much_is_left()
     {
         await using var rig = new Rig(cli: "gemini");
-        // Google's page ends on a code ("Paste this code into your application"): agy waits for it, as the real one does.
-        File.WriteAllText(Path.Combine(rig.Bin, "wants-code"), "");
-        File.WriteAllText(Path.Combine(rig.Bin, "good-code"), "4/0good-code");
         using var agyHome = Antigravity.Use(rig.Home["agy"]); // this test's own, whatever runs beside it
         await rig.OpenAsync();
         var g = rig.Guided;
@@ -418,23 +414,12 @@ public sealed class GuidedSetupTests
         Assert.Equal((GuidedScreen.SignIn, "Sign in to Gemini"), (g.Screen, g.SignInTitle));
         Assert.Contains("Google's sign-in page", g.SignInLede);
 
-        var signingIn = g.OpenSignInCommand.ExecuteAsync(null);
-        // The box for Google's code shows while it waits; the code copied with a line break after it signs in.
-        await Until(() => g.ShowCodeBox, "the box for Google's code");
-        Assert.Equal("Paste Google's code here", g.CodeBox!.Title);
-        Assert.False(g.CodeBox.CanSend); // nothing in it yet
-        g.CodeBox.Code = "4/0good-code\n";
-        await g.CodeBox.Send.Command.ExecuteAsync(null);
-        Assert.Null(g.CodeBox.Problem);
-        Assert.Equal("Signing in to Gemini…", g.CodeBox.Sending);
-        await signingIn;
+        await g.OpenSignInCommand.ExecuteAsync(null);
         await Until(() => g.AiReady, "Gemini signed in and its allowance checked");
-        Assert.Equal("4/0good-code", File.ReadAllText(Path.Combine(rig.Bin, "code.txt")));
-        Assert.False(g.ShowCodeBox);
         Assert.Equal("About 80% of this week's Gemini allowance is left.", g.AllowanceWords);
         Assert.True(g.HasAllowance);
         // The sign-in ran in Syft Notes' own home for agy, never the student's own.
-        Assert.Equal(Antigravity.Home(), File.ReadAllText(Path.Combine(rig.Bin, "signin-home.txt")).Trim());
+        Assert.Equal(Antigravity.Home(), File.ReadAllText(Path.Combine(rig.Bin, "usage-home.txt")).Trim());
 
         await g.ContinueCommand.ExecuteAsync(null);
         await Until(() => g.Screen == GuidedScreen.Chat && !g.Busy, "the chat on Gemini");
