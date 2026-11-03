@@ -70,11 +70,19 @@ public class AiStatusStoreTests
         var row = rows.Engines.Single(r => r.Id == "claude");
         bool signedOut = state == AiEngineState.NotSignedIn;
 
-        // The store says one thing; the row shows it, and the card is there exactly when the AI is signed out.
+        // The store says one thing, and the row shows it.
         Assert.Equal(state, store.For("claude")!.State);
         Assert.Equal(state, row.State);
-        Assert.Equal(signedOut, cards.Problems.Count == 1);
         Assert.Equal(signedOut, row.Warn);
         Assert.Equal(state == AiEngineState.Ready, row.Good);
+        // The library lists a problem card only while the AI is signed out (the fixture does); when there is one, it
+        // is about the same AI as the row, and for the state the row shows: the two read one store, not two copies.
+        if (signedOut)
+        {
+            var card = Assert.Single(cards.Problems);
+            Assert.Equal((AiProblemKind.NotSignedIn, "Sign in"), (card.Kind, card.PrimaryWords));
+            Assert.Contains(row.Name, card.Title, StringComparison.Ordinal);
+        }
+        else Assert.Empty(cards.Problems);
     }
 }

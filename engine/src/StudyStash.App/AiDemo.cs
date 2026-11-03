@@ -343,10 +343,10 @@ public static class AiDemo
         {
             Problems =
             [
-                new AiProblemInfo("engine-offline", "engine_offline", "ollama", "Ollama"),
+                new AiProblemInfo("engine-offline", AiProblemKind.EngineOffline, "ollama", "Ollama"),
                 new AiProblemInfo("not-signed-in", AiProblemKind.NotSignedIn, "codex", "ChatGPT") { FallbackTo = "claude" },
-                new AiProblemInfo("model-missing", "model_missing", "ollama", "Ollama") { SizeGb = 40 },
-                new AiProblemInfo("usage-limit", "usage_limit", "claude", "Claude") { Until = DateTime.Today.AddHours(15).ToString("o"), FallbackTo = "ollama" },
+                new AiProblemInfo("model-missing", AiProblemKind.ModelMissing, "ollama", "Ollama") { SizeGb = 40 },
+                new AiProblemInfo("usage-limit", AiProblemKind.UsageLimit, "claude", "Claude") { Until = DateTime.Today.AddHours(15).ToString("o"), FallbackTo = "ollama" },
             ],
         };
         var m = new AiProblemsModel(new Library(overview));
