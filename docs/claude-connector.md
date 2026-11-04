@@ -77,12 +77,12 @@ How each change is made:
 - **Copy setup** (for any other MCP app) copies the same `mcpServers` JSON, to paste into that app's settings.
 
 Doing it by hand: Claude Code's own command is
-`claude mcp add --scope user study-stash -- "/Applications/Study Stash.app/Contents/MacOS/StudyStash" mcp`
+`claude mcp add --scope user study-stash -- "/Applications/Syft Notes.app/Contents/MacOS/StudyStash" mcp`
 (on Windows, the path to `StudyStash.exe`). The others take the JSON from **Copy setup**, or for Codex:
 
 ```toml
 [mcp_servers.study-stash]
-command = "/Applications/Study Stash.app/Contents/MacOS/StudyStash"
+command = "/Applications/Syft Notes.app/Contents/MacOS/StudyStash"
 args = ["mcp"]
 ```
 

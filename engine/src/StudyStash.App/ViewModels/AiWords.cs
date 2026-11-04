@@ -1,4 +1,5 @@
 using System.Globalization;
+using StudyStash.App.Services.Stores;
 using StudyStash.Core;
 using StudyStash.Core.Ai;
 
@@ -23,35 +24,37 @@ public static partial class AiWords
         _ => "memory",
     };
 
-    /// <summary>The word a state shows next to its dot: ready Ready · unchecked Installed · not_signed_in Not
-    /// signed in · not_running Not running · model_missing Needs its model · limited Limit reached ·
-    /// not_installed Not installed · failed Didn't work.</summary>
-    public static string EngineStateWords(string state) => state switch
+    /// <summary>The word a state shows next to its dot: ready Ready · unchecked Installed · not signed in Not
+    /// signed in · not running Not running · model missing Needs its model · limited Limit reached ·
+    /// not installed Not installed · failed Didn't work. A state this app doesn't know yet (a newer library's) is shown as
+    /// the library said it (<paramref name="said"/>).</summary>
+    public static string EngineStateWords(AiEngineState state, string said = "") => state switch
     {
-        "ready" => "Ready",
-        "unchecked" => "Installed",
-        "not_signed_in" => "Not signed in",
-        "not_running" => "Not running",
-        "model_missing" => "Needs its model",
-        "limited" => "Limit reached",
-        "not_installed" => "Not installed",
-        "failed" => "Didn't work",
-        _ => state,
+        AiEngineState.Ready => "Ready",
+        AiEngineState.Unchecked => "Installed",
+        AiEngineState.NotSignedIn => "Not signed in",
+        AiEngineState.NotRunning => "Not running",
+        AiEngineState.ModelMissing => "Needs its model",
+        AiEngineState.Limited => "Limit reached",
+        AiEngineState.NotInstalled => "Not installed",
+        AiEngineState.Failed => "Didn't work",
+        _ => said,
     };
 
-    public static bool StateIsGood(string state) => state == "ready";
-    public static bool StateIsWarn(string state) => state is "not_signed_in" or "not_running" or "model_missing" or "limited" or "failed";
-    public static bool StateIsMuted(string state) => state is "unchecked" or "not_installed";
+    public static bool StateIsGood(AiEngineState state) => state == AiEngineState.Ready;
+    public static bool StateIsWarn(AiEngineState state) =>
+        state is AiEngineState.NotSignedIn or AiEngineState.NotRunning or AiEngineState.ModelMissing or AiEngineState.Limited or AiEngineState.Failed;
+    public static bool StateIsMuted(AiEngineState state) => state is AiEngineState.Unchecked or AiEngineState.NotInstalled;
 
-    /// <summary>The row's button: ready → Options · unchecked → Check · not_signed_in → Sign in (tinted) ·
-    /// not_running → Start · model_missing → Download · not_installed → Set up · limited/failed → Options.</summary>
-    public static string RowActionWords(string state) => state switch
+    /// <summary>The row's button: ready → Options · unchecked → Check · not signed in → Sign in (tinted) ·
+    /// not running → Start · model missing → Download · not installed → Set up · limited/failed → Options.</summary>
+    public static string RowActionWords(AiEngineState state) => state switch
     {
-        "unchecked" => "Check",
-        "not_signed_in" => "Sign in",
-        "not_running" => "Start",
-        "model_missing" => "Download",
-        "not_installed" => "Set up",
+        AiEngineState.Unchecked => "Check",
+        AiEngineState.NotSignedIn => "Sign in",
+        AiEngineState.NotRunning => "Start",
+        AiEngineState.ModelMissing => "Download",
+        AiEngineState.NotInstalled => "Set up",
         _ => "Options",
     };
 
@@ -76,17 +79,17 @@ public static partial class AiWords
     };
 
     /// <summary>Only "Sign in" is the tinted, accent-coloured button; every other row action is a plain pill.</summary>
-    public static bool RowActionPrimary(string state) => state == "not_signed_in";
+    public static bool RowActionPrimary(AiEngineState state) => state == AiEngineState.NotSignedIn;
 
     /// <summary>Whether the row's button opens the Options menu (its models, and Check it works) instead of acting
     /// straight away.</summary>
-    public static bool NeedsOptions(string state) => state is "ready" or "limited" or "failed";
+    public static bool NeedsOptions(AiEngineState state) => state is AiEngineState.Ready or AiEngineState.Limited or AiEngineState.Failed;
 
     /// <summary>The AI engines pane's row subtitle: Ollama always says nothing leaves it; a ready CLI says it's
     /// signed in; every other CLI just says where it runs.</summary>
-    public static string EngineAbout(string id, string state, bool here = false) =>
+    public static string EngineAbout(string id, AiEngineState state, bool here = false) =>
         id == "ollama" ? $"Runs on {Where(here)}. Nothing leaves it."
-        : Through(id) + (state == "ready" ? $"Runs on {Where(here)}. Signed in." : $"Runs on {Where(here)}.");
+        : Through(id) + (state == AiEngineState.Ready ? $"Runs on {Where(here)}. Signed in." : $"Runs on {Where(here)}.");
 
     /// <summary>Where the AI runs, in the student's words: "this computer" when the library is on it (one computer
     /// does everything), "your library" when the library is on another.</summary>
@@ -195,20 +198,20 @@ public static partial class AiWords
     /// <summary>A row's line in setup's "who writes your notes" list. For the free AI that still needs setting up:
     /// how much there is to download for this computer (<paramref name="gb"/>), and, where only the small one fits
     /// (<paramref name="small"/>), that its notes are simpler: said before the download, not found out after.</summary>
-    public static string SetupAbout(string id, string state, string device = "computer", double gb = 0, bool small = false, bool hasKey = false) => id == "ollama"
+    public static string SetupAbout(string id, AiEngineState state, string device = "computer", double gb = 0, bool small = false, bool hasKey = false) => id == "ollama"
         ? state switch
         {
-            "not_installed" => $"Free and private (Ollama). Syft Notes downloads it for you: {HowBig(gb)}, once.{Simpler(small, device)}",
-            "not_running" => "Free and private (Ollama). It's here, and needs starting.",
-            "model_missing" => $"Free and private (Ollama). It's here, and still needs what it writes notes with: {HowBig(gb)}, once.{Simpler(small, device)}",
+            AiEngineState.NotInstalled => $"Free and private (Ollama). Syft Notes downloads it for you: {HowBig(gb)}, once.{Simpler(small, device)}",
+            AiEngineState.NotRunning => "Free and private (Ollama). It's here, and needs starting.",
+            AiEngineState.ModelMissing => $"Free and private (Ollama). It's here, and still needs what it writes notes with: {HowBig(gb)}, once.{Simpler(small, device)}",
             _ => $"Free and private (Ollama). It runs on this {device}: nothing you record leaves it.",
         }
         // An API key the student gave it writes the notes, whatever else is installed.
         : hasKey ? state switch
         {
-            "ready" => "With your API key. It works.",
-            "limited" => "With your API key. Hit its usage limit for now.",
-            "failed" or "not_signed_in" => "With your API key, which didn't work last time.",
+            AiEngineState.Ready => "With your API key. It works.",
+            AiEngineState.Limited => "With your API key. Hit its usage limit for now.",
+            AiEngineState.Failed or AiEngineState.NotSignedIn => "With your API key, which didn't work last time.",
             _ => "With your API key.",
         }
         : id is "claude" or "codex" or "gemini" ? (id switch
@@ -216,23 +219,23 @@ public static partial class AiWords
             "claude" => "With your paid Claude plan, through Claude Code. ",
             "codex" => "With your paid ChatGPT plan, through Codex. ",
             // Gemini runs on an API key from Google AI Studio, or through Google's Antigravity, signed in.
-            _ => state == "not_installed" ? "With an API key, or Google's Antigravity app. " : "Through Google's Antigravity. ",
+            _ => state == AiEngineState.NotInstalled ? "With an API key, or Google's Antigravity app. " : "Through Google's Antigravity. ",
         }) + state switch
         {
-            "ready" => "Signed in on this computer.",
-            "not_signed_in" => "Installed. Sign in to use it.",
-            "unchecked" => "Installed on this computer.",
-            "not_installed" => $"Not on this {device} yet.",
-            "limited" => "Hit its usage limit for now.",
+            AiEngineState.Ready => "Signed in on this computer.",
+            AiEngineState.NotSignedIn => "Installed. Sign in to use it.",
+            AiEngineState.Unchecked => "Installed on this computer.",
+            AiEngineState.NotInstalled => $"Not on this {device} yet.",
+            AiEngineState.Limited => "Hit its usage limit for now.",
             _ => "",
         }
         : state switch
         {
-            "ready" => "Signed in on this computer.",
-            "not_signed_in" => "Installed. Sign in to use it.",
-            "unchecked" => "Installed on this computer.",
-            "not_installed" => $"Not on this {device} yet.",
-            "limited" => "Hit its usage limit for now.",
+            AiEngineState.Ready => "Signed in on this computer.",
+            AiEngineState.NotSignedIn => "Installed. Sign in to use it.",
+            AiEngineState.Unchecked => "Installed on this computer.",
+            AiEngineState.NotInstalled => $"Not on this {device} yet.",
+            AiEngineState.Limited => "Hit its usage limit for now.",
             _ => "",
         };
 
@@ -263,14 +266,14 @@ public static partial class AiWords
 
     /// <summary>Whether an engine is worth offering to ask or write with: ready, or installed but never checked. A
     /// down/limited/unsignedin/missing-model engine is skipped (not_installed already never reaches the ask menu).</summary>
-    public static bool EngineUsable(string state) => state is "ready" or "unchecked";
+    public static bool EngineUsable(AiEngineState state) => state is AiEngineState.Ready or AiEngineState.Unchecked;
 
     /// <summary>The "Answer with" menu's row subtitle: the ask default says so; Ollama says it's private; a signed-
     /// out row says so; everything else (a ready, non-default CLI) says nothing extra.</summary>
-    public static string AskEngineSubtitle(string id, string state, bool isDefault) =>
+    public static string AskEngineSubtitle(string id, AiEngineState state, bool isDefault) =>
         isDefault ? "Default for questions"
         : id == "ollama" ? "Private, on your library"
-        : state == "not_signed_in" ? "Not signed in"
+        : state == AiEngineState.NotSignedIn ? "Not signed in"
         : "";
 
     /// <summary>The ask field's placeholder for a scope: this lecture (or meeting, or recording), its folder by name,
@@ -440,9 +443,9 @@ public static partial class AiWords
 
     /// <summary>The "Rewrite notes with" menu's row subtitle: the writer says so; a signed-out row says so; every
     /// other usable row says nothing extra (unlike "Answer with", nobody here is "the default").</summary>
-    public static string RewriteEngineSubtitle(string id, string state, bool isWriter) =>
+    public static string RewriteEngineSubtitle(string id, AiEngineState state, bool isWriter) =>
         isWriter ? "Wrote the current notes"
-        : state == "not_signed_in" ? "Not signed in"
+        : state == AiEngineState.NotSignedIn ? "Not signed in"
         : id == "ollama" ? "Private, on your library"
         : "";
 
@@ -454,14 +457,14 @@ public static partial class AiWords
     /// limit · Fell back · Access request · Library offline · Rewrite failed.</summary>
     public static string ProblemCaption(string kind) => kind switch
     {
-        "engine_offline" => "Engine offline",
-        "not_signed_in" => "Not signed in",
-        "model_missing" => "Model missing",
-        "usage_limit" => "Usage limit",
-        "fell_back" => "Fell back",
-        "access_request" => "Access request",
-        "library_offline" => "Library offline",
-        "rewrite_failed" => "Rewrite failed",
+        AiProblemKind.EngineOffline => "Engine offline",
+        AiProblemKind.NotSignedIn => "Not signed in",
+        AiProblemKind.ModelMissing => "Model missing",
+        AiProblemKind.UsageLimit => "Usage limit",
+        AiProblemKind.FellBack => "Fell back",
+        AiProblemKind.AccessRequest => "Access request",
+        AiProblemKind.LibraryOffline => "Library offline",
+        AiProblemKind.RewriteFailed => "Rewrite failed",
         _ => kind,
     };
 
@@ -469,14 +472,14 @@ public static partial class AiWords
     /// cloud_off · error.</summary>
     public static string ProblemIcon(string kind) => kind switch
     {
-        "engine_offline" => "power_off",
-        "not_signed_in" => "person_off",
-        "model_missing" => "download",
-        "usage_limit" => "hourglass_top",
-        "fell_back" => "swap_horiz",
-        "access_request" => "key",
-        "library_offline" => "cloud_off",
-        "rewrite_failed" => "error",
+        AiProblemKind.EngineOffline => "power_off",
+        AiProblemKind.NotSignedIn => "person_off",
+        AiProblemKind.ModelMissing => "download",
+        AiProblemKind.UsageLimit => "hourglass_top",
+        AiProblemKind.FellBack => "swap_horiz",
+        AiProblemKind.AccessRequest => "key",
+        AiProblemKind.LibraryOffline => "cloud_off",
+        AiProblemKind.RewriteFailed => "error",
         _ => "info",
     };
 
@@ -484,45 +487,45 @@ public static partial class AiWords
     /// Fg2 for the merely informational ones.</summary>
     public static string ProblemColorKey(string kind) => kind switch
     {
-        "engine_offline" => "Accent",
-        "not_signed_in" or "model_missing" or "library_offline" or "rewrite_failed" => "Warn",
+        AiProblemKind.EngineOffline => "Accent",
+        AiProblemKind.NotSignedIn or AiProblemKind.ModelMissing or AiProblemKind.LibraryOffline or AiProblemKind.RewriteFailed => "Warn",
         _ => "Fg2",
     };
 
     /// <summary>The Windows InfoBar's severity: err · warn · info.</summary>
     public static string ProblemSeverity(string kind) => kind switch
     {
-        "engine_offline" or "library_offline" or "rewrite_failed" => "err",
-        "not_signed_in" or "model_missing" => "warn",
+        AiProblemKind.EngineOffline or AiProblemKind.LibraryOffline or AiProblemKind.RewriteFailed => "err",
+        AiProblemKind.NotSignedIn or AiProblemKind.ModelMissing => "warn",
         _ => "info",
     };
 
     public static string ProblemTitle(string kind, string engineName, string fallbackName, bool here = false) => kind switch
     {
-        "engine_offline" => $"{engineName} isn't running on {Where(here)}",
-        "not_signed_in" => here ? $"Sign in to {engineName}" : $"Sign in to {engineName} on your library",
-        "model_missing" => $"{engineName} needs its notes model",
-        "usage_limit" => $"{engineName} hit its usage limit",
-        "fell_back" => $"This answer came from {engineName}",
-        "access_request" => $"{engineName} wants to read your library",
-        "library_offline" => "Your library isn't answering",
-        "rewrite_failed" => $"{engineName} couldn't rewrite the notes",
+        AiProblemKind.EngineOffline => $"{engineName} isn't running on {Where(here)}",
+        AiProblemKind.NotSignedIn => here ? $"Sign in to {engineName}" : $"Sign in to {engineName} on your library",
+        AiProblemKind.ModelMissing => $"{engineName} needs its notes model",
+        AiProblemKind.UsageLimit => $"{engineName} hit its usage limit",
+        AiProblemKind.FellBack => $"This answer came from {engineName}",
+        AiProblemKind.AccessRequest => $"{engineName} wants to read your library",
+        AiProblemKind.LibraryOffline => "Your library isn't answering",
+        AiProblemKind.RewriteFailed => $"{engineName} couldn't rewrite the notes",
         _ => engineName,
     };
 
     public static string ProblemMessage(string kind, string engineName, string fallbackName, string until, double sizeGb, string detail, bool here = false) => kind switch
     {
-        "engine_offline" => "New lectures wait and get their notes when it's back.",
+        AiProblemKind.EngineOffline => "New lectures wait and get their notes when it's back.",
         // No stand-in (fallbackName empty): nothing writes the notes until it's signed in. The library writes the ones it
         // missed once it is.
-        "not_signed_in" => fallbackName.Length > 0 ? $"Until then, questions go to {fallbackName}."
+        AiProblemKind.NotSignedIn => fallbackName.Length > 0 ? $"Until then, questions go to {fallbackName}."
             : "Until then, lectures are filed without notes. They're written once you've signed in.",
-        "model_missing" => sizeGb > 0 ? $"About {sizeGb:0} GB, downloaded once on {Where(here)}." : $"Downloaded once on {Where(here)}.",
-        "usage_limit" => ParseUntil(until) is { } t ? $"Questions go to {fallbackName} until {UntilClock(t)}." : $"Questions go to {fallbackName}.",
-        "fell_back" => detail,
-        "access_request" => $"From {detail}. It can read, not change.",
-        "library_offline" => $"Your AI runs on {Where(here)}. Check it's on and connected.",
-        "rewrite_failed" => $"{detail} Your current notes are unchanged.",
+        AiProblemKind.ModelMissing => sizeGb > 0 ? $"About {sizeGb:0} GB, downloaded once on {Where(here)}." : $"Downloaded once on {Where(here)}.",
+        AiProblemKind.UsageLimit => ParseUntil(until) is { } t ? $"Questions go to {fallbackName} until {UntilClock(t)}." : $"Questions go to {fallbackName}.",
+        AiProblemKind.FellBack => detail,
+        AiProblemKind.AccessRequest => $"From {detail}. It can read, not change.",
+        AiProblemKind.LibraryOffline => $"Your AI runs on {Where(here)}. Check it's on and connected.",
+        AiProblemKind.RewriteFailed => $"{detail} Your current notes are unchanged.",
         _ => detail,
     };
 
@@ -590,13 +593,13 @@ public static partial class AiWords
     /// Deny/Allow · Try again · Try again/Dismiss.</summary>
     public static string ProblemAction(string kind) => kind switch
     {
-        "engine_offline" => "Start Ollama",
-        "not_signed_in" => "Sign in",
-        "model_missing" => "Download",
-        "usage_limit" => "Dismiss",
-        "access_request" => "Allow",
-        "library_offline" => "Try again",
-        "rewrite_failed" => "Try again",
+        AiProblemKind.EngineOffline => "Start Ollama",
+        AiProblemKind.NotSignedIn => "Sign in",
+        AiProblemKind.ModelMissing => "Download",
+        AiProblemKind.UsageLimit => "Dismiss",
+        AiProblemKind.AccessRequest => "Allow",
+        AiProblemKind.LibraryOffline => "Try again",
+        AiProblemKind.RewriteFailed => "Try again",
         _ => "",
     };
 }

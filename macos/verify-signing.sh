@@ -1,16 +1,16 @@
 #!/bin/sh
 # Checks that a built (or downloaded) Syft Notes is signed the way a release is, and says what it found.
-#   sh macos/verify-signing.sh "<path>/Study Stash.app" [<path>/Syft-Notes.dmg] [notarized|signed|rehearsal]
+#   sh macos/verify-signing.sh "<path>/Syft Notes.app" [<path>/Syft-Notes.dmg] [notarized|signed|rehearsal]
 # notarized (the default)  signed with a Developer ID, hardened runtime and timestamp, with library validation on, and
 #                          accepted by Gatekeeper as notarized, with the ticket stapled (the DMG too, if given)
 # signed                   the same without notarization: what CI checks when it has a certificate but no notary key
 # rehearsal                signed by CI's throwaway self-signed identity: the signature is whole, hardened and
 #                          timestamped, and Gatekeeper is not asked, as it would (rightly) refuse it
-# Handy by hand on a copy you downloaded: sh macos/verify-signing.sh "/Applications/Study Stash.app"
+# Handy by hand on a copy you downloaded: sh macos/verify-signing.sh "/Applications/Syft Notes.app"
 # APPLE_TEAM_ID, when set, is the Team ID the signature must carry.
 set -eu
 
-APP=${1:?"usage: sh macos/verify-signing.sh \"<path>/Study Stash.app\" [<path>/Syft-Notes.dmg] [notarized|signed|rehearsal]"}
+APP=${1:?"usage: sh macos/verify-signing.sh \"<path>/Syft Notes.app\" [<path>/Syft-Notes.dmg] [notarized|signed|rehearsal]"}
 DMG=""
 MODE=notarized
 shift
