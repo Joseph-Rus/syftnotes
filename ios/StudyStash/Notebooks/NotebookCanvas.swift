@@ -380,6 +380,18 @@ final class NotebookCanvas: NSObject {
             h.combine(s.path.count)
             h.combine(s.ink.color.hashValue)
             h.combine(s.mask == nil)
+            // The eraser's bites inside a stroke change only its mask (its box stays the same): the mask's shape counts.
+            s.mask?.cgPath.applyWithBlock { e in
+                let element = e.pointee
+                h.combine(element.type.rawValue)
+                let points = switch element.type {
+                case .moveToPoint, .addLineToPoint: 1
+                case .addQuadCurveToPoint: 2
+                case .addCurveToPoint: 3
+                default: 0
+                }
+                for k in 0..<points { h.combine(element.points[k].x); h.combine(element.points[k].y) }
+            }
         }
         return h.finalize()
     }

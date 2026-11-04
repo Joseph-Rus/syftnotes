@@ -101,6 +101,28 @@ import UIKit
         let reopened = NotebookStore(folder: folder).notebook(n.id)
         #expect(reopened?.pages.count == 3)
         #expect(reopened?.needsSaving == true)
+
+        // A hole rubbed out of the middle of a wide marker line (the pixel eraser): its box stays the same, only its mask
+        // changes. Kept on disk.
+        let top = canvas.frames[2].minY
+        let points = (0..<40).map { i in
+            PKStrokePoint(location: CGPoint(x: 100 + CGFloat(i) * 5, y: top + 300), timeOffset: Double(i) * 0.01,
+                          size: CGSize(width: 30, height: 30), opacity: 1, force: 1, azimuth: 0, altitude: .pi / 2)
+        }
+        let line = PKStrokePath(controlPoints: points, creationDate: .now)
+        let box = CGRect(x: 60, y: top + 260, width: 280, height: 80)
+        let holed = UIBezierPath(rect: box)
+        holed.append(UIBezierPath(rect: CGRect(x: 190, y: top + 290, width: 20, height: 20)).reversing())
+        for mask in [UIBezierPath(rect: box), holed] {
+            var d = canvas.canvas.drawing
+            d.strokes.removeAll { $0.ink.inkType == .marker }
+            d.strokes.append(PKStroke(ink: PKInk(.marker, color: .yellow), path: line, transform: .identity, mask: mask))
+            canvas.canvas.drawing = d
+            canvas.canvasViewDrawingDidChange(canvas.canvas)
+            canvas.flush()
+        }
+        let saved = try #require(onDisk(2).strokes.first { $0.ink.inkType == .marker }?.mask)
+        #expect(!saved.contains(CGPoint(x: 200, y: top + 300)), "the hole is kept")
     }
 
     @Test func aPDFsPagesComeInAtTheirOwnSizes() throws {
