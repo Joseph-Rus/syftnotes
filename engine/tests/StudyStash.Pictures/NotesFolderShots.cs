@@ -4,7 +4,7 @@ using StudyStash.App.ViewModels;
 using StudyStash.App.Views;
 using StudyStash.Core;
 
-namespace StudyStash.App.Tests;
+namespace StudyStash.App.Pictures;
 
 /// <summary>"You have Syft Notes folders in two places" with a school OneDrive's folder in use and a personal one's
 /// from before, and the bring-in's summary and result: a picture of each, in each look, light and dark.</summary>
