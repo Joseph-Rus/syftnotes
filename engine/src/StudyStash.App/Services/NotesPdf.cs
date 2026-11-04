@@ -1,3 +1,4 @@
+using StudyStash.App.Services.Kit;
 using System.Globalization;
 using System.Runtime.InteropServices;
 using System.Text;
@@ -304,7 +305,7 @@ public static class NotesPdf
             Layout(host, width);
             bool waiting = host.GetVisualDescendants().OfType<DiagramView>().Any(d => d.IsLaying);
             if (!waiting && round > 0) return;
-            while (SceneCache.Busy && DateTime.UtcNow < deadline) await Task.Delay(20);
+            await Poll.UntilAsync(() => !SceneCache.Busy, TimeSpan.FromMilliseconds(20), deadline - DateTime.UtcNow);
             // What the diagrams posted when their layouts finished (measure again, or show the card) runs first.
             await Dispatcher.UIThread.InvokeAsync(() => { }, DispatcherPriority.Background);
             if (DateTime.UtcNow >= deadline || round > 20)

@@ -1,3 +1,4 @@
+using StudyStash.App.Services.Kit;
 using System.Globalization;
 using System.Runtime.InteropServices;
 using System.Text.Json.Nodes;
@@ -1622,7 +1623,7 @@ public static partial class Shell
     {
         try
         {
-            await Task.Delay(TimeSpan.FromSeconds(5), stop.Token).ConfigureAwait(false);
+            await Poll.AfterAsync(TimeSpan.FromSeconds(5), stop.Token).ConfigureAwait(false);
         }
         catch (OperationCanceledException)
         {

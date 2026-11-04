@@ -33,6 +33,26 @@ public class KitTests
     });
 
     [Fact]
+    public Task Poll_every_ends_when_the_callers_own_token_is_cancelled_and_after_waits_on_the_clock() => Off(async () =>
+    {
+        var clock = new ManualClock();
+        using var stop = new CancellationTokenSource();
+        int ticks = 0;
+        var poller = Poll.Every(TimeSpan.FromSeconds(2), _ => { ticks++; return Task.CompletedTask; }, clock: clock, stop: stop.Token);
+        clock.Advance(TimeSpan.FromSeconds(2));
+        Assert.Equal(1, ticks);
+        await stop.CancelAsync();
+        await poller.Done;
+        Assert.False(poller.Running);
+
+        var after = Poll.AfterAsync(TimeSpan.FromSeconds(5), Ct, clock);
+        clock.Advance(TimeSpan.FromSeconds(4));
+        Assert.False(after.IsCompleted);
+        clock.Advance(TimeSpan.FromSeconds(1));
+        await after;
+    });
+
+    [Fact]
     public Task Poll_gives_up_at_the_timeout() => Off(async () =>
     {
         var clock = new ManualClock();
