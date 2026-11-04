@@ -147,9 +147,9 @@ public sealed record LinkedFolder(string Name, string Path, bool Here, Action Op
 }
 
 /// <summary>What a folder's page is made from: the folder, the sidebar group it's in ("" for Classes), how many notes
-/// it holds, and (when it's a class linked to Canvas) its course.</summary>
+/// it holds, and (when it's a class linked to Canvas) its course and, when Canvas shares it, the student's grade in it.</summary>
 public sealed record ClassHomeFacts(string Name, IBrush Dot, int Lectures, string? Code, string? CourseTitle, string? Description,
-    CanvasApi.Counts? Canvas, string Group = "");
+    CanvasApi.Counts? Canvas, string Group = "", CanvasApi.ClassGrade? Grade = null);
 
 /// <summary>
 /// The pages that fill the library window beside the sidebar. Home: today's date, a sentence or two on what's most
@@ -189,6 +189,9 @@ public sealed partial class OverviewModel : ObservableObject
     /// <summary>A sentence or two under the title, the most pressing thing first.</summary>
     public string Lede { get; init; } = "";
     public bool HasLede => Lede.Length > 0;
+    /// <summary>A class's grade under its lede ("Grade 91.2% · A-"); "" when Canvas doesn't share one.</summary>
+    public string GradeLine { get; init; } = "";
+    public bool HasGradeLine => GradeLine.Length > 0;
     public IBrush Dot { get; init; } = Brushes.Gray;
     /// <summary>What this folder's recordings are called: lectures in a class, meetings in a club or at work.</summary>
     public string Noun { get; init; } = Nouns.Lecture;
@@ -565,7 +568,7 @@ public sealed partial class OverviewModel : ObservableObject
     static OverviewDue DueRow(CanvasApi.Item i, Sources s, Func<string, IBrush> dot, bool classLabel, bool done = false)
     {
         bool late = !done && LateBefore(i, s);
-        string when = done ? "Handed in"
+        string when = done ? (CanvasWords.ScoreOf(i) is { Length: > 0 } score ? $"Handed in · {score}" : "Handed in")
             : i.DueAt is not { } d ? "No due date"
             : late ? $"Was due {Words(Local(d, s), Local(d, s).Year == Local(s.Now, s).Year ? "ddd d" : "d MMM yyyy")}"
             : Time(d, s.Zone);
@@ -884,6 +887,7 @@ public sealed partial class OverviewModel : ObservableObject
             Dot = c.Dot,
             Noun = noun,
             Lede = string.Join(" ", parts),
+            GradeLine = c.Grade is { } grade ? CanvasWords.GradeText(grade) : "",
             NextText = NextMeets(c.Name, s),
             NotesEmpty = $"No {noun}s yet. Record one here, or attach a recording.",
             OnCalendar = c.Canvas is null ? null : () => s.OpenDue?.Invoke(c.Name),

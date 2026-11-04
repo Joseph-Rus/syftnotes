@@ -66,6 +66,8 @@
           <TextBlock Name="Title" Classes="page-title" Text="{Binding Title}" IsVisible="{Binding !IsFolder}" />
           <c:Highlight Name="FolderTitle" Classes="page-title" Under="True" Text="{Binding Title}" Fill="{Binding Dot}" IsVisible="{Binding IsFolder}" HorizontalAlignment="Left" />
           <c:PageText Name="Lede" Classes="page-lede" Text="{Binding Lede}" IsVisible="{Binding HasLede}" Margin="0,8,0,0" />
+          <!-- A class: its grade on Canvas, when Canvas shares it -->
+          <c:PageText Name="GradeLine" Classes="page-lede" Text="{Binding GradeLine}" IsVisible="{Binding HasGradeLine}" Margin="0,2,0,0" />
         </StackPanel>
         <StackPanel Name="Actions" Classes="ov-actions" Grid.Column="{Binding ActionsColumn}" Grid.Row="{Binding ActionsRow}" Orientation="Horizontal"
                     Spacing="8" VerticalAlignment="Bottom">

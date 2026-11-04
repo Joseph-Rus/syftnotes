@@ -258,7 +258,9 @@ public static class Demo
     /// </summary>
     /// <param name="go">Makes the sample one to click through: where a click that leads somewhere (a folder, a note,
     /// an event to record, Stop) asks to go. Null for a still picture, where nothing leads anywhere.</param>
-    public static LibraryModel Semester(Page page = Page.Home, bool recording = false, bool narrow = false, Action<Page>? go = null)
+    /// <param name="graded">Work already marked, so a class's page shows its grade and the Due calendar the scores of what's
+    /// handed in this week (for the pictures of those; the checked pictures leave it off).</param>
+    public static LibraryModel Semester(Page page = Page.Home, bool recording = false, bool narrow = false, Action<Page>? go = null, bool graded = false)
     {
         (string Name, string Hue, int Notes, string Group)[] folders =
         [
@@ -304,6 +306,8 @@ public static class Demo
             Class = c, Id = id, Name = name, Kind = "assignment", DueAt = new DateTimeOffset(2026, 10, 1, 23, 59, 0, TimeSpan.FromHours(-4)).AddDays(day - 1), Status = status, Missing = missing,
         };
         CanvasApi.Item Done(string c, string id, string name, int day) => Item(c, id, name, day, "submitted");
+        CanvasApi.Item Marked(string c, string id, string name, int day, string scoreText) =>
+            Item(c, id, name, day, "graded") with { Points = 10, ScoreText = scoreText, GradedAt = Item(c, id, name, day).DueAt };
         const string toc = "Theory of Computation", arch = "Computer Architecture", mining = "Data Mining", cap = "Capstone";
         var due = new CanvasApi.DueResponse
         {
@@ -329,7 +333,9 @@ public static class Demo
                 new CanvasApi.Group
                 {
                     Key = "handed_in", Label = "Handed in",
-                    Items = [Done(ml, "h1", "Paper summary", 2), Done(toc, "h2", "CCHW1", 5), Done(arch, "h3", "HW2", 8), Done(cap, "h4", "Sprint 2 report", 9)],
+                    Items = graded
+                        ? [Marked(mining, "h5", "Reading quiz 5", 12, "9/10"), Marked(arch, "h3", "HW2", 11, "A-"), Done(cap, "h4", "Sprint 2 report", 13), Marked(toc, "h2", "CCHW1", 14, "Complete")]
+                        : [Done(ml, "h1", "Paper summary", 2), Done(toc, "h2", "CCHW1", 5), Done(arch, "h3", "HW2", 8), Done(cap, "h4", "Sprint 2 report", 9)],
                 },
             ],
         };
@@ -452,7 +458,8 @@ public static class Demo
                 string name = club ? "ACM" : ml;
                 foreach (var c in m.Classes) c.Selected = c.Name == name;
                 var facts = new ClassHomeFacts(name, DotOf(name), club ? 5 : 14, club ? null : "CSCI 4220", club ? null : "Machine and Deep Learning", null,
-                    club ? null : new CanvasApi.Counts { ToHandIn = 3, Done = 5, Modules = 8, Files = 12, Announcements = 6, AnnouncementsNew = 1 }, GroupOf(name));
+                    club ? null : new CanvasApi.Counts { ToHandIn = 3, Done = 5, Modules = 8, Files = 12, Announcements = 6, AnnouncementsNew = 1 }, GroupOf(name),
+                    graded && !club ? new CanvasApi.ClassGrade { Score = 91.2, Letter = "A-" } : null);
                 var folder = OverviewModel.ForClass(facts, Sources(club ? acmNotes : mlNotes));
                 folder.AddLinks(facts, club ? null : _ => { });
                 Records(folder);
