@@ -253,6 +253,13 @@ public class CanvasClassTests
     [Fact]
     public async Task Read_again_keeps_the_place_and_a_list_that_fails_keeps_what_it_showed()
     {
+        // Only the classes a sync finished between two looks have news: none known (no sync before) or a new sync
+        // started meanwhile (it names a class not left before) means any class may.
+        static CanvasApi.State Syncing(params string[] classes) => new() { Syncing = new CanvasApi.SyncingInfo { Left = classes.Length, Classes = classes } };
+        Assert.Null(CanvasFeed.Finished(null, Syncing("B")));
+        Assert.Equal(new[] { "A" }, CanvasFeed.Finished(["A", "B"], Syncing("B"))!);
+        Assert.Null(CanvasFeed.Finished(["A", "B"], Syncing("A", "B", "C")));
+
         var stop = TestContext.Current.CancellationToken;
         var handler = new FakeLibrary()
             .Json(HttpMethod.Get, "/api/v2/canvas/assignments", "assignments-cs101")
