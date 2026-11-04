@@ -85,4 +85,39 @@ public class AiStatusStoreTests
         }
         else Assert.Empty(cards.Problems);
     }
+
+    /// <summary>
+    /// Gemini's sign-in waits for the code Google's page ends on, and the box for it was closed: pressing Sign in (or Open
+    /// the page again) changes nothing on the library, so the store asks for the box again. Pressed for an AI that isn't
+    /// waiting on a code, it doesn't.
+    /// </summary>
+    [Fact]
+    public Task Sign_in_pressed_while_geminis_sign_in_waits_for_its_code_brings_the_box_back_and_not_for_another_AI() => Task.Run(async () =>
+    {
+        var waiting = AiTestData.MixedOverview() with
+        {
+            Engines = [.. AiTestData.MixedOverview().Engines.Select(e => e.Id == "gemini"
+                ? e with { State = "not_signed_in", Installed = true, SignIn = SignInPhase.Waiting, PasteCode = true } : e)],
+        };
+        // Its sign-in is already going: the library answers with the same overview.
+        var lib = new FakeAiLibrary { Overview = waiting };
+        lib.OnSignIn = _ => new AiSaid(AiSignIns.StartedWords("gemini"), waiting);
+        lib.OnSignInAgain = _ => new AiSaid(AiSignIns.StartedWords("gemini"), waiting);
+        using var store = new AiStatusStore(lib, new ManualClock());
+        var asked = new List<string?>();
+        store.WantsCodeChanged += asked.Add;
+
+        await store.RefreshAsync();
+        Assert.Equal(["gemini"], asked); // the box opens
+        Assert.Equal("gemini", store.WantsCode);
+
+        // The box was closed; Sign in, then Open the page again: each asks for it again.
+        await store.ActAsync("gemini", AiAction.SignIn);
+        await store.ActAsync("gemini", AiAction.SignInAgain);
+        Assert.Equal(["gemini", "gemini", "gemini"], asked);
+
+        // Codex isn't waiting on a code: its Sign in doesn't bring Gemini's box up.
+        await store.ActAsync("codex", AiAction.SignIn);
+        Assert.Equal(3, asked.Count);
+    }, TestContext.Current.CancellationToken);
 }

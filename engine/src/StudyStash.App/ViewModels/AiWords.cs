@@ -542,8 +542,25 @@ public static partial class AiWords
         SignInPhase.GaveUp => "It stopped waiting before you'd finished. Try again.",
         SignInPhase.Region => $"{engineName} isn't offered in your country yet.",
         SignInPhase.Stuck => SignInStuckWords(engineName),
+        SignInPhase.BadCode => CodeDidntWork,
         _ => "",
     };
+
+    // --- a sign-in whose page ends on a code (Gemini's: Google's page says "Paste this code into your application") ----
+
+    /// <summary>The paste box's title: "Paste Google's code here".</summary>
+    public static string CodeTitle(string maker) => $"Paste {maker}'s code here";
+
+    /// <summary>The paste box's line: what the page shows once they've signed in, and where it goes.</summary>
+    public static string CodeLede(string maker) =>
+        $"When you've signed in, {maker}'s page shows a code. Press Copy on that page, then paste the code here.";
+
+    public const string CodeField = "Paste the code";
+    public const string CodeButton = "Finish signing in";
+    public static string CodeSending(string engineName) => $"Signing in to {engineName}…";
+    public const string CodeDoesntLookRight = "That doesn't look like the code. Copy it from the page again, and paste it here.";
+    public const string CodeDidntWork = "That code didn't work. Press Try again to get a new one.";
+    public const string CodeSignInStopped = "That sign-in has stopped. Press Try again to get a new code.";
 
     /// <summary>Syft Notes' own help page: where Get help goes when it couldn't start an AI's sign-in, or install it.</summary>
     public const string HelpPage = "https://syftnotes.com/support/";
@@ -559,6 +576,7 @@ public static partial class AiWords
         SignInPhase.GaveUp => $"Signing in to {engineName} stopped before you'd finished. Try again.",
         SignInPhase.Region => $"{engineName} isn't offered in your country yet.",
         SignInPhase.Stuck => SignInStuckWords(engineName),
+        SignInPhase.BadCode => CodeDidntWork,
         _ => "",
     };
 
@@ -569,6 +587,7 @@ public static partial class AiWords
         SignInPhase.GaveUp => $"Signing in to {engineName} stopped",
         SignInPhase.Region => $"{engineName} isn't offered in your country",
         SignInPhase.Stuck => $"{engineName}'s sign-in didn't start",
+        SignInPhase.BadCode => $"{engineName}'s code didn't work",
         _ => "",
     };
 
@@ -585,7 +604,7 @@ public static partial class AiWords
     /// isn't served.</summary>
     public static string SignInButton(string phase) => phase switch
     {
-        SignInPhase.GaveUp or SignInPhase.Stuck => "Try again",
+        _ when SignInPhase.TryAgain(phase) => "Try again",
         _ => "",
     };
 
