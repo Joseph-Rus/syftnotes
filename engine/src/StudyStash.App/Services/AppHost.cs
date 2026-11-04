@@ -1,3 +1,4 @@
+using StudyStash.App.Services.Kit;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using System.Text.Json.Serialization;
@@ -837,7 +838,7 @@ public sealed partial class AppHost : IDisposable, IProblemSource
             }
             try
             {
-                await Task.Delay(TimeSpan.FromSeconds(Library == LibraryState.Connected ? 20 : 10), stop.Token);
+                await Poll.AfterAsync(TimeSpan.FromSeconds(Library == LibraryState.Connected ? 20 : 10), stop.Token);
             }
             catch (OperationCanceledException)
             {
@@ -1043,9 +1044,20 @@ public sealed partial class AppHost : IDisposable, IProblemSource
                 if (x.TitleTyped) x.Title = title;
             });
         var l = Recorder.Continue(id);
+        RecorderStarted();
+        return l;
+    }
+
+    /// <summary>What follows a recorder that has started, whether it's a new lecture or one kept going: the computer
+    /// stays awake, Whisper starts on it (after class, it lets go of a model still loaded), and the library is told
+    /// what is recording, now and every 30 seconds, so a phone's photos know which lecture they belong to.</summary>
+    void RecorderStarted()
+    {
         awake ??= new KeepAwake("Recording a lecture");
         Whisper.Wake();
-        return l;
+        TellLibraryRecording(true);
+        beat?.Dispose();
+        beat = new Timer(_ => TellLibraryRecording(false), null, TimeSpan.FromSeconds(30), TimeSpan.FromSeconds(30));
     }
 
     async Task<RecordStart> MicThenAsync(Func<Lecture> start)
@@ -1080,12 +1092,7 @@ public sealed partial class AppHost : IDisposable, IProblemSource
         if (waits && Downloading is null) _ = DownloadModelAsync();
         var calendar = CalendarStart(className, forEvent);
         var l = WithEvent(Recorder.Start(calendar.ClassName, Client().DisplayName, afterClass: !Settings.LiveTranscript, waitsForModel: waits), calendar);
-        awake ??= new KeepAwake("Recording a lecture");
-        // Live, Whisper starts on it; after class, the look lets go of a model still loaded from the lecture before.
-        Whisper.Wake();
-        TellLibraryRecording(true);
-        beat?.Dispose();
-        beat = new Timer(_ => TellLibraryRecording(false), null, TimeSpan.FromSeconds(30), TimeSpan.FromSeconds(30));
+        RecorderStarted();
         return l;
     }
 
@@ -1381,7 +1388,7 @@ public sealed partial class AppHost : IDisposable, IProblemSource
         Changed?.Invoke();
         using (var waiting = CancellationTokenSource.CreateLinkedTokenSource(cts.Token))
         {
-            await Task.WhenAny(Task.Delay(wait, waiting.Token), now.Task);
+            await Task.WhenAny(Poll.AfterAsync(wait, waiting.Token), now.Task);
             await waiting.CancelAsync();
         }
         cts.Token.ThrowIfCancellationRequested();

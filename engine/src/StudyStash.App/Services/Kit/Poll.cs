@@ -35,15 +35,24 @@ public static class Poll
         TimeProvider? clock = null) =>
         UntilAsync(_ => Task.FromResult(check()), every, timeout, ct, clock);
 
+    /// <summary>Waits <paramref name="after"/> on the clock, then carries on: a one-off pause (a toast's few seconds, a
+    /// typing pause, a rest before a retry) with a stop token, on a clock a test can move. Cancelling throws
+    /// <see cref="OperationCanceledException"/>, as <see cref="Task.Delay(TimeSpan, CancellationToken)"/> does.</summary>
+    public static Task AfterAsync(TimeSpan after, CancellationToken ct = default, TimeProvider? clock = null) =>
+        Task.Delay(after, clock ?? TimeProvider.System, ct);
+
     /// <summary>
     /// Waits <paramref name="every"/>, runs <paramref name="tick"/>, and again, until the returned
     /// <see cref="Poller"/> is disposed or <paramref name="keepGoing"/> (asked straight after each tick, on the same
     /// thread) says no. <see cref="Poller.Wake"/> cuts the current wait short. A tick that throws ends the poll, with the
     /// exception in <see cref="Poller.Done"/>: a tick that should carry on after a failure catches it itself.
+    /// <paramref name="stop"/> ends it too, as disposing does.
     /// </summary>
-    public static Poller Every(TimeSpan every, Func<CancellationToken, Task> tick, Func<bool>? keepGoing = null, TimeProvider? clock = null)
+    public static Poller Every(TimeSpan every, Func<CancellationToken, Task> tick, Func<bool>? keepGoing = null, TimeProvider? clock = null,
+        CancellationToken stop = default)
     {
         var poller = new Poller();
+        if (stop.CanBeCanceled) stop.Register(poller.Dispose); // the caller's own token ends it too (at once if already cancelled)
         poller.Done = poller.RunAsync(every, tick, keepGoing, clock ?? TimeProvider.System);
         return poller;
     }
