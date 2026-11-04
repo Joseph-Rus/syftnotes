@@ -191,7 +191,7 @@ public class AiApiTests
         Assert.NotNull(reply);
         Assert.True(reply!.FellBack);
         Assert.Equal("Ollama's own answer.", reply.Answer);
-        Assert.Contains("didn't answer", reply.Why);
+        Assert.Equal("Claude hit its usage limit.", reply.Why); // not "rate limit exceeded, resets in 2 hours"
 
         var overview = await remote.EnginesAsync();
         var row = overview!.Engines.Single(e => e.Id == "claude");
@@ -200,7 +200,7 @@ public class AiApiTests
     }
 
     [Fact]
-    public async Task Turning_fallback_off_lets_the_picked_engines_own_error_come_back()
+    public async Task Turning_fallback_off_lets_the_picked_engines_own_failure_come_back_in_plain_words()
     {
         using var dir = new TempDir();
         var cfg = Cfg(dir);
@@ -213,8 +213,7 @@ public class AiApiTests
 
         var refused = await Assert.ThrowsAsync<LibraryRefusedException>(() =>
             remote.AskAsync(new AskRequest("What happened?") { Engine = "claude", Live = "Something happened." }));
-        Assert.Equal(503, refused.Status);
-        Assert.Contains("the model refused to answer", refused.Message);
+        Assert.Equal((503, Engines.DidntAnswer("Claude")), (refused.Status, refused.Message)); // its raw text stays in its record
     }
 
     [Fact]
