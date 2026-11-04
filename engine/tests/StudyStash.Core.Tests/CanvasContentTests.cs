@@ -150,6 +150,48 @@ public class CanvasContentTests
     }
 
     [Fact]
+    public void The_class_grade_is_the_students_own_and_only_when_canvas_shares_it()
+    {
+        using var dir = new TempDir();
+        var sync = FakeCanvas.Library(dir, () => FakeCanvas.DesignNow);
+        const string head = """{"id": 4201, "name": "COMP 101 · Intro to Programming", "course_code": "COMP 101", "term": {"name": "Fall 2025"}, "html_url": "https://canvas.test/courses/4201",""";
+        ClassGrade? Synced(string rest)
+        {
+            var canvas = FakeCanvas.Cs101().Json(CoursePath, head + rest);
+            Assert.True(canvas.Run(sync));
+            // The grade rides on the request that already names the course: no call of its own.
+            Assert.Single(canvas.Requested, u => new Uri(u).AbsolutePath == CoursePath);
+            Assert.Contains("include[]=total_scores", canvas.Requested.First(u => new Uri(u).AbsolutePath == CoursePath), StringComparison.Ordinal);
+            return CourseIndex.Load(dir.Path, "CS 101")!.Grade;
+        }
+
+        // What's graded so far, not the final that counts the gaps as zero.
+        var grade = Synced("""
+            "enrollments": [{"type": "student", "computed_current_score": 91.2, "computed_current_grade": "A-", "computed_final_score": 80.0, "computed_final_grade": "B-"}]}
+            """);
+        Assert.Equal((91.2, "A-"), (grade!.Score, grade.Letter));
+        var settings = new CanvasSettings { Url = FakeCanvas.Base };
+        settings.Courses["CS 101"] = 4201;
+        var row = CanvasView.ClassRow("CS 101", settings, CourseIndex.Load(dir.Path, "CS 101"), new ScoutState("never", 0, "", ""), FakeCanvas.DesignNow);
+        Assert.Equal((91.2, "A-"), (row["grade"]!["score"]!.GetValue<double>(), row["grade"]!["letter"]!.GetValue<string>()));
+
+        // A course with no letter scheme has a percentage and no letter.
+        var plain = Synced("""
+            "enrollments": [{"type": "student", "computed_current_score": 91.2, "computed_current_grade": null}]}
+            """);
+        Assert.Equal((91.2, ""), (plain!.Score, plain.Letter));
+
+        // Canvas stops sharing it (hidden by the course, or nothing graded yet): the old grade doesn't linger.
+        Assert.Null(Synced("""
+            "hide_final_grades": true, "enrollments": [{"type": "student", "computed_current_score": 91.2, "computed_current_grade": "A-"}]}
+            """));
+        Assert.Null(CanvasView.ClassRow("CS 101", settings, CourseIndex.Load(dir.Path, "CS 101"), new ScoutState("never", 0, "", ""), FakeCanvas.DesignNow)["grade"]);
+        Assert.Null(Synced("""
+            "enrollments": [{"type": "student", "computed_current_score": null, "computed_current_grade": null}]}
+            """));
+    }
+
+    [Fact]
     public void Pages_hidden_from_the_student_still_lets_the_sync_finish()
     {
         using var dir = new TempDir();

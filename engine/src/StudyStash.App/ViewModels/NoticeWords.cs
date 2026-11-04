@@ -12,6 +12,14 @@ public static class NoticeWords
     /// <summary>The lecture paused by itself and waits for the student: <see cref="AppHost.RecordingPaused"/>.</summary>
     public const string PausedTitle = AppHost.RecordingPaused;
 
+    /// <summary>Record was pressed and the recording couldn't start (the disk nearly full, say: <paramref name="why"/>
+    /// is the recorder's own words). It needs the student, so it's shown even where they've turned notifications off,
+    /// and it stays until it's closed or a recording does start (<paramref name="notRecording"/>).</summary>
+    public static Notice CouldntStart(string why, Func<bool> notRecording) => new()
+    {
+        Title = "Couldn't start recording", Text = why, UntilClosed = true, StillTrue = notRecording,
+    };
+
     /// <summary>A lecture the library has filed: its class, its title, and whether its notes were written (when they
     /// weren't, the transcript is there all the same). Notes its AI couldn't write because it needs signing in again
     /// say so, and the button is Sign in, to Settings → Your AI.</summary>

@@ -115,10 +115,6 @@ struct NotebookEditor: View {
             }
         }
         .task {
-            // Anything kept on this phone while the library couldn't be reached goes now.
-            if let api = app.api { await store.sendWaiting(api: api) }
-        }
-        .task {
             #if DEBUG
             // Pictures: `-notebook-sheet paper|pages` opens the paper or the pages over the notebook.
             try? await Task.sleep(for: .seconds(0.8))
@@ -129,7 +125,10 @@ struct NotebookEditor: View {
             }
             #endif
         }
-        .onAppear { canvas.onPullToAdd = { addPage(after: nil) } }
+        .onAppear {
+            canvas.onPullToAdd = { addPage(after: nil) }
+            store.open.insert(id)
+        }
         .onChange(of: overlaid) { _, over in canvas.showTools(!over) }
         .onChange(of: scenePhase) { _, phase in if phase != .active { canvas.flush() } }
         // Closed some other way (beside a lecture, or the app going elsewhere): saved all the same, quietly.
@@ -432,6 +431,7 @@ struct NotebookEditor: View {
     }
 
     private func saveQuietly() {
+        store.open.remove(id)
         canvas.flush()
         guard !closing, let n = notebook else { return }
         if n.savedAt == nil, store.isBlank(n) {
@@ -490,9 +490,13 @@ extension NotebookStore {
     }
 
     /// Every notebook with something in it that changed since it last reached the library (closed while it couldn't
-    /// be reached), sent now. The notebook open and the library's refresh call it.
+    /// be reached), sent now with the recordings waiting (the app coming back, its refresh). Not one open to write in:
+    /// it goes when it's closed. Each one's PDF is drawn first, so nothing is drawn unless the library answers.
     func sendWaiting(api: APIClient) async {
-        for n in notebooks where n.needsSaving && !isBlank(n) && !Self.sending.contains(n.id) {
+        let waiting = notebooks.filter { $0.needsSaving && !open.contains($0.id) && !Self.sending.contains($0.id) && !isBlank($0) }
+        guard !waiting.isEmpty else { return }
+        do { _ = try await api.me() } catch let e as APIError where e.unreachable { return } catch {}
+        for n in waiting where !open.contains(n.id) {
             _ = await send(n.id, api: api, waitingAtMost: .seconds(120))
         }
     }
