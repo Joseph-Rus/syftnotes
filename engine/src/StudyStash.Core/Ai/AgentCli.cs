@@ -53,18 +53,16 @@ public sealed record AgentCliInfo
     public bool TakesCode { get; init; }
     /// <summary>Its sign-in stays open once it's signed in (plain `agy` goes on to its chat): Syft Notes stops it.</summary>
     public bool StaysOpen { get; init; }
-    /// <summary>Its sign-in can be for another account while one is still signed in: it always starts afresh and stops
-    /// once it's done (Claude Code's, Codex's), so <see cref="AgentSignIn.StartAnother"/> waits for it to finish. agy's
-    /// can't: signed in, plain agy goes straight to its chat, and on a Mac and Windows it keeps its one sign-in in the
-    /// system's password store, shared with the student's own agy, which its <c>/login</c> and <c>/logout</c> would
-    /// change for them too.</summary>
-    public bool SignsInAnother => !StaysOpen;
     /// <summary>Says whether it's signed in, by its exit code: `claude auth status`, `codex login status`, `agy models`
     /// (which says "Please sign in" and stops when it isn't, never opening the browser).</summary>
     public required IReadOnlyList<string> StatusArgs { get; init; }
     /// <summary>What its commands' environment needs besides the app's own: agy's home of Syft Notes' own
     /// (<see cref="Antigravity.Home"/>). Asked each time (the tests move that home).</summary>
     public Func<IReadOnlyDictionary<string, string>> Env { get; init; } = () => new Dictionary<string, string>();
+    /// <summary>Its sign-in runs with this folder first on its PATH, whose browser openers open nothing, and Syft Notes
+    /// opens its page instead: agy's (<see cref="Antigravity.OpenersOff"/>), whose browser took agy's home as the
+    /// student's. Null when it opens the browser itself.</summary>
+    public Func<string>? OpenersOff { get; init; }
 
     public AgentInstaller Installer(bool windows) => windows ? WindowsInstaller : MacInstaller;
     public string SignInLine => string.Join(' ', [Binary, .. SignInArgs]);
@@ -125,6 +123,7 @@ public static partial class AgentCli
         TakesCode = true,
         StaysOpen = true,
         Env = () => Antigravity.HomeEnv(),
+        OpenersOff = Antigravity.OpenersOff,
     };
 
     public static readonly IReadOnlyList<AgentCliInfo> All = [Claude, Codex, Gemini];

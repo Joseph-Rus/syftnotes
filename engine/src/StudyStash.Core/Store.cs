@@ -4,7 +4,7 @@ using Microsoft.Data.Sqlite;
 
 namespace StudyStash.Core;
 
-/// <summary>Which class a note belongs in, and who decided: folder | rules | ollama | none | human.</summary>
+/// <summary>Which class a note belongs in, and who decided: folder | rules | an AI's id (ollama, claude, codex, gemini) | none | human.</summary>
 public sealed class Classification(string className, double confidence, string by, string lectureTitle = "",
     List<string>? topics = null)
 {
@@ -98,8 +98,9 @@ public static partial class Notes
         return string.Join("\n", output);
     }
 
-    /// <summary>Where a note file's notes would be, when none were written: the recording was too short for them
-    /// (<see cref="Summarize.TooShort"/>), or notes were asked for and none came back.</summary>
+    /// <summary>Where a note file's notes would be, when none were written because the recording was too short for them
+    /// (<see cref="Summarize.TooShort"/>). Notes that were asked for and never came back leave no section at all (files
+    /// from before said <see cref="NoNotesReturned"/> there).</summary>
     public static readonly string TooShortForNotes = $"_({Summarize.TooShortWords()})_";
     public const string NoNotesReturned = "_(no AI notes returned)_";
 
@@ -144,7 +145,8 @@ public static partial class Notes
         if (!summarized || (fromNotes && Py.Strip(m.NotesMarkdown).Length > 0))
         {
             string notes = Py.Strip(m.NotesMarkdown);
-            lines.AddRange(["## Notes", "", notes.Length > 0 ? notes : Summarize.TooShort(m) ? TooShortForNotes : NoNotesReturned, ""]);
+            if (notes.Length > 0 || Summarize.TooShort(m))
+                lines.AddRange(["## Notes", "", notes.Length > 0 ? notes : TooShortForNotes, ""]);
         }
         if (Py.Strip(m.PrivateNotes).Length > 0) lines.AddRange(["## Private notes", "", Py.Strip(m.PrivateNotes), ""]);
         if (Py.Strip(m.Transcript).Length > 0) lines.AddRange(["## Transcript", "", Py.Strip(m.Transcript), ""]);
@@ -231,7 +233,12 @@ public sealed partial class Store : IDisposable
         MigrateNotesVersions();
     }
 
-    public void Dispose() => conn.Dispose();
+    /// <summary>Closes the database once whatever is using it now is done: a background job (an attachment being read)
+    /// may still be mid-query when the library stops. Anything after that finds it closed.</summary>
+    public void Dispose()
+    {
+        lock (gate) conn.Dispose();
+    }
 
     void Migrate()
     {
@@ -566,6 +573,16 @@ public sealed partial class Store : IDisposable
         lock (gate)
         {
             using var cmd = Command("SELECT COUNT(*) FROM notes");
+            return Convert.ToInt32(cmd.ExecuteScalar(), System.Globalization.CultureInfo.InvariantCulture);
+        }
+    }
+
+    /// <summary>How many filed lectures have a summary written for them (what "Rewrite all" would rewrite).</summary>
+    public int SummaryCount()
+    {
+        lock (gate)
+        {
+            using var cmd = Command($"SELECT COUNT(*) FROM notes WHERE {Filed} AND COALESCE(summary_md, '') <> ''");
             return Convert.ToInt32(cmd.ExecuteScalar(), System.Globalization.CultureInfo.InvariantCulture);
         }
     }
