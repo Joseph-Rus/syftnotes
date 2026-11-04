@@ -230,7 +230,7 @@ public sealed partial class TypedEditor : UserControl
             if (e.Property == TextBox.TextProperty && !busy)
             {
                 if (line.Typed is { } before && box.Text == before) Again(line);
-                else Typed(line);
+                else Typed(line, e.OldValue as string);
             }
             else if (e.Property == IsFocusedProperty) ShowRule(line);
         };
@@ -396,7 +396,7 @@ public sealed partial class TypedEditor : UserControl
 
     /// <summary>A plain line that now starts "# ", "- ", "1. ", "[ ] " or "> " becomes a heading, a bullet, a numbered
     /// line, a checkbox or a quote, there and then; a bullet that now starts "[ ] " becomes a checkbox.</summary>
-    void Typed(Line line)
+    void Typed(Line line, string? was = null)
     {
         string text = line.Box.Text ?? "";
         bool code = line.InCode || lines.TakeWhile(l => l != line).Count(l => l.Kind == Kind.Plain && FenceLine().IsMatch(l.Box.Text ?? "")) % 2 == 1;
@@ -406,9 +406,9 @@ public sealed partial class TypedEditor : UserControl
         else if (line.Kind == Kind.Bullet)
         {
             // A "- " (or "* ") typed at a bullet's start is that bullet's own mark, not a second one; "[ ] " after it makes
-            // a checkbox. Only one the caret is past: an edit in front of a " - " already in the words ("x - 5", the x
-            // deleted) leaves the minus where it is.
-            string rest = BulletLead().Match(text) is { Success: true } mark && line.Box.CaretIndex >= mark.Length ? text[mark.Length..] : text;
+            // a checkbox. Only a mark this change made: one already in the words, or one an edit in front of it uncovered
+            // ("x - 5", the x deleted), stays as written.
+            string rest = BulletLead().Match(text) is { Success: true } mark && MadeNow(was ?? "", text, mark.Length) ? text[mark.Length..] : text;
             if (Box().Match(rest) is { Success: true } box)
                 now = (Kind.Task, line.Lead + (box.Groups[1].Value is "x" or "X" ? "[x] " : "[ ] "), rest[box.Length..]);
             else if (rest != text) now = (Kind.Bullet, line.Lead, rest);
@@ -432,6 +432,16 @@ public sealed partial class TypedEditor : UserControl
             Dispatcher.UIThread.Post(() => line.Typed = null, DispatcherPriority.Input);
         }
         Changed();
+    }
+
+    /// <summary>Whether the change from <paramref name="was"/> to <paramref name="now"/> made the mark that is now the first
+    /// <paramref name="mark"/> characters: there was none before, and the change reaches its end.</summary>
+    static bool MadeNow(string was, string now, int mark)
+    {
+        if (BulletLead().IsMatch(was)) return false;
+        int same = 0;
+        while (same < was.Length && same < now.Length && was[^(same + 1)] == now[^(same + 1)]) same++;
+        return now.Length - same >= mark;
     }
 
     /// <summary>The keystroke that made a line a heading, a bullet or a checkbox put back what the field held before
@@ -709,7 +719,7 @@ public sealed partial class TypedEditor : UserControl
             line.Box.CaretIndex = before.Length + parts[0].Length;
             // (What joined the line may have made it a heading, a bullet or a checkbox.)
             int words = (line.Box.Text ?? "").Length;
-            Typed(line);
+            Typed(line, before + after);
             Focus(line, (line.Box.Text ?? "").Length - (words - before.Length - parts[0].Length));
             return;
         }
