@@ -61,12 +61,19 @@ public class SlideTimesTests
         Assert.Null(times[3].At);
         Assert.Null(times[4].At);
 
-        // A lecture that skips the kelp slide still places the others; a slide built up over two pages gets one time.
-        string[] builtUp = [deck[0], deck[2], deck[5], $"{deck[5]}\nKrill feed whales"];
-        var skipped = SlideTimes.Match(builtUp, Transcript([.. Taught(0, Reefs), .. Chat(180, 360), .. Taught(360, Plankton)]));
+        // A lecture that skips the kelp slide still places the others. A slide built up over two pages gets one time,
+        // and a caption page between two different slides joins the first without chaining the second onto it.
+        const string Events = "Bleaching events: ocean temperature, recovery";
+        string[] builtUp = [deck[0], $"{Course}\nBleaching", $"{Course}\n{Events}", deck[2], deck[5], $"{deck[5]}\nKrill feed whales"];
+        var skipped = SlideTimes.Match(builtUp, Transcript([.. Taught(0, Reefs), .. Taught(180, Events), .. Chat(360, 540), .. Taught(540, Plankton)]));
         Within(skipped[0], 0, 3);
-        Assert.Null(skipped[1].At);
-        Within(skipped[2], 6, 9);
-        Assert.Equal(skipped[2].At, skipped[3].At);
+        Assert.Equal(skipped[0].At, skipped[1].At);
+        // Its own time, after the reefs' (chained, it would share theirs). "Bleaching" is on both slides and said near the
+        // end of the reefs too, so its moment can come a few seconds before 3:00.
+        Assert.True(skipped[2].At > skipped[0].At);
+        Within(skipped[2], 2, 6);
+        Assert.Null(skipped[3].At);
+        Within(skipped[4], 9, 12);
+        Assert.Equal(skipped[4].At, skipped[5].At);
     }
 }
