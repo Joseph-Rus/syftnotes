@@ -33,7 +33,7 @@ public sealed class SleptException(Exception inner) : Exception("the computer sl
 public sealed class Pipeline(Config cfg, Store store, SortChatFn? chat = null,
     Func<Meeting, Config, Task<string>>? summarize = null, Action<string>? log = null, Func<string>? notesModel = null,
     Func<string>? notesEngine = null, SleepClock? sleep = null, Action<string>? filed = null, Func<bool>? notesFast = null,
-    Func<string, DateTime?>? limitUntil = null)
+    Func<string, DateTime?>? limitUntil = null, Func<string>? sortedWith = null)
 {
     readonly SleepClock sleep = sleep ?? SleepClock.System;
     readonly Func<Meeting, Config, Task<string>> summarize = summarize ?? ((m, c) => Summarize.SummarizeTranscriptAsync(m, c));
@@ -159,6 +159,8 @@ public sealed class Pipeline(Config cfg, Store store, SortChatFn? chat = null,
             var basis = summary.Length > 0 ? m.WithNotes(summary) : m;
             var classes = Classify.WithCanvas(Cfg.Classes, Cfg.Home);
             c = await Classify.ClassifyAsync(basis, Cfg, chat, classes);
+            // The AI that sorted it is named as it is (claude, gemini…), not always Ollama.
+            if (c.By == "ollama" && sortedWith?.Invoke() is { Length: > 0 } sorter) c.By = sorter;
             if (c.By is "folder" or "rules" && Cfg.OllamaEnabled && classes.Count > 0)
             {
                 // The folder or title picked the class; still let the model name the lecture and tag its topics.

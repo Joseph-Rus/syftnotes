@@ -566,6 +566,37 @@ public class OverviewTests
         Assert.Equal("Record", m.RecordWords);
     }
 
+    [AvaloniaTheory]
+    [InlineData(SkinKind.Mac)]
+    [InlineData(SkinKind.Win)]
+    public void A_screen_reader_hears_the_stop_square_only_while_it_records(SkinKind skin)
+    {
+        // Ready to record, the stop square inside Record is only its red dot: Windows' UI Automation read it as an
+        // enabled "Stop recording" button inside "Start recording".
+        var m = OverviewModel.Home(Sources());
+        m.OnRecord = () => { };
+        var view = new Overview { DataContext = m };
+        var w = Host(view, skin, 1100, 800);
+        try
+        {
+            var stop = view.FindControl<Button>("StopRecording")!;
+            static bool Heard(Control c) => Avalonia.Automation.Peers.ControlAutomationPeer.CreatePeerForElement(c).IsControlElement();
+            Assert.False(Heard(stop));
+            var recorder = new RecorderModel { Elapsed = "00:05" };
+            m.Recorder = recorder;
+            m.Recording = true;
+            Dispatcher.UIThread.RunJobs();
+            Assert.True(Heard(stop));
+            recorder.IsPaused = true;
+            Dispatcher.UIThread.RunJobs();
+            Assert.True(Heard(stop));
+        }
+        finally
+        {
+            w.Close();
+        }
+    }
+
     [Fact]
     public void Pages_left_while_it_records_let_the_recorder_go()
     {

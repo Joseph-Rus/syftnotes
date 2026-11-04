@@ -4,6 +4,7 @@ using Avalonia.Automation.Peers;
 using Avalonia.Controls;
 using Avalonia.Controls.Documents;
 using Avalonia.Controls.Primitives;
+using Avalonia.Headless;
 using Avalonia.Headless.XUnit;
 using Avalonia.LogicalTree;
 using Avalonia.Styling;
@@ -14,6 +15,7 @@ using StudyStash.App.Controls.Rich;
 using StudyStash.App.Services;
 using StudyStash.App.ViewModels;
 using StudyStash.App.Views;
+using StudyStash.Core.Canvas;
 using StudyStash.Core.Rich;
 
 namespace StudyStash.App.Tests;
@@ -84,6 +86,67 @@ public class AccessibleNamesTests
                 AllNamed(models, "Settings, Recording, the models");
                 window.Close();
             }
+        }
+        finally
+        {
+            ((App)Application.Current!).UseSkin(SkinKind.Mac);
+        }
+    }
+
+    [AvaloniaTheory]
+    [InlineData(SkinKind.Mac)]
+    [InlineData(SkinKind.Win)]
+    public async Task The_new_class_box_says_what_it_is_and_stops_typing_at_the_longest_name_the_library_takes(SkinKind skin)
+    {
+        try
+        {
+            ((App)Application.Current!).UseSkin(skin);
+            var (model, host, home) = await SettingsAsync();
+            using (home)
+            using (host)
+            using (model)
+            {
+                var view = new SettingsView { DataContext = model };
+                var window = new Window { Width = 900, Height = 900, Content = view };
+                window.Show();
+                model.Section = "Classes";
+                Dispatcher.UIThread.RunJobs();
+                window.UpdateLayout();
+                var box = view.FindControl<TextBox>("NewLibraryClass")!;
+                Assert.Equal("New class name", Said(box));
+                box.Focus();
+                window.KeyTextInput(new string('x', CourseNames.MaxLength + 10));
+                Dispatcher.UIThread.RunJobs();
+                Assert.Equal(CourseNames.MaxLength, model.Lib.NewClass.Length);
+                window.Close();
+            }
+        }
+        finally
+        {
+            ((App)Application.Current!).UseSkin(SkinKind.Mac);
+        }
+    }
+
+    [AvaloniaTheory]
+    [InlineData(SkinKind.Mac)]
+    [InlineData(SkinKind.Win)]
+    public void Setups_class_box_stops_typing_at_the_longest_name_the_library_takes(SkinKind skin)
+    {
+        try
+        {
+            ((App)Application.Current!).UseSkin(skin);
+            var m = SetupModel.For(skin, AppRole.Both);
+            m.Go(SetupStep.Classes);
+            var view = skin == SkinKind.Mac ? (Control)new MacSetup { DataContext = m } : new WinSetup { DataContext = m };
+            var window = new Window { Width = 900, Height = 900, Content = view };
+            window.Show();
+            Dispatcher.UIThread.RunJobs();
+            window.UpdateLayout();
+            Shown<TextBox>(view).Single(t => t.PlaceholderText == "CS 101").Focus();
+            window.KeyTextInput(new string('x', CourseNames.MaxLength + 10));
+            Dispatcher.UIThread.RunJobs();
+            Assert.Equal(CourseNames.MaxLength, m.NewClass.Length);
+            window.Close();
         }
         finally
         {

@@ -33,13 +33,16 @@ max_context = 16384
 name = "CS 101"
 aliases = ["cs101", "intro programming"]
 description = "Intro to programming"
+color = 0
 
 [[classes]]
 name = "Bio \U0001f9ec 110"
 aliases = ["bio110", "biology"]
 description = ""
+color = 1
 
 [[classes]]
 name = "Calc II"
 aliases = []
 description = "Series \u2014 and \"sequences\""
+color = 2

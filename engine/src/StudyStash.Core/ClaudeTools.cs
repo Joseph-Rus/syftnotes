@@ -151,7 +151,7 @@ public sealed class LocalLibrary(LibraryReader reader, Canvas.CanvasSync? canvas
                     id = matches[0].Id;
                 }
                 if (id is null) return CanvasErr("Give an assignment id or words of its name.");
-                var found = Canvas.CanvasView.Assignment(index, id.Value, canvas.Clock(), canvas.Crawl.AssignmentFolder(cls, id.Value));
+                var found = Canvas.CanvasView.Assignment(index, id.Value, canvas.Clock(), canvas.Crawl.AssignmentFolder(cls, id.Value), Canvas.DueMarks.Load(home ?? ""));
                 return found is null ? CanvasErr($"No assignment {id} in {cls}.") : found;
             }
             case "modules":
@@ -167,7 +167,7 @@ public sealed class LocalLibrary(LibraryReader reader, Canvas.CanvasSync? canvas
                 return result;
             }
             default: // "assignments": what's still due, everywhere or in one class
-                var all = Canvas.Assignments.Load(home ?? "");
+                var all = Canvas.Assignments.Shown(home ?? "");
                 var list = Canvas.Assignments.Upcoming(all, DateTime.Now, body?["days"] is JsonValue d && d.TryGetValue(out int n) ? n : 14, cls);
                 return new JsonArray(list.Select(a => (JsonNode)new JsonObject
                 {
@@ -815,6 +815,7 @@ public static class ClaudeTools
             if (list.Count == 0) return;
             sb.Append(label).Append(":\n").Append(string.Join("\n", list.Select(Row))).Append("\n\n");
         }
+        sb.Append("Times are ").Append(Canvas.CanvasMarkdown.LocalTimes(TimeZoneInfo.Local)).Append(".\n\n");
         Section("Overdue", overdue);
         Section("Due soon", soon);
         Section("No due date", undated);
@@ -825,12 +826,17 @@ public static class ClaudeTools
     {
         var sb = new StringBuilder();
         sb.Append($"# {S(a["name"])} — {S(a["class"])}\n\n");
-        string due = S(a["due_at"]).Length > 0 ? Canvas.CanvasMarkdown.When(S(a["due_at"]), TimeZoneInfo.Local) : "";
+        string due = Canvas.CanvasMarkdown.When(S(a["due_at"]), TimeZoneInfo.Local);
+        if (due.Length > 0 && DateTimeOffset.TryParse(S(a["due_at"]), CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal, out var dueTime))
+            due += " " + Canvas.CanvasMarkdown.ZoneName(TimeZoneInfo.Local, dueTime); // the zone on the due date itself
         sb.Append("Due: ").Append(due.Length > 0 ? due : "No due date").Append('\n');
         string pts = Num(a["points"]);
         if (pts.Length > 0) sb.Append("Points: ").Append(pts).Append('\n');
         sb.Append("Status: ").Append(S(a["label"]));
         if (S(a["score_text"]) is { Length: > 0 } score) sb.Append(" · ").Append(score);
+        // What the student marked in Syft Notes (never sent to Canvas), as the app shows it.
+        if (S(a["mark"]) is "done") sb.Append(" · marked done in Syft Notes");
+        else if (S(a["mark"]) is "hidden") sb.Append(" · hidden in Syft Notes");
         sb.Append('\n');
         if (a["submission"] is JsonObject subm && S(subm["submitted_at"]) is { Length: > 0 } submittedAt)
             sb.Append("Submitted: ").Append(Canvas.CanvasMarkdown.When(submittedAt, TimeZoneInfo.Local)).Append('\n');

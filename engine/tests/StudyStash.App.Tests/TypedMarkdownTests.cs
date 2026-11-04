@@ -145,6 +145,76 @@ public class TypedMarkdownTests
     }
 
     [AvaloniaFact]
+    public void A_dash_typed_on_a_bullet_that_is_already_there_is_that_bullet_not_a_second_one()
+    {
+        var editor = new TypedEditor { Width = 600 };
+        var w = Show(editor);
+        try
+        {
+            void Type(string text)
+            {
+                foreach (char c in text) w.KeyTextInput(c.ToString());
+                Settle();
+            }
+            editor.Fields[0].Focus();
+            Settle();
+            // "- " makes the bullet; Return carries it on, so the next line is already a bullet before a word is typed.
+            Type("- first");
+            w.KeyPress(Avalonia.Input.Key.Enter, RawInputModifiers.None, PhysicalKey.None, null);
+            Settle();
+            // A student who types "- " there anyway (or "* ") still has the one bullet, in the editor and as saved.
+            Type("- second");
+            w.KeyPress(Avalonia.Input.Key.Enter, RawInputModifiers.None, PhysicalKey.None, null);
+            Settle();
+            Type("* third");
+            // The same one level in.
+            w.KeyPress(Avalonia.Input.Key.Enter, RawInputModifiers.None, PhysicalKey.None, null);
+            w.KeyPress(Avalonia.Input.Key.Tab, RawInputModifiers.None, PhysicalKey.None, null);
+            Settle();
+            Type("- inner");
+            Assert.Equal("- first\n- second\n- third\n  - inner", editor.Text);
+            Assert.Equal(["first", "second", "third", "inner"], editor.Fields.Select(f => f.Text));
+            Assert.Equal(["•", "•", "•", "◦"], editor.Markers);
+            Assert.Equal("- ==first==\n- ==second==\n- ==third==\n  - ==inner==", StudyStash.App.ViewModels.TypedNotes.AllMine(editor.Text));
+
+            // Lines pasted at a new bullet's start: the first one's "- " is that bullet's, as when it's typed.
+            w.KeyPress(Avalonia.Input.Key.Enter, RawInputModifiers.None, PhysicalKey.None, null);
+            Settle();
+            editor.Insert("- a\n- b");
+            Settle();
+            Assert.EndsWith("  - inner\n  - a\n- b", editor.Text);
+            // An edit in front of a " - " already in the words keeps the minus: "x - 5" with the x deleted.
+            w.KeyPress(Avalonia.Input.Key.Enter, RawInputModifiers.None, PhysicalKey.None, null);
+            Settle();
+            Type("x - 5");
+            var five = editor.Fields[^1];
+            five.CaretIndex = 1;
+            w.KeyPress(Avalonia.Input.Key.Back, RawInputModifiers.None, PhysicalKey.None, null);
+            Settle();
+            Assert.Equal(" - 5", five.Text);
+            // ...and a digit typed at its end afterwards doesn't take it either.
+            five.CaretIndex = five.Text!.Length;
+            Type("0");
+            Assert.Equal(" - 50", five.Text);
+            // "- " typed on a new bullet with nothing after it yet: one bullet, there and then.
+            w.KeyPress(Avalonia.Input.Key.Enter, RawInputModifiers.None, PhysicalKey.None, null);
+            Settle();
+            Type("- ");
+            Assert.Equal("", editor.Fields[^1].Text);
+            Assert.EndsWith("\n- ", editor.Text);
+            // "- " typed at the start of a bullet that has words: the same.
+            Type("foo");
+            editor.Fields[^1].CaretIndex = 0;
+            Type("- ");
+            Assert.Equal("foo", editor.Fields[^1].Text);
+        }
+        finally
+        {
+            w.Close();
+        }
+    }
+
+    [AvaloniaFact]
     public void Editing_the_written_notes_carries_lists_on_and_takes_the_bold_key()
     {
         var notes = new MarkdownBox { Width = 600, AcceptsReturn = true, TextWrapping = TextWrapping.Wrap, WholeNotes = true, Text = "## Cell division\n- mitosis" };
