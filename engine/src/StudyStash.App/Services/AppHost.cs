@@ -218,6 +218,9 @@ public sealed partial class AppHost : IDisposable, IProblemSource
     public bool OlderLibrary { get; private set; }
     /// <summary>The library's name, classes (in order: their colors) and the rest of /api/v2/library.</summary>
     public JsonObject? Overview { get; private set; }
+    /// <summary>What the library is for says school, or says nothing (a library from before it was asked).</summary>
+    public bool ForSchool => ForSchoolIn(Overview);
+    internal static bool ForSchoolIn(JsonObject? overview) => overview?["for_school"] is not JsonValue v || !v.TryGetValue(out bool school) || school;
     public DownloadProgress? Downloading { get; private set; }
     /// <summary>The model <see cref="Downloading"/> is about.</summary>
     public WhisperModel? DownloadingModel { get; private set; }

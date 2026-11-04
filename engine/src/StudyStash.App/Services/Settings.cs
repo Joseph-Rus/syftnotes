@@ -351,7 +351,7 @@ public sealed partial class SettingsModel : ObservableObject, IDisposable
         this.confirm = confirm;
         bool records = host.Settings.Role != AppRole.Library;
         // Not for school (what the library is for says so): Folders, and no Canvas.
-        bool school = host.Overview?["for_school"] is not System.Text.Json.Nodes.JsonValue fs || !fs.TryGetValue(out bool sc) || sc;
+        bool school = host.ForSchool;
         string device = Machine.Device;
         ComputerNavTitle = host.Settings.Role == AppRole.Laptop ? "This laptop" : $"This {device}";
         NavItem Nav(string id, string glyph, string label) => new() { Id = id, Glyph = glyph, Label = label };
