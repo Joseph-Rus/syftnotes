@@ -26,10 +26,15 @@ public class MacRenameTests
         var plan = MacRename.Plan(Bundle(t.Path, "Study Stash.app", "0.23.0"), _ => true)!;
         Assert.Equal(Path.Combine(t.Path, "Syft Notes.app"), plan.To);
         var spawned = new List<IReadOnlyList<string>>();
-        Assert.True(Go(plan, spawned));
+        // The waiter starts while the bundle this process runs from is still in place: once it has moved, the process
+        // can't load the code that starts a program (a student's first 0.23.0 start crashed that way).
+        bool movedBeforeSpawn = true;
+        Assert.True(MacRename.Run(plan, _ => false, () => { }, (_, _, _) => new ProcResult(0, ""),
+            a => { movedBeforeSpawn = !Directory.Exists(plan.From); spawned.Add(a); }, 4242, ["--background"], _ => { }));
+        Assert.False(movedBeforeSpawn);
         Assert.False(Directory.Exists(Path.Combine(t.Path, "Study Stash.app")));
         Assert.True(File.Exists(Path.Combine(t.Path, "Syft Notes.app", "Contents", "Info.plist")));
-        Assert.Equal(["4242", plan.To, "--background"], spawned.Single().Skip(3).ToArray());
+        Assert.Equal(["4242", plan.From, plan.To, "--background"], spawned.Single().Skip(3).ToArray());
         Assert.Contains("caffeinate -w", spawned.Single()[2]);
     }
 
