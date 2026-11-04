@@ -38,9 +38,6 @@ public sealed class VoiceMemos(string home, Func<DateTimeOffset>? clock = null)
 
     public static readonly TimeSpan ClaimLasts = TimeSpan.FromHours(2);
 
-    /// <summary>What a phone's recording can be, by its name's ending: Voice Memos saves .m4a.</summary>
-    public static readonly string[] Endings = [".m4a", ".mp3", ".wav", ".aac", ".caf", ".mp4", ".aif", ".aiff", ".qta"];
-
     static readonly JsonSerializerOptions Json = new() { WriteIndented = true, PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower };
     readonly Lock gate = new();
     readonly Func<DateTimeOffset> now = clock ?? (() => DateTimeOffset.UtcNow);
@@ -48,7 +45,8 @@ public sealed class VoiceMemos(string home, Func<DateTimeOffset>? clock = null)
     public string Dir => Path.Combine(home, "voice-memos");
     string Index => Path.Combine(Dir, "memos.json");
 
-    public static bool IsAudio(string name) => Endings.Contains(Path.GetExtension(name).ToLowerInvariant());
+    /// <summary>Whether a phone's recording is one the computers can read, by its name's ending: Voice Memos saves .m4a.</summary>
+    public static bool IsAudio(string name) => LectureFromFile.SoundEndings.Contains(Path.GetExtension(name).ToLowerInvariant());
 
     List<VoiceMemo> Read()
     {
