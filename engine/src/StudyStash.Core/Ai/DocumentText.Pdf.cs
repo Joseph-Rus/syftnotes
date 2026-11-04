@@ -10,12 +10,12 @@ public static partial class DocumentText
     internal const int TypedEnough = 40;
 
     /// <summary>
-    /// A PDF's pages, each page's text in turn, blank pages left out. A page with next to no typed text (a scan, or
+    /// A PDF's pages, each page's text in turn ("" for a blank page). A page with next to no typed text (a scan, or
     /// iPad notes, whose handwriting is ink rather than letters) is drawn and read by text recognition, up to
     /// <see cref="DocumentTextOptions.MaxOcrPages"/> pages and until <see cref="DocumentTextOptions.TimeLimit"/> is up;
     /// the pages it didn't get to keep what was typed on them.
     /// </summary>
-    static string? Pdf(string path, DocumentTextOptions options, CancellationToken ct)
+    static List<string>? Pdf(string path, DocumentTextOptions options, CancellationToken ct)
     {
         var started = DateTime.UtcNow;
         var pages = PdfPages(path, options.MaxPages, ct);
@@ -26,7 +26,7 @@ public static partial class DocumentText
         if (bare.Count > 0 && left > TimeSpan.Zero && (options.PageReader ?? PageReader) is { } read)
             foreach (var (i, text) in OneAtATime(() => read(path, bare, DateTime.UtcNow + left, ct), ct))
                 if (i >= 0 && i < pages.Count && Letters(text) > Letters(pages[i])) pages[i] = text;
-        return string.Join("\n\n", pages.Select(Py.Strip).Where(t => t.Length > 0));
+        return [.. pages.Select(Py.Strip)];
     }
 
     static readonly SemaphoreSlim recognizing = new(1, 1);
