@@ -6,7 +6,7 @@ shell-in-services 0
 windows-by-hand 6
 bare-catches 42
 fire-and-forget-in-shell 0
-mac-views 38
+mac-views 37
 literal-colours 5
-literal-font-sizes 246
+literal-font-sizes 240
 clients-by-hand 1

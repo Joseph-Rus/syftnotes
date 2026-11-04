@@ -8,6 +8,7 @@ using StudyStash.Audio;
 using StudyStash.Core;
 using StudyStash.Core.Ai;
 using StudyStash.App.ViewModels;
+using StudyStash.App.ViewModels.Kit;
 
 namespace StudyStash.App.Services;
 
@@ -83,6 +84,7 @@ public sealed partial class SettingsModel : ObservableObject, IDisposable
     readonly AppHost host;
     /// <summary>What Settings asks of the app (open Connect Canvas, run setup again, quit…) goes out here.</summary>
     readonly IMessenger messages;
+    readonly IConfirm confirm;
 
     /// <summary>The page shown; Settings opens on General (a library-only computer on its library).</summary>
     [ObservableProperty] public partial string Section { get; set; } = "";
@@ -138,9 +140,6 @@ public sealed partial class SettingsModel : ObservableObject, IDisposable
     public bool IsLibraryRole => host.Settings.Role != AppRole.Laptop;
     /// <summary>"Use just this computer"'s line under its name: what it does, naming the library it would stop using.</summary>
     [ObservableProperty] public partial string JustThisComputerLine { get; set; } = "";
-    [ObservableProperty] public partial bool ConfirmingBecomeLibrary { get; set; }
-    [ObservableProperty] public partial string BecomeLibraryQuestion { get; set; } = "";
-    [ObservableProperty] public partial bool ConfirmingBecomeLaptop { get; set; }
     [ObservableProperty] public partial string BecomeLaptopAddress { get; set; } = "";
     [ObservableProperty] public partial string BecomeLaptopPassword { get; set; } = "";
     [ObservableProperty] public partial string? SwitchSay { get; set; }
@@ -188,14 +187,6 @@ public sealed partial class SettingsModel : ObservableObject, IDisposable
     /// <summary>Models downloaded here but not in use (after a switch): each has its own Remove in the list, never
     /// removed unasked.</summary>
     [ObservableProperty] public partial string SpareLine { get; set; } = "";
-    /// <summary>A model's Remove was pressed: the question about that one, with Remove and Keep.</summary>
-    [ObservableProperty] public partial bool ConfirmingRemove { get; set; }
-    /// <summary>The model the question is about.</summary>
-    WhisperModel? removing;
-    public string RemoveQuestion => removing is { } m
-        ? $"Remove {m.Name} from this computer? It frees {WhisperModel.SizeOf(m.Bytes)}, and you can download it again here any time."
-        : "";
-    partial void OnConfirmingRemoveChanged(bool value) => OnPropertyChanged(nameof(RemoveQuestion));
     List<WhisperModel> spare = [];
     [ObservableProperty] public partial string Language { get; set; } = "";
     /// <summary>When a lecture is written down: as it records (the recorder's transcript and chat), or after class
@@ -344,8 +335,8 @@ public sealed partial class SettingsModel : ObservableObject, IDisposable
     /// shared Canvas poll (none in a test or a shot, so nothing there polls). What it asks of the app goes out on
     /// <paramref name="messages"/> (the app's one messenger when not given).</summary>
     public static SettingsModel Make(AppHost host, IAiLibrary? ai = null, CanvasContext? canvas = null, CanvasWatch? watch = null,
-        Func<LibrarySettingsModel.Call?>? library = null, IMessenger? messages = null) =>
-        new(host, ai, canvas, watch, library, messages ?? WeakReferenceMessenger.Default);
+        Func<LibrarySettingsModel.Call?>? library = null, IMessenger? messages = null, IConfirm? confirm = null) =>
+        new(host, ai, canvas, watch, library, messages ?? WeakReferenceMessenger.Default, confirm ?? Confirm.Default);
 
     /// <summary>True while the constructor fills in what's already set: nothing is saved, and starting at login isn't
     /// touched, until the student changes something.</summary>
@@ -353,10 +344,11 @@ public sealed partial class SettingsModel : ObservableObject, IDisposable
     /// <summary>Putting the box back after the login item couldn't be changed.</summary>
     bool settingLogin;
 
-    SettingsModel(AppHost host, IAiLibrary? ai, CanvasContext? canvas, CanvasWatch? watch, Func<LibrarySettingsModel.Call?>? library, IMessenger messages)
+    SettingsModel(AppHost host, IAiLibrary? ai, CanvasContext? canvas, CanvasWatch? watch, Func<LibrarySettingsModel.Call?>? library, IMessenger messages, IConfirm confirm)
     {
         this.host = host;
         this.messages = messages;
+        this.confirm = confirm;
         bool records = host.Settings.Role != AppRole.Library;
         // Not for school (what the library is for says so): Folders, and no Canvas.
         bool school = host.Overview?["for_school"] is not System.Text.Json.Nodes.JsonValue fs || !fs.TryGetValue(out bool sc) || sc;
@@ -391,9 +383,10 @@ public sealed partial class SettingsModel : ObservableObject, IDisposable
             ]),
         ];
         ComputerNav = [.. NavGroups.SelectMany(g => g.Items).Where(n => !LibraryPages.Contains(n.Id))];
-        Voices = new ListenVoicesModel(() => host.Remote() is null ? null : new StudyStash.Core.Study.StudyRemote(host.Client().ServerUrl, host.Client().PoolKey));
+        Voices = new ListenVoicesModel(() => host.Remote() is null ? null : new StudyStash.Core.Study.StudyRemote(host.Client().ServerUrl, host.Client().PoolKey), confirm);
         Lib = new LibrarySettingsModel(library ?? (() => host.Remote() is { } lib ? (m, path, body) => lib.SettingsAsync(m, path, body) : null))
         {
+            Confirmer = confirm,
             IsHere = host.Settings.LibraryHere,
             UpdateHere = AppUpdates.Current is { } updates ? async () => NoticeWords.UpdateNowLine(await Task.Run(updates.NowAsync)) : null,
             AppAutoUpdate = () => host.Client().AutoUpdate,
@@ -474,7 +467,7 @@ public sealed partial class SettingsModel : ObservableObject, IDisposable
             {
                 host.Save(s => s.AnswerPhoneWhenClosed = on);
                 await host.SyncBackgroundAsync();
-            }, () => host.BackgroundProblem));
+            }, () => host.BackgroundProblem), confirm: confirm);
         Keys = new ShortcutsModel(() => host.Settings.Keys, change => host.Save(s => change(s.Keys)), Skin.Current == SkinKind.Mac, records);
         Phones.Ticking = Phones.UiTicking();
         Assistant = new SettingsChatModel(new SettingsChatServices
@@ -619,12 +612,6 @@ public sealed partial class SettingsModel : ObservableObject, IDisposable
         spare = [.. WhisperModels.All.Where(m => !m.Bundled && m.Id != host.Model.Id && m.Id != host.DownloadingModel?.Id && WhisperModels.IsDownloaded(host.Home, m))];
         SpareLine = spare.Count == 0 ? ""
             : $"Also on this computer: {string.Join(", ", spare.Select(m => $"{m.Name} ({WhisperModel.SizeOf(m.Bytes)})"))}.";
-        if (removing is not null && !spare.Any(m => m.Id == removing.Id))
-        {
-            removing = null;
-            ConfirmingRemove = false;
-        }
-        OnPropertyChanged(nameof(RemoveQuestion));
         foreach (var m in Models)
         {
             m.Chosen = m.Model.Id == host.Model.Id;
@@ -926,32 +913,29 @@ public sealed partial class SettingsModel : ObservableObject, IDisposable
     void GoJustThisComputer()
     {
         Section = "Connection";
-        AskBecomeLibrary();
+        BecomeLibraryCommand.Execute(null);
     }
 
     /// <summary>"Use just this computer": a laptop asks to keep everything on this computer, which becomes the library
     /// too (and keeps recording), bringing over the library it used. It says what will happen before anything does.</summary>
     [RelayCommand]
-    void AskBecomeLibrary()
+    async Task BecomeLibrary()
     {
         var old = RoleSwitch.OldLibraryOf(host);
-        BecomeLibraryQuestion = old is null
+        string question = old is null
             ? $"This {Device} keeps recording, and becomes your library too: its own place for notes, classes and settings."
             : $"{OldName(old)} on {RoleSwitch.ComputerOf(old.Url)} keeps its own copy. Classes and notes come here: every lecture with its notes and transcript, "
               + $"the files you attached, your classes with their other names and Canvas courses, and your chats. Then this {Device} is your library, and keeps recording. "
               + $"A big library takes a while; if it stops part-way, what came stays and you can try again.";
-        ConfirmingBecomeLibrary = true;
         SwitchSay = null;
+        if (await confirm.AskAsync(new ConfirmAsk("Use just this computer?", question, "Use just this computer"))) await ToLibraryAsync();
     }
-
-    [RelayCommand] void CancelBecomeLibrary() => ConfirmingBecomeLibrary = false;
 
     /// <summary>The student said yes: this computer becomes the library (taking over the old one's name and password
     /// when it has none of its own), then brings over everything in the library it used, if any, saying how far it's
     /// got and, at the end, what came. A problem bringing things over (the old library's offline, say) never undoes
     /// the switch: it's said in plain words, and Try again picks up where it stopped.</summary>
-    [RelayCommand]
-    async Task ConfirmBecomeLibrary()
+    async Task ToLibraryAsync()
     {
         Switching = true;
         SwitchSay = null;
@@ -962,7 +946,6 @@ public sealed partial class SettingsModel : ObservableObject, IDisposable
             var old = RoleSwitch.OldLibraryOf(host);
             string done = await RoleSwitch.ToLibraryAsync(host, libraryHere(), old, DisplayName);
             LibraryHere = true;
-            ConfirmingBecomeLibrary = false;
             Refresh();
             // What the switch remembered: whether the library here is new, so it takes the old one's notes settings too.
             var bring = RoleSwitch.Pending(host.Home) ?? old;
@@ -1070,25 +1053,25 @@ public sealed partial class SettingsModel : ObservableObject, IDisposable
 
     /// <summary>A library (or a one-computer setup) asks to become a plain laptop, sending to another library.</summary>
     [RelayCommand]
-    void AskBecomeLaptop()
+    async Task BecomeLaptop()
     {
         if (Setup.NormalizeAddress(BecomeLaptopAddress).Length == 0)
         {
             SwitchSay = "Type your new library's address first, like http://mac-mini:8787.";
             return;
         }
-        ConfirmingBecomeLaptop = true;
         SwitchSay = null;
+        if (await confirm.AskAsync(new ConfirmAsk("Use a library on another computer?",
+                "Everything in this library goes to that address first, so nothing is left behind; if that library can't take it all, nothing changes here. "
+                + "Then this computer stops being the library: its lectures, notes and settings stay right where they are, ready for it to be the library again any time.",
+                "Switch"))) await ToLaptopAsync();
     }
-
-    [RelayCommand] void CancelBecomeLaptop() => ConfirmingBecomeLaptop = false;
 
     /// <summary>The student said yes: everything in this library goes to the new one first, so nothing is left behind,
     /// then this computer stops being the library and becomes a laptop that sends to it. Nothing changes if either
     /// step fails (or the other library is too old to take everything): the library here keeps running, ready to be
     /// tried again.</summary>
-    [RelayCommand]
-    async Task ConfirmBecomeLaptop()
+    async Task ToLaptopAsync()
     {
         Switching = true;
         SwitchSay = null;
@@ -1099,7 +1082,6 @@ public sealed partial class SettingsModel : ObservableObject, IDisposable
             string sent = await RoleSwitch.HandOffLecturesAsync(host, BecomeLaptopAddress, BecomeLaptopPassword, SendProgress, libraryHttp);
             string done = await RoleSwitch.ToLaptopAsync(host, BecomeLaptopAddress, BecomeLaptopPassword);
             LibraryHere = false;
-            ConfirmingBecomeLaptop = false;
             SwitchSay = sent + " " + done;
         }
         catch (InvalidOperationException e)
@@ -1125,30 +1107,15 @@ public sealed partial class SettingsModel : ObservableObject, IDisposable
         else _ = host.DownloadModelAsync(choice.Model);
     }
 
-    /// <summary>A downloaded model's own Remove: asks first, under the list.</summary>
+    /// <summary>A downloaded model's own Remove: asks first, then the model goes from this computer.</summary>
     [RelayCommand]
-    void AskRemoveModel(ModelChoice choice)
+    async Task RemoveModel(ModelChoice choice)
     {
         if (!choice.CanRemove) return;
-        removing = choice.Model;
-        ConfirmingRemove = false; // the question is asked afresh, about this one
-        ConfirmingRemove = true;
-    }
-
-    [RelayCommand]
-    void KeepSpare()
-    {
-        removing = null;
-        ConfirmingRemove = false;
-    }
-
-    /// <summary>The student said yes: the model asked about goes from this computer.</summary>
-    [RelayCommand]
-    void RemoveSpare()
-    {
-        string? problem = removing is { } m ? host.RemoveModel(m) : null;
-        removing = null;
-        ConfirmingRemove = false;
+        var m = choice.Model;
+        if (!await confirm.AskAsync(new ConfirmAsk($"Remove {m.Name}?",
+                $"It leaves this computer and frees {WhisperModel.SizeOf(m.Bytes)}. You can download it again here any time.", "Remove", "Keep"))) return;
+        string? problem = host.RemoveModel(m);
         Refresh();
         if (problem is not null) ModelLine = problem;
     }

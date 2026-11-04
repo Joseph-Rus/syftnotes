@@ -7,6 +7,7 @@ using Avalonia.Styling;
 using Avalonia.Threading;
 using Avalonia.VisualTree;
 using StudyStash.App.ViewModels;
+using StudyStash.App.ViewModels.Kit;
 using StudyStash.App.Views;
 
 namespace StudyStash.App.Tests;
@@ -149,7 +150,8 @@ public class PhonesViewTests
             switched.Add(whenClosed = on);
             return Task.CompletedTask;
         }, () => null);
-        var model = new PhonesModel(() => Library(paired: true)) { Google = new PhoneGoogleModel(drive, background: background) };
+        var confirm = new FakeConfirm(answer: false);
+        var model = new PhonesModel(() => Library(paired: true)) { Google = new PhoneGoogleModel(drive, background: background, confirm: confirm) };
         await model.Load();
         Control view = skin == SkinKind.Mac ? new MacPhones { DataContext = model } : new WinPhones { DataContext = model };
         var w = new Window { Width = 760, Height = 1100, RequestedThemeVariant = dark ? ThemeVariant.Dark : ThemeVariant.Light, Content = view };
@@ -184,11 +186,10 @@ public class PhonesViewTests
             Dispatcher.UIThread.RunJobs();
             Assert.Equal([false], switched);
 
-            // Disconnect asks first, in words.
-            ButtonSaying("Disconnect…")!.Command!.Execute(null);
-            Dispatcher.UIThread.RunJobs();
-            Assert.True(Shows(model.Google.ConfirmWords));
-            Assert.NotNull(ButtonSaying("Disconnect"));
+            // Disconnect asks first, in words; a no leaves the account connected.
+            await model.Google.DisconnectCommand.ExecuteAsync(null);
+            Assert.Equal([("Disconnect from Google?", model.Google.ConfirmWords, "Disconnect")], confirm.Asked.Select(a => (a.Title, a.Text, a.Yes)));
+            Assert.True(model.Google.Connected);
         }
         finally
         {
