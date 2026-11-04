@@ -315,6 +315,42 @@ public class LibrarySettingsApiTests
         Assert.Equal(["CS 101"], Configs.Load(cfg.Home).Classes.Select(c => c.Name));
     }
 
+    /// <summary>A class removed in the app's Settings: its lecture moves to Unsorted (note file and all), its empty
+    /// folder goes, the sidebar no longer lists it, and its Canvas course is un-ticked.</summary>
+    [Fact]
+    public async Task Removing_a_class_moves_its_lectures_to_Unsorted_and_stops_its_Canvas_course()
+    {
+        using var dir = new TempDir();
+        var (cfg, store) = Library(dir);
+        using var _s = store;
+        store.Save(new Meeting("m1") { Title = "Osmosis", Date = "2026-09-01", Transcript = "Today." }, new Classification("BIO 110", 0.9, "folder"), summaryMd: "## Summary\nOsmosis.");
+        Canvas.CanvasSettings.Update(cfg.Home, c =>
+        {
+            c.Courses = new() { ["CS 101"] = 4206, ["BIO 110"] = 4207 };
+            c.Chosen = ["4206", "4207"];
+        });
+        await using var site = await Site(cfg, store);
+
+        await Json(await site.Client.SendAsync(Req(HttpMethod.Post, "/api/v2/settings", new
+        {
+            classes = new object[] { new { name = "CS 101", was = "CS 101" } },
+            known = new[] { "CS 101", "BIO 110" },
+        })));
+
+        Assert.Equal(["CS 101"], Configs.Load(cfg.Home).ClassNames());
+        var moved = store.Get("m1")!;
+        Assert.Equal(Configs.Unsorted, moved.ClassName);
+        Assert.Equal(Configs.Unsorted, Path.GetFileName(Path.GetDirectoryName(moved.MdPath)));
+        Assert.Contains("Osmosis.", File.ReadAllText(moved.MdPath!));
+        Assert.False(Directory.Exists(Path.Combine(cfg.PoolDir, "BIO 110")));
+        var overview = new LibraryReader(Configs.Load(cfg.Home), store).Overview();
+        Assert.Equal(["CS 101"], overview["classes"]!.AsArray().Select(c => c!["name"]!.GetValue<string>()));
+        Assert.Equal(1, overview["unsorted"]!.GetValue<int>());
+        var canvas = Canvas.CanvasSettings.Load(cfg.Home);
+        Assert.Equal(["CS 101"], canvas.Courses.Keys);
+        Assert.Equal(["4206"], canvas.Chosen!);
+    }
+
     [Fact]
     public async Task Saving_the_library_page_keeps_classes_it_never_showed_and_every_class_s_folder()
     {

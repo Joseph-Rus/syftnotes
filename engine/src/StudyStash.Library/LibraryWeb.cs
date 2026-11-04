@@ -873,8 +873,8 @@ public sealed partial class LibraryWeb
         }
         string classes = $"<div class=\"group-head\" id=\"classes\">Classes</div><div class=\"group\">{string.Concat(rows)}</div>"
             + "<p class=\"group-foot\">Lectures are sorted into these. A lecture recorded for a class, or whose title "
-            + "matches a name here, is filed without asking the AI. Removing a class keeps its lectures; move them "
-            + "from their pages. Type a new name over a class to rename it: its lectures and folder go with it. Fill in the last row "
+            + "matches a name here, is filed without asking the AI. Removing a class moves its lectures "
+            + "to Unsorted; nothing is deleted. Type a new name over a class to rename it: its lectures and folder go with it. Fill in the last row "
             + "to add a class.</p>";
         string form = $"<form method=\"post\" action=\"/settings\">{ai}{classes}"
             + "<div class=\"actions\"><button class=\"primary\">Save settings</button></div></form>" + CourseNamesGroup(renamed);
@@ -967,8 +967,10 @@ public sealed partial class LibraryWeb
         if (double.TryParse(Py.Strip(f.Get("min_confidence", Py.FloatRepr(cfg.MinConfidence))), NumberStyles.Float,
                 CultureInfo.InvariantCulture, out double confidence) && !double.IsNaN(confidence))
             cfg.MinConfidence = Math.Clamp(confidence, 0.0, 1.0);
+        var removed = Removed(classes);
         cfg.Classes = classes;
         Configs.Save(cfg);
+        ClassesRemoved(removed);
         if (f.ContainsKey("ai_provider"))
         {
             var picked = AiSettings.Load(cfg.Home);
