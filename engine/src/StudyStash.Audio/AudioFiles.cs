@@ -35,7 +35,7 @@ public static class AudioFiles
         }
         catch (Exception e) when (e is System.ComponentModel.Win32Exception or InvalidOperationException)
         {
-            throw new InvalidOperationException(OperatingSystem.IsLinux() ? "Reading a voice memo here needs ffmpeg. Install it, then try again." : CantRead, e);
+            throw new InvalidOperationException(OperatingSystem.IsLinux() ? "Reading this recording here needs ffmpeg. Install it, then try again." : CantRead, e);
         }
         using (p)
         {

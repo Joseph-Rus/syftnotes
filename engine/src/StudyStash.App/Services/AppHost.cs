@@ -422,13 +422,15 @@ public sealed partial class AppHost : IDisposable, IProblemSource
     /// (<see cref="LectureFromFile"/>; <see cref="LectureFromFile.CanRead"/> says which files). The file is only read.
     /// A long video takes a while, so it's read off the screen's thread. A title given is the student's own and the
     /// library keeps it; <paramref name="day"/> null is the day the file was last changed. The outcome is the lecture,
-    /// or words to tell the student.</summary>
-    public async Task<Outcome<Lecture>> AddLectureFromFileAsync(string path, string? className = null, string? title = null, DateOnly? day = null)
+    /// or words to tell the student. Cancelling doesn't stop a conversion that's running, but the lecture isn't added
+    /// (no lecture, no sound left behind) and an <see cref="OperationCanceledException"/> comes out, as from any call
+    /// the student cancels.</summary>
+    public async Task<Outcome<Lecture>> AddLectureFromFileAsync(string path, string? className = null, string? title = null, DateOnly? day = null, CancellationToken cancel = default)
     {
         string owner = Client().DisplayName;
         try
         {
-            var lecture = await Task.Run(() => LectureFromFile.FromFile(Lectures, AudioFiles.ToRecording, path, className, title, day, owner));
+            var lecture = await Task.Run(() => LectureFromFile.FromFile(Lectures, AudioFiles.ToRecording, path, className, title, day, owner, cancel), cancel);
             log($"[file] {lecture.Id} ({lecture.Seconds:0} s), waiting for Whisper");
             Whisper.Wake();
             Changed?.Invoke();
