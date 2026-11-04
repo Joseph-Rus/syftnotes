@@ -161,4 +161,13 @@ public static class LibraryCall
     public static bool IsOffline(Exception e) =>
         e is HttpRequestException or TaskCanceledException or TimeoutException or IOException or JsonException
             or InvalidOperationException or UriFormatException;
+
+    /// <summary>For <c>catch (Exception e) when (LibraryCall.Handled(e, "[area] what"))</c> where a screen shows its own
+    /// plain words for any failure of a call to the library: the expected ones (<see cref="IsOffline"/>) pass quietly,
+    /// anything else is written to the log first, so it isn't lost. Always true.</summary>
+    public static bool Handled(Exception e, string where)
+    {
+        if (!IsOffline(e)) Program.Log($"{where} failed: {e.GetType().Name}: {e.Message}");
+        return true;
+    }
 }

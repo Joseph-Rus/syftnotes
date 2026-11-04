@@ -1,3 +1,4 @@
+using StudyStash.App.Services;
 using System.Collections.ObjectModel;
 using System.Globalization;
 using CommunityToolkit.Mvvm.ComponentModel;
@@ -228,7 +229,7 @@ public sealed partial class ExamPrepModel : ObservableObject
                 };
             }
         }
-        catch
+        catch (Exception e) when (LibraryCall.Handled(e, "[exam-prep] Finish"))
         {
             Saved = "Your library isn't answering, so this go wasn't kept.";
         }
@@ -257,7 +258,7 @@ public sealed partial class ExamPrepModel : ObservableObject
         {
             await library.DeletePrepAsync(Prep.Id);
         }
-        catch
+        catch (Exception e) when (LibraryCall.Handled(e, "[exam-prep] Delete"))
         {
             return;
         }

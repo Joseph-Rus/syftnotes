@@ -4,7 +4,7 @@ engine-state-strings 0
 shell-in-viewmodels 0
 shell-in-services 0
 windows-by-hand 0
-bare-catches 34
+bare-catches 7
 fire-and-forget-in-shell 0
 mac-views 37
 literal-colours 5

@@ -1,3 +1,4 @@
+using StudyStash.App.Services;
 using System.Collections.ObjectModel;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
@@ -426,7 +427,7 @@ public sealed partial class AiAskModel : ObservableObject
         {
             overview = await library.EnginesAsync();
         }
-        catch
+        catch (Exception e) when (LibraryCall.Handled(e, "[ai-ask] Load"))
         {
             Offline = true;
             return;
@@ -554,7 +555,7 @@ public sealed partial class AiAskModel : ObservableObject
             if (Partial() is { } partial) turn.Answer = partial;
             turn.Failed = ex.Message;
         }
-        catch
+        catch (Exception e) when (LibraryCall.Handled(e, "[ai-ask] Ask"))
         {
             string? partial = Partial();
             if (partial is not null) turn.Answer = partial;
