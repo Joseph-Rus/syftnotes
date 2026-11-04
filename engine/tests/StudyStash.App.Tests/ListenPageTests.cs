@@ -3,6 +3,7 @@ using Avalonia.Headless.XUnit;
 using Avalonia.Threading;
 using Avalonia.VisualTree;
 using StudyStash.App.ViewModels;
+using StudyStash.App.ViewModels.Kit;
 using StudyStash.App.Views;
 using StudyStash.Core.Study;
 using StudyStash.Core.Tests;
@@ -159,11 +160,13 @@ public class ListenPageTests
             Dispatcher.UIThread.RunJobs();
             Assert.False(listen.ShowVoicesOffer);
 
-            var settings = new ListenVoicesModel(lib.Study);
+            var confirm = new FakeConfirm(answer: false);
+            var settings = new ListenVoicesModel(() => lib.Study, confirm);
             await settings.LoadAsync();
             Assert.True(settings.Here);
             await settings.RemoveCommand.ExecuteAsync(null);
-            Assert.Equal(("Remove them", true), (settings.RemoveSaid, settings.Here));
+            Assert.Equal(("Remove them", true), (confirm.Asked.Single().Yes, settings.Here)); // a no leaves them where they are
+            confirm.Answer = true;
             await settings.RemoveCommand.ExecuteAsync(null);
             Assert.True(settings.CanDownload);
             Assert.False(pack.Here);
