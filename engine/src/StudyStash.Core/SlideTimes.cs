@@ -23,8 +23,10 @@ public static class SlideTimes
     /// <summary>Back-to-back pages sharing this much of their words are one slide built up (a Beamer build-up).</summary>
     const double SamePage = 0.8;
 
-    /// <summary>A slide needs this many words that tell it apart (not on every slide, not said all lecture long).</summary>
+    /// <summary>A slide needs this many words that tell it apart: each weighing at least <see cref="RealWeight"/> of a
+    /// word found on one slide only and said in under a quarter of the lecture (the most a word can weigh).</summary>
     const int FewestWords = 3;
+    const double RealWeight = 0.25;
 
     /// <summary>A slide needs this share of its words heard in its window.</summary>
     const double LeastScore = 0.35;
@@ -55,18 +57,19 @@ public static class SlideTimes
 
     sealed record Group(List<int> Pages, HashSet<string> Words);
 
-    /// <summary>The pages, with back-to-back near copies (a slide built up a line at a time) joined into one. The words
-    /// on more than half the pages (a course name, a footer) are left out of the comparison.</summary>
+    /// <summary>The pages, with back-to-back near copies (a slide built up a line at a time) joined into one. Each page is
+    /// compared with its group's first page, so a short page between two slides (a caption) can't chain them together.
+    /// The words on more than half the pages (a course name, a footer) are left out of the comparison.</summary>
     static List<Group> Groups(List<HashSet<string>> words)
     {
         var common = words.SelectMany(w => w).GroupBy(w => w).Where(g => g.Count() * 2 > words.Count).Select(g => g.Key).ToHashSet();
         var groups = new List<Group>();
-        HashSet<string>? before = null;
+        HashSet<string>? start = null;
         for (int i = 0; i < words.Count; i++)
         {
             var own = words[i].Except(common).ToHashSet();
-            if (before is not null && own.Count > 0 && before.Count > 0
-                && (double)own.Count(before.Contains) / Math.Min(own.Count, before.Count) >= SamePage)
+            if (start is not null && own.Count > 0 && start.Count > 0
+                && (double)own.Count(start.Contains) / Math.Min(own.Count, start.Count) >= SamePage)
             {
                 groups[^1].Pages.Add(i);
                 groups[^1].Words.UnionWith(words[i]);
@@ -74,8 +77,8 @@ public static class SlideTimes
             else
             {
                 groups.Add(new Group([i], [.. words[i]]));
+                start = own;
             }
-            before = own;
         }
         return groups;
     }
@@ -102,6 +105,7 @@ public static class SlideTimes
             heard[stem] = inWindow;
             // On every slide, or said all lecture long, a word says nothing about where a slide was taught. Said in up
             // to a quarter of the lecture it counts in full (a slide can be taught for a while), and less from there.
+            // A deck of one slide (or one that joins into one) has nothing to tell its slide apart from, so is never placed.
             double onSlides = Math.Log((double)n / groups.Count(g => g.Words.Contains(stem)));
             double inLecture = Math.Clamp(Math.Log((double)windows / Math.Max(windowsWith, 1)) / Math.Log(Spread), 0, 1);
             weight[stem] = onSlides * inLecture;
@@ -110,9 +114,11 @@ public static class SlideTimes
         // Each slide's score in each window: the share of its weighted words heard there.
         var score = new double[n, windows];
         var distinct = new List<string>[n];
+        var telling = new int[n];
         for (int g = 0; g < n; g++)
         {
             distinct[g] = [.. groups[g].Words.Where(s => weight[s] > 0)];
+            telling[g] = distinct[g].Count(s => weight[s] >= RealWeight * Math.Log(n));
             double whole = distinct[g].Sum(s => weight[s]);
             if (whole == 0) continue;
             foreach (var stem in distinct[g])
@@ -140,9 +146,11 @@ public static class SlideTimes
             else g--;
         }
 
+        // Windows overlap, so a slide's first line can come before the previous slide's: a time is never earlier than that.
+        var after = TimeSpan.Zero;
         for (int g = 0; g < n; g++)
         {
-            if (chosen[g] is not int at || distinct[g].Count < FewestWords) continue;
+            if (chosen[g] is not int at || telling[g] < FewestWords) continue;
             double own = score[g, at];
             // Its spot: the windows around its own that it keeps scoring in (a slide can be taught for minutes on end).
             int first = at, last = at;
@@ -160,7 +168,8 @@ public static class SlideTimes
             double from = at * Step;
             int line = Enumerable.Range(0, lines.Count).First(l => lines[l].Start >= from && lines[l].Start < from + Window
                 && distinct[g].Any(s => text[l].Contains(" " + s, StringComparison.Ordinal)));
-            yield return (groups[g], TimeSpan.FromSeconds(lines[line].Start));
+            after = TimeSpan.FromSeconds(Math.Max(lines[line].Start, after.TotalSeconds));
+            yield return (groups[g], after);
         }
     }
 
