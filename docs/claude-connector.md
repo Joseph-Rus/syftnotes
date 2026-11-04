@@ -50,18 +50,19 @@ new ChatGPT app, or use the internet address below.
 
 ### What it writes, and where
 
-Each app gets one entry, `study-stash`, that starts the Syft Notes app as an MCP server over stdio:
+Each app gets one entry, `syft-notes`, that starts the Syft Notes app as an MCP server over stdio:
 `StudyStash mcp --client <app>` (with `--home <folder>` if your settings aren't in the usual place). No password,
 token or address goes into the app's settings: the server reads your library through this computer with the
 password Syft Notes already keeps in its own settings (`~/.study-stash`), and `--client` only lets Settings show
-which app started it.
+which app started it. An entry from the Study Stash days, called `study-stash`, is renamed to `syft-notes` when you
+Connect.
 
 | App | File | Where Syft Notes goes |
 |---|---|---|
-| Claude Desktop | Mac: `~/Library/Application Support/Claude/claude_desktop_config.json`. Windows: `%APPDATA%\Claude\claude_desktop_config.json`, or, for the Microsoft Store build, `%LOCALAPPDATA%\Packages\Claude_…\LocalCache\Roaming\Claude\claude_desktop_config.json` | `mcpServers.study-stash` |
-| Claude Code | `~/.claude.json` (or `$CLAUDE_CONFIG_DIR/.claude.json`), the servers for every project, as `claude mcp add --scope user` keeps them | `mcpServers.study-stash` |
-| ChatGPT | `~/.codex/config.toml` (or `$CODEX_HOME/config.toml`). The ChatGPT app, the Codex CLI and its IDE extension all read it | a `[mcp_servers.study-stash]` table |
-| Gemini CLI | `~/.gemini/settings.json` | `mcpServers.study-stash` |
+| Claude Desktop | Mac: `~/Library/Application Support/Claude/claude_desktop_config.json`. Windows: `%APPDATA%\Claude\claude_desktop_config.json`, or, for the Microsoft Store build, `%LOCALAPPDATA%\Packages\Claude_…\LocalCache\Roaming\Claude\claude_desktop_config.json` | `mcpServers.syft-notes` |
+| Claude Code | `~/.claude.json` (or `$CLAUDE_CONFIG_DIR/.claude.json`), the servers for every project, as `claude mcp add --scope user` keeps them | `mcpServers.syft-notes` |
+| ChatGPT | `~/.codex/config.toml` (or `$CODEX_HOME/config.toml`). The ChatGPT app, the Codex CLI and its IDE extension all read it | a `[mcp_servers.syft-notes]` table |
+| Gemini CLI | `~/.gemini/settings.json` | `mcpServers.syft-notes` |
 
 On Windows, `~` is your user folder (`C:\Users\<you>`).
 
@@ -69,7 +70,7 @@ How each change is made:
 
 - **A merge, never a replace.** Everything else in the file (the app's other MCP servers, its settings) stays. In
   `config.toml` every other line stays exactly as it was, comments included.
-- **The file as it was is kept** next to it, as `<file>.study-stash-backup`, before each change.
+- **The file as it was is kept** next to it, as `<file>.syft-notes-backup`, before each change.
 - **A file Syft Notes can't rewrite safely is left alone**: JSON that isn't valid, JSON with comments (a rewrite
   would drop them), TOML that isn't valid, or Syft Notes set up by hand in a form it won't rewrite. Settings says
   why and shows the setup to add by hand.
@@ -77,11 +78,11 @@ How each change is made:
 - **Copy setup** (for any other MCP app) copies the same `mcpServers` JSON, to paste into that app's settings.
 
 Doing it by hand: Claude Code's own command is
-`claude mcp add --scope user study-stash -- "/Applications/Syft Notes.app/Contents/MacOS/StudyStash" mcp`
+`claude mcp add --scope user syft-notes -- "/Applications/Syft Notes.app/Contents/MacOS/StudyStash" mcp`
 (on Windows, the path to `StudyStash.exe`). The others take the JSON from **Copy setup**, or for Codex:
 
 ```toml
-[mcp_servers.study-stash]
+[mcp_servers.syft-notes]
 command = "/Applications/Syft Notes.app/Contents/MacOS/StudyStash"
 args = ["mcp"]
 ```
@@ -262,7 +263,7 @@ All the tests are in `engine/tests/StudyStash.Core.Tests`. `ConnectorTests.` is 
 Codex 0.160.1, signed in to a real ChatGPT account). The library was a throwaway one on 127.0.0.1 with the two
 made-up lectures.
 
-- ChatGPT's Codex (`codex exec`, with Syft Notes given as `mcp_servers.study-stash` exactly as Connect writes it)
+- ChatGPT's Codex (`codex exec`, with Syft Notes given as `mcp_servers.syft-notes` exactly as Connect writes it)
   started `StudyStash mcp --client codex` over stdio and called `list_classes` and `search_notes`; both answered from
   the library, and the note that turns the row to **Connected** was written.
 - **Connect** on a copy of that ChatGPT's real `config.toml` (it already holds ChatGPT's own `node_repl` server and

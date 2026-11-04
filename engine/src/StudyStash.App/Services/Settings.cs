@@ -202,7 +202,7 @@ public sealed partial class SettingsModel : ObservableObject, IDisposable
     [ObservableProperty] public partial string KeepAudio { get; set; } = "30";
     [ObservableProperty] public partial bool Shortcuts { get; set; }
     [ObservableProperty] public partial bool CountThisCopy { get; set; } = true;
-    public string CountThisCopySub => "Once a day, send one anonymous count (a random code for this copy, the version and Mac or Windows) so we know how many people use Syft Notes.";
+    public string CountThisCopySub => "Once a day, send one anonymous count (a random code for this copy, the version and Mac, Windows or Linux) so we know how many people use Syft Notes.";
     /// <summary>Which shortcut (if either) another app already has, once the toggle's had a moment to try them.</summary>
     [ObservableProperty] public partial string? ShortcutsSay { get; set; }
     public bool CanRecordComputerAudio => host.CanRecordComputerAudio;
