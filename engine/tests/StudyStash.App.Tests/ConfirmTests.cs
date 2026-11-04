@@ -5,8 +5,10 @@ using Avalonia.Headless.XUnit;
 using Avalonia.Input;
 using Avalonia.VisualTree;
 using StudyStash.App.Controls;
+using StudyStash.App.Services.Kit;
 using StudyStash.App.ViewModels.Kit;
 using StudyStash.App.Views;
+using StudyStash.App.Windows;
 
 namespace StudyStash.App.Tests;
 
@@ -80,6 +82,31 @@ public class ConfirmTests
         Assert.NotNull(dialog);
         front.Close();
         behind.Close();
+    }
+
+    /// <summary>Quit while recording asks over the library window even with Settings in front: the library is raised
+    /// as the menu's Open does (AppWindows.Raise), the question waits until the shared Confirm would pick it (both can
+    /// count as active for a moment), and is asked there.</summary>
+    [AvaloniaFact]
+    public async Task The_quit_question_sits_on_the_library_window_with_another_in_front()
+    {
+        var library = ShownWindow();
+        var settings = ShownWindow();
+        settings.Activate();
+        Dispatcher.UIThread.RunJobs();
+        Assert.True(settings.IsActive);
+
+        AppWindows.Raise(library);
+        Assert.True(await Poll.UntilAsync(() => ConfirmLayer.Pick() == ConfirmLayer.For(library), TimeSpan.FromMilliseconds(20), TimeSpan.FromSeconds(5)));
+        var asking = Confirm.Default.AskAsync(QuitWhileRecording.Question);
+        await DialogShowingAsync(library);
+
+        Assert.True(ConfirmLayer.For(library)!.Host.IsOpen);
+        Assert.False(ConfirmLayer.For(settings)!.Host.IsOpen);
+        library.KeyPressQwerty(PhysicalKey.Escape, RawInputModifiers.None);
+        Assert.False(await asking);
+        settings.Close();
+        library.Close();
     }
 
     [AvaloniaFact]

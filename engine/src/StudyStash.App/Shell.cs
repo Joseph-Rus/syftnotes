@@ -383,9 +383,22 @@ public static partial class Shell
         life.Shutdown(code);
     }
 
-    /// <summary>The student's own Quit while a lecture records asks first; "Keep recording" leaves it recording. Quit
-    /// again while it asks opens the library window, where the question is, as the menu's Open does.</summary>
-    static readonly QuitWhileRecording quitWhileRecording = new(() => host.Recorder.Current is not null, AskAsync, ShowLibrary);
+    /// <summary>The student's own Quit while a lecture records asks first, always over the library window; "Keep
+    /// recording" leaves it recording. Quit again while it asks opens the library window, where the question is, as the
+    /// menu's Open does.</summary>
+    static readonly QuitWhileRecording quitWhileRecording = new(() => host.Recorder.Current is not null, AskOverLibraryAsync, ShowLibrary);
+
+    /// <summary>Asks over the library window: it comes to the front first (shown and activated, as the menu's Open does)
+    /// and the question waits until the shared Confirm would pick it. Activation lands a moment later, and Settings
+    /// can still count as in front meanwhile: asked at once, the question went there. After a second it asks anyway,
+    /// over the window in front.</summary>
+    static async Task<bool> AskOverLibraryAsync(ConfirmAsk ask)
+    {
+        ShowLibrary();
+        if (mainWindow is { } w && !await Poll.UntilAsync(() => ConfirmLayer.Pick() == ConfirmLayer.For(w), TimeSpan.FromMilliseconds(50), TimeSpan.FromSeconds(1)))
+            Program.Log("[app] the library window didn't come to the front for the quit question; asking over the window in front");
+        return await library.Confirmer.AskAsync(ask);
+    }
 
     /// <summary>The student's own Quit: asked first while a lecture records (a yes saves it as Stop would: quitting
     /// stops the recorder); at once otherwise.</summary>
