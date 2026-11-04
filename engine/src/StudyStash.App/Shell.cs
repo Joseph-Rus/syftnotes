@@ -146,7 +146,7 @@ public static partial class Shell
         Run(() => SuggestLighterModelAsync(), "SuggestLighterModel");
         // The program may have moved (Velopack's install, the Mac bundle's new name): what names the old one is put right.
         UiTasks.RunQuietly(() => Task.Run(() => NewPlace.RunHere(host.Home)), "put right what names the app's old place");
-        AppUpdates.Start(host, stop.Token, SayUpdate, () => TypingNotes);
+        AppUpdates.Start(host, stop.Token, SayUpdate, () => TypingNotes, LibraryWindowOpen);
         if (AppUpdates.Current is { } updater)
             updater.FoundChanged += () => Dispatcher.UIThread.Post(() =>
             {
@@ -1162,6 +1162,17 @@ public static partial class Shell
             UpdateDock();
         };
         return mainWindow = w;
+    }
+
+    /// <summary>The library window is on screen right now (not hidden to the tray, not minimized): an update's restart
+    /// brings it back. Asked from the updater's thread, so it's read on the UI thread's, for 2 seconds at most: a UI
+    /// thread that doesn't answer in time counts as no window (the app comes back quietly) rather than holding the
+    /// update's hand-off.</summary>
+    static bool LibraryWindowOpen()
+    {
+        var answer = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+        Dispatcher.UIThread.Post(() => answer.TrySetResult(mainWindow is { IsVisible: true } w && w.WindowState != WindowState.Minimized));
+        return answer.Task.Wait(TimeSpan.FromSeconds(2)) && answer.Task.Result;
     }
 
     /// <summary>The library window opens where it was left, at the size it was left (or zoomed), if that spot is

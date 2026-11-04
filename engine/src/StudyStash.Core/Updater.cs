@@ -95,8 +95,8 @@ public sealed class UpdateHost
 /// </summary>
 public static partial class Updates
 {
-    public const double FirstCheckAfter = 10 * 60;
-    public const double CheckEvery = 6 * 3600;
+    public const double FirstCheckAfter = 2 * 60;
+    public const double CheckEvery = 3600;
     public const double LockStaleAfter = 20 * 60;
 
     /// <summary>The version on disk right now: another process (the CLI, the library page's Update now) may have
