@@ -1,6 +1,7 @@
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using StudyStash.App.Services.Kit;
+using StudyStash.App.ViewModels.Kit;
 using StudyStash.Core;
 using StudyStash.Core.Study;
 
@@ -14,17 +15,20 @@ namespace StudyStash.App.ViewModels;
 public sealed partial class ListenVoicesModel : ObservableObject, IDisposable
 {
     readonly Func<IStudyLibrary?> library;
+    readonly IConfirm confirm;
     CancellationTokenSource? watching;
 
-    public ListenVoicesModel(Func<IStudyLibrary?> library) => this.library = library;
+    public ListenVoicesModel(Func<IStudyLibrary?> library, IConfirm? confirm = null)
+    {
+        this.library = library;
+        this.confirm = confirm ?? Confirm.Default;
+    }
 
     public ListenVoicesModel(IStudyLibrary library) : this(() => library) { }
 
     /// <summary>What the library said; null before it's been asked, or when it has none.</summary>
     [ObservableProperty] public partial VoicesInfo? Info { get; set; }
     [ObservableProperty] public partial string? Problem { get; set; }
-    /// <summary>Remove was pressed once: it asks before it goes.</summary>
-    [ObservableProperty] public partial bool ConfirmingRemove { get; set; }
 
     /// <summary>How often a download is looked at again.</summary>
     public TimeSpan LookEvery { get; set; } = TimeSpan.FromSeconds(1);
@@ -47,8 +51,8 @@ public sealed partial class ListenVoicesModel : ObservableObject, IDisposable
     /// <summary>"42 of 149 MB".</summary>
     public string ProgressSaid => Info is { } i ? $"{i.Done / 1_000_000} of {Size}" : "";
     public double Fraction => Info is { Bytes: > 0 } i ? Math.Clamp(i.Done / (double)i.Bytes, 0, 1) : 0;
-    /// <summary>Remove asks once before it goes.</summary>
-    public string RemoveSaid => ConfirmingRemove ? "Remove them" : "Remove…";
+    /// <summary>Remove asks before it goes.</summary>
+    public string RemoveSaid => "Remove…";
     /// <summary>On the Listen card: one line that offers them, until they're here.</summary>
     public string OfferSaid => $"Better voices: download Kokoro ({Size}, open source)";
 
@@ -64,8 +68,6 @@ public sealed partial class ListenVoicesModel : ObservableObject, IDisposable
     }
 
     partial void OnProblemChanged(string? value) => OnPropertyChanged(nameof(HasProblem));
-
-    partial void OnConfirmingRemoveChanged(bool value) => OnPropertyChanged(nameof(RemoveSaid));
 
     /// <summary>Asks the library (when the page opens); keeps looking while a download is going.</summary>
     public async Task LoadAsync()
@@ -111,12 +113,7 @@ public sealed partial class ListenVoicesModel : ObservableObject, IDisposable
     [RelayCommand(CanExecute = nameof(Here))]
     async Task Remove()
     {
-        if (!ConfirmingRemove)
-        {
-            ConfirmingRemove = true;
-            return;
-        }
-        ConfirmingRemove = false;
+        if (!await confirm.AskAsync(new ConfirmAsk($"Remove the {Title}?", "They're taken off your library's computer, and your computer's own voices read listens again. You can download them again any time.", "Remove them", "Keep them"))) return;
         if (library() is not { } lib) return;
         try
         {
@@ -131,8 +128,6 @@ public sealed partial class ListenVoicesModel : ObservableObject, IDisposable
             Problem = "Your library isn't answering. Try again in a moment.";
         }
     }
-
-    [RelayCommand] void CancelRemove() => ConfirmingRemove = false;
 
     /// <summary>Looks again every second while they download, until they're here or it stops.</summary>
     void Watch()

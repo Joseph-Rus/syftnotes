@@ -1,6 +1,7 @@
 <Styles xmlns="https://github.com/avaloniaui"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        xmlns:c="using:StudyStash.App.Controls">
+        xmlns:c="using:StudyStash.App.Controls"
+        xmlns:dh="clr-namespace:DialogHostAvalonia;assembly=DialogHost.Avalonia">
   <Styles.Resources>
     <!-- A button that is only its background: the design's buttons, rows and chips. Hover and press lay a faint
          wash over it, the way both systems do. -->
@@ -1405,5 +1406,17 @@
   </Style>
   <Style Selector="Border.diff-line.removed TextBlock.diff-text">
     <Setter Property="TextDecorations" Value="Strikethrough" />
+  </Style>
+
+  <!-- The dialog layer of a window (Controls/ConfirmLayer.cs): a veil in the window's ground over the page, and the question
+       on a raised panel with the look's hairline and shadow. The veil is the token's own strength, not the control's 56%. -->
+  <Style Selector="dh|DialogHost.confirm">
+    <Setter Property="OverlayBackground" Value="{DynamicResource Scrim}" />
+    <Setter Property="Background" Value="{DynamicResource PopupBg}" />
+    <Setter Property="dh:DialogHostStyle.CornerRadius" Value="{DynamicResource RadiusPanel}" />
+    <Setter Property="dh:DialogHostStyle.BoxShadow" Value="{DynamicResource ShadowFloat}" />
+  </Style>
+  <Style Selector="dh|DialogHost.confirm[IsOpen=True] /template/ Rectangle#PART_ContentCover">
+    <Setter Property="Opacity" Value="1" />
   </Style>
 </Styles>
