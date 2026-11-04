@@ -1,5 +1,6 @@
 using Avalonia.Controls;
 using Avalonia.Input;
+using Avalonia.VisualTree;
 using StudyStash.App.Platform;
 using Avalonia.Input.Platform;
 using StudyStash.App.ViewModels;
@@ -10,6 +11,12 @@ namespace StudyStash.App.Views;
 /// closes, ⌘C (Ctrl+C) copies the answer.</summary>
 public static class QuickKeys
 {
+    /// <summary>The chosen row scrolls into view when the results scroll inside the panel.</summary>
+    public static void Reveal(UserControl view, QuickModel m)
+    {
+        if (m.Selected is { } row && view.GetVisualDescendants().OfType<Button>().FirstOrDefault(b => b.DataContext == row && b.IsEffectivelyVisible) is { } button) button.BringIntoView();
+    }
+
     public static void Attach(UserControl view, TextBox box)
     {
         box.AddHandler(InputElement.KeyDownEvent, async (_, e) =>
@@ -20,10 +27,12 @@ public static class QuickKeys
             {
                 case Key.Down:
                     m.Move(1);
+                    Reveal(view, m);
                     e.Handled = true;
                     break;
                 case Key.Up:
                     m.Move(-1);
+                    Reveal(view, m);
                     e.Handled = true;
                     break;
                 case var _ when Keybindings.Of(KeyAction.Ask).Matches(e.Key, e.KeyModifiers):
