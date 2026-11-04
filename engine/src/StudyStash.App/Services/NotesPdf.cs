@@ -125,6 +125,7 @@ public static class NotesPdf
         host.Styles.Add(new Style(x => x.Is<TextBlock>()) { Setters = { new Setter(TextElement.FontFeaturesProperty, plain) } });
         // Never shown: it's what gives the pieces the app's styles, and the light look.
         var window = new Window { Content = host, RequestedThemeVariant = ThemeVariant.Light, ShowInTaskbar = false, ShowActivated = false };
+        bool handedOver = false;
         try
         {
             await SettleAsync(host, width);
@@ -132,12 +133,13 @@ public static class NotesPdf
             // Avalonia sets the canvas's matrix outright as it draws, so the notes are drawn into a picture first (a
             // picture keeps its matrix relative to wherever it's played back), and the picture is put on each page.
             var picture = await PictureAsync(column);
-            return new PrintedNotes(window, column, footer, footerPage, picture, slices, Links(column), paper, Title(lecture));
+            var printed = new PrintedNotes(window, column, footer, footerPage, picture, slices, Links(column), paper, Title(lecture));
+            handedOver = true;
+            return printed;
         }
-        catch
+        finally
         {
-            Close(window);
-            throw;
+            if (!handedOver) Close(window);
         }
     }
 

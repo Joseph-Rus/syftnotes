@@ -115,9 +115,10 @@ sealed class PartMap
             {
                 Stamp(Illustration.Part(cleaned, parts[i]), i, box: true);
             }
-            catch (Exception)
+            catch (Exception e)
             {
                 // A part that can't be drawn alone isn't on the map.
+                Program.Log($"[parts] part {i} left off the map: {e.GetType().Name}: {e.Message}");
             }
         }
         // Labels last, on top: a click on a part's name is a click on the part.
@@ -127,8 +128,9 @@ sealed class PartMap
             {
                 Stamp(Illustration.CalloutOf(cleaned, parts[i]), i, box: false);
             }
-            catch (Exception)
+            catch (Exception e)
             {
+                Program.Log($"[parts] label {i} left off the map: {e.GetType().Name}: {e.Message}");
             }
         }
         return new PartMap(owner, width, height, scale, [.. parts], boxes);
