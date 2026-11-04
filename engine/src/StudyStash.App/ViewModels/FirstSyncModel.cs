@@ -104,9 +104,6 @@ public sealed partial class FirstSyncModel : ObservableObject, IDisposable
     public SyncStage Files { get; } = new() { Title = "Getting files and pages" };
     public ObservableCollection<SyncStage> Stages { get; }
 
-    /// <summary>The courses found (all of them, ticked or not), once Find my courses answered.</summary>
-    [ObservableProperty] public partial int FoundCount { get; set; }
-
     /// <summary>Every line is done: the sync finished.</summary>
     [NotifyPropertyChangedFor(nameof(CanContinue), nameof(CanSkip), nameof(HasDoneLine))]
     [ObservableProperty]
@@ -202,18 +199,17 @@ public sealed partial class FirstSyncModel : ObservableObject, IDisposable
 
     bool bringingIn;
 
-    /// <summary>The courses are found: the first line says how many, the ticked ones become classes, and the first sync
-    /// is asked for.</summary>
+    /// <summary>The courses are found: the ticked ones become classes and the first sync is asked for. The first line
+    /// counts those same ticked courses, the list the sync counts: Canvas also lists last term's courses, sandboxes and
+    /// chapel, which the picker leaves unticked, so counting every course would say 7 found and then sync "6 of 6".</summary>
     async Task FoundAsync()
     {
-        FoundCount = connect.Picker.Courses.Count;
         var bring = connect.Found;
-        Find.Detail = FoundCount == 1 ? "1 found" : $"{FoundCount} found";
+        Find.Detail = bring.Count switch { 0 => "none found", 1 => "1 found", var n => $"{n} found" };
         if (bring.Count == 0)
         {
             // Nothing this term (or nothing ticked): nothing to sync. The classes can be added by hand on Home.
             Find.State = StageState.Partial;
-            if (FoundCount == 0) Find.Detail = "none found";
             Due.State = Files.State = StageState.ToDo;
             DoneLine = "Canvas has no classes for you this term. Add your classes on Home any time, or connect them again from Settings → Canvas.";
             Finished = true;

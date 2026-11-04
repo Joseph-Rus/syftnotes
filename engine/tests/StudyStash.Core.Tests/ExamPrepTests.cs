@@ -175,4 +175,13 @@ public class ExamPrepTests
         Assert.Equal(503, e.Status);
         Assert.Empty((await lib.Study.ExamsAsync())!.Preps);
     }
+
+    [Fact]
+    public void The_AI_is_told_the_exams_day_in_the_students_time_zone()
+    {
+        // 11:59 PM on Monday in Pacific time is already Tuesday in UTC.
+        var midterm = new DateTimeOffset(2026, 11, 3, 7, 59, 0, TimeSpan.Zero);
+        string prompt = ExamPrep.Prompt("Chemistry", "Midterm 1", midterm, FakeCanvas.Zone, []);
+        Assert.Contains("on Monday 2 November", prompt);
+    }
 }

@@ -194,7 +194,7 @@ public sealed partial class LibraryWeb
                 if (!prepping.Add(key)) return Http.Detail(409, "That exam's prep is already being written.");
             try
             {
-                string json = await Jobs.PlanAsync("ask", ExamPrep.Prompt(cls, title, when, lectures), ExamPrep.Schema);
+                string json = await Jobs.PlanAsync("ask", ExamPrep.Prompt(cls, title, when, Canvas.Zone, lectures), ExamPrep.Schema);
                 string by = Core.Ai.Engines.Name(Core.Ai.AiSettings.Load(cfg.Home).For("ask").Provider);
                 var prep = ExamPrep.Read(json, cls, title, when, lectures, now, by);
                 ExamPreps.Save(prep);
