@@ -48,7 +48,8 @@ function Finish {
   }
   if ($NoOpen) { return }
   $open = if ($script:moved -and (Test-Path -LiteralPath $newExe)) { $newExe } elseif ($OldExe -and (Test-Path -LiteralPath $OldExe)) { $OldExe } elseif (Test-Path -LiteralPath $newExe) { $newExe } else { $null }
-  if ($open) { Say "opening $open"; Start-Process -FilePath $open -ArgumentList $OpenArgs -WorkingDirectory (Split-Path -Parent $open) } else { Say "no copy of the app to open" }
+  # Start-Process refuses an empty -ArgumentList (an app that was open comes back with its window: no arguments).
+  if ($open) { Say "opening $open"; $start = @{ FilePath = $open; WorkingDirectory = (Split-Path -Parent $open) }; if ($OpenArgs) { $start.ArgumentList = $OpenArgs }; Start-Process @start } else { Say "no copy of the app to open" }
 }
 try {
 $Shell = New-Object -ComObject WScript.Shell

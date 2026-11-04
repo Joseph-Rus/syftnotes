@@ -146,7 +146,7 @@ public static partial class Shell
         Run(() => SuggestLighterModelAsync(), "SuggestLighterModel");
         // The program may have moved (Velopack's install, the Mac bundle's new name): what names the old one is put right.
         UiTasks.RunQuietly(() => Task.Run(() => NewPlace.RunHere(host.Home)), "put right what names the app's old place");
-        AppUpdates.Start(host, stop.Token, SayUpdate, () => TypingNotes);
+        AppUpdates.Start(host, stop.Token, SayUpdate, () => TypingNotes, LibraryWindowOpen);
         if (AppUpdates.Current is { } updater)
             updater.FoundChanged += () => Dispatcher.UIThread.Post(() =>
             {
@@ -1163,6 +1163,10 @@ public static partial class Shell
         };
         return mainWindow = w;
     }
+
+    /// <summary>The library window is on screen right now (not hidden to the tray, not minimized): an update's restart
+    /// brings it back. Asked from the updater's thread, so it's read on the UI thread's.</summary>
+    static bool LibraryWindowOpen() => Dispatcher.UIThread.Invoke(() => mainWindow is { IsVisible: true } w && w.WindowState != WindowState.Minimized);
 
     /// <summary>The library window opens where it was left, at the size it was left (or zoomed), if that spot is
     /// still on a display (true); otherwise it's for the caller to centre it.</summary>
