@@ -1,3 +1,5 @@
+using System.Runtime.Versioning;
+using Microsoft.Win32;
 using StudyStash.App.Platform;
 using StudyStash.Core;
 
@@ -10,8 +12,8 @@ namespace StudyStash.App.Services;
 /// the rest), start at login and the background library are written again for <see cref="Desktop.Program"/>, and
 /// Windows' notification name and link are written on their first use. A Mac Dock icon pinned to the old bundle is
 /// pointed at the new one, once. An AppImage puts itself in the applications menu. Nothing changes for a build folder,
-/// the self-test, or a connection to another copy someone keeps on purpose. Settings, lectures and Documents are never
-/// touched.
+/// the self-test, or a connection to another copy someone keeps on purpose. On Windows the Inno Setup install the move
+/// left behind goes (<see cref="ClearOldInstall"/>), and its studystash: link opens this copy. Settings, lectures and Documents are never touched.
 /// </summary>
 public static class NewPlace
 {
@@ -41,6 +43,53 @@ public static class NewPlace
         return done;
     }
 
+    /// <summary>Inno Setup's entry for this account's old install (setup.iss: its AppId, per-user).</summary>
+    public const string InnoKey = @"Software\Microsoft\Windows\CurrentVersion\Uninstall\{6F2C9A51-3B7E-4D28-9C41-8E5A0B7D2F63}_is1";
+
+    /// <summary>
+    /// The Inno Setup install the move to Velopack left behind (its uninstaller can hang on Windows 11, and it would
+    /// end every StudyStash.exe, this copy's too): its folder <paramref name="folder"/> is deleted directly, never by
+    /// running its uninstaller, then its Apps-list entry (<paramref name="forgetEntry"/>), the shortcuts in
+    /// <paramref name="shortcutPlaces"/> that still start a program in it, and the remembered failed move. Only a
+    /// folder <see cref="Moves.OldInstallFolder"/> agrees is the old install; one with a file in use stays, and is
+    /// tried again on the next start. What was done (or what's left), for the log; null when there's nothing to do.
+    /// </summary>
+    public static string? ClearOldInstall(string? folder, string running, string home, IEnumerable<string> shortcutPlaces, Action forgetEntry)
+    {
+        if (!Moves.OldInstallFolder(folder, running)) return null;
+        string old = Path.TrimEndingDirectorySeparator(Path.GetFullPath(folder!));
+        if (Directory.Exists(old) && Moves.IsLink(old))
+            return $"the old install in {old} is a link to another folder, so it's left as it is";
+        if (Moves.DeleteOldInstall(old) is { } held)
+            return $"the old install in {old} is still there ({Path.GetFileName(held)} is in use); trying again next start";
+        try
+        {
+            foreach (string place in shortcutPlaces.Where(Directory.Exists))
+                foreach (string lnk in Directory.EnumerateFiles(place, "*.lnk").ToList())
+                    if (VelopackHooks.LinkNames(lnk, old + Path.DirectorySeparatorChar)) File.Delete(lnk);
+            forgetEntry();
+            File.Delete(Bridge.FailedFile(home));
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException or System.Security.SecurityException)
+        {
+            return $"removed the old install in {old}, but not all of what named it ({e.Message}); trying again next start";
+        }
+        return $"removed the old install in {old}";
+    }
+
+    /// <summary><see cref="ClearOldInstall"/> for the Inno Setup entry <paramref name="key"/> in this account's
+    /// registry, and its Start-menu and desktop shortcuts.</summary>
+    [SupportedOSPlatform("windows")]
+    public static string? ClearOldInno(string home, string key, IEnumerable<string>? shortcutPlaces = null)
+    {
+        string? folder;
+        using (var entry = Registry.CurrentUser.OpenSubKey(key))
+            folder = entry?.GetValue("InstallLocation") as string;
+        return ClearOldInstall(folder, AppContext.BaseDirectory, home,
+            shortcutPlaces ?? [Environment.GetFolderPath(Environment.SpecialFolder.Programs), Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory)],
+            () => Registry.CurrentUser.DeleteSubKeyTree(key, throwOnMissingSubKey: false));
+    }
+
     /// <summary>The real thing, once the app has started: only for a copy that's installed (Velopack's, or a Mac
     /// bundle), never while the self-test or a test runs.</summary>
     public static void RunHere(string home)
@@ -48,6 +97,8 @@ public static class NewPlace
         if (Desktop.SystemChangesOff || SelfTest.Dir is not null) return;
         bool installed = VelopackUpdates.Installed || OperatingSystem.IsMacOS() && Apps.MacBundleOf() is not null;
         if (!installed) return;
+        // First, so the old copy is gone by the time the AI apps' connections name this one.
+        if (OperatingSystem.IsWindows()) OldInnoCopy(home);
         try
         {
             foreach (string line in Run(ClaudeSetup.ThisComputer(home), home, Desktop.Program, () => Desktop.LoginProgram(home),
@@ -62,6 +113,37 @@ public static class NewPlace
         catch (Exception e) when (e is IOException or UnauthorizedAccessException or InvalidOperationException or System.Security.SecurityException)
         {
             Program.Log("[moved] couldn't put everything right for the new place: " + e.Message);
+        }
+    }
+
+    /// <summary>What the Inno Setup copy left: its install (<see cref="ClearOldInno"/>), and the studystash: link (a
+    /// click on a notification) it registered, which now opens this copy and so goes with Velopack's uninstall, as
+    /// Inno's uninstaller took the old one's. Each step on its own: one that fails is logged and tried again next start,
+    /// and never stops what comes after it.</summary>
+    [SupportedOSPlatform("windows")]
+    static void OldInnoCopy(string home)
+    {
+        Step("remove the old install", () =>
+        {
+            if (ClearOldInno(home, InnoKey) is { } cleared) Program.Log("[moved] " + cleared);
+        });
+        Step("point studystash: links at this copy", () =>
+        {
+            if (!Moves.OldProgram(WinNotifications.LinkProgram(), Desktop.Program)) return;
+            WinNotifications.RegisterLink("Syft Notes", Desktop.Program);
+            Program.Log("[moved] studystash: links now open " + Desktop.Program);
+        });
+    }
+
+    static void Step(string what, Action step)
+    {
+        try
+        {
+            step();
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException or InvalidOperationException or System.Security.SecurityException)
+        {
+            Program.Log($"[moved] couldn't {what} this time: {e.Message}");
         }
     }
 }
