@@ -67,7 +67,7 @@ public static partial class Shell
         int want = Math.Clamp(homeShown, OverviewModel.PageSize, 480);
         var listed = await NotesAsync(lib, homeUnsorted ? Configs.Unsorted : null, want + 1, null);
         if (turn != pageState.Turn) return;
-        if (listed is not { } lectures) { ListFailed(); return; }
+        if (listed is not { } lectures) { ListFailed(null); return; }
         var sources = OverviewSources(WithLocal([.. lectures.Take(want)], null, homeUnsorted, all: lectures.Count <= want));
         var home = OverviewModel.Home(sources, homeUnsorted);
         home.CanLoadMore = lectures.Count > want;
@@ -115,7 +115,7 @@ public static partial class Shell
         if (host.Remote() is not { } lib) return;
         var listed = await NotesAsync(lib, name, 500, null);
         if (turn != pageState.Turn) return;
-        if (listed is null) { ListFailed(); return; }
+        if (listed is null) { ListFailed(name); return; }
         var lectures = WithLocal(listed, name, false, all: true);
         var row = CanvasClassRow(name);
         var info = (host.Overview?["classes"] as JsonArray ?? []).OfType<JsonObject>().FirstOrDefault(c => S(c["name"]) == name);
@@ -419,12 +419,12 @@ public static partial class Shell
         if (pageState.Overview == cls) await ShowFolderAsync(cls);
     }
 
-    /// <summary>The library couldn't list the notes (though its check said it was there): that isn't "No notes yet". A
-    /// page being read again stays as it is; any other opening says the library can't be reached, as a load of the
+    /// <summary>The library couldn't list the notes (though its check said it was there): that isn't "No notes yet". The
+    /// same page being read again stays as it is; any other opening (another page, or Back and Forward to one) says the library can't be reached, as a load of the
     /// library does. Either way the library is checked again, which brings the page back when it answers.</summary>
-    static void ListFailed()
+    static void ListFailed(string? folder)
     {
-        if (!OverviewModel.KeepsPageWhenListFails(restoring, library.Overview is not null))
+        if (!OverviewModel.KeepsPageWhenListFails(library.Overview, folder, homeUnsorted))
         {
             ClearPane();
             library.Overview = null;

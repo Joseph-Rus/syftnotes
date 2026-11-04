@@ -1,3 +1,4 @@
+using Avalonia.Media;
 using StudyStash.App.ViewModels;
 
 namespace StudyStash.App.Tests;
@@ -7,10 +8,18 @@ namespace StudyStash.App.Tests;
 public class HomeOfflineTests
 {
     [Fact]
-    public void A_notes_list_that_failed_keeps_the_page_only_when_it_is_read_again()
+    public void A_notes_list_that_failed_keeps_the_page_only_when_that_page_is_showing()
     {
-        Assert.True(OverviewModel.KeepsPageWhenListFails(readingAgain: true, pageShowing: true));
-        Assert.False(OverviewModel.KeepsPageWhenListFails(readingAgain: true, pageShowing: false));
-        Assert.False(OverviewModel.KeepsPageWhenListFails(readingAgain: false, pageShowing: true));
+        var sources = new OverviewModel.Sources { Now = DateTimeOffset.UnixEpoch, Zone = TimeZoneInfo.Utc, Classes = [("CS 101", Brushes.Gray, 0)] };
+        var home = OverviewModel.Home(sources, onlyUnsorted: false);
+        var folder = OverviewModel.ForClass(new ClassHomeFacts("CS 101", Brushes.Gray, 0, null, null, null, null), sources);
+
+        Assert.True(OverviewModel.KeepsPageWhenListFails(home, null, unsorted: false)); // Home, read again
+        Assert.True(OverviewModel.KeepsPageWhenListFails(folder, "CS 101", unsorted: false)); // the folder, read again
+        Assert.False(OverviewModel.KeepsPageWhenListFails(folder, null, unsorted: false)); // Back from the folder to Home
+        Assert.False(OverviewModel.KeepsPageWhenListFails(home, "CS 101", unsorted: false)); // Home to a folder
+        Assert.False(OverviewModel.KeepsPageWhenListFails(folder, "BIO 110", unsorted: false)); // one folder to another
+        Assert.False(OverviewModel.KeepsPageWhenListFails(home, null, unsorted: true)); // Home's other filter
+        Assert.False(OverviewModel.KeepsPageWhenListFails(null, null, unsorted: false)); // nothing showing
     }
 }
