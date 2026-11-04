@@ -24,11 +24,15 @@ public sealed partial class LibraryWeb
         var now = TimeZoneInfo.ConvertTime(Canvas.Clock(), zone);
         var sb = new StringBuilder();
         sb.Append("Today is ").Append(now.ToString("dddd d MMMM yyyy, h:mm tt", CultureInfo.InvariantCulture))
-            .Append(", ").Append(CanvasMarkdown.ZoneName(zone, now)).Append(". Every time below is in that time zone.\n");
+            .Append(", ").Append(CanvasMarkdown.ZoneName(zone, now)).Append(". Every time below is ").Append(CanvasMarkdown.LocalTimes(zone)).Append(".\n");
         bool Mine(JsonNode? row) => onlyClass is null || Py.AsString(row?["class"]) == onlyClass;
         // due_at is Canvas's UTC time; the row's "due" is already the student's clock time, so converting it again
-        // put every due time hours out (8 hours early in Pacific time, and so "overdue" before it was).
-        string When(JsonNode? row) => CanvasMarkdown.When(Py.AsString(row?["due_at"]), zone) is { Length: > 0 } at ? at : "no due date";
+        // put every due time hours out (8 hours early in Pacific time, and so "overdue" before it was). A list saved
+        // before due_at was kept has only "due": said as it is.
+        string When(JsonNode? row) =>
+            CanvasMarkdown.When(Py.AsString(row?["due_at"]), zone) is { Length: > 0 } at ? at
+            : DateTime.TryParse(Py.AsString(row?["due"]), CultureInfo.InvariantCulture, DateTimeStyles.None, out var clock)
+                ? clock.ToString("ddd d MMM yyyy, h:mm tt", CultureInfo.InvariantCulture) : "no due date";
         string Line(JsonNode? row, string prefix) =>
             $"- {prefix}{When(row)}: {Py.AsString(row?["class"])}: {Py.AsString(row?["name"])}{(row?["missing"]?.GetValue<bool>() == true ? " (missing)" : "")}";
         try
