@@ -31,7 +31,11 @@
                       Content="{x:Static vm:NotesFolderPickModel.BackLabel}" />
               <TextBlock Grid.Column="1" Classes="say" Foreground="{DynamicResource Warn}" Text="{Binding Say}" TextWrapping="Wrap"
                          IsVisible="{Binding Say, Converter={x:Static ObjectConverters.IsNotNull}}" Margin="16,0" VerticalAlignment="Center" />
-              <c:SyftLoader Grid.Column="2" Kind="HoppingBits" Size="20" IsVisible="{Binding Busy}" VerticalAlignment="Center" Margin="0,0,12,0" />
+              <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="10" IsVisible="{Binding Busy}" VerticalAlignment="Center" Margin="0,0,12,0">
+                <TextBlock Name="Progress" Classes="choice-about" Text="{Binding Progress}" VerticalAlignment="Center"
+                           IsVisible="{Binding Progress, Converter={x:Static ObjectConverters.IsNotNull}}" />
+                <c:SyftLoader Kind="HoppingBits" Size="20" VerticalAlignment="Center" />
+              </StackPanel>
               <Panel Grid.Column="3">
                 <Button Name="UseFolder" Classes="btn ink" Command="{Binding Use.Command}" IsVisible="{Binding OnPick}" IsEnabled="{Binding !Busy}"
                         IsDefault="{Binding OnPick}" Content="{x:Static vm:NotesFolderPickModel.UseLabel}" />

@@ -30,8 +30,8 @@ public static partial class Shell
 
     static void AskWhichNotesFolder(IReadOnlyList<LibraryFolder> found)
     {
-        var model = new NotesFolderPickModel(found, Py.UserHome(), (picked, bringIn) => UseNotesFolderAsync(picked, found, bringIn),
-            picked => LibraryFolderPick.PlanAsync(host, picked, found), dir => Machine.Open(dir));
+        var model = new NotesFolderPickModel(found, Py.UserHome(), (picked, bringIn, progress, ct) => UseNotesFolderAsync(picked, found, bringIn, progress, ct),
+            (picked, progress, ct) => LibraryFolderPick.PlanAsync(host, picked, found, progress, ct), dir => Machine.Open(dir));
         var view = new NotesFolderPick { DataContext = model, Height = model.WantedHeight };
         // Come up by itself at a login start, it leaves the keyboard where it was.
         bool asked = !Program.Background;
@@ -47,9 +47,10 @@ public static partial class Shell
         });
     }
 
-    static async Task<Outcome<List<BringInCount>>> UseNotesFolderAsync(LibraryFolder picked, IReadOnlyList<LibraryFolder> shown, bool bringIn)
+    static async Task<Outcome<List<BringInCount>>> UseNotesFolderAsync(LibraryFolder picked, IReadOnlyList<LibraryFolder> shown, bool bringIn,
+        Action<int, int> progress, CancellationToken ct)
     {
-        var outcome = await LibraryFolderPick.UseAsync(host, picked, shown, bringIn);
+        var outcome = await LibraryFolderPick.UseAsync(host, picked, shown, bringIn, progress, ct);
         if (outcome.Ok && (bringIn || !picked.InUse)) RequestLibraryReload(whole: true);
         return outcome;
     }

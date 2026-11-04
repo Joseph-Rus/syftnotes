@@ -36,10 +36,14 @@ public enum NotesFolderStep { Pick, Summary, Done }
 /// </summary>
 public sealed partial class NotesFolderPickModel : ObservableObject
 {
-    public delegate Task<Outcome<List<BringInCount>>> UseFolder(LibraryFolder picked, bool bringIn);
+    /// <summary>Uses <paramref name="picked"/>, bringing in the others' notes when <paramref name="bringIn"/>, and
+    /// says how far it's got (done, of total).</summary>
+    public delegate Task<Outcome<List<BringInCount>>> UseFolder(LibraryFolder picked, bool bringIn, Action<int, int> progress, CancellationToken ct);
+    /// <summary>What bringing in the others' notes would do with <paramref name="picked"/> as the library's folder.</summary>
+    public delegate Task<Outcome<List<BringInCount>>> PlanFolder(LibraryFolder picked, Action<int, int> progress, CancellationToken ct);
 
     readonly UseFolder use;
-    readonly Func<LibraryFolder, Task<Outcome<List<BringInCount>>>> plan;
+    readonly PlanFolder plan;
     readonly Dictionary<string, string> whereOf;
 
     /// <param name="found">The library folders, the one in use first (<see cref="LibraryFolders.Find(string?)"/>).</param>
@@ -50,7 +54,7 @@ public sealed partial class NotesFolderPickModel : ObservableObject
     /// <param name="reveal">Shows a folder in Finder or File Explorer.</param>
     /// <param name="today">For the year: a date this year leaves it out.</param>
     public NotesFolderPickModel(IReadOnlyList<LibraryFolder> found, string userHome, UseFolder use,
-        Func<LibraryFolder, Task<Outcome<List<BringInCount>>>> plan, Action<string> reveal, DateOnly? today = null)
+        PlanFolder plan, Action<string> reveal, DateOnly? today = null)
     {
         this.use = use;
         this.plan = plan;
@@ -73,9 +77,9 @@ public sealed partial class NotesFolderPickModel : ObservableObject
             return row;
         })];
         if (!Rows.Any(r => r.IsPicked) && Rows.Count > 0) Rows[0].IsPicked = true;
-        Use = new AsyncAction(_ => UseAsync(bringIn: false));
-        Look = new AsyncAction(_ => LookAsync());
-        Bring = new AsyncAction(_ => UseAsync(bringIn: true));
+        Use = new AsyncAction(ct => UseAsync(bringIn: false, ct));
+        Look = new AsyncAction(LookAsync);
+        Bring = new AsyncAction(ct => UseAsync(bringIn: true, ct));
         foreach (var a in new[] { Use, Look, Bring })
             a.PropertyChanged += (_, e) =>
             {
@@ -106,6 +110,8 @@ public sealed partial class NotesFolderPickModel : ObservableObject
     public IRelayCommand Finish { get; }
     /// <summary>One of them is running: the buttons wait, and the loader shows.</summary>
     public bool Busy => Use.Busy || Look.Busy || Bring.Busy;
+    /// <summary>How far the one running has got: "Copying 120 of 400…"; null when it hasn't said, or nothing runs.</summary>
+    [ObservableProperty] public partial string? Progress { get; private set; }
     /// <summary>What went wrong with the last of them, in plain words; null when nothing did.</summary>
     public string? Say => Bring.Say ?? Look.Say ?? Use.Say;
     public IRelayCommand Back { get; }
@@ -139,9 +145,17 @@ public sealed partial class NotesFolderPickModel : ObservableObject
         foreach (var r in Rows) r.IsPicked = r == row;
     }
 
-    async Task<Outcome> UseAsync(bool bringIn)
+    /// <summary>"Looking through 120 of 400…" or "Copying 120 of 400…" (lectures and attached files, both folders').</summary>
+    public static string Counting(bool copying, int done, int total) =>
+        $"{(copying ? "Copying" : "Looking through")} {done.ToString("N0", CultureInfo.InvariantCulture)} of {total.ToString("N0", CultureInfo.InvariantCulture)}…";
+
+    Action<int, int> Report(bool copying) => (done, total) => Progress = total > 0 ? Counting(copying, done, total) : null;
+
+    async Task<Outcome> UseAsync(bool bringIn, CancellationToken ct)
     {
-        var outcome = await use(Picked.Folder, bringIn);
+        Progress = null;
+        var outcome = await use(Picked.Folder, bringIn, Report(copying: true), ct);
+        Progress = null;
         if (!outcome.Ok) return outcome;
         if (!bringIn)
         {
@@ -156,16 +170,18 @@ public sealed partial class NotesFolderPickModel : ObservableObject
         return outcome;
     }
 
-    async Task<Outcome> LookAsync()
+    async Task<Outcome> LookAsync(CancellationToken ct)
     {
-        var outcome = await plan(Picked.Folder);
+        Progress = null;
+        var outcome = await plan(Picked.Folder, Report(copying: false), ct);
+        Progress = null;
         if (!outcome.Ok) return outcome;
         var plans = outcome.Value ?? [];
         PlanRows = [.. plans.Select(p => new NotesFolderPlanRow(WhereOf(p.From), Says(p)))];
-        bool any = plans.Any(p => p.New + p.Both > 0);
+        bool any = plans.Any(p => p.New + p.Both + p.Files > 0);
         StepTitle = Rows.Count > 2 ? "Bring in notes from the other folders" : "Bring in notes from the other folder";
         StepLede = any
-            ? $"They're copied into {Picked.Where}. The other {(Rows.Count > 2 ? "folders stay" : "folder stays")} as it is."
+            ? $"They're copied into {Picked.Where}. The other {(Rows.Count > 2 ? "folders stay as they are" : "folder stays as it is")}."
             : "Everything there is already here.";
         BringButton = any ? "Bring them in" : UseLabel;
         SummaryAction = any ? Bring : Use;
@@ -175,11 +191,13 @@ public sealed partial class NotesFolderPickModel : ObservableObject
 
     string WhereOf(string path) => whereOf.TryGetValue(path, out string? w) ? w : path;
 
-    /// <summary>"12 lectures to bring in · 3 already here · 1 different in both (both kept)"; what's 0 is left out.</summary>
+    /// <summary>"12 lectures to bring in · 5 attached files · 3 already here · 1 different in both (both kept)"; what's 0
+    /// is left out.</summary>
     public static string Says(BringInCount p)
     {
         var parts = new List<string>();
         if (p.New > 0) parts.Add($"{Lectures(p.New)} to bring in");
+        if (p.Files > 0) parts.Add($"{Files(p.Files)}");
         if (p.Here > 0) parts.Add($"{p.Here} already here");
         if (p.Both > 0) parts.Add($"{p.Both} different in both (both kept)");
         if (p.Deleted > 0) parts.Add($"{p.Deleted} you deleted {(p.Deleted == 1 ? "stays" : "stay")} deleted");
@@ -191,6 +209,7 @@ public sealed partial class NotesFolderPickModel : ObservableObject
     {
         var parts = new List<string>();
         if (d.New > 0) parts.Add($"{Lectures(d.New)} brought in");
+        if (d.Files > 0) parts.Add($"{Files(d.Files)} brought in");
         if (d.Both > 0) parts.Add($"{d.Both} kept twice");
         if (d.Here > 0) parts.Add($"{d.Here} already here");
         return parts.Count > 0 ? string.Join(" · ", parts) : "Nothing new";
@@ -207,6 +226,8 @@ public sealed partial class NotesFolderPickModel : ObservableObject
         string from = string.Join(" or ", done.Where(d => d.Both > 0).Select(d => $"“(from {whereOf(d.From).Split(" › ")[0]})”").Distinct());
         return lede + $" {(both == 1 ? "1 lecture was" : $"{both} lectures were")} different in each folder, so both are kept: the other one's title ends with {from}.";
     }
+
+    static string Files(int n) => n == 1 ? "1 attached file" : $"{n.ToString("N0", CultureInfo.InvariantCulture)} attached files";
 
     static string Lectures(int n) => n == 1 ? "1 lecture" : $"{n.ToString("N0", CultureInfo.InvariantCulture)} lectures";
 
