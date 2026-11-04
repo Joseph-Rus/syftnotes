@@ -97,20 +97,10 @@ public static class NewPlace
         if (Desktop.SystemChangesOff || SelfTest.Dir is not null) return;
         bool installed = VelopackUpdates.Installed || OperatingSystem.IsMacOS() && Apps.MacBundleOf() is not null;
         if (!installed) return;
+        // First, so the old copy is gone by the time the AI apps' connections name this one.
+        if (OperatingSystem.IsWindows()) OldInnoCopy(home);
         try
         {
-            if (OperatingSystem.IsWindows())
-            {
-                // First, so the old copy is gone by the time the AI apps' connections name this one.
-                if (ClearOldInno(home, InnoKey) is { } cleared) Program.Log("[moved] " + cleared);
-                // The studystash: link (a click on a notification) the old copy registered opens this one; Velopack's
-                // uninstall takes it once it names this copy, as Inno's uninstaller took the old one's.
-                if (Moves.OldProgram(WinNotifications.LinkProgram(), Desktop.Program))
-                {
-                    WinNotifications.RegisterLink("Syft Notes", Desktop.Program);
-                    Program.Log("[moved] studystash: links now open " + Desktop.Program);
-                }
-            }
             foreach (string line in Run(ClaudeSetup.ThisComputer(home), home, Desktop.Program, () => Desktop.LoginProgram(home),
                          () => Desktop.StartAtLogin(true, home), BackgroundLibrary.ThisComputer()))
                 Program.Log("[moved] " + line);
@@ -123,6 +113,37 @@ public static class NewPlace
         catch (Exception e) when (e is IOException or UnauthorizedAccessException or InvalidOperationException or System.Security.SecurityException)
         {
             Program.Log("[moved] couldn't put everything right for the new place: " + e.Message);
+        }
+    }
+
+    /// <summary>What the Inno Setup copy left: its install (<see cref="ClearOldInno"/>), and the studystash: link (a
+    /// click on a notification) it registered, which now opens this copy and so goes with Velopack's uninstall, as
+    /// Inno's uninstaller took the old one's. Each step on its own: one that fails is logged and tried again next start,
+    /// and never stops what comes after it.</summary>
+    [SupportedOSPlatform("windows")]
+    static void OldInnoCopy(string home)
+    {
+        Step("remove the old install", () =>
+        {
+            if (ClearOldInno(home, InnoKey) is { } cleared) Program.Log("[moved] " + cleared);
+        });
+        Step("point studystash: links at this copy", () =>
+        {
+            if (!Moves.OldProgram(WinNotifications.LinkProgram(), Desktop.Program)) return;
+            WinNotifications.RegisterLink("Syft Notes", Desktop.Program);
+            Program.Log("[moved] studystash: links now open " + Desktop.Program);
+        });
+    }
+
+    static void Step(string what, Action step)
+    {
+        try
+        {
+            step();
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException or InvalidOperationException or System.Security.SecurityException)
+        {
+            Program.Log($"[moved] couldn't {what} this time: {e.Message}");
         }
     }
 }
