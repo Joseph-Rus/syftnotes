@@ -273,7 +273,9 @@ public sealed partial class ListenModel : ObservableObject, IDisposable
         Position = Math.Min(Seconds, startedAt + clock.Elapsed.TotalSeconds);
         if (Position >= Seconds)
         {
-            Pause();
+            // The end: it stops where it is. (Pause would ask Tick where it had got to again, and Tick would pause
+            // again, for ever: the app crashed with a stack overflow when a listen played to its end.)
+            Stop();
             Position = Seconds;
         }
     }
@@ -281,6 +283,11 @@ public sealed partial class ListenModel : ObservableObject, IDisposable
     void Pause()
     {
         Tick();
+        Stop();
+    }
+
+    void Stop()
+    {
         ticking?.Cancel();
         clock.Stop();
         player.Stop();
