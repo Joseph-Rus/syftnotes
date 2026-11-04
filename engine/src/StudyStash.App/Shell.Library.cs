@@ -901,7 +901,7 @@ public static partial class Shell
                     rows.Add(new QuickRow { Kind = QuickKind.Header, Title = "Passages from notes", First = rows.Count == 0 });
                     foreach (var p in passages)
                     {
-                        string where = p["at"] is JsonValue v && v.TryGetValue(out double at) ? TimedText.Clock(at) : S(p["section"]) is { Length: > 0 } sec ? sec : "Transcript";
+                        string where = p["at"] is JsonValue v && v.TryGetValue(out double at) ? TimedText.Clock(at) : S(p["section"]) is { Length: > 0 } sec ? PlainMath.Inline(sec) : "Transcript";
                         rows.Add(new QuickRow
                         {
                             Kind = QuickKind.Passage, Title = "…" + Excerpt(S(p["text"]), query) + "…", Sub = $"{S(p["title"])} · {where}", Dot = DotFor(S(p["class"])),
@@ -978,9 +978,10 @@ public static partial class Shell
     }
 
     /// <summary>A passage of notes as it reads, not as it's written: no Markdown's **, `, # or list markers, no
-    /// link addresses, one line.</summary>
+    /// link addresses, no raw LaTeX, one line.</summary>
     internal static string PlainPassage(string text)
     {
+        text = PlainMath.Inline(text);
         text = System.Text.RegularExpressions.Regex.Replace(text, @"!?\[([^\]]*)\]\([^)]*\)", "$1");
         text = System.Text.RegularExpressions.Regex.Replace(text, @"(?m)^\s*(#{1,6}\s+|[-*+]\s+|\d+\.\s+|>\s?)", "");
         text = System.Text.RegularExpressions.Regex.Replace(text, @"(\*\*|__|\*|`|~~)", "");
