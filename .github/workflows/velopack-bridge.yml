@@ -10,10 +10,8 @@
 name: Velopack bridge
 
 on:
+  # By hand only (gh workflow run velopack-bridge): it installs, updates and uninstalls on three throwaway runners.
   workflow_dispatch:
-  # The bridge's own branch: GitHub runs a workflow by hand only once the file is on main.
-  push:
-    branches: [lib-velopack-bridge]
 
 permissions:
   contents: read
@@ -85,8 +83,6 @@ jobs:
 
   mac:
     name: Mac - 0.22.1's Study Stash.app becomes Syft Notes.app on Velopack, updates, uninstalls
-    # Mac runners are few: a push whose message says "[no mac]" leaves this one out while other runs need them.
-    if: github.event_name != 'push' || !contains(github.event.head_commit.message, '[no mac]')
     runs-on: macos-latest
     timeout-minutes: 120
     steps:
