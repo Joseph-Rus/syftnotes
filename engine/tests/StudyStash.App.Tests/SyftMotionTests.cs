@@ -1,3 +1,4 @@
+using Microsoft.Extensions.Time.Testing;
 using System.Diagnostics;
 using System.Runtime.InteropServices;
 using Avalonia;
@@ -104,21 +105,28 @@ public class SyftMotionTests
     [AvaloniaFact]
     public async Task The_splash_goes_once_ready_but_not_before_its_minimum_and_by_its_maximum()
     {
+        // On a clock the test moves a tenth of a second at a time (a real one ran late on a busy CI Mac).
         foreach (bool ready in new[] { true, false })
         {
-            var splash = new SyftSplash { IsReady = ready };
+            var clock = new FakeTimeProvider();
+            var splash = new SyftSplash { IsReady = ready, Clock = clock };
             var window = new Window { Width = 300, Height = 400, Content = splash };
-            var clock = Stopwatch.StartNew();
+            var start = clock.GetUtcNow();
             double? finished = null;
-            splash.Finished += () => finished = clock.Elapsed.TotalSeconds;
+            splash.Finished += () => finished = (clock.GetUtcNow() - start).TotalSeconds;
             window.Show();
-            while (finished is null && clock.Elapsed.TotalSeconds < 6)
-                await Task.Delay(10, TestContext.Current.CancellationToken);
+            for (int step = 0; finished is null && step < 60; step++)
+            {
+                clock.Advance(TimeSpan.FromSeconds(0.1));
+                Dispatcher.UIThread.RunJobs();
+            }
             window.Close();
             Assert.NotNull(finished);
-            if (ready) Assert.InRange(finished!.Value, SyftSplash.MinSeconds, SyftSplash.MinSeconds + 0.8);
-            else Assert.InRange(finished!.Value, SyftSplash.MaxSeconds, SyftSplash.MaxSeconds + 0.8);
+            double fade = SyftSplash.FadeSeconds + 0.02;
+            if (ready) Assert.InRange(finished!.Value, SyftSplash.MinSeconds + fade, SyftSplash.MinSeconds + fade + 0.2);
+            else Assert.InRange(finished!.Value, SyftSplash.MaxSeconds + fade, SyftSplash.MaxSeconds + fade + 0.2);
         }
+        await Task.CompletedTask;
     }
 
     /// <summary>The mark and loaders say what they are: "Syft Notes", and "Loading", politely.</summary>
