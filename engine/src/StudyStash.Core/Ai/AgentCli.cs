@@ -59,6 +59,10 @@ public sealed record AgentCliInfo
     /// <summary>What its commands' environment needs besides the app's own: agy's home of Syft Notes' own
     /// (<see cref="Antigravity.Home"/>). Asked each time (the tests move that home).</summary>
     public Func<IReadOnlyDictionary<string, string>> Env { get; init; } = () => new Dictionary<string, string>();
+    /// <summary>Its sign-in runs with this folder first on its PATH, whose browser openers open nothing, and Syft Notes
+    /// opens its page instead: agy's (<see cref="Antigravity.OpenersOff"/>), whose browser took agy's home as the
+    /// student's. Null when it opens the browser itself.</summary>
+    public Func<string>? OpenersOff { get; init; }
 
     public AgentInstaller Installer(bool windows) => windows ? WindowsInstaller : MacInstaller;
     public string SignInLine => string.Join(' ', [Binary, .. SignInArgs]);
@@ -119,6 +123,7 @@ public static partial class AgentCli
         TakesCode = true,
         StaysOpen = true,
         Env = () => Antigravity.HomeEnv(),
+        OpenersOff = Antigravity.OpenersOff,
     };
 
     public static readonly IReadOnlyList<AgentCliInfo> All = [Claude, Codex, Gemini];
