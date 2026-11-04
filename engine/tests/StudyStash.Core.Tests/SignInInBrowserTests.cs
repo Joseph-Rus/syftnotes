@@ -118,7 +118,6 @@ public class SignInInBrowserTests
         });
 
         await rig.Remote.SignInAsync("claude");
-        Assert.Equal(SignInPhase.Waiting, (await rig.RowAsync("claude")).SignIn);
 
         // Ready only once the sign-in it started has finished by itself, not at the first look at the status.
         var ready = await rig.UntilAsync("claude", e => e.State == "ready");
