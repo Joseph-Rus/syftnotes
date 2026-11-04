@@ -418,6 +418,36 @@ public sealed partial class AppHost : IDisposable, IProblemSource
     /// <summary>Voice memos from the phone, brought in as lectures for Whisper (<see cref="Start"/> runs it).</summary>
     public VoiceMemoImport Memos { get; }
 
+    /// <summary>Makes a lecture from a recording or video on this computer, waiting for Whisper like any recording
+    /// (<see cref="LectureFromFile"/>; <see cref="LectureFromFile.CanRead"/> says which files). The file is only read.
+    /// A long video takes a while, so it's read off the screen's thread. A title given is the student's own and the
+    /// library keeps it; <paramref name="day"/> null is the day the file was last changed. The outcome is the lecture,
+    /// or words to tell the student. Cancelling doesn't stop a conversion that's running, but the lecture isn't added
+    /// (no lecture, no sound left behind) and an <see cref="OperationCanceledException"/> comes out, as from any call
+    /// the student cancels.</summary>
+    public async Task<Outcome<Lecture>> AddLectureFromFileAsync(string path, string? className = null, string? title = null, DateOnly? day = null, CancellationToken cancel = default)
+    {
+        string owner = Client().DisplayName;
+        try
+        {
+            var lecture = await Task.Run(() => LectureFromFile.FromFile(Lectures, AudioFiles.ToRecording, path, className, title, day, owner, cancel), cancel);
+            log($"[file] {lecture.Id} ({lecture.Seconds:0} s), waiting for Whisper");
+            Whisper.Wake();
+            Changed?.Invoke();
+            return Outcome<Lecture>.Answered(lecture);
+        }
+        catch (Exception e) when (e is InvalidOperationException or InvalidDataException)
+        {
+            log($"[file] couldn't bring it in: {e.Message}{(e.InnerException is { } why ? $" ({why.Message})" : "")}");
+            return Outcome<Lecture>.Failed(new Failure(FailureKind.Refused, e.Message));
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException)
+        {
+            log($"[file] couldn't open it: {e.GetType().Name}: {e.Message}");
+            return Outcome<Lecture>.Failed(new Failure(FailureKind.Refused, "Syft Notes couldn't open that file. Check that it's still there and that this computer has room for it."));
+        }
+    }
+
     /// <summary>The student's Granola, once they've signed in to it in Settings: looked at for lectures Syft Notes
     /// doesn't have (<see cref="Start"/> runs it), which Transfer brings over.</summary>
     public GranolaImport Granola { get; }
@@ -1028,18 +1058,23 @@ public sealed partial class AppHost : IDisposable, IProblemSource
 
     /// <summary>Keep recording a lecture that stopped (minutes or days ago): what's recorded now is added to the end of
     /// its transcript, and its notes are written again. The microphone is asked for as Record asks.
-    /// <paramref name="title"/> is what the library calls the note now, when the app has just read it.</summary>
-    public Task<RecordStart> ContinueAsync(string id, string? title = null) => MicThenAsync(() => ContinueRecording(id, title));
+    /// <paramref name="title"/> and <paramref name="className"/> are what the library calls the note now and the folder
+    /// it's in ("" for none), when the app has just read them.</summary>
+    public Task<RecordStart> ContinueAsync(string id, string? title = null, string? className = null) =>
+        MicThenAsync(() => ContinueRecording(id, title, className));
 
-    public Lecture ContinueRecording(string id, string? title = null)
+    public Lecture ContinueRecording(string id, string? title = null, string? className = null)
     {
         if (!ModelReady) throw new InvalidOperationException("Download the transcription model first (Settings → Recording).");
-        // The note may have been renamed in the library since it was filed: its name there is the one its page goes by
-        // while it records again. A title typed on the recording the first time gives way to it too, or it would go
-        // back to the library as the student's newest and replace the one they chose since.
-        if (title is { Length: > 0 })
+        // The note may have been renamed or moved in the library since it was filed: its name and folder there are the
+        // ones its page, the sidebar and the pill go by while it records again (not Unsorted, from before it was moved).
+        // A title typed on the recording the first time gives way to it too, or it would go back to the library as the
+        // student's newest and replace the one they chose since.
+        if (title is { Length: > 0 } || className is not null)
             Lectures.Update(id, x =>
             {
+                if (className is not null) x.ClassName = x.FiledClass = className;
+                if (title is not { Length: > 0 }) return;
                 x.FiledTitle = title;
                 if (x.TitleTyped) x.Title = title;
             });

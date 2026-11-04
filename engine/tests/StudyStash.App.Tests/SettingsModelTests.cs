@@ -84,14 +84,16 @@ public class SettingsModelTests
             Started = DateTimeOffset.Now.AddDays(-10).ToString("yyyy-MM-dd'T'HH:mm:sszzz", System.Globalization.CultureInfo.InvariantCulture),
         });
         using (new WavWriter(store.AudioPath("rec-old"))) { }
+        File.SetLastWriteTimeUtc(store.AudioPath("rec-old"), DateTime.UtcNow.AddDays(-10)); // recorded 10 days ago: its sound is as old
         using var host = new AppHost(home.Path, log: _ => { }, loginItems: new CountingLoginItems(), models: new ModelSetting(File: home["model.bin"]))
         {
             PruneAfterChange = TimeSpan.Zero,
         };
         host.Start();
         using var model = SettingsModel.Make(host);
-        await Task.Delay(300);
-        Assert.True(File.Exists(store.AudioPath("rec-old"))); // 0 keeps every recording
+        // 0 keeps every recording: the same look the app takes at start, asked here and now instead of slept on.
+        Assert.Equal(0, host.Lectures.PruneAudio(host.Settings.KeepAudioDays, DateTimeOffset.Now));
+        Assert.True(File.Exists(store.AudioPath("rec-old")));
 
         model.KeepAudio = "7";
 

@@ -197,7 +197,7 @@ public static class Cli
             Pipeline? writer = null; // the pipeline, below: the diagrams wait while it writes notes
             var diagrams = new DiagramJobs(cfg, store, ai) { NotesBusy = () => writer?.Writing == true };
             var pipeline = writer = new Pipeline(cfg, store, ai.SortAsync, ai.SummarizeAsync, notesModel: () => ai.Describe("notes", cfg), notesFast: ai.NotesInFastMode,
-                filed: id => diagrams.AfterFiled(id, ai.TakeDiagramsFollow(id)), limitUntil: ai.LimitUntil);
+                filed: id => diagrams.AfterFiled(id, ai.TakeDiagramsFollow(id)), limitUntil: ai.LimitUntil, sortedWith: () => ai.SortedWith);
             // An AI that needed signing in again answers once more: the lectures it couldn't write notes for meanwhile
             // get them now, without the student asking for each.
             ai.NotesAiChosen += () =>
@@ -255,13 +255,13 @@ public static class Cli
             var indexing = fileIndex.RunAsync(Console.WriteLine, stop.Token);
             // Canvas, through the Chrome extension: one queue for the sync and for AIs' reads.
             var canvas = new StudyStash.Core.Canvas.CanvasSync(home, c => store.ClassDir(c)) { KnownClass = c => cfg.ClassNames().Contains(c) };
-            // After a sync, an AI explores each class it hasn't explored yet (Settings can ask again).
+            // After a sync, an AI explores each class it hasn't explored yet, and tries again where it failed (Settings can ask again).
             var scout = new StudyStash.Core.Canvas.Scout(home, c => store.ClassDir(c), ai);
             canvas.Synced += classes =>
             {
-                var s = StudyStash.Core.Canvas.CanvasSettings.Load(home);
                 if (ai.AgentReady().Ok)
-                    scout.Queue(classes.Where(c => !s.Scouts.ContainsKey(c) && !File.Exists(Path.Combine(store.ClassDir(c), "Canvas", "canvas-recipe.md"))).ToArray());
+                    scout.Queue(StudyStash.Core.Canvas.Scout.ToExplore(classes, StudyStash.Core.Canvas.CanvasSettings.Load(home).Scouts,
+                        c => File.Exists(Path.Combine(store.ClassDir(c), "Canvas", "canvas-recipe.md")), DateTimeOffset.Now));
             };
             // The phone over Google Drive (docs/phone-google.md): its link runs here, in the library, so the phone is
             // answered whenever the library runs, the app open or not. It starts once the app has connected an account.
@@ -391,7 +391,9 @@ public static class Cli
                     BackgroundLibrary.WritePids(home, Environment.ProcessId, p.Id);
                     try
                     {
-                        await p.WaitForExitAsync(stop.Token);
+                        // Its own end, not its output's: something it started (git's background helpers) can hold the
+                        // output open after it has gone, and the library was never started again (Windows).
+                        await Machine.ExitedAsync(p, stop.Token);
                     }
                     catch (OperationCanceledException)
                     {

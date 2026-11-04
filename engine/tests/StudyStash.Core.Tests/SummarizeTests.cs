@@ -158,7 +158,11 @@ public class SummarizeTests
         Assert.Contains("_(Too short for notes: Syft Notes writes them from about a minute and a half of speech.)_", Py.ReadText(store.Get("short")!.MdPath!));
         // Enough was said and nothing came back: that isn't called too short.
         Assert.Null(reader.Lecture("long")!["no_notes"]);
-        Assert.Contains("_(no AI notes returned)_", Py.ReadText(store.Get("long")!.MdPath!));
+        // ...and its file leaves the Notes out rather than putting an error-looking line in the student's own file.
+        string longFile = Py.ReadText(store.Get("long")!.MdPath!);
+        Assert.DoesNotContain("no AI notes returned", longFile);
+        Assert.DoesNotContain("## Notes", longFile);
+        Assert.Contains("## Transcript", longFile);
         // A library that writes no notes at all (setup's "No AI for now") says that of both, the short one too.
         cfg.OllamaEnabled = cfg.SummaryEnabled = false;
         Assert.Equal(Summarize.NoNotesOff, reader.Lecture("long")!["no_notes"]!.GetValue<string>());

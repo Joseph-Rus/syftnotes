@@ -4,7 +4,7 @@ using Microsoft.Data.Sqlite;
 
 namespace StudyStash.Core;
 
-/// <summary>Which class a note belongs in, and who decided: folder | rules | ollama | none | human.</summary>
+/// <summary>Which class a note belongs in, and who decided: folder | rules | an AI's id (ollama, claude, codex, gemini) | none | human.</summary>
 public sealed class Classification(string className, double confidence, string by, string lectureTitle = "",
     List<string>? topics = null)
 {
@@ -98,8 +98,9 @@ public static partial class Notes
         return string.Join("\n", output);
     }
 
-    /// <summary>Where a note file's notes would be, when none were written: the recording was too short for them
-    /// (<see cref="Summarize.TooShort"/>), or notes were asked for and none came back.</summary>
+    /// <summary>Where a note file's notes would be, when none were written because the recording was too short for them
+    /// (<see cref="Summarize.TooShort"/>). Notes that were asked for and never came back leave no section at all (files
+    /// from before said <see cref="NoNotesReturned"/> there).</summary>
     public static readonly string TooShortForNotes = $"_({Summarize.TooShortWords()})_";
     public const string NoNotesReturned = "_(no AI notes returned)_";
 
@@ -144,7 +145,8 @@ public static partial class Notes
         if (!summarized || (fromNotes && Py.Strip(m.NotesMarkdown).Length > 0))
         {
             string notes = Py.Strip(m.NotesMarkdown);
-            lines.AddRange(["## Notes", "", notes.Length > 0 ? notes : Summarize.TooShort(m) ? TooShortForNotes : NoNotesReturned, ""]);
+            if (notes.Length > 0 || Summarize.TooShort(m))
+                lines.AddRange(["## Notes", "", notes.Length > 0 ? notes : TooShortForNotes, ""]);
         }
         if (Py.Strip(m.PrivateNotes).Length > 0) lines.AddRange(["## Private notes", "", Py.Strip(m.PrivateNotes), ""]);
         if (Py.Strip(m.Transcript).Length > 0) lines.AddRange(["## Transcript", "", Py.Strip(m.Transcript), ""]);
@@ -231,7 +233,12 @@ public sealed partial class Store : IDisposable
         MigrateNotesVersions();
     }
 
-    public void Dispose() => conn.Dispose();
+    /// <summary>Closes the database once whatever is using it now is done: a background job (an attachment being read)
+    /// may still be mid-query when the library stops. Anything after that finds it closed.</summary>
+    public void Dispose()
+    {
+        lock (gate) conn.Dispose();
+    }
 
     void Migrate()
     {
@@ -570,6 +577,16 @@ public sealed partial class Store : IDisposable
         }
     }
 
+    /// <summary>How many filed lectures have a summary written for them (what "Rewrite all" would rewrite).</summary>
+    public int SummaryCount()
+    {
+        lock (gate)
+        {
+            using var cmd = Command($"SELECT COUNT(*) FROM notes WHERE {Filed} AND COALESCE(summary_md, '') <> ''");
+            return Convert.ToInt32(cmd.ExecuteScalar(), System.Globalization.CultureInfo.InvariantCulture);
+        }
+    }
+
     /// <summary>Every lecture's note file, as the index has it.</summary>
     public List<string> NoteFiles()
     {
@@ -614,24 +631,43 @@ public sealed partial class Store : IDisposable
     {
         string name = $"{Notes.DatePrefix(m.Date)} {Notes.Slugify(m.Title)}";
         string path = Path.Combine(ClassDir(className), name + ".md");
-        if (File.Exists(path))
-        {
-            using var cmd = Command("SELECT id FROM notes WHERE md_path=?", path);
-            if (cmd.ExecuteScalar() is string other && other != m.Id)
-                path = Path.Combine(ClassDir(className), $"{name} [{Py.Tail(m.Id, 6)}].md");
-        }
+        // A file already there that isn't this lecture's own (another lecture's, or one the student keeps in the folder)
+        // is never written over: this one takes a name of its own.
+        if (File.Exists(path) && !OwnFile(path, m.Id))
+            path = Path.Combine(ClassDir(className), $"{name} [{Py.Tail(m.Id, 6)}].md");
         return path;
+    }
+
+    /// <summary>Whether the note file at <paramref name="path"/> is this lecture's own: the one it's filed at, or one the
+    /// library wrote for it (its front matter names it) that wasn't recorded yet. A file that can't be read isn't.</summary>
+    bool OwnFile(string path, string id)
+    {
+        using (var cmd = Command("SELECT md_path FROM notes WHERE id=?", id))
+            if (cmd.ExecuteScalar() is string filed && Py.SamePath(filed, path)) return true;
+        try
+        {
+            string want = $"id: {PyJson.Dumps(id)}";
+            foreach (string line in File.ReadLines(path).Take(16))
+                if (line == want) return true;
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException)
+        {
+        }
+        return false;
     }
 
     /// <summary>Write the Markdown file and mark the note done. New notes are a version (<see cref="NotesVersions"/>)
     /// made by <paramref name="versionKind"/>: the library writing them, unless said otherwise.</summary>
     public string Save(Meeting m, Classification c, string summaryMd = "", string summaryModel = "", string error = "",
-        string versionKind = NotesChangeKind.Written)
+        string versionKind = NotesChangeKind.Written, string? fileText = null)
     {
         lock (gate)
         {
             string path = TargetPath(m, c.ClassName);
-            Py.WriteText(path, Notes.Render(m, c, summaryMd, summaryModel));
+            // The file's own text (one moved with edits of its own) is written as it is; otherwise the library's. Either way
+            // before the old file goes, so a write that fails leaves that one where it was.
+            if (fileText is null) Py.WriteText(path, Notes.Render(m, c, summaryMd, summaryModel));
+            else ReplaceFile(path, fileText);
             string now = Now();
             string? oldPath = null, firstSeen = null;
             (string Markdown, string Model, string At) before = ("", "", "");
@@ -875,13 +911,35 @@ public sealed partial class Store : IDisposable
                 Exec("UPDATE notes SET class_name=?, classified_by=?, confidence=1.0 WHERE id=?", className, by, noteId);
                 return string.IsNullOrEmpty(row.MdPath) ? null : row.MdPath;
             }
-            string? old = string.IsNullOrEmpty(row.MdPath) ? null : row.MdPath;
-            var m = Meeting(row);
-            var c = new Classification(className, 1.0, by, row.LectureTitle ?? "", JsonList(row.Topics));
-            string newPath = Save(m, c, row.SummaryMd ?? "", row.SummaryModel ?? "", row.Error ?? "");
-            DropEmptyDir(old, newPath);
-            return newPath;
+            return Refile(row, new Classification(className, 1.0, by, row.LectureTitle ?? "", JsonList(row.Topics)), null,
+                text => Notes.WithClass(text, row.ClassName ?? "", className));
         }
+    }
+
+    /// <summary>A filed lecture's note file written again where it belongs now that its class or title changed
+    /// (<paramref name="c"/>; <paramref name="change"/> changes the lecture itself). What was written in the file itself
+    /// (in another app, or by an AI working in the folder) and not taken in yet goes with it: its summary taken in first
+    /// (the older one kept as a version), and the file's own text moved, changed by <paramref name="sameInFile"/> to say
+    /// the same. A file that can't be read throws, and nothing moves. Where the file is now.</summary>
+    string Refile(NoteRow row, Classification c, Action<Meeting>? change, Func<string, string> sameInFile)
+    {
+        string? old = string.IsNullOrEmpty(row.MdPath) ? null : row.MdPath;
+        var m = Meeting(row);
+        string summary = row.SummaryMd ?? "", model = row.SummaryModel ?? "";
+        string? edited = null;
+        bool crlf = false;
+        if (old is not null)
+        {
+            var was = new Classification(row.ClassName ?? "", row.Confidence ?? 1, row.ClassifiedBy ?? "", row.LectureTitle ?? "", JsonList(row.Topics));
+            edited = EditedFile(old, m, was, summary, model, out crlf);
+            if (edited is not null && TakeInSummary(row, m, summary, model, edited) is { } theirs) summary = theirs;
+        }
+        change?.Invoke(m);
+        // The file's own text is written in the library's place before the old file goes, so a write that fails loses nothing.
+        string? moved = edited is null ? null : sameInFile(edited);
+        string path = Save(m, c, summary, model, row.Error ?? "", fileText: moved is not null && crlf ? moved.Replace("\n", "\r\n") : moved);
+        DropEmptyDir(old, path);
+        return path;
     }
 
     /// <summary>What became of renaming a lecture.</summary>
@@ -899,14 +957,13 @@ public sealed partial class Store : IDisposable
             var row = Get(noteId);
             if (row is null) return Renamed.Gone;
             if (row.Status is Queued or Working) return Renamed.Busy;
-            string? old = string.IsNullOrEmpty(row.MdPath) ? null : row.MdPath;
-            var m = Meeting(row);
-            m.Title = title;
-            m.Raw[Core.Meeting.TitleBy] = Core.Meeting.ByHand;
             var c = new Classification(string.IsNullOrEmpty(row.ClassName) ? Configs.Unsorted : row.ClassName, row.Confidence ?? 0,
                 row.ClassifiedBy ?? "", title, JsonList(row.Topics));
-            string path = Save(m, c, row.SummaryMd ?? "", row.SummaryModel ?? "", row.Error ?? "");
-            DropEmptyDir(old, path);
+            Refile(row, c, m =>
+            {
+                m.Title = title;
+                m.Raw[Core.Meeting.TitleBy] = Core.Meeting.ByHand;
+            }, text => Notes.WithTitle(text, row.LectureTitle is { Length: > 0 } was ? was : row.Title ?? "", title));
             return Renamed.Done;
         }
     }

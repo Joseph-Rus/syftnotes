@@ -505,9 +505,9 @@ public static class Setup
             return;
         }
         // Said here, in a student's words; the library's own refusal is a note to whoever calls its API.
-        if (name.Length > 60)
+        if (name.Length > StudyStash.Core.Canvas.CourseNames.MaxLength)
         {
-            m.ClassProblem = "Keep the class's name to 60 characters.";
+            m.ClassProblem = $"Keep the class's name to {StudyStash.Core.Canvas.CourseNames.MaxLength} characters.";
             return;
         }
         if (host.Remote() is not { } lib)

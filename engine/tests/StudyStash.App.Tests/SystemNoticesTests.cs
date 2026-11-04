@@ -2,6 +2,7 @@ using Avalonia.Headless.XUnit;
 using StudyStash.App.Platform;
 using StudyStash.App.Services;
 using StudyStash.App.ViewModels;
+using StudyStash.Core;
 
 namespace StudyStash.App.Tests;
 
@@ -159,6 +160,19 @@ public class SystemNoticesTests
         choosy.Notices.Show(notice);
         Assert.Equal([notice], choosy.Own);
         Assert.False(choosy.Notices.Knows(SystemNotices.IdOf(notice)));
+    }
+
+    [Fact]
+    public void Record_that_couldnt_start_is_said_even_with_notifications_turned_off()
+    {
+        // A nearly full disk: Record seemed to do nothing on a Mac with Syft Notes' notifications off, because the
+        // refusal was a toast, which isn't shown there. It's the recorder's own words, as the app's own card.
+        var declined = new Rig(NotificationState.Denied);
+        bool recording = false;
+        var notice = NoticeWords.CouldntStart(RecordingWords.NearlyFull, () => !recording);
+        declined.Notices.Show(notice);
+        Assert.Equal([notice], declined.Own);
+        Assert.Equal(("Couldn't start recording", RecordingWords.NearlyFull), (notice.Title, notice.Text));
     }
 
     [Fact]
