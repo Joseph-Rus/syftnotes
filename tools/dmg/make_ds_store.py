@@ -28,5 +28,5 @@ with DSStore.open(out, "w+") as d:
     d["."]["bwsp"] = plistlib.dumps(bwsp, fmt=plistlib.FMT_BINARY)
     d["."]["icvl"] = ("type", b"icnv")
     d["."]["icvp"] = plistlib.dumps(icvp, fmt=plistlib.FMT_BINARY)
-    d["Study Stash.app"]["Iloc"] = APP_AT
+    d["Syft Notes.app"]["Iloc"] = APP_AT
     d["Applications"]["Iloc"] = APPLICATIONS_AT

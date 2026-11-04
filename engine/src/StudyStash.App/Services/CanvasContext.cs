@@ -42,8 +42,7 @@ public sealed record CanvasContext(CanvasClient? Client, CanvasClock Clock, Func
     /// the student added the extension to last time (app.json) is the one to use again.</summary>
     public static CanvasContext For(AppHost host)
     {
-        var cc = host.Client();
-        var client = cc.ServerUrl.Length > 0 ? new CanvasClient(cc.ServerUrl, cc.PoolKey) : null;
+        var client = host.Api.Canvas;
         Browsers.Picked = host.Settings.CanvasBrowser;
         var actions = new CanvasActions(
             // What Canvas calls a link is whatever someone typed there: only a web page is opened.
@@ -60,7 +59,7 @@ public sealed record CanvasContext(CanvasClient? Client, CanvasClock Clock, Func
             OpenAddOn: browser => Browsers.Open(browser, Browsers.StorePage(browser)),
             RevealFolder: Reveal,
             OpenFile: path => Machine.Open(path),
-            PrepareExtension: (key, canvasUrl) => Core.Canvas.Extension.EnsureFor(host.Home, cc.ServerUrl, key, canvasUrl).Path,
+            PrepareExtension: (key, canvasUrl) => Core.Canvas.Extension.EnsureFor(host.Home, host.Client().ServerUrl, key, canvasUrl).Path,
             Copy: Copy,
             Advise: () => Browsers.Advise());
         return new CanvasContext(client, new CanvasClock(() => DateTimeOffset.Now, TimeZoneInfo.Local), cls => Skin.ClassDot(host.ColorOf(cls)), actions, host.Home);

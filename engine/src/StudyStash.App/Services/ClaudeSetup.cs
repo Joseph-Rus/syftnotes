@@ -421,6 +421,9 @@ public sealed class ClaudeSetup
     /// <summary>The places this app doesn't read that may hold a copy of Syft Notes' entry (Claude Desktop's older folders).</summary>
     IReadOnlyList<string> OthersOf(string id) => id == "claude-desktop" ? Desktop.Others : [];
 
+    /// <summary>The program Syft Notes' entry in this app's settings starts, or null when there's none.</summary>
+    public string? CommandOf(string id) => ReadText(ConfigOf(id)) is { } text ? EntryIn(id, text)?.Command : null;
+
     public AiAppState State(string id)
     {
         string path = ConfigOf(id);
@@ -625,10 +628,15 @@ public sealed class ClaudeSetup
         {
             return TomlSerializer.Deserialize<TomlTable>(text);
         }
-#pragma warning disable CA1031 // whatever the parser throws, the answer is the same: not TOML Syft Notes can rewrite
-        catch (Exception)
+        catch (TomlException)
+        {
+            return null;
+        }
+#pragma warning disable CA1031 // whatever else the parser throws, the answer is the same: not TOML Syft Notes can rewrite
+        catch (Exception e)
 #pragma warning restore CA1031
         {
+            StudyStash.App.Program.Log($"[claude-setup] config.toml wouldn't parse: {e.GetType().Name}");
             return null;
         }
     }

@@ -45,7 +45,7 @@ public sealed partial class AiEngineRow : ObservableObject
     public string Name { get; init; } = "";
     public string Icon { get; init; } = "";
     public string About { get; init; } = "";
-    public string State { get; init; } = "";
+    public AiEngineState State { get; init; }
     public string StateWords { get; init; } = "";
     public bool Good { get; init; }
     public bool Warn { get; init; }
@@ -679,7 +679,7 @@ public sealed partial class AiEnginesModel : ObservableObject, IDisposable
             Name = name,
             Icon = AiWords.EngineIcon(e.Id),
             About = about,
-            State = e.State,
+            State = status.State,
             StateWords = state,
             Good = good,
             Warn = warn,
@@ -750,20 +750,20 @@ public sealed partial class AiEnginesModel : ObservableObject, IDisposable
             Name = name,
             Icon = AiWords.EngineIcon(e.Id),
             About = phase ?? (signIn.Length > 0 ? AiWords.SignInAbout(name, signIn)
-                : e.Installed || !cli ? AiWords.EngineAbout(e.Id, e.State, Here) : Here ? AiWords.NotSetUpAbout(e.Id) : "Install it on your library's computer."),
-            State = e.State,
-            StateWords = phase is not null ? "Setting up" : signIn == SignInPhase.Waiting ? "Signing in" : AiWords.EngineStateWords(e.State),
-            Good = AiWords.StateIsGood(e.State),
-            Warn = AiWords.StateIsWarn(e.State) && signIn != SignInPhase.Waiting && phase is null,
-            Muted = AiWords.StateIsMuted(e.State) || signIn == SignInPhase.Waiting || phase is not null,
+                : e.Installed || !cli ? AiWords.EngineAbout(e.Id, status.State, Here) : Here ? AiWords.NotSetUpAbout(e.Id) : "Install it on your library's computer."),
+            State = status.State,
+            StateWords = phase is not null ? "Setting up" : signIn == SignInPhase.Waiting ? "Signing in" : AiWords.EngineStateWords(status.State, e.State),
+            Good = AiWords.StateIsGood(status.State),
+            Warn = AiWords.StateIsWarn(status.State) && signIn != SignInPhase.Waiting && phase is null,
+            Muted = AiWords.StateIsMuted(status.State) || signIn == SignInPhase.Waiting || phase is not null,
             SignIn = signIn,
             LinkWords = signIn.Length > 0 ? AiWords.SignInLink(signIn) : !e.Installed && installStopped.Contains(e.Id) ? "Get help" : "",
             ActionWords = phase is not null ? ""
                 : signIn.Length > 0 ? AiWords.SignInButton(signIn)
                 : !e.Installed && cli && !Here ? "Get it"
-                : status.Action == AiAction.Check && status.State == AiEngineState.NotSignedIn ? "Check" : AiWords.RowActionWords(e.State),
-            IsPrimary = AiWords.RowActionPrimary(e.State),
-            NeedsOptions = AiWords.NeedsOptions(e.State),
+                : status.Action == AiAction.Check && status.State == AiEngineState.NotSignedIn ? "Check" : AiWords.RowActionWords(status.State),
+            IsPrimary = AiWords.RowActionPrimary(status.State),
+            NeedsOptions = AiWords.NeedsOptions(status.State),
             Model = e.Model,
             Models = e.Models,
             Site = e.Site,
@@ -785,7 +785,7 @@ public sealed partial class AiEnginesModel : ObservableObject, IDisposable
         {
             // Not set up · signed out (Sign in, or Check once a Sign in that isn't hidden was pressed) · not running ·
             // its model missing · not checked yet: the library's own action for it. (Anything else asks nothing.)
-            var action = store.NextAction(row.Id, AiStatusStore.StateOf(row.State));
+            var action = store.NextAction(row.Id, row.State);
             var said = action == AiAction.None ? Outcome<AiSaid>.Failed(Failure.OlderLibrary) : await Own(() => store.ActAsync(row.Id, action));
             await AfterAction(said);
             // Sign in from a laptop says where to sign in: the row's button is Check for when that's done.

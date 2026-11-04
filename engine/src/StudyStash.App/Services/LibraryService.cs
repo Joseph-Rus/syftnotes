@@ -1,3 +1,4 @@
+using StudyStash.App.Services.Kit;
 using System.ComponentModel;
 using System.Diagnostics;
 using System.Net.Sockets;
@@ -240,8 +241,7 @@ public sealed class LibraryService : IDisposable
     /// listen on it.</summary>
     async Task WaitPortFreeAsync()
     {
-        var until = DateTime.UtcNow + TimeSpan.FromSeconds(15);
-        while (DateTime.UtcNow < until && await portStatus(cfg.WebPort) != "free") await Task.Delay(100);
+        await Poll.UntilAsync(async _ => await portStatus(cfg.WebPort) == "free", TimeSpan.FromMilliseconds(100), TimeSpan.FromSeconds(15));
     }
 
     /// <summary>
@@ -374,7 +374,7 @@ public sealed class LibraryService : IDisposable
         SetState(LibraryServiceState.Starting);
         _ = Task.Run(async () =>
         {
-            await Task.Delay(TimeSpan.FromSeconds(delay));
+            await Poll.AfterAsync(TimeSpan.FromSeconds(delay));
             if (!stopping && !disposed) await SpawnAsync();
         });
     }

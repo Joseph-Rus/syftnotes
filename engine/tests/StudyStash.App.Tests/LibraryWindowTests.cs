@@ -287,9 +287,8 @@ public class LibraryWindowTests
         Assert.True(m.HasDeleted && m.HasToast);
         Assert.Equal("Deleted “Recursion and the call stack”", m.ToastSaid);
 
-        // "Deleted · Undo" goes by itself once its minutes are up.
-        await Task.Delay(400, TestContext.Current.CancellationToken);
-        Assert.False(m.HasToast);
+        // "Deleted · Undo" goes by itself once its minutes are up (50 ms here).
+        await Wait.UntilAsync(() => !m.HasToast, "the deleted toast going by itself");
 
         // The last one under its heading: the heading goes too.
         await m.DeleteCommand.ExecuteAsync(rows[2]);
@@ -334,8 +333,9 @@ public class LibraryWindowTests
         m.SayMoved(new NoteMove("c", "CS 101", ""));
         Assert.Equal("Moved to Unsorted.", m.ToastSaid);
         Assert.False(m.CanDismissToast);
-        await Task.Delay(400, TestContext.Current.CancellationToken); // the move's own few seconds
-        Assert.Equal("Deleted “Stack frames and scope”", m.ToastSaid);
+        // The move's own few seconds (50 ms here), then the deletion behind it shows again. Waited on, not slept: a
+        // busy CI Mac was still showing the move after a fixed 400 ms (main's run 41762571248).
+        await Wait.UntilAsync(() => m.ToastSaid == "Deleted “Stack frames and scope”", "the deletion's toast back after the move's");
         Assert.True(m.CanDismissToast);
         await m.UndoToastCommand.ExecuteAsync(null);
         Assert.Equal(["b"], undone);
@@ -402,6 +402,23 @@ public class LibraryWindowTests
         // Out of every folder: it says Unsorted.
         m.SayMoved(new NoteMove("a", "ACM", ""));
         Assert.Equal("Moved to Unsorted.", m.ToastSaid);
+    }
+
+    /// <summary>Moved, put back, and moved to the same place again: the second "Moved · Undo" has its own few seconds
+    /// (the first one's timer used to take it away early).</summary>
+    [Fact]
+    public async Task Moving_a_note_again_after_Undo_gives_the_new_toast_its_own_time()
+    {
+        var clock = new Microsoft.Extensions.Time.Testing.FakeTimeProvider();
+        var m = new LibraryModel { UndoShows = TimeSpan.FromSeconds(10), Clock = clock, OnUndoMove = _ => Task.CompletedTask };
+        m.SayMoved(new NoteMove("a", "", "ACM"));
+        clock.Advance(TimeSpan.FromSeconds(7));
+        await m.UndoToastCommand.ExecuteAsync(null);
+        m.SayMoved(new NoteMove("a", "", "ACM")); // the same move again
+        clock.Advance(TimeSpan.FromSeconds(4)); // the first one's ten seconds are up
+        Assert.Equal("Moved to ACM.", m.ToastSaid);
+        clock.Advance(TimeSpan.FromSeconds(6)); // the second one's are
+        await Wait.UntilAsync(() => !m.HasToast, "the second toast going after its own ten seconds");
     }
 
     [AvaloniaTheory]

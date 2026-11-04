@@ -1,5 +1,6 @@
 using Avalonia.Headless.XUnit;
 using StudyStash.App.Services;
+using StudyStash.App.Services.Stores;
 using StudyStash.App.ViewModels;
 using StudyStash.Core;
 using StudyStash.Core.Ai;
@@ -9,15 +10,15 @@ namespace StudyStash.App.Tests;
 public class AiWordsTests
 {
     [Theory]
-    [InlineData("ready", "Ready", "Options")]
-    [InlineData("unchecked", "Installed", "Check")]
-    [InlineData("not_signed_in", "Not signed in", "Sign in")]
-    [InlineData("not_running", "Not running", "Start")]
-    [InlineData("model_missing", "Needs its model", "Download")]
-    [InlineData("limited", "Limit reached", "Options")]
-    [InlineData("not_installed", "Not installed", "Set up")]
-    [InlineData("failed", "Didn't work", "Options")]
-    public void Every_state_has_its_word_and_its_row_action(string state, string words, string action)
+    [InlineData(AiEngineState.Ready, "Ready", "Options")]
+    [InlineData(AiEngineState.Unchecked, "Installed", "Check")]
+    [InlineData(AiEngineState.NotSignedIn, "Not signed in", "Sign in")]
+    [InlineData(AiEngineState.NotRunning, "Not running", "Start")]
+    [InlineData(AiEngineState.ModelMissing, "Needs its model", "Download")]
+    [InlineData(AiEngineState.Limited, "Limit reached", "Options")]
+    [InlineData(AiEngineState.NotInstalled, "Not installed", "Set up")]
+    [InlineData(AiEngineState.Failed, "Didn't work", "Options")]
+    public void Every_state_has_its_word_and_its_row_action(AiEngineState state, string words, string action)
     {
         Assert.Equal(words, AiWords.EngineStateWords(state));
         Assert.Equal(action, AiWords.RowActionWords(state));
@@ -26,27 +27,27 @@ public class AiWordsTests
     [Fact]
     public void Only_sign_in_is_the_primary_button()
     {
-        Assert.True(AiWords.RowActionPrimary("not_signed_in"));
-        foreach (string s in new[] { "ready", "unchecked", "not_running", "model_missing", "limited", "not_installed", "failed" })
+        Assert.True(AiWords.RowActionPrimary(AiEngineState.NotSignedIn));
+        foreach (var s in new[] { AiEngineState.Ready, AiEngineState.Unchecked, AiEngineState.NotRunning, AiEngineState.ModelMissing, AiEngineState.Limited, AiEngineState.NotInstalled, AiEngineState.Failed })
             Assert.False(AiWords.RowActionPrimary(s));
     }
 
     [Fact]
     public void Only_ready_limited_and_failed_open_the_options_menu()
     {
-        Assert.True(AiWords.NeedsOptions("ready"));
-        Assert.True(AiWords.NeedsOptions("limited"));
-        Assert.True(AiWords.NeedsOptions("failed"));
-        foreach (string s in new[] { "unchecked", "not_signed_in", "not_running", "model_missing", "not_installed" })
+        Assert.True(AiWords.NeedsOptions(AiEngineState.Ready));
+        Assert.True(AiWords.NeedsOptions(AiEngineState.Limited));
+        Assert.True(AiWords.NeedsOptions(AiEngineState.Failed));
+        foreach (var s in new[] { AiEngineState.Unchecked, AiEngineState.NotSignedIn, AiEngineState.NotRunning, AiEngineState.ModelMissing, AiEngineState.NotInstalled })
             Assert.False(AiWords.NeedsOptions(s));
     }
 
     [Fact]
     public void Ollama_never_leaves_this_computer_a_signed_in_cli_says_so()
     {
-        Assert.Equal("Runs on your library. Nothing leaves it.", AiWords.EngineAbout("ollama", "ready"));
-        Assert.Equal("Through Claude Code. Runs on your library. Signed in.", AiWords.EngineAbout("claude", "ready"));
-        Assert.Equal("Through Codex. Runs on your library.", AiWords.EngineAbout("codex", "not_signed_in"));
+        Assert.Equal("Runs on your library. Nothing leaves it.", AiWords.EngineAbout("ollama", AiEngineState.Ready));
+        Assert.Equal("Through Claude Code. Runs on your library. Signed in.", AiWords.EngineAbout("claude", AiEngineState.Ready));
+        Assert.Equal("Through Codex. Runs on your library.", AiWords.EngineAbout("codex", AiEngineState.NotSignedIn));
         // Where a student chooses one, each AI goes by what they'd call it; the tool is in the line under it.
         Assert.Equal(("Ollama (free, advanced)", "Claude", "ChatGPT", "Gemini"),
             (AiWords.PlainName("ollama", "Ollama"), AiWords.PlainName("claude", "Claude Code"), AiWords.PlainName("codex", "Codex"), AiWords.PlainName("gemini", "Gemini")));
@@ -55,36 +56,36 @@ public class AiWordsTests
     [Fact]
     public void Setup_words_are_phrased_for_this_computer()
     {
-        Assert.Equal("Free and private (Ollama). It runs on this computer: nothing you record leaves it.", AiWords.SetupAbout("ollama", "ready"));
-        Assert.Equal("With your paid Claude plan, through Claude Code. Signed in on this computer.", AiWords.SetupAbout("claude", "ready"));
-        Assert.Equal("With your paid ChatGPT plan, through Codex. Installed. Sign in to use it.", AiWords.SetupAbout("codex", "not_signed_in"));
+        Assert.Equal("Free and private (Ollama). It runs on this computer: nothing you record leaves it.", AiWords.SetupAbout("ollama", AiEngineState.Ready));
+        Assert.Equal("With your paid Claude plan, through Claude Code. Signed in on this computer.", AiWords.SetupAbout("claude", AiEngineState.Ready));
+        Assert.Equal("With your paid ChatGPT plan, through Codex. Installed. Sign in to use it.", AiWords.SetupAbout("codex", AiEngineState.NotSignedIn));
         // The list names each one as a student would: what they have, or what it is. The tools' names are in the line under.
         Assert.Equal(("Free AI on this Mac", "Claude", "ChatGPT", "Gemini"),
             (AiWords.SetupName("ollama", "Ollama", "Mac"), AiWords.SetupName("claude", "Claude Code"), AiWords.SetupName("codex", "Codex"), AiWords.SetupName("gemini", "Gemini")));
         // Gemini through Google's Antigravity, or on an API key; one the student gave a key says so.
-        Assert.Equal("Through Google's Antigravity. Installed on this computer.", AiWords.SetupAbout("gemini", "unchecked"));
-        Assert.Equal("With an API key, or Google's Antigravity app. Not on this Mac yet.", AiWords.SetupAbout("gemini", "not_installed", "Mac"));
-        Assert.Equal("With your API key. It works.", AiWords.SetupAbout("claude", "ready", hasKey: true));
-        Assert.Equal("With your paid Claude plan, through Claude Code. Not on this Mac yet.", AiWords.SetupAbout("claude", "not_installed", "Mac"));
-        Assert.Equal("Free and private (Ollama). Syft Notes downloads it for you: a few gigabytes, once.", AiWords.SetupAbout("ollama", "not_installed", "PC"));
+        Assert.Equal("Through Google's Antigravity. Installed on this computer.", AiWords.SetupAbout("gemini", AiEngineState.Unchecked));
+        Assert.Equal("With an API key, or Google's Antigravity app. Not on this Mac yet.", AiWords.SetupAbout("gemini", AiEngineState.NotInstalled, "Mac"));
+        Assert.Equal("With your API key. It works.", AiWords.SetupAbout("claude", AiEngineState.Ready, hasKey: true));
+        Assert.Equal("With your paid Claude plan, through Claude Code. Not on this Mac yet.", AiWords.SetupAbout("claude", AiEngineState.NotInstalled, "Mac"));
+        Assert.Equal("Free and private (Ollama). Syft Notes downloads it for you: a few gigabytes, once.", AiWords.SetupAbout("ollama", AiEngineState.NotInstalled, "PC"));
     }
 
     [Fact]
     public void Only_ready_and_unchecked_engines_are_worth_asking_or_writing_with()
     {
-        Assert.True(AiWords.EngineUsable("ready"));
-        Assert.True(AiWords.EngineUsable("unchecked"));
-        foreach (string s in new[] { "not_signed_in", "not_running", "model_missing", "limited", "not_installed", "failed" })
+        Assert.True(AiWords.EngineUsable(AiEngineState.Ready));
+        Assert.True(AiWords.EngineUsable(AiEngineState.Unchecked));
+        foreach (var s in new[] { AiEngineState.NotSignedIn, AiEngineState.NotRunning, AiEngineState.ModelMissing, AiEngineState.Limited, AiEngineState.NotInstalled, AiEngineState.Failed })
             Assert.False(AiWords.EngineUsable(s));
     }
 
     [Fact]
     public void The_ask_menus_subtitle_says_default_private_or_signed_out()
     {
-        Assert.Equal("Default for questions", AiWords.AskEngineSubtitle("claude", "ready", isDefault: true));
-        Assert.Equal("Private, on your library", AiWords.AskEngineSubtitle("ollama", "ready", isDefault: false));
-        Assert.Equal("Not signed in", AiWords.AskEngineSubtitle("codex", "not_signed_in", isDefault: false));
-        Assert.Equal("", AiWords.AskEngineSubtitle("codex", "ready", isDefault: false));
+        Assert.Equal("Default for questions", AiWords.AskEngineSubtitle("claude", AiEngineState.Ready, isDefault: true));
+        Assert.Equal("Private, on your library", AiWords.AskEngineSubtitle("ollama", AiEngineState.Ready, isDefault: false));
+        Assert.Equal("Not signed in", AiWords.AskEngineSubtitle("codex", AiEngineState.NotSignedIn, isDefault: false));
+        Assert.Equal("", AiWords.AskEngineSubtitle("codex", AiEngineState.Ready, isDefault: false));
     }
 
     [Fact]
@@ -203,7 +204,7 @@ public class AiEnginesModelTests
         go.SetResult();
         await pressing;
         Assert.Contains("sign-in:gemini", lib.Calls);
-        Assert.Equal("ready", model.Engines.Single(r => r.Id == "gemini").State);
+        Assert.Equal(AiEngineState.Ready, model.Engines.Single(r => r.Id == "gemini").State);
     }
 
     [AvaloniaFact]
@@ -514,7 +515,7 @@ public class AiSetupModelTests
         Assert.Equal(2, lib.Calls.Count(c => c == "sign-in:claude"));
         signedIn = true;
         await Claude().ActCommand.ExecuteAsync(null);
-        Assert.Equal("ready", Claude().State);
+        Assert.Equal(AiEngineState.Ready, Claude().State);
         Assert.Equal(2, lib.Calls.Count(c => c.StartsWith("check", StringComparison.Ordinal)));
 
         var card = new AiProblemsModel(new FakeAiLibrary { Overview = signedOut, OnSignIn = _ => new AiSaid("", signedOut), OnCheck = (_, _) => new AiSaid("", ready) });
@@ -1445,6 +1446,65 @@ public class AiNotesModelTests
         await model.Load("lec-1", Current.Markdown, "Ollama", Current.At);
 
         Assert.True(model.Offline);
+    }
+
+    [AvaloniaFact]
+    public async Task A_rewrite_keeps_being_checked_after_one_failed_check_and_the_new_notes_arrive()
+    {
+        int checks = 0;
+        var lib = new FakeAiLibrary
+        {
+            Overview = AiTestData.MixedOverview(),
+            OnRewrite = _ => ++checks switch
+            {
+                1 => new RewriteInfo("lec-1", "working"),
+                2 => throw new HttpRequestException("down for a moment"),
+                _ => new RewriteInfo("lec-1", "ready") { Draft = new NotesVersion("## Summary\nNew notes.", "Claude Code", "2026-09-29T09:40:00") },
+            },
+        };
+        var ticks = new SemaphoreSlim(0);
+        var model = new AiNotesModel(lib) { Delay = (_, ct) => ticks.WaitAsync(ct) };
+        await model.Load("lec-1", "## Summary\nOld notes.", "Claude Code", "2026-09-29T09:00:00");
+        Assert.Equal(RewriteState.Rewriting, model.State);
+
+        ticks.Release();
+        await Wait.UntilAsync(() => model.Offline, "offline after the failed check", TimeSpan.FromSeconds(2));
+        Assert.Equal(RewriteState.Rewriting, model.State);
+
+        ticks.Release();
+        await Wait.UntilAsync(() => model.State == RewriteState.Ready, "the new notes", TimeSpan.FromSeconds(2));
+        Assert.False(model.Offline);
+        model.Dispose();
+    }
+
+    [AvaloniaFact]
+    public async Task A_rewrite_check_the_library_refuses_stops_checking_and_says_why()
+    {
+        int checks = 0;
+        var lib = new FakeAiLibrary
+        {
+            Overview = AiTestData.MixedOverview(),
+            OnRewrite = _ => ++checks switch
+            {
+                1 => new RewriteInfo("lec-1", "working"),
+                2 => throw new HttpRequestException("down for a moment"), // out of reach first, then refused
+                _ => throw new LibraryRefusedException(404, "That lecture isn't in your library any more."),
+            },
+        };
+        var ticks = new SemaphoreSlim(0);
+        var model = new AiNotesModel(lib) { Delay = (_, ct) => ticks.WaitAsync(ct) };
+        await model.Load("lec-1", "## Summary\nOld notes.", "Claude Code", "2026-09-29T09:00:00");
+
+        ticks.Release();
+        await Wait.UntilAsync(() => model.Offline, "offline after the check that didn't get through", TimeSpan.FromSeconds(2));
+        ticks.Release();
+        await Wait.UntilAsync(() => model.Say is not null, "the refusal said", TimeSpan.FromSeconds(2));
+        Assert.False(model.Offline); // the library answered: it isn't out of reach
+        ticks.Release(5);
+        // Checking stopped: nobody is waiting on the next tick, so the released ticks stay unused.
+        await Wait.UntilAsync(() => ticks.CurrentCount == 5, "no more checks", TimeSpan.FromSeconds(2));
+        Assert.Equal(3, checks);
+        model.Dispose();
     }
 }
 

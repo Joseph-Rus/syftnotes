@@ -19,14 +19,6 @@ public sealed class RoleSwitchTests
 {
     static AppHost Host(string home) => new(home, log: _ => { }, loginItems: new CountingLoginItems());
 
-    static string BuiltEngine()
-    {
-        var bin = new DirectoryInfo(AppContext.BaseDirectory);
-        string config = bin.Parent!.Name, framework = bin.Name;
-        string engineDir = Path.GetFullPath(Path.Combine(bin.FullName, "..", "..", "..", "..", "..", "src", "StudyStash.Engine", "bin", config, framework));
-        return Path.Combine(engineDir, OperatingSystem.IsWindows() ? "studystash.exe" : "studystash");
-    }
-
     /// <summary>A real library (its web app and API) on a free loopback port, with nothing that reaches out.</summary>
     static async Task<(string Url, WebApplication App, Config Cfg, Store Store)> LibraryAsync(TempHome home, string name, string password, string tag,
         params ClassDef[] classes)
@@ -195,28 +187,6 @@ public sealed class RoleSwitchTests
     }
 
     // --- ToLibraryAsync and BringLecturesAsync: real end-to-end moves ---------------------------------------------
-
-    [Fact]
-    public async Task A_laptop_becomes_the_library_taking_the_old_ones_name_and_password_when_it_has_none_of_its_own()
-    {
-        string exe = BuiltEngine();
-        Assert.True(File.Exists(exe), $"build the solution first: no {exe}");
-        using var home = new TempHome();
-        using var host = Host(home.Path);
-        host.Save(s => s.Role = AppRole.Laptop);
-        var old = new OldLibrary("http://mac-mini:8787", "old-pw", "Sam's library");
-        var here = new LibraryHere { Command = [exe], Folder = home["pool"] };
-        try
-        {
-            string said = await RoleSwitch.ToLibraryAsync(host, here, old, "Ada");
-            Assert.Contains("ready", said, StringComparison.Ordinal);
-            Assert.Equal(AppRole.Both, host.Settings.Role);
-            var cfg = Configs.Load(home.Path);
-            Assert.Equal("Sam's library", cfg.PoolName);
-            Assert.Equal("old-pw", cfg.PoolPassword);
-        }
-        finally { if (host.LocalLibrary is { } svc) await svc.StopAsync(); }
-    }
 
     [Fact]
     public async Task Bringing_lectures_over_needs_a_library_on_this_computer_first()

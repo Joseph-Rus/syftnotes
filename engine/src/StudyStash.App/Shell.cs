@@ -1,3 +1,4 @@
+using StudyStash.App.Services.Kit;
 using System.Globalization;
 using System.Runtime.InteropServices;
 using System.Text.Json.Nodes;
@@ -143,9 +144,15 @@ public static partial class Shell
         Wire();
         host.Start();
         Run(() => SuggestLighterModelAsync(), "SuggestLighterModel");
+        // The program may have moved (Velopack's install, the Mac bundle's new name): what names the old one is put right.
+        UiTasks.RunQuietly(() => Task.Run(() => NewPlace.RunHere(host.Home)), "put right what names the app's old place");
         AppUpdates.Start(host, stop.Token, SayUpdate, () => TypingNotes);
         if (AppUpdates.Current is { } updater)
-            updater.FoundChanged += () => Dispatcher.UIThread.Post(() => panel.UpdateVersion = updater.Found is { } r ? string.Join('.', r.Version) : null);
+            updater.FoundChanged += () => Dispatcher.UIThread.Post(() =>
+            {
+                panel.UpdateIsMove = updater.FoundIsMove;
+                panel.UpdateVersion = updater.Found is { } r ? string.Join('.', r.Version) : null;
+            });
         MakeTray();
         // A Mac's app menu (About, Settings… ⌘,, and the system's Hide and Quit ⌘Q) while a window is in front.
         Keybindings.Saved = () => host.Settings.Keys;
@@ -911,7 +918,7 @@ public static partial class Shell
         if (panelWindow is not null && DateTime.UtcNow - panelWindow.LastDeactivateHide < Floating.ToggleDebounce) return;
         if (panelWindow is null)
         {
-            panelWindow = new Floating { Content = PanelView(), CloseOnDeactivate = true, KeepClear = true, Title = "Syft Notes" };
+            panelWindow = AppWindows.MakeFloating(new WindowSpec("panel", "Syft Notes", PanelView()) { CloseOnDeactivate = true, KeepClear = true });
             AppMenu.AddSettingsKey(panelWindow, SettingsFromAnywhere);
         }
         Refresh();
@@ -977,7 +984,7 @@ public static partial class Shell
             pillCard?.Hide();
             return;
         }
-        pillCard ??= new Floating { Content = new PillCard { DataContext = recorder }, OverFullScreen = true, ShowActivated = false, ClickThrough = true, Title = "Syft Notes recorder card" };
+        pillCard ??= AppWindows.MakeFloating(new WindowSpec("recorder-card", "Syft Notes recorder card", new PillCard { DataContext = recorder }) { OverFullScreen = true, ShowActivated = false, ClickThrough = true });
         var (area, scale) = pillCard.WorkArea(pill.Center);
         var size = pillCard.Measured(scale);
         int room = (int)(Floating.ShadowRoom * scale), gap = (int)(10 * scale), width = size.Width - 2 * room;
@@ -989,7 +996,7 @@ public static partial class Shell
     static Floating MakeRecorderWindow()
     {
         var view = Skin.Current == SkinKind.Mac ? (Control)new MacRecorder { DataContext = recorder } : new WinRecorder { DataContext = recorder };
-        var w = new Floating { Content = view, KeepClear = true, SteadySize = true, OverFullScreen = true, ClicksOnPanelOnly = true, Title = "Syft Notes recorder" };
+        var w = AppWindows.MakeFloating(new WindowSpec("recorder", "Syft Notes recorder", view) { KeepClear = true, SteadySize = true, OverFullScreen = true, ClicksOnPanelOnly = true });
         // Gone from the screen: its card goes with it.
         w.PropertyChanged += (_, e) =>
         {
@@ -1091,7 +1098,7 @@ public static partial class Shell
         if (quickWindow is null)
         {
             view = Skin.Current == SkinKind.Mac ? new MacQuick { DataContext = quick } : new WinQuick { DataContext = quick };
-            quickWindow = new Floating { Content = view, CloseOnDeactivate = true, KeepClear = true, Title = "Syft Notes search" };
+            quickWindow = AppWindows.MakeFloating(new WindowSpec("quick", "Syft Notes search", (Control)view!) { CloseOnDeactivate = true, KeepClear = true });
             AppMenu.AddSettingsKey(quickWindow, SettingsFromAnywhere);
         }
         quick.Answering = false;
@@ -1617,7 +1624,7 @@ public static partial class Shell
     {
         try
         {
-            await Task.Delay(TimeSpan.FromSeconds(5), stop.Token).ConfigureAwait(false);
+            await Poll.AfterAsync(TimeSpan.FromSeconds(5), stop.Token).ConfigureAwait(false);
         }
         catch (OperationCanceledException)
         {

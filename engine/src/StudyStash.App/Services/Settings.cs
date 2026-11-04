@@ -494,7 +494,8 @@ public sealed partial class SettingsModel : ObservableObject, IDisposable
         UpdateHereLine = $"Syft Notes {Version} on this laptop";
         // A newer version the app already knows of: Update now is there straight away, no Check now first.
         if (AppUpdates.Current?.Found is { } found)
-            (UpdateHereLine, CanUpdateHere) = NoticeWords.UpdateChecked(new UpdateCheck(AppUpdates.Available, found), Version);
+            (UpdateHereLine, CanUpdateHere) = NoticeWords.UpdateChecked(
+                new UpdateCheck(AppUpdates.Available, found, AppUpdates.Current.FoundIsMove ? AppUpdates.MoveOnly : null), Version);
         ColourTheme = host.Settings.Theme;
         Appearance = host.Settings.Appearance;
         advice = host.Advice;
@@ -762,7 +763,7 @@ public sealed partial class SettingsModel : ObservableObject, IDisposable
     {
         if (loading) return;
         host.Save(s => s.CountThisCopy = value);
-        if (!value) (host.Counter ?? new DailyCount(host.Home, () => false, new HttpClient(), "")).Forget();
+        if (!value) (host.Counter ?? new DailyCount(host.Home, () => false, AppHost.countHttp, "")).Forget();
     }
 
     partial void OnShortcutsChanged(bool value)

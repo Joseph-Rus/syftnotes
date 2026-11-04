@@ -80,7 +80,7 @@ public partial class ThemeTests
             ("Accent", Syft.Ink, Syft.Paper), ("OnAccent", Syft.Paper, Syft.Ink),
             ("Recording", Syft.Coral, Syft.Coral), ("OnRecording", Syft.Ink, Syft.Ink), ("Record", Syft.Coral, Syft.Coral),
             ("Selected", Syft.Lilac, Syft.Lilac), ("OnSelected", Syft.Ink, Syft.Ink),
-            ("Progress", Syft.Sky, Syft.Sky), ("ProgressTrack", Syft.MeshLight, Syft.MeshDark),
+            ("Progress", Syft.SkyDeep, Syft.SkyDeepDark), ("ProgressTrack", Syft.MeshLight, Syft.MeshDark),
             ("Highlight", Syft.Mustard, Syft.Mustard), ("SurfaceRaised", Syft.MeshLight, Syft.MeshDark), ("SurfaceSunken", Syft.MeshLight, Syft.MeshDark),
             ("Chip", Syft.MeshLight, Syft.GhostDark), ("Border", Color.Parse("#E2DFD8"), Syft.GhostDark),
         ];

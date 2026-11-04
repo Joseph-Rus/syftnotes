@@ -1,3 +1,4 @@
+using StudyStash.App.Services.Kit;
 using System.Collections.ObjectModel;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
@@ -197,7 +198,7 @@ public sealed partial class AiAccessModel : ObservableObject
         {
             info = await library.AccessAsync();
         }
-        catch
+        catch (Exception e) when (LibraryCall.Handled(e, "[ai-access] Load"))
         {
             Offline = true;
             return;
@@ -330,7 +331,7 @@ public sealed partial class AiAccessModel : ObservableObject
                 }
                 return;
             }
-            catch
+            catch (Exception e) when (LibraryCall.Handled(e, "[ai-access] SetWebAsync"))
             {
                 Offline = true;
                 return;
@@ -369,7 +370,7 @@ public sealed partial class AiAccessModel : ObservableObject
             var info = await library.CheckWebAsync();
             if (info is not null) Apply(info);
         }
-        catch
+        catch (Exception e) when (LibraryCall.Handled(e, "[ai-access] CheckWebAgain"))
         {
             Offline = true;
         }
@@ -439,14 +440,14 @@ public sealed partial class AiAccessModel : ObservableObject
         {
             for (var i = 0; i < 12 && !ct.IsCancellationRequested; i++)
             {
-                await (Delay?.Invoke(TimeSpan.FromSeconds(5)) ?? Task.Delay(TimeSpan.FromSeconds(5), ct));
+                await (Delay?.Invoke(TimeSpan.FromSeconds(5)) ?? Poll.AfterAsync(TimeSpan.FromSeconds(5), ct));
                 if (ct.IsCancellationRequested) return;
                 ToolAccessInfo? info;
                 try
                 {
                     info = await library.CheckWebAsync();
                 }
-                catch
+                catch (Exception e) when (LibraryCall.Handled(e, "[ai-access] PollAsync"))
                 {
                     return;
                 }
@@ -491,7 +492,7 @@ public sealed partial class AiAccessModel : ObservableObject
         {
             Say = ex.Message;
         }
-        catch
+        catch (Exception e) when (LibraryCall.Handled(e, "[ai-access] PostAsync"))
         {
             Offline = true;
         }

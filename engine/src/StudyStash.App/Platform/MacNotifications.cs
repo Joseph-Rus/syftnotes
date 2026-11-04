@@ -152,8 +152,9 @@ public sealed unsafe class MacNotifications : ISystemNotifications
                 _ => action,
             });
         }
-        catch (Exception)
+        catch (Exception e)
         {
+            Program.Log("[notifications] click failed: " + e.GetType().Name + ": " + e.Message);
         }
 #pragma warning restore CA1031
         if (completion != IntPtr.Zero) ((delegate* unmanaged<IntPtr, void>)((Block*)completion)->Invoke)(completion);
@@ -167,8 +168,9 @@ public sealed unsafe class MacNotifications : ISystemNotifications
         {
             made?.Answered(granted != 0, error == IntPtr.Zero ? null : Text(Send(error, Sel("localizedDescription"))));
         }
-        catch (Exception)
+        catch (Exception e)
         {
+            Program.Log("[notifications] answer failed: " + e.GetType().Name + ": " + e.Message);
         }
 #pragma warning restore CA1031
     }
@@ -197,8 +199,9 @@ public sealed unsafe class MacNotifications : ISystemNotifications
         {
             made?.Settle(false, made.Refusal, settings == IntPtr.Zero ? null : (int)SendGetLong(settings, Sel("authorizationStatus")));
         }
-        catch (Exception)
+        catch (Exception e)
         {
+            Program.Log("[notifications] settings failed: " + e.GetType().Name + ": " + e.Message);
         }
 #pragma warning restore CA1031
     }
