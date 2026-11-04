@@ -119,7 +119,8 @@ public class LibraryWindowTests
     /// <summary>On Home the panel opens the moment a question is sent, with the question and "Asking …" in it, and the
     /// bar glides into the panel's foot then and there. It used to sit at the foot of the page until the answer came:
     /// docked, the bar is narrow enough to stack, and measured at one width while arranged at another it kept the
-    /// layout going until the layout gave up on the page.</summary>
+    /// layout going until the layout gave up on the page. Closing it the same way left the bar a small card at the
+    /// panel's corner until another page opened.</summary>
     [AvaloniaTheory]
     [InlineData(SkinKind.Mac)]
     [InlineData(SkinKind.Win)]
@@ -170,6 +171,22 @@ public class LibraryWindowTests
 
             answer.SetResult(new AskReply("A way to group points around centres.", [], "gemini", "Gemini"));
             await asking;
+            Dispatcher.UIThread.RunJobs();
+
+            // Close: the bar glides back to the middle of the page's foot, full width again, with no page change.
+            step = null;
+            ask.CloseAnswerCommand.Execute(null);
+            Assert.NotNull(step);
+            for (int frame = 1; frame <= 10; frame++)
+            {
+                step!(1 - Math.Pow(1 - frame / 10.0, 3));
+                Dispatcher.UIThread.RunJobs();
+            }
+            done!();
+            Dispatcher.UIThread.RunJobs();
+            Assert.False(split.Beside);
+            Assert.True(Math.Abs(bar.Bounds.Center.X - split.Bounds.Width / 2) < 1, $"the bar {bar.Bounds} should be back in the middle of {split.Bounds.Width}");
+            Assert.True(Math.Abs(bar.Bounds.X - rest) < 1, $"the bar should be back where it rested, at {rest}: {bar.Bounds}");
         }
         finally
         {
