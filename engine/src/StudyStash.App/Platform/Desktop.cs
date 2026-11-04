@@ -396,7 +396,7 @@ public static class Desktop
                 {
                     try
                     {
-                        await Task.Delay(500, stop);
+                        await Services.Kit.Poll.AfterAsync(TimeSpan.FromMilliseconds(500), stop);
                     }
                     catch (OperationCanceledException)
                     {

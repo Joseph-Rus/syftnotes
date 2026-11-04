@@ -1,3 +1,4 @@
+using StudyStash.App.Services.Kit;
 using System.Globalization;
 using System.Text.Json.Nodes;
 using Avalonia;
@@ -850,7 +851,7 @@ public static partial class Shell
     static async Task SearchAsync(string query)
     {
         int turn = ++searchTurn;
-        await Task.Delay(120); // wait for the typing to pause
+        await Poll.AfterAsync(TimeSpan.FromMilliseconds(120)); // wait for the typing to pause
         if (turn != searchTurn || quick.Answering) return;
         var rows = new List<QuickRow>();
         string rec = Keybindings.Show(KeyAction.Record);

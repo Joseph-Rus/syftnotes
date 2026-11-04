@@ -84,18 +84,35 @@ public sealed class DiagramJobs
     static string FileFor(string home, string id) =>
         Path.Combine(Dir(home), Convert.ToHexString(System.Security.Cryptography.SHA1.HashData(System.Text.Encoding.UTF8.GetBytes(id))) + ".json");
 
+    /// <summary>Keeps the job across a restart. Best effort: a file another program holds for a moment (a virus scanner, a
+    /// sync) must never stop the queue itself, or a pass that should have been replaced goes on, and the new one never
+    /// runs. The job lives on in memory; the next change saves it again.</summary>
     void Persist(Job job)
     {
-        Directory.CreateDirectory(Dir(cfg.Home));
-        string path = FileFor(cfg.Home, job.Id), temp = path + ".tmp";
-        File.WriteAllText(temp, JsonSerializer.Serialize(job, Json));
-        File.Move(temp, path, overwrite: true);
+        try
+        {
+            Directory.CreateDirectory(Dir(cfg.Home));
+            string path = FileFor(cfg.Home, job.Id), temp = path + ".tmp";
+            File.WriteAllText(temp, JsonSerializer.Serialize(job, Json));
+            File.Move(temp, path, overwrite: true);
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException)
+        {
+            log($"[diagrams] '{Title(job.Id)}': couldn't save its place in the queue ({e.Message}); it carries on");
+        }
     }
 
     void Forget(string id)
     {
-        string path = FileFor(cfg.Home, id);
-        if (File.Exists(path)) File.Delete(path);
+        try
+        {
+            string path = FileFor(cfg.Home, id);
+            if (File.Exists(path)) File.Delete(path);
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException)
+        {
+            log($"[diagrams] couldn't clear a finished job's file ({e.Message}); it is dropped on the next start");
+        }
     }
 
     /// <summary>Every job the last run left. One that was being designed when it stopped goes back in the queue: its
