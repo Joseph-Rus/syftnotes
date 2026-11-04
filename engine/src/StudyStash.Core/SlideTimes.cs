@@ -20,7 +20,7 @@ public static class SlideTimes
     /// <summary>A word said in more than 1 / this of the lecture's windows counts for less, and for nothing in all of them.</summary>
     const double Spread = 4;
 
-    /// <summary>Back-to-back pages sharing this much of their words are one slide built up (a Beamer build-up).</summary>
+    /// <summary>A page keeping this much of the words of the page before it is that slide built up (a Beamer build-up).</summary>
     const double SamePage = 0.8;
 
     /// <summary>A slide needs this many words that tell it apart: each weighing at least <see cref="RealWeight"/> of a
@@ -57,19 +57,20 @@ public static class SlideTimes
 
     sealed record Group(List<int> Pages, HashSet<string> Words);
 
-    /// <summary>The pages, with back-to-back near copies (a slide built up a line at a time) joined into one. Each page is
-    /// compared with its group's first page, so a short page between two slides (a caption) can't chain them together.
-    /// The words on more than half the pages (a course name, a footer) are left out of the comparison.</summary>
+    /// <summary>The pages, with back-to-back near copies (a slide built up a line at a time) joined into one: a page joins
+    /// the one before it when it keeps most of that page's words. So a short page (a section title, a caption) joins the
+    /// slide after it, and two slides that only repeat that title stay apart. The words on more than half the pages (a
+    /// course name, a footer) are left out of the comparison.</summary>
     static List<Group> Groups(List<HashSet<string>> words)
     {
         var common = words.SelectMany(w => w).GroupBy(w => w).Where(g => g.Count() * 2 > words.Count).Select(g => g.Key).ToHashSet();
         var groups = new List<Group>();
-        HashSet<string>? start = null;
+        HashSet<string>? before = null;
         for (int i = 0; i < words.Count; i++)
         {
             var own = words[i].Except(common).ToHashSet();
-            if (start is not null && own.Count > 0 && start.Count > 0
-                && (double)own.Count(start.Contains) / Math.Min(own.Count, start.Count) >= SamePage)
+            if (before is not null && own.Count > 0 && before.Count > 0
+                && (double)own.Count(before.Contains) / before.Count >= SamePage)
             {
                 groups[^1].Pages.Add(i);
                 groups[^1].Words.UnionWith(words[i]);
@@ -77,8 +78,8 @@ public static class SlideTimes
             else
             {
                 groups.Add(new Group([i], [.. words[i]]));
-                start = own;
             }
+            before = own;
         }
         return groups;
     }

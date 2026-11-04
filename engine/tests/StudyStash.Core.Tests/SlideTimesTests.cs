@@ -62,12 +62,12 @@ public class SlideTimesTests
         Assert.Null(times[4].At);
 
         // A lecture that skips the kelp slide still places the others. A slide built up over two pages gets one time,
-        // and a caption page between two different slides joins the first without chaining the second onto it.
+        // and a caption page between two different slides joins the second without chaining the first onto it.
         const string Events = "Bleaching events: ocean temperature, recovery";
         string[] builtUp = [deck[0], $"{Course}\nBleaching", $"{Course}\n{Events}", deck[2], deck[5], $"{deck[5]}\nKrill feed whales"];
         var skipped = SlideTimes.Match(builtUp, Transcript([.. Taught(0, Reefs), .. Taught(180, Events), .. Chat(360, 540), .. Taught(540, Plankton)]));
         Within(skipped[0], 0, 3);
-        Assert.Equal(skipped[0].At, skipped[1].At);
+        Assert.Equal(skipped[1].At, skipped[2].At);
         // Its own time, after the reefs' (chained, it would share theirs). "Bleaching" is on both slides and said near the
         // end of the reefs too, so its moment can come a few seconds before 3:00.
         Assert.True(skipped[2].At > skipped[0].At);
@@ -75,5 +75,16 @@ public class SlideTimesTests
         Assert.Null(skipped[3].At);
         Within(skipped[4], 9, 12);
         Assert.Equal(skipped[4].At, skipped[5].At);
+
+        // A section's title page joins its first slide; the next slide, repeating only the title, stays apart.
+        const string Causes = "Coral bleaching: causes, ocean temperature, light", Recovery = "Coral bleaching: recovery, algae return";
+        string[] sections = [deck[2], $"{Course}\nCoral bleaching", $"{Course}\n{Causes}", $"{Course}\n{Recovery}", deck[5], deck[4]];
+        var section = SlideTimes.Match(sections, Transcript([.. Taught(0, Kelp), .. Taught(180, Causes), .. Taught(360, Recovery), .. Taught(540, Plankton)]));
+        Within(section[0], 0, 3);
+        Assert.Equal(section[1].At, section[2].At);
+        Within(section[2], 3, 6);
+        Assert.True(section[3].At > section[2].At);
+        Within(section[3], 5, 9);
+        Within(section[4], 9, 12);
     }
 }
