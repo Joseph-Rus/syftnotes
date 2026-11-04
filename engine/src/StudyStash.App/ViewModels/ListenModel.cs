@@ -2,6 +2,7 @@ using System.Collections.ObjectModel;
 using System.Diagnostics;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using StudyStash.App.Services.Kit;
 using StudyStash.Core;
 using StudyStash.Core.Study;
 
@@ -180,31 +181,32 @@ public sealed partial class ListenModel : ObservableObject, IDisposable
     {
         watching?.Cancel();
         var stop = watching = new CancellationTokenSource();
-        _ = Task.Run(async () =>
+        // Started off the UI thread, so the looking and waiting stay off it.
+        _ = Task.Run(() => Poll.Every(LookEvery, async _ =>
         {
-            while (!stop.IsCancellationRequested)
+            try
             {
-                try
+                var info = await library.ListenAsync(LectureId);
+                if (info is null || stop.IsCancellationRequested)
                 {
-                    await Task.Delay(LookEvery, stop.Token);
-                    var info = await library.ListenAsync(LectureId);
-                    if (info is null || stop.IsCancellationRequested) return;
-                    if (info.State != ListenInfo.Making)
-                    {
-                        Avalonia.Threading.Dispatcher.UIThread.Post(() => Show(info));
-                        return;
-                    }
-                }
-                catch (OperationCanceledException)
-                {
+                    stop.Cancel();
                     return;
                 }
-                catch (Exception e) when (LibraryTrouble.Handled(e))
+                if (info.State != ListenInfo.Making)
                 {
-                    // The library didn't answer this time: look again next time.
+                    Avalonia.Threading.Dispatcher.UIThread.Post(() => Show(info));
+                    stop.Cancel();
                 }
             }
-        });
+            catch (OperationCanceledException)
+            {
+                stop.Cancel();
+            }
+            catch (Exception e) when (LibraryTrouble.Handled(e))
+            {
+                // The library didn't answer this time: look again next time.
+            }
+        }, stop: stop.Token));
     }
 
     [RelayCommand]
@@ -245,26 +247,14 @@ public sealed partial class ListenModel : ObservableObject, IDisposable
         Playing = true;
         ticking?.Cancel();
         var stop = ticking = new CancellationTokenSource();
-        _ = TickAsync(stop.Token);
+        Poll.Every(TimeSpan.FromMilliseconds(250), _ =>
+        {
+            Tick();
+            return Task.CompletedTask;
+        }, stop: stop.Token);
     }
 
     double startedAt;
-
-    async Task TickAsync(CancellationToken stop)
-    {
-        while (!stop.IsCancellationRequested)
-        {
-            try
-            {
-                await Task.Delay(250, stop);
-            }
-            catch (OperationCanceledException)
-            {
-                return;
-            }
-            Tick();
-        }
-    }
 
     /// <summary>Where it's got to, from how long it's been playing; at the end it stops.</summary>
     public void Tick()

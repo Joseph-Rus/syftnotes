@@ -1,3 +1,4 @@
+using StudyStash.App.Services.Kit;
 using System.Globalization;
 using System.Net;
 using System.Security.Cryptography;
@@ -103,11 +104,11 @@ public sealed class DailyCount
         if (Off) return;
         try
         {
-            await Task.Delay(First, ct);
+            await Poll.AfterAsync(First, ct);
             while (true)
             {
                 await RoundAsync(ct);
-                await Task.Delay(Every, ct);
+                await Poll.AfterAsync(Every, ct);
             }
         }
         catch (OperationCanceledException) { }
