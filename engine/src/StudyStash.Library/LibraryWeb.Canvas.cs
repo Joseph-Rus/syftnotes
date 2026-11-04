@@ -94,8 +94,8 @@ public sealed partial class LibraryWeb
 
     void MapCanvas(WebApplication app)
     {
-        // The extension's folder is ready before anyone asks for it, and an updated Syft Notes brings it up to date:
-        // Chrome's copy reloads itself from it.
+        // A folder that's already made for Chrome is brought up to date by an updated Syft Notes: Chrome's copy reloads
+        // itself from it. None is made here until a student loads the folder (Add to Opera, or Make the folder below).
         EnsureHere();
         // A sync's jobs that were out with Chrome when the library stopped: their answers found nobody to take them,
         // so they go out again at once rather than after the ten minutes a job is given (a sync mid-way through a
@@ -402,25 +402,27 @@ public sealed partial class LibraryWeb
                 : FindOutcome.Of(await FindCoursesAsync(), Canvas.Settings, Canvas.Clock());
             return Http.SeeOther("/settings?canvas=" + outcome + "#canvas");
         })));
-        // The folder is made by the library itself now; an old page's "Make it" just goes back to Settings.
+        // Make the folder, for a student loading it from this page (the app makes its own when Add to Chrome asks).
         app.MapPost("/settings/canvas/extension", Http.Handle(ctx => WithMemberAsync(ctx, _ =>
         {
-            EnsureHere();
+            EnsureHere(make: true);
             return Task.FromResult(Http.SeeOther("/settings#canvas"));
         })));
     }
 
-    /// <summary>Make (or bring up to date) the extension's folder on this computer, pointing at this library and this
-    /// Canvas. Never fatal: a folder that can't be written is logged, and Settings says it isn't ready.</summary>
-    void EnsureHere()
+    /// <summary>Bring up to date the extension's folder on this computer, when it has one, pointing at this library and
+    /// this Canvas; <paramref name="make"/> makes it first, for a student who asked to load it. Never fatal: a folder
+    /// that can't be written is logged, and Settings says it isn't ready.</summary>
+    void EnsureHere(bool make = false)
     {
         try
         {
             // The folder of its own, and the one inside the home a Chrome may already have loaded (kept up to date too).
-            var made = Extension.EnsureFor(cfg.Home, $"http://127.0.0.1:{cfg.WebPort}", CanvasSettings.ExtensionKey(cfg.Home), Canvas.Settings.Url);
-            string folder = made.Path;
+            string home = Extension.Folder(cfg.Home), library = $"http://127.0.0.1:{cfg.WebPort}", key = CanvasSettings.ExtensionKey(cfg.Home);
+            var made = make ? Extension.EnsureFor(cfg.Home, home, library, key, Canvas.Settings.Url)
+                : Extension.KeepFor(cfg.Home, home, library, key, Canvas.Settings.Url);
             if (!made.Changed) return;
-            Console.WriteLine($"[canvas] the extension's folder is ready (version {Extension.Version()}): {folder}");
+            Console.WriteLine($"[canvas] the extension's folder is ready (version {Extension.Version()}): {made.Path}");
             // Chrome's copy is waiting for work with the old folder's permissions: it looks at the folder now, and
             // reloads itself into the new one.
             Canvas.Nudge();
@@ -729,7 +731,11 @@ public sealed partial class LibraryWeb
         string stores = $"from the {Link(Extension.ChromeStorePublishedAt, "Chrome Web Store")}, or in Firefox from "
             + $"{Link(Extension.FirefoxAddOn, "Mozilla's add-ons site")}";
         string folder = Extension.Folder(cfg.Home);
-        string where = Extension.Ready(folder) ? $"<code>{Ui.Esc(folder)}</code>" : $"<code>{Ui.Esc(folder)}</code> (not ready: restart Syft Notes)";
+        // The folder is made when asked, not before: the button makes it (and the page shows where it is).
+        string where = Extension.Ready(folder)
+            ? $"<div class=\"row\"><span class=\"grow\">The extension's folder is ready: <code>{Ui.Esc(folder)}</code></span></div>"
+            : "<form method=\"post\" action=\"/settings/canvas/extension\"><div class=\"row\"><span class=\"grow\">Syft Notes makes the extension's folder when you ask</span>"
+                + "<button>Make the folder</button></div></form>";
         return $"<div class=\"group-head\" id=\"canvas\">Canvas</div>{say}<form method=\"post\" action=\"/settings/canvas\"><div class=\"group\">"
             + $"<div class=\"row\"><label class=\"grow\" for=\"canvas_url\">Your school's Canvas</label><input id=\"canvas_url\" name=\"canvas_url\" type=\"text\" value=\"{Ui.Esc(s.Url)}\" placeholder=\"school.instructure.com\" style=\"width:16rem\"></div>"
             + rows
@@ -750,7 +756,7 @@ public sealed partial class LibraryWeb
                     + "<div class=\"row\"><span class=\"grow\">3. Click Connect, then Allow</span></div>")
             + "</div>"
             + "<div class=\"group-head\">Opera, or a browser that can't add it from a store</div><div class=\"group\">"
-            + $"<div class=\"row\"><span class=\"grow\">The extension's folder is ready: {where}</span></div>"
+            + where
             + "<div class=\"row\"><span class=\"grow\">1. In that browser, open chrome://extensions and turn on Developer mode</span></div>"
             + "<div class=\"row\"><span class=\"grow\">2. Click Load unpacked and pick that folder, or drag the folder onto the Extensions page</span></div>"
             + "</div>"

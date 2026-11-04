@@ -437,15 +437,18 @@ public class CanvasApiTests
             Assert.True((await site.Client.SendAsync(ask)).IsSuccessStatusCode);
         }
 
-        // Before any Chrome: the folder is ready, nothing has checked in.
+        // Before any Chrome: nothing has checked in, and no folder is made until a student loads it.
         var e = await GetAsync(site, "/api/v2/canvas/extension");
         Assert.Equal((key, "https://canvas.test", Extension.Version(), Extension.Protocol), (e["key"]!.GetValue<string>(), e["canvas"]!.GetValue<string>(), e["version"]!.GetValue<string>(), e["protocol"]!.GetValue<int>()));
-        Assert.Equal((Extension.Folder(cfg.Home), true), (e["folder"]!.GetValue<string>(), e["folder_ready"]!.GetValue<bool>()));
+        Assert.Equal((Extension.Folder(cfg.Home), false), (e["folder"]!.GetValue<string>(), e["folder_ready"]!.GetValue<bool>()));
         Assert.Null(e["seen"]); // never "": a date the library doesn't have is null
         Assert.Equal(("", 0, "", false), (e["seen_version"]!.GetValue<string>(), e["seen_protocol"]!.GetValue<int>(), e["seen_where"]!.GetValue<string>(), e["connected"]!.GetValue<bool>()));
         // A Chrome Web Store copy in this computer's Chrome connects with the code: this folder's connection.
         Assert.Equal(new ExtensionConnection("http://127.0.0.1:" + cfg.WebPort, key, "https://canvas.test"),
             Extension.ReadConnectionCode(e["connection_code"]!.GetValue<string>()));
+        // Loaded from the folder (made the way Add to Chrome makes it): ready, and it connects the way the code does.
+        Extension.EnsureFor(cfg.Home, "http://127.0.0.1:" + cfg.WebPort, key, "https://canvas.test");
+        Assert.True((await GetAsync(site, "/api/v2/canvas/extension"))["folder_ready"]!.GetValue<bool>());
         Assert.Equal(Extension.Connection(Extension.Folder(cfg.Home)), Extension.ReadConnectionCode(e["connection_code"]!.GetValue<string>()));
 
         // This computer's Chrome, long-polling (1.4, protocol 3).

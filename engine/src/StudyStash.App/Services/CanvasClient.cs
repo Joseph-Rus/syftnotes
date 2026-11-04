@@ -116,10 +116,12 @@ public sealed class CanvasClient(string serverUrl, Func<string> key, HttpClient?
     /// <summary>
     /// "Add to Chrome"'s one question: is a browser with the extension talking to the library, and which folder does
     /// Chrome's family load it from on this computer. A library that says (<c>"extension": {"connected", "folder", "version"}</c>
-    /// in GET canvas) is taken at its word, its folder used only when the library is on this computer. An older one
-    /// is read the old way: connected once the extension has ever checked in, and the folder made here by
-    /// <paramref name="prepare"/> (key, Canvas address) from GET canvas/extension, pointing at this library as this
-    /// computer reaches it. Without <paramref name="prepare"/> nothing is written and a laptop's folder stays null.
+    /// in GET canvas) is taken at its word, its folder used only when the library is on this computer and has the
+    /// folder made. Otherwise (an older library, a library elsewhere, or no folder made yet: the folder is made when
+    /// asked for, not before) it's made here by <paramref name="prepare"/> (key, Canvas address) from GET
+    /// canvas/extension, pointing at this library as this computer reaches it; an older library's "connected" is
+    /// read the old way, once the extension has ever checked in. Without <paramref name="prepare"/> nothing is
+    /// written and the folder stays null.
     /// Null for a library too old to have GET canvas at all.
     /// </summary>
     public async Task<CanvasApi.ExtensionStatus?> ExtensionStatusAsync(Func<string, string, string>? prepare = null, CancellationToken stop = default)
