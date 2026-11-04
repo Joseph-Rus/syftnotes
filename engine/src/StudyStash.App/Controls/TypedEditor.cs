@@ -405,8 +405,10 @@ public sealed partial class TypedEditor : UserControl
         else if (line.Kind == Kind.Plain && Parse(text, typing: true) is { Kind: not Kind.Plain } plainNow) now = plainNow;
         else if (line.Kind == Kind.Bullet)
         {
-            // A "- " (or "* ") typed in a bullet is that bullet's own mark, not a second one; "[ ] " after it makes a checkbox.
-            string rest = WithoutMark(text);
+            // A "- " (or "* ") typed at a bullet's start is that bullet's own mark, not a second one; "[ ] " after it makes
+            // a checkbox. Only one the caret is past: an edit in front of a " - " already in the words ("x - 5", the x
+            // deleted) leaves the minus where it is.
+            string rest = BulletLead().Match(text) is { Success: true } mark && line.Box.CaretIndex >= mark.Length ? text[mark.Length..] : text;
             if (Box().Match(rest) is { Success: true } box)
                 now = (Kind.Task, line.Lead + (box.Groups[1].Value is "x" or "X" ? "[x] " : "[ ] "), rest[box.Length..]);
             else if (rest != text) now = (Kind.Bullet, line.Lead, rest);
@@ -715,7 +717,9 @@ public sealed partial class TypedEditor : UserControl
         // it's written as (and a block of code pasted is code).
         var all = lines.Select(l => l.Lead + (l.Box.Text ?? "")).ToList();
         all.RemoveAt(at);
-        all.InsertRange(at, [line.Lead + before + parts[0], .. parts[1..^1], parts[^1] + after]);
+        // Pasted at a bullet's start, the first line's own "- " is that bullet's mark, as when it's typed.
+        string first = line.Kind == Kind.Bullet && before.Length == 0 ? WithoutMark(parts[0]) : parts[0];
+        all.InsertRange(at, [line.Lead + before + first, .. parts[1..^1], parts[^1] + after]);
         Build(string.Join("\n", all));
         var last = lines[at + parts.Length - 1];
         Changed();
