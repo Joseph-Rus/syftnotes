@@ -287,10 +287,10 @@ public static class CanvasView
 
     /// <summary>One assignment, everything the design's assignment sheet shows: instructions, rubric with marks,
     /// submission, comments and where its spec and feedback are saved.</summary>
-    public static JsonObject? Assignment(CourseIndex? index, long id, DateTimeOffset now, string? folder)
+    public static JsonObject? Assignment(CourseIndex? index, long id, DateTimeOffset now, string? folder, IReadOnlyList<DueMark>? marks = null)
     {
         if (index?.Assignments.FirstOrDefault(a => a.Id == id) is not { } a) return null;
-        var row = ItemJson(Assignments.From(index.Class, a, now), folder ?? a.Folder);
+        var row = ItemJson(DueMarks.Apply([Assignments.From(index.Class, a, now)], marks ?? [])[0], folder ?? a.Folder);
         row["instructions"] = a.Instructions;
         row["unlock_at"] = When(a.UnlockAt);
         row["lock_at"] = When(a.LockAt);
