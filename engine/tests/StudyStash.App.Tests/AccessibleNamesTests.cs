@@ -130,6 +130,33 @@ public class AccessibleNamesTests
     [AvaloniaTheory]
     [InlineData(SkinKind.Mac)]
     [InlineData(SkinKind.Win)]
+    public void Setups_class_box_stops_typing_at_the_longest_name_the_library_takes(SkinKind skin)
+    {
+        try
+        {
+            ((App)Application.Current!).UseSkin(skin);
+            var m = SetupModel.For(skin, AppRole.Both);
+            m.Go(SetupStep.Classes);
+            var view = skin == SkinKind.Mac ? (Control)new MacSetup { DataContext = m } : new WinSetup { DataContext = m };
+            var window = new Window { Width = 900, Height = 900, Content = view };
+            window.Show();
+            Dispatcher.UIThread.RunJobs();
+            window.UpdateLayout();
+            Shown<TextBox>(view).Single(t => t.PlaceholderText == "CS 101").Focus();
+            window.KeyTextInput(new string('x', CourseNames.MaxLength + 10));
+            Dispatcher.UIThread.RunJobs();
+            Assert.Equal(CourseNames.MaxLength, m.NewClass.Length);
+            window.Close();
+        }
+        finally
+        {
+            ((App)Application.Current!).UseSkin(SkinKind.Mac);
+        }
+    }
+
+    [AvaloniaTheory]
+    [InlineData(SkinKind.Mac)]
+    [InlineData(SkinKind.Win)]
     public async Task Setups_cards_and_switch_say_what_they_are(SkinKind skin)
     {
         try
