@@ -434,12 +434,13 @@ public sealed partial class LibrarySettingsModel : ObservableObject
             UpdateLine = newer ? $"Version {Str(u?["latest"]).TrimStart('v')} is out. The library has {Version}." : IsHere ? $"Syft Notes {Version}, the newest." : $"Your library has Syft Notes {Version}, the newest.";
             AutoUpdate = Flag(u?["auto"]) && (!IsHere || AppAutoUpdate?.Invoke() != false);
 
-            int i = 0;
-            var classes = (s["classes"] as JsonArray ?? []).OfType<JsonObject>().Select(c => new LibraryClassRow
+            var classes = (s["classes"] as JsonArray ?? []).OfType<JsonObject>().Select((c, i) => new LibraryClassRow
             {
                 Name = Str(c["name"]), Was = Str(c["name"]), Description = Str(c["description"]), Folder = Str(c["folder"]),
                 Aliases = string.Join(", ", (c["aliases"] as JsonArray ?? []).Select(Str).Where(a => a.Length > 0)),
-                Lectures = c["lectures"] is JsonValue cl && cl.TryGetValue(out int k) ? k : 0, Dot = Skin.ClassDot(i++),
+                Lectures = c["lectures"] is JsonValue cl && cl.TryGetValue(out int k) ? k : 0,
+                // The colour it keeps (a library from before says none: its place gives it one, as it did then).
+                Dot = Skin.ClassDot(c["color"] is JsonValue cv && cv.TryGetValue(out int color) ? color : i),
             }).ToList();
             knownClasses = [.. classes.Select(c => c.Name)];
             // What was just typed comes back as it was sent: keep those rows (and the field being typed in).
