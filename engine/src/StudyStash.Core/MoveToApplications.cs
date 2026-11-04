@@ -28,7 +28,8 @@ public static class MoveToApplications
         else if (parent is not null && (parent == Join(userHome, "Downloads") || parent == Join(userHome, "Desktop"))) { }
         else return null;
         string apps = applicationsWritable ? "/Applications" : Path.Combine(userHome, "Applications");
-        return new MovePlan(app, Path.Combine(apps, Path.GetFileName(app)), volume);
+        // Always under the app's own name, whatever the copy was called (an old download's "Study Stash.app").
+        return new MovePlan(app, Path.Combine(apps, MacRename.Name), volume);
     }
 
     static string Join(string a, string b) => a.Replace('\\', '/').TrimEnd('/') + "/" + b;
@@ -80,11 +81,17 @@ public static class MoveToApplications
         return true;
     }
 
-    /// <summary>Any other process running a program from a Study Stash.app bundle (the app, or the library it runs).</summary>
-    internal static bool OtherCopyRunning(Runner run, int pid) =>
-        run("/usr/bin/pgrep", ["-f", "Study Stash.app/Contents/MacOS/"], TimeSpan.FromSeconds(10)) is { ExitCode: 0 } p
+    /// <summary>Any other process running a program from a Syft Notes.app (or an old Study Stash.app) bundle: the app,
+    /// or the library it runs. <paramref name="bundle"/> narrows it to one bundle.</summary>
+    public static bool OtherCopyRunning(Runner run, int pid, string? bundle = null) =>
+        run("/usr/bin/pgrep", ["-f", bundle is null ? "(Syft Notes|Study Stash)\\.app/Contents/MacOS/" : Ere(bundle.TrimEnd('/') + "/Contents/MacOS/")], TimeSpan.FromSeconds(10)) is { ExitCode: 0 } p
         && p.Stdout.Split('\n', StringSplitOptions.RemoveEmptyEntries)
             .Any(l => int.TryParse(l.Trim(), out int other) && other != pid);
+
+    /// <summary>A path as a POSIX extended regular expression (pgrep's) that matches it alone: its special characters
+    /// escaped, and nothing else (a space stays a space).</summary>
+    internal static string Ere(string text) =>
+        string.Concat(text.Select(c => "\\.^$|?*+()[]{}".Contains(c) ? "\\" + c : c.ToString()));
 
     /// <summary>`hdiutil info` lists only disk images, so a volume it names is one this download made, never a
     /// USB stick or another disk.</summary>

@@ -3,6 +3,7 @@ using Microsoft.Extensions.DependencyInjection;
 using StudyStash.App.Services;
 using StudyStash.App.Services.Stores;
 using StudyStash.App.ViewModels;
+using StudyStash.App.ViewModels.Kit;
 using StudyStash.App.Windows;
 using StudyStash.Core;
 
@@ -35,6 +36,8 @@ public static class AppServices
         // The one messenger services and view models send on, and Shell listens to (Messages.cs).
         services.AddSingleton<IMessenger>(WeakReferenceMessenger.Default);
         services.AddSingleton<ToolkitHooks>();
+        // The one "Are you sure?": view models take IConfirm, so a test answers it without a window.
+        services.AddSingleton<IConfirm>(Confirm.Default);
 
         // The engine room, and the long-lived pieces it already owns: registered as they are, so whoever needs one
         // takes it in its constructor instead of reaching through the host.

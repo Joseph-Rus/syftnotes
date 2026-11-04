@@ -2,7 +2,9 @@ using System.Globalization;
 using Avalonia.Threading;
 using StudyStash.App.Platform;
 using StudyStash.App.Services;
+using StudyStash.App.Controls;
 using StudyStash.App.ViewModels;
+using StudyStash.App.ViewModels.Kit;
 using StudyStash.Core;
 using StudyStash.Core.Calendar;
 
@@ -25,6 +27,14 @@ public static partial class Shell
     {
         if (host.Recorder.Current is not null) StopRecording();
         else Run(() => StartRecordingAsync(RecordClass(), null, openPage: mainWindow is { IsVisible: true, IsActive: true }), "StartRecording");
+    }
+
+    /// <summary>Asks over the library window, which comes up first when only the menu bar's panel is showing (and is
+    /// brought to the front when it was open behind another app: the question itself raises its window).</summary>
+    static Task<bool> AskAsync(ConfirmAsk ask)
+    {
+        if (ConfirmLayer.Pick() is null) ShowLibrary();
+        return library.Confirmer.AskAsync(ask);
     }
 
     /// <summary>
@@ -50,12 +60,12 @@ public static partial class Shell
                 return;
             }
             string now = live.Title.Length > 0 ? live.Title : live.ClassName.Length > 0 ? ClassNames.Display(live.ClassName) : "this recording";
-            library.Confirming = new ConfirmAsk($"Stop recording {now} and keep recording this one?",
-                SavedSoFar, "Stop and switch", () =>
-                {
-                    StopRecording(stay: true);
-                    Run(() => BeginAsync(() => host.ContinueAsync(id, title), openPage: true), "Begin");
-                });
+            Run(async () =>
+            {
+                if (!await AskAsync(new ConfirmAsk($"Stop recording {now} and keep recording this one?", SavedSoFar, "Stop and switch", "Keep recording"))) return;
+                StopRecording(stay: true);
+                await BeginAsync(() => host.ContinueAsync(id, title), openPage: true);
+            }, "ContinueRecording");
             return;
         }
         Run(() => BeginAsync(() => host.ContinueAsync(id, title), openPage: true), "Begin");
@@ -161,12 +171,9 @@ public static partial class Shell
                 return;
             }
             string now = live.Title.Length > 0 ? live.Title : live.ClassName.Length > 0 ? ClassNames.Display(live.ClassName) : "this recording";
-            library.Confirming = new ConfirmAsk($"Stop recording {now} and start {pick.Title}?",
-                SavedSoFar, "Stop and start", () =>
-                {
-                    StopRecording(stay: true);
-                    Run(() => StartRecordingAsync("", pick, openPage: true), "StartRecording");
-                });
+            if (!await AskAsync(new ConfirmAsk($"Stop recording {now} and start {pick.Title}?", SavedSoFar, "Stop and start", "Keep recording"))) return;
+            StopRecording(stay: true);
+            await StartRecordingAsync("", pick, openPage: true);
             return;
         }
         await StartRecordingAsync("", pick, openPage: true);
@@ -294,10 +301,8 @@ public static partial class Shell
         l.FiledTitle.Length > 0 && !(l.TitleTyped && l.Title.Length > 0) ? l.FiledTitle : WorkingTitle(l);
 
     /// <summary>Who writes a lecture's notes, as the hint under the student's own names them ("Claude"): the AI the
-    /// library is set to write notes with, once the app has heard which; until then, "your library".</summary>
-    static string notesWriter = "";
-
-    static string NotesWriter() => notesWriter.Length > 0 ? notesWriter : "your library";
+    /// library is set to write notes with (the AI store's word, once it has heard which); until then, "your library".</summary>
+    static string NotesWriter() => host.AiStatus.NotesWriter is { Length: > 0 } writer ? writer : "your library";
 
     /// <summary>The library writes no notes (after setup's "No AI for now", or switched off in Settings → Notes and
     /// sorting): what's recorded is filed with its transcript and nothing more, so nothing here says notes are on
@@ -308,16 +313,12 @@ public static partial class Shell
     /// writes notes) gets its notes like any other.</summary>
     static string SavedSoFar => NotesOff ? "What's recorded so far is saved." : "What's recorded so far is saved, and its notes are written as usual.";
 
-    /// <summary>Asks the library which AI writes its notes (when the window is read: it can change in Settings).</summary>
+    /// <summary>Has the AI store look again, so <see cref="NotesWriter"/> names the AI the library writes notes with now
+    /// (when the window is read: it can change in Settings).</summary>
     static async Task HearNotesWriterAsync()
     {
-        try
-        {
-            if (host.Remote() is not null && await Ai().EnginesAsync() is { Notes.Length: > 0 } ai) notesWriter = Core.Ai.Engines.Name(ai.Notes);
-        }
-        catch (Exception e) when (e is HttpRequestException or TaskCanceledException or LibraryRefusedException or System.Text.Json.JsonException)
-        {
-        }
+        if (host.Remote() is null) return;
+        await host.AiStatus.RefreshAsync();
     }
 
     // --- what's typed while it records ---------------------------------------------------------------------------------

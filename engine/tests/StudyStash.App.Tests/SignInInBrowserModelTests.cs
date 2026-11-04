@@ -42,7 +42,7 @@ public class SignInInBrowserModelTests
 
         // The library's own look at the sign-in says it's done: the row is ready, by itself.
         lib.Overview = Claude("ready");
-        await Until(() => Row().State == "ready");
+        await Until(() => Row().State == AiEngineState.Ready);
         Assert.Equal("Claude is signed in.", model.Say);
         Assert.False(Row().HasLink);
         Assert.DoesNotContain(lib.Calls, c => c.StartsWith("check", StringComparison.Ordinal));
@@ -58,7 +58,7 @@ public class SignInInBrowserModelTests
         Assert.Equal("Open the page again", back.Engines.Single(r => r.Id == "claude").LinkWords);
 
         lib.Overview = Claude("ready");
-        await Until(() => back.Engines.Single(r => r.Id == "claude").State == "ready");
+        await Until(() => back.Engines.Single(r => r.Id == "claude").State == AiEngineState.Ready);
     }
 
     [AvaloniaFact]
@@ -170,7 +170,7 @@ public class SignInInBrowserModelTests
         await card.Problems.Single().PrimaryCommand!.ExecuteAsync(null);
         Assert.Equal(AiWords.SignInWaiting, Row().About);
         lib.Overview = Claude("ready");
-        await Until(() => card.Problems.Count == 0 && Row().State == "ready");
+        await Until(() => card.Problems.Count == 0 && Row().State == AiEngineState.Ready);
 
         // From the row: the card follows.
         lib.Overview = Claude("not_signed_in");
@@ -179,7 +179,7 @@ public class SignInInBrowserModelTests
         await Row().ActCommand.ExecuteAsync(null);
         Assert.Equal("Finish signing in to Claude", card.Problems.Single().Title);
         lib.Overview = Claude("ready");
-        await Until(() => card.Problems.Count == 0 && Row().State == "ready");
+        await Until(() => card.Problems.Count == 0 && Row().State == AiEngineState.Ready);
         // The line under the list, which said "Finish signing in…", says it's done, whichever of the two heard first.
         await Until(() => rows.Say == "Claude is signed in.");
     }

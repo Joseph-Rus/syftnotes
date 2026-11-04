@@ -5,6 +5,7 @@ using CommunityToolkit.Mvvm.Input;
 using StudyStash.Core;
 using StudyStash.Core.Ai;
 using StudyStash.Core.Rich;
+using StudyStash.App.Services.Stores;
 
 namespace StudyStash.App.ViewModels;
 
@@ -452,13 +453,14 @@ public sealed partial class AiAskModel : ObservableObject
         // never reaches this menu.
         var ordered = overview.Engines.Where(e => e.Id == overview.Ask)
             .Concat(overview.Engines.Where(e => e.Id != overview.Ask))
-            .Where(e => e.State != "not_installed");
+            .Where(e => AiStatusStore.StateOf(e) != AiEngineState.NotInstalled);
 
         Menu.Items.Clear();
         foreach (var e in ordered)
         {
             bool isDefault = e.Id == overview.Ask;
-            var item = new EngineMenuItem(e.Id, e.Name, AiWords.AskEngineSubtitle(e.Id, e.State, isDefault), isDefault, AiWords.EngineUsable(e.State));
+            var state = AiStatusStore.StateOf(e);
+            var item = new EngineMenuItem(e.Id, e.Name, AiWords.AskEngineSubtitle(e.Id, state, isDefault), isDefault, AiWords.EngineUsable(state));
             item.Command = new RelayCommand(() => { Engine = item.Id; CloseMenu?.Invoke(); }, () => item.Enabled);
             Menu.Items.Add(item);
         }
