@@ -22,6 +22,7 @@ public class DueMarksTests
         [
             new Assignment("CS 101", 9101, "Asynchronous Lecture 5", "2025-09-23T23:59", 10, "missing", null, "", "", Missing: true, DueAt: "2025-09-24T06:59:00Z"),
             new Assignment("CS 101", 9102, "Homework 4", "2025-09-28T23:59", 20, "open", null, "", "", DueAt: "2025-09-29T06:59:00Z"),
+            new Assignment("CS 101", 9103, "In-class quiz 2", "2025-09-22T09:00", 5, "no submission", null, "", "", DueAt: "2025-09-22T16:00:00Z"),
         ]);
         string before = File.ReadAllText(Assignments.PathIn(dir.Path));
 
@@ -59,6 +60,13 @@ public class DueMarksTests
         var plain = await Read(JsonNode.Parse(await site.Text("/api/v2/canvas/due"))!.AsObject());
         Assert.Equal($"overdue [{lecture5}] handed in [] hidden [] to hand in 2 Home [{lecture5}, Homework 4]", plain.State);
         Assert.Contains($"{lecture5} (missing)", plain.Asked);
+
+        // An in-class quiz that has already happened takes nothing to hand in: it isn't overdue or counted above, Ask isn't told
+        // of it, and the class's list puts it with the done ones.
+        Assert.DoesNotContain("In-class quiz", plain.Asked);
+        var classList = JsonNode.Parse(await site.Text("/api/v2/canvas/assignments?class=CS%20101"))!;
+        Assert.Equal($"to hand in [{lecture5}, Homework 4] done [In-class quiz 2]",
+            $"to hand in [{string.Join(", ", Names(classList["to_hand_in"]))}] done [{string.Join(", ", Names(classList["done"]))}]");
 
         // Hidden: off every list, and in the Due list's own "hidden" for the Due tab's "Show hidden".
         var hidden = await Read(await Mark("hidden"));

@@ -261,7 +261,7 @@ public sealed partial class LibraryWeb
         {
             if (@class is null || !cfg.ClassNames().Contains(@class)) return Http.Detail(400, "unknown class");
             var mine = Assignments.Shown(cfg.Home).Where(a => a.ClassName == @class).ToList();
-            return Http.Json(CanvasView.ForClass(@class, mine, id => Canvas.Crawl.AssignmentFolder(@class, id)));
+            return Http.Json(CanvasView.ForClass(@class, mine, id => Canvas.Crawl.AssignmentFolder(@class, id), TimeZoneInfo.ConvertTime(Canvas.Clock(), Canvas.Zone).DateTime));
         }));
         app.MapGet("/api/v2/canvas/assignment", (HttpContext ctx, string? @class, long? id) => Api(ctx, () =>
         {
