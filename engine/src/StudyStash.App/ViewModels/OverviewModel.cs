@@ -362,11 +362,53 @@ public sealed partial class OverviewModel : ObservableObject
         OnPropertyChanged(nameof(Idle));
         OnPropertyChanged(nameof(Paused));
         OnPropertyChanged(nameof(Running));
+        OnPropertyChanged(nameof(ShowRecordMenu));
         OnPropertyChanged(nameof(RecordWords));
         OnPropertyChanged(nameof(Elapsed));
         OnPropertyChanged(nameof(RecordTip));
     }
     [RelayCommand] void Record() => OnRecord?.Invoke();
+
+    // --- A lecture from a recording that already exists (in development: only with the test helpers) ------------------
+
+    /// <summary>How the way in is offered, until Joey picks: a button of its own beside Attach and Record, or a menu on Record.</summary>
+    public enum AddRecordingEntry { Button, Menu }
+
+    /// <summary>Opens the form for a recording the student has (picked, or dropped on the page); null leaves the way in out.</summary>
+    public Action<string>? OnAddRecording
+    {
+        get;
+        set
+        {
+            field = value;
+            OnPropertyChanged(nameof(CanAddRecording));
+            OnPropertyChanged(nameof(ShowAddButton));
+            OnPropertyChanged(nameof(ShowRecordMenu));
+        }
+    }
+    /// <summary>The system's file picker for a recording (the view sets it): its path, null when cancelled.</summary>
+    public Func<Task<string?>>? PickRecording { get; set; }
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(ShowAddButton), nameof(ShowRecordMenu))]
+    public partial AddRecordingEntry Entry { get; set; }
+    public bool CanAddRecording => StudyStash.Core.TestSwitches.On && OnAddRecording is not null;
+    /// <summary>"Add a recording", a button beside Attach and Record.</summary>
+    public bool ShowAddButton => CanAddRecording && Entry == AddRecordingEntry.Button;
+    /// <summary>Record's small menu: Record now, or add a recording you already have.</summary>
+    public bool ShowRecordMenu => CanAddRecording && Entry == AddRecordingEntry.Menu && Idle;
+
+    [RelayCommand]
+    async Task AddRecording()
+    {
+        if (PickRecording is null || OnAddRecording is null) return;
+        if (await PickRecording() is { } path) OnAddRecording(path);
+    }
+
+    /// <summary>A recording is being dragged over the page (its file name), or no longer is (null): the page says it will take it.</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(IsDropping))]
+    public partial string? DroppingName { get; set; }
+    public bool IsDropping => DroppingName is not null;
 
     /// <summary>Home's "Buy us a coffee": Syft Notes is free, and a tip for the two students who build it goes to
     /// their Ko-fi page (<see cref="Services.SupportAsk"/>). Only on Home, a quiet line at the foot of the page.</summary>

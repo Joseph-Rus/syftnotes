@@ -2,6 +2,7 @@ using Avalonia.Controls;
 using Avalonia.Controls.Shapes;
 using Avalonia.Layout;
 using StudyStash.App.Controls;
+using StudyStash.App.ViewModels;
 
 namespace StudyStash.App.Views;
 
@@ -12,7 +13,7 @@ namespace StudyStash.App.Views;
 /// </summary>
 public static class ClassPicker
 {
-    public const string SortLabel = "Let the library sort it";
+    public const string SortLabel = ClassNames.SortLabel;
 
     /// <summary>The menu for <paramref name="classes"/>, <paramref name="chosen"/> checked: "" lets the library sort
     /// it, a class's name records into that class. Picking a row hands <paramref name="pick"/> the same kind of value.</summary>
