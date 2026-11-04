@@ -126,6 +126,10 @@ public sealed class AiSettings
     /// <summary>True when a job runs on the library's own Ollama, the way the engine always has.</summary>
     public bool Local(string job) => For(job).Provider == "ollama";
 
+    /// <summary>Whether Ollama was chosen for the notes, sorting or Ask: what a job falls back to when nobody has been
+    /// chosen doesn't count, so a library on Gemini alone has nothing to be told about Ollama.</summary>
+    public bool OllamaChosen => new[] { "notes", "sort", "ask" }.Any(job => Picked(job) && Local(job));
+
     static readonly JsonSerializerOptions Options = new() { WriteIndented = true, PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower };
 
     public static AiSettings Load(string home)

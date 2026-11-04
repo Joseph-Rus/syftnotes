@@ -1197,8 +1197,8 @@
                       </StackPanel>
                     </Border>
 
-                    <TextBlock Classes="section gap" Text="Local models" />
-                    <Border Classes="group">
+                    <TextBlock Classes="section gap" Text="Local models" IsVisible="{Binding Lib.OllamaChosen}" />
+                    <Border Classes="group" IsVisible="{Binding Lib.OllamaChosen}">
                       <StackPanel>
                         <Border Classes="row">
                           <Grid ColumnDefinitions="*,Auto">
@@ -1237,10 +1237,10 @@
                         </Border>
                       </StackPanel>
                     </Border>
-                    <c:PageText Classes="say" Text="{Binding Lib.OllamaLine}" />
+                    <c:PageText Classes="say" Text="{Binding Lib.OllamaLine}" IsVisible="{Binding Lib.OllamaChosen}" />
 
-                    <TextBlock Classes="section gap" Text="Rewrite every summary" />
-                    <Border Classes="group">
+                    <TextBlock Classes="section gap" Text="Rewrite every summary" IsVisible="{Binding Lib.HasSummaries}" />
+                    <Border Classes="group" IsVisible="{Binding Lib.HasSummaries}">
                       <Border Classes="row">
                         <Grid ColumnDefinitions="*,Auto">
                           <StackPanel Spacing="2" VerticalAlignment="Center">
@@ -1251,7 +1251,7 @@
                         </Grid>
                       </Border>
                     </Border>
-                    <TextBlock Classes="say" Text="Useful after switching models. It can take a while." />
+                    <TextBlock Classes="say" Text="Useful after switching models. It can take a while." IsVisible="{Binding Lib.HasSummaries}" />
 
                     <!-- Listen: Kokoro's voices, downloaded into the library (one press; how far it's got; Remove) -->
                     <StackPanel Name="ListenVoices" IsVisible="{Binding Voices.Available}" Spacing="8">

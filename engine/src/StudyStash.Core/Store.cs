@@ -4,7 +4,7 @@ using Microsoft.Data.Sqlite;
 
 namespace StudyStash.Core;
 
-/// <summary>Which class a note belongs in, and who decided: folder | rules | ollama | none | human.</summary>
+/// <summary>Which class a note belongs in, and who decided: folder | rules | an AI's id (ollama, claude, codex, gemini) | none | human.</summary>
 public sealed class Classification(string className, double confidence, string by, string lectureTitle = "",
     List<string>? topics = null)
 {
@@ -566,6 +566,16 @@ public sealed partial class Store : IDisposable
         lock (gate)
         {
             using var cmd = Command("SELECT COUNT(*) FROM notes");
+            return Convert.ToInt32(cmd.ExecuteScalar(), System.Globalization.CultureInfo.InvariantCulture);
+        }
+    }
+
+    /// <summary>How many filed lectures have a summary written for them (what "Rewrite all" would rewrite).</summary>
+    public int SummaryCount()
+    {
+        lock (gate)
+        {
+            using var cmd = Command($"SELECT COUNT(*) FROM notes WHERE {Filed} AND COALESCE(summary_md, '') <> ''");
             return Convert.ToInt32(cmd.ExecuteScalar(), System.Globalization.CultureInfo.InvariantCulture);
         }
     }

@@ -68,6 +68,55 @@ public class SortingFollowsNotesTests
     }
 
     [Fact]
+    public async Task A_library_on_Gemini_alone_never_chose_Ollama_and_files_its_lectures_as_sorted_by_Gemini()
+    {
+        using var dir = new TempDir();
+        var cfg = Cfg(dir);
+        cfg.OllamaModel = Config.DefaultOllamaModel; // nobody chose a free model on this library
+        new AiSettings { Provider = "gemini" }.Save(cfg.Home);
+        using var store = new Store(cfg.DbPath, cfg.PoolDir);
+        var gemini = Says("gemini", Answer);
+        var ollama = Says("ollama", "not json");
+        var ai = new AiJobs(cfg.Home)
+        {
+            Providers = id => id == "gemini" ? gemini : ollama,
+            Checks = new FakeChecks().Installed("agy").Ollama(installed: false).Build() with { RamGb = () => 8 },
+        };
+        var pipeline = new Pipeline(cfg, store, ai.SortAsync, (_, _) => Task.FromResult("## Summary\nRecursion."), _ => { },
+            sortedWith: () => ai.SortedWith);
+        store.Enqueue(new Meeting("l1") { Title = "Lecture", Transcript = string.Concat(Enumerable.Repeat("Recursion is a function calling itself.\n", 60)) });
+        store.Enqueue(new Meeting("l2") { Title = "Lecture 2", Transcript = "Too short for notes." });
+
+        await pipeline.RunPendingAsync();
+
+        // Sorting went to Gemini (it never waited on an Ollama that isn't there), and the lecture says so.
+        Assert.Equal(("CS 101", "gemini"), (store.Get("l1")!.ClassName, store.Get("l1")!.ClassifiedBy));
+        Assert.Contains("classified_by: gemini (0.90)", Py.ReadText(store.Get("l1")!.MdPath!));
+        Assert.Empty(ollama.Prompts);
+
+        // Settings: nothing to say about Ollama until it is chosen for something; the free model nobody chose is the one
+        // this 8 GB computer can run (not the built-in 24 GB one), and one the student chose stays; "Rewrite all" counts
+        // the one lecture that has a summary, not both.
+        await using var site = await TestSite.StartAsync(b => LibraryWeb.Build(b, cfg, store, pipeline, new LibraryWebOptions
+        {
+            ListModels = _ => Task.FromResult<List<(string, double)>?>(null), Tailscale = () => new TailscaleInfo(),
+            Latest = _ => Task.FromResult<Release?>(null), Ai = ai,
+        }));
+        async Task<JsonNode> Settings()
+        {
+            using var req = new HttpRequestMessage(HttpMethod.Get, "/api/v2/settings");
+            req.Headers.Authorization = new("Bearer", "pw");
+            return JsonNode.Parse(await (await site.Client.SendAsync(req)).Content.ReadAsStringAsync())!;
+        }
+        var now = await Settings();
+        Assert.Equal((false, "qwen3:1.7b", 1), (now["ollama"]!["chosen"]!.GetValue<bool>(), now["ollama"]!["sort_model"]!.GetValue<string>(), now["lectures"]!.GetValue<int>()));
+        cfg.OllamaModel = "qwen3:8b";
+        new AiSettings { Provider = "gemini", ByJob = { ["ask"] = new AiChoice("ollama") } }.Save(cfg.Home);
+        now = await Settings();
+        Assert.Equal((true, "qwen3:8b"), (now["ollama"]!["chosen"]!.GetValue<bool>(), now["ollama"]!["sort_model"]!.GetValue<string>()));
+    }
+
+    [Fact]
     public async Task Sorting_stays_on_Ollama_when_it_has_the_model()
     {
         using var dir = new TempDir();
