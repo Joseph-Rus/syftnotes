@@ -50,6 +50,10 @@ first time you need it (docs/ARCHITECTURE.md section 3 says how), not inside you
 10. When a change brings a count down, lower its line in `tools/connections-baseline.txt` in the same change.
 
 ## Standing rules
+- **Refine, don't expand.** What works today stays working. A change makes an existing piece simpler, clearer or more
+  reliable; it doesn't add a new layer, library, setting or option unless the owner asked for it. A good change usually
+  removes more lines than it adds. Never mix a cleanup with a new feature in one PR.
+- **Small PRs, merged fast.** About six open at once at most; each merges within a day or is closed.
 - **Few tests.** Test what could really break for a student: one focused test per piece. No big fake suites.
 - **A test that fails without a code cause** is fixed or deleted the same day. Never re-run CI to get past it, and no
   retries or quarantine.
