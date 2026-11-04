@@ -10,7 +10,7 @@ public class MacDockTests
 {
     const string App = "/Applications/Syft Notes.app";
 
-    static string Tile(string url, string? id, int type = 15) => $"""
+    static string Tile(string url, string? id, int type = 15, string label = "Study Stash") => $"""
         <dict>
         	<key>GUID</key>
         	<integer>12345</integer>
@@ -27,7 +27,7 @@ public class MacDockTests
         			<integer>{type}</integer>
         		</dict>
         		<key>file-label</key>
-        		<string>Label</string>
+        		<string>{label}</string>
         	</dict>
         	<key>tile-type</key>
         	<string>file-tile</string>
@@ -65,10 +65,10 @@ public class MacDockTests
     public void A_pinned_tile_for_the_old_app_that_is_gone_points_at_the_new_one_and_nothing_else_changes()
     {
         byte[] before = Dock(
-            Tile("file:///System/Applications/Mail.app/", "com.apple.mail"),
+            Tile("file:///System/Applications/Mail.app/", "com.apple.mail", label: "Mail"),
             Tile("file:///Applications/Study%20Stash.app/", "com.study-stash.app"),
             Tile("/Applications/Study Stash.app", null, 0),
-            Tile("file:///Applications/Notes%20Helper.app/", "com.example.helper"));
+            Tile("file:///Applications/Notes%20Helper.app/", "com.example.helper", label: "Notes Helper"));
         var fix = MacDock.Repaired(before, App, _ => false);
 
         Assert.True(fix.Changed);
@@ -83,7 +83,8 @@ public class MacDockTests
         var top = Top(fix.Plist);
         Assert.Equal("48", top.Elements("integer").Single().Value);
         Assert.Single(top.Elements("false"));
-        // Each repaired tile: the new place in the form it already had, the old bookmark gone, the rest as it was.
+        // Each repaired tile: the new place in the form it already had, the new name on hover, the old bookmark gone, the
+        // rest as it was.
         foreach (var (tile, url, type) in new[] { (now[1], "file:///Applications/Syft%20Notes.app/", "15"), (now[2], "/Applications/Syft Notes.app/", "0") })
         {
             var data = tile.Element("dict")!;
@@ -92,7 +93,7 @@ public class MacDockTests
             var file = data.Element("dict")!;
             Assert.Equal(url, file.Element("string")!.Value);
             Assert.Equal(type, file.Element("integer")!.Value);
-            Assert.Equal("Label", data.Elements("string").Last().Value);
+            Assert.Equal("Syft Notes", data.Elements("string").Last().Value);
             Assert.Equal("12345", tile.Element("integer")!.Value);
         }
     }
@@ -102,7 +103,7 @@ public class MacDockTests
     {
         // No old tile; an old tile whose app is still there; someone else's app by that name.
         byte[] before = Dock(
-            Tile("file:///System/Applications/Mail.app/", "com.apple.mail"),
+            Tile("file:///System/Applications/Mail.app/", "com.apple.mail", label: "Mail"),
             Tile("file:///Applications/Study%20Stash.app/", "com.study-stash.app"),
             Tile("file:///Users/Shared/Study%20Stash.app/", "com.example.other"));
         var fix = MacDock.Repaired(before, App, path => path == "/Applications/Study Stash.app");
