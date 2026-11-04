@@ -1,10 +1,11 @@
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Input;
+using StudyStash.App.Controls.Rich;
 using StudyStash.App.Views;
 using StudyStash.Core.Rich;
 
-namespace StudyStash.App.Controls.Rich;
+namespace StudyStash.App.Windows;
 
 /// <summary>
 /// A plot from the notes, larger, in a window of its own, the way a diagram opens: the toolbar across the top (zoom,
