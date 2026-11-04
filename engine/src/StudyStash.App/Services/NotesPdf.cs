@@ -233,7 +233,7 @@ public static class NotesPdf
         if (mac) Controls.Typography.SetExtra(title, -0.6);
         column.Children.Add(title);
 
-        string notes = AiWords.DropLeadingSummary(S(lecture["notes"]));
+        string notes = AiWords.DropLeadingSummary(StudyStash.Core.Rich.NoteExport.Shown(lecture));
         column.Children.Add(new NoteView { PageHeight = pageHeight, Markdown = notes.Trim().Length == 0 ? "_No notes yet._" : notes });
 
         string raw = S(lecture["transcript"]);
