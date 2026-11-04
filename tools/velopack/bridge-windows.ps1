@@ -100,6 +100,9 @@ try {
   # --- 4. where everything stands
   Check (-not (Test-Path -LiteralPath $oldDir)) "the old install folder is gone"
   Check (-not (Test-Path -Path $innoKey)) "the Inno Setup uninstall entry is gone"
+  Check (-not (Test-Path -LiteralPath (Join-Path $home_ "bridge-failed.txt"))) "the new copy cleared bridge-failed.txt once the old install was gone"
+  $link = (Get-ItemProperty -Path "HKCU:\Software\Classes\studystash\shell\open\command" -ErrorAction SilentlyContinue).'(default)'
+  Check (-not $link -or $link -like "*$newExe*") "the studystash: link (a click on a notification) opens the new copy ($(if ($link) { $link } else { 'not registered' }))"
   Check ((Test-Path -LiteralPath $newExe) -and ((& $newExe version | Out-String).Trim() -eq $V1)) "Velopack's copy is at $newExe and runs $V1"
   $apps = @(Get-ItemProperty "HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall\*" -ErrorAction SilentlyContinue | Where-Object { $_.DisplayName -eq "Syft Notes" })
   Check ($apps.Count -eq 1 -and $apps[0].PSChildName -eq "SyftNotes") "one Syft Notes in Windows' Apps list, Velopack's ($(($apps | ForEach-Object PSChildName) -join ', '))"
@@ -158,6 +161,9 @@ try {
   # --- 7. a move whose uninstall can't finish (something holds a file in the old folder): Velopack's copy is the one
   # that opens, and the move is remembered as unfinished, so the old copy, if opened again, doesn't do it all over.
   Publish $V1Feed $V1
+  # Every move writes "remembered the move ... as unfinished" (the new copy clears it once the old folder is gone), so
+  # this step's waits start from a fresh log, not step 3's lines.
+  Move-Item -LiteralPath (Join-Path $logs "update.log") -Destination (Join-Path $Res "update-before-step7.log") -Force
   $failedFile = Join-Path $home_ "bridge-failed.txt"
   Remove-Item -LiteralPath $failedFile -ErrorAction SilentlyContinue
   $p = Start-Process $Old -ArgumentList "/VERYSILENT", "/SUPPRESSMSGBOXES", "/NORESTART" -PassThru
