@@ -1,0 +1,110 @@
+<!-- "Add a lecture from a recording" (both looks), in a small window of its own: the file (its name, its size, and for a
+     video that only its sound is used), the title made from its name, the class (the page it was started on, or the
+     library's own sort), the day, one line on what happens next, and Add lecture. A file that can't be read, or one the
+     library turned down, says why in plain words above the buttons. -->
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:StudyStash.App.ViewModels"
+             xmlns:c="using:StudyStash.App.Controls"
+             x:Class="StudyStash.App.Views.FromFilePage"
+             x:DataType="vm:FromFileModel"
+             Classes="in-setup"
+             Width="480">
+  <UserControl.KeyBindings>
+    <KeyBinding Gesture="Escape" Command="{Binding CancelCommand}" />
+  </UserControl.KeyBindings>
+  <UserControl.Styles>
+    <StyleInclude Source="avares://StudyStash/Views/SetupStyles.axaml" />
+    <StyleInclude Source="avares://StudyStash/Views/CalendarStyles.axaml" />
+    <Style Selector="Border#Chrome.chrome">
+      <Setter Property="CornerRadius" Value="{DynamicResource RadiusPanel}" />
+      <Setter Property="BoxShadow" Value="{DynamicResource ShadowLg}" />
+    </Style>
+    <!-- The class, as a field: the same height and white as the title's, its words in ink. -->
+    <Style Selector="Button.picker.as-field">
+      <Setter Property="Height" Value="34" />
+      <Setter Property="Padding" Value="10,0,8,0" />
+      <Setter Property="Foreground" Value="{DynamicResource Ink}" />
+      <Setter Property="FontWeight" Value="Normal" />
+      <Setter Property="HorizontalAlignment" Value="Stretch" />
+      <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+    </Style>
+  </UserControl.Styles>
+  <Border Name="Chrome" Background="{DynamicResource Canvas}" ClipToBounds="True">
+    <DockPanel>
+      <c:WindowHeader Name="Header" DockPanel.Dock="Top" CanResize="False" Title="{x:Static vm:FromFileWords.WindowTitle}" />
+      <StackPanel Margin="28,4,28,26" Spacing="{DynamicResource Space5}">
+
+        <!-- The file -->
+        <Border Name="FileCard" Classes="group">
+          <Grid ColumnDefinitions="Auto,12,*" Margin="16,12">
+            <c:Icon Glyph="graphic_eq" Size="22" IsVisible="{Binding !IsVideo}" VerticalAlignment="Center" />
+            <c:Icon Glyph="play_circle" Size="22" IsVisible="{Binding IsVideo}" VerticalAlignment="Center" />
+            <StackPanel Grid.Column="2" VerticalAlignment="Center">
+              <TextBlock Name="FileName" Classes="say" FontWeight="Bold" Text="{Binding FileName}" ToolTip.Tip="{Binding FileName}" c:Tips.WhenCut="True"
+                         TextWrapping="NoWrap" TextTrimming="CharacterEllipsis" />
+              <TextBlock Name="FileDetail" Classes="hint" Text="{Binding FileDetail}" />
+            </StackPanel>
+          </Grid>
+        </Border>
+
+        <StackPanel>
+          <TextBlock Classes="label" Text="{x:Static vm:FromFileWords.TitleLabel}" />
+          <Border Classes="field">
+            <TextBox Name="TitleField" Classes="bare" Text="{Binding Title}" MaxLength="120" VerticalAlignment="Center" AutomationProperties.Name="{x:Static vm:FromFileWords.TitleLabel}">
+              <TextBox.KeyBindings>
+                <KeyBinding Gesture="Enter" Command="{Binding Add.Command}" />
+              </TextBox.KeyBindings>
+            </TextBox>
+          </Border>
+        </StackPanel>
+
+        <StackPanel>
+          <TextBlock Classes="label" Text="{x:Static vm:FromFileWords.ClassLabel}" />
+          <Button Name="ClassButton" Classes="picker as-field" Click="OnPickClass" AutomationProperties.Name="{Binding ClassWords}">
+            <Grid ColumnDefinitions="Auto,*,Auto">
+              <c:Swatch Fill="{Binding ClassDot}" IsVisible="{Binding HasClassDot}" Margin="3,0,10,0" VerticalAlignment="Center" />
+              <TextBlock Grid.Column="1" Text="{Binding ClassWords}" ToolTip.Tip="{Binding ClassWords}" c:Tips.WhenCut="True" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
+              <c:Icon Grid.Column="2" Glyph="expand_more" Size="14" VerticalAlignment="Center" />
+            </Grid>
+          </Button>
+        </StackPanel>
+
+        <StackPanel>
+          <TextBlock Classes="label" Text="{x:Static vm:FromFileWords.DateLabel}" />
+          <Button Name="DateButton" Classes="picker as-field" AutomationProperties.Name="{Binding DateWords}">
+            <Grid ColumnDefinitions="*,Auto">
+              <TextBlock Text="{Binding DateWords}" VerticalAlignment="Center" />
+              <c:Icon Grid.Column="1" Glyph="event" Size="16" VerticalAlignment="Center" />
+            </Grid>
+            <Button.Flyout>
+              <Flyout Placement="BottomEdgeAlignedLeft" VerticalOffset="6" FlyoutPresenterClasses="bare">
+                <Border Classes="menu">
+                  <Calendar Name="DateCalendar" SelectedDate="{Binding Date}" DisplayDateEnd="{Binding Today}" SelectedDatesChanged="OnDayPicked" />
+                </Border>
+              </Flyout>
+            </Button.Flyout>
+          </Button>
+        </StackPanel>
+
+        <TextBlock Name="Next" Classes="hint" Text="{x:Static vm:FromFileWords.Next}" />
+
+        <!-- It didn't work, or can't: the words are the library's own -->
+        <Grid ColumnDefinitions="Auto,8,*" IsVisible="{Binding Problem, Converter={x:Static c:Converters.NotEmpty}}">
+          <c:Icon Classes="warn" Size="16" VerticalAlignment="Top" Margin="0,1,0,0" />
+          <TextBlock Name="Problem" Grid.Column="2" Classes="say" Text="{Binding Problem}" TextWrapping="Wrap" />
+        </Grid>
+
+        <Grid ColumnDefinitions="*,Auto,8,Auto">
+          <StackPanel Orientation="Horizontal" Spacing="8" IsVisible="{Binding Add.Busy}" VerticalAlignment="Center">
+            <c:SyftLoader Kind="HoppingBits" Size="16" VerticalAlignment="Center" />
+            <TextBlock Classes="say" Text="{x:Static vm:FromFileWords.Working}" VerticalAlignment="Center" />
+          </StackPanel>
+          <Button Name="Cancel" Grid.Column="1" Classes="btn sm" Command="{Binding CancelCommand}" Content="{x:Static vm:FromFileWords.Cancel}" />
+          <Button Name="AddLecture" Grid.Column="3" Classes="btn sm ink" Command="{Binding Add.Command}" IsEnabled="{Binding CanAdd}"
+                  Content="{x:Static vm:FromFileWords.Add}" />
+        </Grid>
+      </StackPanel>
+    </DockPanel>
+  </Border>
+</UserControl>

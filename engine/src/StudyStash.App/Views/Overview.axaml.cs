@@ -16,7 +16,8 @@ public partial class Overview : UserControl
         {
             if (e.Property == AskSplit.BesideProperty && DataContext is OverviewModel m) m.Beside = Split.Beside;
         };
-        AttachFiles.AcceptDrops(Page, () => (DataContext as OverviewModel)?.Files);
+        AttachFiles.AcceptDrops(Page, () => (DataContext as OverviewModel)?.Files,
+            () => DataContext is OverviewModel { CanAddRecording: true } m ? new RecordingDrop(m.OnAddRecording!, name => m.DroppingName = name) : null);
         Fades.Under(Fade, "Surface", 0.55);
         // Another page opens at its top, not wherever the last one was scrolled to; the same one read again (Canvas
         // synced, a note came in) stays where the student was. Back and Forward ask for the place they left it.
@@ -29,6 +30,7 @@ public partial class Overview : UserControl
                 scrolled.Follow(null);
                 return;
             }
+            m.PickRecording ??= () => AttachFiles.PickRecordingAsync(this);
             m.Beside = Split.Beside;
             string key = m.IsHome ? m.OnlyUnsorted ? "\u0001unsorted" : "" : m.IsDuePage ? "\u0001due" : m.ClassName;
             if (key != showing) Page.Offset = default;
