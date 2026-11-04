@@ -36,6 +36,11 @@ public class BridgeTests
         Assert.True(Bridge.Offers(With("0.23.1", "SyftNotes-win-x64-Setup.exe"), inno, "0.23.0", Architecture.X64, t.Path));
         File.SetLastWriteTimeUtc(Bridge.FailedFile(t.Path), DateTime.UtcNow - Bridge.RetryAfter - TimeSpan.FromHours(1));
         Assert.True(Bridge.Offers(release, inno, "0.23.0", Architecture.X64, t.Path));
+        // Why it failed is kept for the app's words: FUSE, or anything else.
+        Bridge.Failed(t.Path, release.Tag, Bridge.NeedsFuse);
+        Assert.Equal(Bridge.NeedsFuse, Bridge.FailedWhy(t.Path));
+        Bridge.Failed(t.Path, release.Tag);
+        Assert.Equal("", Bridge.FailedWhy(t.Path));
     }
 
     [Fact]

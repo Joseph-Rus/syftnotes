@@ -35,10 +35,19 @@ function Say([string]$Line) { Add-Content -LiteralPath $Log -Value ("{0:yyyy-MM-
 $new = Join-Path $env:LOCALAPPDATA "SyftNotes"
 $newExe = Join-Path $new "current\StudyStash.exe"
 $moved = $false
+$old = $null
+# The end, whatever happened. Once Velopack's copy is installed it is the one that opens, even if the old copy didn't
+# uninstall all the way (its folder or its Setup entry still there): the new copy never moves again, and the old one,
+# if it's ever opened, finds the move remembered as failed (-FailedFile) instead of doing it all over again. Before
+# that point nothing has changed, so the old copy opens, and the failure is remembered the same way.
 function Finish {
-  if (-not $script:moved -and $FailedFile -and $Tag) { Set-Content -LiteralPath $FailedFile -Value $Tag -ErrorAction SilentlyContinue }
+  $leftover = (Test-Path -Path $InnoKey) -or ($script:old -and (Test-Path -LiteralPath $script:old))
+  if ((-not $script:moved -or $leftover) -and $FailedFile -and $Tag) {
+    Set-Content -LiteralPath $FailedFile -Value $Tag -ErrorAction SilentlyContinue
+    Say "remembered the move to $Tag as unfinished ($(if ($script:moved) { 'the old copy is still partly there' } else { 'nothing was moved' }))"
+  }
   if ($NoOpen) { return }
-  $open = if ((Test-Path -LiteralPath $newExe) -and -not (Test-Path -Path $InnoKey)) { $newExe } elseif ($OldExe -and (Test-Path -LiteralPath $OldExe)) { $OldExe } elseif (Test-Path -LiteralPath $newExe) { $newExe } else { $null }
+  $open = if ($script:moved -and (Test-Path -LiteralPath $newExe)) { $newExe } elseif ($OldExe -and (Test-Path -LiteralPath $OldExe)) { $OldExe } elseif (Test-Path -LiteralPath $newExe) { $newExe } else { $null }
   if ($open) { Say "opening $open"; Start-Process -FilePath $open -ArgumentList $OpenArgs -WorkingDirectory (Split-Path -Parent $open) } else { Say "no copy of the app to open" }
 }
 try {
@@ -123,7 +132,7 @@ if ((Test-Path -LiteralPath $lnk) -and (Has (Target $lnk) $new)) {
   Copy-Item -LiteralPath $lnk -Destination $kept -Force
 }
 
-# From here the new copy is installed and starts the app, whatever else goes wrong.
+# From here the new copy is installed and is the one that opens, whatever else goes wrong (Finish).
 $moved = $true
 
 # 5. The Inno uninstaller. unins000.exe starts a copy of itself from the temp folder and ends at once, so what is waited

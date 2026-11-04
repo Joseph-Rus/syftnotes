@@ -154,6 +154,26 @@ try {
   Check (-not (Test-Path "HKCU:\Software\Classes\studystash")) "the studystash: link is gone"
   $after = $markers | ForEach-Object { (Get-FileHash -LiteralPath $_).Hash }
   Check (-not (Compare-Object $before $after)) "settings and lectures are still there, untouched"
+
+  # --- 7. a move whose uninstall can't finish (something holds a file in the old folder): Velopack's copy is the one
+  # that opens, and the move is remembered as unfinished, so the old copy, if opened again, doesn't do it all over.
+  Publish $V1Feed $V1
+  $failedFile = Join-Path $home_ "bridge-failed.txt"
+  Remove-Item -LiteralPath $failedFile -ErrorAction SilentlyContinue
+  $p = Start-Process $Old -ArgumentList "/VERYSILENT", "/SUPPRESSMSGBOXES", "/NORESTART" -PassThru
+  $null = $p.Handle; $null = $p.WaitForExit(300000)
+  Get-Process -Name StudyStash -ErrorAction SilentlyContinue | Stop-Process -Force
+  # Blocks on an event that never comes (no timer): it only holds the file open until it's stopped below.
+  $holder = Start-Process powershell.exe -WindowStyle Hidden -PassThru -ArgumentList "-NoProfile", "-Command",
+    "`$f = [IO.File]::Open('$oldDir\held-open.txt', 'OpenOrCreate', 'ReadWrite', 'None'); Wait-Event -SourceIdentifier never-comes"
+  $p = Start-Process $Bridge -ArgumentList "/VERYSILENT", "/SUPPRESSMSGBOXES", "/NORESTART", "/CLOSEAPPLICATIONS", "/relaunch=1" -PassThru
+  $null = $p.Handle; $null = $p.WaitForExit(300000)
+  $null = WaitFor (Join-Path $logs "update.log") "remembered the move to v$([regex]::Escape($V1)) as unfinished" 900 "a move whose old folder couldn't go is remembered as unfinished"
+  $null = WaitFor (Join-Path $logs "update.log") "opening $([regex]::Escape($newExe))" 60 "and it's Velopack's copy that opens, not the old one"
+  Check ((Test-Path -LiteralPath $failedFile) -and ((Get-Content -LiteralPath $failedFile -Raw).Trim() -like "v$V1*")) "bridge-failed.txt names v$V1, so the old copy won't move again for a week"
+  Stop-Process -Id $holder.Id -Force -ErrorAction SilentlyContinue
+  Get-Process -Name StudyStash -ErrorAction SilentlyContinue | Stop-Process -Force
+  if (Test-Path -Path $veloKey) { $u = Start-Process "cmd.exe" -ArgumentList "/c", (Get-ItemProperty -Path $veloKey).QuietUninstallString -PassThru; $null = $u.Handle; $null = $u.WaitForExit(300000) }
 } finally {
   Stop-Process -Id $server.Id -Force -ErrorAction SilentlyContinue
   Copy-Item (Join-Path $logs "*.log") $Res -ErrorAction SilentlyContinue

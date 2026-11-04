@@ -72,6 +72,45 @@ public class AppUpdatesTests
     }
 
     [Fact]
+    public async Task With_auto_updates_off_a_move_at_the_same_version_says_finish_updating_not_a_new_version()
+    {
+        var same = Release(Engine.Version);
+        var told = new List<UpdateNews>();
+        var updates = Updates_(onDisk: Engine.Version, automatic: false, latest: () => Task.FromResult<Release?>(same), moves: _ => true, told: told);
+
+        Assert.Equal("available", await updates.RoundAsync());
+        Assert.True(updates.FoundIsMove);
+        Assert.Equal(AppUpdates.MoveOnly, told.Single().Why);
+        var check = await updates.CheckAsync();
+        Assert.Equal(AppUpdates.MoveOnly, check.Why);
+        var (line, canUpdate) = StudyStash.App.ViewModels.NoticeWords.UpdateChecked(check, Engine.Version);
+        Assert.Contains("finish updating", line);
+        Assert.DoesNotContain("is out", line);
+        Assert.True(canUpdate);
+        Assert.Equal("Finish updating", new StudyStash.App.ViewModels.PanelModel { UpdateIsMove = true, UpdateVersion = Engine.Version }.UpdateWords);
+    }
+
+    [Fact]
+    public async Task A_failed_move_says_why_in_its_own_words()
+    {
+        var told = new List<UpdateNews>();
+        var updates = new AppUpdates
+        {
+            Latest = () => Task.FromResult<Release?>(Release(Engine.Version)), Idle = () => true, Enabled = () => true,
+            OnDiskVersion = () => Engine.Version, Apply = (_, _, _, _) => Task.FromResult(false), Moves = _ => true,
+            FailedWhy = () => Bridge.NeedsFuse, RelaunchAndQuit = () => { }, Tell = told.Add, Log = _ => { }, Home = "unused",
+        };
+
+        Assert.Equal("install failed", await updates.RoundAsync());
+        Assert.Equal(Bridge.NeedsFuse, told.Single(n => n.Kind == UpdateNewsKind.Failed).Why);
+        var (title, text, action) = StudyStash.App.ViewModels.NoticeWords.MoveFailed(Bridge.NeedsFuse, Engine.Version);
+        Assert.Contains("libfuse2", text);
+        Assert.DoesNotContain("tries again later", text);
+        Assert.Null(action);
+        Assert.Contains("a week", StudyStash.App.ViewModels.NoticeWords.MoveFailed("", Engine.Version).Text);
+    }
+
+    [Fact]
     public async Task Disabled_never_checks_for_a_release()
     {
         bool asked = false;
