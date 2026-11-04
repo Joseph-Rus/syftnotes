@@ -194,6 +194,12 @@ public static class Engines
     public static string NotesNeedSignIn(string name) =>
         $"{NotesBecause}{name}{SignInAgain} Sign in from Settings → Your AI, and they're written then.";
 
+    /// <summary>An AI that couldn't be reached, as a student is told wherever it shows: the setup chats, Ask.</summary>
+    public static string CouldntBeReached(string brand) => $"{brand} couldn't be reached. Check your internet connection.";
+
+    /// <summary>An AI that stopped without an answer worth showing: the setup chats' words, and Ask's.</summary>
+    public static string DidntAnswer(string brand) => $"{brand} didn't answer. Try again.";
+
     /// <summary>Why a lecture has no notes yet when no AI is chosen to write them: its reason on every page, until a first
     /// AI is chosen (<see cref="Store.RequeueNoAi"/> then writes them).</summary>
     public const string NotesNeedAnAi = "Your notes aren't written yet because no AI writes them. Choose one in Settings → Your AI, and they're written then.";
@@ -289,6 +295,11 @@ public static class Engines
     static bool LimitedNow(string id, AiSettings settings, EngineChecks checks) =>
         settings.Limits.TryGetValue(id, out string? until) && DateTime.TryParse(until, CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind, out var t)
         && t > checks.Now();
+
+    /// <summary>Whether a job whose AI can't answer may go to Ollama instead: Fallback is on, and Ollama is installed on
+    /// this computer to take it (a student on Gemini alone never set it up). The one rule for Ask, the notes, and what
+    /// Settings says about them.</summary>
+    public static bool CanFallBack(AiSettings settings, EngineChecks checks) => settings.Fallback && checks.OllamaInstalled();
 
     /// <summary>
     /// Whether an engine (never Ollama, the fallback itself) is known unusable right now — not installed, not
@@ -395,7 +406,7 @@ public static class Engines
         var ollama = engines[0];
         // Nobody chosen yet (a fresh library): an Ollama that isn't running is no problem to report.
         bool ollamaMatters = (settings.Picked("notes") || settings.Picked("ask"))
-            && (settings.For("notes").Provider == "ollama" || settings.For("ask").Provider == "ollama" || settings.Fallback);
+            && (settings.For("notes").Provider == "ollama" || settings.For("ask").Provider == "ollama" || CanFallBack(settings, checks));
         if (ollamaMatters && ollama.State == "not_running" && !Dismissed("engine_offline:ollama"))
             problems.Add(new AiProblemInfo("engine_offline:ollama", "engine_offline", "ollama", ollama.Name));
         if (ollamaMatters && ollama.State == "model_missing" && !Dismissed("model_missing:ollama"))
@@ -409,7 +420,7 @@ public static class Engines
             if (Dismissed(pid) || problems.Any(p => p.Id == pid)) continue;
             var row = engines.First(e => e.Id == id);
             if (row.State != "not_signed_in") continue;
-            problems.Add(new AiProblemInfo(pid, "not_signed_in", id, row.Name) { FallbackTo = settings.Fallback ? Name("ollama") : "" });
+            problems.Add(new AiProblemInfo(pid, "not_signed_in", id, row.Name) { FallbackTo = CanFallBack(settings, checks) ? Name("ollama") : "" });
         }
 
         foreach (var (id, until) in settings.Limits)
@@ -423,7 +434,7 @@ public static class Engines
         // Who draws the diagrams now: nobody when they're off, the designer the pick comes to, else the notes engine
         // itself (as it writes), the one the notes really go to once a fallback is counted.
         string notesNow = settings.For("notes").Provider;
-        if (notesNow.Length > 0 && notesNow != "ollama" && settings.Fallback && KnownUnusableWhy(notesNow, settings, checks) is not null) notesNow = "ollama";
+        if (notesNow.Length > 0 && notesNow != "ollama" && CanFallBack(settings, checks) && KnownUnusableWhy(notesNow, settings, checks) is not null) notesNow = "ollama";
         string diagrams = DiagramEngines.Normal(settings.Diagrams);
         string by = settings.Kinds() == RichKinds.None || !settings.NotesChosen ? ""
             : (await DiagramEngines.PickAsync(settings, cfg, checks, notesNow))?.Engine ?? notesNow;
