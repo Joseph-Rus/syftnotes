@@ -32,7 +32,7 @@ public class NewPlaceTests
         Write(home["user/Claude/claude_desktop_config.json"],
             """{"mcpServers":{"syft-notes":{"command":"/Applications/Study Stash.app/Contents/MacOS/StudyStash","args":["mcp","--client","claude-desktop"]},"github":{"command":"gh-mcp"}}}""");
         Write(home["user/.codex/config.toml"], "[mcp_servers.syft-notes]\ncommand = \"/Applications/Study Stash.app/Contents/MacOS/StudyStash\"\nargs = [\"mcp\"]\n");
-        Write(home["user/.claude.json"], "{\"mcpServers\":{\"syft-notes\":{\"type\":\"stdio\",\"command\":\"" + other + "\",\"args\":[\"mcp\"]}}}");
+        Write(home["user/.claude.json"], new JsonObject { ["mcpServers"] = new JsonObject { ["syft-notes"] = new JsonObject { ["type"] = "stdio", ["command"] = other, ["args"] = new JsonArray("mcp") } } }.ToJsonString());
         bool relogged = false;
 
         var done = NewPlace.Run(setup, home["study-stash"], now, () => "/Applications/Study Stash.app/Contents/MacOS/StudyStash", () => relogged = true);
