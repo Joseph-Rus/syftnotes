@@ -15,8 +15,8 @@ public class NotesFolderShots
         string home = OperatingSystem.IsWindows() ? @"C:\Users\ada" : "/Users/ada";
         LibraryFolder[] found =
         [
-            new(Path.Combine(home, "OneDrive - Example University", "Documents", "Study Stash"), 4, false, new DateOnly(2026, 11, 2), true),
-            new(Path.Combine(home, "OneDrive", "Documents", "Study Stash"), 38, false, new DateOnly(2026, 10, 3), false),
+            new(Path.Combine(home, "OneDrive - Example University", "Documents", "Study Stash"), 4, new DateOnly(2026, 11, 2), true),
+            new(Path.Combine(home, "OneDrive", "Documents", "Study Stash"), 38, new DateOnly(2026, 10, 3), false),
         ];
         var model = new NotesFolderPickModel(found, home, (_, _, progress, _) =>
             {

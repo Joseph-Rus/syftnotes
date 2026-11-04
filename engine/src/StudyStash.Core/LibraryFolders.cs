@@ -3,10 +3,9 @@ using System.Text.RegularExpressions;
 
 namespace StudyStash.Core;
 
-/// <summary>A folder on this computer that holds a Syft Notes library: where it is, how many lectures' notes it has
-/// (counted up to <see cref="LibraryFolders.CountCap"/>; <paramref name="Capped"/> when there are more), the day of
-/// its newest one, and whether it's the one the library uses now.</summary>
-public sealed record LibraryFolder(string Path, int Lectures, bool Capped, DateOnly? Newest, bool InUse);
+/// <summary>A folder on this computer that holds a Syft Notes library: where it is, how many lectures' notes it has, the
+/// day of its newest one, and whether it's the one the library uses now.</summary>
+public sealed record LibraryFolder(string Path, int Lectures, DateOnly? Newest, bool InUse);
 
 /// <summary>
 /// The library folders on this computer, when there may be more than one. A student's Documents can move (OneDrive
@@ -14,20 +13,16 @@ public sealed record LibraryFolder(string Path, int Lectures, bool Capped, DateO
 /// a second Documents/Study Stash beside the first, with no word said. The app asks which one to use when it finds two
 /// or more (Shell's library folder question); nothing here moves, merges or deletes a file.
 /// <para>A folder counts only if it really holds a library: a class folder with at least one lecture's notes in it
-/// (<c>&lt;folder&gt;/&lt;Class&gt;/*.md</c>, as the library files them). Each is looked at only one level deep, and
-/// counting stops at <see cref="CountCap"/>, so a look is quick even in a folder OneDrive keeps online.</para>
+/// (<c>&lt;folder&gt;/&lt;Class&gt;/*.md</c>, as the library files them). Each is looked at only one level deep, by
+/// name only, so a look is quick even in a folder OneDrive keeps online.</para>
 /// </summary>
 public static partial class LibraryFolders
 {
-    /// <summary>The names a library folder has had: Study Stash is the one the app has always made; the others are the
-    /// app's later names, looked for in case a student named theirs after it.</summary>
-    public static readonly string[] Names = ["Study Stash", "Syft Notes", "Egghead Notes"];
+    /// <summary>The library folder's name: the one the app has always made.</summary>
+    public const string Name = "Study Stash";
 
     /// <summary>The first versions (before the app) kept the library in the home folder, under this name.</summary>
     public const string OldestName = "GranolaShare";
-
-    /// <summary>Lectures counted in one folder before the count stops.</summary>
-    public const int CountCap = 5000;
 
     /// <summary>The library folders on this computer, the one in use (<paramref name="inUse"/>, config.toml's
     /// pool_dir) first, then the newest first.</summary>
@@ -96,9 +91,7 @@ public static partial class LibraryFolders
         }
         var places = new List<string>();
         if (inUse is { Length: > 0 }) places.Add(inUse);
-        foreach (string d in docs)
-            foreach (string name in Names)
-                places.Add(Path.Combine(d, name));
+        places.AddRange(docs.Select(d => Path.Combine(d, Name)));
         places.Add(Path.Combine(userHome, OldestName));
         return places;
     }
@@ -132,7 +125,7 @@ public static partial class LibraryFolders
                 {
                     var day = DayOf(note);
                     if (newest is null || day > newest) newest = day;
-                    if (++count >= CountCap) return new LibraryFolder(dir, count, true, newest, inUse);
+                    count++;
                 }
             }
         }
@@ -140,7 +133,7 @@ public static partial class LibraryFolders
         {
             // Gone, or turned away part-way: what was counted stands.
         }
-        return count > 0 ? new LibraryFolder(dir, count, false, newest, inUse) : null;
+        return count > 0 ? new LibraryFolder(dir, count, newest, inUse) : null;
     }
 
     /// <summary>A lecture's day: its file name starts with it ("2026-10-02 Cell division.md"), else the day the file
@@ -202,7 +195,7 @@ public static partial class LibraryFolders
         var bits = rest.Split(Seps, StringSplitOptions.RemoveEmptyEntries).ToList();
         // A Mac's cloud folders live in ~/Library/CloudStorage/<provider>.
         if (underHome && bits.Count >= 3 && bits[0] == "Library" && bits[1] == "CloudStorage") bits.RemoveRange(0, 2);
-        int cloud = bits.FindLastIndex(b => b.StartsWith("OneDrive", StringComparison.OrdinalIgnoreCase) || b.StartsWith("GoogleDrive", StringComparison.Ordinal));
+        int cloud = bits.FindLastIndex(b => b.StartsWith("OneDrive", StringComparison.OrdinalIgnoreCase));
         if (cloud >= 0)
         {
             parts.Add(Cloud(bits[cloud]));
@@ -217,15 +210,14 @@ public static partial class LibraryFolders
         {
             parts.Add(parent);
         }
-        if (!name.Equals(Names[0], StringComparison.OrdinalIgnoreCase)) parts.Add(name);
+        if (!name.Equals(Name, StringComparison.OrdinalIgnoreCase)) parts.Add(name);
         return string.Join(" › ", parts);
     }
 
     /// <summary>"OneDrive" and "OneDrive-Personal" → OneDrive – Personal; "OneDrive - Example University" (Windows) or
-    /// "OneDrive-Example University" (a Mac) → OneDrive – Example University; Google Drive's folder → Google Drive.</summary>
+    /// "OneDrive-Example University" (a Mac) → OneDrive – Example University.</summary>
     static string Cloud(string folder)
     {
-        if (folder.StartsWith("GoogleDrive", StringComparison.Ordinal)) return "Google Drive";
         string who = folder["OneDrive".Length..].TrimStart(' ', '-', '–').Trim();
         return $"OneDrive – {(who.Length == 0 ? "Personal" : who)}";
     }

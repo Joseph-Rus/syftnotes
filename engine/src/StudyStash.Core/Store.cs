@@ -596,7 +596,8 @@ public sealed partial class Store : IDisposable
         lock (gate)
         {
             if (Get(m.Id) is not null) return false;
-            Save(m, c, summaryMd, summaryModel, error, keepText: string.IsNullOrEmpty(noteText) ? null : noteText);
+            string path = Save(m, c, summaryMd, summaryModel, error);
+            if (!string.IsNullOrEmpty(noteText)) File.WriteAllText(path, noteText, new System.Text.UTF8Encoding(false));
             return true;
         }
     }
@@ -613,8 +614,7 @@ public sealed partial class Store : IDisposable
             var c = new Classification(string.IsNullOrEmpty(row.ClassName) ? Configs.Unsorted : row.ClassName, row.Confidence ?? 0,
                 row.ClassifiedBy ?? "", row.LectureTitle ?? "", JsonList(row.Topics));
             string text = Notes.Render(m, c, row.SummaryMd ?? "", row.SummaryModel ?? "");
-            string path = Py.NormPath(want);
-            for (int i = 2; File.Exists(path); i++) path = Path.Combine(Py.Parent(want), $"{Path.GetFileNameWithoutExtension(want)} ({i}).md");
+            string path = FreeBeside(Py.NormPath(want));
             WriteWhole(path, OperatingSystem.IsWindows() ? text.Replace("\n", "\r\n") : text);
             Exec("UPDATE notes SET md_path=? WHERE id=?", path, id);
             return path;
@@ -1091,9 +1091,7 @@ public sealed partial class Store : IDisposable
             {
                 // Another lecture's file there since (one of the same class, day and title, or the folder in use's own
                 // after a switch of folders): this one comes back beside it, "name (2).md", never over it.
-                string path = back.MdPath;
-                for (int i = 2; File.Exists(path) && Py.ReadText(path) != text.Replace("\r\n", "\n"); i++)
-                    path = Path.Combine(Py.Parent(back.MdPath), $"{Path.GetFileNameWithoutExtension(back.MdPath)} ({i}).md");
+                string path = FreeBeside(back.MdPath, p => Py.ReadText(p) == text.Replace("\r\n", "\n"));
                 if (path != back.MdPath)
                 {
                     Exec("UPDATE notes SET md_path=? WHERE id=?", path, noteId);
@@ -1194,6 +1192,17 @@ public sealed partial class Store : IDisposable
             foreach (var (id, row) in moved) Exec("UPDATE trash SET row_json=? WHERE id=?", row, id);
             return moved.Count;
         }
+    }
+
+    /// <summary><paramref name="want"/>, or the first of "name (2).ext", "name (3).ext"… beside it, that has no file
+    /// (nor is in <paramref name="reserved"/>, which it joins), or whose file <paramref name="reuse"/> accepts.</summary>
+    public static string FreeBeside(string want, Func<string, bool>? reuse = null, ISet<string>? reserved = null)
+    {
+        string path = want;
+        for (int i = 2; File.Exists(path) && reuse?.Invoke(path) != true || reserved?.Contains(path) == true; i++)
+            path = Path.Combine(Py.Parent(want), $"{Path.GetFileNameWithoutExtension(want)} ({i}){Path.GetExtension(want)}");
+        reserved?.Add(path);
+        return path;
     }
 
     /// <summary>Writes <paramref name="text"/> as the whole of <paramref name="path"/> or not at all: into a hidden file

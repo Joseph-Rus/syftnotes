@@ -278,11 +278,38 @@ public sealed class LibraryBringInTests
         main.Store.AddAttachment(new Attachment("handout", "handout.pdf", "handout.pdf", "Thermodynamics", null, new FileInfo(handoutThere).Length, "application/pdf", "2026-09-10"));
         foreach (string id in new[] { "page-a", "page-b" })
             main.Store.AddAttachment(new Attachment(id, "page 1.jpg", "page 1.jpg", "Thermodynamics", null, 0, "image/jpeg", "2026-10-01"));
+        string dirHere = Path.Combine(school, "Thermodynamics", Store.AttachmentsFolder), dirThere = Path.Combine(personal, "Thermodynamics", Store.AttachmentsFolder);
+        // The same slides on two lectures: two names, the same bytes, only in the old folder.
+        foreach (string name in new[] { "week 3.pdf", "week 3 (2).pdf" })
+        {
+            File.WriteAllText(Path.Combine(dirThere, name), "%PDF week three");
+            main.Store.AddAttachment(new Attachment(name, name, name, "Thermodynamics", null, 15, "application/pdf", "2026-09-21"));
+        }
+        // A sheet added in this folder and annotated since (its listed size is the original's, which the old folder has).
+        File.WriteAllText(Path.Combine(dirThere, "sheet.pdf"), "%PDF sheet");
+        File.WriteAllText(Path.Combine(dirHere, "sheet.pdf"), "%PDF sheet, annotated here");
+        main.Store.AddAttachment(new Attachment("sheet", "sheet.pdf", "sheet.pdf", "Thermodynamics", null, 10, "application/pdf", "2026-10-20"));
+        // Two scans of one name: A's file is gone from the old folder, B was uploaded here.
+        File.WriteAllText(Path.Combine(dirHere, "scan.jpg"), "B's scan");
+        main.Store.AddAttachment(new Attachment("scan-a", "scan.jpg", "scan.jpg", "Thermodynamics", null, 99, "image/jpeg", "2026-09-01"));
+        main.Store.AddAttachment(new Attachment("scan-b", "scan.jpg", "scan.jpg", "Thermodynamics", null, 8, "image/jpeg", "2026-10-30"));
 
+        var plan = LibraryBringIn.Plan(main.Store, main.Cfg, school, personal, home);
         var did = LibraryBringIn.Apply(main.Store, main.Cfg, personal, home);
 
-        // slides beside, the handout in, the second page beside, and the old photo of IMG_0001.jpg's name as its own.
-        Assert.Equal(4, did.Files);
+        // slides beside, the handout in, the second page beside, the old IMG_0001.jpg as its own, both weeks in, and the
+        // sheet's original beside: what was said, done.
+        Assert.Equal(7, did.Files);
+        Assert.Equal(plan.Files, did.Files);
+        foreach (string name in new[] { "week 3.pdf", "week 3 (2).pdf" })
+            Assert.Equal("%PDF week three", File.ReadAllText(main.Store.AttachmentPath(main.Store.GetAttachment(name)!)));
+        // The annotated sheet the attachment moved off (to the old original) is listed as the class's own, not hidden.
+        Assert.Contains(main.Store.ListAttachments("Thermodynamics"), a => a.Id != "sheet"
+            && File.Exists(main.Store.AttachmentPath(a)) && File.ReadAllText(main.Store.AttachmentPath(a)) == "%PDF sheet, annotated here");
+        // The scans never share a file: removing A leaves B's.
+        Assert.NotEqual(main.Store.AttachmentPath(main.Store.GetAttachment("scan-a")!), main.Store.AttachmentPath(main.Store.GetAttachment("scan-b")!));
+        Assert.True(main.Store.RemoveAttachment("scan-a"));
+        Assert.Equal("B's scan", File.ReadAllText(main.Store.AttachmentPath(main.Store.GetAttachment("scan-b")!)));
         // X's file was gone: it's written afresh from its row, at a path of its own.
         string x = main.Store.Get("x")!.MdPath!;
         Assert.Contains("X's notes.", File.ReadAllText(x));
