@@ -1112,7 +1112,7 @@
                               <Border Grid.Column="2" Classes="field"><TextBox Classes="bare" Text="{Binding Name}" FontWeight="Medium" VerticalAlignment="Center" LostFocus="OnClassLostFocus" AutomationProperties.Name="Class name" /></Border>
                               <Border Grid.Column="4" Classes="field"><TextBox Classes="bare" Text="{Binding Aliases}" PlaceholderText="Other names, like cs101" VerticalAlignment="Center" LostFocus="OnClassLostFocus" /></Border>
                               <Button Grid.Column="6" Theme="{StaticResource Surface}" Width="30" Height="30" CornerRadius="{DynamicResource RadiusControl}" HorizontalContentAlignment="Center"
-                                      Command="{Binding $parent[UserControl].((s:SettingsModel)DataContext).Lib.RemoveClassCommand}" CommandParameter="{Binding}" ToolTip.Tip="Remove the class (its lectures stay)" AutomationProperties.Name="Remove the class">
+                                      Command="{Binding $parent[UserControl].((s:SettingsModel)DataContext).Lib.RemoveClassCommand}" CommandParameter="{Binding}" ToolTip.Tip="Remove the class" AutomationProperties.Name="Remove the class">
                                 <c:Icon Glyph="close" Size="15" Foreground="{DynamicResource Fg3}" />
                               </Button>
                               <Border Grid.Row="2" Grid.Column="2" Grid.ColumnSpan="3" Classes="field">
@@ -1132,7 +1132,7 @@
                         <Button Grid.Column="6" Classes="btn sm" Command="{Binding Lib.AddClassCommand}" VerticalAlignment="Center"><TextBlock Text="Add" /></Button>
                       </Grid>
                     </Border>
-                    <TextBlock Classes="say" Text="Renaming or removing a class keeps its lectures where they are." />
+                    <TextBlock Classes="say" Text="Renaming a class takes its lectures with it. Removing one moves them to Unsorted." />
                   </StackPanel>
 
                   <!-- Notes and sorting -->

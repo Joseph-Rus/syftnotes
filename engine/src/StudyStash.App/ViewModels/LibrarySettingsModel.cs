@@ -22,6 +22,23 @@ public sealed partial class LibraryClassRow : ObservableObject
     public string Folder { get; init; } = "";
     public int Lectures { get; init; }
     public IBrush Dot { get; init; } = Brushes.Gray;
+    /// <summary>The sidebar section it's in: "" for Classes, else a folder of the student's own ("Clubs"), whose
+    /// recordings are meetings.</summary>
+    public string Group { get; init; } = "";
+    /// <summary>What removing it does, asked before: "Its 12 lectures move to Unsorted. Nothing is deleted."</summary>
+    public string RemoveWords
+    {
+        get
+        {
+            string noun = Nouns.For(Name, Group);
+            return Lectures switch
+            {
+                0 => $"It has no {noun}s. Nothing is deleted.",
+                1 => $"Its 1 {noun} moves to {Configs.Unsorted}. Nothing is deleted.",
+                _ => $"Its {Lectures} {noun}s move to {Configs.Unsorted}. Nothing is deleted.",
+            };
+        }
+    }
     /// <summary>"12 lectures · …/Lecture notes/CS 101", under the class.</summary>
     public string Meta => (Lectures == 1 ? "1 lecture" : $"{Lectures} lectures") + (Folder.Length > 0 ? " · " + Folder : "");
 }
@@ -426,7 +443,7 @@ public sealed partial class LibrarySettingsModel : ObservableObject
             int i = 0;
             var classes = (s["classes"] as JsonArray ?? []).OfType<JsonObject>().Select(c => new LibraryClassRow
             {
-                Name = Str(c["name"]), Was = Str(c["name"]), Description = Str(c["description"]), Folder = Str(c["folder"]),
+                Name = Str(c["name"]), Was = Str(c["name"]), Description = Str(c["description"]), Folder = Str(c["folder"]), Group = Str(c["group"]),
                 Aliases = string.Join(", ", (c["aliases"] as JsonArray ?? []).Select(Str).Where(a => a.Length > 0)),
                 Lectures = c["lectures"] is JsonValue cl && cl.TryGetValue(out int k) ? k : 0, Dot = Skin.ClassDot(i++),
             }).ToList();
@@ -732,6 +749,8 @@ public sealed partial class LibrarySettingsModel : ObservableObject
     [RelayCommand]
     async Task RemoveClass(LibraryClassRow row)
     {
+        string name = row.Name.Trim().Length > 0 ? row.Name.Trim() : row.Was;
+        if (!await Confirmer.AskAsync(new ConfirmAsk($"Remove {name}?", row.RemoveWords, "Remove"))) return;
         Classes.Remove(row);
         await SendClassesAsync($"{row.Name}");
     }

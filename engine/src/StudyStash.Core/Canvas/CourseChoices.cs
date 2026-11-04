@@ -161,6 +161,20 @@ public static partial class CourseChoices
         return outcome;
     }
 
+    /// <summary>A class taken off the library's list: its Canvas course is un-ticked and stops syncing, as
+    /// <see cref="Apply"/> with keep does it (its Canvas files stay). Only this course: <see cref="Apply"/> would also let
+    /// go of any linked course missing from the last course lookup. Nothing when the class had no course.</summary>
+    public static void Unlink(string home, string cls)
+    {
+        if (!CanvasSettings.Load(home).Courses.ContainsKey(cls)) return;
+        CanvasSettings.Update(home, s =>
+        {
+            if (!s.Courses.Remove(cls, out long id)) return;
+            s.Scouts.Remove(cls);
+            s.Chosen?.Remove(Id(id));
+        });
+    }
+
     /// <summary>Why courses can't be dropped with their files right now, or null when they can.</summary>
     public static string? Blocked(Crawl? crawl) => ClassRename.Blocked(crawl);
 

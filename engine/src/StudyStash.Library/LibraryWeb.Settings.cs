@@ -265,6 +265,44 @@ public sealed partial class LibraryWeb
         return [.. cfg.Classes.Where(c => !had.Contains(c.Name) && !sent.Any(s => s.Name.Equals(c.Name, StringComparison.OrdinalIgnoreCase)))];
     }
 
+    /// <summary>The library's classes a new class list leaves out (renames are done by then, so a renamed class is in
+    /// it under its new name): the ones removed.</summary>
+    List<string> Removed(List<ClassDef> classes) =>
+        [.. cfg.Classes.Select(c => c.Name).Where(n => !classes.Any(c => c.Name.Equals(n, StringComparison.OrdinalIgnoreCase)))];
+
+    /// <summary>Classes taken off the list, in the app's Settings or on this page: their lectures move to Unsorted, the
+    /// way "Move to" moves one, the class's folder goes once nothing is left in it, and its Canvas course stops syncing
+    /// (its Canvas files stay). Nothing else is deleted.</summary>
+    void ClassesRemoved(List<string> removed)
+    {
+        foreach (string cls in removed)
+        {
+            var lectures = store.ListNotes(cls)
+                .Concat(store.Processing().Where(n => n.Status is Store.Queued or Store.Working && string.Equals(n.ClassName, cls, StringComparison.OrdinalIgnoreCase)))
+                .DistinctBy(n => n.Id).ToList();
+            foreach (var lecture in lectures) store.SetClass(lecture.Id, Configs.Unsorted);
+            DropIfEmpty(store.ClassFolder(cls));
+            StudyStash.Core.Canvas.CourseChoices.Unlink(cfg.Home, cls);
+            Console.WriteLine($"[classes] removed {cls}: {lectures.Count} lectures moved to {Configs.Unsorted}");
+        }
+    }
+
+    /// <summary>Deletes <paramref name="dir"/> when it holds no file, however deep (empty Attachments or Canvas folders
+    /// left behind); a folder with any file in it stays, and so does that file.</summary>
+    static void DropIfEmpty(string dir)
+    {
+        if (!Directory.Exists(dir)) return;
+        foreach (string sub in Directory.EnumerateDirectories(dir)) DropIfEmpty(sub);
+        try
+        {
+            if (!Directory.EnumerateFileSystemEntries(dir).Any()) Directory.Delete(dir);
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException)
+        {
+            Console.WriteLine($"[classes] kept the folder {Path.GetFileName(dir)}: {e.Message}");
+        }
+    }
+
     /// <summary>Changes what the body names and leaves the rest; null when done, or why not (nothing is changed then).</summary>
     IResult? ChangeSettings(JsonObject body)
     {
@@ -340,6 +378,7 @@ public sealed partial class LibraryWeb
             var linked = folders ?? Folders.Load(cfg.Home);
             folders = [.. linked.Select(f => renames.FirstOrDefault(r => r.From == f.Class) is { } r ? f with { Class = r.To } : f)];
         }
+        List<string> removed = classes is null ? [] : Removed(classes);
         if (classes is not null) cfg.Classes = classes;
         if (body["notes"] is JsonObject notes)
         {
@@ -357,6 +396,7 @@ public sealed partial class LibraryWeb
             cfg.Uses = [.. uses.Select(n => n is JsonValue v && v.TryGetValue(out string? u) ? u.Trim().ToLowerInvariant() : "")
                 .Where(u => Config.UseKinds.Contains(u)).Distinct()];
         Configs.Save(cfg);
+        ClassesRemoved(removed);
         if (terminal is not null || sortEngine is not null)
         {
             var picked = AiSettings.Load(cfg.Home);
