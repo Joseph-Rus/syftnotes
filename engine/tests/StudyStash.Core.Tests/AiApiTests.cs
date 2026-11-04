@@ -137,12 +137,12 @@ public class AiApiTests
     }
 
     [Fact]
-    public async Task Ask_with_no_internet_and_no_Ollama_says_the_AI_couldnt_be_reached_instead_of_that_Ollama_isnt_installed()
+    public async Task Ask_with_no_Ollama_says_what_is_wrong_with_the_AI_in_plain_words_and_never_asks_Ollama()
     {
         using var dir = new TempDir();
         var cfg = Cfg(dir);
         using var store = new Store(cfg.DbPath, cfg.PoolDir);
-        var gemini = new ScriptedAi("gemini", "Gemini") { Script = [AiEvent.Error("fetch failed: getaddrinfo ENOTFOUND generativelanguage.googleapis.com")] };
+        var gemini = new ScriptedAi("gemini", "Gemini");
         var ollama = new ScriptedAi("ollama") { Script = [AiEvent.Error("Ollama isn't installed (https://ollama.com/download)")] };
         var ai = new AiJobs(cfg.Home)
         {
@@ -153,9 +153,20 @@ public class AiApiTests
         await using var site = await Site(cfg, store, ai);
         var remote = new AiRemote("http://localhost", "pw", site.Client);
 
-        var refused = await Assert.ThrowsAsync<LibraryRefusedException>(() =>
-            remote.AskAsync(new AskRequest("What happened?") { Engine = "gemini", Live = "Something happened today." }));
-        Assert.Equal((503, Engines.CouldntBeReached("Gemini")), (refused.Status, refused.Message));
+        // No internet; any other failure; and last, one that says it isn't signed in (which the library remembers).
+        (string Raw, string Said)[] cases =
+        [
+            ("fetch failed: getaddrinfo ENOTFOUND generativelanguage.googleapis.com", Engines.CouldntBeReached("Gemini")),
+            ("""{"type":"error","message":"INTERNAL: upstream stream closed"}""", Engines.DidntAnswer("Gemini")),
+            ("""{"type":"error","message":"Not logged in · Please run /login"}""", "Gemini isn't signed in on your library."),
+        ];
+        foreach (var (raw, said) in cases)
+        {
+            gemini.Script = [AiEvent.Error(raw)];
+            var refused = await Assert.ThrowsAsync<LibraryRefusedException>(() =>
+                remote.AskAsync(new AskRequest("What happened?") { Engine = "gemini", Live = "Something happened today." }));
+            Assert.Equal((503, said), (refused.Status, refused.Message));
+        }
         Assert.Empty(ollama.Prompts);
     }
 
