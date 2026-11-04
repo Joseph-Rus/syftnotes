@@ -47,6 +47,13 @@
       <Setter Property="Padding" Value="8,4" />
       <Setter Property="CornerRadius" Value="6" />
     </Style>
+    <!-- A slide's card above the transcript line it was taught at. -->
+    <Style Selector="Border.slide-note">
+      <Setter Property="Background" Value="{DynamicResource SurfaceRaised}" />
+      <Setter Property="CornerRadius" Value="{DynamicResource RadiusControl}" />
+      <Setter Property="Padding" Value="{DynamicResource Inset2}" />
+      <Setter Property="HorizontalAlignment" Value="Left" />
+    </Style>
     <Style Selector="Border.heard.here">
       <Setter Property="Background" Value="{DynamicResource Hover}" />
     </Style>
@@ -224,6 +231,11 @@
             <c:BySkin Name="LectureAttachments" Mac="{x:Type v:MacAttachments}" Win="{x:Type v:WinAttachments}"
                       DataContext="{Binding $parent[UserControl].((vm:LibraryModel)DataContext).LectureFiles}" />
           </Panel>
+
+          <!-- The slides of an attached deck, in the order they came up in the lecture (a test build's library only) -->
+          <v:SlideStrip Name="Slides" Margin="0,14,0,0" HorizontalAlignment="Stretch"
+                        IsVisible="{Binding $parent[UserControl].((vm:LibraryModel)DataContext).LectureFiles.ShowSlides, FallbackValue=False}"
+                        DataContext="{Binding $parent[UserControl].((vm:LibraryModel)DataContext).LectureFiles}" />
 
           <!-- The notes: 68 characters wide (704), 16 on 26 -->
           <StackPanel Name="NotesBody" IsVisible="{Binding ShowNotes}" MaxWidth="704" HorizontalAlignment="Left" Margin="0,18,0,0">
@@ -560,14 +572,33 @@
               </ItemsControl.ItemsPanel>
               <ItemsControl.ItemTemplate>
                 <DataTemplate x:DataType="vm:HeardLine">
-                  <!-- The line a diagram pointed to ("where was this said"), marked -->
-                  <Border Classes="heard" Classes.here="{Binding Here}">
-                    <Grid ColumnDefinitions="Auto,*">
-                      <Button Classes="heard-time num" Content="{Binding Time}" IsVisible="{Binding Time, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" Click="OnTime"
-                              AutomationProperties.Name="{Binding Time}" />
-                      <c:PageText Grid.Column="1" Text="{Binding Text}" CopyLead="{Binding CopyLead}" FontSize="{DynamicResource FontSubtitle}" LineHeight="26.4" TextWrapping="Wrap" />
-                    </Grid>
-                  </Border>
+                  <StackPanel Spacing="{DynamicResource Space3}">
+                    <!-- The slides the library found were taught here: small cards above the line (none for most lines) -->
+                    <ItemsControl Name="LineSlides" ItemsSource="{Binding Slides}" IsVisible="{Binding HasSlides}">
+                      <ItemsControl.ItemsPanel>
+                        <ItemsPanelTemplate><StackPanel Spacing="{DynamicResource Space1}" /></ItemsPanelTemplate>
+                      </ItemsControl.ItemsPanel>
+                      <ItemsControl.ItemTemplate>
+                        <DataTemplate x:DataType="vm:SlideItem">
+                          <Border Classes="slide-note" AutomationProperties.Name="{Binding Said}">
+                            <Grid ColumnDefinitions="Auto,*" ColumnSpacing="{DynamicResource Space2}">
+                              <c:Icon Glyph="slideshow" Size="14" Foreground="{DynamicResource TextMuted}" VerticalAlignment="Center" />
+                              <TextBlock Grid.Column="1" Text="{Binding Line}" FontSize="{DynamicResource FontCaption}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis"
+                                         VerticalAlignment="Center" ToolTip.Tip="{Binding Line}" c:Tips.WhenCut="True" />
+                            </Grid>
+                          </Border>
+                        </DataTemplate>
+                      </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                    <!-- The line a diagram pointed to ("where was this said"), marked -->
+                    <Border Classes="heard" Classes.here="{Binding Here}">
+                      <Grid ColumnDefinitions="Auto,*">
+                        <Button Classes="heard-time num" Content="{Binding Time}" IsVisible="{Binding Time, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" Click="OnTime"
+                                AutomationProperties.Name="{Binding Time}" />
+                        <c:PageText Grid.Column="1" Text="{Binding Text}" CopyLead="{Binding CopyLead}" FontSize="{DynamicResource FontSubtitle}" LineHeight="26.4" TextWrapping="Wrap" />
+                      </Grid>
+                    </Border>
+                  </StackPanel>
                 </DataTemplate>
               </ItemsControl.ItemTemplate>
             </ItemsControl>

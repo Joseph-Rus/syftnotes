@@ -15,7 +15,8 @@ public static partial class Shell
             Controls.NoteView.PhotoSource = null;
             return;
         }
-        var files = new AttachmentsModel(lib, note.ClassName, note.Id)
+        // A slide's card takes the page to its moment in the transcript, and the transcript shows the slides above their lines.
+        var files = new AttachmentsModel(lib, note.ClassName, note.Id, note.ShowAt, note.PinSlides)
         {
             // Once the library is writing them again, the lecture shows that it is.
             Rewriting = () => Avalonia.Threading.Dispatcher.UIThread.Post(() =>

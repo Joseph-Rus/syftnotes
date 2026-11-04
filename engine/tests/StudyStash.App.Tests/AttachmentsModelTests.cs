@@ -19,15 +19,25 @@ public class AttachmentsModelTests
         public List<string> Removed { get; } = [];
         public List<string> Rewritten { get; } = [];
         public int Listed { get; private set; }
+        readonly object listing = new();
+
+        /// <summary>Changes what's kept while the model may be listing it from another thread.</summary>
+        public void Edit(Action change)
+        {
+            lock (listing) change();
+        }
 
         public Task<JsonObject?> AttachmentListAsync(string? className, string? lectureId, CancellationToken stop = default)
         {
-            Listed++;
-            if (Fails is not null) throw Fails;
-            if (Older) return Task.FromResult<JsonObject?>(null);
-            var result = new JsonObject { ["attachments"] = new JsonArray([.. Kept.Select(k => (JsonNode)k.DeepClone())]) };
-            if (lectureId is not null) result["rewrite"] = Rewrite;
-            return Task.FromResult<JsonObject?>(result);
+            lock (listing)
+            {
+                Listed++;
+                if (Fails is not null) throw Fails;
+                if (Older) return Task.FromResult<JsonObject?>(null);
+                var result = new JsonObject { ["attachments"] = new JsonArray([.. Kept.Select(k => (JsonNode)k.DeepClone())]) };
+                if (lectureId is not null) result["rewrite"] = Rewrite;
+                return Task.FromResult<JsonObject?>(result);
+            }
         }
 
         public Task<JsonArray> AttachAsync(IEnumerable<string> paths, string? className, string? lectureId, CancellationToken stop = default)
@@ -258,5 +268,54 @@ public class AttachmentsModelTests
         int after = lib.Listed;
         await Task.Delay(30, TestContext.Current.CancellationToken);
         Assert.Equal(after, lib.Listed);
+    }
+    static JsonObject Slide(int n, string title, double? at) => new() { ["n"] = n, ["title"] = title, ["at"] = at };
+
+    [Fact]
+    public async Task A_deck_makes_cards_the_placed_ones_first_in_time_order_and_waits_while_its_pages_are_read()
+    {
+        using var dir = new TempHome();
+        var lib = new FakeLibrary();
+        var week5 = Item("a", "Week 5 slides.pdf");
+        week5["slides"] = new JsonArray(Slide(1, "Why attention", 600), Slide(2, "Queries and keys", null), Slide(3, "Softmax", 240), Slide(4, "Heads", 600));
+        var week6 = Item("b", "Week 6 slides.pdf");
+        week6["slides"] = null;
+        lib.Kept.AddRange([week5, week6]);
+        double? jumpedTo = null;
+        IReadOnlyList<SlideItem>? onTranscript = null;
+        string? opened = null;
+        using var model = new AttachmentsModel(lib, "CS 101", "l1", at => jumpedTo = at, pinned => onTranscript = pinned)
+        {
+            PollEvery = TimeSpan.FromMilliseconds(5), CacheDir = dir["cache"], OpenFile = p => opened = p,
+        };
+        var loading = model.LoadAsync();
+        await Wait.UntilAsync(() => model.HasPinned, "the slides to show");
+
+        // Placed ones first, by the moment they came up (a tie by number); the rest after, as the deck has them.
+        Assert.Equal(["Softmax", "Why attention", "Heads"], model.PinnedSlides.Select(s => s.Title));
+        Assert.Equal(["Queries and keys"], model.UnpinnedSlides.Select(s => s.Title));
+        Assert.Equal(["04:00", "10:00", "10:00"], model.PinnedSlides.Select(s => s.Moment));
+        Assert.Equal(model.PinnedSlides, onTranscript);
+
+        // The other deck's pages are still being read: it says so, and the list keeps looking.
+        Assert.True(model.ReadingSlides);
+        Assert.False(loading.IsCompleted);
+        lib.Edit(() => week6["slides"] = new JsonArray(Slide(1, "Layer norm", null)));
+        await loading.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+        Assert.False(model.ReadingSlides);
+        Assert.Equal(["Queries and keys", "Layer norm"], model.UnpinnedSlides.Select(s => s.Title));
+
+        // A placed slide takes the page to its moment; one that couldn't be placed opens its deck.
+        await model.OpenSlideCommand.ExecuteAsync(model.PinnedSlides[0]);
+        Assert.Equal(240, jumpedTo);
+        Assert.Null(opened);
+        await model.OpenSlideCommand.ExecuteAsync(model.UnpinnedSlides[1]);
+        Assert.Equal(Path.Combine(dir["cache"], "b", "Week 6 slides.pdf"), opened);
+
+        // Taking the deck away takes its cards away, and the transcript's.
+        await model.RemoveCommand.ExecuteAsync(model.Items.First(i => i.Id == "a"));
+        Assert.False(model.HasPinned);
+        Assert.Empty(onTranscript!);
+        Assert.Equal(["Layer norm"], model.UnpinnedSlides.Select(s => s.Title));
     }
 }

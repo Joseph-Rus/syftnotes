@@ -16,6 +16,11 @@ public sealed partial class HeardLine : ObservableObject
     public double? Start { get; init; }
     /// <summary>The line a diagram's "where was this said" (or its moment) points to, marked until another is.</summary>
     [ObservableProperty] public partial bool Here { get; set; }
+    /// <summary>The slides the library found were taught at this line: each shows as a small card above it.</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HasSlides))]
+    public partial IReadOnlyList<SlideItem> Slides { get; set; } = [];
+    public bool HasSlides => Slides.Count > 0;
     /// <summary>The newest line reads in the full text color; older ones fade to secondary.</summary>
     [ObservableProperty] public partial bool Latest { get; set; }
     /// <summary>How many lines have come after it (0 for the newest): the recorder shows the newest bold and fades the
