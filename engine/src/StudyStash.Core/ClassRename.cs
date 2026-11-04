@@ -122,6 +122,7 @@ public static class ClassRename
         if (all.Any(a => a.ClassName == from)) Assignments.Save(home, all.Select(a => a.ClassName == from ? a with { ClassName = to } : a));
         CanvasSeen.Rename(home, from, to);
         DueMarks.Rename(home, from, to);
+        DueMine.Rename(home, from, to);
         CanvasNotifications.Rename(home, from, to);
         (crawl ?? new Crawl(home, name => Path.Combine(cfg.PoolDir, Notes.FolderName(name)), () => DateTimeOffset.UtcNow, () => TimeZoneInfo.Local))
             .RenameClass(from, to);

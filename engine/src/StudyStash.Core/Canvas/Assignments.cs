@@ -19,10 +19,13 @@ namespace StudyStash.Core.Canvas;
 /// <param name="Mark">What the student did about it in Syft Notes (never in Canvas): "done", "hidden" or "". Put on by
 /// <see cref="DueMarks.Apply"/>, never saved with the list.</param>
 /// <param name="MarkAt">When they did, UTC ISO; "" when they haven't.</param>
+/// <param name="What">For an item of the student's own (<see cref="DueMine"/>, Kind "mine"): exam | study | task; "" for Canvas's.</param>
+/// <param name="AllDay">Their own item has a day and no time (due at the end of it).</param>
 public sealed record Assignment(string ClassName, long Id, string Name, string Due, double? Points, string Status,
     double? Score, string Submitted, string Url, bool Late = false, bool Missing = false, bool Excused = false, string Grade = "",
     string GradedAt = "", string GradingType = "", string Kind = "assignment", string DueAt = "", int? Comments = null,
-    bool MarkedDone = false, string MarkedDoneAt = "", [property: JsonIgnore] string Mark = "", [property: JsonIgnore] string MarkAt = "")
+    bool MarkedDone = false, string MarkedDoneAt = "", [property: JsonIgnore] string Mark = "", [property: JsonIgnore] string MarkAt = "",
+    [property: JsonIgnore] string What = "", [property: JsonIgnore] bool AllDay = false)
 {
     /// <summary>Handed in, doesn't need anything more, or the student ticked it off themselves (in Canvas's planner, or here).</summary>
     public bool Done => Status is "graded" or "submitted" or "excused" or "late" or "closed" || MarkedDone || Mark == DueMarks.Done;
@@ -203,11 +206,12 @@ public static class Assignments
 
     /// <summary>The saved list with the student's own marks on it (<see cref="DueMarks"/>; a hidden one stays, as <c>Mark</c>
     /// "hidden"), for the classes still linked to a Canvas course. Un-ticking a course leaves its rows in the file until the
-    /// next sync; they are gone from here at once, so every list drops them together.</summary>
+    /// next sync; they are gone from here at once, so every list drops them together. The student's own items
+    /// (<see cref="DueMine"/>) join it, with or without Canvas, whatever their class.</summary>
     public static List<Assignment> Marked(string home)
     {
         var linked = CanvasSettings.Load(home).Courses.Keys.ToHashSet();
-        return DueMarks.Apply(Load(home).Where(a => linked.Contains(a.ClassName)), DueMarks.Load(home));
+        return DueMarks.Apply(Load(home).Where(a => linked.Contains(a.ClassName)).Concat(DueMine.Rows(home)), DueMarks.Load(home));
     }
 
     /// <summary>The list as the student sees it: <see cref="Marked"/> with what they hid left out. Every list the app, Ask,

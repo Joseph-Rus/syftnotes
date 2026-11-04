@@ -4,6 +4,7 @@ using Avalonia.Media;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using StudyStash.App.Services;
+using StudyStash.App.ViewModels.Kit;
 
 namespace StudyStash.App.ViewModels;
 
@@ -59,10 +60,20 @@ public sealed partial class DueCalendarModel : ObservableObject
     /// <summary>"Mark done", "Hide" and "Undo", for the rows under the calendar and anything that marks from it.</summary>
     public Kit.DueMarkModel Marks { get; }
 
-    public DueCalendarModel(OverviewModel.Sources s)
+    /// <summary>The form for the student's own items: Add, or one of them clicked.</summary>
+    public Kit.OwnDueFormModel Own { get; }
+
+    /// <summary>The calendar has an Add (there's a library to keep them in).</summary>
+    public bool CanAddOwn => sources.Own is not null;
+
+    [RelayCommand]
+    void AddOwn() => Own.Add(Today);
+
+    public DueCalendarModel(OverviewModel.Sources s, IConfirm? confirm = null)
     {
-        sources = s;
         Marks = new Kit.DueMarkModel(s.Mark);
+        Own = new Kit.OwnDueFormModel(s.Own, s.Mark, [.. s.Classes.Select(c => c.Name)], confirm);
+        sources = s with { OpenOwn = item => Own.Edit(item, s.Zone) };
         var dots = s.Classes.GroupBy(c => c.Name).ToDictionary(g => g.Key, g => g.First().Dot);
         dot = name => dots.TryGetValue(name, out var d) ? d : Brushes.Gray;
         all = [.. (s.Due?.Groups ?? []).SelectMany(g => g.Items.Select(i => (i, Done: g.Key == "handed_in" || !CanvasWords.ToHandIn(i))))
@@ -182,11 +193,15 @@ public sealed partial class DueCalendarModel : ObservableObject
         string sub = missing ? "Missing" : done ? ""
             : at.Date == Today ? $"{(at.Hour >= 17 ? "Tonight" : "Today")} {time}"
             : at is { Hour: 23, Minute: 59 } ? "" : time;
+        // The student's own item has its small kind word in front, in place of Canvas's link: "Exam · 9:00 AM".
+        if (i.Own) sub = sub.Length > 0 ? $"{Kit.OwnDueFormModel.WordFor(i.What)} · {sub}" : Kit.OwnDueFormModel.WordFor(i.What);
         string cls = ClassNames.Display(i.Class);
         bool ticked = i.Mark == "done";
         string state = ticked ? Kit.DueMarkModel.DoneState : done ? "Handed in" : missing ? "Missing" : "";
-        string said = string.Join(", ", new[] { i.Name, cls, $"due {OverviewModel.Day(i.DueAt!.Value, sources.Now, sources.Zone)} at {time}", state }.Where(w => w.Length > 0));
-        return new CalendarItem(i.Class, i.Id, i.Name, sub, missing, done, dot(i.Class), $"{i.Name}, {cls}", said, () => sources.OpenAssignment?.Invoke(i.Class, i.Id), ticked);
+        string day = OverviewModel.Day(i.DueAt!.Value, sources.Now, sources.Zone);
+        string said = string.Join(", ", new[] { i.Name, cls, i.AllDay ? $"due {day}" : $"due {day} at {time}", state }.Where(w => w.Length > 0));
+        return new CalendarItem(i.Class, i.Id, i.Name, sub, missing, done, dot(i.Class), $"{i.Name}, {cls}", said,
+            () => { if (i.Own) sources.OpenOwn?.Invoke(i); else sources.OpenAssignment?.Invoke(i.Class, i.Id); }, ticked);
     }
 
     void Build()

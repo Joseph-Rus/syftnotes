@@ -6,6 +6,15 @@ namespace StudyStash.App.Services;
 /// take it back. What a button that marks calls; <see cref="CanvasFeed.MarkAsync"/> is the real one.</summary>
 public delegate Task<Outcome> DueMarker(string cls, string kind, string id, string mark, CancellationToken stop);
 
+/// <summary>What the student typed for an item of their own on the Due list: <paramref name="Id"/> is "" for a new one;
+/// <paramref name="What"/> exam, study or task; <paramref name="Class"/> "" for none; <paramref name="Day"/> "2026-11-05" and
+/// <paramref name="Time"/> "09:00" or "" (the library works the moments out).</summary>
+public sealed record OwnDueDraft(string Id, string Title, string What, string Class, string Day, string Time);
+
+/// <summary>Adds or changes an item of the student's own, and deletes one: what the form's buttons call.
+/// <see cref="CanvasFeed.SaveOwnAsync"/> and <see cref="CanvasFeed.DeleteOwnAsync"/> are the real ones.</summary>
+public sealed record OwnDueEditor(Func<OwnDueDraft, CancellationToken, Task<Outcome>> Save, Func<string, CancellationToken, Task<Outcome>> Delete);
+
 /// <summary>
 /// What the app shows from Canvas, kept current: what's due (the sidebar's Due and its count, the Due page, the
 /// dropdown's next due, the quick panel's Canvas rows) and every class with its course (a linked class's own page).
@@ -80,10 +89,21 @@ public sealed class CanvasFeed : IDisposable
 
     /// <summary>Marks a Due item done or hidden (or takes the mark back), in Syft Notes only. The library answers with the Due
     /// list as it now stands and this takes it in at once, so Home, Due, the calendar and the sidebar's count change together.</summary>
-    public async Task<Outcome> MarkAsync(string cls, string kind, string id, string mark, CancellationToken stop = default)
+    public Task<Outcome> MarkAsync(string cls, string kind, string id, string mark, CancellationToken stop = default) =>
+        ChangeAsync(client => client.MarkAsync(cls, kind, id, mark, stop), stop);
+
+    /// <summary>Adds an item of the student's own to the Due list, or (with its id) changes it. Taken in like a mark.</summary>
+    public Task<Outcome> SaveOwnAsync(OwnDueDraft draft, CancellationToken stop = default) =>
+        ChangeAsync(client => client.SaveOwnAsync(draft.Id, draft.Title, draft.What, draft.Class, draft.Day, draft.Time, stop), stop);
+
+    /// <summary>Takes an item of the student's own off the Due list. Taken in like a mark.</summary>
+    public Task<Outcome> DeleteOwnAsync(string id, CancellationToken stop = default) =>
+        ChangeAsync(client => client.DeleteOwnAsync(id, stop), stop);
+
+    async Task<Outcome> ChangeAsync(Func<CanvasClient, Task<CanvasApi.DueResponse?>> change, CancellationToken stop)
     {
         if (context.Client is not { } client) return Outcome.Failed(Failure.Offline);
-        var done = await LibraryCall.Run(() => client.MarkAsync(cls, kind, id, mark, stop), stop);
+        var done = await LibraryCall.Run(() => change(client), stop);
         if (done.Value is { } due)
         {
             Due = due;

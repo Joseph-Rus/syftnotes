@@ -33,21 +33,32 @@ public sealed partial class LibraryWeb
             CanvasMarkdown.When(Py.AsString(row?["due_at"]), zone) is { Length: > 0 } at ? at
             : DateTime.TryParse(Py.AsString(row?["due"]), CultureInfo.InvariantCulture, DateTimeStyles.None, out var clock)
                 ? clock.ToString("ddd d MMM yyyy, h:mm tt", CultureInfo.InvariantCulture) : "no due date";
-        string Line(JsonNode? row, string prefix) =>
-            $"- {prefix}{When(row)}: {Py.AsString(row?["class"])}: {Py.AsString(row?["name"])}{(row?["missing"]?.GetValue<bool>() == true ? " (missing)" : "")}";
+        // The student's own items (kind "mine") say so, and one with no class has none to name.
+        bool Own(JsonNode? row) => Py.AsString(row?["kind"]) == DueMine.Kind;
+        string Line(JsonNode? row, string prefix)
+        {
+            string cls = Py.AsString(row?["class"]) is { Length: > 0 } c ? c + ": " : "";
+            string tag = Own(row) ? $" (own {Py.AsString(row?["what"]) switch { "exam" => "exam", "study" => "study session", _ => "to-do" }})"
+                : row?["missing"]?.GetValue<bool>() == true ? " (missing)" : "";
+            return $"- {prefix}{When(row)}: {cls}{Py.AsString(row?["name"])}{tag}";
+        }
         try
         {
-            if (Canvas.Settings.Url.Length == 0) sb.Append("Canvas isn't linked to Syft Notes, so due dates aren't known.\n");
-            else
-            {
-                var groups = DueList()["groups"] as JsonArray ?? [];
-                JsonArray Rows(string key) => groups.FirstOrDefault(g => Py.AsString(g?["key"]) == key)?["items"] as JsonArray ?? [];
-                var lines = new List<string>();
-                lines.AddRange(Rows("overdue").Where(Mine).Select(r => Line(r, "Overdue, was due ")));
-                lines.AddRange(Rows("week").Where(Mine).Select(r => Line(r, "")));
-                lines.AddRange(Rows("later").Where(Mine).Take(AgendaLater).Select(r => Line(r, "")));
-                sb.Append(lines.Count == 0 ? "Nothing is due in Canvas right now.\n" : "Due in Canvas, soonest first:\n" + string.Join('\n', lines) + "\n");
-            }
+            // Canvas not being linked says nothing about the student's own items, so the list is read either way.
+            bool linked = Canvas.Settings.Url.Length > 0;
+            if (!linked) sb.Append("Canvas isn't linked to Syft Notes, so its due dates aren't known.\n");
+            var groups = DueList()["groups"] as JsonArray ?? [];
+            JsonArray Rows(string key) => groups.FirstOrDefault(g => Py.AsString(g?["key"]) == key)?["items"] as JsonArray ?? [];
+            var rows = new List<(JsonNode? Row, string Prefix)>();
+            rows.AddRange(Rows("overdue").Where(Mine).Select(r => (r, "Overdue, was due ")));
+            rows.AddRange(Rows("week").Where(Mine).Select(r => (r, "")));
+            rows.AddRange(Rows("later").Where(Mine).Take(AgendaLater).Select(r => (r, "")));
+            // A to-do of the student's own with no date is theirs to remember; Canvas's undated ones are left out, as before.
+            rows.AddRange(Rows("undated").Where(r => Mine(r) && Own(r)).Select(r => (r, "")));
+            if (rows.Count > 0)
+                sb.Append(rows.Any(r => Own(r.Row)) ? "Due, soonest first (\"own\" is something the student added in Syft Notes, not from Canvas):\n" : "Due in Canvas, soonest first:\n")
+                    .Append(string.Join('\n', rows.Select(r => Line(r.Row, r.Prefix)))).Append('\n');
+            else if (linked) sb.Append("Nothing is due in Canvas right now.\n");
         }
         catch (Exception e) when (e is IOException or UnauthorizedAccessException or System.Text.Json.JsonException or InvalidOperationException)
         {

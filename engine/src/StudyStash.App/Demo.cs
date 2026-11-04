@@ -281,7 +281,9 @@ public static class Demo
     /// <param name="done">The id of a Due item (d1 is the missing one) the student ticked off in Syft Notes.</param>
     /// <param name="hidden">The id of a Due item the student hid.</param>
     /// <param name="quiet">No class or meeting left today, so Home's sentence is about what's due (and missing).</param>
-    public static LibraryModel Semester(Page page = Page.Home, bool recording = false, bool narrow = false, Action<Page>? go = null, string? done = null, string? hidden = null, bool quiet = false)
+    /// <param name="own">Two of the student's own items on the Due list: a Data Mining midterm (an exam, Wednesday 9:00 AM, id o1) and a
+    /// study session for Theory of Computation (Tuesday 4:00 PM, id o2).</param>
+    public static LibraryModel Semester(Page page = Page.Home, bool recording = false, bool narrow = false, Action<Page>? go = null, string? done = null, string? hidden = null, bool quiet = false, bool own = false)
     {
         (string Name, string Hue, int Notes, string Group)[] folders =
         [
@@ -357,6 +359,18 @@ public static class Demo
                 },
             ],
         };
+        if (own)
+        {
+            CanvasApi.Item Own(string c, string id, string name, string what, double day, double hour) => new()
+            {
+                Class = c, Id = id, Name = name, Kind = "mine", What = what, Status = "open", DueAt = monday.AddDays(day).AddHours(hour),
+            };
+            due = due with
+            {
+                Groups = [.. due.Groups.Select(g => g.Key == "week" ? g with { Items = [.. g.Items, Own(toc, "o2", "Review proofs", "study", 1, 16), Own(mining, "o1", "Data Mining midterm", "exam", 2, 9)] } : g)],
+                ToHandIn = due.ToHandIn + 2,
+            };
+        }
         if (done is not null || hidden is not null) due = Marked(due, done, hidden);
         OverviewModel.LectureFacts L(string id, string title, string c, int day, double hour, double min, string summary) =>
             new(id, title, c, monday.AddDays(day).AddHours(hour), min * 60, summary, false, monday.AddDays(day).AddHours(hour).ToString("o"));
@@ -406,6 +420,7 @@ public static class Demo
             OpenDue = _ => go?.Invoke(Page.Due),
             RecordEvent = _ => go?.Invoke(Page.Recording),
             Mark = (_, _, _, _, _) => Task.FromResult(Outcome.Done),
+            Own = new OwnDueEditor((_, _) => Task.FromResult(Outcome.Done), (_, _) => Task.FromResult(Outcome.Done)),
         };
         var recorder = new RecorderModel { ClassName = ml, ClassDot = Dot("Blue"), Elapsed = "12:04", Levels = PillWave };
         if (go is not null)

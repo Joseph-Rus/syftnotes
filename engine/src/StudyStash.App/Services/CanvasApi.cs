@@ -451,8 +451,15 @@ public static class CanvasApi
         public DateTimeOffset? MarkedDone { get; init; }
         /// <summary>What the student did about it in Syft Notes alone (never in Canvas): "done", "hidden" or "".</summary>
         public string Mark { get; init; } = "";
+        /// <summary>For a Kind "mine" item (the student's own, which Canvas knows nothing of): exam, study or task.</summary>
+        public string What { get; init; } = "";
+        /// <summary>A day with no time (it is due at the end of it).</summary>
+        public bool AllDay { get; init; }
         public string? Url { get; init; }
         public string? Folder { get; init; }
+
+        /// <summary>The student's own item, not Canvas's.</summary>
+        public bool Own => Kind == Core.Canvas.DueMine.Kind;
     }
 
     public sealed record AssignmentsResponse

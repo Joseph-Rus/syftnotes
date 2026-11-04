@@ -40,8 +40,12 @@ public static class DueMarks
     {
         var mine = new Dictionary<(string, string, long), DueMark>();
         foreach (var m in marks) mine[(m.Class, m.Kind, m.Id)] = m;
-        return [.. items.Select(a => mine.TryGetValue((a.ClassName, a.Kind, a.Id), out var m) ? a with { Mark = m.Mark, MarkAt = m.At } : a)];
+        return [.. items.Select(a => mine.TryGetValue((KeyClass(a.ClassName, a.Kind), a.Kind, a.Id), out var m) ? a with { Mark = m.Mark, MarkAt = m.At } : a)];
     }
+
+    /// <summary>The class a mark is kept under: the item's own, except an item of the student's own (<see cref="DueMine"/>), whose
+    /// mark follows it when its class is changed.</summary>
+    public static string KeyClass(string cls, string kind) => kind == DueMine.Kind ? "" : cls;
 
     /// <summary>Marks an item <see cref="Done"/> or <see cref="Hidden"/>, or takes its mark off ("").</summary>
     public static void Set(string home, string cls, string kind, long id, string mark, DateTimeOffset now)
@@ -49,6 +53,7 @@ public static class DueMarks
         lock (Gate)
         {
             var all = Load(home);
+            cls = KeyClass(cls, kind);
             all.RemoveAll(m => m.Class == cls && m.Kind == kind && m.Id == id);
             if (mark.Length > 0) all.Add(new DueMark(cls, kind, id, mark, now.UtcDateTime.ToString("o", CultureInfo.InvariantCulture)));
             SharedFile.Write(PathIn(home), JsonSerializer.Serialize(all, Options));

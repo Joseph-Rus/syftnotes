@@ -28,6 +28,7 @@ public sealed class CanvasClient(string serverUrl, Func<string> key, HttpClient?
     readonly HttpClient client = http ?? Shared;
     readonly string canvasRoot = serverUrl.TrimEnd('/') + "/api/v2/canvas";
     readonly string filesRoot = serverUrl.TrimEnd('/') + "/api/v2/files";
+    readonly string ownRoot = serverUrl.TrimEnd('/') + "/api/v2/due/mine";
 
     public string ServerUrl { get; } = serverUrl.TrimEnd('/');
 
@@ -176,6 +177,19 @@ public sealed class CanvasClient(string serverUrl, Func<string> key, HttpClient?
     public Task<CanvasApi.DueResponse?> MarkAsync(string cls, string kind, string id, string mark, CancellationToken stop = default) =>
         SendAsync<CanvasApi.DueResponse>(HttpMethod.Post, canvasRoot + "/mark",
             new JsonObject { ["class"] = cls, ["kind"] = kind, ["id"] = long.TryParse(id, out long n) ? n : 0, ["mark"] = mark }, stop);
+
+    /// <summary>Adds an item of the student's own to the Due list, or (with its id) changes it; no Canvas needed. The Due list as it now
+    /// stands; null from a library from before own items.</summary>
+    public Task<CanvasApi.DueResponse?> SaveOwnAsync(string id, string title, string what, string cls, string day, string time, CancellationToken stop = default)
+    {
+        var body = new JsonObject { ["title"] = title, ["what"] = what, ["class"] = cls, ["day"] = day, ["time"] = time };
+        if (long.TryParse(id, out long n) && n != 0) body["id"] = n;
+        return SendAsync<CanvasApi.DueResponse>(HttpMethod.Post, ownRoot, body, stop);
+    }
+
+    /// <summary>Takes an item of the student's own off the Due list. The Due list as it now stands.</summary>
+    public Task<CanvasApi.DueResponse?> DeleteOwnAsync(string id, CancellationToken stop = default) =>
+        SendAsync<CanvasApi.DueResponse>(HttpMethod.Delete, $"{ownRoot}/{Q(id)}", null, stop);
 
     public Task<CanvasApi.AssignmentsResponse?> AssignmentsAsync(string cls, CancellationToken stop = default) =>
         SendAsync<CanvasApi.AssignmentsResponse>(HttpMethod.Get, $"{canvasRoot}/assignments?class={Q(cls)}", null, stop);

@@ -1,0 +1,86 @@
+<!-- The student's own items on Due (an exam, a study session, a to-do), in the window's dialog layer: a title, what it is, the day,
+     a time if it has one, a class if it's for one. Opened from the calendar's Add, or on an item already there, which also offers
+     Mark done (Undo once it is) and Delete. Drawn from the Syft tokens, the same on both systems. Escape closes it. -->
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:k="using:StudyStash.App.ViewModels.Kit"
+             xmlns:v="using:StudyStash.App.Views"
+             x:Class="StudyStash.App.Views.OwnDueForm"
+             x:DataType="k:OwnDueFormModel"
+             Width="420" Focusable="False"
+             AutomationProperties.Name="{Binding Heading}">
+  <UserControl.Styles>
+    <Style Selector="Border.own-field">
+      <Setter Property="Background" Value="{DynamicResource SurfaceSunken}" />
+      <Setter Property="CornerRadius" Value="{DynamicResource RadiusControl}" />
+      <Setter Property="BoxShadow" Value="{DynamicResource LineRing}" />
+      <Setter Property="Padding" Value="12,0" />
+      <Setter Property="Height" Value="36" />
+    </Style>
+    <Style Selector="TextBlock.own-label">
+      <Setter Property="FontSize" Value="{DynamicResource FontCaption}" />
+      <Setter Property="FontWeight" Value="Bold" />
+      <Setter Property="Foreground" Value="{DynamicResource TextMuted}" />
+    </Style>
+  </UserControl.Styles>
+  <StackPanel Margin="{DynamicResource Inset6}" Spacing="{DynamicResource Space3}">
+    <TextBlock Name="Heading" Text="{Binding Heading}" FontSize="{DynamicResource FontSubtitle}" FontWeight="SemiBold" TextWrapping="Wrap" />
+
+    <StackPanel Spacing="{DynamicResource Space1}">
+      <TextBlock Classes="own-label" Text="Title" />
+      <Border Classes="own-field">
+        <TextBox Name="TitleBox" Classes="bare" Text="{Binding Title, Mode=TwoWay}" PlaceholderText="Chemistry midterm" MaxLength="120"
+                 FontSize="{DynamicResource FontBody}" AutomationProperties.Name="Title">
+          <TextBox.KeyBindings>
+            <KeyBinding Gesture="Enter" Command="{Binding SaveCommand}" />
+          </TextBox.KeyBindings>
+        </TextBox>
+      </Border>
+    </StackPanel>
+
+    <Border Classes="seg-group" HorizontalAlignment="Left">
+      <StackPanel Orientation="Horizontal">
+        <Button Name="Exam" Classes="seg-item" Classes.on="{Binding IsExam}" Content="{x:Static k:OwnDueFormModel.ExamLabel}" Command="{Binding SetWhatCommand}" CommandParameter="exam" />
+        <Button Name="Study" Classes="seg-item" Classes.on="{Binding IsStudy}" Content="{x:Static k:OwnDueFormModel.StudyLabel}" Command="{Binding SetWhatCommand}" CommandParameter="study" />
+        <Button Name="Task" Classes="seg-item" Classes.on="{Binding IsTask}" Content="{x:Static k:OwnDueFormModel.TaskLabel}" Command="{Binding SetWhatCommand}" CommandParameter="task" />
+      </StackPanel>
+    </Border>
+
+    <Grid ColumnDefinitions="*,12,*" RowDefinitions="Auto,Auto">
+      <TextBlock Classes="own-label" Text="Day" />
+      <CalendarDatePicker Name="DayBox" Grid.Row="1" SelectedDate="{Binding Day, Mode=TwoWay}" HorizontalAlignment="Stretch" AutomationProperties.Name="Day" />
+      <TextBlock Grid.Column="2" Classes="own-label" Text="Time (if it has one)" />
+      <TimePicker Name="TimeBox" Grid.Column="2" Grid.Row="1" SelectedTime="{Binding Time, Mode=TwoWay}" ClockIdentifier="12HourClock" MinuteIncrement="5"
+                  HorizontalAlignment="Stretch" AutomationProperties.Name="Time" />
+    </Grid>
+    <Button Name="NoTime" Classes="text-link" HorizontalAlignment="Left" Content="No time" Command="{Binding NoTimeCommand}" IsVisible="{Binding HasTime}" />
+
+    <StackPanel Spacing="{DynamicResource Space1}">
+      <TextBlock Classes="own-label" Text="Class (if it's for one)" />
+      <ComboBox Name="ClassBox" ItemsSource="{Binding Classes}" SelectedItem="{Binding Chosen, Mode=TwoWay}" HorizontalAlignment="Stretch" AutomationProperties.Name="Class">
+        <ComboBox.ItemTemplate>
+          <DataTemplate x:DataType="k:OwnDueClass">
+            <TextBlock Text="{Binding Label}" TextTrimming="CharacterEllipsis" />
+          </DataTemplate>
+        </ComboBox.ItemTemplate>
+      </ComboBox>
+    </StackPanel>
+
+    <TextBlock Name="Say" Text="{Binding Action.Say}" FontSize="{DynamicResource FontBody}" Foreground="{DynamicResource Late}" TextWrapping="Wrap"
+               IsVisible="{Binding Action.Say, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+    <TextBlock Name="MarkSay" Text="{Binding Marks.Action.Say}" FontSize="{DynamicResource FontBody}" Foreground="{DynamicResource Late}" TextWrapping="Wrap"
+               IsVisible="{Binding Marks.Action.Say, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+
+    <Grid ColumnDefinitions="Auto,*,Auto" Margin="0,8,0,0">
+      <StackPanel Orientation="Horizontal" Spacing="{DynamicResource Space2}">
+        <Button Name="Delete" Classes="btn sm" Content="Delete" Command="{Binding DeleteCommand}" IsVisible="{Binding Editing}" />
+        <Button Name="MarkDone" Classes="btn sm" Content="{x:Static k:DueMarkModel.DoneLabel}" Command="{Binding Marks.MarkDoneCommand}" IsVisible="{Binding Marks.CanMark}" />
+        <Button Name="Undo" Classes="btn sm" Content="{x:Static k:DueMarkModel.UndoLabel}" Command="{Binding Marks.UndoItCommand}" IsVisible="{Binding Marks.CanUndo}" />
+      </StackPanel>
+      <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="{DynamicResource Space2}">
+        <Button Name="Cancel" Classes="btn sm" Content="Cancel" Command="{Binding CloseCommand}" />
+        <Button Name="Save" Classes="btn sm ink" Content="{Binding SaveLabel}" Command="{Binding SaveCommand}" IsEnabled="{Binding CanSave}" />
+      </StackPanel>
+    </Grid>
+  </StackPanel>
+</UserControl>
