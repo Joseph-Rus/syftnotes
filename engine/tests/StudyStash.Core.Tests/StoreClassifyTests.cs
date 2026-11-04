@@ -231,6 +231,47 @@ public class StoreClassifyTests
     }
 
     [Fact]
+    public void Moving_a_lecture_keeps_what_was_written_in_its_note_file_and_never_writes_over_a_students_own_file()
+    {
+        using var dir = new TempDir();
+        using var store = new Store(dir["state.db"], dir["pool"]);
+        var m = new Meeting("lec-abcdef") { Title = "Cells", Date = "2026-09-02", Transcript = "[00:00] Cells divide." };
+        string path = store.Save(m, new Classification("CS 101", 1, "rules"), "Cells divide by mitosis.", "Claude");
+
+        // Edited in the note file itself (another app, or an AI working in the folder), not taken in yet: its summary
+        // changed, and a line of the student's own added at the end.
+        string text = Py.ReadText(path).Replace("Cells divide by mitosis.", "Cells divide by mitosis and meiosis.") + "\nMy own line.\nNext class: **quiz on Friday**\n";
+        Py.WriteText(path, text);
+        // The new file can't be written (something holds its place): nothing moves, and nothing written is lost.
+        string blocked = Path.Combine(dir["pool"], "Bio 110", ".2026-09-02 Cells.md.diagrams");
+        Directory.CreateDirectory(blocked);
+        Assert.True(Record.Exception(() => store.SetClass("lec-abcdef", "Bio 110")) is IOException or UnauthorizedAccessException);
+        Assert.Contains("My own line.", Py.ReadText(path));
+        Directory.Delete(blocked);
+        string? moved = store.SetClass("lec-abcdef", "Bio 110");
+
+        string now = Py.ReadText(moved!);
+        Assert.False(File.Exists(path));
+        Assert.Contains("Cells divide by mitosis and meiosis.", now);
+        Assert.Contains("My own line.", now);
+        Assert.Contains("class: \"Bio 110\"", now);
+        Assert.Contains("class: **Bio 110**", now);
+        Assert.Contains("Next class: **quiz on Friday**", now); // a line of the student's own isn't the class line
+        Assert.Equal("Cells divide by mitosis and meiosis.", store.Get("lec-abcdef")!.SummaryMd);
+        Assert.Contains(store.NotesVersions("lec-abcdef"), v => store.NotesVersion("lec-abcdef", v.Seq)!.Markdown == "Cells divide by mitosis."); // the older notes kept
+
+        // A file of the student's own with the lecture's name in the class it moves to: kept as it is, and the lecture
+        // takes a name of its own beside it.
+        string theirs = Path.Combine(dir["pool"], Configs.Unsorted, "2026-09-02 Cells.md");
+        Directory.CreateDirectory(Path.GetDirectoryName(theirs)!);
+        File.WriteAllText(theirs, "my own notes");
+        string? again = store.SetClass("lec-abcdef", Configs.Unsorted);
+        Assert.Equal("my own notes", File.ReadAllText(theirs));
+        Assert.Equal("2026-09-02 Cells [abcdef].md", Path.GetFileName(again));
+        Assert.Contains("My own line.", Py.ReadText(again!));
+    }
+
+    [Fact]
     public void Renaming_a_class_only_by_capitals_keeps_the_file()
     {
         // On a Mac or Windows "bio 110" and "Bio 110" are one folder: the Python engine deleted the file it had just
