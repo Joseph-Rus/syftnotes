@@ -261,7 +261,7 @@ public static class Cli
             {
                 if (ai.AgentReady().Ok)
                     scout.Queue(StudyStash.Core.Canvas.Scout.ToExplore(classes, StudyStash.Core.Canvas.CanvasSettings.Load(home).Scouts,
-                        c => File.Exists(Path.Combine(store.ClassDir(c), "Canvas", "canvas-recipe.md"))));
+                        c => File.Exists(Path.Combine(store.ClassDir(c), "Canvas", "canvas-recipe.md")), DateTimeOffset.Now));
             };
             // The phone over Google Drive (docs/phone-google.md): its link runs here, in the library, so the phone is
             // answered whenever the library runs, the app open or not. It starts once the app has connected an account.
