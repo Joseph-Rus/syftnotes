@@ -94,9 +94,10 @@ public static class MacDock
     }
 
     /// <summary>
-    /// The repair on this Mac, once per account (<see cref="DoneFile"/> in <paramref name="home"/>, written before it
-    /// starts, so it never runs twice): read the Dock's settings, and only if a pinned tile needs it, keep a copy as they
-    /// were in logs, write them back changed and restart the Dock. Anything unexpected leaves the Dock alone and logs
+    /// The repair on this Mac, once per account (<see cref="DoneFile"/> in <paramref name="home"/>, written once the Dock's
+    /// settings are read and before anything is written, so a read that fails tries again next start and a write never
+    /// happens twice): read the Dock's settings, and only if a pinned tile needs it, keep a copy as they were in logs,
+    /// write them back changed and restart the Dock. Anything unexpected leaves the Dock alone and logs
     /// one line; it never throws.
     /// </summary>
     public static void Repair(string home, string app, Runner run, Action<string> log)
@@ -105,12 +106,12 @@ public static class MacDock
         {
             string done = Path.Combine(home, DoneFile);
             if (File.Exists(done)) return;
-            File.WriteAllText(done, "");
             if (run("/usr/bin/defaults", ["export", Domain, "-"], Wait) is not { ExitCode: 0, Stdout.Length: > 0 } export)
             {
-                log("[dock] couldn't read the Dock's settings, so a pinned Syft Notes icon is left as it was");
+                log("[dock] couldn't read the Dock's settings, so a pinned Syft Notes icon is left as it was for now");
                 return;
             }
+            File.WriteAllText(done, "");
             byte[] before = Encoding.UTF8.GetBytes(export.Stdout);
             var fix = Repaired(before, app, Directory.Exists);
             if (fix.Problem is { } problem) log($"[dock] left the Dock alone: {problem}");
