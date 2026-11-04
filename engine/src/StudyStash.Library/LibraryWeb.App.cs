@@ -155,7 +155,7 @@ public sealed partial class LibraryWeb
             var body = await Http.JsonBodyAsync(ctx.Request);
             string? name = Str(body, "name");
             string about = Str(body, "description") ?? "";
-            if (name is null || name.Length > 60) return Http.Detail(400, "a class needs a name (up to 60 characters)");
+            if (name is null || name.Length > StudyStash.Core.Canvas.CourseNames.MaxLength) return Http.Detail(400, $"a class needs a name (up to {StudyStash.Core.Canvas.CourseNames.MaxLength} characters)");
             if (name.Equals(Configs.Unsorted, StringComparison.OrdinalIgnoreCase)) return Http.Detail(400, "that name is taken");
             if (about.Length > 500) about = about[..500];
             var known = cfg.Classes.FirstOrDefault(c => c.Name.Equals(name, StringComparison.OrdinalIgnoreCase));
