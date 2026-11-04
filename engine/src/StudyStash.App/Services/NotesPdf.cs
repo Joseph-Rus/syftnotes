@@ -17,6 +17,7 @@ using SkiaSharp;
 using StudyStash.App.Controls;
 using StudyStash.App.Controls.Rich;
 using StudyStash.App.ViewModels;
+using StudyStash.App.Windows;
 using StudyStash.Core;
 
 namespace StudyStash.App.Services;
@@ -125,7 +126,7 @@ public static class NotesPdf
         host.SetValue(TextElement.FontFeaturesProperty, plain);
         host.Styles.Add(new Style(x => x.Is<TextBlock>()) { Setters = { new Setter(TextElement.FontFeaturesProperty, plain) } });
         // Never shown: it's what gives the pieces the app's styles, and the light look.
-        var window = new Window { Content = host, RequestedThemeVariant = ThemeVariant.Light, ShowInTaskbar = false, ShowActivated = false };
+        var window = AppWindows.MakeOffScreen(host);
         bool handedOver = false;
         try
         {
