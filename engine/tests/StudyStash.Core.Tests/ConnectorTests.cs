@@ -499,7 +499,7 @@ public class ConnectorTests
         // Tools off: Claude is told up front, before it tries a call and gets refused.
         door.Access.ToolsOn = false;
         html = await (await c.GetAsync("/authorize?" + Query(fields))).Content.ReadAsStringAsync();
-        Assert.Contains("Reading is switched off for AI apps in Syft Notes (Settings → AI apps), so Claude Code won't see anything until you turn it on.", html);
+        Assert.Contains("Reading is switched off for AI apps in Syft Notes (Settings → Your AI → Advanced settings), so Claude Code won't see anything until you turn it on.", html);
     }
 
     [Fact]
@@ -1046,7 +1046,7 @@ public class ConnectorTests
         {
             var r = await mcp.CallToolAsync(t.Name, new Dictionary<string, object?>());
             Assert.True(r.IsError);
-            Assert.Equal("Reading is switched off for AI apps in Syft Notes. The student can turn it on in Syft Notes → Settings → AI apps.", Text(r));
+            Assert.Equal("Reading is switched off for AI apps in Syft Notes. The student can turn it on in Syft Notes → Settings → Your AI → Advanced settings.", Text(r));
         }
 
         door.Access.ToolsOn = true; // no reconnect needed
@@ -1071,7 +1071,7 @@ public class ConnectorTests
         {
             var r = await mcp.CallToolAsync(name, new Dictionary<string, object?>());
             Assert.True(r.IsError, name);
-            Assert.Equal("Syft Notes' settings don't let AI tools read Canvas right now (Settings → AI apps → Canvas assignments and files).", Text(r));
+            Assert.Equal("Syft Notes' settings don't let AI tools read Canvas right now (Settings → Your AI → Advanced settings → Canvas assignments and files).", Text(r));
         }
         Assert.True((await mcp.CallToolAsync("list_classes", new Dictionary<string, object?>())).IsError is null or false);
     }
