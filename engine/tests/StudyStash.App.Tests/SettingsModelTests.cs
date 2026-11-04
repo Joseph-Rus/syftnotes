@@ -84,6 +84,7 @@ public class SettingsModelTests
             Started = DateTimeOffset.Now.AddDays(-10).ToString("yyyy-MM-dd'T'HH:mm:sszzz", System.Globalization.CultureInfo.InvariantCulture),
         });
         using (new WavWriter(store.AudioPath("rec-old"))) { }
+        File.SetLastWriteTimeUtc(store.AudioPath("rec-old"), DateTime.UtcNow.AddDays(-10)); // recorded 10 days ago: its sound is as old
         using var host = new AppHost(home.Path, log: _ => { }, loginItems: new CountingLoginItems(), models: new ModelSetting(File: home["model.bin"]))
         {
             PruneAfterChange = TimeSpan.Zero,
