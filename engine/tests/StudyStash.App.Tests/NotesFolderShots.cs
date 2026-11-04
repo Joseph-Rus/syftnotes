@@ -10,7 +10,7 @@ namespace StudyStash.App.Tests;
 /// from before, and the bring-in's summary and result: a picture of each, in each look, light and dark.</summary>
 public class NotesFolderShots
 {
-    static NotesFolderPick View(NotesFolderStep step = NotesFolderStep.Pick)
+    static NotesFolderPick View(NotesFolderStep step = NotesFolderStep.Pick, bool copying = false)
     {
         string home = OperatingSystem.IsWindows() ? @"C:\Users\ada" : "/Users/ada";
         LibraryFolder[] found =
@@ -18,14 +18,22 @@ public class NotesFolderShots
             new(Path.Combine(home, "OneDrive - Example University", "Documents", "Study Stash"), 4, false, new DateOnly(2026, 11, 2), true),
             new(Path.Combine(home, "OneDrive", "Documents", "Study Stash"), 38, false, new DateOnly(2026, 10, 3), false),
         ];
-        var model = new NotesFolderPickModel(found, home, (_, _) => Task.FromResult(Services.Outcome<List<BringInCount>>.Answered([Counted(found[1].Path)])),
-            _ => Task.FromResult(Services.Outcome<List<BringInCount>>.Answered([Counted(found[1].Path)])), _ => { }, new DateOnly(2026, 11, 3));
+        var model = new NotesFolderPickModel(found, home, (_, _, progress, _) =>
+            {
+                if (!copying) return Task.FromResult(Services.Outcome<List<BringInCount>>.Answered([Counted(found[1].Path)]));
+                // Part-way through a big folder: it says how far, and never finishes in the picture.
+                progress(120, 400);
+                return new TaskCompletionSource<Services.Outcome<List<BringInCount>>>().Task;
+            },
+            (_, _, _) => Task.FromResult(Services.Outcome<List<BringInCount>>.Answered([Counted(found[1].Path)])), _ => { }, new DateOnly(2026, 11, 3));
         if (step != NotesFolderStep.Pick) (step == NotesFolderStep.Summary ? model.Look : model.Bring).Command.Execute(null);
+        if (copying) model.Bring.Command.Execute(null);
         Assert.Equal(step, model.Step);
+        Assert.Equal(copying, model.Busy);
         return new NotesFolderPick { DataContext = model, Height = model.WantedHeight };
     }
 
-    static BringInCount Counted(string from) => new(from, New: 34, Here: 3, Both: 1, Deleted: 0, Classes: 2, Files: 0);
+    static BringInCount Counted(string from) => new(from, New: 34, Here: 3, Both: 1, Deleted: 0, Classes: 2, Files: 5);
 
     [AvaloniaFact]
     public void Mac_and_Win_notes_folder_question()
@@ -38,6 +46,8 @@ public class NotesFolderShots
                 Shot.Take("mac-" + name, SkinKind.Mac, t, () => View(step), size: new Avalonia.Size(708, 580));
                 Shot.Take("win-" + name, SkinKind.Win, t, () => View(step), size: new Avalonia.Size(708, 580));
             }
+            Shot.Take("mac-notes-folder-copying", SkinKind.Mac, t, () => View(NotesFolderStep.Summary, copying: true), size: new Avalonia.Size(708, 580));
+            Shot.Take("win-notes-folder-copying", SkinKind.Win, t, () => View(NotesFolderStep.Summary, copying: true), size: new Avalonia.Size(708, 580));
         }
     }
 }

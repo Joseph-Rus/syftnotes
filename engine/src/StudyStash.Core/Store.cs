@@ -194,6 +194,8 @@ public sealed partial class Store : IDisposable
         CREATE TABLE IF NOT EXISTS sync_state (key TEXT PRIMARY KEY, value TEXT);
         CREATE TABLE IF NOT EXISTS trash (id TEXT PRIMARY KEY, row_json TEXT, md_text TEXT, deleted_at TEXT);
         CREATE TABLE IF NOT EXISTS gone (id TEXT PRIMARY KEY, gone_at TEXT);
+        CREATE TABLE IF NOT EXISTS deleted (id TEXT PRIMARY KEY, deleted_at TEXT);
+        INSERT OR IGNORE INTO deleted(id, deleted_at) SELECT id, gone_at FROM gone;
 
         """;
 
@@ -641,10 +643,7 @@ public sealed partial class Store : IDisposable
             string path = at is null ? TargetPath(m, c.ClassName) : Py.NormPath(at);
             if (keepText is null) Py.WriteText(path, Notes.Render(m, c, summaryMd, summaryModel));
             else if (!File.Exists(path) || File.ReadAllText(path, new System.Text.UTF8Encoding(false)) != keepText)
-            {
-                Directory.CreateDirectory(Py.Parent(path));
-                File.WriteAllText(path, keepText, new System.Text.UTF8Encoding(false));
-            }
+                WriteWhole(path, keepText);
             string now = Now();
             string? oldPath = null, firstSeen = null;
             (string Markdown, string Model, string At) before = ("", "", "");
@@ -1013,7 +1012,11 @@ public sealed partial class Store : IDisposable
             if (path is not null && File.Exists(path)) File.Delete(path);
             Exec("DELETE FROM notes WHERE id=?", noteId);
             Unindex(noteId);
-            if (forGood) ForgetNotesVersions(noteId);
+            if (forGood)
+            {
+                ForgetNotesVersions(noteId);
+                Exec("INSERT OR IGNORE INTO deleted(id, deleted_at) VALUES(?,?)", noteId, Now());
+            }
             DropEmptyDir(path, null);
             return true;
         }
@@ -1090,6 +1093,7 @@ public sealed partial class Store : IDisposable
             foreach (string id in ids)
             {
                 Exec("INSERT INTO gone(id, gone_at) VALUES(?,?) ON CONFLICT(id) DO UPDATE SET gone_at=excluded.gone_at", id, now);
+                Exec("INSERT OR IGNORE INTO deleted(id, deleted_at) VALUES(?,?)", id, now);
                 Exec("DELETE FROM trash WHERE id=?", id);
                 DetachAttachments(id);
                 ForgetNotesVersions(id);
@@ -1123,6 +1127,43 @@ public sealed partial class Store : IDisposable
             using var r = cmd.ExecuteReader();
             while (r.Read()) ids.Add(r.GetString(0));
             return ids;
+        }
+    }
+
+    /// <summary>Every lecture the student deleted: in the trash now, or deleted for good at any time since this was kept
+    /// (unlike <see cref="Gone"/>, which forgets after a month). Bringing in another folder's notes never brings one back.</summary>
+    public HashSet<string> DeletedIds()
+    {
+        lock (gate)
+        {
+            var ids = new HashSet<string>();
+            using var cmd = Command("SELECT id FROM trash UNION SELECT id FROM gone UNION SELECT id FROM deleted");
+            using var r = cmd.ExecuteReader();
+            while (r.Read()) ids.Add(r.GetString(0));
+            return ids;
+        }
+    }
+
+    /// <summary>Writes <paramref name="text"/> as the whole of <paramref name="path"/> or not at all: into a hidden file
+    /// beside it, then renamed into place, so a crash or a full disk never leaves half a note file.</summary>
+    public static void WriteWhole(string path, string text) =>
+        PutWhole(path, temp => File.WriteAllText(temp, text, new System.Text.UTF8Encoding(false)), overwrite: true);
+
+    /// <summary>Makes <paramref name="path"/> whole or not at all: <paramref name="write"/> fills a hidden file beside
+    /// it, which is then renamed into place (over what's there only with <paramref name="overwrite"/>).</summary>
+    public static void PutWhole(string path, Action<string> write, bool overwrite)
+    {
+        string dir = Py.Parent(path);
+        Directory.CreateDirectory(dir);
+        string temp = Path.Combine(dir, $".{Path.GetFileName(path)}.{Guid.NewGuid():N}.part");
+        try
+        {
+            write(temp);
+            File.Move(temp, path, overwrite);
+        }
+        finally
+        {
+            if (File.Exists(temp)) File.Delete(temp);
         }
     }
 

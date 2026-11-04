@@ -1,3 +1,5 @@
+using System.Text.Json.Nodes;
+using StudyStash.App.Services.Kit;
 using StudyStash.Core;
 
 namespace StudyStash.App.Services;
@@ -25,15 +27,17 @@ public static class LibraryFolderPick
     }
 
     /// <summary>
-    /// The student picked <paramref name="picked"/> from <paramref name="shown"/>: the answer is remembered, and when
-    /// it isn't the folder in use, config.toml's pool_dir becomes it, this computer's library starts again to read it
-    /// (as a new password does), and lists the lectures in it state.db doesn't (a folder used before state.db was made
-    /// afresh). With <paramref name="bringIn"/>, the other folders' notes are then copied in (<see cref="LibraryBringIn"/>):
-    /// what that did. Not a file is moved or deleted. A config.toml that can't be written is said in plain words, and
-    /// nothing is remembered then, so it's asked again.
+    /// The student picked <paramref name="picked"/> from <paramref name="shown"/>. When it isn't the folder in use,
+    /// config.toml's pool_dir becomes it, this computer's library starts again to read it (as a new password does), and
+    /// then lists the lectures in it state.db doesn't (a folder used before state.db was made afresh) and copies in the
+    /// files of the lectures it lists from the other folders, so nothing it lists is read or written there any more. With
+    /// <paramref name="bringIn"/>, the other folders' own notes are copied in too (<see cref="LibraryBringIn"/>). Not a
+    /// file is moved or deleted. What that did, or why it couldn't; <paramref name="progress"/> hears how far it's got.
+    /// The answer is remembered once the folder is in use. A config.toml that can't be written is said in plain words,
+    /// and nothing is remembered then, so it's asked again.
     /// </summary>
     public static async Task<Outcome<List<BringInCount>>> UseAsync(AppHost host, LibraryFolder picked, IReadOnlyList<LibraryFolder> shown,
-        bool bringIn = false)
+        bool bringIn = false, Action<int, int>? progress = null, CancellationToken ct = default)
     {
         if (!picked.InUse)
         {
@@ -63,18 +67,65 @@ public static class LibraryFolderPick
             s.NotesFolderChosen = picked.Path;
         });
         if (picked.InUse && !bringIn) return Outcome<List<BringInCount>>.Answered([]);
-        var others = bringIn ? Others(picked, shown) : [];
-        var done = await LibraryCall.Run(() => host.Remote()?.BringInAsync(others) ?? Task.FromResult<List<BringInCount>?>(null));
-        if (done.Ok) host.Log($"[library] brought in: {string.Join("; ", done.Value!.Select(d => $"{d.New} new, {d.Here} here, {d.Both} both, {d.Deleted} deleted"))}");
-        else host.Log($"[library] couldn't list the notes folder's lectures: {done.Failure!.Kind}");
+        var others = Others(picked, shown);
+        var ask = new JsonObject
+        {
+            ["kind"] = BringInJob.Bring,
+            ["from"] = Paths(bringIn ? others : []),
+            ["refile"] = Paths(bringIn ? [] : others),
+        };
+        var done = await RunJobAsync(host, ask, progress, ct);
+        if (done.Ok) host.Log($"[library] brought in: {string.Join("; ", done.Value!.Select(d => $"{d.New} new, {d.Here} here, {d.Both} both, {d.Deleted} deleted, {d.Files} files"))}");
+        else host.Log($"[library] couldn't finish with the notes folder: {done.Failure!.Kind}");
         // The folder is in use either way; only bringing notes in is the student's to retry.
         return done.Ok || bringIn ? done : Outcome<List<BringInCount>>.Answered([]);
     }
 
     /// <summary>What bringing in the other folders' notes would do, with <paramref name="picked"/> as the folder the
     /// library uses: one count per other folder. Changes nothing.</summary>
-    public static Task<Outcome<List<BringInCount>>> PlanAsync(AppHost host, LibraryFolder picked, IReadOnlyList<LibraryFolder> shown) =>
-        LibraryCall.Run(() => host.Remote()?.BringInPlanAsync(picked.Path, Others(picked, shown)) ?? Task.FromResult<List<BringInCount>?>(null));
+    public static Task<Outcome<List<BringInCount>>> PlanAsync(AppHost host, LibraryFolder picked, IReadOnlyList<LibraryFolder> shown,
+        Action<int, int>? progress = null, CancellationToken ct = default) =>
+        RunJobAsync(host, new JsonObject { ["kind"] = BringInJob.Look, ["into"] = picked.Path, ["from"] = Paths(Others(picked, shown)) }, progress, ct);
+
+    /// <summary>What a job that stopped part-way says: what came in stays, and doing it again brings only the rest.</summary>
+    public static readonly Failure Stopped = new(FailureKind.Refused,
+        "Syft Notes stopped before it finished. Try again: nothing comes in twice.");
+
+    /// <summary>Starts the library's bring-in job (<see cref="LibraryBringIn.Route"/>) and asks after it each second until
+    /// it ends, telling <paramref name="progress"/> how far it's got: its results, or why it didn't finish. A library
+    /// that stops answering for half a minute, or starts again (the job is gone), ends the wait.</summary>
+    static async Task<Outcome<List<BringInCount>>> RunJobAsync(AppHost host, JsonObject ask, Action<int, int>? progress, CancellationToken ct)
+    {
+        var started = await LibraryCall.Run(() => host.Remote()?.StartFolderJobAsync(ask, ct) ?? Task.FromResult<BringInStatus?>(null), ct);
+        if (!started.Ok) return Outcome<List<BringInCount>>.Failed(started.Failure!);
+        var last = started.Value!;
+        Failure? lost = null;
+        int quiet = 0;
+        await Poll.UntilAsync(async c =>
+        {
+            if (!last.Running) return true;
+            var now = await LibraryCall.Run(() => host.Remote()?.FolderJobAsync(c) ?? Task.FromResult<BringInStatus?>(null), c);
+            if (now.Failure?.Kind == FailureKind.Offline && ++quiet < 30) return false;
+            if (!now.Ok || now.Value!.Id != last.Id)
+            {
+                lost = now.Failure?.Kind == FailureKind.Offline ? now.Failure : Stopped;
+                return true;
+            }
+            quiet = 0;
+            last = now.Value;
+            progress?.Invoke(last.Done, last.Total);
+            return !last.Running;
+        }, TimeSpan.FromSeconds(1), Timeout.InfiniteTimeSpan, ct);
+        if (lost is not null) return Outcome<List<BringInCount>>.Failed(lost);
+        if (last.Error is { } why)
+        {
+            host.Log($"[library] bring-in stopped: {why}");
+            return Outcome<List<BringInCount>>.Failed(Stopped);
+        }
+        return Outcome<List<BringInCount>>.Answered(last.Results);
+    }
+
+    static JsonArray Paths(IEnumerable<string> paths) => new([.. paths.Select(p => (JsonNode)p)]);
 
     static List<string> Others(LibraryFolder picked, IReadOnlyList<LibraryFolder> shown) =>
         [.. shown.Where(f => !LibraryFolders.Comparer.Equals(f.Path, picked.Path)).Select(f => f.Path)];

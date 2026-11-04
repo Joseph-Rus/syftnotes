@@ -30,7 +30,7 @@ public sealed class LibraryFolderPickTests
 
         var asked = LibraryFolderPick.ToAsk(host, Find);
         Assert.NotNull(asked);
-        var outcome = await LibraryFolderPick.UseAsync(host, asked.Single(f => !f.InUse), asked);
+        var outcome = await LibraryFolderPick.UseAsync(host, asked.Single(f => !f.InUse), asked, ct: TestContext.Current.CancellationToken);
 
         Assert.True(outcome.Ok);
         Assert.True(LibraryFolders.Comparer.Equals(LibraryFolders.Real(older), LibraryFolders.Real(Configs.Load(home.Path).PoolDir)));

@@ -41,7 +41,12 @@ public sealed class LibraryBringInTests
             old.File("only-old", "Thermodynamics", "First law", "Energy is conserved.", "2026-09-07");
             old.File("con", "Con", "Opening night", "A class Windows won't name a folder after.");
             old.File("deleted", "Thermodynamics", "A lecture deleted since", "Gone.");
+            old.File("deleted-long-ago", "Thermodynamics", "Deleted for good long ago", "Gone for good.");
         }
+        // The old folder's slides: its state.db, which knew their lecture, is gone; they come in with their class.
+        string slides = Path.Combine(personal, "Thermodynamics", Store.AttachmentsFolder, "slides.pdf");
+        Directory.CreateDirectory(Path.GetDirectoryName(slides)!);
+        File.WriteAllBytes(slides, [.. "%PDF-1.7 Carnot cycle slides"u8]);
         // Written on Windows: every line ends "\r\n". A copy keeps that, and it's the same lecture as one ending "\n".
         foreach (string f in Directory.EnumerateFiles(personal, "*.md", SearchOption.AllDirectories))
             File.WriteAllText(f, File.ReadAllText(f).Replace("\r\n", "\n").Replace("\n", "\r\n"));
@@ -49,14 +54,18 @@ public sealed class LibraryBringInTests
         main.File("edited", "Thermodynamics", "Entropy", "Entropy only grows, edited since.");
         main.File("deleted", "Thermodynamics", "A lecture deleted since", "Gone.");
         Assert.True(main.Store.Trash("deleted"));
+        // Deleted for good long ago: past the month Gone() remembers, it's still known as deleted.
+        main.File("deleted-long-ago", "Thermodynamics", "Deleted for good long ago", "Gone for good.");
+        Assert.True(main.Store.Delete("deleted-long-ago"));
+        Assert.DoesNotContain("deleted-long-ago", main.Store.Gone());
         var before = Files(personal);
         Assert.True(Directory.Exists(Path.Combine(personal, "Con_")));
 
         var plan = LibraryBringIn.Plan(main.Store, main.Cfg, school, personal, home);
         var did = LibraryBringIn.Apply(main.Store, main.Cfg, personal, home);
 
-        Assert.Equal((2, 1, 1, 1, 1), (plan.New, plan.Here, plan.Both, plan.Deleted, plan.Classes));
-        Assert.Equal(plan with { Files = 0 }, did with { Files = 0 });
+        Assert.Equal((2, 1, 1, 2, 1, 1), (plan.New, plan.Here, plan.Both, plan.Deleted, plan.Classes, plan.Files));
+        Assert.Equal(plan, did);
         // Only in the old folder: listed here, in its class, its note file copied exactly into this folder.
         var first = main.Store.Get("only-old")!;
         Assert.Equal("Thermodynamics", first.ClassName);
@@ -74,6 +83,11 @@ public sealed class LibraryBringInTests
         Assert.Contains("id: \"" + copy.Id + "\"", File.ReadAllText(copy.MdPath!));
         // Deleted here: stays deleted. One Thermodynamics, however many folders had it.
         Assert.Null(main.Store.Get("deleted"));
+        Assert.Null(main.Store.Get("deleted-long-ago"));
+        // The slides: copied into the class's Attachments here, and listed with the class.
+        var slide = Assert.Single(main.Store.ListAttachments("Thermodynamics"));
+        Assert.Equal(("slides.pdf", "application/pdf", null), (slide.Name, slide.Type, slide.NoteId));
+        Assert.Equal(File.ReadAllBytes(slides), File.ReadAllBytes(main.Store.AttachmentPath(slide)));
         Assert.Single(Directory.GetDirectories(school), d => Path.GetFileName(d).Equals("Thermodynamics", StringComparison.OrdinalIgnoreCase));
         Assert.Equal(before, Files(personal));
 
@@ -81,7 +95,8 @@ public sealed class LibraryBringInTests
         var mainFiles = Files(school);
         int count = main.Store.NoteCount();
         var again = LibraryBringIn.Apply(main.Store, main.Cfg, personal, home);
-        Assert.Equal((0, 4, 0, 1, 0), (again.New, again.Here, again.Both, again.Deleted, again.Classes));
+        Assert.Equal((0, 4, 0, 2, 0, 0), (again.New, again.Here, again.Both, again.Deleted, again.Classes, again.Files));
+        Assert.Single(main.Store.ListAttachments("Thermodynamics"));
         Assert.Equal(mainFiles, Files(school));
         Assert.Equal(count, main.Store.NoteCount());
         Assert.Equal(before, Files(personal));
@@ -107,14 +122,29 @@ public sealed class LibraryBringInTests
         Assert.Equal(1, LibraryBringIn.ListOwn(main.Store, main.Cfg));
         Assert.True(main.Store.Get("unlisted") is { MdPath: { } p } && Py.SamePath(p, Path.Combine(school, Notes.FolderName(cls), "2026-09-14 Mixing chambers.md")));
 
-        var did = LibraryBringIn.Apply(main.Store, main.Cfg, personal, home);
+        // The old folder also has a lecture this state.db never listed: "Use this one" alone leaves it there.
+        using (var stray = new Library(dir, "stray", personal)) stray.File("stray", cls, "Nozzle efficiency", "Not listed here.");
+
+        var did = LibraryBringIn.Refile(main.Store, main.Cfg, personal, home);
 
         Assert.Equal((1, 0, 0), (did.New, did.Here, did.Both));
+        Assert.Null(main.Store.Get("stray"));
         string moved = main.Store.Get("old")!.MdPath!;
         Assert.True(moved.Length > 260, moved);
         Assert.StartsWith(school, moved);
         Assert.Equal(File.ReadAllText(listed), File.ReadAllText(moved));
         Assert.True(File.Exists(listed));
-        Assert.Equal(0, LibraryBringIn.Apply(main.Store, main.Cfg, personal, home).New);
+        Assert.Equal(0, LibraryBringIn.Refile(main.Store, main.Cfg, personal, home).New);
+        Assert.Equal(1, LibraryBringIn.Apply(main.Store, main.Cfg, personal, home).New); // the stray one, when asked
+
+        // A write cut short (a crash, a full disk) leaves no half file to be taken for the lecture next time.
+        string half = Path.Combine(school, "Half.md");
+        Assert.Throws<IOException>(() => Store.PutWhole(half, temp =>
+        {
+            File.WriteAllText(temp, "---\nid: \"half\"\n");
+            throw new IOException("disk full");
+        }, overwrite: false));
+        Assert.False(File.Exists(half));
+        Assert.Empty(Directory.EnumerateFiles(school, "*.part", SearchOption.AllDirectories));
     }
 }

@@ -39,30 +39,40 @@ public sealed record BringInCount(string From, int New, int Here, int Both, int 
 /// (a class this library hasn't got is added; "Thermodynamics" in both folders is one class). Listed, and the same:
 /// nothing to do. Listed, and different: the lecture here stays as it is, and the other folder's version comes in beside
 /// it as a lecture of its own, "title (from OneDrive – Personal)", the way a sync service keeps a conflicted copy.
-/// Deleted here (in the trash, or gone this month): it stays deleted.</item>
-/// <item>An attached file a listed lecture is missing here is copied from the other folder.</item>
+/// Deleted here (in the trash, or deleted for good: <see cref="Store.DeletedIds"/>): it stays deleted.</item>
+/// <item>An attached file a listed lecture is missing here is copied from the other folder; the other folder's attached
+/// files this one has no copy of come in with their class.</item>
+/// <item>Every file is written whole or not at all (a hidden file renamed into place), so a crash part-way leaves no
+/// half a lecture to be taken for the real one next time.</item>
 /// </list>
 /// </summary>
 public static class LibraryBringIn
 {
-    public const string Route = "/api/v2/folders";
-    public const string BringInRoute = "/api/v2/folders/bring-in";
+    /// <summary>GET: the bring-in job running or last run (<see cref="BringInJob"/>); POST: start one.</summary>
+    public const string Route = "/api/v2/folders/job";
 
     /// <summary>What bringing in <paramref name="from"/> would do, changing nothing: for a library whose folder is
     /// <paramref name="into"/> (this library's, or one the student is about to use).</summary>
-    public static BringInCount Plan(Store store, Config cfg, string into, string from, string userHome) =>
-        new Run(store, cfg, into, from, userHome, apply: false).Go();
+    public static BringInCount Plan(Store store, Config cfg, string into, string from, string userHome, Action<int, int>? progress = null) =>
+        new Run(store, cfg, into, from, userHome, Mode.Plan, progress).Go();
 
     /// <summary>Brings in <paramref name="from"/>'s notes (see the class), into this library's folder.</summary>
-    public static BringInCount Apply(Store store, Config cfg, string from, string userHome) =>
-        new Run(store, cfg, store.PoolDir, from, userHome, apply: true).Go();
+    public static BringInCount Apply(Store store, Config cfg, string from, string userHome, Action<int, int>? progress = null) =>
+        new Run(store, cfg, store.PoolDir, from, userHome, Mode.Apply, progress).Go();
+
+    /// <summary>Only the lectures this library lists from <paramref name="from"/> (the folder it used before the
+    /// student picked this one): their note files and attached files copied into this folder, and their rows pointed at
+    /// the copies, so nothing the library lists is still read or written in the other folder. The other folder's own
+    /// lectures stay there.</summary>
+    public static BringInCount Refile(Store store, Config cfg, string from, string userHome, Action<int, int>? progress = null) =>
+        new Run(store, cfg, store.PoolDir, from, userHome, Mode.Refile, progress).Go();
 
     /// <summary>Lists the note files in this library's own folder that state.db doesn't (a folder picked that the library
     /// used before its state.db was made afresh), where they are. How many.</summary>
     public static int ListOwn(Store store, Config cfg)
     {
         int listed = 0;
-        var gone = Deleted(store);
+        var gone = store.DeletedIds();
         foreach (var file in NoteFiles(store.PoolDir))
             if (Read(file) is { } note && store.Get(note.Id) is null && !gone.Contains(note.Id))
             {
@@ -72,109 +82,181 @@ public static class LibraryBringIn
         return listed;
     }
 
-    sealed class Run(Store store, Config cfg, string into, string from, string userHome, bool apply)
+    enum Mode { Plan, Apply, Refile }
+
+    sealed class Run(Store store, Config cfg, string into, string from, string userHome, Mode mode, Action<int, int>? progress)
     {
+        readonly bool apply = mode != Mode.Plan;
         int fresh, here, both, deleted, classes, files;
-        readonly HashSet<string> gone = Deleted(store);
+        int done, total;
+        readonly HashSet<string> gone = store.DeletedIds();
         /// <summary>A dry run's memory of what it would have listed: id → its note file's text.</summary>
         readonly Dictionary<string, string> planned = [];
         /// <summary>The other folder's note files already copied in for the lectures listed from there.</summary>
         readonly HashSet<string> copied = new(LibraryFolders.Comparer);
+        /// <summary>The other folder's attached files already copied in for attachments listed here.</summary>
+        readonly HashSet<string> copiedFiles = new(LibraryFolders.Comparer);
+
+        void Step() => progress?.Invoke(++done, total);
 
         public BringInCount Go()
         {
             if (Under(into, from) || Under(from, into) || !Directory.Exists(from)) return Count();
+            var own = mode == Mode.Refile ? [] : NoteFiles(into);
+            var rows = store.ListNotes().Where(r => !string.IsNullOrEmpty(r.MdPath) && Under(r.MdPath, from)).ToList();
+            var theirs = mode == Mode.Refile ? [] : NoteFiles(from);
+            var attached = mode == Mode.Refile ? [] : AttachedFiles(from);
+            var listedAttachments = store.ListAttachments();
+            total = own.Count + rows.Count + theirs.Count + listedAttachments.Count + attached.Count;
+            progress?.Invoke(0, total);
             // This folder's own unlisted lectures first, so one in both folders is found here.
-            foreach (var file in NoteFiles(into))
+            foreach (var file in own)
+            {
                 if (Read(file) is { } note && store.Get(note.Id) is null && !gone.Contains(note.Id))
                 {
                     if (apply) classes += Enlist(store, cfg, note, note.Text, note.Path, apply: true);
                     else planned.TryAdd(note.Id, note.Text);
                 }
+                Step();
+            }
             // Lectures listed here whose file is still in the other folder.
-            foreach (var row in store.ListNotes())
+            foreach (var row in rows)
             {
-                if (string.IsNullOrEmpty(row.MdPath) || !Under(row.MdPath, from)) continue;
+                Step();
                 if (!File.Exists(row.MdPath)) continue;
-                string text = Text(row.MdPath);
-                string rel = Path.GetRelativePath(from, row.MdPath);
+                string text = Text(row.MdPath!);
+                string rel = Path.GetRelativePath(from, row.MdPath!);
                 if (apply) store.Refile(row.Id, CopyIn(text, Path.Combine(into, rel)));
                 fresh++;
                 planned[row.Id] = text;
-                copied.Add(Path.GetFullPath(row.MdPath));
+                copied.Add(Path.GetFullPath(row.MdPath!));
             }
             // The other folder's own lectures.
-            foreach (var file in NoteFiles(from))
+            foreach (var file in theirs)
             {
-                if (Read(file) is not { } note) continue;
-                if (gone.Contains(note.Id))
-                {
-                    deleted++;
-                    continue;
-                }
-                if (copied.Contains(Path.GetFullPath(note.Path))) continue; // counted above
-                var row = store.Get(note.Id);
-                string? mine = planned.TryGetValue(note.Id, out string? p) ? p
-                    : row?.MdPath is { Length: > 0 } path && File.Exists(path) ? Text(path) : null;
-                if (row is not null && mine is null && string.IsNullOrEmpty(row.MdPath))
-                {
-                    here++; // still being written here: its notes come from this library
-                    continue;
-                }
-                if (mine is null)
-                {
-                    if (row is null) classes += Enlist(store, cfg, note, note.Text, null, apply);
-                    else if (apply) store.Refile(row.Id, CopyIn(note.Text, Path.Combine(into, Path.GetRelativePath(from, note.Path))));
-                    fresh++;
-                    planned[note.Id] = note.Text;
-                    continue;
-                }
-                if (Same(mine, note.Text))
-                {
-                    here++;
-                    continue;
-                }
-                // Different in each folder: this one's stays, the other's comes in beside it.
-                string copyId = $"{note.Id}-{Hash(note.Text)}";
-                if (store.Get(copyId) is not null || planned.ContainsKey(copyId) || gone.Contains(copyId))
-                {
-                    here++;
-                    continue;
-                }
-                var copy = note.Beside(copyId, Short(LibraryFolders.Where(from, userHome)));
-                classes += Enlist(store, cfg, copy, copy.Text, null, apply);
-                planned[copyId] = copy.Text;
-                both++;
+                Step();
+                Theirs(file);
             }
-            files = Attachments();
+            files = ListedAttachments(listedAttachments) + OtherAttachments(attached);
             return Count();
+        }
+
+        void Theirs(string file)
+        {
+            if (Read(file) is not { } note) return;
+            if (gone.Contains(note.Id))
+            {
+                deleted++;
+                return;
+            }
+            if (copied.Contains(Path.GetFullPath(note.Path))) return; // counted above
+            var row = store.Get(note.Id);
+            string? mine = planned.TryGetValue(note.Id, out string? p) ? p
+                : row?.MdPath is { Length: > 0 } path && File.Exists(path) ? Text(path) : null;
+            if (row is not null && mine is null && string.IsNullOrEmpty(row.MdPath))
+            {
+                here++; // still being written here: its notes come from this library
+                return;
+            }
+            if (mine is null)
+            {
+                if (row is null) classes += Enlist(store, cfg, note, note.Text, null, apply);
+                else if (apply) store.Refile(row.Id, CopyIn(note.Text, Path.Combine(into, Path.GetRelativePath(from, note.Path))));
+                fresh++;
+                planned[note.Id] = note.Text;
+                return;
+            }
+            if (Same(mine, note.Text))
+            {
+                here++;
+                return;
+            }
+            // Different in each folder: this one's stays, the other's comes in beside it.
+            string copyId = $"{note.Id}-{Hash(note.Text)}";
+            if (store.Get(copyId) is not null || planned.ContainsKey(copyId) || gone.Contains(copyId))
+            {
+                here++;
+                return;
+            }
+            var copy = note.Beside(copyId, Short(LibraryFolders.Where(from, userHome)));
+            classes += Enlist(store, cfg, copy, copy.Text, null, apply);
+            planned[copyId] = copy.Text;
+            both++;
         }
 
         BringInCount Count() => new(from, fresh, here, both, deleted, classes, files);
 
-        /// <summary>Attached files a lecture here is missing, copied from the same place in the other folder.</summary>
-        int Attachments()
+        /// <summary>Attached files a listed attachment is missing here, copied from the same place in the other folder
+        /// (an attachment state.db already lists, whose file the folder the library used before has).</summary>
+        int ListedAttachments(List<Attachment> listed)
         {
             int n = 0;
-            foreach (var a in store.ListAttachments())
+            foreach (var a in listed)
             {
+                Step();
                 string mine = store.AttachmentPath(a);
                 if (!Under(mine, store.PoolDir)) continue;
                 string target = Path.Combine(into, Path.GetRelativePath(store.PoolDir, mine));
                 string other = Path.Combine(from, Path.GetRelativePath(store.PoolDir, mine));
                 if (File.Exists(target) || !File.Exists(other)) continue;
-                if (apply)
-                {
-                    Directory.CreateDirectory(Py.Parent(target));
-                    File.Copy(other, target, overwrite: false);
-                }
+                copiedFiles.Add(Path.GetFullPath(other));
+                if (apply) Store.PutWhole(target, temp => File.Copy(other, temp), overwrite: false);
                 n++;
             }
             return n;
         }
 
+        /// <summary>The other folder's attached files this folder has no copy of: copied into the same class's
+        /// Attachments here (a free name when theirs is taken by a different file) and listed with the class, their words
+        /// read again here. Which lecture each belonged to was in the other folder's state.db, not in the folder.</summary>
+        int OtherAttachments(List<string> attached)
+        {
+            int n = 0;
+            foreach (string other in attached)
+            {
+                Step();
+                if (copiedFiles.Contains(Path.GetFullPath(other))) continue;
+                string clsFolder = Path.GetFileName(Py.Parent(Py.Parent(other)));
+                string dir = Path.Combine(into, clsFolder, Store.AttachmentsFolder);
+                string sha;
+                long size;
+                try
+                {
+                    size = new FileInfo(other).Length;
+                    sha = Sha(other);
+                }
+                catch (Exception e) when (e is IOException or UnauthorizedAccessException)
+                {
+                    continue;
+                }
+                if (HasCopy(dir, size, sha)) continue;
+                string id = "folder-" + sha[..24];
+                if (store.GetAttachment(id) is not null || planned.ContainsKey(id)) continue;
+                planned[id] = "";
+                n++;
+                if (!apply) continue;
+                string cls = ClassFor(clsFolder);
+                string file = Core.Attachments.FreeName(store.AttachmentsDir(cls), Path.GetFileName(other));
+                string target = Path.Combine(store.AttachmentsDir(cls), file);
+                Store.PutWhole(target, temp => File.Copy(other, temp), overwrite: false);
+                byte[] head = new byte[64];
+                int read;
+                using (var stream = File.OpenRead(target)) read = stream.Read(head);
+                store.AddAttachment(new Attachment(id, Path.GetFileName(other), file, cls, null, size,
+                    Core.Attachments.Sniff(head.AsSpan(0, read), file), File.GetLastWriteTimeUtc(other).ToString("o", CultureInfo.InvariantCulture)));
+            }
+            return n;
+        }
+
+        /// <summary>The class a folder of the other library is: one of this library's whose folder has that name, else
+        /// the folder's own name.</summary>
+        string ClassFor(string folder) =>
+            cfg.Classes.FirstOrDefault(c => Notes.FolderName(c.Name).Equals(folder, StringComparison.OrdinalIgnoreCase))?.Name
+            ?? store.ClassesSummary().Select(c => c.ClassName).FirstOrDefault(c => Notes.FolderName(c).Equals(folder, StringComparison.OrdinalIgnoreCase))
+            ?? folder;
+
         /// <summary>A note file's copy in this folder at <paramref name="want"/>, or beside it when that's a different
-        /// file: where it is.</summary>
+        /// file: where it is. Written whole or not at all.</summary>
         static string CopyIn(string text, string want)
         {
             string path = want;
@@ -183,10 +265,54 @@ public static class LibraryBringIn
                 if (Same(Text(path), text)) return path;
                 path = Path.Combine(Py.Parent(want), $"{Path.GetFileNameWithoutExtension(want)} ({i}).md");
             }
-            Directory.CreateDirectory(Py.Parent(path));
-            File.WriteAllText(path, text, new UTF8Encoding(false));
+            Store.WriteWhole(path, text);
             return path;
         }
+    }
+
+    /// <summary>Every attached file in a library folder (<c>&lt;Class&gt;/Attachments/*</c>), hidden ones left out.</summary>
+    static List<string> AttachedFiles(string root)
+    {
+        var found = new List<string>();
+        var options = new EnumerationOptions { IgnoreInaccessible = true };
+        try
+        {
+            foreach (var cls in new DirectoryInfo(root).EnumerateDirectories("*", options).OrderBy(d => d.Name, StringComparer.Ordinal))
+            {
+                if (cls.Name.StartsWith('.') || cls.Attributes.HasFlag(FileAttributes.ReparsePoint)) continue;
+                var dir = new DirectoryInfo(Path.Combine(cls.FullName, Store.AttachmentsFolder));
+                if (!dir.Exists) continue;
+                found.AddRange(dir.EnumerateFiles("*", options).Where(f => !f.Name.StartsWith('.')).Select(f => f.FullName).Order(StringComparer.Ordinal));
+            }
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException)
+        {
+            // Gone, or turned away part-way: what was found stands.
+        }
+        return found;
+    }
+
+    /// <summary>Whether <paramref name="dir"/> has a file of this size and SHA-256 already.</summary>
+    static bool HasCopy(string dir, long size, string sha)
+    {
+        if (!Directory.Exists(dir)) return false;
+        foreach (var f in new DirectoryInfo(dir).EnumerateFiles())
+        {
+            try
+            {
+                if (f.Length == size && Sha(f.FullName) == sha) return true;
+            }
+            catch (Exception e) when (e is IOException or UnauthorizedAccessException)
+            {
+            }
+        }
+        return false;
+    }
+
+    static string Sha(string path)
+    {
+        using var stream = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite, 81920);
+        return Convert.ToHexStringLower(SHA256.HashData(stream));
     }
 
     /// <summary>Lists <paramref name="note"/> in its class (added to the library when it hasn't got it) with
@@ -225,9 +351,6 @@ public static class LibraryBringIn
             at: at, keepText: text);
         return added;
     }
-
-    /// <summary>The lectures deleted here: in the trash, or gone for good this month.</summary>
-    static HashSet<string> Deleted(Store store) => [.. store.Trashed(), .. store.Gone()];
 
     /// <summary>Every lecture's note file in a library folder: <c>&lt;Class&gt;/*.md</c>, the Inbox's captured notes and
     /// hidden folders left out (as <see cref="LibraryFolders"/> counts them).</summary>
@@ -391,4 +514,64 @@ public static class LibraryBringIn
         var cmp = OperatingSystem.IsLinux() ? StringComparison.Ordinal : StringComparison.OrdinalIgnoreCase;
         return p.Equals(d, cmp) || p.StartsWith(d + Path.DirectorySeparatorChar, cmp);
     }
+}
+
+/// <summary>
+/// One run of <see cref="LibraryBringIn"/> in the library, which the app asks after while it goes (a big OneDrive folder
+/// takes longer than one request may): what it is (<see cref="Look"/>, or <see cref="Bring"/>), how far it has got, and
+/// once it ends, what each folder did or would do, or why it stopped. The library runs one at a time: asking for
+/// another while one runs gets the one running.
+/// </summary>
+public sealed class BringInJob(string kind)
+{
+    /// <summary>What bringing in would do (nothing changes).</summary>
+    public const string Look = "look";
+    /// <summary>The folder's own unlisted lectures listed, then each folder brought in (or only its listed lectures'
+    /// files copied in: <see cref="LibraryBringIn.Refile"/>).</summary>
+    public const string Bring = "bring";
+
+    readonly Lock gate = new();
+    int done, total;
+    bool running = true;
+    string? error;
+    readonly List<BringInCount> results = [];
+
+    public string Id { get; } = Guid.NewGuid().ToString("N");
+    public string Kind { get; } = kind;
+    public bool Running { get { lock (gate) return running; } }
+
+    public void Progress(int doneNow, int totalNow)
+    {
+        lock (gate) (done, total) = (doneNow, totalNow);
+    }
+
+    public void Add(BringInCount result)
+    {
+        lock (gate) results.Add(result);
+    }
+
+    /// <summary>It's over: <paramref name="why"/> says it stopped part-way (for the log; the app says it in its words).</summary>
+    public void End(string? why = null)
+    {
+        lock (gate) (running, error) = (false, why);
+    }
+
+    public JsonObject Json()
+    {
+        lock (gate)
+            return new JsonObject
+            {
+                ["id"] = Id, ["kind"] = Kind, ["running"] = running, ["done"] = done, ["total"] = total, ["error"] = error,
+                ["results"] = new JsonArray([.. results.Select(r => (JsonNode)r.Json())]),
+            };
+    }
+}
+
+/// <summary>A <see cref="BringInJob"/> as the app reads it.</summary>
+public sealed record BringInStatus(string Id, string Kind, bool Running, int Done, int Total, string? Error, List<BringInCount> Results)
+{
+    public static BringInStatus? FromJson(JsonObject? o) => o?["id"] is null ? null : new(
+        Py.AsString(o["id"]) ?? "", Py.AsString(o["kind"]) ?? "", o["running"] is JsonValue r && r.TryGetValue(out bool b) && b,
+        o["done"] is JsonValue d && d.TryGetValue(out int dn) ? dn : 0, o["total"] is JsonValue t && t.TryGetValue(out int tn) ? tn : 0,
+        Py.AsString(o["error"]), [.. (o["results"] as JsonArray ?? []).OfType<JsonObject>().Select(BringInCount.FromJson)]);
 }
