@@ -277,12 +277,35 @@ public sealed partial class NoteModel : ObservableObject
         if (!ShowTranscript) CanGoBack = true;
         var lines = Lines;
         if (lines.Count == 0) return;
-        int at = 0;
-        for (int i = 0; i < lines.Count; i++)
-            if (lines[i].Start is double s && s <= seconds + 0.5) at = i;
+        int at = LineAt(lines, seconds);
         for (int i = 0; i < lines.Count; i++) lines[i].Here = i == at;
         ShowTranscript = true;
         Jumped?.Invoke(at);
+    }
+
+    /// <summary>The line said at a moment: the last that began by then (the first, where none has).</summary>
+    static int LineAt(IList<HeardLine> lines, double seconds)
+    {
+        int at = 0;
+        for (int i = 0; i < lines.Count; i++)
+            if (lines[i].Start is double s && s <= seconds + 0.5) at = i;
+        return at;
+    }
+
+    /// <summary>Puts each slide the library placed in the lecture above the transcript line it was taught at (the line
+    /// <see cref="ShowAt"/> would bring it to). Told again, it sets them afresh.</summary>
+    public void PinSlides(IReadOnlyList<SlideItem> pinned)
+    {
+        var at = new Dictionary<int, List<SlideItem>>();
+        if (Transcript.Any(l => l.Start is not null))
+            foreach (var slide in pinned.Where(s => s.At is not null))
+            {
+                int line = LineAt(Transcript, slide.At!.Value);
+                if (!at.TryGetValue(line, out var here)) at[line] = here = [];
+                here.Add(slide);
+            }
+        for (int i = 0; i < Transcript.Count; i++)
+            if (Transcript[i].HasSlides || at.ContainsKey(i)) Transcript[i].Slides = at.TryGetValue(i, out var cards) ? cards : [];
     }
 }
 

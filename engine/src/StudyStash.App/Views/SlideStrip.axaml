@@ -1,0 +1,78 @@
+<!-- The slides of a deck attached to a lecture (both looks, drawn from the tokens): one card for each, its number, its title
+     and, where the library could tell, the moment of the lecture it was taught at. The placed ones come first, in the order
+     they came up; a click takes the page to that moment in the transcript. The rest sit under a quiet heading, and a click
+     opens the deck. While the deck's pages are being read, one quiet line says so. -->
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:StudyStash.App.ViewModels"
+             xmlns:c="using:StudyStash.App.Controls"
+             x:Class="StudyStash.App.Views.SlideStrip"
+             x:DataType="vm:AttachmentsModel">
+  <UserControl.Styles>
+    <Style Selector="Button.slide">
+      <Setter Property="Theme" Value="{StaticResource Surface}" />
+      <Setter Property="Background" Value="{DynamicResource SurfaceRaised}" />
+      <Setter Property="CornerRadius" Value="{DynamicResource RadiusCard}" />
+      <Setter Property="Padding" Value="{DynamicResource Inset3}" />
+      <Setter Property="Width" Value="176" />
+      <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+      <Setter Property="VerticalContentAlignment" Value="Top" />
+    </Style>
+    <Style Selector="TextBlock.slide-heading">
+      <Setter Property="FontSize" Value="{DynamicResource FontCaption}" />
+      <Setter Property="FontWeight" Value="SemiBold" />
+      <Setter Property="Foreground" Value="{DynamicResource TextSubtle}" />
+    </Style>
+  </UserControl.Styles>
+
+  <UserControl.Resources>
+    <!-- A slide: "Slide 3", its moment when it has one, and its title (two lines at most; the whole of it on hover when cut). -->
+    <DataTemplate x:Key="SlideCard" x:DataType="vm:SlideItem">
+      <Button Classes="slide" Command="{Binding $parent[UserControl].((vm:AttachmentsModel)DataContext).OpenSlideCommand}" CommandParameter="{Binding}"
+              ToolTip.Tip="{Binding Tip}" AutomationProperties.Name="{Binding Said}">
+        <StackPanel Spacing="{DynamicResource Space1}">
+          <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="{DynamicResource Space2}">
+            <c:Icon Glyph="slideshow" Size="14" Foreground="{DynamicResource TextMuted}" VerticalAlignment="Center" />
+            <TextBlock Grid.Column="1" Text="{Binding Label}" FontSize="{DynamicResource FontCaption}" FontWeight="SemiBold" VerticalAlignment="Center" />
+            <TextBlock Grid.Column="2" Classes="num" Text="{Binding Moment}" IsVisible="{Binding Pinned}" FontSize="{DynamicResource FontCaption}"
+                       Foreground="{DynamicResource TextMuted}" VerticalAlignment="Center" />
+          </Grid>
+          <TextBlock Text="{Binding Title}" IsVisible="{Binding HasTitle}" FontSize="{DynamicResource FontBody}" TextWrapping="Wrap" MaxLines="2"
+                     TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding Title}" c:Tips.WhenCut="True" />
+        </StackPanel>
+      </Button>
+    </DataTemplate>
+    <ItemsPanelTemplate x:Key="Row">
+      <StackPanel Orientation="Horizontal" Spacing="{DynamicResource Space2}" />
+    </ItemsPanelTemplate>
+  </UserControl.Resources>
+
+  <StackPanel Spacing="{DynamicResource Space2}">
+    <StackPanel Name="ReadingLine" Orientation="Horizontal" Spacing="{DynamicResource Space2}" IsVisible="{Binding ReadingSlides}">
+      <c:SyftLoader Kind="HoppingBits" Size="18" />
+      <TextBlock Text="{x:Static vm:AttachmentWords.SlidesReading}" FontSize="{DynamicResource FontCaption}" Foreground="{DynamicResource TextMuted}" VerticalAlignment="Center" />
+    </StackPanel>
+
+    <StackPanel Name="PlacedSlides" Spacing="{DynamicResource Space2}" IsVisible="{Binding HasPinned}">
+      <TextBlock Classes="slide-heading" Text="{x:Static vm:AttachmentWords.SlidesHeading}" />
+      <ScrollViewer HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Disabled">
+        <!-- (A gap under the cards, where the scroll bar sits, so it isn't drawn over them.) -->
+        <StackPanel Spacing="{DynamicResource Space1}">
+          <ItemsControl ItemsSource="{Binding PinnedSlides}" ItemsPanel="{StaticResource Row}" ItemTemplate="{StaticResource SlideCard}" />
+          <Border Height="{DynamicResource Space1}" />
+        </StackPanel>
+      </ScrollViewer>
+    </StackPanel>
+
+    <StackPanel Name="UnplacedSlides" Spacing="{DynamicResource Space2}" IsVisible="{Binding HasUnpinned}">
+      <TextBlock Classes="slide-heading" Text="{x:Static vm:AttachmentWords.SlidesUnplaced}" />
+      <ScrollViewer HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Disabled">
+        <!-- (A gap under the cards, where the scroll bar sits, so it isn't drawn over them.) -->
+        <StackPanel Spacing="{DynamicResource Space1}">
+          <ItemsControl ItemsSource="{Binding UnpinnedSlides}" ItemsPanel="{StaticResource Row}" ItemTemplate="{StaticResource SlideCard}" />
+          <Border Height="{DynamicResource Space1}" />
+        </StackPanel>
+      </ScrollViewer>
+    </StackPanel>
+  </StackPanel>
+</UserControl>

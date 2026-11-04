@@ -23,6 +23,9 @@ public static class AttachmentWords
     public const string OlderLibrary = "Your library runs an older Syft Notes: update it to attach files.";
     public const string Unreachable = "Can't reach your library right now.";
     public const string Unreadable = "Couldn't read that file. Check that it's still there and that Syft Notes may open it, then try again.";
+    public const string SlidesHeading = "Slides in the order they came up";
+    public const string SlidesReading = "Reading the slides…";
+    public const string SlidesUnplaced = "Couldn't tell when these came up";
 
     /// <summary>"Slides · 2.4 MB", "The student's own notes · 830 KB · Reading your handwriting…" (said as "Your notes").</summary>
     public static string About(string name, string type, long size, bool reading, bool hasText)
@@ -58,12 +61,38 @@ public sealed partial class PhotoItem : ObservableObject
     [ObservableProperty] public partial Avalonia.Media.Imaging.Bitmap? Thumb { get; set; }
 }
 
+/// <summary>One slide of an attached deck: its number and title, and the moment of the lecture it was taught at ("12:34")
+/// when the library could tell. A slide it couldn't place has no moment, and opens its file instead of the transcript.</summary>
+public sealed class SlideItem
+{
+    public string DeckId { get; init; } = "";
+    public string DeckName { get; init; } = "";
+    public int Number { get; init; }
+    public string Title { get; init; } = "";
+    /// <summary>Seconds into the lecture, where the library could tell.</summary>
+    public double? At { get; init; }
+
+    public bool Pinned => At is not null;
+    public bool HasTitle => Title.Length > 0;
+    public string Label => $"Slide {Number}";
+    public string Moment => At is { } s ? TimedText.Clock(s) : "";
+    /// <summary>"Slide 3 · Self-attention": a card in the transcript says this on one line.</summary>
+    public string Line => HasTitle ? $"{Label} · {Title}" : Label;
+    public string Tip => At is not null ? $"Go to {Moment} in the transcript" : $"Open {DeckName}";
+    /// <summary>What a screen reader hears of the card.</summary>
+    public string Said => string.Join(", ", new[] { Label, Title, Pinned ? $"at {Moment}" : "" }.Where(w => w.Length > 0));
+}
+
 /// <summary>
 /// What's attached to a lecture (or a class): the files, an Attach button and a place to drop files, "Reading your
 /// handwriting…" while the library reads them, and for a lecture whose notes came first, "Rewrite notes with your
-/// attachments". It talks to the library over its API, whether that's this computer or another one.
+/// attachments". It talks to the library over its API, whether that's this computer or another one. For a lecture, a deck
+/// of slides also shows as cards (<see cref="PinnedSlides"/>, <see cref="UnpinnedSlides"/>); <paramref name="showAt"/> takes
+/// the page to a pinned slide's moment in the transcript, and <paramref name="pinSlides"/> is told which slides have one, so the
+/// transcript can show each above its line.
 /// </summary>
-public sealed partial class AttachmentsModel(IAttachmentLibrary library, string? className, string? lectureId) : ObservableObject, IDisposable
+public sealed partial class AttachmentsModel(IAttachmentLibrary library, string? className, string? lectureId,
+    Action<double>? showAt = null, Action<IReadOnlyList<SlideItem>>? pinSlides = null) : ObservableObject, IDisposable
 {
     readonly CancellationTokenSource stop = new();
 
@@ -75,11 +104,24 @@ public sealed partial class AttachmentsModel(IAttachmentLibrary library, string?
     public bool HasPhotos => Photos.Count > 0;
     public string HeaderText => HasItems ? AttachmentWords.Heading : "Whiteboard photos";
 
+    /// <summary>The slides the library placed in the lecture, in the order they came up.</summary>
+    public ObservableCollection<SlideItem> PinnedSlides { get; } = [];
+    /// <summary>The slides it couldn't place, in their decks' order.</summary>
+    public ObservableCollection<SlideItem> UnpinnedSlides { get; } = [];
+    public bool HasPinned => PinnedSlides.Count > 0;
+    public bool HasUnpinned => UnpinnedSlides.Count > 0;
+    /// <summary>The strip of slides has something to say: cards, or that they're being read.</summary>
+    public bool ShowSlides => ReadingSlides || HasPinned || HasUnpinned;
+    List<SlideItem> slides = [];
+    string slidesSeen = "";
+
     /// <summary>Ids of this lecture's pictures from the last listing: the only ones its notes may show.</summary>
     HashSet<string> pictures = [];
     readonly TaskCompletionSource listed = new(TaskCreationOptions.RunContinuationsAsynchronously);
 
     [ObservableProperty] public partial bool Reading { get; set; }
+    /// <summary>A deck's pages are still being read, so its slides aren't known yet.</summary>
+    [ObservableProperty] public partial bool ReadingSlides { get; set; }
     [ObservableProperty] public partial bool Busy { get; set; }
     [ObservableProperty] public partial bool OfferRewrite { get; set; }
     [ObservableProperty] public partial string? Problem { get; set; }
@@ -103,16 +145,20 @@ public sealed partial class AttachmentsModel(IAttachmentLibrary library, string?
     /// <summary>The notes are being written again: the host reloads the lecture when they're done.</summary>
     public Action? Rewriting { get; set; }
 
+    partial void OnReadingSlidesChanged(bool value) => OnPropertyChanged(nameof(ShowSlides));
     partial void OnProblemChanged(string? value) => OnPropertyChanged(nameof(HasProblem));
     partial void OnSaidChanged(string? value) => OnPropertyChanged(nameof(HasSaid));
 
-    /// <summary>Lists what's attached; while anything is being read, looks again every few seconds until it's done.</summary>
+    /// <summary>Lists what's attached; while anything is being read (a file's words, or a deck's slides), looks again every
+    /// few seconds until it's done.</summary>
     public async Task LoadAsync()
     {
         await RefreshAsync();
-        if (!Reading || stop.IsCancellationRequested) return;
-        await Poll.Every(PollEvery, _ => RefreshAsync(), () => Reading, stop: stop.Token).Done;
+        if (!Waiting || stop.IsCancellationRequested) return;
+        await Poll.Every(PollEvery, _ => RefreshAsync(), () => Waiting, stop: stop.Token).Done;
     }
+
+    bool Waiting => Reading || ReadingSlides;
 
     async Task RefreshAsync()
     {
@@ -124,13 +170,13 @@ public sealed partial class AttachmentsModel(IAttachmentLibrary library, string?
         catch (Exception e) when (e is HttpRequestException or TaskCanceledException or LibraryRefusedException)
         {
             if (!stop.IsCancellationRequested) Problem = AttachmentWords.Unreachable;
-            Reading = false;
+            Reading = ReadingSlides = false;
             return;
         }
         if (list is null)
         {
             Problem = AttachmentWords.OlderLibrary;
-            Reading = false;
+            Reading = ReadingSlides = false;
             listed.TrySetResult();
             return;
         }
@@ -142,12 +188,16 @@ public sealed partial class AttachmentsModel(IAttachmentLibrary library, string?
 
     static string S(JsonNode? n) => n is JsonValue v && v.TryGetValue(out string? s) ? s ?? "" : "";
     static bool B(JsonNode? n) => n is JsonValue v && v.TryGetValue(out bool b) && b;
+    static double? D(JsonNode? n) =>
+        n is JsonValue v ? v.TryGetValue(out double d) ? d : v.TryGetValue(out long l) ? l : v.TryGetValue(out int i) ? i : null : null;
 
     void Show(JsonArray list)
     {
         Items.Clear();
         var shown = Photos.Select(p => p.Id).ToHashSet();
         var photos = new List<(string Taken, PhotoItem Item)>();
+        var decks = new List<SlideItem>();
+        bool unread = false;
         pictures = [.. list.OfType<JsonObject>().Where(a => S(a["type"]).StartsWith("image/", StringComparison.Ordinal)).Select(a => S(a["id"]))];
         foreach (var a in list.OfType<JsonObject>())
         {
@@ -158,6 +208,16 @@ public sealed partial class AttachmentsModel(IAttachmentLibrary library, string?
                 photos.Add((S(a["taken"]), new PhotoItem { Id = S(a["id"]), Name = name, Label = new PhotoRef("", "", at, "").Moment }));
                 continue;
             }
+            // A test build's library lists a deck's slides with it: null while its pages are being read.
+            if (TestSwitches.On && a.ContainsKey("slides"))
+            {
+                if (a["slides"] is JsonArray pages)
+                    decks.AddRange(pages.OfType<JsonObject>().Select(p => new SlideItem
+                    {
+                        DeckId = S(a["id"]), DeckName = name, Number = (int)(D(p["n"]) ?? 0), Title = S(p["title"]).Trim(), At = D(p["at"]),
+                    }));
+                else unread = true;
+            }
             long size = a["size"] is JsonValue sv ? sv.TryGetValue(out long bytes) ? bytes : sv.TryGetValue(out int small) ? small : 0 : 0;
             Items.Add(new AttachmentItem
             {
@@ -166,6 +226,9 @@ public sealed partial class AttachmentsModel(IAttachmentLibrary library, string?
             });
         }
         Reading = Items.Any(i => i.Reading);
+        slides = decks;
+        ReadingSlides = unread;
+        ShowSlideCards();
         var ordered = photos.OrderBy(p => p.Taken, StringComparer.Ordinal).Select(p => p.Item).ToList();
         if (!ordered.Select(p => p.Id).SequenceEqual(Photos.Select(p => p.Id)))
         {
@@ -177,6 +240,27 @@ public sealed partial class AttachmentsModel(IAttachmentLibrary library, string?
         OnPropertyChanged(nameof(HasItems));
         OnPropertyChanged(nameof(HeaderText));
         OnPropertyChanged(nameof(ShowHeader));
+    }
+
+    /// <summary>Lays the slides out as cards: the placed ones in the order they came up, then the rest. The transcript is told
+    /// which have a moment, and only when they've changed (a list read again every few seconds mustn't redraw).</summary>
+    void ShowSlideCards()
+    {
+        var pinned = slides.Where(s => s.Pinned).OrderBy(s => s.At).ThenBy(s => s.Number).ToList();
+        var unpinned = slides.Where(s => !s.Pinned).ToList();
+        string seen = string.Join("|", pinned.Concat(unpinned).Select(s => $"{s.DeckId}/{s.Number}/{s.Title}/{s.At}"));
+        if (seen != slidesSeen)
+        {
+            slidesSeen = seen;
+            PinnedSlides.Clear();
+            foreach (var s in pinned) PinnedSlides.Add(s);
+            UnpinnedSlides.Clear();
+            foreach (var s in unpinned) UnpinnedSlides.Add(s);
+            pinSlides?.Invoke(pinned);
+            OnPropertyChanged(nameof(HasPinned));
+            OnPropertyChanged(nameof(HasUnpinned));
+        }
+        OnPropertyChanged(nameof(ShowSlides));
     }
 
     /// <summary>The file of one of this lecture's pictures on this computer, fetched from the library the first time; null
@@ -298,11 +382,22 @@ public sealed partial class AttachmentsModel(IAttachmentLibrary library, string?
         }
     }
 
+    /// <summary>A slide's card: a placed slide takes the page to its moment in the transcript; one that couldn't be placed
+    /// opens its deck, as a click on the file does.</summary>
+    [RelayCommand]
+    async Task OpenSlide(SlideItem slide)
+    {
+        if (slide.At is { } at) showAt?.Invoke(at);
+        else if (Items.FirstOrDefault(i => i.Id == slide.DeckId) is { } deck) await Open(deck);
+    }
+
     /// <summary>Removes a file from the library (it leaves the list at once).</summary>
     [RelayCommand(AllowConcurrentExecutions = true)]
     async Task Remove(AttachmentItem item)
     {
         Items.Remove(item);
+        slides.RemoveAll(s => s.DeckId == item.Id);
+        ShowSlideCards();
         OnPropertyChanged(nameof(HasItems));
         OnPropertyChanged(nameof(HeaderText));
         OnPropertyChanged(nameof(ShowHeader));
