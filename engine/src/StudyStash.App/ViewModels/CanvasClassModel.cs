@@ -1,5 +1,6 @@
 using System.Collections.ObjectModel;
 using System.IO;
+using System.Text.Json;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using StudyStash.App.Services;
@@ -29,6 +30,8 @@ public sealed record FileRow(string Name, string SizeText, string? FolderHeader,
 /// still "started" — opens on its own).</summary>
 public sealed partial class ModuleNode : ObservableObject
 {
+    /// <summary>Canvas's id for the module: what the student opened stays open when the list is read again.</summary>
+    public string Id { get; init; } = "";
     public required string Name { get; init; }
     public required string ItemsCountText { get; init; }
     [ObservableProperty] public partial bool Expanded { get; set; }
@@ -65,6 +68,18 @@ public sealed partial class CanvasClassModel(CanvasContext context) : Observable
     string name = "";
     int lectureTotal;
     DueRow? selectedAssignment;
+    /// <summary>Each list as it was last drawn (its class, the day, and the library's answer): read again and the same,
+    /// it isn't drawn again, so the place in it stays.</summary>
+    string assignmentsShown = "", modulesShown = "", filesShown = "", announcementsShown = "";
+
+    /// <summary>The class's lists have been asked for and nothing is drawn yet: the list column shows the loader.</summary>
+    [ObservableProperty] public partial bool Loading { get; set; }
+
+    /// <summary>A list couldn't be read: the library's offline words (the others still show what they read); null when
+    /// every list was read.</summary>
+    [ObservableProperty] public partial string? Problem { get; set; }
+    public bool HasProblem => Problem is { Length: > 0 };
+    partial void OnProblemChanged(string? value) => OnPropertyChanged(nameof(HasProblem));
 
     [ObservableProperty] public partial string Title { get; set; } = "";
     [ObservableProperty] public partial string HeaderLine { get; set; } = "";
@@ -144,8 +159,15 @@ public sealed partial class CanvasClassModel(CanvasContext context) : Observable
     public void Show(CanvasApi.ClassRow classInfo, CanvasApi.AssignmentsResponse assignments, CanvasApi.ModulesResponse modules,
         CanvasApi.FilesResponse files, CanvasApi.AnnouncementsResponse announcements)
     {
-        var zone = context.Clock.Zone;
-        var now = context.Clock.Now();
+        ShowClass(classInfo);
+        ShowAssignments(assignments);
+        ShowModules(modules);
+        ShowFiles(files);
+        ShowAnnouncements(announcements);
+    }
+
+    void ShowClass(CanvasApi.ClassRow classInfo)
+    {
         cls = classInfo.Class;
         code = classInfo.Canvas is { } course
             ? course.ShortCode.Length > 0 ? course.ShortCode : StudyStash.Core.Canvas.CourseNames.ShortCode(course.Code, course.Name)
@@ -153,27 +175,62 @@ public sealed partial class CanvasClassModel(CanvasContext context) : Observable
         name = classInfo.Canvas is { } c ? c.Title.Length > 0 ? c.Title : StudyStash.Core.Canvas.CourseNames.Title(c.Name, c.Code) : cls;
         Title = cls;
         UpdateHeaderLine();
-        ScoutLine = classInfo.Scout is { State.Length: > 0 } s ? CanvasWords.ScoutHeaderLine(s, zone) : "";
+        ScoutLine = classInfo.Scout is { State.Length: > 0 } s ? CanvasWords.ScoutHeaderLine(s, context.Clock.Zone) : "";
         OnPropertyChanged(nameof(HasScoutLine));
+    }
 
+    /// <summary>What a list drawn from <paramref name="answer"/> shows today; false when that's what it shows already.</summary>
+    bool Changed<T>(ref string shown, T answer)
+    {
+        string now = $"{cls}|{TimeZoneInfo.ConvertTime(context.Clock.Now(), context.Clock.Zone).Date:yyyy-MM-dd}|{JsonSerializer.Serialize(answer, CanvasApi.Json)}";
+        if (now == shown) return false;
+        shown = now;
+        return true;
+    }
+
+    void ShowAssignments(CanvasApi.AssignmentsResponse assignments)
+    {
+        if (!Changed(ref assignmentsShown, assignments)) return;
+        var zone = context.Clock.Zone;
+        var now = context.Clock.Now();
+        var picked = selectedAssignment;
+        selectedAssignment = null;
         ToHandIn.Clear();
         foreach (var item in assignments.ToHandIn) ToHandIn.Add(MakeAssignmentRow(item, zone, now));
         OnPropertyChanged(nameof(HasToHandIn));
 
         Done.Clear();
         foreach (var item in assignments.Done) Done.Add(MakeAssignmentRow(item, zone, now));
+        // The one open beside the list stays picked.
+        if (picked is not null && ToHandIn.Concat(Done).FirstOrDefault(r => r.Class == picked.Class && r.Id == picked.Id) is { } again)
+        {
+            again.Selected = true;
+            selectedAssignment = again;
+        }
+    }
 
+    void ShowModules(CanvasApi.ModulesResponse modules)
+    {
+        if (!Changed(ref modulesShown, modules)) return;
+        // A module the student opened or closed stays that way; a new one opens if it's the one in progress.
+        var opened = Modules.Where(m => m.Id.Length > 0).GroupBy(m => m.Id).ToDictionary(g => g.Key, g => g.First().Expanded);
         ModulesCount = modules.Count;
         Modules.Clear();
         foreach (var m in modules.Modules)
         {
-            var node = new ModuleNode { Name = m.Name, ItemsCountText = CanvasWords.ItemsCountText(m.ItemsCount), Expanded = m.State == "started" };
+            var node = new ModuleNode { Id = m.Id, Name = m.Name, ItemsCountText = CanvasWords.ItemsCountText(m.ItemsCount), Expanded = m.State == "started" };
             foreach (var it in m.Items) node.Items.Add(new ModuleItemRow(ModuleGlyph(it), it.Title, CanvasWords.ModuleItemWord(it), () => _ = OpenModuleItemAsync(it)));
             Modules.Add(node);
         }
         RecentModules.Clear();
         foreach (var node in RecentModuleNodes()) RecentModules.Add(node);
+        foreach (var node in Modules)
+            if (opened.TryGetValue(node.Id, out bool expanded)) node.Expanded = expanded;
+    }
 
+    void ShowFiles(CanvasApi.FilesResponse files)
+    {
+        if (!Changed(ref filesShown, files)) return;
         FilesCount = files.Count;
         Files.Clear();
         string? lastFolder = null;
@@ -184,7 +241,13 @@ public sealed partial class CanvasClassModel(CanvasContext context) : Observable
             string path = f.Local is { Length: > 0 } saved ? saved : CombinePath(f.Folder, f.Name);
             Files.Add(new FileRow(f.Name, CanvasWords.Size(f.Size), header, () => _ = OpenSavedFileAsync(path)));
         }
+    }
 
+    void ShowAnnouncements(CanvasApi.AnnouncementsResponse announcements)
+    {
+        if (!Changed(ref announcementsShown, announcements)) return;
+        var zone = context.Clock.Zone;
+        string? open = announcementItems.FirstOrDefault(kv => kv.Value.Row.Selected).Key;
         AnnouncementsCount = announcements.Count;
         AnnouncementsNew = announcements.New;
         AnnouncementsCountText = CanvasWords.AnnouncementsCountText(AnnouncementsCount, AnnouncementsNew);
@@ -193,7 +256,7 @@ public sealed partial class CanvasClassModel(CanvasContext context) : Observable
         announcementItems.Clear();
         foreach (var a in announcements.Items)
         {
-            var row = new AnnouncementRow { Title = a.Title, When = CanvasWords.Day(a.PostedAt, zone), New = a.New };
+            var row = new AnnouncementRow { Title = a.Title, When = CanvasWords.Day(a.PostedAt, zone), New = a.New, Selected = a.Id == open };
             var apiItem = a;
             row.OnOpen = _ => OpenAnnouncement(row, apiItem);
             Announcements.Add(row);
@@ -351,6 +414,9 @@ public sealed partial class CanvasClassModel(CanvasContext context) : Observable
         if (context.Client is { } client) _ = client.MarkAnnouncementsSeenAsync(cls, [a.Id]);
     }
 
+    /// <summary>Reads the class's four lists and shows them. Each is read on its own: one the library couldn't give
+    /// keeps what it showed (nothing, the first time) and <see cref="Problem"/> says so, while the others show what they
+    /// read. Never throws for the library; only the caller's own cancelling comes through.</summary>
     public async Task LoadAsync(CanvasApi.ClassRow classInfo, CancellationToken stop = default)
     {
         if (context.Client is not { } client)
@@ -358,16 +424,46 @@ public sealed partial class CanvasClassModel(CanvasContext context) : Observable
             Show(classInfo, new CanvasApi.AssignmentsResponse { Class = classInfo.Class }, new CanvasApi.ModulesResponse(), new CanvasApi.FilesResponse(), new CanvasApi.AnnouncementsResponse());
             return;
         }
-        var assignmentsTask = client.AssignmentsAsync(classInfo.Class, stop);
-        var modulesTask = client.ModulesAsync(classInfo.Class, stop);
-        var filesTask = client.FilesAsync(classInfo.Class, stop);
-        var announcementsTask = client.AnnouncementsAsync(classInfo.Class, stop);
-        await Task.WhenAll(assignmentsTask, modulesTask, filesTask, announcementsTask);
-        Show(classInfo,
-            await assignmentsTask ?? new CanvasApi.AssignmentsResponse { Class = classInfo.Class },
-            await modulesTask ?? new CanvasApi.ModulesResponse(),
-            await filesTask ?? new CanvasApi.FilesResponse(),
-            await announcementsTask ?? new CanvasApi.AnnouncementsResponse());
+        string c = classInfo.Class;
+        bool first = assignmentsShown.Length == 0 || cls != c;
+        if (first) Loading = true;
+        var assignments = Read(() => client.AssignmentsAsync(c, stop), new CanvasApi.AssignmentsResponse { Class = c }, stop);
+        var modules = Read(() => client.ModulesAsync(c, stop), new CanvasApi.ModulesResponse(), stop);
+        var files = Read(() => client.FilesAsync(c, stop), new CanvasApi.FilesResponse(), stop);
+        var announcements = Read(() => client.AnnouncementsAsync(c, stop), new CanvasApi.AnnouncementsResponse(), stop);
+        try
+        {
+            await Task.WhenAll(assignments, modules, files, announcements);
+        }
+        finally
+        {
+            Loading = false;
+        }
+        ShowClass(classInfo);
+        if ((await assignments).Value is { } got) ShowAssignments(got);
+        else if (first) ShowAssignments(new CanvasApi.AssignmentsResponse { Class = c });
+        if ((await modules).Value is { } m) ShowModules(m);
+        else if (first) ShowModules(new CanvasApi.ModulesResponse());
+        if ((await files).Value is { } f) ShowFiles(f);
+        else if (first) ShowFiles(new CanvasApi.FilesResponse());
+        if ((await announcements).Value is { } a) ShowAnnouncements(a);
+        else if (first) ShowAnnouncements(new CanvasApi.AnnouncementsResponse());
+        Problem = new Outcome[] { await assignments, await modules, await files, await announcements }.FirstOrDefault(o => !o.Ok)?.Failure?.Words;
+    }
+
+    /// <summary>One list, read through <see cref="LibraryCall"/>: a library from before the list (it answers nothing)
+    /// has none to show, which isn't a failure. One that answered with an error is written to the log and, to the
+    /// student, said as the library not answering.</summary>
+    static async Task<Outcome<T>> Read<T>(Func<Task<T?>> read, T none, CancellationToken stop) where T : class
+    {
+        try
+        {
+            return await LibraryCall.Run<T>(async () => await read() ?? none, stop);
+        }
+        catch (CanvasLibraryException e) when (LibraryCall.Handled(e, "[canvas] a class's list"))
+        {
+            return Outcome<T>.Failed(Failure.Offline);
+        }
     }
 
     [RelayCommand]
