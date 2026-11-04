@@ -271,6 +271,22 @@ public sealed class AgentSignIn : IDisposable
         return Restart();
     }
 
+    /// <summary>
+    /// Starts the sign-in for another account than the one signed in, which couldn't be used (its plan): Claude Code's
+    /// or Codex's (<see cref="AgentCliInfo.SignsInAnother"/>), which always starts afresh. The old account is never
+    /// signed out (they run in the student's own home, and would be signed out everywhere): <see cref="WaitAsync"/>
+    /// takes the account this sign-in signs in once it has finished, not the old one still there. False when it didn't
+    /// start.
+    /// </summary>
+    public bool StartAnother()
+    {
+        untilFinished = cli.SignsInAnother;
+        return Start();
+    }
+
+    /// <summary>The old sign-in is still there (<see cref="StartAnother"/>): signed in counts once this one has finished.</summary>
+    volatile bool untilFinished;
+
     /// <summary>Runs the sign-in again, the one going stopped first. False when it didn't start.</summary>
     public bool Restart()
     {
@@ -299,7 +315,7 @@ public sealed class AgentSignIn : IDisposable
         {
             var now = await Task.Run(Check, CancellationToken.None);
             changed?.Invoke(now);
-            if (now.SignedIn)
+            if (now.SignedIn && !(untilFinished && Running))
             {
                 // Plain agy goes on to its chat once it's signed in: nothing more is wanted from it.
                 if (cli.StaysOpen) Stop();
