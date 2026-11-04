@@ -44,6 +44,11 @@ final class NotebookCanvas: NSObject {
     @ObservationIgnored private var settingDrawing = false
     /// What each page's ink was when last written, so only a page that changed is written again.
     @ObservationIgnored private var written: [UUID: Int] = [:]
+    /// Pages written in a pause whose pictures (Home's shelf, the pages) aren't drawn again yet: drawing them at every
+    /// pause held up the writing. They're drawn at the next `flush` (closing, the pages opening, the app going away).
+    @ObservationIgnored private var unpictured: Set<UUID> = []
+    /// The pages' pictures are on screen beside the page (an iPad's pages sidebar): they follow each pause.
+    @ObservationIgnored var picturesShowing = false
     /// The bars over the canvas (title bar, home indicator), from SwiftUI.
     @ObservationIgnored private var chrome: UIEdgeInsets = .zero
     @ObservationIgnored private var obscured: CGFloat = 0
@@ -321,10 +326,19 @@ final class NotebookCanvas: NSObject {
 
     // MARK: ink
 
-    /// Write each page's ink that changed, now (closing, the pages view opening, the app going away).
-    func flush() {
+    /// Write each page's ink that changed, now (closing, the pages view opening, the app going away), and draw its
+    /// pictures again.
+    func flush() { write(pictures: true) }
+
+    private func write(pictures: Bool) {
         saveTask?.cancel()
         saveTask = nil
+        defer {
+            if pictures, !unpictured.isEmpty {
+                store.redrawPictures(unpictured)
+                unpictured = []
+            }
+        }
         guard dirty, let n = notebook, n.pages.count == frames.count else { return }
         dirty = false
         let pages = strokesByPage()
@@ -335,7 +349,8 @@ final class NotebookCanvas: NSObject {
             guard written[p.id] != sig else { continue }
             // Only a page written on is moved into its own units (its strokes measured again) and written.
             let ink = PKDrawing(strokes: pages[i]).transformed(using: CGAffineTransform(translationX: -frames[i].minX, y: -frames[i].minY))
-            store.setDrawing(ink, n, p)
+            store.setDrawing(ink, n, p, redraw: false)
+            unpictured.insert(p.id)
             written[p.id] = sig
             changed = true
         }
@@ -456,8 +471,8 @@ extension NotebookCanvas: PKCanvasViewDelegate {
         saveTask?.cancel()
         saveTask = Task { [weak self] in
             try? await Task.sleep(for: .seconds(0.5))
-            guard !Task.isCancelled else { return }
-            self?.flush()
+            guard !Task.isCancelled, let self else { return }
+            self.write(pictures: self.picturesShowing)
         }
     }
 

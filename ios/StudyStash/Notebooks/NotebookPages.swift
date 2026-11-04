@@ -117,6 +117,9 @@ struct NotebookPages: View {
         }
         .accessibilityIdentifier("page.notebookPages")
         .confirmDeletingPage($deleting, canvas: canvas)
+        // Beside the page, the pictures follow the writing (elsewhere they're drawn when the pages open).
+        .onAppear { if sidebar { canvas.picturesShowing = true; canvas.flush() } }
+        .onDisappear { if sidebar { canvas.picturesShowing = false } }
     }
 
     private func cell(_ page: Notebook.Page, _ i: Int, count: Int) -> some View {
