@@ -222,6 +222,8 @@ public sealed partial class Store
             {
             }
             Exec("DELETE FROM attachments WHERE id=?", id);
+            // One brought in from another library folder (LibraryBringIn) stays removed when that folder is brought in again.
+            if (id.StartsWith("folder-", StringComparison.Ordinal)) Exec("INSERT OR IGNORE INTO deleted(id, deleted_at) VALUES(?,?)", id, Now());
             return true;
         }
     }

@@ -28,13 +28,15 @@ public static class LibraryFolderPick
 
     /// <summary>
     /// The student picked <paramref name="picked"/> from <paramref name="shown"/>. When it isn't the folder in use,
-    /// config.toml's pool_dir becomes it, this computer's library starts again to read it (as a new password does), and
-    /// then lists the lectures in it state.db doesn't (a folder used before state.db was made afresh) and copies in the
-    /// files of the lectures it lists from the other folders, so nothing it lists is read or written there any more. With
-    /// <paramref name="bringIn"/>, the other folders' own notes are copied in too (<see cref="LibraryBringIn"/>). Not a
-    /// file is moved or deleted. What that did, or why it couldn't; <paramref name="progress"/> hears how far it's got.
-    /// The answer is remembered once the folder is in use. A config.toml that can't be written is said in plain words,
-    /// and nothing is remembered then, so it's asked again.
+    /// config.toml's pool_dir becomes it and this computer's library starts again to read it (as a new password does).
+    /// Then the library lists the lectures in it state.db doesn't (a folder used before state.db was made afresh), and
+    /// copies in what it reads from the other folders: the files of the lectures it lists there, the trash's, and the
+    /// Inbox's captures and class notes (<see cref="LibraryBringIn.Refile"/>), so nothing it shows is read or written
+    /// there any more. With <paramref name="bringIn"/>, the other folders' own notes come in too
+    /// (<see cref="LibraryBringIn.Apply"/>). Not a file is moved or deleted. <paramref name="progress"/> hears how far
+    /// it's got. The answer is remembered only once all of that is done; until then the question comes back at the next
+    /// start, and using the folder in use finishes the copying. A config.toml that can't be written is said in plain
+    /// words.
     /// </summary>
     public static async Task<Outcome<List<BringInCount>>> UseAsync(AppHost host, LibraryFolder picked, IReadOnlyList<LibraryFolder> shown,
         bool bringIn = false, Action<int, int>? progress = null, CancellationToken ct = default)
@@ -61,12 +63,8 @@ public static class LibraryFolderPick
                 await host.CheckLibraryAsync();
             }
         }
-        host.Save(s =>
-        {
-            s.NotesFoldersSeen = [.. shown.Select(f => f.Path)];
-            s.NotesFolderChosen = picked.Path;
-        });
-        if (picked.InUse && !bringIn) return Outcome<List<BringInCount>>.Answered([]);
+        // Then the lectures the library lists from the other folders come in, and with bringIn, the rest of their notes.
+        // Using the folder in use runs it too: a switch whose copying didn't finish is finished then.
         var others = Others(picked, shown);
         var ask = new JsonObject
         {
@@ -75,11 +73,24 @@ public static class LibraryFolderPick
             ["refile"] = Paths(bringIn ? [] : others),
         };
         var done = await RunJobAsync(host, ask, progress, ct);
-        if (done.Ok) host.Log($"[library] brought in: {string.Join("; ", done.Value!.Select(d => $"{d.New} new, {d.Here} here, {d.Both} both, {d.Deleted} deleted, {d.Files} files"))}");
-        else host.Log($"[library] couldn't finish with the notes folder: {done.Failure!.Kind}");
-        // The folder is in use either way; only bringing notes in is the student's to retry.
-        return done.Ok || bringIn ? done : Outcome<List<BringInCount>>.Answered([]);
+        if (!done.Ok)
+        {
+            // The answer isn't remembered, so the question comes back at the next start until the copying is done.
+            host.Log($"[library] couldn't finish with the notes folder: {done.Failure!.Kind}");
+            return bringIn || picked.InUse ? done : Outcome<List<BringInCount>>.Failed(NotFinished);
+        }
+        host.Log($"[library] brought in: {string.Join("; ", done.Value!.Select(d => $"{d.New} new, {d.Here} here, {d.Both} both, {d.Deleted} deleted, {d.Files} files"))}");
+        host.Save(s =>
+        {
+            s.NotesFoldersSeen = [.. shown.Select(f => f.Path)];
+            s.NotesFolderChosen = picked.Path;
+        });
+        return done;
     }
+
+    /// <summary>The folder was switched, but the lectures from the other one couldn't be copied in yet.</summary>
+    public static readonly Failure NotFinished = new(FailureKind.Refused,
+        "Syft Notes uses this folder now, but couldn't copy your lectures over from the other one yet. Try again.");
 
     /// <summary>What bringing in the other folders' notes would do, with <paramref name="picked"/> as the folder the
     /// library uses: one count per other folder. Changes nothing.</summary>
@@ -96,9 +107,39 @@ public static class LibraryFolderPick
     /// that stops answering for half a minute, or starts again (the job is gone), ends the wait.</summary>
     static async Task<Outcome<List<BringInCount>>> RunJobAsync(AppHost host, JsonObject ask, Action<int, int>? progress, CancellationToken ct)
     {
-        var started = await LibraryCall.Run(() => host.Remote()?.StartFolderJobAsync(ask, ct) ?? Task.FromResult<BringInStatus?>(null), ct);
-        if (!started.Ok) return Outcome<List<BringInCount>>.Failed(started.Failure!);
-        var last = started.Value!;
+        // The library runs one job at a time: one that isn't ours (another look, still going) is waited out, then ours
+        // is asked for again.
+        string mine = Guid.NewGuid().ToString("N");
+        ask["asked"] = mine;
+        BringInStatus? last = null;
+        for (int tries = 0; tries < 5 && last is null; tries++)
+        {
+            var started = await LibraryCall.Run(() => host.Remote()?.StartFolderJobAsync(ask, ct) ?? Task.FromResult<BringInStatus?>(null), ct);
+            if (!started.Ok) return Outcome<List<BringInCount>>.Failed(started.Failure!);
+            if (started.Value!.Asked == mine)
+            {
+                last = started.Value;
+                break;
+            }
+            var theirs = await FollowAsync(host, started.Value, null, ct);
+            if (theirs.Failure?.Kind == FailureKind.Offline) return Outcome<List<BringInCount>>.Failed(theirs.Failure);
+        }
+        if (last is null) return Outcome<List<BringInCount>>.Failed(Stopped);
+        var ours = await FollowAsync(host, last, progress, ct);
+        if (!ours.Ok) return Outcome<List<BringInCount>>.Failed(ours.Failure!);
+        last = ours.Value!;
+        if (last.Error is { } why)
+        {
+            host.Log($"[library] bring-in stopped: {why}");
+            return Outcome<List<BringInCount>>.Failed(Stopped);
+        }
+        return Outcome<List<BringInCount>>.Answered(last.Results);
+    }
+
+    /// <summary>Asks after the job <paramref name="job"/> each second until it ends: how it ended, or why the wait did.</summary>
+    static async Task<Outcome<BringInStatus>> FollowAsync(AppHost host, BringInStatus job, Action<int, int>? progress, CancellationToken ct)
+    {
+        var last = job;
         Failure? lost = null;
         int quiet = 0;
         await Poll.UntilAsync(async c =>
@@ -116,13 +157,7 @@ public static class LibraryFolderPick
             progress?.Invoke(last.Done, last.Total);
             return !last.Running;
         }, TimeSpan.FromSeconds(1), Timeout.InfiniteTimeSpan, ct);
-        if (lost is not null) return Outcome<List<BringInCount>>.Failed(lost);
-        if (last.Error is { } why)
-        {
-            host.Log($"[library] bring-in stopped: {why}");
-            return Outcome<List<BringInCount>>.Failed(Stopped);
-        }
-        return Outcome<List<BringInCount>>.Answered(last.Results);
+        return lost is null ? Outcome<BringInStatus>.Answered(last) : Outcome<BringInStatus>.Failed(lost);
     }
 
     static JsonArray Paths(IEnumerable<string> paths) => new([.. paths.Select(p => (JsonNode)p)]);

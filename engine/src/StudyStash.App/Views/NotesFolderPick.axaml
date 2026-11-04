@@ -23,20 +23,21 @@
         <Border Classes="setup-pane" />
         <Border Classes="setup-clip">
           <DockPanel>
-            <Grid DockPanel.Dock="Bottom" Classes="setup-foot" ColumnDefinitions="Auto,*,Auto,Auto">
-              <!-- Pick: bring the others' notes in (it says what it will do first); Summary: back to the pick. -->
-              <Button Name="BringIn" Classes="text-link" Command="{Binding Look.Command}" IsVisible="{Binding OnPick}" IsEnabled="{Binding !Busy}"
-                      Content="{Binding BringLabel}" VerticalAlignment="Center" />
-              <Button Name="Back" Classes="btn" Command="{Binding Back}" IsVisible="{Binding OnSummary}" IsEnabled="{Binding !Busy}"
-                      Content="{x:Static vm:NotesFolderPickModel.BackLabel}" />
-              <TextBlock Grid.Column="1" Classes="say" Foreground="{DynamicResource Warn}" Text="{Binding Say}" TextWrapping="Wrap"
-                         IsVisible="{Binding Say, Converter={x:Static ObjectConverters.IsNotNull}}" Margin="16,0" VerticalAlignment="Center" />
-              <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="10" IsVisible="{Binding Busy}" VerticalAlignment="Center" Margin="0,0,12,0">
-                <TextBlock Name="Progress" Classes="choice-about" Text="{Binding Progress}" VerticalAlignment="Center"
-                           IsVisible="{Binding Progress, Converter={x:Static ObjectConverters.IsNotNull}}" />
+            <Grid DockPanel.Dock="Bottom" Classes="setup-foot" RowDefinitions="Auto,Auto" ColumnDefinitions="Auto,*,Auto">
+              <!-- While it works: how far, on a line of its own, so the buttons never move or get pushed out. -->
+              <Grid Grid.ColumnSpan="3" ColumnDefinitions="Auto,10,*" IsVisible="{Binding Busy}" Margin="0,0,0,10">
                 <c:SyftLoader Kind="HoppingBits" Size="20" VerticalAlignment="Center" />
-              </StackPanel>
-              <Panel Grid.Column="3">
+                <TextBlock Name="Progress" Grid.Column="2" Classes="choice-about" Text="{Binding Progress}" VerticalAlignment="Center"
+                           TextTrimming="CharacterEllipsis" />
+              </Grid>
+              <!-- Pick: bring the others' notes in (it says what it will do first); Summary: back to the pick. -->
+              <Button Name="BringIn" Grid.Row="1" Classes="text-link" Command="{Binding Look.Command}" IsVisible="{Binding OnPick}" IsEnabled="{Binding !Busy}"
+                      Content="{Binding BringLabel}" VerticalAlignment="Center" />
+              <Button Name="Back" Grid.Row="1" Classes="btn" Command="{Binding Back}" IsVisible="{Binding OnSummary}" IsEnabled="{Binding !Busy}"
+                      Content="{x:Static vm:NotesFolderPickModel.BackLabel}" />
+              <TextBlock Grid.Row="1" Grid.Column="1" Classes="say" Foreground="{DynamicResource Warn}" Text="{Binding Say}" TextWrapping="Wrap"
+                         IsVisible="{Binding Say, Converter={x:Static ObjectConverters.IsNotNull}}" Margin="16,0" VerticalAlignment="Center" />
+              <Panel Grid.Row="1" Grid.Column="2">
                 <Button Name="UseFolder" Classes="btn ink" Command="{Binding Use.Command}" IsVisible="{Binding OnPick}" IsEnabled="{Binding !Busy}"
                         IsDefault="{Binding OnPick}" Content="{x:Static vm:NotesFolderPickModel.UseLabel}" />
                 <Button Name="BringThem" Classes="btn ink" Command="{Binding SummaryAction.Command, FallbackValue={x:Null}}" IsVisible="{Binding OnSummary}"

@@ -32,10 +32,14 @@ public sealed class LibraryFolderPickTests
         Assert.NotNull(asked);
         var outcome = await LibraryFolderPick.UseAsync(host, asked.Single(f => !f.InUse), asked, ct: TestContext.Current.CancellationToken);
 
-        Assert.True(outcome.Ok);
+        // The folder is switched, but with no library running nothing could be copied over: that's said, and the
+        // answer isn't remembered, so it's asked again at the next start.
+        Assert.False(outcome.Ok);
+        Assert.Equal(LibraryFolderPick.NotFinished, outcome.Failure);
         Assert.True(LibraryFolders.Comparer.Equals(LibraryFolders.Real(older), LibraryFolders.Real(Configs.Load(home.Path).PoolDir)));
         Assert.Equal(before.Item1, Files(inUse));
         Assert.Equal(before.Item2, Files(older));
-        Assert.Null(LibraryFolderPick.ToAsk(host, Find));
+        Assert.Null(host.Settings.NotesFoldersSeen);
+        Assert.NotNull(LibraryFolderPick.ToAsk(host, Find));
     }
 }
