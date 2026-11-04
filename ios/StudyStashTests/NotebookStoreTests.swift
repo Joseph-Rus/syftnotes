@@ -128,23 +128,35 @@ import UIKit
     }
 
     /// A notebook closed while the library couldn't be reached goes with the recordings waiting, when the library
-    /// answers (the app coming back): opening a notebook no longer sends it.
+    /// answers (the app coming back): opening a notebook no longer sends it. One open to write in waits to be closed.
     @Test func aNotebookKeptOfflineIsSentWhenTheLibraryAnswers() async throws {
         let store = NotebookStore.shared
-        let n = Notebook.blank(title: "Kept offline", className: nil, lecture: nil)
-        store.save(n)
-        defer { if let m = store.notebook(n.id) { store.delete(m) } }
         let points = (0..<20).map { i in
             PKStrokePoint(location: CGPoint(x: 100 + CGFloat(i) * 4, y: 200), timeOffset: Double(i) * 0.01,
                           size: CGSize(width: 3, height: 3), opacity: 1, force: 1, azimuth: 0, altitude: .pi / 2)
         }
-        store.setDrawing(PKDrawing(strokes: [PKStroke(ink: PKInk(.pen, color: .black), path: PKStrokePath(controlPoints: points, creationDate: .now))]),
-                         n, n.pages[0])
-        #expect(store.notebook(n.id)?.needsSaving == true)
+        let line = PKDrawing(strokes: [PKStroke(ink: PKInk(.pen, color: .black), path: PKStrokePath(controlPoints: points, creationDate: .now))])
+        let kept = Notebook.blank(title: "Kept offline", className: nil, lecture: nil)
+        let open = Notebook.blank(title: "Open", className: nil, lecture: nil)
+        for n in [kept, open] {
+            store.save(n)
+            store.setDrawing(line, n, n.pages[0])
+        }
+        store.open.insert(open.id)
+        defer {
+            store.open.remove(open.id)
+            for n in [kept, open] { if let m = store.notebook(n.id) { store.delete(m) } }
+        }
+        #expect(store.notebook(kept.id)?.needsSaving == true)
         let session = URLSessionConfiguration.ephemeral
         session.protocolClasses = [AnsweringLibrary.self]
-        await RecordingStore.shared.sendWaiting(api: APIClient(base: URL(string: "http://answering.test")!, session: URLSession(configuration: session)))
-        #expect(store.notebook(n.id)?.needsSaving == false)
+        let api = APIClient(base: URL(string: "http://answering.test")!, session: URLSession(configuration: session))
+
+        // The library back: the closed one goes, the open one waits.
+        AnsweringLibrary.state.withLock { $0 = (answers: true, uploads: 0) }
+        await RecordingStore.shared.sendWaiting(api: api)
+        #expect(store.notebook(kept.id)?.needsSaving == false)
+        #expect(store.notebook(open.id)?.needsSaving == true)
     }
 
     @Test func aPDFsPagesComeInAtTheirOwnSizes() throws {
@@ -199,13 +211,20 @@ private final class HeldLibrary: URLProtocol, @unchecked Sendable {
     }
 }
 
-/// A library that takes whatever it's sent.
+/// A library that takes whatever it's sent, or can't be reached; it counts the uploads that got as far as it.
 private final class AnsweringLibrary: URLProtocol, @unchecked Sendable {
+    static let state = OSAllocatedUnfairLock(initialState: (answers: true, uploads: 0))
+
     override class func canInit(with request: URLRequest) -> Bool { true }
     override class func canonicalRequest(for request: URLRequest) -> URLRequest { request }
     override func stopLoading() {}
 
     override func startLoading() {
+        let answers = Self.state.withLock { s in
+            if request.url?.path().hasSuffix("/attachments") == true { s.uploads += 1 }
+            return s.answers
+        }
+        guard answers else { return client!.urlProtocol(self, didFailWithError: URLError(.cannotConnectToHost)) }
         let reply = HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: ["Content-Type": "application/json"])!
         client?.urlProtocol(self, didReceive: reply, cacheStoragePolicy: .notAllowed)
         client?.urlProtocol(self, didLoad: Data(#"{"attachments":[]}"#.utf8))

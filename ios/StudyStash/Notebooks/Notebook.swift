@@ -173,6 +173,8 @@ final class NotebookStore {
     private(set) var notebooks: [Notebook] = []
     /// Goes up each time a page's ink is written, so its picture is drawn again.
     private(set) var inkRevision: [UUID: Int] = [:]
+    /// Notebooks open to write in right now (an editor shows them).
+    @ObservationIgnored var open: Set<UUID> = []
     let folder: URL
 
     init(folder: URL = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0].appending(path: "Notebooks")) {
