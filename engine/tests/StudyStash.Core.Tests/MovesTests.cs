@@ -22,6 +22,38 @@ public class MovesTests
     }
 
     [Fact]
+    public void Only_Inno_Setups_own_folder_for_the_app_counts_as_the_old_install()
+    {
+        string temp = Path.Combine(Path.GetTempPath(), "studystash-moves-" + Guid.NewGuid().ToString("N")[..8]);
+        string old = Path.Combine(temp, "Programs", "Study Stash");
+        string running = Path.Combine(temp, "SyftNotes", "current");
+        try
+        {
+            Directory.CreateDirectory(old);
+            File.WriteAllText(Path.Combine(old, "StudyStash.exe"), "");
+            // Without Inno's uninstall data it's someone's own copy, not the install.
+            Assert.False(Moves.OldInstallFolder(old, running));
+            File.WriteAllText(Path.Combine(old, "unins000.dat"), "");
+            Assert.True(Moves.OldInstallFolder(old, running));
+            Assert.True(Moves.OldInstallFolder(old + Path.DirectorySeparatorChar, running));
+            // Never a drive's root, the running copy's folder, a folder holding it, any other folder, or a relative path.
+            Assert.False(Moves.OldInstallFolder(Path.GetPathRoot(temp), running));
+            Assert.False(Moves.OldInstallFolder(old, old));
+            Assert.False(Moves.OldInstallFolder(old, Path.Combine(old, "current")));
+            Assert.False(Moves.OldInstallFolder(Path.Combine(temp, "Programs"), running));
+            Assert.False(Moves.OldInstallFolder(temp, running));
+            Assert.False(Moves.OldInstallFolder(Path.Combine("Programs", "Study Stash"), running));
+            Assert.False(Moves.OldInstallFolder("", running));
+            // Already gone (an earlier start deleted it but couldn't forget its entry): still the old install.
+            Assert.True(Moves.OldInstallFolder(Path.Combine(temp, "gone", "Programs", "Study Stash"), running));
+        }
+        finally
+        {
+            Directory.Delete(temp, recursive: true);
+        }
+    }
+
+    [Fact]
     public void Reads_the_program_a_Run_value_a_LaunchAgent_and_a_desktop_entry_start()
     {
         Assert.Equal(@"C:\Program Files\Study Stash\StudyStash.exe", Moves.RunProgram(@"""C:\Program Files\Study Stash\StudyStash.exe"" --background"));
