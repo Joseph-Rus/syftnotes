@@ -169,11 +169,16 @@ public sealed class HiddenTerminal : IDisposable
     sealed class UnixBackend : IBackend
     {
         readonly int master;
-        int closed;
+        // Syft Notes' own copy of the far end, held until the program has gone and what it showed has been read. When the
+        // program's own close was the last, a Mac threw away what it showed last if it wasn't read quickly enough (seen
+        // on a busy computer: a refusal for the country, printed just before it stopped, never arrived).
+        int slave;
+        int closed, gone;
 
-        UnixBackend(int master, int pid)
+        UnixBackend(int master, int slave, int pid)
         {
             this.master = master;
+            this.slave = slave;
             Pid = pid;
         }
 
@@ -253,16 +258,16 @@ public sealed class HiddenTerminal : IDisposable
                 envp.Add(IntPtr.Zero);
                 int err = posix_spawn(out int pid, launch.FileName, actions, attr, [.. argv], [.. envp]);
                 if (err != 0) throw new IOException($"{Path.GetFileName(launch.FileName)} didn't start: {err}");
-                return new UnixBackend(master, pid);
+                return new UnixBackend(master, slave, pid);
             }
             catch
             {
                 close(master);
+                if (slave >= 0) close(slave);
                 throw;
             }
             finally
             {
-                if (slave >= 0) close(slave);
                 if (actions != IntPtr.Zero)
                 {
                     posix_spawn_file_actions_destroy(actions);
@@ -293,8 +298,9 @@ public sealed class HiddenTerminal : IDisposable
             while (true)
             {
                 int r = waitpid(Pid, out int status, 0);
-                if (r == Pid) return (status & 0x7f) == 0 ? (status >> 8) & 0xff : 128 + (status & 0x7f);
                 if (r < 0 && Marshal.GetLastPInvokeError() == EINTR) continue;
+                Volatile.Write(ref gone, 1);
+                if (r == Pid) return (status & 0x7f) == 0 ? (status >> 8) & 0xff : 128 + (status & 0x7f);
                 return -1;
             }
         }
@@ -304,14 +310,21 @@ public sealed class HiddenTerminal : IDisposable
             var fds = new PollFd[1];
             while (!stop())
             {
+                // Once the program has gone, nothing left to read lets go of the far end: the end comes once anything
+                // it started has let go too.
+                bool drained = Volatile.Read(ref gone) == 1 && Volatile.Read(ref slave) >= 0;
                 fds[0] = new PollFd { Fd = master, Events = PollIn };
-                int r = poll(fds, 1, 250);
+                int r = poll(fds, 1, drained ? 0 : 250);
                 if (r < 0)
                 {
                     if (Marshal.GetLastPInvokeError() == EINTR) continue;
                     return 0;
                 }
-                if (r == 0) continue;
+                if (r == 0)
+                {
+                    if (drained) LetGoOfSlave();
+                    continue;
+                }
                 // Data first; a hang-up with nothing left to read is the end (every copy of the far end is closed).
                 nint n = read(master, into, into.Length);
                 if (n > 0) return (int)n;
@@ -351,8 +364,15 @@ public sealed class HiddenTerminal : IDisposable
             {
                 exited.Wait(TimeSpan.FromSeconds(5));
                 read.Wait(TimeSpan.FromSeconds(5));
+                LetGoOfSlave();
                 close(master);
             }) { IsBackground = true, Name = "hidden terminal: close" }.Start();
+        }
+
+        void LetGoOfSlave()
+        {
+            int fd = Interlocked.Exchange(ref slave, -1);
+            if (fd >= 0) close(fd);
         }
 
         [StructLayout(LayoutKind.Sequential)]
