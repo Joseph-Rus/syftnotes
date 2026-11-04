@@ -9,6 +9,7 @@ using Microsoft.AspNetCore.Hosting.Server.Features;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using StudyStash.App.Services;
+using StudyStash.App.ViewModels.Kit;
 using StudyStash.Core;
 using StudyStash.Core.Canvas;
 using StudyStash.Library;
@@ -184,7 +185,8 @@ public sealed class UseJustThisComputerTests
         string laptop = home["laptop"];
         LaptopOf(laptop, OldAddress, "old-pw", "Sam's library");
         using var host = new AppHost(laptop, log: _ => { });
-        using var model = SettingsModel.Make(host)
+        var confirm = new FakeConfirm();
+        using var model = SettingsModel.Make(host, confirm: confirm)
             .WithLibraryHere(() => new LibraryHere { Command = [exe, "--no-ollama"], Folder = home["new-pool"], FirstPort = 28787 })
             .WithLibraryHttp(Network(old));
         model.DisplayName = "Ada";
@@ -192,14 +194,10 @@ public sealed class UseJustThisComputerTests
         {
             // The student sees what will happen before anything does.
             Assert.Contains("Stop using Sam's library on mac-mini", model.JustThisComputerLine, StringComparison.Ordinal);
-            model.AskBecomeLibraryCommand.Execute(null);
-            Assert.True(model.ConfirmingBecomeLibrary);
-            Assert.StartsWith("Sam's library on mac-mini keeps its own copy. Classes and notes come here", model.BecomeLibraryQuestion, StringComparison.Ordinal);
-
-            await model.ConfirmBecomeLibraryCommand.ExecuteAsync(null);
+            await model.BecomeLibraryCommand.ExecuteAsync(null);
+            Assert.StartsWith("Sam's library on mac-mini keeps its own copy. Classes and notes come here", confirm.Asked.Single().Text, StringComparison.Ordinal);
 
             Assert.Equal(AppRole.Both, host.Settings.Role);
-            Assert.False(model.ConfirmingBecomeLibrary);
             Assert.False(model.HasPendingBring);
             Assert.Null(RoleSwitch.Pending(laptop));
             Assert.Contains("26 lectures and 3 classes came over from Sam's library, with 5 files and 1 chat.", model.SwitchSay, StringComparison.Ordinal);

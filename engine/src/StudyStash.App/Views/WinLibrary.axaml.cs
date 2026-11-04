@@ -15,16 +15,4 @@ public partial class WinLibrary : UserControl
             if (DataContext is LibraryModel m) m.Narrow = e.NewSize.Width < LibraryModel.NarrowBelow;
         };
     }
-
-    /// <summary>A click beside "Delete this lecture?" is Cancel.</summary>
-    void OnDeleteAskPressed(object? sender, PointerPressedEventArgs e)
-    {
-        if (ReferenceEquals(e.Source, sender) && DataContext is LibraryModel m) m.CancelDeleteCommand.Execute(null);
-    }
-
-    /// <summary>A click beside "Stop recording … and start …?" is Cancel.</summary>
-    void OnConfirmAskPressed(object? sender, PointerPressedEventArgs e)
-    {
-        if (ReferenceEquals(e.Source, sender) && DataContext is LibraryModel m) m.CancelConfirmCommand.Execute(null);
-    }
 }

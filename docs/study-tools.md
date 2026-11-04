@@ -140,5 +140,5 @@ own voices speak a line. `ListenVoicesTests` downloads stand-in voices (`FakeVoi
 library and checks which voices read each listen, fetches a small stand-in Kokoro from a pretend Hugging
 Face, and has Kokoro itself speak when its files are on this computer (in `STUDYSTASH_KOKORO`, or the
 default home's models folder). The app's are `AskRecipesTests`, `ExamFlagsTests`, `ReviewPageTests`,
-`ExamPrepPageTests` and `ListenPageTests`, and `StudyShots` draws each of them, light and dark, in both
-looks, into `STUDYSTASH_SHOTS`.
+`ExamPrepPageTests` and `ListenPageTests`. (`StudyShots`, which drew each of them in both looks, was removed with
+the other picture-only tests.)

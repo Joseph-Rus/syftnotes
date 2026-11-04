@@ -18,6 +18,9 @@
     <PackageReference Include="Avalonia.Desktop" Version="12.1.3" />
     <PackageReference Include="Avalonia.Themes.Fluent" Version="12.1.3" />
     <PackageReference Include="CommunityToolkit.Mvvm" Version="8.4.2" />
+    <!-- The one "Are you sure?" (ViewModels/Kit/Confirm.cs): the dialog layer each window carries. 0.12.3 is the latest
+         stable and needs Avalonia 12.0.0 or newer; pinned, so a new version is a change we make. -->
+    <PackageReference Include="DialogHost.Avalonia" Version="0.12.3" />
     <!-- The app's container (AppServices.cs). ASP.NET Core (the MCP server, through StudyStash.Library) brings it too;
          named here so the app doesn't depend on that by accident. -->
     <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="10.0.12" />
@@ -40,6 +43,7 @@
 
   <ItemGroup>
     <InternalsVisibleTo Include="StudyStash.App.Tests" />
+    <InternalsVisibleTo Include="StudyStash.Pictures" />
   </ItemGroup>
 
   <!-- A student's copy (TestHelpers=false, see engine/Directory.Build.props) leaves out the self-test and the demo

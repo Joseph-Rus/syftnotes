@@ -126,7 +126,7 @@ public class ToastTests
     {
         ((App)Application.Current!).UseSkin(skin);
         int opened = 0, dismissed = 0;
-        var model = new CanvasToastModel(CanvasShots.ToastGallery()[0].Item)
+        var model = new CanvasToastModel(Scenes.ToastGallery()[0].Item)
         {
             When = "now", Expanded = true,
             OnOpen = _ => { opened++; return Task.CompletedTask; },
@@ -228,7 +228,7 @@ public class ToastTests
     public void A_menu_is_a_plain_panel(SkinKind skin, double radius)
     {
         ((App)Application.Current!).UseSkin(skin);
-        var menu = SurfaceShots.ClassMenu();
+        var menu = Scenes.ClassMenu();
         var w = Host(menu, skin);
         try
         {
