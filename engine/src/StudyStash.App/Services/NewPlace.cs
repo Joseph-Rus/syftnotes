@@ -8,9 +8,10 @@ namespace StudyStash.App.Services;
 /// right where it still names the program as it was before it moved (Moves.cs: Inno Setup's folder, "Study
 /// Stash.app", the tarball's folder, or one that's gone). The AI apps' connections (Claude, ChatGPT/Codex, Gemini and
 /// the rest), start at login and the background library are written again for <see cref="Desktop.Program"/>, and
-/// Windows' notification name and link are written on their first use. An AppImage puts itself in the applications
-/// menu. Nothing changes for a build folder, the self-test, or a connection to another copy someone keeps on purpose.
-/// Settings, lectures and Documents are never touched.
+/// Windows' notification name and link are written on their first use. A Mac Dock icon pinned to the old bundle is
+/// pointed at the new one, once. An AppImage puts itself in the applications menu. Nothing changes for a build folder,
+/// the self-test, or a connection to another copy someone keeps on purpose. Settings, lectures and Documents are never
+/// touched.
 /// </summary>
 public static class NewPlace
 {
@@ -52,6 +53,9 @@ public static class NewPlace
             foreach (string line in Run(ClaudeSetup.ThisComputer(home), home, Desktop.Program, () => Desktop.LoginProgram(home),
                          () => Desktop.StartAtLogin(true, home), BackgroundLibrary.ThisComputer()))
                 Program.Log("[moved] " + line);
+            // A Dock icon pinned to "Study Stash.app" before the rename: pointed at this bundle, once (MacDock.cs).
+            if (OperatingSystem.IsMacOS() && Apps.MacBundleOf() is { } bundle && Path.GetFileName(bundle) == MacRename.Name)
+                MacDock.Repair(home, bundle, Machine.Run, Program.Log);
             if (OperatingSystem.IsLinux() && Environment.GetEnvironmentVariable("APPIMAGE") is { Length: > 0 } image)
                 new LinuxMenu().Write(image, Path.Combine(AppContext.BaseDirectory, "syft-notes.png"), Program.Log);
         }
