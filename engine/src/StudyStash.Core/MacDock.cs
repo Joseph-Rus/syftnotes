@@ -29,8 +29,8 @@ public static class MacDock
 
     /// <summary>The Dock's settings (a plist as <c>defaults export com.apple.dock -</c> prints it) with each pinned tile
     /// for an "…/Study Stash.app" that's gone (and is ours, when the tile says whose it is) pointed at
-    /// <paramref name="app"/>: its URL, in the form the tile already used, and its saved bookmark dropped so the Dock
-    /// makes a new one. Every other tile and setting is left as it was. Anything it can't read changes nothing.</summary>
+    /// <paramref name="app"/>: its URL, in the form the tile already used, its name (the Dock's hover label) "Syft
+    /// Notes", and its saved bookmark dropped so the Dock makes a new one. Every other tile and setting is left as it was. Anything it can't read changes nothing.</summary>
     public static DockRepair Repaired(byte[] plist, string app, Func<string, bool> exists)
     {
         try
@@ -84,6 +84,7 @@ public static class MacDock
         if (!string.Equals(Path.GetFileName(path), MacRename.OldName, StringComparison.Ordinal) || exists(path)) return false;
         string bundle = app.TrimEnd('/') + "/";
         url.Value = isUrl ? "file://" + string.Join('/', bundle.Split('/').Select(Uri.EscapeDataString)) : bundle;
+        if (Value(data, "file-label") is { Name.LocalName: "string" } label) label.Value = Path.GetFileNameWithoutExtension(MacRename.Name);
         if (data.Elements("key").FirstOrDefault(k => k.Value == "book") is { } book)
         {
             book.ElementsAfterSelf().FirstOrDefault()?.Remove();
