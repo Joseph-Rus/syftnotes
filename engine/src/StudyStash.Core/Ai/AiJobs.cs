@@ -30,22 +30,28 @@ public sealed class AiJobs(string home, Func<string>? ollamaHost = null)
     public AiSignIns SignIns => signIns ??= new AiSignIns(Checks, MarkSignedIn) { Every = SignInEvery, Patience = SignInPatience };
 
     /// <summary>An AI's own status command said the student signed in: it's ready now, with no check to press, and the
-    /// notes it couldn't write while it was signed out are written (<see cref="SignedInAgain"/>). A usage limit is left
-    /// alone: signing in doesn't end one.</summary>
+    /// notes it couldn't write while it was signed out are written (<see cref="SignedInAgain"/>). The AI the student just
+    /// signed in to is the one they want: it writes their notes and answers their questions from now on, whatever was
+    /// chosen before, so nobody has to go to Settings to pick it (signing back in to the one already used changes
+    /// nothing). A usage limit is left alone: signing in doesn't end one.</summary>
     public void MarkSignedIn(string id)
     {
         var s = Settings;
         bool back = Engines.LooksLikeAuth(s.Tests.GetValueOrDefault(id, ""));
         s.Tests[id] = "works";
-        // The first AI a student gets working, with none chosen yet, is the one that writes their notes (and answers).
-        bool first = !s.Picked("notes") && id != "ollama";
-        if (first) s.Provider = id;
+        bool chosen = id != "ollama" && (s.For("notes").Provider != id || s.For("ask").Provider != id);
+        if (chosen)
+        {
+            s.Provider = id;
+            // As Settings' own pick does (/api/v2/ai/defaults): the notes, Ask, and the chat that answers with Ask.
+            foreach (string job in new[] { "notes", "ask", "agent" }) s.ByJob[job] = new AiChoice(id);
+        }
         s.Save(home);
-        if (first) NotesAiChosen?.Invoke();
+        if (chosen) NotesAiChosen?.Invoke();
         if (back) SignedInAgain?.Invoke(id);
     }
 
-    /// <summary>An AI was chosen to write the notes where none was before: the library writes the notes it kept waiting.</summary>
+    /// <summary>An AI was just chosen to write the notes (signed in to): the library writes the notes it kept waiting.</summary>
     public event Action? NotesAiChosen;
 
     /// <summary>The library's start: an ai.json from before "nobody chosen yet" whose Ollama was only the old default
