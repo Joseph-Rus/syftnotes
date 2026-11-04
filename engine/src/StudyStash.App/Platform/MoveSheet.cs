@@ -24,6 +24,32 @@ static class MoveSheet
         }
     }
 
+    /// <summary>The Mac bundle's rename (MacRename.cs), before any window: true when this copy quits now because the app
+    /// opens again from "Syft Notes.app". A build folder and the self-test never rename.</summary>
+    public static bool Rename(IReadOnlyList<string> args)
+    {
+        if (!OperatingSystem.IsMacOS() || SelfTest.Dir is not null) return false;
+        try
+        {
+            if (MacRename.Plan(AppContext.BaseDirectory) is not { } plan) return false;
+            var background = BackgroundLibrary.ThisComputer();
+            return MacRename.Run(plan, bundle => MoveToApplications.OtherCopyRunning(Machine.Run, Environment.ProcessId, bundle),
+                () =>
+                {
+                    // This copy's own background library runs from the bundle that's moving: it stops, and the app starts
+                    // it again from the new place (its LaunchAgent rewritten to the new path, LibraryService).
+                    foreach (var (home, run) in background.All())
+                        if (run.Count > 0 && run[0].StartsWith(plan.From.TrimEnd('/') + "/", StringComparison.Ordinal)) background.Stop(home);
+                },
+                Machine.Run, Updates.SpawnDetached, Environment.ProcessId, args, Program.Log);
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException or System.ComponentModel.Win32Exception or InvalidOperationException)
+        {
+            Program.Log("[rename] couldn't rename the app: " + e.Message);
+            return false;
+        }
+    }
+
     internal const string Move = "Move to Applications";
 
     /// <summary>The sheet. Anything but the Move button (Not now, Esc) is "no".</summary>

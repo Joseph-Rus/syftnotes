@@ -230,7 +230,7 @@ public static partial class Shell
         {
             case UpdateNewsKind.Ready:
             {
-                var (title, text, action) = NoticeWords.UpdateReady(v);
+                var (title, text, action) = news.Why == AppUpdates.MoveOnly ? NoticeWords.MoveReady() : NoticeWords.UpdateReady(v);
                 Notify(new Notice { Title = title, Text = text, ActionLabel = action, Act = () => Run(() => UpdateNowAsync(), "UpdateNow"), Stay = NoticeTimes.Advice });
                 break;
             }
@@ -250,6 +250,13 @@ public static partial class Shell
             {
                 var (title, text) = NoticeWords.UpdateWaits(v);
                 Notify(new Notice { Title = title, Text = text, Stay = NoticeTimes.Advice });
+                break;
+            }
+            case UpdateNewsKind.Failed when news.Why is { } why:
+            {
+                // The move to the new way of updating (Bridge.cs): its own words, FUSE's on Linux.
+                var (title, text, action) = NoticeWords.MoveFailed(why, Engine.Version);
+                Notify(new Notice { Title = title, Text = text, ActionLabel = action, Act = action is null ? null : () => Dialogs.OpenUrl(page), Stay = NoticeTimes.Advice });
                 break;
             }
             case UpdateNewsKind.Failed:

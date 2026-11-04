@@ -64,6 +64,12 @@ public sealed class UpdateHost
         else if (system == "Windows")
         {
             appDir = Apps.WindowsInstallOf(baseDir) ?? "";
+            if (appDir.Length == 0 && Apps.VelopackInstalled(baseDir)) reason = "Syft Notes updates itself from the app.";
+        }
+        else if (system == "Linux" && Apps.VelopackInstalled(baseDir))
+        {
+            // The AppImage: the app updates it through Velopack (the app's AppUpdates), never this.
+            reason = "Syft Notes updates itself from the app.";
         }
         else if (system == "Linux")
         {
@@ -128,9 +134,29 @@ public static partial class Updates
     /// <summary>Start a program with no console and no wait, so it outlives this one.</summary>
     public static void SpawnDetached(IReadOnlyList<string> args)
     {
-        var psi = new ProcessStartInfo(args[0]) { UseShellExecute = false, CreateNoWindow = true };
+        // In the temp folder, not this copy's own: a program left running in a folder keeps Windows from deleting it
+        // (the move to Velopack's install uninstalls the folder this copy runs from).
+        var psi = new ProcessStartInfo(args[0]) { UseShellExecute = false, CreateNoWindow = true, WorkingDirectory = Path.GetTempPath() };
         foreach (string a in args.Skip(1)) psi.ArgumentList.Add(a);
         using var _ = Process.Start(psi);
+    }
+
+    /// <summary>Whether <paramref name="file"/> is the release's <paramref name="asset"/>, by its SHA256SUMS.txt.</summary>
+    public static bool ChecksumMatches(string file, string asset, IReadOnlyDictionary<string, string>? checksums) => ChecksumOk(file, asset, checksums);
+
+    /// <summary>Stops the background libraries running <paramref name="exe"/> (they start again from the new copy).</summary>
+    public static IReadOnlyList<string> StopBackground(string exe, UpdateHost host)
+    {
+        var homes = BackgroundRunning(exe, host);
+        foreach (string h in homes) host.Background!.Stop(h);
+        return homes;
+    }
+
+    /// <summary>Starts again the background libraries <see cref="StopBackground"/> stopped, when what they were
+    /// stopped for didn't happen.</summary>
+    public static void StartBackground(IReadOnlyList<string> homes, UpdateHost host)
+    {
+        foreach (string h in homes) host.Background?.Start(h);
     }
 
     static bool ChecksumOk(string file, string asset, IReadOnlyDictionary<string, string>? checksums)
