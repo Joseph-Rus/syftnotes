@@ -23,12 +23,14 @@ public class AppUpdatesTests
         bool installerRelaunches = false,
         Action? quit = null,
         List<UpdateNews>? told = null,
-        Func<Release, bool>? moves = null)
+        Func<Release, bool>? moves = null,
+        Func<Task<Release?>>? latestNow = null)
     {
         log ??= [];
         return new AppUpdates
         {
             Latest = latest ?? (() => Task.FromResult<Release?>(null)),
+            LatestNow = latestNow,
             Idle = idleNow ?? (() => idle),
             Enabled = () => enabled,
             Automatic = () => automatic,
@@ -241,6 +243,45 @@ public class AppUpdatesTests
         Assert.Equal(1, applied);
     }
 
+    /// <summary>Update now asks GitHub afresh: the background rounds' hour-old answer may not know a release that
+    /// came out since, and the student would be told they're up to date.</summary>
+    [Fact]
+    public async Task Update_now_asks_for_the_newest_release_afresh_not_the_hour_old_answer()
+    {
+        int applied = 0, fresh = 0;
+        var updates = Updates_(
+            latest: () => Task.FromResult<Release?>(null), // the cached answer from before the release
+            latestNow: () => { fresh++; return Task.FromResult<Release?>(Release()); },
+            apply: (_, _, _, _) => { applied++; return Task.FromResult(true); });
+
+        Assert.Equal("up to date", await updates.RoundAsync());
+        Assert.Equal(0, fresh);
+        Assert.Equal("relaunching", await updates.NowAsync());
+        Assert.Equal(1, fresh);
+        Assert.Equal(1, applied);
+    }
+
+    /// <summary>Update now pressed during a lecture: one fresh GitHub call for the press, and the one-minute rounds
+    /// that wait for the lecture keep that answer, so a long lecture can't run into GitHub's hourly limit.</summary>
+    [Fact]
+    public async Task Update_now_during_a_lecture_asks_GitHub_once_and_installs_when_the_lecture_ends()
+    {
+        bool idle = false;
+        int applied = 0, fresh = 0;
+        var updates = Updates_(
+            idleNow: () => idle,
+            latest: () => Task.FromResult<Release?>(null), // the cached answer from before the release
+            latestNow: () => { fresh++; return Task.FromResult<Release?>(Release()); },
+            apply: (_, _, _, _) => { applied++; return Task.FromResult(true); });
+
+        Assert.Equal("waiting until you're done recording", await updates.NowAsync());
+        for (int minute = 0; minute < 90; minute++) Assert.Equal("waiting until you're done recording", await updates.RoundAsync());
+        idle = true;
+        Assert.Equal("relaunching", await updates.RoundAsync());
+        Assert.Equal(1, fresh);
+        Assert.Equal(1, applied);
+    }
+
     [Fact]
     public async Task A_newer_copy_already_on_disk_relaunches_without_checking_for_a_release()
     {
@@ -274,5 +315,27 @@ public class AppUpdatesTests
         Configs.SaveClient(new ClientConfig(home.Path) { AutoUpdate = false });
 
         Assert.False(Configs.LoadClient(home.Path).AutoUpdate);
+    }
+
+    [Fact]
+    public void An_update_brings_the_library_window_back_only_when_it_was_open()
+    {
+        Assert.Equal(["--background"], AppUpdates.RelaunchWith(Configs.DefaultHome, windowOpen: false));
+        Assert.Empty(AppUpdates.RelaunchWith(Configs.DefaultHome, windowOpen: true));
+        Assert.Equal(["--home", "/notes"], AppUpdates.RelaunchWith("/notes", windowOpen: true));
+    }
+
+    [Fact]
+    public void The_Windows_waiter_has_no_argument_list_when_the_app_comes_back_with_no_arguments()
+    {
+        // Start-Process refuses an empty -ArgumentList, which would leave the student with no app at all.
+        var spawned = new List<IReadOnlyList<string>>();
+        var host = new UpdateHost { System = "Windows", AppDir = @"C:\Apps\Syft Notes", SpawnDetached = spawned.Add };
+
+        AppUpdates.SpawnWaiter(host, []);
+        AppUpdates.SpawnWaiter(host, ["--background"]);
+
+        Assert.DoesNotContain("-ArgumentList", spawned[0][^1]);
+        Assert.Contains("-ArgumentList '--background'", spawned[1][^1]);
     }
 }
