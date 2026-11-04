@@ -1165,8 +1165,15 @@ public static partial class Shell
     }
 
     /// <summary>The library window is on screen right now (not hidden to the tray, not minimized): an update's restart
-    /// brings it back. Asked from the updater's thread, so it's read on the UI thread's.</summary>
-    static bool LibraryWindowOpen() => Dispatcher.UIThread.Invoke(() => mainWindow is { IsVisible: true } w && w.WindowState != WindowState.Minimized);
+    /// brings it back. Asked from the updater's thread, so it's read on the UI thread's, for 2 seconds at most: a UI
+    /// thread that doesn't answer in time counts as no window (the app comes back quietly) rather than holding the
+    /// update's hand-off.</summary>
+    static bool LibraryWindowOpen()
+    {
+        var answer = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+        Dispatcher.UIThread.Post(() => answer.TrySetResult(mainWindow is { IsVisible: true } w && w.WindowState != WindowState.Minimized));
+        return answer.Task.Wait(TimeSpan.FromSeconds(2)) && answer.Task.Result;
+    }
 
     /// <summary>The library window opens where it was left, at the size it was left (or zoomed), if that spot is
     /// still on a display (true); otherwise it's for the caller to centre it.</summary>
