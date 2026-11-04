@@ -115,10 +115,6 @@ struct NotebookEditor: View {
             }
         }
         .task {
-            // Anything kept on this phone while the library couldn't be reached goes now.
-            if let api = app.api { await store.sendWaiting(api: api) }
-        }
-        .task {
             #if DEBUG
             // Pictures: `-notebook-sheet paper|pages` opens the paper or the pages over the notebook.
             try? await Task.sleep(for: .seconds(0.8))
@@ -490,7 +486,7 @@ extension NotebookStore {
     }
 
     /// Every notebook with something in it that changed since it last reached the library (closed while it couldn't
-    /// be reached), sent now. The notebook open and the library's refresh call it.
+    /// be reached), sent now: with the recordings waiting, when the library answers (the app coming back, its refresh).
     func sendWaiting(api: APIClient) async {
         for n in notebooks where n.needsSaving && !isBlank(n) && !Self.sending.contains(n.id) {
             _ = await send(n.id, api: api, waitingAtMost: .seconds(120))

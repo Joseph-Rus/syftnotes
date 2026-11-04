@@ -71,11 +71,13 @@ import UIKit
         // In the page's own units, not the canvas's.
         #expect(abs(onDisk(1).bounds.midY - 200) < 4)
 
-        // A line on page 1, then the app goes to the background straight away (what the editor does then).
+        // A line on page 1, then the app goes to the background straight away (what the editor does then). Page 2's
+        // picture, left alone while it was written in, is drawn again.
         write(page: 0, y: 120)
         canvas.flush()
         #expect(onDisk(0).strokes.count == 1)
         #expect(onDisk(1).strokes.count == 1)
+        #expect(store.inkRevision[n.pages[1].id] != nil)
 
         // A line at the foot of the A4 page 1, then page 1 made US Letter (shorter): the line is now on page 2. A line
         // written on page 1 after that leaves page 1's file without the foot line, so page 2's file has it.
@@ -125,6 +127,26 @@ import UIKit
         #expect(!saved.contains(CGPoint(x: 200, y: top + 300)), "the hole is kept")
     }
 
+    /// A notebook closed while the library couldn't be reached goes with the recordings waiting, when the library
+    /// answers (the app coming back): opening a notebook no longer sends it.
+    @Test func aNotebookKeptOfflineIsSentWhenTheLibraryAnswers() async throws {
+        let store = NotebookStore.shared
+        let n = Notebook.blank(title: "Kept offline", className: nil, lecture: nil)
+        store.save(n)
+        defer { if let m = store.notebook(n.id) { store.delete(m) } }
+        let points = (0..<20).map { i in
+            PKStrokePoint(location: CGPoint(x: 100 + CGFloat(i) * 4, y: 200), timeOffset: Double(i) * 0.01,
+                          size: CGSize(width: 3, height: 3), opacity: 1, force: 1, azimuth: 0, altitude: .pi / 2)
+        }
+        store.setDrawing(PKDrawing(strokes: [PKStroke(ink: PKInk(.pen, color: .black), path: PKStrokePath(controlPoints: points, creationDate: .now))]),
+                         n, n.pages[0])
+        #expect(store.notebook(n.id)?.needsSaving == true)
+        let session = URLSessionConfiguration.ephemeral
+        session.protocolClasses = [AnsweringLibrary.self]
+        await RecordingStore.shared.sendWaiting(api: APIClient(base: URL(string: "http://answering.test")!, session: URLSession(configuration: session)))
+        #expect(store.notebook(n.id)?.needsSaving == false)
+    }
+
     @Test func aPDFsPagesComeInAtTheirOwnSizes() throws {
         let folder = FileManager.default.temporaryDirectory.appending(path: "notebooks-\(UUID().uuidString)")
         defer { try? FileManager.default.removeItem(at: folder) }
@@ -170,6 +192,20 @@ private final class HeldLibrary: URLProtocol, @unchecked Sendable {
     override func startLoading() {
         Self.arrived.withLock { $0 = true }
         _ = Self.answer.wait(timeout: .now() + 10)
+        let reply = HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: ["Content-Type": "application/json"])!
+        client?.urlProtocol(self, didReceive: reply, cacheStoragePolicy: .notAllowed)
+        client?.urlProtocol(self, didLoad: Data(#"{"attachments":[]}"#.utf8))
+        client?.urlProtocolDidFinishLoading(self)
+    }
+}
+
+/// A library that takes whatever it's sent.
+private final class AnsweringLibrary: URLProtocol, @unchecked Sendable {
+    override class func canInit(with request: URLRequest) -> Bool { true }
+    override class func canonicalRequest(for request: URLRequest) -> URLRequest { request }
+    override func stopLoading() {}
+
+    override func startLoading() {
         let reply = HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: ["Content-Type": "application/json"])!
         client?.urlProtocol(self, didReceive: reply, cacheStoragePolicy: .notAllowed)
         client?.urlProtocol(self, didLoad: Data(#"{"attachments":[]}"#.utf8))
