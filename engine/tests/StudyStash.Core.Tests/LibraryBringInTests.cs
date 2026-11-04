@@ -131,8 +131,6 @@ public sealed class LibraryBringInTests
         using var main = new Library(dir, "main", school);
         // The new folder has a lecture state.db doesn't list (written by a copy of the app whose state.db was new).
         using (var other = new Library(dir, "other", school)) other.File("unlisted", cls, "Mixing chambers", "Mass in equals mass out.");
-        Assert.Equal(1, LibraryBringIn.ListOwn(main.Store, main.Cfg));
-        Assert.True(main.Store.Get("unlisted") is { MdPath: { } p } && Py.SamePath(p, Path.Combine(school, Notes.FolderName(cls), "2026-09-14 Mixing chambers.md")));
 
         // A lecture in the trash when the folder changed, filed in the old folder.
         using (var before = new Library(dir, "main", personal)) before.File("binned", cls, "Throttling", "Enthalpy stays the same.");
@@ -152,6 +150,8 @@ public sealed class LibraryBringInTests
 
         Assert.Equal((1, 0, 0, 2), (did.New, did.Here, did.Both, did.Files));
         Assert.Null(main.Store.Get("stray"));
+        // This folder's own unlisted lecture is listed where it is.
+        Assert.True(main.Store.Get("unlisted") is { MdPath: { } p } && Py.SamePath(p, Path.Combine(school, Notes.FolderName(cls), "2026-09-14 Mixing chambers.md")));
         foreach (string f in new[] { capture, classNote })
             Assert.Equal(File.ReadAllText(f), File.ReadAllText(Path.Combine(school, Path.GetRelativePath(personal, f))));
         // The binned lecture comes back into the folder in use, beside (never over) the lecture of the same class, day

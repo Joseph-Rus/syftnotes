@@ -63,24 +63,10 @@ public static class LibraryBringIn
     /// <summary>Only the lectures this library lists from <paramref name="from"/> (the folder it used before the
     /// student picked this one): their note files and attached files copied into this folder, and their rows pointed at
     /// the copies, so nothing the library lists is still read or written in the other folder. The other folder's own
-    /// lectures stay there.</summary>
+    /// lectures stay there. This folder's own note files state.db doesn't list (a folder used before state.db was made
+    /// afresh) are listed where they are, as with every run.</summary>
     public static BringInCount Refile(Store store, Config cfg, string from, string userHome, Action<int, int>? progress = null) =>
         new Run(store, cfg, store.PoolDir, from, userHome, Mode.Refile, progress).Go();
-
-    /// <summary>Lists the note files in this library's own folder that state.db doesn't (a folder picked that the library
-    /// used before its state.db was made afresh), where they are. How many.</summary>
-    public static int ListOwn(Store store, Config cfg)
-    {
-        int listed = 0;
-        var gone = store.DeletedIds();
-        foreach (var file in NoteFiles(store.PoolDir))
-            if (Read(file) is { } note && store.Get(note.Id) is null && !gone.Contains(note.Id))
-            {
-                Enlist(store, cfg, note, note.Text, note.Path, apply: true);
-                listed++;
-            }
-        return listed;
-    }
 
     enum Mode { Plan, Apply, Refile }
 
@@ -106,7 +92,7 @@ public static class LibraryBringIn
         {
             if (Under(into, from) || Under(from, into)) return Count();
             // A folder gone since still has its rows pointed here (their files went with it), so none is left pointing there.
-            var own = mode == Mode.Refile ? [] : NoteFiles(into);
+            var own = NoteFiles(into);
             var rows = store.ListNotes().Where(r => !string.IsNullOrEmpty(r.MdPath) && inside.Rel(r.MdPath) is not null).ToList();
             var theirs = mode == Mode.Refile ? [] : NoteFiles(from);
             var attached = mode == Mode.Refile ? [] : AttachedFiles(from);
@@ -137,7 +123,7 @@ public static class LibraryBringIn
                     continue;
                 }
                 string text = Text(row.MdPath!);
-                if (apply) store.Refile(row.Id, CopyIn(text, Path.Combine(into, rel)));
+                if (apply) store.Refile(row.Id, CopyIn(row.Id, text, Path.Combine(into, rel)));
                 fresh++;
                 planned[row.Id] = text;
                 copied.Add(Path.GetFullPath(Path.Combine(from, rel)));
@@ -183,7 +169,7 @@ public static class LibraryBringIn
             if (mine is null)
             {
                 if (row is null) Enlist(store, cfg, note, note.Text, null, apply, newClasses);
-                else if (apply) store.Refile(row.Id, CopyIn(note.Text, Path.Combine(into, Path.GetRelativePath(from, note.Path))));
+                else if (apply) store.Refile(row.Id, CopyIn(row.Id, note.Text, Path.Combine(into, Path.GetRelativePath(from, note.Path))));
                 fresh++;
                 planned[note.Id] = note.Text;
                 return;
@@ -313,14 +299,15 @@ public static class LibraryBringIn
             ?? store.ClassesSummary().Select(c => c.ClassName).FirstOrDefault(c => Notes.FolderName(c).Equals(folder, StringComparison.OrdinalIgnoreCase))
             ?? folder;
 
-        /// <summary>A note file copied into this folder at <paramref name="want"/>, or beside it when that's a different
-        /// file: where it is. Written whole or not at all.</summary>
-        static string CopyIn(string text, string want)
+        /// <summary>Lecture <paramref name="id"/>'s note file copied into this folder at <paramref name="want"/>, or beside
+        /// it when anything else is there: where it is. Written whole or not at all.</summary>
+        static string CopyIn(string id, string text, string want)
         {
             string path = want;
             for (int i = 2; File.Exists(path); i++)
             {
-                if (Same(Text(path), text)) return path;
+                // A copy already here is used only when it's proven this lecture's: its words, with its id.
+                if (Same(Text(path), text) && Read(path)?.Id == id) return path;
                 path = Path.Combine(Py.Parent(want), $"{Path.GetFileNameWithoutExtension(want)} ({i}).md");
             }
             Store.WriteWhole(path, text);
@@ -668,7 +655,13 @@ public static class LibraryBringIn
     public static int PointingInto(Store store, string dir)
     {
         var inside = new Inside(dir);
-        return store.NoteFiles().Count(p => inside.Rel(p) is not null) + store.TrashPaths().Count(p => inside.Rel(p) is not null);
+        int trashed = 0;
+        store.RepointTrash(p =>
+        {
+            if (inside.Rel(p) is not null) trashed++;
+            return null;
+        });
+        return store.NoteFiles().Count(p => inside.Rel(p) is not null) + trashed;
     }
 
     /// <summary>Paths inside a folder however they're written: as written, or with every link followed (a row written

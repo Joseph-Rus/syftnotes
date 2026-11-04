@@ -1175,7 +1175,8 @@ public sealed partial class Store : IDisposable
     }
 
     /// <summary>Each lecture in the trash whose file was at a path <paramref name="map"/> knows (one in a library folder
-    /// no longer in use) will be restored to where <paramref name="map"/> says instead. How many.</summary>
+    /// no longer in use) will be restored to where <paramref name="map"/> says instead. How many. (A map that only looks
+    /// sees every trashed lecture's path, and changes nothing.)</summary>
     public int RepointTrash(Func<string, string?> map)
     {
         lock (gate)
@@ -1192,20 +1193,6 @@ public sealed partial class Store : IDisposable
                 }
             foreach (var (id, row) in moved) Exec("UPDATE trash SET row_json=? WHERE id=?", row, id);
             return moved.Count;
-        }
-    }
-
-    /// <summary>Where each lecture in the trash would be restored to (its note file's path).</summary>
-    public List<string> TrashPaths()
-    {
-        lock (gate)
-        {
-            var paths = new List<string>();
-            using var cmd = Command("SELECT row_json FROM trash");
-            using var r = cmd.ExecuteReader();
-            while (r.Read())
-                if (!r.IsDBNull(0) && JsonNode.Parse(r.GetString(0)) is JsonObject row && Py.AsString(row["md_path"]) is { Length: > 0 } p) paths.Add(p);
-            return paths;
         }
     }
 
