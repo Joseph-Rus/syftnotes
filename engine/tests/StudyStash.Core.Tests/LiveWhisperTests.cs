@@ -26,6 +26,23 @@ public class LiveWhisperTests
         Assert.All(t.Segments, s => Assert.True(s.End >= s.Start));
     }
 
+    /// <summary>The live words' model and the transcript's loading at the same moment (a recording stopped about 5 s
+    /// in, as its first live pass starts): on a Windows PC's graphics card (Vulkan) two loads at once crashed the app
+    /// every time, so they take turns.</summary>
+    [Fact]
+    public async Task The_live_words_and_the_transcript_can_load_at_the_same_moment()
+    {
+        if (Model is not { } model) return;
+        using var go = new Barrier(2);
+        var live = Task.Factory.StartNew(() => { go.SignalAndWait(); return new LiveWhisperHearer(model); }, TaskCreationOptions.LongRunning);
+        var transcript = Task.Factory.StartNew(() => { go.SignalAndWait(); return new WhisperTranscriber(model); }, TaskCreationOptions.LongRunning);
+        using var hearer = await live;
+        using var whisper = await transcript;
+        var speech = Sound.ReadWav(Fixture);
+        Assert.Contains("midterm", string.Join(" ", (await whisper.TranscribeAsync(speech, "", "", default)).Segments.Select(s => s.Text)).ToLowerInvariant());
+        Assert.NotEmpty(hearer.Hear(speech[..(Sound.Rate * 5)], "en", "").Words);
+    }
+
     /// <summary>The whole way: a recording on the laptop, Whisper, the library's API, filed in its class.</summary>
     [Fact]
     public async Task A_recording_reaches_the_library_and_is_filed()
