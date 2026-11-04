@@ -6,7 +6,7 @@
 #
 # Downloads the newest release's Mac installer (a signed DMG holding one universal app, for Apple
 # silicon and Intel), checks it against the release's SHA256SUMS.txt when there is one, and drags
-# the app into Applications. Safe to rerun: it replaces an older Study Stash.app only once the new
+# the app into Applications. Safe to rerun: it replaces an older Syft Notes.app (or Study Stash.app) only once the new
 # copy is fully in place.
 #
 #
@@ -91,7 +91,10 @@ say "Opening $NAME..."
 mkdir -p "$WORK/mount"
 hdiutil attach -nobrowse -readonly -noautoopen -mountpoint "$WORK/mount" "$DMG" >/dev/null \
   || fail "couldn't open $NAME"
-[ -d "$WORK/mount/Study Stash.app" ] || fail "$NAME has no Study Stash.app in it"
+# The app is Syft Notes.app (a release from before the Velopack bridge called it Study Stash.app).
+SRC_APP="$WORK/mount/Syft Notes.app"
+[ -d "$SRC_APP" ] || SRC_APP="$WORK/mount/Study Stash.app"
+[ -d "$SRC_APP" ] || fail "$NAME has no Syft Notes.app in it"
 
 DEST="${STUDYSTASH_APPLICATIONS:-}"
 if [ -z "$DEST" ]; then
@@ -100,12 +103,13 @@ if [ -z "$DEST" ]; then
 fi
 mkdir -p "$DEST"
 say "Installing into $DEST..."
-rm -rf "$DEST/Study Stash.app.new"
-ditto "$WORK/mount/Study Stash.app" "$DEST/Study Stash.app.new" || fail "couldn't copy the app into $DEST"
-rm -rf "$DEST/Study Stash.app"
-mv "$DEST/Study Stash.app.new" "$DEST/Study Stash.app"
+rm -rf "$DEST/Syft Notes.app.new"
+ditto "$SRC_APP" "$DEST/Syft Notes.app.new" || fail "couldn't copy the app into $DEST"
+# One copy, under the new name: an older Study Stash.app goes too.
+rm -rf "$DEST/Syft Notes.app" "$DEST/Study Stash.app"
+mv "$DEST/Syft Notes.app.new" "$DEST/Syft Notes.app"
 
 say "Installed Syft Notes in $DEST."
 if [ "${STUDYSTASH_NO_OPEN:-}" != 1 ]; then
-  open "$DEST/Study Stash.app"
+  open "$DEST/Syft Notes.app"
 fi

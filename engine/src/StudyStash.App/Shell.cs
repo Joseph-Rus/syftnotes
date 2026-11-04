@@ -143,9 +143,15 @@ public static partial class Shell
         Wire();
         host.Start();
         Run(() => SuggestLighterModelAsync(), "SuggestLighterModel");
+        // The program may have moved (Velopack's install, the Mac bundle's new name): what names the old one is put right.
+        UiTasks.RunQuietly(() => Task.Run(() => NewPlace.RunHere(host.Home)), "put right what names the app's old place");
         AppUpdates.Start(host, stop.Token, SayUpdate, () => TypingNotes);
         if (AppUpdates.Current is { } updater)
-            updater.FoundChanged += () => Dispatcher.UIThread.Post(() => panel.UpdateVersion = updater.Found is { } r ? string.Join('.', r.Version) : null);
+            updater.FoundChanged += () => Dispatcher.UIThread.Post(() =>
+            {
+                panel.UpdateIsMove = updater.FoundIsMove;
+                panel.UpdateVersion = updater.Found is { } r ? string.Join('.', r.Version) : null;
+            });
         MakeTray();
         // A Mac's app menu (About, Settings… ⌘,, and the system's Hide and Quit ⌘Q) while a window is in front.
         Keybindings.Saved = () => host.Settings.Keys;

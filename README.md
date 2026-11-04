@@ -265,7 +265,7 @@ One download for every computer, on the [latest release](https://github.com/Jose
 
 | Mac | Windows | Linux |
 |---|---|---|
-| [Syft-Notes.dmg](https://github.com/Joseph-Rus/study-stash/releases/latest/download/Syft-Notes.dmg) | [Syft-Notes-Setup.exe](https://github.com/Joseph-Rus/study-stash/releases/latest/download/Syft-Notes-Setup.exe) | [x64](https://github.com/Joseph-Rus/study-stash/releases/latest/download/Syft-Notes-linux-x64.tar.gz) · [ARM64](https://github.com/Joseph-Rus/study-stash/releases/latest/download/Syft-Notes-linux-arm64.tar.gz) |
+| [Syft-Notes.dmg](https://github.com/Joseph-Rus/study-stash/releases/latest/download/Syft-Notes.dmg) | [Syft-Notes-Setup.exe](https://github.com/Joseph-Rus/study-stash/releases/latest/download/Syft-Notes-Setup.exe) | [x64](https://github.com/Joseph-Rus/study-stash/releases/latest/download/SyftNotes-linux-x64.AppImage) · [ARM64](https://github.com/Joseph-Rus/study-stash/releases/latest/download/SyftNotes-linux-arm64.AppImage) |
 
 It's the same app every way; what a computer is for is chosen when you first open it, not when
 you download it. The Mac app needs macOS 15 (Sequoia) or later, on Apple silicon or Intel; the
@@ -277,10 +277,14 @@ later, Fedora, Debian 12, Mint, and the like), on x64 or ARM64.
   open it). Allow the microphone when it asks.
 - **Windows:** run the Setup.exe. It installs for your account only, no admin rights needed. If
   Windows says "Windows protected your PC", click **More info**, then **Run anyway**.
-- **Linux:** unpack the tarball and run its `install.sh` (`tar -xzf Syft-Notes-linux-x64.tar.gz &&
-  sh syft-notes/install.sh`). It installs for your account only, no root needed: the app in
-  `~/.local/share/syft-notes`, **Syft Notes** in your applications menu, and `syft-notes` on your
-  PATH. It looks like the Windows app and lives in your desktop's tray (on GNOME, the AppIndicator
+- **Linux:** the download is an AppImage, the app in one file. Put it where you keep apps (`~/Applications`
+  is usual), allow it to run (in your file manager's Properties, or `chmod +x SyftNotes-linux-x64.AppImage`),
+  and open it: Syft Notes puts itself in your applications menu, with `syft-notes` on your PATH, and updates
+  that file in place. No root needed. If it doesn't open, your system needs FUSE, which AppImages run
+  through: on Ubuntu 22.04 and Debian, `sudo apt install libfuse2`; on Ubuntu 24.04, `sudo apt install
+  libfuse2t64`; most other desktops have it. (Each release still has the older tarball with its
+  `install.sh`; a copy installed that way moves itself over to the AppImage on its next update.) It looks
+  like the Windows app and lives in your desktop's tray (on GNOME, the AppIndicator
   extension shows it; Ubuntu has it already). The shortcuts work on X11; Wayland doesn't let an app
   have keys of its own, so there you record and search from the tray, or give the keys to Syft Notes
   in your desktop's keyboard settings.
@@ -765,17 +769,20 @@ Installed copies update themselves: they check for a new release a few minutes a
 every 6 hours, and install it when nothing is recording or being transcribed and you aren't typing
 in a lecture's notes. To update right away, use **Update now** in **Settings → General → Updates**,
 or from the menu bar on a Mac. A laptop whose library is another computer has that library's own
-**Update now** and **Update automatically** under **Settings → Library**. On a Mac an update swaps in
-the new **Study Stash.app**; on Windows it runs the new Setup.exe quietly; on Linux it unpacks the new
-tarball beside the app and swaps it in. Every download is checked against the release's
-`SHA256SUMS.txt` first.
+**Update now** and **Update automatically** under **Settings → Library**. Updates come through
+[Velopack](https://velopack.io): it downloads only what changed since your version when it can, checks it, and
+swaps it in once Syft Notes has quit, then opens it again; nothing asks for a password. A copy installed before
+Velopack (the Windows Setup.exe of 0.22 and earlier, the Linux tarball) moves itself over on its next update:
+your settings, lectures, start at login and connected AI apps come with it, and the old copy is uninstalled. On a
+Mac the app is now called **Syft Notes.app**; one called Study Stash.app renames itself.
 
 ## Uninstall
 
 **Mac:** if you turned on **Open when you log in** (Settings → General), turn it off first, so no
 login item is left behind; then quit Syft Notes and drag it from Applications to the Trash.
 **Windows:** Settings → Apps → **Syft Notes** → Uninstall.
-**Linux:** run `sh ~/.local/share/syft-notes/uninstall.sh`. Your lectures and settings stay where
+**Linux:** run `syft-notes --uninstall` (a copy still installed from the tarball: `sh
+~/.local/share/syft-notes/uninstall.sh`). Your lectures and settings stay where
 they are; only the app goes. To remove them too, delete the folders under
 [Where your data lives](#where-your-data-lives).
 
@@ -796,9 +803,12 @@ dotnet run --project engine/src/StudyStash.App -- --home /some/temp/dir
 (cd web && npm ci && npm test && npm run build)   # the phone app, into web/dist, which the app then carries
 ```
 
-`macos/build-app.sh` builds "Study Stash.app" and `Syft-Notes.dmg` (with Xcode's command line tools), and
+`macos/build-app.sh` builds "Syft Notes.app" and `Syft-Notes.dmg` (with Xcode's command line tools), and
 `windows/build.ps1` `Syft-Notes-Setup.exe`, and `linux/build.sh` `Syft-Notes-linux-x64.tar.gz` and
-`Syft-Notes-linux-arm64.tar.gz`; each builds the phone app into it first. `engine/README.md` has more on the projects and tests.
+`Syft-Notes-linux-arm64.tar.gz`; each builds the phone app into it first. Velopack's packages (the update feeds,
+Velopack's Setup.exe for each Windows processor, and the AppImages) come from `macos/velopack-pack.sh` (run by
+`macos/sign-release.sh`), `windows/velopack-pack.ps1` and `linux/velopack-pack.sh`, with
+[vpk](https://docs.velopack.io) 1.2.161. `engine/README.md` has more on the projects and tests.
 
 Releases come from CI (`.github/workflows/ci.yml`), at two speeds. A change that reaches `main` is
 tested once: the engine's tests on macOS, Linux and Windows (side by side), and the Mac, Windows and

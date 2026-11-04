@@ -2,7 +2,7 @@
 # Signs the Mac app with a real identity, notarizes it and makes the DMG again around it: what turns the ad hoc build
 # of macos/build-app.sh into the installer a student opens with no trip to Privacy & Security. It's a step of its own,
 # after the build, so that nothing the build runs (npm's packages, the .NET restore) ever sees the signing key.
-#   sh macos/sign-release.sh [out-dir]      default: dist/mac (where build-app.sh made Study Stash.app)
+#   sh macos/sign-release.sh [out-dir]      default: dist/mac (where build-app.sh made Syft Notes.app)
 # STUDYSTASH_SIGN_IDENTITY   the certificate to sign with: its hash or its name ("Developer ID Application: ...")
 # STUDYSTASH_SIGN_KEYCHAIN   the keychain holding it, when it isn't one of the user's own
 # STUDYSTASH_NOTARY_KEY, STUDYSTASH_NOTARY_KEY_ID, STUDYSTASH_NOTARY_ISSUER_ID
@@ -19,7 +19,7 @@ set -eu
 HERE=$(cd "$(dirname "$0")" && pwd)
 ROOT=$(cd "$HERE/.." && pwd)
 OUT=${1:-"$ROOT/dist/mac"}
-APP="$OUT/Study Stash.app"
+APP="$OUT/Syft Notes.app"
 MACOS="$APP/Contents/MacOS"
 fail() { echo "sign-release.sh: $*" >&2; exit 1; }
 
@@ -43,7 +43,8 @@ fi
 # only now with the real identity, the hardened runtime and a timestamp; several at once, as the timestamp server is
 # the slow part. Resources (the icon, Info.plist) are sealed by the bundle's own signature.
 echo "Signing the files in the app with ${STUDYSTASH_SIGN_IDENTITY}..."
-for dir in "$MACOS" "$APP/Contents/Frameworks"; do
+# The two .NET trees live in Contents/Resources/<arch> (Contents/MacOS/<arch> are links to them, build-app.sh).
+for dir in "$APP/Contents/Resources/arm64" "$APP/Contents/Resources/x64" "$MACOS" "$APP/Contents/Frameworks"; do
   [ -d "$dir" ] || continue
   find "$dir" -type f ! -path "$MACOS/StudyStash" -print0 | xargs -0 -n 25 -P 6 sh "$HERE/codesign-files.sh"
 done
@@ -87,7 +88,12 @@ if [ -s "$problems" ]; then
 fi
 rm -f "$problems"
 
-if [ "$notarize" = true ]; then
+# Velopack's package (docs/LIBRARIES.md, phase 5): its updater goes into the bundle, the bundle is signed again around
+# it and notarized and stapled (when there's a key), and the update feed is written to $OUT/velopack/osx. Every release
+# needs it, since the app updates through Velopack; STUDYSTASH_VELOPACK=off only for a signing check by hand.
+if [ "${STUDYSTASH_VELOPACK:-on}" != off ]; then
+  sh "$HERE/velopack-pack.sh" "$OUT" "$entitlements" "$notarize"
+elif [ "$notarize" = true ]; then
   zip="$OUT/notarize.zip"
   rm -f "$zip"
   ditto -c -k --keepParent "$APP" "$zip"
@@ -109,4 +115,4 @@ if [ "$notarize" = true ]; then
   sh "$HERE/notarize.sh" staple "$OUT/Syft-Notes.dmg"
 fi
 
-echo "Signed Study Stash.app and Syft-Notes.dmg$([ "$notarize" = true ] && echo ", notarized and stapled" || echo " (not notarized)")."
+echo "Signed Syft Notes.app and Syft-Notes.dmg$([ "$notarize" = true ] && echo ", notarized and stapled" || echo " (not notarized)")."
