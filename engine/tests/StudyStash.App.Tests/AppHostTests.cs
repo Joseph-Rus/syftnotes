@@ -273,7 +273,10 @@ public class AppHostTests
         }, () => shown++);
 
         var first = guard.MayQuitAsync();
-        Assert.False(await guard.MayQuitAsync());
+        // A second quit while the question is open is answered at once (no), never a second question to wait on.
+        var again = guard.MayQuitAsync();
+        Assert.True(again.IsCompleted);
+        Assert.False(again.Result);
         Assert.Equal(1, shown);
         answer.SetResult(false);
         Assert.False(await first);
