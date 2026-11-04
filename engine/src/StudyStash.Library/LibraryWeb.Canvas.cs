@@ -405,15 +405,14 @@ public sealed partial class LibraryWeb
         // Make the folder, for a student loading it from this page (the app makes its own when Add to Chrome asks).
         app.MapPost("/settings/canvas/extension", Http.Handle(ctx => WithMemberAsync(ctx, _ =>
         {
-            EnsureHere(make: true);
-            return Task.FromResult(Http.SeeOther("/settings#canvas"));
+            return Task.FromResult(Http.SeeOther(EnsureHere(make: true) ? "/settings#canvas" : "/settings?canvas=folder-failed#canvas"));
         })));
     }
 
     /// <summary>Bring up to date the extension's folder on this computer, when it has one, pointing at this library and
     /// this Canvas; <paramref name="make"/> makes it first, for a student who asked to load it. Never fatal: a folder
-    /// that can't be written is logged, and Settings says it isn't ready.</summary>
-    void EnsureHere(bool make = false)
+    /// that can't be written is logged, and false is returned (the page the student asked from says so, in words).</summary>
+    bool EnsureHere(bool make = false)
     {
         try
         {
@@ -421,15 +420,17 @@ public sealed partial class LibraryWeb
             string home = Extension.Folder(cfg.Home), library = $"http://127.0.0.1:{cfg.WebPort}", key = CanvasSettings.ExtensionKey(cfg.Home);
             var made = make ? Extension.EnsureFor(cfg.Home, home, library, key, Canvas.Settings.Url)
                 : Extension.KeepFor(cfg.Home, home, library, key, Canvas.Settings.Url);
-            if (!made.Changed) return;
+            if (!made.Changed) return true;
             Console.WriteLine($"[canvas] the extension's folder is ready (version {Extension.Version()}): {made.Path}");
             // Chrome's copy is waiting for work with the old folder's permissions: it looks at the folder now, and
             // reloads itself into the new one.
             Canvas.Nudge();
+            return true;
         }
         catch (Exception e) when (e is IOException or UnauthorizedAccessException)
         {
             Console.WriteLine($"[canvas] couldn't write the extension's folder: {e.Message}");
+            return false;
         }
     }
 
@@ -687,6 +688,7 @@ public sealed partial class LibraryWeb
                 $"<div class=\"notice\"><div>{Ui.Esc(FindOutcome.Say(flash, flash == FindOutcome.Other ? lastFindError : ""))}</div></div>",
             "saved" => $"<div class=\"notice good\"><div>Saved. Canvas syncs within a minute while {Ui.Esc(s.BrowserName())} is open.</div></div>",
             "scout" => "<div class=\"notice good\"><div>Exploring. It takes a few minutes; what it finds lands in the class's Canvas folder.</div></div>",
+            "folder-failed" => "<div class=\"notice\"><div>Syft Notes couldn't make the folder. Check there's space on this computer, then try again.</div></div>",
             _ => "",
         };
         if (s.Error.Length > 0) say += $"<div class=\"notice\"><div>{Ui.Esc(s.Error)}</div></div>";
