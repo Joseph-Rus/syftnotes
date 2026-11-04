@@ -31,7 +31,8 @@ public static partial class Shell
     static void AskWhichNotesFolder(IReadOnlyList<LibraryFolder> found)
     {
         var model = new NotesFolderPickModel(found, Py.UserHome(), (picked, bringIn, progress, ct) => UseNotesFolderAsync(picked, found, bringIn, progress, ct),
-            (picked, progress, ct) => LibraryFolderPick.PlanAsync(host, picked, found, progress, ct), dir => Machine.Open(dir));
+            (picked, progress, ct) => LibraryFolderPick.PlanAsync(host, picked, found, progress, ct), dir => Machine.Open(dir),
+            folderInUse: () => LibraryFolderPick.FolderInUse(host));
         var view = new NotesFolderPick { DataContext = model, Height = model.WantedHeight };
         // Come up by itself at a login start, it leaves the keyboard where it was.
         bool asked = !Program.Background;

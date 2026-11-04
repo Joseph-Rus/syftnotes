@@ -41,9 +41,12 @@ public static class LibraryFolderPick
     public static async Task<Outcome<List<BringInCount>>> UseAsync(AppHost host, LibraryFolder picked, IReadOnlyList<LibraryFolder> shown,
         bool bringIn = false, Action<int, int>? progress = null, CancellationToken ct = default)
     {
-        if (!picked.InUse)
+        if (LibraryHere.Existing(host.Home) is not { } cfg) return Outcome<List<BringInCount>>.Failed(Failure.Offline);
+        // Which folder is in use is config.toml's, now: the window's "In use now" can be from before a switch that
+        // didn't finish.
+        bool inUse = IsInUse(cfg.PoolDir, picked.Path);
+        if (!inUse)
         {
-            if (LibraryHere.Existing(host.Home) is not { } cfg) return Outcome<List<BringInCount>>.Failed(Failure.Offline);
             string was = cfg.PoolDir;
             cfg.PoolDir = Py.NormPath(picked.Path);
             try
@@ -77,7 +80,7 @@ public static class LibraryFolderPick
         {
             // The answer isn't remembered, so the question comes back at the next start until the copying is done.
             host.Log($"[library] couldn't finish with the notes folder: {done.Failure!.Kind}");
-            return bringIn || picked.InUse ? done : Outcome<List<BringInCount>>.Failed(NotFinished);
+            return bringIn || inUse ? done : Outcome<List<BringInCount>>.Failed(NotFinished);
         }
         host.Log($"[library] brought in: {string.Join("; ", done.Value!.Select(d => $"{d.New} new, {d.Here} here, {d.Both} both, {d.Deleted} deleted, {d.Files} files"))}");
         host.Save(s =>
@@ -87,6 +90,13 @@ public static class LibraryFolderPick
         });
         return done;
     }
+
+    /// <summary>Whether <paramref name="folder"/> is <paramref name="poolDir"/> (config.toml's), however each is written.</summary>
+    public static bool IsInUse(string? poolDir, string folder) =>
+        poolDir is { Length: > 0 } && LibraryFolders.Comparer.Equals(LibraryFolders.Real(poolDir), LibraryFolders.Real(folder));
+
+    /// <summary>The folder config.toml says the library uses now; null when there's no library here.</summary>
+    public static string? FolderInUse(AppHost host) => LibraryHere.Existing(host.Home)?.PoolDir;
 
     /// <summary>The folder was switched, but the lectures from the other one couldn't be copied in yet.</summary>
     public static readonly Failure NotFinished = new(FailureKind.Refused,

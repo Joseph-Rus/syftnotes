@@ -1069,8 +1069,18 @@ public sealed partial class Store : IDisposable
             var back = Get(noteId);
             if (back is not null && !string.IsNullOrEmpty(back.MdPath) && text is not null)
             {
-                Directory.CreateDirectory(Py.Parent(back.MdPath));
-                Py.WriteText(back.MdPath, text);
+                // Another lecture's file there since (one of the same class, day and title, or the folder in use's own
+                // after a switch of folders): this one comes back beside it, "name (2).md", never over it.
+                string path = back.MdPath;
+                for (int i = 2; File.Exists(path) && Py.ReadText(path) != text.Replace("\r\n", "\n"); i++)
+                    path = Path.Combine(Py.Parent(back.MdPath), $"{Path.GetFileNameWithoutExtension(back.MdPath)} ({i}).md");
+                if (path != back.MdPath)
+                {
+                    Exec("UPDATE notes SET md_path=? WHERE id=?", path, noteId);
+                    back = Get(noteId)!;
+                }
+                Directory.CreateDirectory(Py.Parent(back.MdPath!));
+                Py.WriteText(back.MdPath!, text);
                 var m = Meeting(back);
                 Index(noteId, string.IsNullOrEmpty(back.SummaryMd) ? m.NotesMarkdown : back.SummaryMd, m.Transcript, back.UpdatedAt ?? "");
             }
@@ -1162,6 +1172,20 @@ public sealed partial class Store : IDisposable
                 }
             foreach (var (id, row) in moved) Exec("UPDATE trash SET row_json=? WHERE id=?", row, id);
             return moved.Count;
+        }
+    }
+
+    /// <summary>Where each lecture in the trash would be restored to (its note file's path).</summary>
+    public List<string> TrashPaths()
+    {
+        lock (gate)
+        {
+            var paths = new List<string>();
+            using var cmd = Command("SELECT row_json FROM trash");
+            using var r = cmd.ExecuteReader();
+            while (r.Read())
+                if (!r.IsDBNull(0) && JsonNode.Parse(r.GetString(0)) is JsonObject row && Py.AsString(row["md_path"]) is { Length: > 0 } p) paths.Add(p);
+            return paths;
         }
     }
 

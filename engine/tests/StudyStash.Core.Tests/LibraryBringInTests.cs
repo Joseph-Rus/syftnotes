@@ -1,4 +1,6 @@
+using System.Text.Json.Nodes;
 using StudyStash.Core;
+using StudyStash.Library;
 
 namespace StudyStash.Core.Tests;
 
@@ -152,15 +154,27 @@ public sealed class LibraryBringInTests
         Assert.Null(main.Store.Get("stray"));
         foreach (string f in new[] { capture, classNote })
             Assert.Equal(File.ReadAllText(f), File.ReadAllText(Path.Combine(school, Path.GetRelativePath(personal, f))));
-        // The binned lecture comes back into the folder in use.
+        // The binned lecture comes back into the folder in use, beside (never over) the lecture of the same class, day
+        // and title there.
+        string mine = main.File("mine", cls, "Throttling", "This folder's own throttling lecture.");
+        string mineText = File.ReadAllText(mine);
         Assert.True(main.Store.Restore("binned"));
-        Assert.StartsWith(school, main.Store.Get("binned")!.MdPath);
+        string binned = main.Store.Get("binned")!.MdPath!;
+        Assert.StartsWith(school, binned);
+        Assert.NotEqual(mine, binned);
+        Assert.Equal(mineText, File.ReadAllText(mine));
+        Assert.Contains("Enthalpy stays the same.", File.ReadAllText(binned));
+        // A capture the student filed (or deleted) since, and a class note they edited, don't come back.
+        File.Delete(Path.Combine(school, Path.GetRelativePath(personal, capture)));
+        File.WriteAllText(Path.Combine(school, Path.GetRelativePath(personal, classNote)), "Edited since.");
         string moved = main.Store.Get("old")!.MdPath!;
         Assert.True(moved.Length > 260, moved);
         Assert.StartsWith(school, moved);
         Assert.Equal(File.ReadAllText(listed), File.ReadAllText(moved));
         Assert.True(File.Exists(listed));
         Assert.Equal((0, 0), LibraryBringIn.Refile(main.Store, main.Cfg, personal, home) is var again ? (again.New, again.Files) : default);
+        Assert.False(File.Exists(Path.Combine(school, Path.GetRelativePath(personal, capture))));
+        Assert.Single(Directory.GetFiles(Path.GetDirectoryName(Path.Combine(school, Path.GetRelativePath(personal, classNote)))!));
         Assert.Equal(1, LibraryBringIn.Apply(main.Store, main.Cfg, personal, home).New); // the stray one, when asked
 
         // A write cut short (a crash, a full disk) leaves no half file to be taken for the lecture next time.
@@ -172,5 +186,54 @@ public sealed class LibraryBringInTests
         }, overwrite: false));
         Assert.False(File.Exists(half));
         Assert.Empty(Directory.EnumerateFiles(school, "*.part", SearchOption.AllDirectories));
+    }
+
+    /// <summary>The library's job finishes a switch only when no lecture is left filed in the folder it leaves: one
+    /// reached through a link is found and copied in; a library still reading the old folder (another copy's, answering
+    /// from before the switch) ends the job with an error instead of passing it over.</summary>
+    [Fact]
+    public async Task A_switch_is_done_only_when_nothing_is_left_in_the_old_folder()
+    {
+        using var dir = new TempDir();
+        string home = dir["home"];
+        string school = Path.Combine(home, "OneDrive - Example University", "Documents", "Study Stash");
+        string personal = Path.Combine(home, "OneDrive", "Documents", "Study Stash");
+        // The old folder, reached by the student's link to it: the rows are written that way.
+        string link = Path.Combine(home, "Notes link");
+        Directory.CreateDirectory(personal);
+        try
+        {
+            Directory.CreateSymbolicLink(link, Path.GetDirectoryName(personal)!);
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException)
+        {
+            link = Path.GetDirectoryName(personal)!; // Windows without the right to make links: the plain path
+        }
+        using (var before = new Library(dir, "main", Path.Combine(link, "Study Stash"))) before.File("old", "Thermodynamics", "Heat engines", "Carnot.");
+
+        async Task<BringInStatus> RunAsync(Library lib, string leave)
+        {
+            await using var site = await TestSite.StartAsync(b => LibraryWeb.Build(b, lib.Cfg, lib.Store, new Pipeline(lib.Cfg, lib.Store, log: _ => { }),
+                new LibraryWebOptions { ListModels = _ => Task.FromResult<List<(string, double)>?>(null), Latest = _ => Task.FromResult<Release?>(null) }));
+            var remote = new RemoteLibrary("http://localhost", "", site.Client);
+            var ask = new JsonObject { ["asked"] = "t", ["kind"] = BringInJob.Bring, ["refile"] = new JsonArray(leave) };
+            var job = await remote.StartFolderJobAsync(ask, TestContext.Current.CancellationToken);
+            Assert.True(await Waiting.UntilAsync(async () => (job = await remote.FolderJobAsync(TestContext.Current.CancellationToken))!.Running == false));
+            return job!;
+        }
+
+        // The library answering still reads the old folder: the job says so.
+        using (var stale = new Library(dir, "main", personal))
+        {
+            var refused = await RunAsync(stale, personal);
+            Assert.NotNull(refused.Error);
+            Assert.Equal(1, LibraryBringIn.PointingInto(stale.Store, personal));
+        }
+        // The library reads the new folder: the lecture filed through the link is copied in, and nothing is left there.
+        using var main = new Library(dir, "main", school);
+        var done = await RunAsync(main, personal);
+        Assert.Null(done.Error);
+        Assert.Equal(0, LibraryBringIn.PointingInto(main.Store, personal));
+        Assert.StartsWith(school, main.Store.Get("old")!.MdPath);
     }
 }

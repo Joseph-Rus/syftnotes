@@ -10,7 +10,7 @@ namespace StudyStash.App.Pictures;
 /// from before, and the bring-in's summary and result: a picture of each, in each look, light and dark.</summary>
 public class NotesFolderShots
 {
-    static NotesFolderPick View(NotesFolderStep step = NotesFolderStep.Pick, bool copying = false, bool looking = false)
+    static NotesFolderPick View(NotesFolderStep step = NotesFolderStep.Pick, bool copying = false, bool looking = false, bool failed = false)
     {
         string home = OperatingSystem.IsWindows() ? @"C:\Users\ada" : "/Users/ada";
         LibraryFolder[] found =
@@ -20,6 +20,8 @@ public class NotesFolderShots
         ];
         var model = new NotesFolderPickModel(found, home, (_, _, progress, _) =>
             {
+                // The switch went through but the copying didn't: what the student reads then.
+                if (failed) return Task.FromResult(Services.Outcome<List<BringInCount>>.Failed(Services.LibraryFolderPick.NotFinished));
                 if (!copying) return Task.FromResult(Services.Outcome<List<BringInCount>>.Answered([Counted(found[1].Path)]));
                 // Part-way through a big folder: it says how far, and never finishes in the picture.
                 progress(120, 400);
@@ -35,6 +37,7 @@ public class NotesFolderShots
         if (step != NotesFolderStep.Pick) (step == NotesFolderStep.Summary ? model.Look : model.Bring).Command.Execute(null);
         if (copying) model.Bring.Command.Execute(null);
         if (looking) model.Look.Command.Execute(null);
+        if (failed) model.Use.Command.Execute(null);
         Assert.Equal(step, model.Step);
         Assert.Equal(copying || looking, model.Busy);
         return new NotesFolderPick { DataContext = model, Height = model.WantedHeight };
@@ -53,6 +56,8 @@ public class NotesFolderShots
                 Shot.Take("mac-" + name, SkinKind.Mac, t, () => View(step), size: new Avalonia.Size(708, 620));
                 Shot.Take("win-" + name, SkinKind.Win, t, () => View(step), size: new Avalonia.Size(708, 620));
             }
+            Shot.Take("mac-notes-folder-not-finished", SkinKind.Mac, t, () => View(failed: true), size: new Avalonia.Size(708, 620));
+            Shot.Take("win-notes-folder-not-finished", SkinKind.Win, t, () => View(failed: true), size: new Avalonia.Size(708, 620));
             Shot.Take("mac-notes-folder-looking", SkinKind.Mac, t, () => View(looking: true), size: new Avalonia.Size(708, 620));
             Shot.Take("win-notes-folder-looking", SkinKind.Win, t, () => View(looking: true), size: new Avalonia.Size(708, 620));
             Shot.Take("mac-notes-folder-copying", SkinKind.Mac, t, () => View(NotesFolderStep.Summary, copying: true), size: new Avalonia.Size(708, 620));
