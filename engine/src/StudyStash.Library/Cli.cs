@@ -197,7 +197,7 @@ public static class Cli
             Pipeline? writer = null; // the pipeline, below: the diagrams wait while it writes notes
             var diagrams = new DiagramJobs(cfg, store, ai) { NotesBusy = () => writer?.Writing == true };
             var pipeline = writer = new Pipeline(cfg, store, ai.SortAsync, ai.SummarizeAsync, notesModel: () => ai.Describe("notes", cfg), notesFast: ai.NotesInFastMode,
-                filed: id => diagrams.AfterFiled(id, ai.TakeDiagramsFollow(id)), limitUntil: ai.LimitUntil);
+                filed: id => diagrams.AfterFiled(id, ai.TakeDiagramsFollow(id)), limitUntil: ai.LimitUntil, sortedWith: () => ai.SortedWith);
             // An AI that needed signing in again answers once more: the lectures it couldn't write notes for meanwhile
             // get them now, without the student asking for each.
             ai.NotesAiChosen += () =>
