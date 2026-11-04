@@ -60,7 +60,8 @@ public static class MacRename
     /// The little shell program that does the rename once this copy is gone: it waits for <paramref name="pid"/> to quit
     /// (caffeinate -w blocks until it exits), then moves <c>From</c> to <c>To</c> (an older copy at <c>To</c> deleted
     /// first) and opens it with the arguments this copy had (--background after an update's relaunch, so no window). If
-    /// the move fails it opens the old bundle again, with <see cref="Failed"/>. For a newer copy already in place
+    /// anything is still at <c>To</c> (mv would put the app inside a folder there) or the move fails, it opens the old
+    /// bundle again, with <see cref="Failed"/>. For a newer copy already in place
     /// (<c>OpenInstead</c>) it deletes this copy and opens that one.
     /// </summary>
     internal static IReadOnlyList<string> Script(int pid, RenamePlan plan, IReadOnlyList<string> args) =>
@@ -71,7 +72,7 @@ public static class MacRename
         /usr/bin/caffeinate -w "$pid"
         if [ "$newer" = 1 ]; then /bin/rm -rf "$from"; exec /usr/bin/open "$to" --args "$@"; fi
         [ -n "$old" ] && /bin/rm -rf "$old"
-        /bin/mv "$from" "$to" && exec /usr/bin/open "$to" --args "$@"
+        [ ! -e "$to" ] && /bin/mv "$from" "$to" && exec /usr/bin/open "$to" --args "$@"
         exec /usr/bin/open "$from" --args "$@" "$0"
         """,
         Failed, pid.ToString(System.Globalization.CultureInfo.InvariantCulture), plan.From, plan.To,

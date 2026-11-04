@@ -66,6 +66,17 @@ public class MacRenameTests
         spawned.Clear();
         Assert.False(Go(stuck, spawned, args: ["--background", MacRename.Failed]));
         Assert.Empty(spawned);
+
+        // A folder that turned up at the new name after the plan was made: mv would move the app inside it and say
+        // it worked. The old copy opens again instead, as it was.
+        string folder = Path.Combine(t.Path, "c");
+        var late = MacRename.Plan(Bundle(folder, "Study Stash.app", "0.23.0"), _ => true)!;
+        spawned.Clear();
+        Assert.True(Go(late, spawned));
+        Directory.CreateDirectory(late.To);
+        Assert.Equal($"open {late.From} --args --background {MacRename.Failed}", RunScript(spawned.Single()));
+        Assert.True(File.Exists(Path.Combine(late.From, "Contents", "Info.plist")));
+        Assert.Empty(Directory.GetFileSystemEntries(late.To));
     }
 
     [Fact]
