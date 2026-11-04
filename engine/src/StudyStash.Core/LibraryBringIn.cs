@@ -207,6 +207,14 @@ public static class LibraryBringIn
                 string target = Path.Combine(into, group.Key), other = Path.Combine(from, group.Key);
                 var rows = group.ToList();
                 bool targetHere = File.Exists(target), otherHere = File.Exists(other);
+                // The old file was taken once already (by an earlier run): settled. The attachment keeps what it has now,
+                // however the student changed it since, and the old file never comes in again.
+                if (otherHere && store.GetState(Taken + FolderId(Path.GetFileName(Py.Parent(Py.Parent(other))), Sha(other))) is not null)
+                {
+                    copiedFiles.Add(Path.GetFullPath(other));
+                    foreach (var _ in rows) Step();
+                    continue;
+                }
                 long here = targetHere ? Length(target) : -1, there = otherHere ? Length(other) : -1;
                 bool same = targetHere && otherHere && SameBytes(target, other);
                 // The one that keeps the file here: the one listed with its size; else, unless one is proven to be the
