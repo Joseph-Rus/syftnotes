@@ -47,8 +47,8 @@ public static class VelopackUpdates
 
     /// <summary>Downloads the newest release for this computer and, if <paramref name="ready"/> still says so (a lecture
     /// may have started during the download), hands it to Velopack's updater, which applies it once this process quits
-    /// and opens the app again with <paramref name="relaunchArgs"/>. False leaves this version as it is.</summary>
-    public static async Task<bool> ApplyAsync(Release release, Func<bool> ready, Func<Action> stopBackground, IReadOnlyList<string> relaunchArgs, Action<string> log)
+    /// and opens the app again with <paramref name="relaunchArgs"/> (asked at that moment). False leaves this version as it is.</summary>
+    public static async Task<bool> ApplyAsync(Release release, Func<bool> ready, Func<Action> stopBackground, Func<IReadOnlyList<string>> relaunchArgs, Action<string> log)
     {
         if (Manager is not { } m) return false;
         UpdateInfo? update;
@@ -80,7 +80,7 @@ public static class VelopackUpdates
         var startBackground = stopBackground();
         try
         {
-            m.WaitExitThenApplyUpdates(update.TargetFullRelease, silent: true, restart: true, [.. relaunchArgs]);
+            m.WaitExitThenApplyUpdates(update.TargetFullRelease, silent: true, restart: true, [.. relaunchArgs()]);
         }
         catch (Exception e) when (e is IOException or InvalidOperationException or System.ComponentModel.Win32Exception)
         {
