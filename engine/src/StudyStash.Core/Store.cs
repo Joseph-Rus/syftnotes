@@ -435,17 +435,18 @@ public sealed partial class Store : IDisposable
         }
     }
 
-    /// <summary>Every lecture filed with no notes (notes were off, or nothing wrote them), queued to have them written:
-    /// a first AI was just chosen on a lecture's page. How many.</summary>
+    /// <summary>Every lecture with no notes (filed without them because notes were off or nothing wrote them, or one that
+    /// failed), queued to have them written: an AI was just chosen on a lecture's or Home's "get notes" card. How many.</summary>
     public int RequeueMissing()
     {
         lock (gate)
-            return Exec("UPDATE notes SET status=?, updated_at=? WHERE status=? AND COALESCE(summary_md, '')=''", Queued, Now(), Done);
+            return Exec("UPDATE notes SET status=?, updated_at=? WHERE status IN (?, ?) AND COALESCE(summary_md, '')=''", Queued, Now(), Done, Failed);
     }
 
     /// <summary>"Rewrite every summary": the lectures that have one (<see cref="SummaryCount"/> counts the same), queued to
-    /// be written again; one that failed to rewrite is tried again, a lecture with no summary is not (it has its own "Try
-    /// again", and <see cref="RequeueMissing"/> writes the ones filed without notes). How many.</summary>
+    /// be written again; one that failed to rewrite is tried again. A lecture with no summary is not: it is written by
+    /// <see cref="RequeueMissing"/> (choosing an AI on a "get notes" card), or tried again from the library web page's
+    /// "Try again" on a failed one. How many.</summary>
     public int RequeueAll()
     {
         lock (gate) return Exec($"UPDATE notes SET status=?, updated_at=? WHERE status IN (?, ?) AND {HasSummary}", Queued, Now(), Done, Failed);

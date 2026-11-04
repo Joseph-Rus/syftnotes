@@ -485,6 +485,35 @@ public class LibrarySettingsApiTests
     }
 
     [Fact]
+    public async Task A_lecture_that_failed_with_no_notes_is_written_by_get_notes_and_left_alone_by_Rewrite_all()
+    {
+        using var dir = new TempDir();
+        var (cfg, store) = Library(dir);
+        using var _s = store;
+        await using var site = await Site(cfg, store);
+        Meeting Lecture(string id) => new(id) { Title = id, Date = "2026-10-14T09:00:00", Transcript = "So recursion is a function calling itself." };
+        void Filed(string id, string summary)
+        {
+            store.Enqueue(Lecture(id));
+            store.Finish(store.ClaimNext()!, store.Meeting(store.Get(id)!), new Classification("CS 101", 0.9, "rules", id, []), summary, summary.Length > 0 ? "qwen3:1.7b" : "", "");
+        }
+        Filed("has-notes", "## Summary\nRecursion.");
+        Filed("failed-on-retry", ""); // filed with no notes, then a retry failed
+        store.Requeue("failed-on-retry");
+        store.MarkFailed(store.ClaimNext()!.Id, "the AI stopped");
+        store.Enqueue(Lecture("never-filed")); // failed before it was filed
+        store.MarkFailed(store.ClaimNext()!.Id, "the AI stopped");
+
+        async Task<int> Queued(string route) =>
+            (await Json(await site.Client.SendAsync(Req(HttpMethod.Post, route, new { }))))["queued"]!.GetValue<int>();
+
+        Assert.Equal(1, await Queued("/api/v2/settings/rewrite-all")); // the one summary, as the count says
+        Assert.Equal([Store.Failed, Store.Failed], new[] { "failed-on-retry", "never-filed" }.Select(id => store.Get(id)!.Status));
+        Assert.Equal(2, await Queued("/api/v2/settings/write-missing")); // an AI chosen on the "get notes" card writes them
+        Assert.Equal([Store.Queued, Store.Queued], new[] { "failed-on-retry", "never-filed" }.Select(id => store.Get(id)!.Status));
+    }
+
+    [Fact]
     public async Task The_apps_client_reads_and_changes_them_with_the_password()
     {
         using var dir = new TempDir();
