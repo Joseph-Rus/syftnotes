@@ -85,4 +85,12 @@ public class ExamHintsTests
         Assert.Equal("Recursion traces will be on it, the stack diagrams from last week.", hint.Said);
         Assert.Empty(ExamHints.Find("[18:05] Okay, the stack. The plates will be on it, one by one."));
     }
+
+    [Fact]
+    public void A_sentence_cut_across_two_captions_is_one_flag()
+    {
+        var hint = Assert.Single(ExamHints.Find("[10:00] For the exam next Friday,\n[10:03] you need to know the difference between mitosis and meiosis.\n[10:09] Now, on to the next slide."));
+        Assert.Equal("For the exam next Friday, you need to know the difference between mitosis and meiosis.", hint.Said);
+        Assert.Equal("10:00", hint.Moment);
+    }
 }
