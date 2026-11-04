@@ -283,7 +283,7 @@ public sealed partial class LibraryWeb
             {
                 string cls = Text(item["name"]) ?? "";
                 if (cls.Length == 0) continue;
-                if (cls.Length > 60) return Http.Detail(400, $"“{cls[..20]}…” is too long for a class name (up to 60 characters).");
+                if (cls.Length > StudyStash.Core.Canvas.CourseNames.MaxLength) return Http.Detail(400, $"“{cls[..20]}…” is too long for a class name (up to {StudyStash.Core.Canvas.CourseNames.MaxLength} characters).");
                 if (cls.Equals(Configs.Unsorted, StringComparison.OrdinalIgnoreCase)) return Http.Detail(400, $"“{Configs.Unsorted}” is taken: lectures wait there to be filed.");
                 if (!seen.Add(cls)) return Http.Detail(400, $"There are two classes called {cls}.");
                 var aliases = (item["aliases"] as JsonArray)?.Select(Text).OfType<string>().Where(a => a.Length > 0).Distinct().ToList() ?? [];

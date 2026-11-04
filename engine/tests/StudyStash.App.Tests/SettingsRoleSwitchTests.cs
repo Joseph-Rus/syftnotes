@@ -106,7 +106,7 @@ public sealed class SettingsRoleSwitchTests
         // to bring over (RoleSwitchTests covers that, with an old library on another host to bring lectures from).
         new AppSettings { SetupDone = true, Role = AppRole.Laptop }.Save(home["laptop"]);
         using var host = new AppHost(home["laptop"], log: _ => { });
-        using var model = SettingsModel.Make(host, confirm: new FakeConfirm()).WithLibraryHere(() => new LibraryHere { Command = [exe], Folder = home["new-pool"] });
+        using var model = SettingsModel.Make(host, confirm: new FakeConfirm()).WithLibraryHere(() => new LibraryHere { Command = [exe], FirstPort = LibraryHereTests.FreePort(), Folder = home["new-pool"] });
         model.DisplayName = "Ada";
         try
         {
@@ -143,7 +143,7 @@ public sealed class SettingsRoleSwitchTests
         Configs.Save(cfg);
         using (var seed = new Store(cfg.DbPath, cfg.PoolDir)) FileLecture(seed, "b1");
 
-        var here = new LibraryHere { Command = [exe] };
+        var here = new LibraryHere { Command = [exe], FirstPort = LibraryHereTests.FreePort() };
         string done = await here.CreateAsync(host, null, null, "Ada");
         Assert.Contains("ready", done, StringComparison.Ordinal);
 

@@ -866,6 +866,8 @@ public sealed class TranscriptionWorker(LectureStore store, Func<ITranscriber> l
                 else if (!isLive) Fail(l.Id, "its recording is missing");
                 continue;
             }
+            // A recording that has only just begun: its file exists, but its header isn't on disk yet. Nothing to hear.
+            if (isLive && new FileInfo(audio).Length < WavWriter.HeaderBytes) continue;
             // The file's own time: a lecture picked up again after its sound was cleared starts its file later on.
             long from = (long)Math.Round(Math.Max(0, l.TranscribedSeconds - l.AudioStart) * Sound.Rate);
             float[] window;

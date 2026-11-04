@@ -26,7 +26,7 @@ final class NotebookCanvas: NSObject {
     /// Fingers draw right now (no Pencil, or the student chose so).
     private(set) var fingersDraw = true
 
-    @ObservationIgnored let canvas = PKCanvasView()
+    @ObservationIgnored let canvas = InkCanvas()
     @ObservationIgnored let picker = PKToolPicker()
     /// What Apple's pens are shown for. Not the canvas: a phone showed the keyboard (made first responder, the canvas
     /// asks for one whenever a menu opens over it).
@@ -38,7 +38,7 @@ final class NotebookCanvas: NSObject {
     @ObservationIgnored private var contentWidth: CGFloat = Notebook.letter.width
     @ObservationIgnored private var contentHeight: CGFloat = Notebook.letter.height
     @ObservationIgnored private(set) var id: UUID?
-    @ObservationIgnored private let store = NotebookStore.shared
+    @ObservationIgnored let store: NotebookStore
     @ObservationIgnored private var saveTask: Task<Void, Never>?
     @ObservationIgnored private var dirty = false
     @ObservationIgnored private var settingDrawing = false
@@ -63,7 +63,8 @@ final class NotebookCanvas: NSObject {
     static let gap: CGFloat = 28
     private static let pullDistance: CGFloat = 72
 
-    override init() {
+    init(store: NotebookStore = .shared) {
+        self.store = store
         super.init()
         canvas.backgroundColor = .clear
         canvas.isOpaque = false
@@ -115,7 +116,7 @@ final class NotebookCanvas: NSObject {
 
         let center = NotificationCenter.default
         for name in [Notification.Name.NSUndoManagerDidCloseUndoGroup, .NSUndoManagerDidUndoChange, .NSUndoManagerDidRedoChange] {
-            observers.append(center.addObserver(forName: name, object: nil, queue: .main) { [weak self] _ in
+            observers.append(center.addObserver(forName: name, object: canvas.undoManager, queue: .main) { [weak self] _ in
                 MainActor.assumeIsolated { self?.refreshUndo() }
             })
         }
@@ -144,14 +145,16 @@ final class NotebookCanvas: NSObject {
         var strokes: [PKStroke] = []
         written = [:]
         for (i, p) in n.pages.enumerated() {
-            let d = store.drawing(n, p)
-            written[p.id] = Self.signature(d.strokes)
-            strokes += d.transformed(using: CGAffineTransform(translationX: frames[i].minX, y: frames[i].minY)).strokes
+            let placed = store.drawing(n, p).transformed(using: CGAffineTransform(translationX: frames[i].minX, y: frames[i].minY)).strokes
+            // What the page's file holds, placed as `flush` will see it: a page that no longer holds just that (a stroke
+            // that fell onto the next page when this one got shorter) is written again.
+            written[p.id] = Self.signature(placed)
+            strokes += placed
         }
         settingDrawing = true
         canvas.drawing = PKDrawing(strokes: strokes)
         settingDrawing = false
-        checkLastPage()
+        noteLastPage(strokesByPage())
         canvas.undoManager?.removeAllActions()
         refreshUndo()
         pageCount = n.pages.count
@@ -307,9 +310,9 @@ final class NotebookCanvas: NSObject {
         hint.center = CGPoint(x: contentWidth * s / 2, y: contentHeight * s + 30)
     }
 
-    private func checkLastPage() {
-        guard let top = frames.last?.minY else { lastInked = false; return }
-        lastInked = canvas.drawing.strokes.contains { $0.renderBounds.maxY > top }
+    private func noteLastPage(_ pages: [[PKStroke]]) {
+        lastInked = !(pages.last?.isEmpty ?? true)
+        updateHint()
     }
 
     private func overscroll() -> CGFloat {
@@ -324,18 +327,15 @@ final class NotebookCanvas: NSObject {
         saveTask = nil
         guard dirty, let n = notebook, n.pages.count == frames.count else { return }
         dirty = false
-        var buckets = [[PKStroke]](repeating: [], count: frames.count)
-        for stroke in canvas.drawing.strokes {
-            let i = page(at: stroke.renderBounds.midY)
-            var s = stroke
-            s.transform = s.transform.concatenating(CGAffineTransform(translationX: -frames[i].minX, y: -frames[i].minY))
-            buckets[i].append(s)
-        }
+        let pages = strokesByPage()
+        noteLastPage(pages)
         var changed = false
         for (i, p) in n.pages.enumerated() {
-            let sig = Self.signature(buckets[i])
+            let sig = Self.signature(pages[i])
             guard written[p.id] != sig else { continue }
-            store.setDrawing(PKDrawing(strokes: buckets[i]), n, p)
+            // Only a page written on is moved into its own units (its strokes measured again) and written.
+            let ink = PKDrawing(strokes: pages[i]).transformed(using: CGAffineTransform(translationX: -frames[i].minX, y: -frames[i].minY))
+            store.setDrawing(ink, n, p)
             written[p.id] = sig
             changed = true
         }
@@ -351,9 +351,24 @@ final class NotebookCanvas: NSObject {
         return n.pages[i].pdf == nil && !canvas.drawing.strokes.contains { page(at: $0.renderBounds.midY) == i }
     }
 
+    /// The canvas's strokes, each with the page it's on, as they are on the canvas: their sizes are known already, so
+    /// this stays quick in a notebook of thousands of strokes (a stroke moved is measured afresh).
+    private func strokesByPage() -> [[PKStroke]] {
+        var pages = [[PKStroke]](repeating: [], count: frames.count)
+        guard !frames.isEmpty else { return pages }
+        for stroke in canvas.drawing.strokes { pages[page(at: stroke.renderBounds.midY)].append(stroke) }
+        return pages
+    }
+
     /// The page a point down the canvas belongs to: the gaps are split between the pages either side.
+    /// Looked up by halves (the pages run down in order): every stroke is looked up each save.
     private func page(at y: CGFloat) -> Int {
-        frames.firstIndex { y < $0.maxY + Self.gap / 2 } ?? max(frames.count - 1, 0)
+        var low = 0, high = max(frames.count - 1, 0)
+        while low < high {
+            let mid = (low + high) / 2
+            if y < frames[mid].maxY + Self.gap / 2 { high = mid } else { low = mid + 1 }
+        }
+        return low
     }
 
     private static func signature(_ strokes: [PKStroke]) -> Int {
@@ -365,6 +380,18 @@ final class NotebookCanvas: NSObject {
             h.combine(s.path.count)
             h.combine(s.ink.color.hashValue)
             h.combine(s.mask == nil)
+            // The eraser's bites inside a stroke change only its mask (its box stays the same): the mask's shape counts.
+            s.mask?.cgPath.applyWithBlock { e in
+                let element = e.pointee
+                h.combine(element.type.rawValue)
+                let points = switch element.type {
+                case .moveToPoint, .addLineToPoint: 1
+                case .addQuadCurveToPoint: 2
+                case .addCurveToPoint: 3
+                default: 0
+                }
+                for k in 0..<points { h.combine(element.points[k].x); h.combine(element.points[k].y) }
+            }
         }
         return h.finalize()
     }
@@ -375,9 +402,11 @@ final class NotebookCanvas: NSObject {
     @objc private func tappedUndo() { if canUndo { undo() } }
     @objc private func tappedRedo() { if canRedo { redo() } }
 
+    /// Set only when it changes: each set redraws the bars, and this runs after every stroke.
     private func refreshUndo() {
-        canUndo = canvas.undoManager?.canUndo ?? false
-        canRedo = canvas.undoManager?.canRedo ?? false
+        let undo = canvas.undoManager?.canUndo ?? false, redo = canvas.undoManager?.canRedo ?? false
+        if undo != canUndo { canUndo = undo }
+        if redo != canRedo { canRedo = redo }
     }
 
     // MARK: the pens
@@ -420,13 +449,13 @@ final class NotebookCanvas: NSObject {
 extension NotebookCanvas: PKCanvasViewDelegate {
     func canvasViewDrawingDidChange(_ canvasView: PKCanvasView) {
         guard !settingDrawing else { return }
+        // Nothing here goes through the strokes: it runs after every stroke, however full the notebook. The save soon
+        // after (a moment's pause in the writing) sorts them into pages, and says whether the last page has writing.
         dirty = true
         refreshUndo()
-        checkLastPage()
-        updateHint()
         saveTask?.cancel()
         saveTask = Task { [weak self] in
-            try? await Task.sleep(for: .seconds(1.2))
+            try? await Task.sleep(for: .seconds(0.5))
             guard !Task.isCancelled else { return }
             self?.flush()
         }
@@ -464,6 +493,15 @@ extension NotebookCanvas: PKToolPickerObserver {
 
 extension NotebookCanvas: UIGestureRecognizerDelegate {
     func gestureRecognizer(_ g: UIGestureRecognizer, shouldRecognizeSimultaneouslyWith other: UIGestureRecognizer) -> Bool { true }
+}
+
+/// The page, with an undo history of its own. The window's is shared with every text field in the window (Ask's bar
+/// beside a lecture): the notebook's Undo could reach typing there, and a notebook laid out again cleared theirs.
+/// Apple's pens, the system's undo gestures and ⌘Z find this one too (the first responder, `ToolsResponder`, is inside
+/// the canvas).
+final class InkCanvas: PKCanvasView {
+    private let history = UndoManager()
+    override var undoManager: UndoManager? { history }
 }
 
 /// Holds first responder while a notebook is open, so Apple's pens show, and never asks for a keyboard.
