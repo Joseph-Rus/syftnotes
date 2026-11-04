@@ -436,7 +436,7 @@ public static partial class Shell
                 // The library writes no notes, or it's too short for them as far as its length tells already: none
                 // are promised for it.
                 _ when NotesOff => NoteModel.NotesAreOff(noun, l.Segments.Count > 0),
-                _ when WillHaveNotes(l) == false => NoteModel.TooShort(noun, l.Segments.Count > 0, keepRecording is not null, l.Seconds),
+                _ when WillHaveNotes(l) == false => NoteModel.TooShort(noun, l.Segments.Count > 0, keepRecording is not null, l.Seconds, l.TranscribedSeconds),
                 // Recorded before the model arrived: it waits for it (the download's on Home and in the menu bar).
                 LectureState.Transcribing when l.WaitsForModel && !host.ModelReady => host.Downloading is { } d
                     ? $"This {noun} is written down as soon as speech-to-text is ready on this computer ({Math.Clamp((int)Math.Round(d.Fraction * 100), 0, 99)}% downloaded)."

@@ -94,6 +94,8 @@ public class NoticeWordsTests
         string silent = NoteModel.TooShort(Nouns.Recording, transcript: false, canContinue: false, seconds: 120);
         Assert.StartsWith("Nothing was heard. This recording ran 2 min, but Syft Notes heard no speech. Check that the right microphone is picked in", silent);
         Assert.DoesNotContain("too short", silent);
+        // Still being written down (Whisper not done, or waiting for the speech model): nothing is said of what was heard yet.
+        Assert.Contains("too short for notes", NoteModel.TooShort(Nouns.Recording, transcript: false, canContinue: false, seconds: 40, writtenDown: 5));
         // Ten seconds, or two minutes with a few words, are still just too short.
         Assert.Contains("too short for notes", NoteModel.TooShort(Nouns.Recording, transcript: false, canContinue: false, seconds: 10));
         Assert.Contains("too short for notes", NoteModel.TooShort(Nouns.Recording, transcript: true, canContinue: false, seconds: 120));

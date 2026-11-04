@@ -326,8 +326,10 @@ public static partial class Summarize
     public const double NothingHeardAfter = 30;
 
     /// <summary>A recording long enough to have speech in it, with none in it (<see cref="TooShort"/> is its other
-    /// reason for having no transcript to write notes from).</summary>
-    public static bool HeardNothing(double? seconds, int transcriptChars) => transcriptChars == 0 && seconds >= NothingHeardAfter;
+    /// reason for having no transcript to write notes from). <paramref name="writtenDown"/>: how much of it Whisper has
+    /// written down so far, when that is still going on: until all of it is, nothing can be said of what was heard.</summary>
+    public static bool HeardNothing(double? seconds, int transcriptChars, double? writtenDown = null) =>
+        transcriptChars == 0 && seconds >= NothingHeardAfter && (writtenDown is null || writtenDown >= seconds - 0.01);
 
     /// <summary>What a student is told of a recording that's <see cref="HeardNothing"/>: how long it ran, and where to
     /// check the microphone. <paramref name="it"/> names it ("This lecture"); there is no microphone picker in the app,

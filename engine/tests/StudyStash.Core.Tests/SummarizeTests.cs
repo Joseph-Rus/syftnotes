@@ -23,6 +23,19 @@ public class SummarizeTests
     static readonly Action<string> Quiet = _ => { };
 
     [Fact]
+    public void A_recording_with_no_words_after_half_a_minute_heard_nothing()
+    {
+        Assert.True(Summarize.HeardNothing(120, 0));
+        Assert.False(Summarize.HeardNothing(10, 0));
+        Assert.False(Summarize.HeardNothing(120, 300));
+        Assert.False(Summarize.HeardNothing(null, 0));
+        // Whisper still writing it down (a 40 s recording, 5 s done; or waiting for the model): not known yet.
+        Assert.False(Summarize.HeardNothing(40, 0, writtenDown: 5));
+        Assert.True(Summarize.HeardNothing(40, 0, writtenDown: 40));
+        Assert.StartsWith("Nothing was heard. This lecture ran 2 min, but Syft Notes heard no speech.", Summarize.NothingHeardWords("This lecture", 120));
+    }
+
+    [Fact]
     public void Split_transcript_respects_budget_and_keeps_text()
     {
         string text = Lines(200);
