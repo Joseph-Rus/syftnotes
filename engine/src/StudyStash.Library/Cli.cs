@@ -391,7 +391,9 @@ public static class Cli
                     BackgroundLibrary.WritePids(home, Environment.ProcessId, p.Id);
                     try
                     {
-                        await p.WaitForExitAsync(stop.Token);
+                        // Its own end, not its output's: something it started (git's background helpers) can hold the
+                        // output open after it has gone, and the library was never started again (Windows).
+                        await Machine.ExitedAsync(p, stop.Token);
                     }
                     catch (OperationCanceledException)
                     {
