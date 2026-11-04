@@ -4,7 +4,8 @@ namespace StudyStash.Core.Ai;
 /// Signing in to Claude Code, Codex or Antigravity CLI, for guided setup and for every Sign in button in Syft Notes, with
 /// the provider's own sign-in: <c>claude auth login</c>, <c>codex login</c> or <c>agy</c> runs in a terminal
 /// nobody sees (<see cref="HiddenTerminal"/>), so a sign-in made for a terminal works without one ever showing, and it
-/// opens the browser itself. Syft Notes never sees the password or a token. Gemini's page ends on a code to paste
+/// opens the browser itself (Gemini's doesn't: Syft Notes opens its page, <see cref="AgentCliInfo.OpenersOff"/>). Syft
+/// Notes never sees the password or a token. Gemini's page ends on a code to paste
 /// (<see cref="AgentCliInfo.TakesCode"/>): the student pastes it into Syft Notes' box, which types it into the sign-in
 /// (<see cref="SendCodeAsync"/>) and keeps it nowhere. What the sign-in shows is read the
 /// way a person would read it (<see cref="SignInScreen"/>), its few simple questions answered the safe way; whether it's
@@ -18,9 +19,9 @@ namespace StudyStash.Core.Ai;
 /// <para>
 /// The sign-in page's address goes one place only: the system's browser opener, here (<see cref="OpenPage"/>), and only
 /// for a page that finishes by itself (<see cref="SignInScreen.FinishesByItself"/>) or one whose code the student pastes
-/// back into Syft Notes (Gemini's), when the sign-in said it couldn't open the browser, or the student asked for the
-/// page again. It is never shown, logged, saved or put in the overview. Claude Code's printed page ends on a code to
-/// paste, which Syft Notes doesn't take: its sign-in is run again instead.
+/// back into Syft Notes (Gemini's), when the sign-in said it couldn't open the browser or its own openers are off, or
+/// the student asked for the page again. It is never shown, logged, saved or put in the overview. Claude Code's
+/// printed page ends on a code to paste, which Syft Notes doesn't take: its sign-in is run again instead.
 /// </para>
 /// </summary>
 public sealed class AgentSignIn : IDisposable
@@ -107,22 +108,24 @@ public sealed class AgentSignIn : IDisposable
         // A fresh end to wait on, unless "again" made one already (so a wait never takes the old one's end for this one's).
         if (exited.Task.IsCompleted) exited = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         var launch = OperatingSystem.IsWindows() ? WindowsCommand.For([exe, .. cli.SignInArgs]) : new Launch(exe, [.. cli.SignInArgs]);
-        var env = HiddenTerminal.Environment([
-            new("PATH", AiProvider.SearchPath()),
-            new("CLAUDECODE", null), // started from inside Claude Code, claude would refuse to nest
-            // Windows PowerShell, which a sign-in may run to open the browser, finds its own modules (PowerShell 7's
-            // module path, handed down when Syft Notes was started from it, leaves it without Start-Process).
-            .. OperatingSystem.IsWindows() ? [new KeyValuePair<string, string?>("PSModulePath", null)] : Array.Empty<KeyValuePair<string, string?>>(),
-            .. cli.Env().Select(e => new KeyValuePair<string, string?>(e.Key, e.Value)),
-        ]);
         var s = new SignInScreen();
         if (Shown is { } shown) s.Line += shown;
         HiddenTerminal t;
         try
         {
+            var env = HiddenTerminal.Environment([
+                // Its own browser openers first, when they're off: Syft Notes opens its page instead.
+                new("PATH", cli.OpenersOff is { } off ? off() + Path.PathSeparator + AiProvider.SearchPath() : AiProvider.SearchPath()),
+                new("CLAUDECODE", null), // started from inside Claude Code, claude would refuse to nest
+                // Windows PowerShell, which a sign-in may run to open the browser, finds its own modules (PowerShell 7's
+                // module path, handed down when Syft Notes was started from it, leaves it without Start-Process).
+                .. OperatingSystem.IsWindows() ? [new KeyValuePair<string, string?>("PSModulePath", null)] : Array.Empty<KeyValuePair<string, string?>>(),
+                .. cli.Env().Select(e => new KeyValuePair<string, string?>(e.Key, e.Value)),
+            ]);
             t = HiddenTerminal.Start(launch, env);
         }
-        catch (Exception e) when (e is IOException or DllNotFoundException or EntryPointNotFoundException or System.ComponentModel.Win32Exception)
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException or DllNotFoundException or EntryPointNotFoundException
+            or System.ComponentModel.Win32Exception)
         {
             child = null;
             Stuck = true;
@@ -158,14 +161,15 @@ public sealed class AgentSignIn : IDisposable
         return true;
     }
 
-    /// <summary>What the sign-in showed: the questions it asks answered, and its page opened when it said it couldn't open
-    /// the browser itself (only a page that finishes by itself, once).</summary>
+    /// <summary>What the sign-in showed: the questions it asks answered, and its page opened, once, when it said it
+    /// couldn't open the browser itself or its browser openers are off (<see cref="AgentCliInfo.OpenersOff"/>), and
+    /// it's a page Syft Notes may open.</summary>
     void Showed(HiddenTerminal t, SignInScreen s, string text)
     {
         string reply;
         lock (s) reply = s.Read(text);
         if (reply.Length > 0) t.Type(reply);
-        if (s.NoBrowser && MayOpen(s) && s.Page is { } page && Interlocked.CompareExchange(ref opened, 1, 0) == 0)
+        if ((s.NoBrowser || cli.OpenersOff is not null) && MayOpen(s) && s.Page is { } page && Interlocked.CompareExchange(ref opened, 1, 0) == 0)
             _ = Task.Run(() => OpenPage(page));
         // A code turned down: the sign-in waits for a key to go back to its start, with a new page. It's stopped
         // instead, and the student is told to try again.
