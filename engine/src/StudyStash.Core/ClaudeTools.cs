@@ -151,7 +151,7 @@ public sealed class LocalLibrary(LibraryReader reader, Canvas.CanvasSync? canvas
                     id = matches[0].Id;
                 }
                 if (id is null) return CanvasErr("Give an assignment id or words of its name.");
-                var found = Canvas.CanvasView.Assignment(index, id.Value, canvas.Clock(), canvas.Crawl.AssignmentFolder(cls, id.Value));
+                var found = Canvas.CanvasView.Assignment(index, id.Value, canvas.Clock(), canvas.Crawl.AssignmentFolder(cls, id.Value), Canvas.DueMarks.Load(home ?? ""));
                 return found is null ? CanvasErr($"No assignment {id} in {cls}.") : found;
             }
             case "modules":
@@ -167,7 +167,7 @@ public sealed class LocalLibrary(LibraryReader reader, Canvas.CanvasSync? canvas
                 return result;
             }
             default: // "assignments": what's still due, everywhere or in one class
-                var all = Canvas.Assignments.Load(home ?? "");
+                var all = Canvas.Assignments.Shown(home ?? "");
                 var list = Canvas.Assignments.Upcoming(all, DateTime.Now, body?["days"] is JsonValue d && d.TryGetValue(out int n) ? n : 14, cls);
                 return new JsonArray(list.Select(a => (JsonNode)new JsonObject
                 {
@@ -834,6 +834,9 @@ public static class ClaudeTools
         if (pts.Length > 0) sb.Append("Points: ").Append(pts).Append('\n');
         sb.Append("Status: ").Append(S(a["label"]));
         if (S(a["score_text"]) is { Length: > 0 } score) sb.Append(" · ").Append(score);
+        // What the student marked in Syft Notes (never sent to Canvas), as the app shows it.
+        if (S(a["mark"]) is "done") sb.Append(" · marked done in Syft Notes");
+        else if (S(a["mark"]) is "hidden") sb.Append(" · hidden in Syft Notes");
         sb.Append('\n');
         if (a["submission"] is JsonObject subm && S(subm["submitted_at"]) is { Length: > 0 } submittedAt)
             sb.Append("Submitted: ").Append(Canvas.CanvasMarkdown.When(submittedAt, TimeZoneInfo.Local)).Append('\n');
