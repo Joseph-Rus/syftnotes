@@ -54,6 +54,18 @@ public static partial class Machine
         }
     }
 
+    /// <summary>Done when <paramref name="p"/> itself has ended. <see cref="Process.WaitForExitAsync"/> also waits for its
+    /// redirected output to end, which something it started can hold open long after it has gone (on Windows a child
+    /// inherits it, and git's background helpers live on).</summary>
+    public static async Task ExitedAsync(Process p, CancellationToken stop)
+    {
+        var ended = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        p.EnableRaisingEvents = true;
+        p.Exited += (_, _) => ended.TrySetResult();
+        if (p.HasExited) ended.TrySetResult();
+        await ended.Task.WaitAsync(stop);
+    }
+
     /// <summary>How long a stopped command's output may still take to end by itself before what it printed is taken as
     /// it is (it normally ends at once).</summary>
     static readonly TimeSpan OutputSettles = TimeSpan.FromSeconds(2);
