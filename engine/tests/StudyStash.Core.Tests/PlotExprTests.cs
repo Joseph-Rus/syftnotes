@@ -1,4 +1,3 @@
-using System.Diagnostics;
 using StudyStash.Core.Rich;
 
 namespace StudyStash.Core.Tests;
@@ -136,7 +135,6 @@ public class PlotExprTests
     [Fact]
     public void Nothing_it_is_given_hangs_or_crashes_it()
     {
-        var clock = Stopwatch.StartNew();
         // Nested past any sensible depth: refused, not a stack overflow.
         Assert.Throws<PlotException>(() => Value(new string('(', 5000) + "x" + new string(')', 5000)));
         Assert.Throws<PlotException>(() => Value(new string('(', 100) + "x" + new string(')', 100)));
@@ -144,12 +142,12 @@ public class PlotExprTests
         Assert.Throws<PlotException>(() => Value(string.Join("^", Enumerable.Repeat("x", 150))));
         Assert.Throws<PlotException>(() => Value(string.Join("+", Enumerable.Repeat("x", 3000))));
         Assert.Equal(150, Value(string.Join("+", Enumerable.Repeat("x", 150)), 1));
-        // Sums too long to finish: undefined, at once.
+        // Sums too long to finish: undefined, because their steps ran out (counted, not timed: a busy machine made a
+        // time limit fail when nothing was wrong).
         Assert.True(double.IsNaN(Value("sum(k, 1, 1e12, k)")));
         Assert.True(double.IsNaN(Value("sum(i, 1, 1000, sum(j, 1, 1000, sum(k, 1, 1000, i j k)))")));
         Assert.True(double.IsNaN(Value("sum(k, 1, x, k)", double.PositiveInfinity)));
         Assert.True(double.IsNaN(Value("sum(k, 1, x, k)", double.NaN)));
-        Assert.True(clock.Elapsed < TimeSpan.FromSeconds(2), $"took {clock.Elapsed}");
     }
 
     [Fact]
@@ -172,13 +170,15 @@ public class PlotExprTests
     [Fact]
     public void A_hostile_sequence_or_a_chain_of_curves_stops_within_its_budget()
     {
-        var clock = Stopwatch.StartNew();
-        // Each term a long sum, ten thousand terms: the table shares one budget.
+        // Counted in steps, not seconds: a busy machine made a time limit fail when nothing was wrong.
+        // Each term a long sum, ten thousand terms: the table shares one budget, so the last term is never worked out.
         var heavy = Plot.Parse("bars a(n) = sum(k, 1, 40000, k) for n from 0 to 10000");
         var state = new PlotState(heavy);
         double last = state.Term(heavy.Items.OfType<PlotSeries>().Single(), 10000);
         Assert.True(double.IsNaN(last));
-        // Each curve calls the one before twice: 2^23 calls if nothing stopped it.
+        Assert.True(state.Env.Spent <= PlotEnv.MaxSteps * 10 + 100, $"the table took {state.Env.Spent} steps");
+        // Each curve calls the one before twice: 2^23 calls if nothing stopped it. Once its steps are spent each call
+        // takes one more and gives up, so it ends a few steps past the budget, not millions.
         var lines = new List<string> { "f0(x) = x" };
         for (int i = 1; i < 24; i++) lines.Add($"f{i}(x) = f{i - 1}(x) + f{i - 1}(x + 1)");
         var chain = Plot.Parse(string.Join("\n", lines));
@@ -186,7 +186,7 @@ public class PlotExprTests
         s2.NewFrame();
         double v = s2.At(chain.Items.OfType<PlotCurve>().Last(), 1);
         Assert.True(double.IsNaN(v));
-        Assert.True(clock.Elapsed < TimeSpan.FromSeconds(3), $"took {clock.Elapsed}");
+        Assert.True(s2.Env.Budget > -100, $"the chain went {-s2.Env.Budget} steps past its budget");
     }
 
     [Fact]
