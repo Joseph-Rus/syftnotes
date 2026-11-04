@@ -71,6 +71,10 @@ public class MathTextTests
     [InlineData(@"\text{k-means++}", "\\text{k\u2010means\\!+\\!+}")]
     [InlineData(@"O(n++) + 1", @"O(n\!+\!+) + 1")]
     [InlineData(@"a-b+c, x^{2}+1", @"a-b+c, x^{2}+1")]
+    // A single "+" with nothing after it is a charge or an index, which CSharpMath already sets close: left alone.
+    [InlineData(@"Ca^{2+}, x_{n+}", @"Ca^{2+}, x_{n+}")]
+    // Commands inside \text are still rewritten.
+    [InlineData(@"\text{see \textbf{bold} here}", @"\text{see \mathbf{bold} here}")]
     // A rewrite inside a group still applies (nested).
     [InlineData(@"\frac{\dfrac{a}{b}}{c}", @"\frac{\frac{a}{b}}{c}")]
     // Untouched, per the "supported as is" list.

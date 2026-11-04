@@ -12,14 +12,15 @@ using StudyStash.App.Controls.Rich;
 
 namespace StudyStash.App.Pictures;
 
-/// <summary>Formulas next to each other, as the notes draw them inline: k-means++ and the neighbours that must not change. Mac and
-/// Windows look, light and dark, into STUDYSTASH_SHOTS as math-text-<STUDYSTASH_NAME>-<mac|win>-<light|dark>.png; only with
-/// STUDYSTASH_FILM=1.</summary>
+/// <summary>Formulas next to each other, as the notes draw them inline: k-means++, C++ and the neighbours that must not
+/// change (ion charges, a command inside \text). Mac and Windows look, light and dark, into STUDYSTASH_SHOTS as
+/// math-text-<STUDYSTASH_NAME>-<mac|win>-<light|dark>.png; only with STUDYSTASH_FILM=1.</summary>
 public class MathTextShots
 {
     static readonly string[] Formulas =
     [
         @"$k\text{-means}++$", @"$\text{k-means++}$", @"$\text{O}(n\log n)$", @"$a-b$", @"$x^{2}+1$", @"$\text{well-known}+a-b$", @"$(n++)$",
+        @"$Ca^{2+} + Fe^{3+}$", @"$x_{n+}$", @"$\text{C++ and Java}$", @"$\text{see \textbf{bold} here}$",
     ];
 
     [AvaloniaTheory]
@@ -42,7 +43,7 @@ public class MathTextShots
             row.Children.Add(new MathView { Latex = f.Trim('$'), Size = 28, Foreground = fg });
             rows.Children.Add(row);
         }
-        var window = new Window { Width = 660, Height = 420, RequestedThemeVariant = variant, Background = dark ? Brushes.Black : Brushes.White, Content = rows };
+        var window = new Window { Width = 660, Height = 640, RequestedThemeVariant = variant, Background = dark ? Brushes.Black : Brushes.White, Content = rows };
         window.Show();
         Dispatcher.UIThread.RunJobs();
         var frame = window.CaptureRenderedFrame() ?? throw new InvalidOperationException("nothing rendered");
