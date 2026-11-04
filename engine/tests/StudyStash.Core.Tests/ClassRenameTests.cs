@@ -49,6 +49,7 @@ public class ClassRenameTests
         Assignments.Save(cfg.Home, [new Assignment(Cs, 9001, "Lab 1", "2026-09-30T23:59", 10, "open", null, "", ""),
             new Assignment("BIO 110", 9101, "Lab A", "", null, "open", null, "", "")]);
         CanvasSeen.Mark(cfg.Home, Cs, [77]);
+        DueMarks.Set(cfg.Home, Cs, "assignment", 9001, "hidden", DateTimeOffset.UtcNow);
         File.WriteAllText(Path.Combine(cfg.Home, "crawl.json"),
             new JsonObject
             {
@@ -152,6 +153,7 @@ public class ClassRenameTests
         Assert.Equal("Software Engineering", CourseIndex.Load(cfg.Home, "Software Engineering")!.Class);
         Assert.Equal(["Software Engineering", "BIO 110"], Assignments.Load(cfg.Home).Select(a => a.ClassName));
         Assert.Equal([77L], CanvasSeen.For(cfg.Home, "Software Engineering"));
+        Assert.Equal(["Software Engineering"], DueMarks.Load(cfg.Home).Select(m => m.Class)); // what the student hid or ticked goes with it
         var manifest = JsonNode.Parse(File.ReadAllText(Path.Combine(cfg.Home, "crawl.json")))!["manifest"]!.AsObject();
         Assert.Equal(["asgdir:BIO 110:9101", "asgdir:Software Engineering:9001", "file:55:Canvas/files/a.pdf", "fileloc:Software Engineering:55"],
             manifest.Select(kv => kv.Key).Order(StringComparer.Ordinal));

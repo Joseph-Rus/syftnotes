@@ -277,7 +277,7 @@ public sealed partial class LibraryWeb
             Admin = role == "admin", Current = current, Password = cfg.PoolPassword.Length > 0, Back = back, Nonce = options.Nonce(),
             Chat = ChatOn,
             Inbox = ChatOn ? (Directory.Exists(Path.Combine(cfg.PoolDir, "Inbox")) ? Directory.EnumerateFiles(Path.Combine(cfg.PoolDir, "Inbox"), "*.md").Count() : 0) : null,
-            Due = CanvasOn ? StudyStash.Core.Canvas.Assignments.Upcoming(StudyStash.Core.Canvas.Assignments.Load(cfg.Home), DateTime.Now, 7).Count : null,
+            Due = CanvasOn ? StudyStash.Core.Canvas.Assignments.Upcoming(StudyStash.Core.Canvas.Assignments.Shown(cfg.Home), DateTime.Now, 7).Count : null,
         };
     }
 
@@ -617,9 +617,11 @@ public sealed partial class LibraryWeb
             : r.HasTranscript is > 0 ? "No study notes yet" : "No transcript, so no study notes"));
         if (!string.IsNullOrEmpty(r.ClassifiedBy))
         {
-            string sure = r.ClassifiedBy == "ollama"
+            // An AI sorted it when it isn't one of the others: "ollama" is the AI of before the library named which (Engines.Name for the rest).
+            bool byAi = !SortedBy.ContainsKey(r.ClassifiedBy) || r.ClassifiedBy == "ollama";
+            string sure = byAi
                 ? $", {Math.Round((r.Confidence ?? 0) * 100, MidpointRounding.ToEven).ToString(CultureInfo.InvariantCulture)}% sure" : "";
-            about.Add(("Sorted by", "Sorted by " + Ui.Esc(SortedBy.GetValueOrDefault(r.ClassifiedBy, r.ClassifiedBy) + sure)));
+            about.Add(("Sorted by", "Sorted by " + Ui.Esc((SortedBy.GetValueOrDefault(r.ClassifiedBy) ?? Engines.Name(r.ClassifiedBy)) + sure)));
         }
         string aboutHtml = string.Concat(about.Select(a => $"<div><dt>{Ui.Esc(a.Item1)}</dt><dd>{a.Item2}</dd></div>"));
 
