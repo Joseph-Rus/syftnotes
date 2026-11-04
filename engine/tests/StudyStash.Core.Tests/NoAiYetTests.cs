@@ -143,6 +143,15 @@ public class NoAiYetTests
         // Signing back in to the one already used changes nothing.
         ai.MarkSignedIn("claude");
         Assert.Equal(("claude", "claude", 2), Now());
+
+        // Split picks (notes on Gemini with its own model, Ask on Claude), and Claude's sign-in runs out: signing back in
+        // to Claude is a repair, and every pick stays as it was.
+        var split = AiSettings.Load(cfg.Home);
+        split.ByJob["notes"] = new AiChoice("gemini", "gemini-3.8-pro");
+        split.Save(cfg.Home);
+        ai.MarkSignedIn("claude");
+        Assert.Equal(("gemini", "claude", 2), Now());
+        Assert.Equal("gemini-3.8-pro", AiSettings.Load(cfg.Home).For("notes").Model);
     }
 
     [Fact]
