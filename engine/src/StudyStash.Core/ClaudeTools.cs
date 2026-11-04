@@ -815,6 +815,7 @@ public static class ClaudeTools
             if (list.Count == 0) return;
             sb.Append(label).Append(":\n").Append(string.Join("\n", list.Select(Row))).Append("\n\n");
         }
+        sb.Append("Times are in ").Append(Canvas.CanvasMarkdown.ZoneName(TimeZoneInfo.Local, DateTimeOffset.Now)).Append(".\n\n");
         Section("Overdue", overdue);
         Section("Due soon", soon);
         Section("No due date", undated);
@@ -826,7 +827,7 @@ public static class ClaudeTools
         var sb = new StringBuilder();
         sb.Append($"# {S(a["name"])} — {S(a["class"])}\n\n");
         string due = S(a["due_at"]).Length > 0 ? Canvas.CanvasMarkdown.When(S(a["due_at"]), TimeZoneInfo.Local) : "";
-        sb.Append("Due: ").Append(due.Length > 0 ? due : "No due date").Append('\n');
+        sb.Append("Due: ").Append(due.Length > 0 ? $"{due} ({Canvas.CanvasMarkdown.ZoneName(TimeZoneInfo.Local, DateTimeOffset.Now)})" : "No due date").Append('\n');
         string pts = Num(a["points"]);
         if (pts.Length > 0) sb.Append("Points: ").Append(pts).Append('\n');
         sb.Append("Status: ").Append(S(a["label"]));
