@@ -68,9 +68,11 @@ public static class Shot
     /// and saves it as <c>&lt;name&gt;-&lt;light|dark&gt;.png</c>, the size of the design's picture of that section
     /// (or <paramref name="size"/>). The glass blurs what's behind it here, as the design does. At a
     /// <paramref name="scale"/> of 2 it's drawn as a Retina screen draws it, two pixels to a point (a picture twice the
-    /// size, cut pixel for pixel, never resampled).
+    /// size, cut pixel for pixel, never resampled). <paramref name="open"/> runs once the window is showing and before it's
+    /// drawn: a menu to open, a field to fill.
     /// </summary>
-    public static Bitmap Take(string name, SkinKind skin, ThemeVariant variant, Func<Control> build, ColourTheme? theme = null, Size? size = null, double scale = 1)
+    public static Bitmap Take(string name, SkinKind skin, ThemeVariant variant, Func<Control> build, ColourTheme? theme = null, Size? size = null, double scale = 1,
+        Action<Window>? open = null)
     {
         Skin.UseTheme(theme ?? ColourThemes.Default);
         ((StudyStash.App.App)Application.Current!).UseSkin(skin);
@@ -88,6 +90,12 @@ public static class Shot
         if (scale != 1) window.SetRenderScaling(scale);
         window.Show();
         DiagramsReady.Wait(window);
+        if (open is not null)
+        {
+            open(window);
+            Dispatcher.UIThread.RunJobs();
+            DiagramsReady.Wait(window);
+        }
         var whole = window.CaptureRenderedFrame() ?? throw new InvalidOperationException("nothing rendered");
         Bitmap frame;
         if (scale == 1)

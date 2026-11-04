@@ -1,0 +1,71 @@
+<!-- The built-in calendar (a day to pick, in a menu's panel), in the Syft look: ink and paper, no grey sheet. The month's
+     name and its arrows over the weekdays, the days in the body size, today ringed in ink, the picked day in lilac with
+     ink, days from other months and days that haven't happened yet faded. -->
+<Styles xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+  <Style Selector="Calendar">
+    <Setter Property="Background" Value="Transparent" />
+    <Setter Property="Foreground" Value="{DynamicResource Ink}" />
+    <Setter Property="FontFamily" Value="{DynamicResource TextFont}" />
+  </Style>
+  <Style Selector="CalendarItem">
+    <Setter Property="Background" Value="Transparent" />
+    <Setter Property="Foreground" Value="{DynamicResource Ink}" />
+  </Style>
+  <!-- Fluent's grey sheet behind the days: its template sets the colour, which a style can't change, so it's let go clear -->
+  <Style Selector="CalendarItem /template/ Border#BackgroundLayer">
+    <Setter Property="Opacity" Value="0" />
+  </Style>
+  <!-- The month and the arrows -->
+  <Style Selector="CalendarItem /template/ Button#PART_HeaderButton">
+    <Setter Property="Foreground" Value="{DynamicResource Ink}" />
+    <Setter Property="FontSize" Value="{DynamicResource FontSubtitle}" />
+    <Setter Property="FontWeight" Value="Bold" />
+  </Style>
+  <Style Selector="CalendarItem /template/ Button#PART_PreviousButton, CalendarItem /template/ Button#PART_NextButton">
+    <Setter Property="Foreground" Value="{DynamicResource InkMuted}" />
+  </Style>
+  <!-- The weekdays -->
+  <Style Selector="CalendarItem /template/ Grid#PART_MonthView > TextBlock">
+    <Setter Property="FontSize" Value="{DynamicResource FontCaption}" />
+    <Setter Property="FontWeight" Value="Bold" />
+    <Setter Property="Foreground" Value="{DynamicResource InkSubtle}" />
+  </Style>
+  <!-- The days (and, once the month is clicked, the months and years) -->
+  <Style Selector="CalendarDayButton, CalendarButton">
+    <Setter Property="Foreground" Value="{DynamicResource Ink}" />
+    <Setter Property="FontSize" Value="{DynamicResource FontBody}" />
+    <Setter Property="FontWeight" Value="Medium" />
+  </Style>
+  <Style Selector="CalendarDayButton /template/ Border#Root, CalendarButton /template/ Border#Root">
+    <Setter Property="Background" Value="Transparent" />
+    <Setter Property="CornerRadius" Value="{DynamicResource RadiusControl}" />
+  </Style>
+  <Style Selector="CalendarDayButton:pointerover /template/ Border#Root, CalendarButton:pointerover /template/ Border#Root">
+    <Setter Property="Background" Value="{DynamicResource Hover}" />
+  </Style>
+  <Style Selector="CalendarDayButton:inactive, CalendarButton:inactive">
+    <Setter Property="Foreground" Value="{DynamicResource InkSubtle}" />
+  </Style>
+  <Style Selector="CalendarDayButton:inactive /template/ Border#Root, CalendarButton:inactive /template/ Border#Root">
+    <Setter Property="Background" Value="Transparent" />
+  </Style>
+  <Style Selector="CalendarDayButton:blackout, CalendarDayButton:disabled">
+    <Setter Property="Foreground" Value="{DynamicResource TextFade3}" />
+  </Style>
+  <Style Selector="CalendarDayButton:selected /template/ Border#Border, CalendarButton:selected /template/ Border#Border, CalendarDayButton:focus /template/ Border#Border">
+    <Setter Property="BorderBrush" Value="Transparent" />
+  </Style>
+  <Style Selector="CalendarDayButton:today /template/ Border#Border">
+    <Setter Property="BorderBrush" Value="{DynamicResource Ink}" />
+    <Setter Property="BorderThickness" Value="1.5" />
+    <Setter Property="CornerRadius" Value="{DynamicResource RadiusControl}" />
+  </Style>
+  <Style Selector="CalendarDayButton:selected, CalendarButton:selected">
+    <Setter Property="Foreground" Value="{DynamicResource OnSelected}" />
+    <Setter Property="FontWeight" Value="Bold" />
+  </Style>
+  <Style Selector="CalendarDayButton:selected /template/ Border#Root, CalendarButton:selected /template/ Border#Root">
+    <Setter Property="Background" Value="{DynamicResource Selected}" />
+  </Style>
+</Styles>
