@@ -85,6 +85,9 @@ public static class LibraryBringIn
         /// <summary>The other folder's attached files already copied in for attachments listed here.</summary>
         readonly HashSet<string> copiedFiles = new(LibraryFolders.Comparer);
         readonly Inside inside = new(from);
+        /// <summary>Attachment file names in this folder taken this run: every listed attachment's, and each free name
+        /// given out.</summary>
+        readonly HashSet<string> reserved = new(LibraryFolders.Comparer);
 
         void Step() => progress?.Invoke(++done, total);
 
@@ -123,7 +126,7 @@ public static class LibraryBringIn
                     continue;
                 }
                 string text = Text(row.MdPath!);
-                if (apply) store.Refile(row.Id, CopyIn(row.Id, text, Path.Combine(into, rel)));
+                if (apply) store.PointAt(row.Id, CopyIn(row.Id, text, Path.Combine(into, rel)));
                 fresh++;
                 planned[row.Id] = text;
                 copied.Add(Path.GetFullPath(Path.Combine(from, rel)));
@@ -134,6 +137,9 @@ public static class LibraryBringIn
                 Step();
                 Theirs(file);
             }
+            // Every name a listed attachment has here is taken, even before its file is: a free name never lands on one.
+            foreach (var a in listedAttachments.Where(a => Under(store.AttachmentPath(a), store.PoolDir)))
+                reserved.Add(Path.Combine(into, Path.GetRelativePath(store.PoolDir, store.AttachmentPath(a))));
             files = ListedAttachments(listedAttachments) + OtherAttachments(attached);
             // What the student wrote by hand in the other folder (captures waiting in the Inbox, notes filed into a class's
             // Notes): the folder in use is where they're read, so they come too. The Canvas mirror is fetched again.
@@ -169,7 +175,7 @@ public static class LibraryBringIn
             if (mine is null)
             {
                 if (row is null) Enlist(store, cfg, note, note.Text, null, apply, newClasses);
-                else if (apply) store.Refile(row.Id, CopyIn(row.Id, note.Text, Path.Combine(into, Path.GetRelativePath(from, note.Path))));
+                else if (apply) store.PointAt(row.Id, CopyIn(row.Id, note.Text, Path.Combine(into, Path.GetRelativePath(from, note.Path))));
                 fresh++;
                 planned[note.Id] = note.Text;
                 return;
@@ -222,7 +228,6 @@ public static class LibraryBringIn
                 Attachment? keeper = here is null ? null
                     : rows.FirstOrDefault(a => a.Size == hereSize) ?? (here == there || !rows.Any(a => a.Size == thereSize) ? rows[0] : null);
                 bool otherTaken = keeper is not null && here == there;
-                var reserved = new HashSet<string>(LibraryFolders.Comparer);
                 foreach (var a in rows)
                 {
                     Step();
@@ -242,7 +247,7 @@ public static class LibraryBringIn
                     else if (apply)
                     {
                         // This folder's file is another's: this one's comes in beside it, and the attachment points at it.
-                        string beside = Store.FreeBeside(target);
+                        string beside = Store.FreeBeside(target, reserved: reserved);
                         Store.PutWhole(beside, temp => File.Copy(other, temp), overwrite: false);
                         store.SetAttachmentFile(a.Id, Path.GetFileName(beside));
                     }
@@ -282,7 +287,7 @@ public static class LibraryBringIn
                 planned[id] = "";
                 n++;
                 if (!apply) continue;
-                string target = Store.FreeBeside(Path.Combine(store.AttachmentsDir(ClassFor(clsFolder)), Path.GetFileName(other)));
+                string target = Store.FreeBeside(Path.Combine(store.AttachmentsDir(ClassFor(clsFolder)), Path.GetFileName(other)), reserved: reserved);
                 Store.PutWhole(target, temp => File.Copy(other, temp), overwrite: false);
                 Enroll(target, ClassFor(clsFolder), sha, id, Path.GetFileName(other));
             }

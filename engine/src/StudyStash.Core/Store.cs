@@ -641,7 +641,7 @@ public sealed partial class Store : IDisposable
 
     /// <summary>A lecture's note file is now <paramref name="path"/> (a copy of it, brought into this library's folder
     /// from another, <see cref="LibraryBringIn"/>): only where the row looks for it changes. False for no such lecture.</summary>
-    public bool Refile(string noteId, string path)
+    public bool PointAt(string noteId, string path)
     {
         lock (gate) return Exec("UPDATE notes SET md_path=? WHERE id=?", Py.NormPath(path), noteId) > 0;
     }
@@ -698,7 +698,7 @@ public sealed partial class Store : IDisposable
             // The file's own text (one moved with edits of its own) is written as it is; otherwise the library's. Either way
             // before the old file goes, so a write that fails leaves that one where it was.
             if (fileText is null) Py.WriteText(path, Notes.Render(m, c, summaryMd, summaryModel));
-            else ReplaceFile(path, fileText);
+            else if (!File.Exists(path) || File.ReadAllText(path, new System.Text.UTF8Encoding(false)) != fileText) ReplaceFile(path, fileText);
             string now = Now();
             string? oldPath = null, firstSeen = null;
             (string Markdown, string Model, string At) before = ("", "", "");

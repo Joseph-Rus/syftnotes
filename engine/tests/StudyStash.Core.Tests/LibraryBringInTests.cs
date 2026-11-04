@@ -146,11 +146,15 @@ public sealed class LibraryBringInTests
         // The old folder also has a lecture this state.db never listed: "Use this one" alone leaves it there.
         using (var stray = new Library(dir, "stray", personal)) stray.File("stray", cls, "Nozzle efficiency", "Not listed here.");
 
+        string own = Path.Combine(school, Notes.FolderName(cls), "2026-09-14 Mixing chambers.md");
+        var ownWritten = File.GetLastWriteTimeUtc(own);
+
         var did = LibraryBringIn.Refile(main.Store, main.Cfg, personal, home);
 
         Assert.Equal((1, 0, 0, 2), (did.New, did.Here, did.Both, did.Files));
         Assert.Null(main.Store.Get("stray"));
-        // This folder's own unlisted lecture is listed where it is.
+        // This folder's own unlisted lecture is listed where it is, its file not written again.
+        Assert.Equal(ownWritten, File.GetLastWriteTimeUtc(own));
         Assert.True(main.Store.Get("unlisted") is { MdPath: { } p } && Py.SamePath(p, Path.Combine(school, Notes.FolderName(cls), "2026-09-14 Mixing chambers.md")));
         foreach (string f in new[] { capture, classNote })
             Assert.Equal(File.ReadAllText(f), File.ReadAllText(Path.Combine(school, Path.GetRelativePath(personal, f))));
@@ -293,13 +297,22 @@ public sealed class LibraryBringInTests
         File.WriteAllText(Path.Combine(dirHere, "scan.jpg"), "B's scan");
         main.Store.AddAttachment(new Attachment("scan-a", "scan.jpg", "scan.jpg", "Thermodynamics", null, 99, "image/jpeg", "2026-09-01"));
         main.Store.AddAttachment(new Attachment("scan-b", "scan.jpg", "scan.jpg", "Thermodynamics", null, 8, "image/jpeg", "2026-10-30"));
+        // Names the free names above would reach for: a listed sheet's own "sheet (2).pdf" (only in the old folder), and an
+        // unlisted old "scan (2).jpg".
+        File.WriteAllText(Path.Combine(dirThere, "sheet (2).pdf"), "%PDF the second sheet");
+        main.Store.AddAttachment(new Attachment("sheet-2", "sheet (2).pdf", "sheet (2).pdf", "Thermodynamics", null, 21, "application/pdf", "2026-10-21"));
+        File.WriteAllText(Path.Combine(dirThere, "scan (2).jpg"), "an old scan");
 
         var plan = LibraryBringIn.Plan(main.Store, main.Cfg, school, personal, home);
         var did = LibraryBringIn.Apply(main.Store, main.Cfg, personal, home);
 
         // slides beside, the handout in, the second page beside, the old IMG_0001.jpg as its own, both weeks in, and the
         // sheet's original beside: what was said, done.
-        Assert.Equal(7, did.Files);
+        Assert.Equal(9, did.Files);
+        // No two attachments on one file, whatever order they're settled in.
+        string[] files = [.. main.Store.ListAttachments("Thermodynamics").Select(a => main.Store.AttachmentPath(a))];
+        Assert.Equal(files.Length, files.Distinct(StringComparer.OrdinalIgnoreCase).Count());
+        Assert.Equal("%PDF the second sheet", File.ReadAllText(main.Store.AttachmentPath(main.Store.GetAttachment("sheet-2")!)));
         Assert.Equal(plan.Files, did.Files);
         foreach (string name in new[] { "week 3.pdf", "week 3 (2).pdf" })
             Assert.Equal("%PDF week three", File.ReadAllText(main.Store.AttachmentPath(main.Store.GetAttachment(name)!)));
