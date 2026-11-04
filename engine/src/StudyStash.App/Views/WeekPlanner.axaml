@@ -62,7 +62,10 @@
                         <Button Classes="deadline" Classes.late="{Binding Late}" Classes.done="{Binding Done}" AutomationProperties.Name="{Binding Said}"
                                 Command="{Binding $parent[v:WeekPlanner].OpenDue}" CommandParameter="{Binding}">
                           <StackPanel Spacing="2">
-                            <c:Highlight Text="{Binding Title}" Fill="{Binding Dot}" />
+                            <Grid ColumnDefinitions="Auto,*">
+                              <c:Icon Glyph="check" Size="12" Margin="0,3,4,0" VerticalAlignment="Top" IsVisible="{Binding Ticked}" />
+                              <c:Highlight Grid.Column="1" Text="{Binding Title}" Fill="{Binding Dot}" />
+                            </Grid>
                             <TextBlock Classes="deadline-when" Text="{Binding When}" />
                           </StackPanel>
                         </Button>
@@ -83,7 +86,10 @@
                                 <Button Classes="deadline" Classes.late="{Binding Late}" Classes.done="{Binding Done}" AutomationProperties.Name="{Binding Said}"
                                         Click="OnPicked" Command="{Binding Pick}">
                                   <StackPanel Spacing="2">
-                                    <c:Highlight Text="{Binding Title}" Fill="{Binding Dot}" />
+                                    <Grid ColumnDefinitions="Auto,*">
+                                      <c:Icon Glyph="check" Size="12" Margin="0,3,4,0" VerticalAlignment="Top" IsVisible="{Binding Ticked}" />
+                                      <c:Highlight Grid.Column="1" Text="{Binding Title}" Fill="{Binding Dot}" />
+                                    </Grid>
                                     <TextBlock Classes="deadline-when" Text="{Binding When}" />
                                   </StackPanel>
                                 </Button>

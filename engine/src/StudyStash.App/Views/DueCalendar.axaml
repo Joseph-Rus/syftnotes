@@ -5,6 +5,7 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="using:StudyStash.App.ViewModels"
+             xmlns:k="using:StudyStash.App.ViewModels.Kit"
              xmlns:c="using:StudyStash.App.Controls"
              xmlns:v="using:StudyStash.App.Views"
              x:Class="StudyStash.App.Views.DueCalendar"
@@ -92,7 +93,10 @@
                                   AutomationProperties.Name="{Binding Said}"
                                   Command="{Binding $parent[UserControl].((vm:DueCalendarModel)DataContext).OpenCommand}" CommandParameter="{Binding}">
                             <StackPanel>
-                              <c:Highlight Text="{Binding Title}" Fill="{Binding Dot}" />
+                              <Grid ColumnDefinitions="Auto,*">
+                                <c:Icon Glyph="check" Size="12" Margin="0,3,4,0" VerticalAlignment="Top" IsVisible="{Binding Ticked}" />
+                                <c:Highlight Grid.Column="1" Text="{Binding Title}" Fill="{Binding Dot}" />
+                              </Grid>
                               <TextBlock Classes="cal-sub" Text="{Binding Sub}" IsVisible="{Binding HasSub}" />
                             </StackPanel>
                           </Button>
@@ -114,7 +118,10 @@
                                           AutomationProperties.Name="{Binding Said}" Click="OnPicked"
                                           Command="{Binding $parent[UserControl].((vm:DueCalendarModel)DataContext).OpenCommand}" CommandParameter="{Binding}">
                                     <StackPanel>
-                                      <c:Highlight Text="{Binding Title}" Fill="{Binding Dot}" />
+                                      <Grid ColumnDefinitions="Auto,*">
+                                        <c:Icon Glyph="check" Size="12" Margin="0,3,4,0" VerticalAlignment="Top" IsVisible="{Binding Ticked}" />
+                                        <c:Highlight Grid.Column="1" Text="{Binding Title}" Fill="{Binding Dot}" />
+                                      </Grid>
                                       <TextBlock Classes="cal-sub" Text="{Binding Sub}" IsVisible="{Binding HasSub}" />
                                     </StackPanel>
                                   </Button>
@@ -136,5 +143,29 @@
 
     <!-- One week, as the planner: class meetings over what's due, today lifted out -->
     <v:WeekPlanner Name="WeekGrid" IsVisible="{Binding WeekView}" Days="{Binding Week}" OpenDue="{Binding OpenDueCommand}" />
+
+    <!-- What the student hid from Due: "Show hidden (2)" opens the list, each with Undo. Only when something is hidden. -->
+    <StackPanel Name="HiddenDue" Spacing="12" IsVisible="{Binding HasHidden}">
+      <Button Name="ToggleHidden" Classes="text-link" HorizontalAlignment="Left" Content="{Binding HiddenToggle}" Command="{Binding ToggleHiddenCommand}" />
+      <ItemsControl Name="HiddenRows" ItemsSource="{Binding Hidden}" IsVisible="{Binding HiddenOpen}" ClipToBounds="False">
+        <ItemsControl.ItemsPanel>
+          <ItemsPanelTemplate><StackPanel Spacing="12" /></ItemsPanelTemplate>
+        </ItemsControl.ItemsPanel>
+        <ItemsControl.ItemTemplate>
+          <DataTemplate x:DataType="vm:HiddenDue">
+            <Grid ColumnDefinitions="*,Auto" AutomationProperties.Name="{Binding Said}">
+              <StackPanel Spacing="2" VerticalAlignment="Center">
+                <c:Highlight Text="{Binding Title}" Fill="{Binding Dot}" HorizontalAlignment="Left" />
+                <TextBlock Classes="cal-sub" Text="{Binding When}" />
+              </StackPanel>
+              <Button Grid.Column="1" Classes="btn sm" Content="{x:Static k:DueMarkModel.UndoLabel}" Margin="16,0,0,0" VerticalAlignment="Center"
+                      Command="{Binding $parent[UserControl].((vm:DueCalendarModel)DataContext).UnhideCommand}" CommandParameter="{Binding}" />
+            </Grid>
+          </DataTemplate>
+        </ItemsControl.ItemTemplate>
+      </ItemsControl>
+    </StackPanel>
+    <TextBlock Name="MarkSay" Classes="cal-sub" Text="{Binding Marks.Action.Say}" TextWrapping="Wrap"
+               IsVisible="{Binding Marks.Action.Say, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
   </StackPanel>
 </UserControl>

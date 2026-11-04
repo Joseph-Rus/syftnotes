@@ -98,7 +98,7 @@ public sealed record RailDue(string Title, string When, bool Soon, bool Late, bo
 
 /// <summary>Something to hand in: its name (marked with its class's highlighter), when it's due ("11:59 PM", or "Was
 /// due Mon 5" once it's late, or "Handed in"), and the class it's for.</summary>
-public sealed record OverviewDue(string Class, string Id, string Title, string When, bool Late, bool Done, string ClassLabel, IBrush Dot, Action Open)
+public sealed record OverviewDue(string Class, string Id, string Title, string When, bool Late, bool Done, string ClassLabel, IBrush Dot, Action Open, bool Ticked = false)
 {
     /// <summary>What a screen reader says for it: the name alone doesn't say whose it is or when.</summary>
     public string Said => string.Join(", ", new[] { Title, ClassLabel, When }.Where(w => w.Length > 0));
@@ -500,6 +500,8 @@ public sealed partial class OverviewModel : ObservableObject
         public Action<string?>? OpenDue { get; init; }
         /// <summary>Starts recording an event (its id) into its folder.</summary>
         public Action<string>? RecordEvent { get; init; }
+        /// <summary>Marks a Due item done or hidden in Syft Notes (or takes the mark back); null without a library.</summary>
+        public DueMarker? Mark { get; init; }
     }
 
     /// <summary>An event on a calendar: what, when, and the folder it's clearly for (null for none).</summary>
@@ -565,12 +567,12 @@ public sealed partial class OverviewModel : ObservableObject
     static OverviewDue DueRow(CanvasApi.Item i, Sources s, Func<string, IBrush> dot, bool classLabel, bool done = false)
     {
         bool late = !done && LateBefore(i, s);
-        string when = done ? "Handed in"
+        string when = done ? (i.Mark == "done" ? Kit.DueMarkModel.DoneState : "Handed in")
             : i.DueAt is not { } d ? "No due date"
             : late ? $"Was due {Words(Local(d, s), Local(d, s).Year == Local(s.Now, s).Year ? "ddd d" : "d MMM yyyy")}"
             : Time(d, s.Zone);
         return new OverviewDue(i.Class, i.Id, i.Name, when, late, done, classLabel ? ClassNames.Display(i.Class) : "", dot(i.Class),
-            () => s.OpenAssignment?.Invoke(i.Class, i.Id));
+            () => s.OpenAssignment?.Invoke(i.Class, i.Id), i.Mark == "done");
     }
 
     /// <summary>A note as a row of a list. Home's rows name their folder (and can be moved from there); a folder's don't.</summary>

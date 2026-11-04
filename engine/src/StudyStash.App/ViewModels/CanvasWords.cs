@@ -96,7 +96,10 @@ public static class CanvasWords
         !string.IsNullOrEmpty(item.ScoreText) && !(item.Points is null or 0 && item.ScoreText.EndsWith("/0", StringComparison.Ordinal)) ? item.ScoreText : item.Label;
 
     /// <summary>Still to hand in (not yet submitted, and Canvas still takes it).</summary>
-    public static bool ToHandIn(CanvasApi.Item item) => item.Status is "open" or "to_hand_in" or "past due" or "missing" or "overdue";
+    public static bool ToHandIn(CanvasApi.Item item) => ToHandIn(item.Status);
+
+    /// <summary><see cref="ToHandIn(CanvasApi.Item)"/> from a status alone.</summary>
+    public static bool ToHandIn(string status) => status is "open" or "to_hand_in" or "past due" or "missing" or "overdue";
 
     /// <summary>A row's right-hand word in a list: for work still to hand in, how soon it's due ("Today", "Tomorrow",
     /// "In 3 days", "In 2 weeks") or that it's late; for the rest, the score or the plain label.</summary>

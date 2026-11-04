@@ -54,6 +54,9 @@
           </Grid>
         </Border>
 
+        <!-- Mark done / Hide, in Syft Notes only (a tick and Undo once one is done) -->
+        <v:DueMarkBar DataContext="{Binding Marks}" IsVisible="{Binding Showing}" />
+
         <c:PageText Classes="cv-h3" Text="Instructions" Margin="0,18,0,0" IsVisible="{Binding Instructions, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
         <c:NoteView Markdown="{Binding Instructions}" LinkHandler="{Binding LinkHandler}" IsVisible="{Binding Instructions, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
 
