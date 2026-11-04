@@ -98,13 +98,35 @@ public class SignInInBrowserTests
         await rig.Remote.SignInAsync("claude");
         Assert.Equal(1, FakeAgents.Logins(rig.Bin));
 
-        // The student finishes in the browser: the AI's own status says so, and nobody presses anything.
+        // The student finishes in the browser: the AI's own status says so, and nobody presses anything. Only after the
+        // library's first look said signed out, as a real one does long before a student is done: a status that already
+        // says signed in at that first look waits for the sign-in to end by itself, which this one doesn't for 120 s.
+        await rig.UntilAsync("claude", _ => FakeAgents.SignedOutLooks(rig.Bin) >= 1);
         File.WriteAllText(Path.Combine(rig.Bin, "signed-in"), "");
         var ready = await rig.UntilAsync("claude", e => e.State == "ready");
         Assert.Equal("", ready.SignIn);
         Assert.DoesNotContain((await rig.Remote.EnginesAsync())!.Problems, p => p.Kind == "not_signed_in");
         Assert.Equal("works", AiSettings.Load(rig.Cfg.Home).Tests["claude"]);
         Assert.Equal(0, rig.Fake.SignInCalls);
+    }
+
+    [Fact]
+    public async Task A_status_that_already_says_signed_in_waits_for_the_sign_in_to_end_by_itself()
+    {
+        // Claude Code says signed in, but its maker no longer takes that sign-in (the last lecture said so).
+        await using var rig = await Rig.StartAsync(["claude"], bin =>
+        {
+            File.WriteAllText(Path.Combine(bin, "signed-in"), "");
+            File.WriteAllText(Path.Combine(bin, "login-delay"), "3");
+        });
+
+        await rig.Remote.SignInAsync("claude");
+
+        // Ready only once the sign-in it started has finished by itself, not at the first look at the status.
+        var ready = await rig.UntilAsync("claude", e => e.State == "ready");
+        Assert.True(File.Exists(Path.Combine(rig.Bin, "login-done")), "ready before the sign-in ended");
+        Assert.Equal("", ready.SignIn);
+        Assert.Equal(1, FakeAgents.Logins(rig.Bin));
     }
 
     [Fact]

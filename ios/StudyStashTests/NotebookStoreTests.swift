@@ -1,4 +1,5 @@
 import Foundation
+import os
 import PDFKit
 import PencilKit
 import Testing
@@ -28,6 +29,141 @@ import UIKit
         // Saved again, it reads back the same.
         let again = try JSONDecoder.iso.decode(Notebook.self, from: JSONEncoder.iso.encode(n))
         #expect(again == n)
+    }
+
+    /// What's written is on disk moments after each stroke, with the notebook still open (the app can be stopped any
+    /// time), and at once when the app goes to the background; the notebooks opened afresh have it, on its own page.
+    /// Kept too: a line that falls onto the next page when its page gets shorter, and a page added while the notebook is
+    /// on its way to the library.
+    @Test func strokesWrittenAreKeptWithoutClosing() async throws {
+        let folder = FileManager.default.temporaryDirectory.appending(path: "notebooks-\(UUID().uuidString)")
+        defer { try? FileManager.default.removeItem(at: folder) }
+        let store = NotebookStore(folder: folder)
+        let a4 = Notebook.Template(paper: .narrow, colour: .white, size: .a4)
+        var n = Notebook.blank(title: "Week 6", className: nil, lecture: nil, template: a4)
+        n.pages.append(Notebook.Page(a4))
+        store.save(n)
+        let canvas = NotebookCanvas(store: store)
+        canvas.attach(n.id)
+        func write(page: Int, y: CGFloat) {
+            let top = canvas.frames[page].minY
+            let points = (0..<20).map { i in
+                PKStrokePoint(location: CGPoint(x: 100 + CGFloat(i) * 4, y: top + y), timeOffset: Double(i) * 0.01,
+                              size: CGSize(width: 3, height: 3), opacity: 1, force: 1, azimuth: 0, altitude: .pi / 2)
+            }
+            var d = canvas.canvas.drawing
+            d.strokes.append(PKStroke(ink: PKInk(.pen, color: .black), path: PKStrokePath(controlPoints: points, creationDate: .now)))
+            canvas.canvas.drawing = d
+            // As PencilKit tells it when a stroke ends.
+            canvas.canvasViewDrawingDidChange(canvas.canvas)
+        }
+        func onDisk(_ page: Int) -> PKDrawing {
+            let fresh = NotebookStore(folder: folder)
+            guard let m = fresh.notebook(n.id) else { return PKDrawing() }
+            return fresh.drawing(m, m.pages[page])
+        }
+
+        // A line on page 2, the notebook left open: saved soon after, by itself.
+        write(page: 1, y: 200)
+        let deadline = ContinuousClock.now + .seconds(5)
+        while onDisk(1).strokes.isEmpty, ContinuousClock.now < deadline { try await Task.sleep(for: .milliseconds(50)) }
+        #expect(onDisk(1).strokes.count == 1)
+        // In the page's own units, not the canvas's.
+        #expect(abs(onDisk(1).bounds.midY - 200) < 4)
+
+        // A line on page 1, then the app goes to the background straight away (what the editor does then). Page 2's
+        // picture, left alone while it was written in, is drawn again.
+        write(page: 0, y: 120)
+        canvas.flush()
+        #expect(onDisk(0).strokes.count == 1)
+        #expect(onDisk(1).strokes.count == 1)
+        #expect(store.inkRevision[n.pages[1].id] != nil)
+
+        // A line at the foot of the A4 page 1, then page 1 made US Letter (shorter): the line is now on page 2. A line
+        // written on page 1 after that leaves page 1's file without the foot line, so page 2's file has it.
+        write(page: 0, y: 825)
+        canvas.flush()
+        canvas.applyPaper(Notebook.Template(paper: .narrow, colour: .white, size: .letter), to: 0)
+        write(page: 0, y: 300)
+        canvas.flush()
+        #expect(onDisk(0).strokes.count + onDisk(1).strokes.count == 4)
+        #expect(onDisk(1).strokes.count == 2)
+
+        // A page added while the notebook is on its way to the library: kept, and still to be sent.
+        let session = URLSessionConfiguration.ephemeral
+        session.protocolClasses = [HeldLibrary.self]
+        let api = APIClient(base: DemoLibrary.base, session: URLSession(configuration: session))
+        let sending = Task { try await store.upload(n.id, api: api) }
+        let arrived = ContinuousClock.now + .seconds(5)
+        while !HeldLibrary.arrived.withLock({ $0 }), ContinuousClock.now < arrived { try await Task.sleep(for: .milliseconds(20)) }
+        #expect(HeldLibrary.arrived.withLock { $0 })
+        canvas.addPage()
+        HeldLibrary.answer.signal()
+        try await sending.value
+        let reopened = NotebookStore(folder: folder).notebook(n.id)
+        #expect(reopened?.pages.count == 3)
+        #expect(reopened?.needsSaving == true)
+
+        // A hole rubbed out of the middle of a wide marker line (the pixel eraser): its box stays the same, only its mask
+        // changes. Kept on disk.
+        let top = canvas.frames[2].minY
+        let points = (0..<40).map { i in
+            PKStrokePoint(location: CGPoint(x: 100 + CGFloat(i) * 5, y: top + 300), timeOffset: Double(i) * 0.01,
+                          size: CGSize(width: 30, height: 30), opacity: 1, force: 1, azimuth: 0, altitude: .pi / 2)
+        }
+        let line = PKStrokePath(controlPoints: points, creationDate: .now)
+        let box = CGRect(x: 60, y: top + 260, width: 280, height: 80)
+        let holed = UIBezierPath(rect: box)
+        holed.append(UIBezierPath(rect: CGRect(x: 190, y: top + 290, width: 20, height: 20)).reversing())
+        for mask in [UIBezierPath(rect: box), holed] {
+            var d = canvas.canvas.drawing
+            d.strokes.removeAll { $0.ink.inkType == .marker }
+            d.strokes.append(PKStroke(ink: PKInk(.marker, color: .yellow), path: line, transform: .identity, mask: mask))
+            canvas.canvas.drawing = d
+            canvas.canvasViewDrawingDidChange(canvas.canvas)
+            canvas.flush()
+        }
+        let saved = try #require(onDisk(2).strokes.first { $0.ink.inkType == .marker }?.mask)
+        #expect(!saved.contains(CGPoint(x: 200, y: top + 300)), "the hole is kept")
+    }
+
+    /// A notebook closed while the library couldn't be reached goes with the recordings waiting, when the library
+    /// answers (the app coming back): opening a notebook no longer sends it. While the library doesn't answer, no PDF
+    /// is drawn for it (that held up every launch offline); one open to write in waits to be closed.
+    @Test func aNotebookKeptOfflineIsSentWhenTheLibraryAnswers() async throws {
+        let store = NotebookStore.shared
+        let points = (0..<20).map { i in
+            PKStrokePoint(location: CGPoint(x: 100 + CGFloat(i) * 4, y: 200), timeOffset: Double(i) * 0.01,
+                          size: CGSize(width: 3, height: 3), opacity: 1, force: 1, azimuth: 0, altitude: .pi / 2)
+        }
+        let line = PKDrawing(strokes: [PKStroke(ink: PKInk(.pen, color: .black), path: PKStrokePath(controlPoints: points, creationDate: .now))])
+        let kept = Notebook.blank(title: "Kept offline", className: nil, lecture: nil)
+        let open = Notebook.blank(title: "Open", className: nil, lecture: nil)
+        for n in [kept, open] {
+            store.save(n)
+            store.setDrawing(line, n, n.pages[0])
+        }
+        store.open.insert(open.id)
+        defer {
+            store.open.remove(open.id)
+            for n in [kept, open] { if let m = store.notebook(n.id) { store.delete(m) } }
+        }
+        #expect(store.notebook(kept.id)?.needsSaving == true)
+        let session = URLSessionConfiguration.ephemeral
+        session.protocolClasses = [AnsweringLibrary.self]
+        let api = APIClient(base: URL(string: "http://answering.test")!, session: URLSession(configuration: session))
+
+        // The library away: nothing drawn or sent.
+        AnsweringLibrary.state.withLock { $0 = (answers: false, uploads: 0) }
+        await RecordingStore.shared.sendWaiting(api: api)
+        #expect(AnsweringLibrary.state.withLock { $0.uploads } == 0)
+        #expect(store.notebook(kept.id)?.needsSaving == true)
+
+        // The library back: the closed one goes, the open one waits.
+        AnsweringLibrary.state.withLock { $0 = (answers: true, uploads: 0) }
+        await RecordingStore.shared.sendWaiting(api: api)
+        #expect(store.notebook(kept.id)?.needsSaving == false)
+        #expect(store.notebook(open.id)?.needsSaving == true)
     }
 
     @Test func aPDFsPagesComeInAtTheirOwnSizes() throws {
@@ -60,5 +196,45 @@ import UIKit
         #expect(pdf.page(at: 2)?.bounds(for: .cropBox).size == CGSize(width: 612, height: 792))
         // Pages added later still come on the notebook's paper, not the PDF's.
         #expect(n.newPages.paper == .grid && n.newPages.size == .a4)
+    }
+}
+
+/// A library that holds an upload until it's let go, so a notebook can be changed while it's on its way.
+private final class HeldLibrary: URLProtocol, @unchecked Sendable {
+    static let arrived = OSAllocatedUnfairLock(initialState: false)
+    static let answer = DispatchSemaphore(value: 0)
+
+    override class func canInit(with request: URLRequest) -> Bool { true }
+    override class func canonicalRequest(for request: URLRequest) -> URLRequest { request }
+    override func stopLoading() {}
+
+    override func startLoading() {
+        Self.arrived.withLock { $0 = true }
+        _ = Self.answer.wait(timeout: .now() + 10)
+        let reply = HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: ["Content-Type": "application/json"])!
+        client?.urlProtocol(self, didReceive: reply, cacheStoragePolicy: .notAllowed)
+        client?.urlProtocol(self, didLoad: Data(#"{"attachments":[]}"#.utf8))
+        client?.urlProtocolDidFinishLoading(self)
+    }
+}
+
+/// A library that takes whatever it's sent, or can't be reached; it counts the uploads that got as far as it.
+private final class AnsweringLibrary: URLProtocol, @unchecked Sendable {
+    static let state = OSAllocatedUnfairLock(initialState: (answers: true, uploads: 0))
+
+    override class func canInit(with request: URLRequest) -> Bool { true }
+    override class func canonicalRequest(for request: URLRequest) -> URLRequest { request }
+    override func stopLoading() {}
+
+    override func startLoading() {
+        let answers = Self.state.withLock { s in
+            if request.url?.path().hasSuffix("/attachments") == true { s.uploads += 1 }
+            return s.answers
+        }
+        guard answers else { return client!.urlProtocol(self, didFailWithError: URLError(.cannotConnectToHost)) }
+        let reply = HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: ["Content-Type": "application/json"])!
+        client?.urlProtocol(self, didReceive: reply, cacheStoragePolicy: .notAllowed)
+        client?.urlProtocol(self, didLoad: Data(#"{"attachments":[]}"#.utf8))
+        client?.urlProtocolDidFinishLoading(self)
     }
 }

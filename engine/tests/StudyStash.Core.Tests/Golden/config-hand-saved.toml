@@ -33,3 +33,4 @@ max_context = 8192
 name = "101"
 aliases = ["a", "2"]
 description = ""
+color = 0

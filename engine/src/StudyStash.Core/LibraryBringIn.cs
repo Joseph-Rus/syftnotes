@@ -314,7 +314,9 @@ public static class LibraryBringIn
         {
             // A copy already here is used only when it's proven this lecture's: its words, with its id.
             string path = Store.FreeBeside(want, p => Same(Text(p), text) && Read(p)?.Id == id);
-            if (!File.Exists(path)) Store.WriteWhole(path, text);
+            if (File.Exists(path)) return path;
+            Directory.CreateDirectory(Py.Parent(path));
+            Store.ReplaceFile(path, text);
             return path;
         }
     }
@@ -437,7 +439,7 @@ public static class LibraryBringIn
             at = Store.FreeBeside(Path.Combine(dir, name + ".md"));
         }
         store.Save(m, new Classification(cls, note.Confidence, note.By, note.LectureTitle, note.Topics), note.Summary, note.SummaryBy,
-            at: at, keepText: text);
+            fileText: text, at: at);
         return added;
     }
 

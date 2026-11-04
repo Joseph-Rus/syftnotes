@@ -123,6 +123,13 @@ public sealed unsafe class WinNotifications : ISystemNotifications
         command.SetValue("", $"\"{program}\" --open \"%1\"");
     }
 
+    /// <summary>The program a <c>studystash:</c> link opens now, or null when none is registered.</summary>
+    public static string? LinkProgram()
+    {
+        using var command = Registry.CurrentUser.OpenSubKey($@"Software\Classes\{NoticeLinks.Scheme}\shell\open\command");
+        return StudyStash.Core.Moves.RunProgram(command?.GetValue("") as string);
+    }
+
     /// <summary>Takes back what <see cref="RegisterApp"/> wrote (a test's own id; the app's stays until it's
     /// uninstalled).</summary>
     public static void UnregisterApp(string appId) =>
@@ -168,16 +175,34 @@ public sealed unsafe class WinNotifications : ISystemNotifications
         }
     }
 
-    /// <summary>Windows' own setting for this app: 0 is on; anything else is off, by the student (for this app, or for
-    /// everything) or by whoever runs the computer.</summary>
+    /// <summary>ERROR_NOT_FOUND: Windows has no entry for this app in its notification settings yet (it adds one when the
+    /// first notification is shown).</summary>
+    const int NotFound = unchecked((int)0x80070490);
+
+    /// <summary>The setting Windows gave for this app, or the error it gave instead: 0 is on; anything else is off, by
+    /// the student (for this app, or for everything) or by whoever runs the computer. An app Windows hasn't listed yet
+    /// has the default, on.</summary>
+    internal static NotificationState StateFor(int result, int setting) =>
+        result == NotFound ? NotificationState.Allowed
+        : result < 0 ? NotificationState.Unavailable
+        : setting == 0 ? NotificationState.Allowed : NotificationState.Denied;
+
+    int settingError;
+
+    /// <summary>Windows' own setting for this app (<see cref="StateFor"/>). An error other than "not listed yet" is
+    /// written down once, not at every notification.</summary>
     public NotificationState State
     {
         get
         {
             int setting = 0;
-            return Failed(((delegate* unmanaged[Stdcall]<IntPtr, int*, int>)Slot(notifier, 8))(notifier, &setting), "reading the setting")
-                ? NotificationState.Unavailable
-                : setting == 0 ? NotificationState.Allowed : NotificationState.Denied;
+            int result = ((delegate* unmanaged[Stdcall]<IntPtr, int*, int>)Slot(notifier, 8))(notifier, &setting);
+            if (result < 0 && result != NotFound && result != settingError)
+            {
+                settingError = result;
+                Failed(result, "reading the setting");
+            }
+            return StateFor(result, setting);
         }
     }
 
