@@ -601,6 +601,16 @@ public sealed partial class Store : IDisposable
         }
     }
 
+    /// <summary>The lecture whose row has <paramref name="path"/> as its note file (in this disk's letters), or null.</summary>
+    public string? IdAt(string path)
+    {
+        lock (gate)
+        {
+            using var cmd = Command("SELECT id FROM notes WHERE md_path=?" + (OperatingSystem.IsLinux() ? "" : " COLLATE NOCASE") + " LIMIT 1", Py.NormPath(path));
+            return cmd.ExecuteScalar() as string;
+        }
+    }
+
     /// <summary>A lecture's note file is now <paramref name="path"/> (a copy of it, brought into this library's folder
     /// from another, <see cref="LibraryBringIn"/>): only where the row looks for it changes. False for no such lecture.</summary>
     public bool Refile(string noteId, string path)
