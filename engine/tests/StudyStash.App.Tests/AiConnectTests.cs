@@ -171,7 +171,7 @@ public class AiConnectTests
         // all along, follows.
         using var home = new TempHome();
         var lib = new FakeAiLibrary { Overview = Fresh() with { Engines = [new EngineInfo(id, AiConnect.Brand(id), before) { Installed = true }] } };
-        var store = new AiStatusStore(lib);
+        using var store = new AiStatusStore(lib);
         using var settings = new AiEnginesModel(store) { Here = true };
         await settings.Load();
         Assert.NotEqual("Connected", settings.Engines.Single(r => r.Id == id).StateWords);
@@ -186,6 +186,13 @@ public class AiConnectTests
         Assert.Contains($"check:{id}", lib.Calls);
         Assert.DoesNotContain($"sign-in:{id}", lib.Calls);
         Assert.Equal("Connected", settings.Engines.Single(r => r.Id == id).StateWords); // no Connect pressed there
+
+        // The library still can't use it after its check: said, and no browser page opened behind the student's back.
+        var signedOut = lib.Overview! with { Engines = [new EngineInfo(id, AiConnect.Brand(id), "not_signed_in") { Installed = true }] };
+        lib.Overview = signedOut;
+        lib.OnCheck = (_, _) => new AiSaid("Not signed in.", signedOut);
+        Assert.False((await store.ConnectAsync(connect, id, ct: TestContext.Current.CancellationToken)).Ok);
+        Assert.DoesNotContain($"sign-in:{id}", lib.Calls);
     }
 
     [AvaloniaFact]
