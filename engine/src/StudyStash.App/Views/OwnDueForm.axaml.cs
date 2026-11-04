@@ -19,7 +19,7 @@ public partial class OwnDueForm : UserControl
     public OwnDueForm()
     {
         InitializeComponent();
-        Loaded += (_, _) => Dispatcher.UIThread.Post(() => TitleBox.Focus(NavigationMethod.Tab), DispatcherPriority.Loaded);
+        Loaded += (_, _) => Dispatcher.UIThread.Post(() => TitleBox.Focus(), DispatcherPriority.Loaded);
     }
 
     protected override void OnDataContextChanged(EventArgs e)
@@ -28,6 +28,13 @@ public partial class OwnDueForm : UserControl
         if (model is not null) model.PropertyChanged -= OnModelChanged;
         model = DataContext as OwnDueFormModel;
         if (model is not null) model.PropertyChanged += OnModelChanged;
+    }
+
+    /// <summary>A form whose model closed before it was on the screen (nothing to show any more) goes at once.</summary>
+    protected override void OnAttachedToVisualTree(VisualTreeAttachmentEventArgs e)
+    {
+        base.OnAttachedToVisualTree(e);
+        if (model is { IsOpen: false }) Dispatcher.UIThread.Post(() => this.FindAncestorOfType<DialogHost>()?.CurrentSession?.Close(null));
     }
 
     protected override void OnDetachedFromVisualTree(VisualTreeAttachmentEventArgs e)

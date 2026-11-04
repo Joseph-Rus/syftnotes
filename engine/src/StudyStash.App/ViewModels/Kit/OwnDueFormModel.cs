@@ -40,8 +40,9 @@ public sealed partial class OwnDueFormModel : ObservableObject
         };
     }
 
-    /// <summary>The words for what an item is, for its small mark on the calendar: "Exam", "Study session", "To do".</summary>
-    public static string WordFor(string what) => what switch { "exam" => ExamLabel, "study" => StudyLabel, _ => TaskLabel };
+    /// <summary>The small word that marks an item as the student's own on the calendar, short for a day's narrow cell: "Exam", "Study",
+    /// "To do".</summary>
+    public static string WordFor(string what) => what switch { "exam" => ExamLabel, "study" => "Study", _ => TaskLabel };
 
     /// <summary>"Mark done" and "Undo", for an item being changed.</summary>
     public DueMarkModel Marks { get; }
@@ -60,7 +61,7 @@ public sealed partial class OwnDueFormModel : ObservableObject
     public partial string Title { get; set; } = "";
 
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(IsExam), nameof(IsStudy), nameof(IsTask))]
+    [NotifyPropertyChangedFor(nameof(IsExam), nameof(IsStudy), nameof(IsTask), nameof(Heading))]
     public partial string What { get; set; } = "exam";
 
     [ObservableProperty] public partial OwnDueClass Chosen { get; set; } = None;
@@ -83,7 +84,7 @@ public sealed partial class OwnDueFormModel : ObservableObject
     /// <summary>It is one already on the list (not a new one).</summary>
     public bool Editing => id.Length > 0;
     public bool Adding => !Editing;
-    public string Heading => Editing ? "Change " + WordFor(What).ToLowerInvariant() : "Add to your Due list";
+    public string Heading => Editing ? What switch { "exam" => "Change this exam", "study" => "Change this study session", _ => "Change this to-do" } : "Add to your Due list";
     public string SaveLabel => Editing ? "Save" : AddLabel;
     public bool CanSave => editor is not null && Title.Trim().Length > 0 && Day is not null;
 

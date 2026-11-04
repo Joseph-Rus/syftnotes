@@ -254,7 +254,9 @@ project or its author.
   persisted job queue; a read an AI asks for (the MCP Canvas tools) jumps the queue. The student can mark a Due item
   done or hide it (`POST /api/v2/canvas/mark`): that lives in `due_marks.json` (`DueMarks`) and never reaches Canvas.
   `Assignments.Shown` is the saved list with those marks on it and the hidden left out, and every list reads it
-  (`Assignments.Load` is the sync's own copy, for what writes the list back); the Due list returns the hidden apart.
+  (`Assignments.Load` is the sync's own copy, for what writes the list back); the Due list returns the hidden apart. The student can also add
+  their own exam, study session or to-do to the Due calendar (`POST /api/v2/due/mine`, `due_mine.json`, `DueMine`): Syft Notes only, nothing synced to
+  Google or Apple, and no Canvas needed. They join the same list (`Assignments.Marked`) as rows of kind `mine`.
 - **Chat and history** (`Core/Ai/Chats.cs`, `History.cs`): a chat turn runs the picked AI in the
   library folder with the engine's own MCP server. With edits allowed, the library's text is
   committed first, then exactly the files the turn changed become one commit, which History lists

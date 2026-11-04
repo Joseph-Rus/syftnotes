@@ -128,7 +128,8 @@ public static class CanvasNotifications
             {
                 var d = DateTime.Parse(a.Due, CultureInfo.InvariantCulture);
                 if (d < local || d > local.AddHours(24)) continue;
-                Add(f, "due_soon", "Due soon", $"{a.ClassName} · {a.Name} · due {Assignments.Short(a.Due, local)}", a.ClassName, a.Id, null,
+                // The student's own item may be in no class: there is none to name.
+                Add(f, "due_soon", "Due soon", $"{(a.ClassName.Length > 0 ? a.ClassName + " · " : "")}{a.Name} · due {Assignments.Short(a.Due, local)}", a.ClassName, a.Id, null,
                     now.ToString("o", CultureInfo.InvariantCulture));
                 changed = true;
             }

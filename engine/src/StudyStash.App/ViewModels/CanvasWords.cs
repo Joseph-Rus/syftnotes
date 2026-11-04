@@ -134,7 +134,7 @@ public static class CanvasWords
             _ => item.DueAt is { } due ? When(due, zone, now) : "No due date",
         };
         // The date first: a long class name is what gets cut short, not when it's due (the dot says the class).
-        return $"{body} · {item.Class}";
+        return item.Class.Length > 0 ? $"{body} · {item.Class}" : body; // the student's own item may be in no class
     }
 
     /// <summary>A class's tab row: to-hand-in items lead with their points, done ones with their plain label.</summary>

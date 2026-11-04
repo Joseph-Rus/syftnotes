@@ -4,10 +4,10 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:k="using:StudyStash.App.ViewModels.Kit"
-             xmlns:v="using:StudyStash.App.Views"
+             xmlns:c="using:StudyStash.App.Controls"
              x:Class="StudyStash.App.Views.OwnDueForm"
              x:DataType="k:OwnDueFormModel"
-             Width="420" Focusable="False"
+             Width="460" Focusable="False"
              AutomationProperties.Name="{Binding Heading}">
   <UserControl.Styles>
     <Style Selector="Border.own-field">
@@ -16,6 +16,22 @@
       <Setter Property="BoxShadow" Value="{DynamicResource LineRing}" />
       <Setter Property="Padding" Value="12,0" />
       <Setter Property="Height" Value="36" />
+    </Style>
+    <!-- The three pickers (a day, a time, a class) are the app's fields: sunken, rounded, no outline. -->
+    <Style Selector="CalendarDatePicker, TimePicker, ComboBox">
+      <Setter Property="MinWidth" Value="0" />
+      <Setter Property="Background" Value="{DynamicResource SurfaceSunken}" />
+      <Setter Property="BorderThickness" Value="0" />
+      <Setter Property="CornerRadius" Value="{DynamicResource RadiusControl}" />
+      <Setter Property="Height" Value="36" />
+      <Setter Property="FontSize" Value="{DynamicResource FontBody}" />
+    </Style>
+    <Style Selector="TimePicker /template/ Button#PART_FlyoutButton">
+      <Setter Property="Background" Value="{DynamicResource SurfaceSunken}" />
+      <Setter Property="BorderThickness" Value="0" />
+      <Setter Property="CornerRadius" Value="{DynamicResource RadiusControl}" />
+      <Setter Property="Height" Value="36" />
+      <Setter Property="MinWidth" Value="0" />
     </Style>
     <Style Selector="TextBlock.own-label">
       <Setter Property="FontSize" Value="{DynamicResource FontCaption}" />
@@ -46,21 +62,25 @@
       </StackPanel>
     </Border>
 
-    <Grid ColumnDefinitions="*,12,*" RowDefinitions="Auto,Auto">
-      <TextBlock Classes="own-label" Text="Day" />
-      <CalendarDatePicker Name="DayBox" Grid.Row="1" SelectedDate="{Binding Day, Mode=TwoWay}" HorizontalAlignment="Stretch" AutomationProperties.Name="Day" />
-      <TextBlock Grid.Column="2" Classes="own-label" Text="Time (if it has one)" />
+    <Grid ColumnDefinitions="*,12,*" RowDefinitions="Auto,Auto" RowSpacing="4">
+      <TextBlock Classes="own-label" Text="Day" VerticalAlignment="Center" />
+      <CalendarDatePicker Name="DayBox" Grid.Row="1" SelectedDate="{Binding Day, Mode=TwoWay}" SelectedDateFormat="Custom" CustomDateFormatString="ddd d MMM yyyy"
+                          HorizontalAlignment="Stretch" AutomationProperties.Name="Day" />
+      <Grid Grid.Column="2" ColumnDefinitions="*,Auto" Height="20">
+        <TextBlock Classes="own-label" Text="Time (if it has one)" VerticalAlignment="Center" />
+        <Button Name="NoTime" Grid.Column="1" Classes="text-link" FontSize="{DynamicResource FontCaption}" Content="No time" Command="{Binding NoTimeCommand}"
+                IsVisible="{Binding HasTime}" VerticalAlignment="Center" />
+      </Grid>
       <TimePicker Name="TimeBox" Grid.Column="2" Grid.Row="1" SelectedTime="{Binding Time, Mode=TwoWay}" ClockIdentifier="12HourClock" MinuteIncrement="5"
                   HorizontalAlignment="Stretch" AutomationProperties.Name="Time" />
     </Grid>
-    <Button Name="NoTime" Classes="text-link" HorizontalAlignment="Left" Content="No time" Command="{Binding NoTimeCommand}" IsVisible="{Binding HasTime}" />
 
     <StackPanel Spacing="{DynamicResource Space1}">
       <TextBlock Classes="own-label" Text="Class (if it's for one)" />
       <ComboBox Name="ClassBox" ItemsSource="{Binding Classes}" SelectedItem="{Binding Chosen, Mode=TwoWay}" HorizontalAlignment="Stretch" AutomationProperties.Name="Class">
         <ComboBox.ItemTemplate>
           <DataTemplate x:DataType="k:OwnDueClass">
-            <TextBlock Text="{Binding Label}" TextTrimming="CharacterEllipsis" />
+            <TextBlock Text="{Binding Label}" ToolTip.Tip="{Binding Label}" c:Tips.WhenCut="True" TextTrimming="CharacterEllipsis" />
           </DataTemplate>
         </ComboBox.ItemTemplate>
       </ComboBox>

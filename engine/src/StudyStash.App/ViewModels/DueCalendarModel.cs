@@ -200,7 +200,7 @@ public sealed partial class DueCalendarModel : ObservableObject
         string state = ticked ? Kit.DueMarkModel.DoneState : done ? "Handed in" : missing ? "Missing" : "";
         string day = OverviewModel.Day(i.DueAt!.Value, sources.Now, sources.Zone);
         string said = string.Join(", ", new[] { i.Name, cls, i.AllDay ? $"due {day}" : $"due {day} at {time}", state }.Where(w => w.Length > 0));
-        return new CalendarItem(i.Class, i.Id, i.Name, sub, missing, done, dot(i.Class), $"{i.Name}, {cls}", said,
+        return new CalendarItem(i.Class, i.Id, i.Name, sub, missing, done, dot(i.Class), cls.Length > 0 ? $"{i.Name}, {cls}" : i.Name, said,
             () => { if (i.Own) sources.OpenOwn?.Invoke(i); else sources.OpenAssignment?.Invoke(i.Class, i.Id); }, ticked);
     }
 
