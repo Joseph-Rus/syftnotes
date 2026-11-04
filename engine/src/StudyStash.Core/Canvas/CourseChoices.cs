@@ -23,10 +23,10 @@ public static partial class CourseChoices
     public const string PastTerm = "Past term", LaterTerm = "Later term", NoTerm = "No term", NotAClass = "Not a class";
 
     // Words and phrases in a course's name that mean it isn't a class a student records: practice spaces, worship and
-    // assemblies, advising and student-success sites, and an orientation for new students ("New Student Orientation",
+    // assemblies, advising and student-life sites, and an orientation for new students ("New Student Orientation",
     // "Orientation 2026"). Only whole words a real class title wouldn't have: "Community Health Nursing", "Athletic
     // Training" and "Orientation and Mobility" are classes.
-    [GeneratedRegex(@"\b(?:sandbox|chapel|convocation|advising|advisement|student success|student life|resource center|playground|practice course|test course)\b"
+    [GeneratedRegex(@"\b(?:sandbox|chapel|convocation|advising|advisement|student life|resource center|playground|practice course|test course)\b"
         + @"|\b(?:new|incoming|first[- ]year|freshman|transfer|international|graduate|online|students?|welcome)\s+(?:student\s+)?orientation\b"
         + @"|^\W*orientation\b(?!\s+(?:and|&|to|in|of)\b)", RegexOptions.IgnoreCase)]
     private static partial Regex NotAClassWords();
@@ -43,8 +43,8 @@ public static partial class CourseChoices
     /// <see cref="NoTerm"/> or <see cref="NotAClass"/>). Canvas's own word comes first: a course the student teaches,
     /// designs or only observes isn't a class, and one Canvas says is over is last term's. Then a course named like a
     /// sandbox or chapel isn't a class. Then dates: a course is this term's when its dates say so; without dates, when
-    /// the student is enrolled in it as a student (even in Canvas's "Default Term"), or else when its term's name
-    /// ("Fall 2026") does. A course with none of that (no real term, no dates, nothing about the student) isn't. When in
+    /// its term's name ("Fall 2026") does, or, in no real term (Canvas's "Default Term"), when the student is enrolled
+    /// in it as a student. A course with none of that (no real term, no dates, nothing about the student) isn't. When in
     /// doubt a course is ticked: an extra class is easy to untick, a missing one goes unseen.</summary>
     public static (bool Ticked, string Why) Suggest(CourseInfo info, DateTimeOffset now)
     {
@@ -57,9 +57,10 @@ public static partial class CourseChoices
         if (NotAClassWords().IsMatch(info.Name) || NotAClassWords().IsMatch(info.Code)) return (false, NotAClass);
         if (end is { } e && e + Grace < now) return (false, PastTerm);
         if (start is { } s && s - Ahead > now) return (false, LaterTerm);
-        if (start is not null || end is not null || student) return (true, "");
+        if (start is not null || end is not null) return (true, "");
         string term = info.Term.Trim();
-        if (term.Length == 0 || term.Equals("Default Term", StringComparison.OrdinalIgnoreCase)) return (false, NoTerm);
+        // No real term: a student enrollment says it's a class; without one, nothing does.
+        if (term.Length == 0 || term.Equals("Default Term", StringComparison.OrdinalIgnoreCase)) return student ? (true, "") : (false, NoTerm);
         if (Season(term) is var (from, to))
         {
             if (to + Grace < now) return (false, PastTerm);
