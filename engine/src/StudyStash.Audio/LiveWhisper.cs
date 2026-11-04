@@ -69,7 +69,7 @@ public sealed class LiveWhisperHearer : IWordHearer, IDisposable
     /// <param name="threads">0: two, or one on a computer with fewer than four.</param>
     public LiveWhisperHearer(string modelPath, int threads = 0, bool gpu = true)
     {
-        factory = WhisperFactory.FromPath(modelPath, new WhisperFactoryOptions { UseGpu = gpu });
+        factory = WhisperLoads.FromPath(modelPath, gpu);
         this.threads = threads > 0 ? threads : Environment.ProcessorCount >= 4 ? 2 : 1;
     }
 
