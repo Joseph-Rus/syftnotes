@@ -192,6 +192,21 @@ public class TypedMarkdownTests
             w.KeyPress(Avalonia.Input.Key.Back, RawInputModifiers.None, PhysicalKey.None, null);
             Settle();
             Assert.Equal(" - 5", five.Text);
+            // ...and a digit typed at its end afterwards doesn't take it either.
+            five.CaretIndex = five.Text!.Length;
+            Type("0");
+            Assert.Equal(" - 50", five.Text);
+            // "- " typed on a new bullet with nothing after it yet: one bullet, there and then.
+            w.KeyPress(Avalonia.Input.Key.Enter, RawInputModifiers.None, PhysicalKey.None, null);
+            Settle();
+            Type("- ");
+            Assert.Equal("", editor.Fields[^1].Text);
+            Assert.EndsWith("\n- ", editor.Text);
+            // "- " typed at the start of a bullet that has words: the same.
+            Type("foo");
+            editor.Fields[^1].CaretIndex = 0;
+            Type("- ");
+            Assert.Equal("foo", editor.Fields[^1].Text);
         }
         finally
         {
