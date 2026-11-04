@@ -7,7 +7,8 @@ namespace StudyStash.App.Services;
 /// dropdown's next due, the quick panel's Canvas rows) and every class with its course (a linked class's own page).
 /// Follows the shared <see cref="CanvasWatch"/>: whenever the library says Canvas changed — a sync finished, a class
 /// finished syncing, a course was linked or chosen — it reads both again and raises <see cref="Updated"/>, so an
-/// open page refreshes by itself. A read that fails is tried again on the watch's next look, never given up on.
+/// open page refreshes by itself, and says which classes' data it may have changed, so only those pages are read again.
+/// A read that fails is tried again on the watch's next look, never given up on.
 /// Nothing here touches the UI thread.
 /// </summary>
 public sealed class CanvasFeed : IDisposable
@@ -16,6 +17,9 @@ public sealed class CanvasFeed : IDisposable
     readonly CanvasWatch? watch;
     /// <summary>The <see cref="Revision"/> the data here was read at; null until a read after the watch's look worked.</summary>
     string? loadedAt;
+    /// <summary>The classes the sync running at that read still had to do; null when none was running (or the library
+    /// didn't name them).</summary>
+    IReadOnlyList<string>? leftAt;
     int catchingUp;
 
     public CanvasFeed(CanvasContext context, CanvasWatch? watch = null)
@@ -37,8 +41,15 @@ public sealed class CanvasFeed : IDisposable
     /// <summary>The class's row when it's linked to a course; null otherwise.</summary>
     public CanvasApi.ClassRow? LinkedClass(string? name) => name is null ? null : Classes.FirstOrDefault(c => c.Linked && c.Class == name);
 
-    /// <summary>Raised (off the UI thread) after the watch's look brought in newer data.</summary>
-    public event Action? Updated;
+    /// <summary>Raised (off the UI thread) after the watch's look brought in newer data, with the classes whose data it
+    /// may have changed: those a running sync finished since the last read, or null when it could be any (a sync
+    /// starting or ending unseen, a course linked or chosen).</summary>
+    public event Action<IReadOnlySet<string>?>? Updated;
+
+    /// <summary>The classes a sync finished between two reads: those it had left before and hasn't now. Null when no
+    /// sync was running at the first read, so anything may have changed.</summary>
+    public static IReadOnlySet<string>? Finished(IReadOnlyList<string>? leftBefore, CanvasApi.State now) =>
+        leftBefore is null ? null : leftBefore.Except(now.Syncing?.Classes ?? []).ToHashSet();
 
     /// <summary>What the state says about Canvas's data: the library's own revision (a sync finished, a course was
     /// linked or chosen) or, from an older library, when it last synced; and how many classes a running sync has left,
@@ -63,9 +74,12 @@ public sealed class CanvasFeed : IDisposable
         {
             string revision = Revision(s);
             if (!await LoadAsync(stop)) return false;
+            var touched = loadedAt is null ? null : Finished(leftAt, s);
             loadedAt = revision;
+            // (An older library counts what's left without naming it: then nothing is known.)
+            leftAt = s.Syncing is { } sync && sync.Classes.Count == sync.Left ? sync.Classes : null;
             // Still inside the one-at-a-time: two updates never reach a screen at once.
-            Updated?.Invoke();
+            Updated?.Invoke(touched);
             return true;
         }
         finally

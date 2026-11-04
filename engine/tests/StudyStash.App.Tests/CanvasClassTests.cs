@@ -246,4 +246,43 @@ public class CanvasClassTests
         Assert.Equal(23, model.FilesCount);
         Assert.Equal(4, model.AnnouncementsCount);
     }
+
+    /// <summary>A sync reads the open class's lists again (new work, a renamed module) while announcements can't be
+    /// read: the module the student opened stays open, the one they closed stays closed, the assignment beside the list
+    /// stays picked, and the announcements already shown stay, with the library's offline words above them.</summary>
+    [Fact]
+    public async Task Read_again_keeps_the_place_and_a_list_that_fails_keeps_what_it_showed()
+    {
+        var stop = TestContext.Current.CancellationToken;
+        var handler = new FakeLibrary()
+            .Json(HttpMethod.Get, "/api/v2/canvas/assignments", "assignments-cs101")
+            .Json(HttpMethod.Get, "/api/v2/canvas/modules", "modules-cs101")
+            .Json(HttpMethod.Get, "/api/v2/canvas/files", "files-cs101")
+            .Json(HttpMethod.Get, "/api/v2/canvas/announcements", "announcements-cs101");
+        var model = Model(out _, handler);
+        await model.LoadAsync(Cs101(), stop);
+        model.Done.Single(r => r.Id == "9003").SelectCommand.Execute(null);
+        model.Modules.Single(m => m.Id == "m4").Expanded = false; // the one in progress, closed
+        model.Modules.Single(m => m.Id == "m2").Expanded = true;
+
+        static string Edited(string fixture, Action<System.Text.Json.Nodes.JsonObject> edit)
+        {
+            var o = System.Text.Json.Nodes.JsonNode.Parse(CanvasFixtures.Text(fixture))!.AsObject();
+            edit(o);
+            return o.ToJsonString();
+        }
+        handler.Json(HttpMethod.Get, "/api/v2/canvas/assignments", Edited("assignments-cs101", o => o["to_hand_in"]![0]!["name"] = "Lab 3: recursion traces (updated)"))
+            .Json(HttpMethod.Get, "/api/v2/canvas/modules", Edited("modules-cs101", o => o["modules"]![3]!["name"] = "Week 4 · Recursion and stacks"))
+            .Status(HttpMethod.Get, "/api/v2/canvas/announcements", System.Net.HttpStatusCode.ServiceUnavailable);
+        await model.LoadAsync(Cs101(), stop);
+
+        Assert.Equal("Lab 3: recursion traces (updated)", model.ToHandIn.Single().Title);
+        Assert.Equal("9003", model.Done.Single(r => r.Selected).Id);
+        Assert.Equal("Week 4 · Recursion and stacks", model.Modules[3].Name);
+        Assert.Equal(["m2"], model.Modules.Where(m => m.Expanded).Select(m => m.Id));
+        Assert.Equal(4, model.Announcements.Count);
+        Assert.Equal(23, model.FilesCount);
+        Assert.Equal(Failure.Offline.Words, model.Problem);
+        Assert.False(model.Loading);
+    }
 }
