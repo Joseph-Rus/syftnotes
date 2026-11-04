@@ -200,11 +200,16 @@ public static class CanvasView
 
     /// <summary>The Due list across every class: overdue, due this week, later, with no due date, and handed in in
     /// the last week (newest first). What the student hid (<see cref="DueMarks"/>) is in none of them: it comes apart, as
-    /// <c>hidden</c>, for the Due tab's "Show hidden". <paramref name="folderOf"/> looks up where an assignment's files are.</summary>
+    /// <c>hidden</c>, for the Due tab's "Show hidden". The student's own exams and study sessions whose time has gone are in none of
+    /// them either (<see cref="Assignments.Behind"/>): they come apart, as <c>behind</c>, for the calendar's days. <paramref name="folderOf"/>
+    /// looks up where an assignment's files are.</summary>
     public static JsonObject Due(IReadOnlyList<Assignment> everything, string synced, DateTimeOffset nowOffset, TimeZoneInfo zone, Func<string, long, string?> folderOf)
     {
-        var all = everything.Where(a => a.Mark != DueMarks.Hidden).ToList();
         var now = TimeZoneInfo.ConvertTime(nowOffset, zone).DateTime;
+        // The student's own to-do that's past and not ticked off is overdue (an exam or study session is behind them instead).
+        Assignment OwnOverdue(Assignment a) => a.Kind == DueMine.Kind && !DueMine.IsEvent(a) && Assignments.ToHandIn(a, now) && DueOf(a) is { } d && d < now
+            ? a with { Status = "overdue" } : a;
+        var all = everything.Where(a => a.Mark != DueMarks.Hidden).Select(OwnOverdue).ToList();
         bool ToHandIn(Assignment a) => Assignments.ToHandIn(a, now);
         bool Overdue(Assignment a) => ToHandIn(a) && DueOf(a) is { } d && d < now;
         bool Week(Assignment a) => ToHandIn(a) && DueOf(a) is { } d && d >= now && d < now.Date.AddDays(8);
@@ -230,11 +235,14 @@ public static class CanvasView
             groups.Add(new JsonObject { ["key"] = key, ["label"] = label, ["items"] = new JsonArray(items.Select(Row).ToArray()) });
         }
         var next = toHandIn.Where(a => DueOf(a) is not { } d || d >= now).OrderBy(a => DueOf(a) ?? DateTime.MaxValue).FirstOrDefault();
+        // Their own exams and study sessions whose time has gone: in no group (nothing to hand in) but still on the calendar, on their day.
+        var behind = all.Where(a => DueMine.IsEvent(a) && !a.Done && Assignments.Behind(a, now)).OrderBy(a => DueOf(a)).ThenBy(a => a.Name, StringComparer.Ordinal);
         var hidden = everything.Where(a => a.Mark == DueMarks.Hidden).OrderBy(a => DueOf(a) ?? DateTime.MaxValue).ThenBy(a => a.Name, StringComparer.Ordinal);
         return new JsonObject
         {
             ["synced"] = When(synced), ["to_hand_in"] = toHandIn.Count, ["next"] = next is null ? null : Row(next), ["groups"] = groups,
             ["hidden"] = new JsonArray(hidden.Select(Row).ToArray()),
+            ["behind"] = new JsonArray(behind.Select(Row).ToArray()),
         };
     }
 

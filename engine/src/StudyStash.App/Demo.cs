@@ -281,8 +281,9 @@ public static class Demo
     /// <param name="done">The id of a Due item (d1 is the missing one) the student ticked off in Syft Notes.</param>
     /// <param name="hidden">The id of a Due item the student hid.</param>
     /// <param name="quiet">No class or meeting left today, so Home's sentence is about what's due (and missing).</param>
-    /// <param name="own">Two of the student's own items on the Due list: a Data Mining midterm (an exam, Wednesday 9:00 AM, id o1) and a
-    /// study session for Theory of Computation (Tuesday 4:00 PM, id o2).</param>
+    /// <param name="own">The student's own items on the Due list: a Data Mining midterm (an exam, Wednesday 9:00 AM, id o1) and a study
+    /// session for Theory of Computation (Tuesday 4:00 PM, o2) this week; last Friday's study group (o3), behind them; and a to-do with no
+    /// class that is overdue (o4).</param>
     public static LibraryModel Semester(Page page = Page.Home, bool recording = false, bool narrow = false, Action<Page>? go = null, string? done = null, string? hidden = null, bool quiet = false, bool own = false)
     {
         (string Name, string Hue, int Notes, string Group)[] folders =
@@ -361,14 +362,24 @@ public static class Demo
         };
         if (own)
         {
-            CanvasApi.Item Own(string c, string id, string name, string what, double day, double hour) => new()
+            CanvasApi.Item Own(string c, string id, string name, string what, DateTimeOffset at, string status = "open") => new()
             {
-                Class = c, Id = id, Name = name, Kind = "mine", What = what, Status = "open", DueAt = monday.AddDays(day).AddHours(hour),
+                Class = c, Id = id, Name = name, Kind = "mine", What = what, Status = status, DueAt = at, AllDay = at.Hour == 23 && at.Minute == 59,
             };
+            // The week's exam and study session; last Friday's study group is behind them (on its day, not overdue), and a to-do they
+            // didn't tick off is overdue.
+            var studyGroup = Own(toc, "o3", "Study group", "study", monday.AddDays(-3).AddHours(16));
+            var library = Own("", "o4", "Return library books", "task", monday.AddDays(-3).AddHours(23).AddMinutes(59), "overdue");
             due = due with
             {
-                Groups = [.. due.Groups.Select(g => g.Key == "week" ? g with { Items = [.. g.Items, Own(toc, "o2", "Review proofs", "study", 1, 16), Own(mining, "o1", "Data Mining midterm", "exam", 2, 9)] } : g)],
-                ToHandIn = due.ToHandIn + 2,
+                Groups = [.. due.Groups.Select(g => g.Key switch
+                {
+                    "week" => g with { Items = [.. g.Items, Own(toc, "o2", "Review proofs", "study", monday.AddDays(1).AddHours(16)), Own(mining, "o1", "Data Mining midterm", "exam", monday.AddDays(2).AddHours(9))] },
+                    "overdue" => g with { Items = [.. g.Items, library] },
+                    _ => g,
+                })],
+                Behind = [studyGroup],
+                ToHandIn = due.ToHandIn + 3,
             };
         }
         if (done is not null || hidden is not null) due = Marked(due, done, hidden);

@@ -109,6 +109,10 @@ public static class DueMine
         }
     }
 
+    /// <summary>An exam or a study session: it happens at its time and then it is simply behind the student, where a to-do stays
+    /// theirs until it is ticked off (<see cref="Assignments.Behind"/>).</summary>
+    public static bool IsEvent(Assignment a) => a.Kind == Kind && a.What is "exam" or "study";
+
     /// <summary>The items as rows of the Due list: always to do (the student ticks them off with a <see cref="DueMarks"/> mark).</summary>
     public static List<Assignment> Rows(string home) =>
         [.. Load(home).Select(o => new Assignment(o.Class, o.Id, o.Title, o.Due, null, "open", null, "", "", Kind: Kind, DueAt: o.DueAt, What: o.What, AllDay: o.AllDay))];
