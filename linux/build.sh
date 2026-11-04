@@ -3,13 +3,18 @@
 # runtime each processor needs, each packed as the one download for it, Syft-Notes-linux-<x64|arm64>.tar.gz: a folder,
 # syft-notes/, holding the app, its install.sh (which puts it in ~/.local/share/syft-notes with a menu entry and an
 # icon) and its uninstall.sh. The app has no role of its own: setup asks what the computer is for.
-#   sh linux/build.sh [out-dir]                    (default: dist/linux)
+#   sh linux/build.sh [--test-helpers] [out-dir]                    (default: dist/linux)
+# What it makes is a student's copy: no self-test, no demo libraries, no STUDYSTASH_* test switches (TestHelpers=false,
+# engine/Directory.Build.props), and the build stops if the self-test is in it anyway. --test-helpers makes the copy
+# CI self-tests instead; that one is never shipped (macos/build-app.sh and windows/build.ps1 do the same).
 # STUDYSTASH_LINUX_RIDS="linux-arm64" builds just that one; STUDYSTASH_SKIP_WEB=1 uses web/dist as it is (CI builds
 # it once); DOTNET picks the dotnet to run. Needs the .NET SDK, and Node with npm for the phone app (web/).
 set -eu
 
 HERE=$(cd "$(dirname "$0")" && pwd)
 ROOT=$(cd "$HERE/.." && pwd)
+HELPERS=false
+if [ "${1:-}" = --test-helpers ]; then HELPERS=true; shift; fi
 OUT=${1:-"$ROOT/dist/linux"}
 DOTNET=${DOTNET:-dotnet}
 RIDS=${STUDYSTASH_LINUX_RIDS:-"linux-x64 linux-arm64"}
@@ -34,7 +39,11 @@ for RID in $RIDS; do
   DEST="$OUT/$RID/syft-notes"
   rm -rf "$OUT/$RID"
   "$DOTNET" publish "$ROOT/engine/src/StudyStash.App" -c Release -r "$RID" --self-contained true \
-    -p:DebugType=None -o "$DEST" --nologo -v quiet
+    -p:DebugType=None -p:TestHelpers=$HELPERS -o "$DEST" --nologo -v quiet
+  # A student's copy has no self-test in it: its selftest.txt is the one thing only the self-test writes (the assembly
+  # holds it as UTF-16).
+  [ "$HELPERS" = true ] || [ "$(perl -0777 -ne 'print /s\0e\0l\0f\0t\0e\0s\0t\0\.\0t\0x\0t/ ? "self-test" : "clean"' "$DEST/StudyStash.dll")" = clean ] \
+    || { echo "build.sh: the student's copy ($RID) has the self-test in it" >&2; exit 1; }
 
   # Whisper.net and sherpa-onnx ship every system's native code under runtimes/; this processor keeps its own. Whisper's
   # Vulkan build goes too: on Linux it runs on the processor (HardwareProfile.WhisperCard), and a Vulkan library with
