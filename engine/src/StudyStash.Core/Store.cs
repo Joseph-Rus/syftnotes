@@ -659,12 +659,15 @@ public sealed partial class Store : IDisposable
     /// <summary>Write the Markdown file and mark the note done. New notes are a version (<see cref="NotesVersions"/>)
     /// made by <paramref name="versionKind"/>: the library writing them, unless said otherwise.</summary>
     public string Save(Meeting m, Classification c, string summaryMd = "", string summaryModel = "", string error = "",
-        string versionKind = NotesChangeKind.Written)
+        string versionKind = NotesChangeKind.Written, string? fileText = null)
     {
         lock (gate)
         {
             string path = TargetPath(m, c.ClassName);
-            Py.WriteText(path, Notes.Render(m, c, summaryMd, summaryModel));
+            // The file's own text (one moved with edits of its own) is written as it is; otherwise the library's. Either way
+            // before the old file goes, so a write that fails leaves that one where it was.
+            if (fileText is null) Py.WriteText(path, Notes.Render(m, c, summaryMd, summaryModel));
+            else ReplaceFile(path, fileText);
             string now = Now();
             string? oldPath = null, firstSeen = null;
             (string Markdown, string Model, string At) before = ("", "", "");
@@ -923,12 +926,8 @@ public sealed partial class Store : IDisposable
                 if (edited is not null && TakeInSummary(row, m, summary, model, edited) is { } theirs) summary = theirs;
             }
             var c = new Classification(className, 1.0, by, row.LectureTitle ?? "", JsonList(row.Topics));
-            string newPath = Save(m, c, summary, model, row.Error ?? "");
-            if (edited is not null)
-            {
-                string moved = Notes.WithClass(edited, className);
-                ReplaceFile(newPath, crlf ? moved.Replace("\n", "\r\n") : moved);
-            }
+            string? moved = edited is null ? null : Notes.WithClass(edited, row.ClassName ?? "", className);
+            string newPath = Save(m, c, summary, model, row.Error ?? "", fileText: moved is not null && crlf ? moved.Replace("\n", "\r\n") : moved);
             DropEmptyDir(old, newPath);
             return newPath;
         }

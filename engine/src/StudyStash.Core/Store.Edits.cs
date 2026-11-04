@@ -54,22 +54,36 @@ public static partial class Notes
         return string.Join("\n", lines);
     }
 
-    /// <summary>A note file filed under <paramref name="className"/>: its front matter's <c>class:</c> and the class under
-    /// its title (as <see cref="Render"/> writes them) say the new class, every other line as it is.</summary>
-    public static string WithClass(string text, string className)
+    /// <summary>A note file moved from <paramref name="from"/> to <paramref name="to"/>: its front matter's <c>class:</c>
+    /// and the class under its title (as <see cref="Render"/> writes them, and only while they still say the old class) say
+    /// the new one, every other line as it is.</summary>
+    public static string WithClass(string text, string from, string to) => Lines(text, lines =>
     {
-        var lines = text.Split('\n');
-        int end = lines.Length > 0 && lines[0] == "---" ? Array.IndexOf(lines, "---", 1) : -1;
+        int end = FrontMatterEnd(lines);
         for (int i = 1; i < end; i++)
-            if (lines[i].StartsWith("class: ", StringComparison.Ordinal)) { lines[i] = $"class: {PyJson.Dumps(className)}"; break; }
-        for (int i = Math.Max(end, 0); i < lines.Length; i++)
+            if (lines[i] == $"class: {PyJson.Dumps(from)}") { lines[i] = $"class: {PyJson.Dumps(to)}"; break; }
+        string was = $"class: **{from}**";
+        for (int i = end + 1; i < lines.Length; i++)
         {
-            int at = lines[i].IndexOf("class: **", StringComparison.Ordinal), close = at < 0 ? -1 : lines[i].IndexOf("**", at + 9, StringComparison.Ordinal);
-            if (close < 0) continue;
-            lines[i] = lines[i][..(at + 9)] + className + lines[i][close..];
+            if (lines[i].Trim().Length == 0 || lines[i].StartsWith("# ", StringComparison.Ordinal)) continue;
+            // The line under the title: "*date*  ·  class: **…**" (a student's own line further down is never touched).
+            if (lines[i].StartsWith('*') && lines[i].IndexOf(was, StringComparison.Ordinal) is var at and >= 0)
+                lines[i] = lines[i][..at] + $"class: **{to}**" + lines[i][(at + was.Length)..];
             break;
         }
-        return string.Join("\n", lines);
+    });
+
+    /// <summary>Where a note file's front matter ends (its closing <c>---</c>); -1 with none.</summary>
+    static int FrontMatterEnd(string[] lines) => lines.Length > 0 && lines[0] == "---" ? Array.IndexOf(lines, "---", 1) : -1;
+
+    /// <summary>A note file's text changed line by line by <paramref name="change"/>, an invisible byte-order mark at its
+    /// start kept out of the way and put back.</summary>
+    static string Lines(string text, Action<string[]> change)
+    {
+        bool bom = text.StartsWith('\uFEFF');
+        var lines = (bom ? text[1..] : text).Split('\n');
+        change(lines);
+        return (bom ? "\uFEFF" : "") + string.Join("\n", lines);
     }
 
     /// <summary>A note file whose summary says who wrote it as <paramref name="writer"/> ("_Written by … from the

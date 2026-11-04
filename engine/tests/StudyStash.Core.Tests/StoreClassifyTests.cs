@@ -240,8 +240,14 @@ public class StoreClassifyTests
 
         // Edited in the note file itself (another app, or an AI working in the folder), not taken in yet: its summary
         // changed, and a line of the student's own added at the end.
-        string text = Py.ReadText(path).Replace("Cells divide by mitosis.", "Cells divide by mitosis and meiosis.") + "\nMy own line.\n";
+        string text = Py.ReadText(path).Replace("Cells divide by mitosis.", "Cells divide by mitosis and meiosis.") + "\nMy own line.\nNext class: **quiz on Friday**\n";
         Py.WriteText(path, text);
+        // The new file can't be written (something holds its place): nothing moves, and nothing written is lost.
+        string blocked = Path.Combine(dir["pool"], "Bio 110", ".2026-09-02 Cells.md.diagrams");
+        Directory.CreateDirectory(blocked);
+        Assert.True(Record.Exception(() => store.SetClass("lec-abcdef", "Bio 110")) is IOException or UnauthorizedAccessException);
+        Assert.Contains("My own line.", Py.ReadText(path));
+        Directory.Delete(blocked);
         string? moved = store.SetClass("lec-abcdef", "Bio 110");
 
         string now = Py.ReadText(moved!);
@@ -250,6 +256,7 @@ public class StoreClassifyTests
         Assert.Contains("My own line.", now);
         Assert.Contains("class: \"Bio 110\"", now);
         Assert.Contains("class: **Bio 110**", now);
+        Assert.Contains("Next class: **quiz on Friday**", now); // a line of the student's own isn't the class line
         Assert.Equal("Cells divide by mitosis and meiosis.", store.Get("lec-abcdef")!.SummaryMd);
         Assert.Contains(store.NotesVersions("lec-abcdef"), v => store.NotesVersion("lec-abcdef", v.Seq)!.Markdown == "Cells divide by mitosis."); // the older notes kept
 
