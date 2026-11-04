@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using StudyStash.App.Services;
+using StudyStash.App.ViewModels.Kit;
 using StudyStash.Audio;
 using StudyStash.Core;
 
@@ -250,6 +251,33 @@ public class AppHostTests
         Assert.NotNull(start.Lecture);
         Assert.Same(host.Recorder.Current, start.Lecture);
         Assert.Single(host.Lectures.All());
+        host.StopRecording();
+    }
+
+    /// <summary>⌘Q while a lecture records asks first; pressed again while the question shows, it neither asks again
+    /// nor quits; "Keep recording" leaves the lecture recording.</summary>
+    [Fact]
+    public async Task Quit_while_recording_asks_once_and_no_keeps_it_recording()
+    {
+        using var home = new TempHome();
+        using var host = Recording(home, new FakeMics(MicAccess.Allowed));
+        var start = await host.RecordAsync("CS 101");
+        Assert.NotNull(start.Lecture);
+        var answer = new TaskCompletionSource<bool>();
+        var asked = new List<ConfirmAsk>();
+        var guard = new QuitWhileRecording(() => host.Recorder.Current is not null, ask =>
+        {
+            asked.Add(ask);
+            return answer.Task;
+        });
+
+        var first = guard.MayQuitAsync();
+        Assert.False(await guard.MayQuitAsync());
+        answer.SetResult(false);
+        Assert.False(await first);
+
+        Assert.Equal("You're recording", Assert.Single(asked).Title);
+        Assert.Same(start.Lecture, host.Recorder.Current);
         host.StopRecording();
     }
 

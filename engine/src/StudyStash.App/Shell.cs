@@ -17,6 +17,7 @@ using StudyStash.App.Controls;
 using StudyStash.App.Platform;
 using StudyStash.App.Services;
 using StudyStash.App.ViewModels;
+using StudyStash.App.ViewModels.Kit;
 using StudyStash.App.Views;
 using StudyStash.App.Windows;
 using StudyStash.Audio;
@@ -95,8 +96,19 @@ public static partial class Shell
         // ⌘, (the library, Settings), and the Dock following which are open.
         services.GetRequiredService<ToolkitHooks>().Connect();
         desktop.ShutdownMode = ShutdownMode.OnExplicitShutdown;
-        // The system quitting the app (logging out, the Dock's Quit): tidy up and let it go on.
-        desktop.ShutdownRequested += (_, _) => CleanUp();
+        // The system quitting the app: tidy up and let it go on. The student's own (⌘Q, the app menu's or the Dock's
+        // Quit) while a lecture records asks first, as closing the window keeps it recording; logging out, restarting
+        // or shutting down is never held up.
+        desktop.ShutdownRequested += (_, e) =>
+        {
+            if (!quitting && host?.Recorder.Current is not null && Desktop.StudentQuits())
+            {
+                e.Cancel = true;
+                QuitAsking();
+                return;
+            }
+            CleanUp();
+        };
         // Told to stop (kill, launchd): quit properly, so a lecture being recorded is saved. Told twice, just stop.
         if (!OperatingSystem.IsWindows())
             terminate = PosixSignalRegistration.Create(PosixSignal.SIGTERM, c =>
@@ -371,6 +383,16 @@ public static partial class Shell
         life.Shutdown(code);
     }
 
+    /// <summary>The student's own Quit while a lecture records asks first; "Keep recording" leaves it recording.</summary>
+    static readonly QuitWhileRecording quitWhileRecording = new(() => host.Recorder.Current is not null, AskAsync);
+
+    /// <summary>The student's own Quit: asked first while a lecture records (a yes saves it as Stop would: quitting
+    /// stops the recorder); at once otherwise.</summary>
+    static void QuitAsking() => Run(async () =>
+    {
+        if (await quitWhileRecording.MayQuitAsync()) Quit();
+    }, "Quit");
+
     /// <summary>How long quitting may take before the app goes regardless.</summary>
     static readonly TimeSpan QuitLimit = TimeSpan.FromSeconds(30);
 
@@ -467,7 +489,7 @@ public static partial class Shell
         {
             // Avalonia's own TrayIcon never raises Clicked on macOS, so the menu bar icon is a real NSStatusItem.
             MacStatusItem.Create(leftClick: x => TogglePanel(new PixelPoint((int)x, 0)),
-                record: host.Settings.Role == AppRole.Library ? null : ToggleRecording, search: ToggleQuick, open: ShowLibrary, settings: SettingsFromAnywhere, quit: () => Quit());
+                record: host.Settings.Role == AppRole.Library ? null : ToggleRecording, search: ToggleQuick, open: ShowLibrary, settings: SettingsFromAnywhere, quit: QuitAsking);
             MacStatusItem.SetIcon(TrayImageBytes(false));
             // Once the menu bar has laid it out: where it is, and whether the student can see it at all.
             DispatcherTimer.RunOnce(CheckMenuBarIcon, TimeSpan.FromSeconds(2));
@@ -501,7 +523,7 @@ public static partial class Shell
         Item("Open Syft Notes", ShowLibrary);
         Item("Settings…", SettingsFromAnywhere);
         menu.Add(new NativeMenuItemSeparator());
-        Item("Quit Syft Notes", () => Quit());
+        Item("Quit Syft Notes", QuitAsking);
         return menu;
     }
 
