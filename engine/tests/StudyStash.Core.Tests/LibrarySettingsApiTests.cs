@@ -315,8 +315,9 @@ public class LibrarySettingsApiTests
         Assert.Equal(["CS 101"], Configs.Load(cfg.Home).Classes.Select(c => c.Name));
     }
 
-    /// <summary>A class removed in the app's Settings: its lecture moves to Unsorted (note file and all), its empty
-    /// folder goes, the sidebar no longer lists it, and its Canvas course is un-ticked.</summary>
+    /// <summary>A class removed in the app's Settings: its lecture moves to Unsorted (note file and all), and so does
+    /// one whose notes couldn't be written; its empty folder goes, the sidebar no longer lists it, and its Canvas course
+    /// is un-ticked. A class whose name was cleared isn't removed: it stays as it was, lectures and all.</summary>
     [Fact]
     public async Task Removing_a_class_moves_its_lectures_to_Unsorted_and_stops_its_Canvas_course()
     {
@@ -324,6 +325,11 @@ public class LibrarySettingsApiTests
         var (cfg, store) = Library(dir);
         using var _s = store;
         store.Save(new Meeting("m1") { Title = "Osmosis", Date = "2026-09-01", Transcript = "Today." }, new Classification("BIO 110", 0.9, "folder"), summaryMd: "## Summary\nOsmosis.");
+        store.Save(new Meeting("m3") { Title = "Recursion", Date = "2026-09-02", Transcript = "Today." }, new Classification("CS 101", 0.9, "folder"));
+        store.Enqueue(new Meeting("m2") { Title = "Mitosis", Date = "2026-09-03", Transcript = "Today." });
+        store.ClaimNext();
+        store.SetClass("m2", "BIO 110");
+        store.MarkFailed("m2", "The notes engine stopped.");
         Canvas.CanvasSettings.Update(cfg.Home, c =>
         {
             c.Courses = new() { ["CS 101"] = 4206, ["BIO 110"] = 4207 };
@@ -333,11 +339,17 @@ public class LibrarySettingsApiTests
 
         await Json(await site.Client.SendAsync(Req(HttpMethod.Post, "/api/v2/settings", new
         {
-            classes = new object[] { new { name = "CS 101", was = "CS 101" } },
+            // CS 101's name cleared and left; BIO 110 removed.
+            classes = new object[] { new { name = "", was = "CS 101" } },
             known = new[] { "CS 101", "BIO 110" },
         })));
 
-        Assert.Equal(["CS 101"], Configs.Load(cfg.Home).ClassNames());
+        var saved = Configs.Load(cfg.Home);
+        Assert.Equal(["CS 101"], saved.ClassNames());
+        Assert.Equal("Recursion and the call stack", saved.Classes[0].Description);
+        Assert.Equal("CS 101", store.Get("m3")!.ClassName);
+        var failed = store.Get("m2")!;
+        Assert.Equal((Configs.Unsorted, Store.Failed), (failed.ClassName, failed.Status));
         var moved = store.Get("m1")!;
         Assert.Equal(Configs.Unsorted, moved.ClassName);
         Assert.Equal(Configs.Unsorted, Path.GetFileName(Path.GetDirectoryName(moved.MdPath)));

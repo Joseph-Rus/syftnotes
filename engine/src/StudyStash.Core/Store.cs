@@ -876,9 +876,9 @@ public sealed partial class Store : IDisposable
         {
             var row = Get(noteId);
             if (row is null) return null;
-            if (row.Status is Queued or Working)
+            if (row.Status is Queued or Working or Failed)
             {
-                // The pipeline writes the file when it's done and keeps this choice (see Finish).
+                // The pipeline writes the file when it's done (or tried again) and keeps this choice (see Finish).
                 Exec("UPDATE notes SET class_name=?, classified_by=?, confidence=1.0 WHERE id=?", className, by, noteId);
                 return string.IsNullOrEmpty(row.MdPath) ? null : row.MdPath;
             }
@@ -916,6 +916,27 @@ public sealed partial class Store : IDisposable
             DropEmptyDir(old, path);
             return Renamed.Done;
         }
+    }
+
+    /// <summary>Deletes a class's folder when no file is left in it, however deep (an empty Attachments or Canvas
+    /// folder doesn't keep it); a folder with any file in it stays, and so does the file.</summary>
+    public void DropEmptyClassFolder(string className)
+    {
+        static void Drop(string dir)
+        {
+            if (!Directory.Exists(dir)) return;
+            foreach (string sub in Directory.EnumerateDirectories(dir)) Drop(sub);
+            try
+            {
+                if (!Directory.EnumerateFileSystemEntries(dir).Any()) Directory.Delete(dir);
+            }
+            catch (Exception e) when (e is IOException or UnauthorizedAccessException)
+            {
+                // Something else has it open: it stays, empty.
+            }
+        }
+        string folder = ClassFolder(className);
+        if (!Py.SamePath(folder, PoolDir)) Drop(folder);
     }
 
     /// <summary>The folder a class's lectures (and its Canvas files) live in, without making it.</summary>

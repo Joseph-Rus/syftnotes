@@ -146,7 +146,7 @@ public static partial class CourseChoices
                     continue;
                 }
                 if (cfg.Classes.RemoveAll(c => c.Name == cls) > 0) changedClasses = true;
-                RemoveEmptyFolder(store.ClassFolder(cls));
+                store.DropEmptyClassFolder(cls);
                 outcome.Removed.Add(cls);
             }
         if (changedClasses) Configs.Save(cfg);
@@ -198,16 +198,5 @@ public static partial class CourseChoices
         if (all.Any(a => a.ClassName == cls)) Assignments.Save(home, all.Where(a => a.ClassName != cls));
         (crawl ?? new Crawl(home, name => Path.Combine(cfg.PoolDir, Notes.FolderName(name)), () => DateTimeOffset.UtcNow, () => TimeZoneInfo.Local))
             .ForgetClass(cls);
-    }
-
-    static void RemoveEmptyFolder(string folder)
-    {
-        try
-        {
-            if (Directory.Exists(folder) && !Directory.EnumerateFileSystemEntries(folder).Any()) Directory.Delete(folder);
-        }
-        catch (IOException)
-        {
-        }
     }
 }
