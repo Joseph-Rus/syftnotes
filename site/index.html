@@ -351,11 +351,13 @@
           <h3>Linux</h3>
           <span class="tag">This computer</span>
         </div>
-        <p>Needs a desktop with PipeWire or PulseAudio (Ubuntu, Fedora, Debian, Mint and the like). Unpack it and run
-          <code>sh syft-notes/install.sh</code>: it installs for your account only, no root needed, with Syft Notes in
-          your applications menu. It looks like the Windows app and waits in your desktop's tray.</p>
-        <p class="btns"><a class="btn btn-primary" href="https://github.com/Joseph-Rus/study-stash/releases/latest/download/Syft-Notes-linux-x64.tar.gz">Download for x64</a>
-          <a class="btn btn-quiet" href="https://github.com/Joseph-Rus/study-stash/releases/latest/download/Syft-Notes-linux-arm64.tar.gz">ARM64</a></p>
+        <p>Needs a desktop with PipeWire or PulseAudio (Ubuntu, Fedora, Debian, Mint and the like). It's an AppImage:
+          allow it to run (Properties in your file manager) and open it. Syft Notes puts itself in your applications
+          menu, updates itself, and waits in your desktop's tray. No root needed. If it doesn't open, your system needs
+          FUSE: on Ubuntu 22.04 and Debian, <code>sudo apt install libfuse2</code>; on Ubuntu 24.04,
+          <code>libfuse2t64</code>.</p>
+        <p class="btns"><a class="btn btn-primary" href="https://github.com/Joseph-Rus/study-stash/releases/latest/download/SyftNotes-linux-x64.AppImage">Download for x64</a>
+          <a class="btn btn-quiet" href="https://github.com/Joseph-Rus/study-stash/releases/latest/download/SyftNotes-linux-arm64.AppImage">ARM64</a></p>
       </div>
     </div>
     <p class="fine">Every update is checked against the release's <code>SHA256SUMS.txt</code> before it installs.

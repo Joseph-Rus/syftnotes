@@ -2,6 +2,7 @@ using System.Text.Json.Nodes;
 using Avalonia.Headless.XUnit;
 using StudyStash.App.Services;
 using StudyStash.App.ViewModels;
+using StudyStash.App.ViewModels.Kit;
 using StudyStash.Core;
 
 namespace StudyStash.App.Tests;
@@ -10,7 +11,7 @@ namespace StudyStash.App.Tests;
 /// through its API, so the laptop needs nothing else to change its library.</summary>
 public class LibrarySettingsModelTests
 {
-    static (SettingsModel Model, AppHost Host, TempHome Home) Open(FakeLibrarySettings fake, AppRole role = AppRole.Laptop)
+    static (SettingsModel Model, AppHost Host, TempHome Home) Open(FakeLibrarySettings fake, AppRole role = AppRole.Laptop, IConfirm? confirm = null)
     {
         var home = new TempHome();
         new AppSettings { SetupDone = true, Role = role }.Save(home.Path);
@@ -20,7 +21,7 @@ public class LibrarySettingsModelTests
         cc.PoolName = "Sam's library";
         Configs.SaveClient(cc);
         var host = new AppHost(home.Path, log: _ => { });
-        return (SettingsModel.Make(host, library: () => fake.Call), host, home);
+        return (SettingsModel.Make(host, library: () => fake.Call, confirm: confirm), host, home);
     }
 
     [AvaloniaFact]
@@ -260,7 +261,8 @@ public class LibrarySettingsModelTests
     public async Task Classes_named_from_course_codes_are_previewed_then_renamed_and_the_lectures_here_follow()
     {
         var fake = new FakeLibrarySettings { Settings = FakeLibrarySettings.CodeNamed() };
-        var (model, host, home) = Open(fake);
+        var confirm = new FakeConfirm();
+        var (model, host, home) = Open(fake, confirm: confirm);
         using var _h = home;
         using var _host = host;
         using var _m = model;
@@ -274,20 +276,22 @@ public class LibrarySettingsModelTests
         Assert.True(lib.CanUseCourseNames);
         Assert.Equal("2 classes are named from course codes. Their lectures move with them.", lib.CourseNamesSub);
         Assert.Equal("Rename 2 classes", lib.RenameLabel);
-        Assert.False(lib.ConfirmingCourseNames);
-        lib.AskUseCourseNamesCommand.Execute(null);
-        Assert.True(lib.ConfirmingCourseNames); // the preview: each class, its new name, and what moves with it
         Assert.Equal([("Software Engineering", "Now 202710.TS.CSCI321.A", "18 lectures move with it"), ("Senior Design", "Now 202710.TS.ENGR401.A", "14 lectures move with it")],
             lib.CourseNames.Select(r => (r.To, r.Now, r.Meta)));
-        Assert.DoesNotContain(fake.Calls, c => c.Path == "/course-names"); // nothing renamed until asked
 
+        confirm.Answer = false; // the preview says no: nothing is renamed
+        await lib.UseCourseNamesCommand.ExecuteAsync(null);
+        Assert.DoesNotContain(fake.Calls, c => c.Path == "/course-names");
+        Assert.Equal(["Rename 2 classes"], confirm.Asked.Select(a => a.Yes)); // the preview: each class, its new name, and what moves with it
+        Assert.Equal(["202710.TS.CSCI321.A becomes Software Engineering · 18 lectures move with it", "202710.TS.ENGR401.A becomes Senior Design · 14 lectures move with it"], confirm.Asked[0].Lines);
+
+        confirm.Answer = true;
         await lib.UseCourseNamesCommand.ExecuteAsync(null);
 
         Assert.Contains(fake.Calls, c => (c.Method, c.Path) == ("POST", "/course-names"));
         Assert.Equal("Renamed 2 classes to their Canvas course names; 32 lectures moved with them.", lib.Say);
         Assert.Equal(["Software Engineering", "Senior Design", "HIST 210", "MATH 221"], lib.Classes.Select(c => c.Name));
         Assert.False(lib.HasCourseNames);
-        Assert.False(lib.ConfirmingCourseNames);
         Assert.Equal(1, heard);
         Assert.Equal("Software Engineering", host.Lectures.Get("rec-1")!.ClassName); // a lecture waiting here follows
     }
@@ -411,16 +415,20 @@ public class LibrarySettingsModelTests
     public async Task Rewriting_every_summary_asks_first()
     {
         var fake = new FakeLibrarySettings();
-        var (model, host, home) = Open(fake);
+        var confirm = new FakeConfirm();
+        var (model, host, home) = Open(fake, confirm: confirm);
         using var _h = home;
         using var _host = host;
         using var _m = model;
         model.Section = "Notes";
         var lib = model.Lib;
 
-        lib.AskRewriteAllCommand.Execute(null);
-        Assert.True(lib.ConfirmingRewrite);
+        confirm.Answer = false;
+        await lib.RewriteAllCommand.ExecuteAsync(null);
+        Assert.Equal(["Rewrite all 42 summaries?"], confirm.Asked.Select(a => a.Title));
         Assert.DoesNotContain(fake.Calls, c => c.Path == "/rewrite-all");
+
+        confirm.Answer = true;
         await lib.RewriteAllCommand.ExecuteAsync(null);
 
         Assert.Contains(fake.Calls, c => c.Path == "/rewrite-all");
