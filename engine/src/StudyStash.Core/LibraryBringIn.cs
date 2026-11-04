@@ -128,15 +128,15 @@ public static class LibraryBringIn
             {
                 Step();
                 string rel = inside.Rel(row.MdPath!)!;
-                if (!File.Exists(row.MdPath))
+                if (!File.Exists(row.MdPath) || Read(row.MdPath!)?.Id != row.Id)
                 {
-                    // Its file is gone from there: the row looks for it here from now on (the lecture is in its row), at a
-                    // path no other lecture's file is at.
-                    if (apply) store.Refile(row.Id, FreeFor(Path.Combine(into, rel), row.Id));
+                    // Its file is gone from there (or another lecture's file is there now, which comes in as that one):
+                    // the row looks for it here from now on (the lecture is in its row), at a path no other lecture has.
+                    if (apply) store.Refile(row.Id, FreeFor(store, Path.Combine(into, rel), row.Id));
                     continue;
                 }
                 string text = Text(row.MdPath!);
-                if (apply) store.Refile(row.Id, CopyIn(text, Path.Combine(into, rel)));
+                if (apply) store.Refile(row.Id, CopyIn(store, row.Id, text, Path.Combine(into, rel)));
                 fresh++;
                 planned[row.Id] = text;
                 copied.Add(Path.GetFullPath(Path.Combine(from, rel)));
@@ -182,7 +182,7 @@ public static class LibraryBringIn
             if (mine is null)
             {
                 if (row is null) Enlist(store, cfg, note, note.Text, null, apply, newClasses);
-                else if (apply) store.Refile(row.Id, CopyIn(note.Text, Path.Combine(into, Path.GetRelativePath(from, note.Path))));
+                else if (apply) store.Refile(row.Id, CopyIn(store, row.Id, note.Text, Path.Combine(into, Path.GetRelativePath(from, note.Path))));
                 fresh++;
                 planned[note.Id] = note.Text;
                 return;
@@ -223,9 +223,10 @@ public static class LibraryBringIn
                 copiedFiles.Add(Path.GetFullPath(other));
                 if (File.Exists(target))
                 {
-                    if (SameBytes(target, other)) continue;
-                    // A different file of that name here (this folder's own): this attachment's comes in beside it, and
-                    // the attachment is pointed at it, so it never opens or removes the other.
+                    // Two different files of the attachment's name, here and there: whose is it? The one the size it was
+                    // listed with says so. Only when that's the other folder's (and not this one's) does it come in
+                    // beside this folder's file, the attachment pointed at it; otherwise this folder's stays its file.
+                    if (SameBytes(target, other) || Length(target) == a.Size || Length(other) != a.Size) continue;
                     string file = Core.Attachments.FreeName(Py.Parent(target), Path.GetFileName(target));
                     if (apply)
                     {
@@ -290,14 +291,14 @@ public static class LibraryBringIn
             ?? store.ClassesSummary().Select(c => c.ClassName).FirstOrDefault(c => Notes.FolderName(c).Equals(folder, StringComparison.OrdinalIgnoreCase))
             ?? folder;
 
-        /// <summary>A note file's copy in this folder at <paramref name="want"/>, or beside it when that's a different
-        /// file: where it is. Written whole or not at all.</summary>
-        static string CopyIn(string text, string want)
+        /// <summary>Lecture <paramref name="id"/>'s note file copied into this folder at <paramref name="want"/>, or beside
+        /// it when that's a different file or another lecture's path: where it is. Written whole or not at all.</summary>
+        static string CopyIn(Store store, string id, string text, string want)
         {
             string path = want;
-            for (int i = 2; File.Exists(path); i++)
+            for (int i = 2; File.Exists(path) || Others(store, path, id); i++)
             {
-                if (Same(Text(path), text)) return path;
+                if (!Others(store, path, id) && File.Exists(path) && Same(Text(path), text)) return path;
                 path = Path.Combine(Py.Parent(want), $"{Path.GetFileNameWithoutExtension(want)} ({i}).md");
             }
             Store.WriteWhole(path, text);
@@ -396,12 +397,27 @@ public static class LibraryBringIn
 
     /// <summary><paramref name="want"/> when nothing is there or the note file there is lecture <paramref name="id"/>'s;
     /// otherwise the first free "name (2).md" beside it.</summary>
-    static string FreeFor(string want, string id)
+    static string FreeFor(Store store, string want, string id)
     {
         string path = want;
-        for (int i = 2; File.Exists(path) && Read(path)?.Id != id; i++)
+        for (int i = 2; File.Exists(path) && Read(path)?.Id != id || Others(store, path, id); i++)
             path = Path.Combine(Py.Parent(want), $"{Path.GetFileNameWithoutExtension(want)} ({i}).md");
         return path;
+    }
+
+    /// <summary>Whether another lecture's row has <paramref name="path"/> as its note file (written there or not yet).</summary>
+    static bool Others(Store store, string path, string id) => store.IdAt(path) is { } owner && owner != id;
+
+    static long Length(string path)
+    {
+        try
+        {
+            return new FileInfo(path).Length;
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException)
+        {
+            return -1;
+        }
     }
 
     static bool SameBytes(string a, string b)
@@ -470,7 +486,7 @@ public static class LibraryBringIn
             string name = $"{Notes.DatePrefix(m.Date)} {Notes.Slugify(m.Title)}";
             string dir = store.ClassDir(cls);
             at = Path.Combine(dir, name + ".md");
-            for (int i = 2; File.Exists(at); i++) at = Path.Combine(dir, $"{name} ({i}).md");
+            for (int i = 2; File.Exists(at) || Others(store, at, m.Id); i++) at = Path.Combine(dir, $"{name} ({i}).md");
         }
         store.Save(m, new Classification(cls, note.Confidence, note.By, note.LectureTitle, note.Topics), note.Summary, note.SummaryBy,
             at: at, keepText: text);
@@ -631,7 +647,6 @@ public static class LibraryBringIn
     /// <summary>"OneDrive – Personal › Documents" → "OneDrive – Personal": the first part, for a title.</summary>
     static string Short(string where) => where.Split(" › ")[0];
 
-    /// <summary>Whether <paramref name="path"/> is inside <paramref name="dir"/> (or is it).</summary>
     /// <summary>How many lectures, listed or in the trash, still have their file inside <paramref name="dir"/> (reached by
     /// any path, links followed): what a switch away from it has to bring to 0.</summary>
     public static int PointingInto(Store store, string dir)
@@ -658,6 +673,7 @@ public static class LibraryBringIn
         }
     }
 
+    /// <summary>Whether <paramref name="path"/> is inside <paramref name="dir"/> (or is it).</summary>
     static bool Under(string path, string dir)
     {
         string p = Path.GetFullPath(path).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
