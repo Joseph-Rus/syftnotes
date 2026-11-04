@@ -108,6 +108,26 @@ public class SignInInBrowserTests
     }
 
     [Fact]
+    public async Task A_status_that_already_says_signed_in_waits_for_the_sign_in_to_end_by_itself()
+    {
+        // Claude Code says signed in, but its maker no longer takes that sign-in (the last lecture said so).
+        await using var rig = await Rig.StartAsync(["claude"], bin =>
+        {
+            File.WriteAllText(Path.Combine(bin, "signed-in"), "");
+            File.WriteAllText(Path.Combine(bin, "login-delay"), "3");
+        });
+
+        await rig.Remote.SignInAsync("claude");
+        Assert.Equal(SignInPhase.Waiting, (await rig.RowAsync("claude")).SignIn);
+
+        // Ready only once the sign-in it started has finished by itself, not at the first look at the status.
+        var ready = await rig.UntilAsync("claude", e => e.State == "ready");
+        Assert.True(File.Exists(Path.Combine(rig.Bin, "login-done")), "ready before the sign-in ended");
+        Assert.Equal("", ready.SignIn);
+        Assert.Equal(1, FakeAgents.Logins(rig.Bin));
+    }
+
+    [Fact]
     public async Task Open_the_page_again_runs_the_sign_in_once_more_and_never_reads_what_it_prints()
     {
         await using var rig = await Rig.StartAsync(["claude"], bin => File.WriteAllText(Path.Combine(bin, "login-delay"), "120"));
