@@ -92,6 +92,19 @@ public static class HostInfo
     /// this computer), and the other way round.</summary>
     public static bool PortFree(int port) => CanBind(IPAddress.Any, port) && CanBind(IPAddress.Loopback, port);
 
+    /// <summary>Waits up to <paramref name="timeout"/> for <see cref="PortFree"/>: a library handing over to another (an
+    /// update) lets go of its port within seconds. False when it's still taken.</summary>
+    public static async Task<bool> WaitPortFreeAsync(int port, TimeSpan timeout, CancellationToken ct = default)
+    {
+        var deadline = DateTime.UtcNow + timeout;
+        while (!PortFree(port))
+        {
+            if (DateTime.UtcNow >= deadline) return false;
+            await Task.Delay(250, ct);
+        }
+        return true;
+    }
+
     static bool CanBind(IPAddress address, int port)
     {
         using var s = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
