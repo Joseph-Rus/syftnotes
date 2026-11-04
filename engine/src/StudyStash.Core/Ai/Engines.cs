@@ -296,6 +296,11 @@ public static class Engines
         settings.Limits.TryGetValue(id, out string? until) && DateTime.TryParse(until, CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind, out var t)
         && t > checks.Now();
 
+    /// <summary>Whether a job whose AI can't answer may go to Ollama instead: Fallback is on, and Ollama is installed on
+    /// this computer to take it (a student on Gemini alone never set it up). The one rule for Ask, the notes, and what
+    /// Settings says about them.</summary>
+    public static bool CanFallBack(AiSettings settings, EngineChecks checks) => settings.Fallback && checks.OllamaInstalled();
+
     /// <summary>
     /// Whether an engine (never Ollama, the fallback itself) is known unusable right now — not installed, not
     /// signed in, or over its usage limit — worked out without contacting an account, so it can be checked before
