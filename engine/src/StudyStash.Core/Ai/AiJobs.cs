@@ -251,9 +251,7 @@ public sealed class AiJobs(string home, Func<string>? ollamaHost = null)
     bool NotesOnOllama(AiSettings settings) =>
         settings.NotesChosen && (settings.Local("notes") || (CanFallBack(settings) && Engines.KnownUnusableWhy(settings.For("notes").Provider, settings, Checks) is not null));
 
-    /// <summary>Whether a job whose AI can't answer may go to Ollama instead: Fallback is on, and Ollama is on this
-    /// computer to take it (a student on Gemini alone never set it up).</summary>
-    bool CanFallBack(AiSettings settings) => settings.Fallback && Checks.OllamaInstalled();
+    bool CanFallBack(AiSettings settings) => Engines.CanFallBack(settings, Checks);
 
     /// <summary>What an engine's notes may draw: Ollama's small models keep to flowcharts; the CLI engines, whose
     /// SVG holds together, may draw what's spatial too.</summary>
