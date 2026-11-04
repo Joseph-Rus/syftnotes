@@ -115,6 +115,15 @@ public sealed class GeminiSignInTests
         var found = File.ReadAllLines(openers).Where(l => l.Trim().Length > 0).ToList();
         Assert.NotEmpty(found);
         Assert.All(found, f => Assert.StartsWith(Path.Combine(Antigravity.Home(), "openers-off"), f.Trim(), StringComparison.OrdinalIgnoreCase));
+
+        // "Try again" runs the same sign-in again: its new page opens too.
+        signIn.Stop();
+        await Wait.UntilAsync(() => !signIn.Running, "the sign-in stopping");
+        Assert.True(signIn.Start());
+        await Wait.UntilAsync(() =>
+        {
+            lock (pages) return pages.Count == 2;
+        }, "Syft Notes opening the page of the sign-in run again");
         signIn.Stop();
     }
 
