@@ -794,10 +794,10 @@ public sealed partial class LibraryWeb
     /// marks are on them (<see cref="DueMarks"/>); what they hid comes apart as <c>hidden</c>.</summary>
     JsonObject DueList()
     {
-        var marks = DueMarks.Load(cfg.Home);
-        var all = DueMarks.Apply(Assignments.Load(cfg.Home), marks);
+        var all = Assignments.Marked(cfg.Home);
         var graded = all.ToList();
-        foreach (string cls in cfg.ClassNames())
+        var marks = DueMarks.Load(cfg.Home);
+        foreach (string cls in cfg.ClassNames().Where(Canvas.Settings.Courses.ContainsKey))
             if (CourseIndex.Load(cfg.Home, cls) is { } index)
                 all.AddRange(DueMarks.Apply(Assignments.Todos(cls, index.Todos, graded, Canvas.Zone), marks));
         return CanvasView.Due(all, Canvas.Settings.LastDone, Canvas.Clock(), Canvas.Zone, Canvas.Crawl.AssignmentFolder);
