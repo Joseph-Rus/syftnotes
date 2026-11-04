@@ -255,7 +255,7 @@ public class AppHostTests
     }
 
     /// <summary>⌘Q while a lecture records asks first; pressed again while the question shows, it neither asks again
-    /// nor quits; "Keep recording" leaves the lecture recording.</summary>
+    /// nor quits but brings the question to the front; "Keep recording" leaves the lecture recording.</summary>
     [Fact]
     public async Task Quit_while_recording_asks_once_and_no_keeps_it_recording()
     {
@@ -265,14 +265,16 @@ public class AppHostTests
         Assert.NotNull(start.Lecture);
         var answer = new TaskCompletionSource<bool>();
         var asked = new List<ConfirmAsk>();
+        int shown = 0;
         var guard = new QuitWhileRecording(() => host.Recorder.Current is not null, ask =>
         {
             asked.Add(ask);
             return answer.Task;
-        });
+        }, () => shown++);
 
         var first = guard.MayQuitAsync();
         Assert.False(await guard.MayQuitAsync());
+        Assert.Equal(1, shown);
         answer.SetResult(false);
         Assert.False(await first);
 

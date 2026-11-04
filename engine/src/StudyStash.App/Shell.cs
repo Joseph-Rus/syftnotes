@@ -383,8 +383,9 @@ public static partial class Shell
         life.Shutdown(code);
     }
 
-    /// <summary>The student's own Quit while a lecture records asks first; "Keep recording" leaves it recording.</summary>
-    static readonly QuitWhileRecording quitWhileRecording = new(() => host.Recorder.Current is not null, AskAsync);
+    /// <summary>The student's own Quit while a lecture records asks first; "Keep recording" leaves it recording. Quit
+    /// again while it asks opens the library window, where the question is, as the menu's Open does.</summary>
+    static readonly QuitWhileRecording quitWhileRecording = new(() => host.Recorder.Current is not null, AskAsync, ShowLibrary);
 
     /// <summary>The student's own Quit: asked first while a lecture records (a yes saves it as Stop would: quitting
     /// stops the recorder); at once otherwise.</summary>
