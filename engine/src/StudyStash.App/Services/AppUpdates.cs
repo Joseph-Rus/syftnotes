@@ -139,6 +139,10 @@ public sealed class AppUpdates
     readonly SemaphoreSlim oneAtATime = new(1, 1);
     readonly HashSet<string> told = [];
     volatile bool asked;
+    // Update now asks GitHub once per press (fresh), and the rounds that wait for the lecture to end keep that answer
+    // (askedFor) rather than the hour-old cache or a GitHub call a minute.
+    volatile bool fresh;
+    Release? askedFor;
     CancellationTokenSource? napping;
 
     /// <summary>
@@ -179,7 +183,12 @@ public sealed class AppUpdates
         {
             // The student pressed Update now: ask GitHub, not the hour-old answer the background rounds share, or a
             // release out for less than an hour would be said to be up to date.
-            release = await (asked ? LatestNow ?? Latest : Latest)();
+            if (fresh)
+            {
+                fresh = false;
+                release = askedFor = await (LatestNow ?? Latest)();
+            }
+            else release = asked && askedFor is { } pressed ? pressed : await Latest();
         }
         catch (Exception e) when (e is HttpRequestException or TaskCanceledException or System.Text.Json.JsonException)
         {
@@ -291,6 +300,7 @@ public sealed class AppUpdates
     public async Task<string> NowAsync()
     {
         asked = true;
+        fresh = true;
         string result = await RoundAsync();
         if (result == Waiting)
         {
