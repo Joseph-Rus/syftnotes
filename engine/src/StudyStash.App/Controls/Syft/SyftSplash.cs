@@ -1,4 +1,3 @@
-using System.Diagnostics;
 using Avalonia;
 using Avalonia.Automation;
 using Avalonia.Automation.Peers;
@@ -45,8 +44,11 @@ public sealed class SyftSplash : Clocked
     /// <summary>Inline, the stage is cut to this: the s with room over it for Pop Back's hop, and the wordmark under it.</summary>
     internal static readonly SKRect InlineFrame = new(12, 42, 88, 158);
 
-    readonly Stopwatch shown = new();
-    IDisposable? due;
+    /// <summary>The clock its minimum, its maximum and its fade are timed on (the drawing has the render thread's own);
+    /// tests move a fake one.</summary>
+    public TimeProvider Clock { get; init; } = TimeProvider.System;
+    long? shownAt;
+    IDisposable? due, fadeDone;
     bool fading, finished, settled;
 
     static SyftSplash()
@@ -107,8 +109,8 @@ public sealed class SyftSplash : Clocked
     protected override void OnAttachedToVisualTree(VisualTreeAttachmentEventArgs e)
     {
         base.OnAttachedToVisualTree(e);
-        if (shown.IsRunning || finished) return;
-        shown.Start();
+        if (shownAt is not null || finished) return;
+        shownAt = Clock.GetTimestamp();
         if (Inline)
             // Played out, it rests: nothing left to move.
             Later(IntroSeconds(Playing) + 0.1, () =>
@@ -132,12 +134,12 @@ public sealed class SyftSplash : Clocked
     protected override void OnPropertyChanged(AvaloniaPropertyChangedEventArgs change)
     {
         base.OnPropertyChanged(change);
-        if (change.Property == IsReadyProperty && IsReady && shown.IsRunning && !Inline) Ready();
+        if (change.Property == IsReadyProperty && IsReady && shownAt is not null && !Inline) Ready();
     }
 
     void Ready()
     {
-        double left = MinSeconds - shown.Elapsed.TotalSeconds;
+        double left = MinSeconds - Clock.GetElapsedTime(shownAt!.Value).TotalSeconds;
         if (left <= 0) FadeOut();
         else Later(left, FadeOut);
     }
@@ -145,8 +147,12 @@ public sealed class SyftSplash : Clocked
     void Later(double seconds, Action then)
     {
         due?.Dispose();
-        due = DispatcherTimer.RunOnce(then, TimeSpan.FromSeconds(Math.Max(0, seconds)));
+        due = After(seconds, then);
     }
+
+    /// <summary>Runs <paramref name="then"/> on the UI thread once <paramref name="seconds"/> have gone by on <see cref="Clock"/>.</summary>
+    IDisposable After(double seconds, Action then) =>
+        Clock.CreateTimer(_ => Dispatcher.UIThread.Post(then), null, TimeSpan.FromSeconds(Math.Max(0, seconds)), Timeout.InfiniteTimeSpan);
 
     /// <summary>Fades out over <see cref="FadeSeconds"/> (timed on the render thread's clock), then says it's finished.</summary>
     void FadeOut()
@@ -155,12 +161,14 @@ public sealed class SyftSplash : Clocked
         fading = true;
         Mark();
         InvalidateVisual();
-        DispatcherTimer.RunOnce(() =>
+        // Kept apart from the minimum and maximum's timer (and held, so it's never collected before it fires): once the
+        // fade has started, Finished always comes, as it did.
+        fadeDone = After(FadeSeconds + 0.02, () =>
         {
             finished = true;
             Sync();
             Finished?.Invoke();
-        }, TimeSpan.FromSeconds(FadeSeconds + 0.02));
+        });
     }
 
     protected override Size MeasureOverride(Size availableSize) =>
