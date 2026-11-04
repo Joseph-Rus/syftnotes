@@ -66,6 +66,9 @@ public sealed class AiConnect(IAiLibrary library)
     /// card doesn't need to: its own watch turns it ready by itself, and the library makes the first AI signed in the one
     /// that writes the notes.</summary>
     public bool WaitForSignIn { get; init; } = true;
+    /// <summary>The student has just signed in here with the AI's own sign-in, which the library doesn't see (setup's
+    /// install and sign-in screens): an AI the library still has as signed out is checked, and never signed in again here.</summary>
+    public bool SignedInHere { get; init; }
 
     /// <summary>AIs whose last sign-in happened where Syft Notes can't see it finish: checked before signing in again.</summary>
     readonly HashSet<string> checkFirst = [];
@@ -119,12 +122,16 @@ public sealed class AiConnect(IAiLibrary library)
 
             // 3 · Signed in: checked when that isn't known yet (or after a sign-in somewhere Syft Notes can't see), and the
             // hidden sign-in when it isn't.
-            if (Is(engine, AiEngineState.Unchecked, AiEngineState.Failed) || Is(engine, AiEngineState.NotSignedIn) && checkFirst.Remove(id))
+            if (Is(engine, AiEngineState.Unchecked, AiEngineState.Failed) || Is(engine, AiEngineState.NotSignedIn) && (checkFirst.Remove(id) || SignedInHere))
             {
                 Say(ConnectStep.Checking, $"Checking {brand}…");
                 overview = (await library.CheckAsync(id))?.Overview ?? await library.EnginesAsync();
                 engine = overview?.Engines.FirstOrDefault(e => e.Id == id);
             }
+            // Signed in here moments ago, yet the library still can't use it: no browser page nobody asked for. Settings
+            // and Home offer Sign in, as for any AI signed out.
+            if (SignedInHere && Is(engine, AiEngineState.NotSignedIn))
+                return new ConnectOutcome(false, $"{brand} isn't signed in yet. Try again.") { Apps = apps, Overview = overview };
             if (Is(engine, AiEngineState.NotSignedIn))
             {
                 Say(ConnectStep.SigningIn, $"Signing in to {brand}… finish in your browser.");
