@@ -133,7 +133,7 @@ public sealed class FakeLibrarySettings
           "notes": {"write": true, "sort": true, "min_confidence": 0.6, "writer": "Ollama (gemma4:e4b)"},
           "ollama": {"host": "http://localhost:11434", "answering": true,
                      "models": [{"name": "gemma4:e4b", "size": "9.6 GB"}, {"name": "qwen3:1.7b", "size": "1.4 GB"}],
-                     "summary_model": "", "sort_model": "gemma4:e4b", "recommended": "gemma4:e4b"},
+                     "summary_model": "", "sort_model": "gemma4:e4b", "chosen": true},
           "sorting": {"engine": "", "default": "Ollama", "engines": [{"id": "ollama", "name": "Ollama", "installed": true}, {"id": "claude", "name": "Claude", "installed": true}, {"id": "codex", "name": "ChatGPT", "installed": false}]},
           "terminal": {"current": "ghostty", "choices": [{"id": "terminal", "name": "Terminal"}, {"id": "ghostty", "name": "Ghostty"}]},
           "folders": [

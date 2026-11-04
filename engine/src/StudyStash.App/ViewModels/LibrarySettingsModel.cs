@@ -254,7 +254,8 @@ public sealed partial class LibrarySettingsModel : ObservableObject
     [ObservableProperty] public partial bool OllamaAnswering { get; set; }
     [ObservableProperty] public partial string SummaryModel { get; set; } = "";
     [ObservableProperty] public partial string SortModel { get; set; } = "";
-    [ObservableProperty] public partial string Recommended { get; set; } = "";
+    /// <summary>Ollama is chosen for the notes, sorting or Ask: only then is it worth saying it isn't answering.</summary>
+    [ObservableProperty] public partial bool OllamaChosen { get; set; }
     [ObservableProperty] public partial IReadOnlyList<SettingChoice> SummaryChoices { get; set; } = [];
     [ObservableProperty] public partial IReadOnlyList<SettingChoice> SortChoices { get; set; } = [];
     [ObservableProperty] public partial IReadOnlyList<SettingChoice> TerminalChoices { get; set; } = [];
@@ -262,7 +263,9 @@ public sealed partial class LibrarySettingsModel : ObservableObject
     [ObservableProperty] public partial string SortEngine { get; set; } = "";
     [ObservableProperty] public partial IReadOnlyList<SettingChoice> SortEngineChoices { get; set; } = [];
     [ObservableProperty] public partial string Terminal { get; set; } = "";
+    /// <summary>How many lectures have a summary (what "Rewrite all" rewrites).</summary>
     [ObservableProperty] public partial int Lectures { get; set; }
+    public bool HasSummaries => Lectures > 0;
     public IReadOnlyList<SettingChoice> ConfidenceChoices { get; }
 
     public string WriteNotesSub => Writer.Length > 0 ? $"With {Writer}, after each lecture" : "After each lecture";
@@ -274,7 +277,7 @@ public sealed partial class LibrarySettingsModel : ObservableObject
     public bool HasTerminals => TerminalChoices.Count > 0;
     public string OllamaLine => OllamaAnswering
         ? "Ollama runs on the library's computer; notes and sorting stay there and cost nothing."
-        : $"Ollama isn't answering on the library's computer, so local notes and sorting wait. Open the Ollama app there (the model to get: {Recommended}).";
+        : OllamaChosen ? $"Ollama isn't answering on the library's computer, so local notes and sorting wait. Open the Ollama app there (the model to get: {SortModel})." : "";
     public string RewriteTitle => Lectures == 1 ? "Rewrite the summary" : $"Rewrite all {Lectures} summaries";
     public string RewriteSub => Writer.Length > 0 ? $"With {Writer}, one at a time. Lectures stay readable meanwhile." : "One at a time. Lectures stay readable meanwhile.";
 
@@ -331,7 +334,11 @@ public sealed partial class LibrarySettingsModel : ObservableObject
 
     partial void OnSummaryModelChanged(string value) => OnPropertyChanged(nameof(SummaryLabel));
 
-    partial void OnSortModelChanged(string value) => OnPropertyChanged(nameof(SortLabel));
+    partial void OnSortModelChanged(string value)
+    {
+        OnPropertyChanged(nameof(SortLabel));
+        OnPropertyChanged(nameof(OllamaLine));
+    }
 
     partial void OnTerminalChanged(string value) => OnPropertyChanged(nameof(TerminalLabel));
 
@@ -347,9 +354,13 @@ public sealed partial class LibrarySettingsModel : ObservableObject
 
     partial void OnOllamaAnsweringChanged(bool value) => OnPropertyChanged(nameof(OllamaLine));
 
-    partial void OnRecommendedChanged(string value) => OnPropertyChanged(nameof(OllamaLine));
+    partial void OnOllamaChosenChanged(bool value) => OnPropertyChanged(nameof(OllamaLine));
 
-    partial void OnLecturesChanged(int value) => OnPropertyChanged(nameof(RewriteTitle));
+    partial void OnLecturesChanged(int value)
+    {
+        OnPropertyChanged(nameof(RewriteTitle));
+        OnPropertyChanged(nameof(HasSummaries));
+    }
 
     partial void OnFilesChanged(int value) => OnPropertyChanged(nameof(FilesLine));
 
@@ -440,12 +451,13 @@ public sealed partial class LibrarySettingsModel : ObservableObject
             UpdateLine = newer ? $"Version {Str(u?["latest"]).TrimStart('v')} is out. The library has {Version}." : IsHere ? $"Syft Notes {Version}, the newest." : $"Your library has Syft Notes {Version}, the newest.";
             AutoUpdate = Flag(u?["auto"]) && (!IsHere || AppAutoUpdate?.Invoke() != false);
 
-            int i = 0;
-            var classes = (s["classes"] as JsonArray ?? []).OfType<JsonObject>().Select(c => new LibraryClassRow
+            var classes = (s["classes"] as JsonArray ?? []).OfType<JsonObject>().Select((c, i) => new LibraryClassRow
             {
                 Name = Str(c["name"]), Was = Str(c["name"]), Description = Str(c["description"]), Folder = Str(c["folder"]), Group = Str(c["group"]),
                 Aliases = string.Join(", ", (c["aliases"] as JsonArray ?? []).Select(Str).Where(a => a.Length > 0)),
-                Lectures = c["lectures"] is JsonValue cl && cl.TryGetValue(out int k) ? k : 0, Dot = Skin.ClassDot(i++),
+                Lectures = c["lectures"] is JsonValue cl && cl.TryGetValue(out int k) ? k : 0,
+                // The colour it keeps (a library from before says none: its place gives it one, as it did then).
+                Dot = Skin.ClassDot(c["color"] is JsonValue cv && cv.TryGetValue(out int color) ? color : i),
             }).ToList();
             knownClasses = [.. classes.Select(c => c.Name)];
             // What was just typed comes back as it was sent: keep those rows (and the field being typed in).
@@ -472,7 +484,7 @@ public sealed partial class LibrarySettingsModel : ObservableObject
             OllamaAnswering = Flag(ollama?["answering"]);
             SummaryModel = Str(ollama?["summary_model"]);
             SortModel = Str(ollama?["sort_model"]);
-            Recommended = Str(ollama?["recommended"]);
+            OllamaChosen = Flag(ollama?["chosen"]);
             var models = (ollama?["models"] as JsonArray ?? []).OfType<JsonObject>().Select(o => (Name: Str(o["name"]), Size: Str(o["size"]))).ToList();
             List<SettingChoice> ModelChoices(string current, Action<string> pick)
             {

@@ -121,7 +121,7 @@ public static class CanvasView
 
     // --- classes ---------------------------------------------------------------------------------------------------
 
-    public static JsonObject ClassRow(string cls, CanvasSettings s, CourseIndex? index, ScoutState scout, DateTimeOffset now)
+    public static JsonObject ClassRow(string cls, CanvasSettings s, CourseIndex? index, ScoutState scout, DateTimeOffset now, IReadOnlyList<DueMark>? marks = null)
     {
         long? id = s.Courses.TryGetValue(cls, out long cid) ? cid : null;
         var suggested = id is null ? CourseMatch.Suggest(cls, s.Available, s.CourseInfo) : null;
@@ -130,8 +130,9 @@ public static class CanvasView
         var info = s.CourseInfo.GetValueOrDefault(idText);
         string title = titles.GetValueOrDefault(idText) ?? (index is { Name.Length: > 0 } ? CourseNames.Title(index.Name, index.Code) : "");
         string shortCode = CourseNames.ShortCode(index?.Code is { Length: > 0 } c ? c : info?.Code ?? "", index?.Name ?? info?.Name ?? "");
-        var done_ = index?.Assignments.Select(a => Assignments.From(cls, a, now).Done).ToList() ?? [];
-        int toHandIn = done_.Count(d => !d), done = done_.Count(d => d);
+        var mine = DueMarks.Apply((index?.Assignments ?? []).Select(a => Assignments.From(cls, a, now)), marks ?? [])
+            .Where(a => a.Mark != DueMarks.Hidden).ToList();
+        int toHandIn = mine.Count(a => Assignments.ToHandIn(a, TimeZoneInfo.ConvertTime(now, TimeZoneInfo.Local).DateTime)), done = mine.Count - toHandIn;
         int newAnnouncements = index?.Announcements.Count(a => !a.ReadOnCanvas) ?? 0;
         return new JsonObject
         {
@@ -149,12 +150,17 @@ public static class CanvasView
                 ["announcements"] = index?.Announcements.Count ?? 0, ["announcements_new"] = newAnnouncements,
             },
             ["files_hidden"] = index?.FilesHidden ?? false,
+            // The student's grade in the class when Canvas shares it; null when it doesn't (or before a sync that asked).
+            ["grade"] = index?.Grade is { } grade ? new JsonObject { ["score"] = grade.Score, ["letter"] = grade.Letter } : null,
             ["scout"] = new JsonObject { ["state"] = scout.State, ["files"] = scout.Files, ["when"] = When(scout.When), ["report"] = scout.Report },
         };
     }
 
-    public static JsonArray Classes(IReadOnlyList<string> classNames, CanvasSettings s, string home, Func<string, ScoutState> scoutOf, DateTimeOffset now) =>
-        new(classNames.Select(cls => (JsonNode)ClassRow(cls, s, CourseIndex.Load(home, cls), scoutOf(cls), now)).ToArray());
+    public static JsonArray Classes(IReadOnlyList<string> classNames, CanvasSettings s, string home, Func<string, ScoutState> scoutOf, DateTimeOffset now)
+    {
+        var marks = DueMarks.Load(home);
+        return new(classNames.Select(cls => (JsonNode)ClassRow(cls, s, CourseIndex.Load(home, cls), scoutOf(cls), now, marks)).ToArray());
+    }
 
     // --- assignments and the Due list ---------------------------------------------------------------------------
 
@@ -167,33 +173,35 @@ public static class CanvasView
         ["excused"] = a.Excused, ["submitted"] = When(a.Submitted), ["graded_at"] = When(a.GradedAt),
         // When the student ticked it off in Canvas's planner (the flag is the status "marked_done"); null otherwise.
         ["marked_done"] = a.MarkedDone ? When(a.MarkedDoneAt) : null,
+        // What the student did about it in Syft Notes alone ("done", "hidden", or ""): the one an Undo takes back.
+        ["mark"] = a.Mark,
         ["url"] = a.Url, ["folder"] = folder,
     };
 
     static DateTime? DueOf(Assignment a) => a.Due.Length > 0 ? DateTime.Parse(a.Due, CultureInfo.InvariantCulture) : null;
 
-    /// <summary>When the student last did something about it (submitted, or it was graded), local time; null for
-    /// work that's never been touched.</summary>
+    /// <summary>When the student last did something about it (submitted, it was graded, or they ticked it off in Canvas's
+    /// planner or here), local time; null for work that's never been touched.</summary>
     static DateTime? RecentOf(Assignment a, TimeZoneInfo zone)
     {
+        DateTime? InZone(string iso) => iso.Length > 0 && DateTimeOffset.TryParse(iso, CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal, out var t)
+            ? TimeZoneInfo.ConvertTime(t, zone).DateTime : null;
         DateTime? submitted = a.Submitted.Length > 0 ? DateTime.Parse(a.Submitted, CultureInfo.InvariantCulture) : null;
-        DateTime? graded = a.GradedAt.Length > 0 && DateTimeOffset.TryParse(a.GradedAt, CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal, out var g)
-            ? TimeZoneInfo.ConvertTime(g, zone).DateTime : null;
-        DateTime? markedDone = a.MarkedDoneAt.Length > 0 && DateTimeOffset.TryParse(a.MarkedDoneAt, CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal, out var m)
-            ? TimeZoneInfo.ConvertTime(m, zone).DateTime : null;
-        DateTime? best = submitted is null ? graded : graded is null ? submitted : submitted > graded ? submitted : graded;
-        return best is null ? markedDone : markedDone is null ? best : markedDone > best ? markedDone : best;
+        return new[] { submitted, InZone(a.GradedAt), InZone(a.MarkedDoneAt), a.Mark == DueMarks.Done ? InZone(a.MarkAt) : null }.Max();
     }
 
     /// <summary>The Due list across every class: overdue, due this week, later, with no due date, and handed in in
-    /// the last week (newest first). <paramref name="folderOf"/> looks up where an assignment's files are.</summary>
-    public static JsonObject Due(IReadOnlyList<Assignment> all, string synced, DateTimeOffset nowOffset, TimeZoneInfo zone, Func<string, long, string?> folderOf)
+    /// the last week (newest first). What the student hid (<see cref="DueMarks"/>) is in none of them: it comes apart, as
+    /// <c>hidden</c>, for the Due tab's "Show hidden". <paramref name="folderOf"/> looks up where an assignment's files are.</summary>
+    public static JsonObject Due(IReadOnlyList<Assignment> everything, string synced, DateTimeOffset nowOffset, TimeZoneInfo zone, Func<string, long, string?> folderOf)
     {
+        var all = everything.Where(a => a.Mark != DueMarks.Hidden).ToList();
         var now = TimeZoneInfo.ConvertTime(nowOffset, zone).DateTime;
-        bool Overdue(Assignment a) => !a.Done && DueOf(a) is { } d && d < now;
-        bool Week(Assignment a) => !a.Done && DueOf(a) is { } d && d >= now && d < now.Date.AddDays(8);
-        bool Later(Assignment a) => !a.Done && DueOf(a) is { } d && d >= now.Date.AddDays(8);
-        bool Undated(Assignment a) => !a.Done && DueOf(a) is null;
+        bool ToHandIn(Assignment a) => Assignments.ToHandIn(a, now);
+        bool Overdue(Assignment a) => ToHandIn(a) && DueOf(a) is { } d && d < now;
+        bool Week(Assignment a) => ToHandIn(a) && DueOf(a) is { } d && d >= now && d < now.Date.AddDays(8);
+        bool Later(Assignment a) => ToHandIn(a) && DueOf(a) is { } d && d >= now.Date.AddDays(8);
+        bool Undated(Assignment a) => ToHandIn(a) && DueOf(a) is null;
         bool HandedIn(Assignment a) => a.Done && RecentOf(a, zone) is { } r && r >= now.AddDays(-7);
 
         JsonNode Row(Assignment a) => ItemJson(a, folderOf(a.ClassName, a.Id));
@@ -214,14 +222,20 @@ public static class CanvasView
             groups.Add(new JsonObject { ["key"] = key, ["label"] = label, ["items"] = new JsonArray(items.Select(Row).ToArray()) });
         }
         var next = toHandIn.Where(a => DueOf(a) is not { } d || d >= now).OrderBy(a => DueOf(a) ?? DateTime.MaxValue).FirstOrDefault();
-        return new JsonObject { ["synced"] = When(synced), ["to_hand_in"] = toHandIn.Count, ["next"] = next is null ? null : Row(next), ["groups"] = groups };
+        var hidden = everything.Where(a => a.Mark == DueMarks.Hidden).OrderBy(a => DueOf(a) ?? DateTime.MaxValue).ThenBy(a => a.Name, StringComparer.Ordinal);
+        return new JsonObject
+        {
+            ["synced"] = When(synced), ["to_hand_in"] = toHandIn.Count, ["next"] = next is null ? null : Row(next), ["groups"] = groups,
+            ["hidden"] = new JsonArray(hidden.Select(Row).ToArray()),
+        };
     }
 
-    /// <summary>One class's assignments: still to hand in (soonest first), and done (most recently due first).</summary>
-    public static JsonObject ForClass(string cls, IReadOnlyList<Assignment> mine, Func<long, string?> folderOf)
+    /// <summary>One class's assignments: still to hand in (soonest first), and the rest, done or behind you (most recently
+    /// due first). <paramref name="now"/> is the wall clock the due dates are in.</summary>
+    public static JsonObject ForClass(string cls, IReadOnlyList<Assignment> mine, Func<long, string?> folderOf, DateTime now)
     {
-        var toHandIn = mine.Where(a => !a.Done).OrderBy(a => DueOf(a) ?? DateTime.MaxValue).ThenBy(a => a.Name, StringComparer.Ordinal).ToList();
-        var done = mine.Where(a => a.Done).OrderByDescending(a => DueOf(a) ?? DateTime.MinValue).ToList();
+        var toHandIn = mine.Where(a => Assignments.ToHandIn(a, now)).OrderBy(a => DueOf(a) ?? DateTime.MaxValue).ThenBy(a => a.Name, StringComparer.Ordinal).ToList();
+        var done = mine.Where(a => !Assignments.ToHandIn(a, now)).OrderByDescending(a => DueOf(a) ?? DateTime.MinValue).ToList();
         JsonNode Row(Assignment a) => ItemJson(a, folderOf(a.Id));
         return new JsonObject
         {
@@ -277,10 +291,10 @@ public static class CanvasView
 
     /// <summary>One assignment, everything the design's assignment sheet shows: instructions, rubric with marks,
     /// submission, comments and where its spec and feedback are saved.</summary>
-    public static JsonObject? Assignment(CourseIndex? index, long id, DateTimeOffset now, string? folder)
+    public static JsonObject? Assignment(CourseIndex? index, long id, DateTimeOffset now, string? folder, IReadOnlyList<DueMark> marks)
     {
         if (index?.Assignments.FirstOrDefault(a => a.Id == id) is not { } a) return null;
-        var row = ItemJson(Assignments.From(index.Class, a, now), folder ?? a.Folder);
+        var row = ItemJson(DueMarks.Apply([Assignments.From(index.Class, a, now)], marks)[0], folder ?? a.Folder);
         row["instructions"] = a.Instructions;
         row["unlock_at"] = When(a.UnlockAt);
         row["lock_at"] = When(a.LockAt);

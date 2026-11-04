@@ -406,7 +406,7 @@ public static class Engines
         var ollama = engines[0];
         // Nobody chosen yet (a fresh library): an Ollama that isn't running is no problem to report.
         bool ollamaMatters = (settings.Picked("notes") || settings.Picked("ask"))
-            && (settings.For("notes").Provider == "ollama" || settings.For("ask").Provider == "ollama" || settings.Fallback);
+            && (settings.For("notes").Provider == "ollama" || settings.For("ask").Provider == "ollama" || CanFallBack(settings, checks));
         if (ollamaMatters && ollama.State == "not_running" && !Dismissed("engine_offline:ollama"))
             problems.Add(new AiProblemInfo("engine_offline:ollama", "engine_offline", "ollama", ollama.Name));
         if (ollamaMatters && ollama.State == "model_missing" && !Dismissed("model_missing:ollama"))
@@ -420,7 +420,7 @@ public static class Engines
             if (Dismissed(pid) || problems.Any(p => p.Id == pid)) continue;
             var row = engines.First(e => e.Id == id);
             if (row.State != "not_signed_in") continue;
-            problems.Add(new AiProblemInfo(pid, "not_signed_in", id, row.Name) { FallbackTo = settings.Fallback ? Name("ollama") : "" });
+            problems.Add(new AiProblemInfo(pid, "not_signed_in", id, row.Name) { FallbackTo = CanFallBack(settings, checks) ? Name("ollama") : "" });
         }
 
         foreach (var (id, until) in settings.Limits)
@@ -434,7 +434,7 @@ public static class Engines
         // Who draws the diagrams now: nobody when they're off, the designer the pick comes to, else the notes engine
         // itself (as it writes), the one the notes really go to once a fallback is counted.
         string notesNow = settings.For("notes").Provider;
-        if (notesNow.Length > 0 && notesNow != "ollama" && settings.Fallback && KnownUnusableWhy(notesNow, settings, checks) is not null) notesNow = "ollama";
+        if (notesNow.Length > 0 && notesNow != "ollama" && CanFallBack(settings, checks) && KnownUnusableWhy(notesNow, settings, checks) is not null) notesNow = "ollama";
         string diagrams = DiagramEngines.Normal(settings.Diagrams);
         string by = settings.Kinds() == RichKinds.None || !settings.NotesChosen ? ""
             : (await DiagramEngines.PickAsync(settings, cfg, checks, notesNow))?.Engine ?? notesNow;
