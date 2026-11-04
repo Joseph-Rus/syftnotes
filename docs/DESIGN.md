@@ -251,7 +251,10 @@ project or its author.
   is a read-only fetch proxy. It asks the library for work
   (`/api/v2/canvas/work`) with its own key, fetches Canvas URLs with the browser's own session, and
   posts the answers back — never a Canvas API token, which many schools disable. The sync is a
-  persisted job queue; a read an AI asks for (the MCP Canvas tools) jumps the queue.
+  persisted job queue; a read an AI asks for (the MCP Canvas tools) jumps the queue. The student can mark a Due item
+  done or hide it (`POST /api/v2/canvas/mark`): that lives in `due_marks.json` (`DueMarks`) and never reaches Canvas.
+  `Assignments.Shown` is the saved list with those marks on it and the hidden left out, and every list reads it
+  (`Assignments.Load` is the sync's own copy, for what writes the list back); the Due list returns the hidden apart.
 - **Chat and history** (`Core/Ai/Chats.cs`, `History.cs`): a chat turn runs the picked AI in the
   library folder with the engine's own MCP server. With edits allowed, the library's text is
   committed first, then exactly the files the turn changed become one commit, which History lists
