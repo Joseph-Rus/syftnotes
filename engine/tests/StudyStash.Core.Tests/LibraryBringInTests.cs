@@ -267,10 +267,21 @@ public sealed class LibraryBringInTests
         }
         main.Store.AddAttachment(new Attachment("slides", "slides.pdf", "slides.pdf", "Thermodynamics", null, new FileInfo(theirs).Length, "application/pdf", "2026-09-14"));
         main.Store.AddAttachment(new Attachment("photo", "IMG_0001.jpg", "IMG_0001.jpg", "Thermodynamics", null, new FileInfo(photoHere).Length, "image/jpeg", "2026-11-02"));
+        // Two listed with one name (a phone's "page 1.jpg", added once while each folder was in use), sizes unknown.
+        string pageHere = Path.Combine(school, "Thermodynamics", Store.AttachmentsFolder, "page 1.jpg");
+        string pageThere = Path.Combine(personal, "Thermodynamics", Store.AttachmentsFolder, "page 1.jpg");
+        File.WriteAllText(pageHere, "this folder's page");
+        File.WriteAllText(pageThere, "the old folder's page");
+        foreach (string id in new[] { "page-a", "page-b" })
+            main.Store.AddAttachment(new Attachment(id, "page 1.jpg", "page 1.jpg", "Thermodynamics", null, 0, "image/jpeg", "2026-10-01"));
 
-        var did = LibraryBringIn.Refile(main.Store, main.Cfg, personal, home);
+        var did = LibraryBringIn.Apply(main.Store, main.Cfg, personal, home);
 
-        Assert.Equal(1, did.Files);
+        // slides beside, the second page beside, and the old photo of IMG_0001.jpg's name as an attachment of its own.
+        Assert.Equal(3, did.Files);
+        // X's file was gone: it's written afresh from its row, at a path of its own.
+        string x = main.Store.Get("x")!.MdPath!;
+        Assert.Contains("X's notes.", File.ReadAllText(x));
         Assert.NotEqual(y, main.Store.Get("x")!.MdPath);
         Assert.True(main.Store.Trash("x"));
         Assert.Equal(yText, File.ReadAllText(y));
@@ -279,9 +290,17 @@ public sealed class LibraryBringInTests
         Assert.Equal("%PDF old folder's slides", File.ReadAllText(main.Store.AttachmentPath(moved)));
         // The photo added in this folder stays this folder's file.
         Assert.Equal("this folder's whiteboard photo", File.ReadAllText(main.Store.AttachmentPath(main.Store.GetAttachment("photo")!)));
+        // The old folder's photo that no listed attachment took comes in as its own.
+        Assert.Contains(main.Store.ListAttachments("Thermodynamics"), a => a.Name == "IMG_0001.jpg" && a.Id != "photo"
+            && File.ReadAllText(main.Store.AttachmentPath(a)) == "an old photo of the same name");
+        // The two pages: each its own file, so removing one leaves the other's.
+        string pageA = main.Store.AttachmentPath(main.Store.GetAttachment("page-a")!), pageB = main.Store.AttachmentPath(main.Store.GetAttachment("page-b")!);
+        Assert.NotEqual(pageA, pageB, StringComparer.OrdinalIgnoreCase);
+        Assert.True(main.Store.RemoveAttachment("page-a"));
+        Assert.True(File.Exists(pageB));
         Assert.True(main.Store.RemoveAttachment("slides"));
         Assert.Equal("%PDF this folder's own slides", File.ReadAllText(ours));
-        Assert.Equal(0, LibraryBringIn.Refile(main.Store, main.Cfg, personal, home).Files);
+        Assert.Equal(0, LibraryBringIn.Apply(main.Store, main.Cfg, personal, home).Files);
     }
 
     /// <summary>One lecture's path is never another's, even before its file is written: a lecture whose file is gone
@@ -300,6 +319,8 @@ public sealed class LibraryBringInTests
             // X: its file gone from the old folder since. Z: another lecture's file sits at its old path now.
             xOld = before.File("x", "Thermodynamics", "Entropy", "X's notes.");
             zOld = before.File("z", "Thermodynamics", "Enthalpy", "Z's notes.");
+            // H: its file edited by hand since, front matter and all taken out.
+            File.WriteAllText(before.File("h", "Thermodynamics", "Heat pumps", "H's notes."), "Edited by hand.\n");
         }
         File.Delete(xOld);
         File.Delete(zOld);
@@ -314,15 +335,19 @@ public sealed class LibraryBringInTests
 
         LibraryBringIn.Apply(main.Store, main.Cfg, personal, home);
 
-        string?[] paths = [.. new[] { "x", "y", "w", "z", "v" }.Select(id => main.Store.Get(id)?.MdPath)];
-        Assert.All(paths, p => Assert.NotNull(p));
+        // Every lecture has a file of its own: one path each, each with its own words. X's and Z's were written afresh
+        // from their rows; Z didn't take V's words, and V and H came in as themselves (H with the student's edit).
+        string[] ids = ["x", "y", "w", "z", "v", "h"];
+        string[] paths = [.. ids.Select(id => main.Store.Get(id)!.MdPath!)];
         Assert.Equal(paths.Length, paths.Distinct(StringComparer.OrdinalIgnoreCase).Count());
-        // Z didn't take V's words: V came in as itself.
-        Assert.False(File.Exists(main.Store.Get("z")!.MdPath) && File.ReadAllText(main.Store.Get("z")!.MdPath!).Contains("V's notes."));
-        Assert.Contains("V's notes.", File.ReadAllText(main.Store.Get("v")!.MdPath!));
-        // Deleting X takes none of the others' files.
+        foreach (var (id, words) in new[] { ("x", "X's notes."), ("y", "Y's notes."), ("w", "W's notes."), ("z", "Z's notes."), ("v", "V's notes."), ("h", "Edited by hand.") })
+            Assert.Contains(words, File.ReadAllText(main.Store.Get(id)!.MdPath!));
+        // A new lecture of X's class, day and title, and a trashed one put back, never land on another's file.
+        string n = main.File("n", "Thermodynamics", "Entropy", "N's notes.");
+        Assert.DoesNotContain(n, paths, StringComparer.OrdinalIgnoreCase);
+        // Deleting X and Z takes none of the others' files.
         Assert.True(main.Store.Trash("x"));
         Assert.True(main.Store.Trash("z"));
-        foreach (string id in new[] { "y", "w", "v" }) Assert.True(File.Exists(main.Store.Get(id)!.MdPath));
+        foreach (string id in new[] { "y", "w", "v", "h", "n" }) Assert.True(File.Exists(main.Store.Get(id)!.MdPath));
     }
 }

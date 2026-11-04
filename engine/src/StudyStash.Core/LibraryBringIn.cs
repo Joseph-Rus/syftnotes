@@ -128,15 +128,16 @@ public static class LibraryBringIn
             {
                 Step();
                 string rel = inside.Rel(row.MdPath!)!;
-                if (!File.Exists(row.MdPath) || Read(row.MdPath!)?.Id != row.Id)
+                // The file there is this lecture's when its id says so, or it has none (edited by hand: no other lecture
+                // can claim it). Otherwise (gone, or another lecture's, which comes in as that one) the lecture's file is
+                // written here afresh from its row, so its row never points at a path with no file.
+                if (!File.Exists(row.MdPath) || Read(row.MdPath!) is { } there && there.Id != row.Id)
                 {
-                    // Its file is gone from there (or another lecture's file is there now, which comes in as that one):
-                    // the row looks for it here from now on (the lecture is in its row), at a path no other lecture has.
-                    if (apply) store.Refile(row.Id, FreeFor(store, Path.Combine(into, rel), row.Id));
+                    if (apply) store.WriteFromRow(row.Id, Path.Combine(into, rel));
                     continue;
                 }
                 string text = Text(row.MdPath!);
-                if (apply) store.Refile(row.Id, CopyIn(store, row.Id, text, Path.Combine(into, rel)));
+                if (apply) store.Refile(row.Id, CopyIn(text, Path.Combine(into, rel)));
                 fresh++;
                 planned[row.Id] = text;
                 copied.Add(Path.GetFullPath(Path.Combine(from, rel)));
@@ -182,7 +183,7 @@ public static class LibraryBringIn
             if (mine is null)
             {
                 if (row is null) Enlist(store, cfg, note, note.Text, null, apply, newClasses);
-                else if (apply) store.Refile(row.Id, CopyIn(store, row.Id, note.Text, Path.Combine(into, Path.GetRelativePath(from, note.Path))));
+                else if (apply) store.Refile(row.Id, CopyIn(note.Text, Path.Combine(into, Path.GetRelativePath(from, note.Path))));
                 fresh++;
                 planned[note.Id] = note.Text;
                 return;
@@ -212,30 +213,50 @@ public static class LibraryBringIn
         int ListedAttachments(List<Attachment> listed)
         {
             int n = 0;
-            foreach (var a in listed)
+            // Each name in a class's Attachments, with every listed attachment that has it (two can: one added while each
+            // folder was in use). Two attachments never share one file.
+            foreach (var group in listed.Where(a => Under(store.AttachmentPath(a), store.PoolDir))
+                         .GroupBy(a => Path.GetRelativePath(store.PoolDir, store.AttachmentPath(a)), LibraryFolders.Comparer))
             {
-                Step();
-                string mine = store.AttachmentPath(a);
-                if (!Under(mine, store.PoolDir)) continue;
-                string target = Path.Combine(into, Path.GetRelativePath(store.PoolDir, mine));
-                string other = Path.Combine(from, Path.GetRelativePath(store.PoolDir, mine));
-                if (!File.Exists(other)) continue;
-                copiedFiles.Add(Path.GetFullPath(other));
-                if (File.Exists(target))
+                string target = Path.Combine(into, group.Key), other = Path.Combine(from, group.Key);
+                var rows = group.ToList();
+                bool targetHere = File.Exists(target), otherHere = File.Exists(other);
+                long here = targetHere ? Length(target) : -1, there = otherHere ? Length(other) : -1;
+                bool same = targetHere && otherHere && SameBytes(target, other);
+                // The one that keeps the file here: the one listed with its size; else, unless one is proven to be the
+                // other folder's file (listed with that size), the first.
+                Attachment? keeper = !targetHere ? null
+                    : rows.FirstOrDefault(a => a.Size == here) ?? (same || !rows.Any(a => a.Size == there) ? rows[0] : null);
+                bool otherTaken = keeper is not null && same;
+                foreach (var a in rows)
                 {
-                    // Two different files of the attachment's name, here and there: whose is it? The one the size it was
-                    // listed with says so. Only when that's the other folder's (and not this one's) does it come in
-                    // beside this folder's file, the attachment pointed at it; otherwise this folder's stays its file.
-                    if (SameBytes(target, other) || Length(target) == a.Size || Length(other) != a.Size) continue;
-                    string file = Core.Attachments.FreeName(Py.Parent(target), Path.GetFileName(target));
-                    if (apply)
+                    Step();
+                    if (a == keeper || !otherHere) continue;
+                    if (keeper is null && !targetHere)
                     {
-                        Store.PutWhole(Path.Combine(Py.Parent(target), file), temp => File.Copy(other, temp), overwrite: false);
-                        store.SetAttachmentFile(a.Id, file);
+                        // Nothing here yet: the old folder's file comes to its own place.
+                        if (apply) Store.PutWhole(target, temp => File.Copy(other, temp), overwrite: false);
+                        keeper = a;
+                        targetHere = true;
                     }
+                    else
+                    {
+                        // This folder's file is another's: this one's comes in beside it, and the attachment points at it.
+                        string file = Core.Attachments.FreeName(Py.Parent(target), Path.GetFileName(target));
+                        if (apply)
+                        {
+                            Store.PutWhole(Path.Combine(Py.Parent(target), file), temp => File.Copy(other, temp), overwrite: false);
+                            store.SetAttachmentFile(a.Id, file);
+                        }
+                    }
+                    otherTaken = true;
+                    n++;
                 }
-                else if (apply) Store.PutWhole(target, temp => File.Copy(other, temp), overwrite: false);
-                n++;
+                // A file no listed attachment took comes in as its own (OtherAttachments); one taken never does, even
+                // after the attachment that took it is removed.
+                if (!otherTaken) continue;
+                copiedFiles.Add(Path.GetFullPath(other));
+                if (apply) store.SetState(Taken + FolderId(Path.GetFileName(Py.Parent(Py.Parent(other))), Sha(other)), "taken");
             }
             return n;
         }
@@ -265,8 +286,9 @@ public static class LibraryBringIn
                 }
                 if (HasCopy(dir, size, sha)) continue;
                 // The same file attached to two classes is one attachment in each: the id is the class's and the file's.
-                string id = "folder-" + Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(clsFolder.ToLowerInvariant() + "/" + sha)))[..24];
-                if (gone.Contains(id)) continue; // removed by the student once: it stays removed
+                string id = FolderId(clsFolder, sha);
+                // Removed by the student once, or taken once as a listed attachment's own file: it stays as it is.
+                if (gone.Contains(id) || store.GetState(Taken + id) is not null) continue;
                 if (store.GetAttachment(id) is not null || planned.ContainsKey(id)) continue;
                 planned[id] = "";
                 n++;
@@ -291,14 +313,14 @@ public static class LibraryBringIn
             ?? store.ClassesSummary().Select(c => c.ClassName).FirstOrDefault(c => Notes.FolderName(c).Equals(folder, StringComparison.OrdinalIgnoreCase))
             ?? folder;
 
-        /// <summary>Lecture <paramref name="id"/>'s note file copied into this folder at <paramref name="want"/>, or beside
-        /// it when that's a different file or another lecture's path: where it is. Written whole or not at all.</summary>
-        static string CopyIn(Store store, string id, string text, string want)
+        /// <summary>A note file copied into this folder at <paramref name="want"/>, or beside it when that's a different
+        /// file: where it is. Written whole or not at all.</summary>
+        static string CopyIn(string text, string want)
         {
             string path = want;
-            for (int i = 2; File.Exists(path) || Others(store, path, id); i++)
+            for (int i = 2; File.Exists(path); i++)
             {
-                if (!Others(store, path, id) && File.Exists(path) && Same(Text(path), text)) return path;
+                if (Same(Text(path), text)) return path;
                 path = Path.Combine(Py.Parent(want), $"{Path.GetFileNameWithoutExtension(want)} ({i}).md");
             }
             Store.WriteWhole(path, text);
@@ -395,18 +417,12 @@ public static class LibraryBringIn
         return true;
     }
 
-    /// <summary><paramref name="want"/> when nothing is there or the note file there is lecture <paramref name="id"/>'s;
-    /// otherwise the first free "name (2).md" beside it.</summary>
-    static string FreeFor(Store store, string want, string id)
-    {
-        string path = want;
-        for (int i = 2; File.Exists(path) && Read(path)?.Id != id || Others(store, path, id); i++)
-            path = Path.Combine(Py.Parent(want), $"{Path.GetFileNameWithoutExtension(want)} ({i}).md");
-        return path;
-    }
+    /// <summary>The id an attached file of the other folder's comes in with: its class folder's and its bytes'.</summary>
+    static string FolderId(string clsFolder, string sha) =>
+        "folder-" + Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(clsFolder.ToLowerInvariant() + "/" + sha)))[..24];
 
-    /// <summary>Whether another lecture's row has <paramref name="path"/> as its note file (written there or not yet).</summary>
-    static bool Others(Store store, string path, string id) => store.IdAt(path) is { } owner && owner != id;
+    /// <summary>Before a <see cref="FolderId"/> in sync_state: that file was taken as a listed attachment's own.</summary>
+    const string Taken = "bring-in-taken:";
 
     static long Length(string path)
     {
@@ -486,7 +502,7 @@ public static class LibraryBringIn
             string name = $"{Notes.DatePrefix(m.Date)} {Notes.Slugify(m.Title)}";
             string dir = store.ClassDir(cls);
             at = Path.Combine(dir, name + ".md");
-            for (int i = 2; File.Exists(at) || Others(store, at, m.Id); i++) at = Path.Combine(dir, $"{name} ({i}).md");
+            for (int i = 2; File.Exists(at); i++) at = Path.Combine(dir, $"{name} ({i}).md");
         }
         store.Save(m, new Classification(cls, note.Confidence, note.By, note.LectureTitle, note.Topics), note.Summary, note.SummaryBy,
             at: at, keepText: text);
