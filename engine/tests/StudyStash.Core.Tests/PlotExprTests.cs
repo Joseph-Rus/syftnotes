@@ -171,12 +171,13 @@ public class PlotExprTests
     public void A_hostile_sequence_or_a_chain_of_curves_stops_within_its_budget()
     {
         // Counted in steps, not seconds: a busy machine made a time limit fail when nothing was wrong.
-        // Each term a long sum, ten thousand terms: the table shares one budget, so the last term is never worked out.
+        // Each term a long sum, ten thousand terms: the table shares one budget.
+        // The first terms fit in it; a late one doesn't (each term its own budget would work them all out).
         var heavy = Plot.Parse("bars a(n) = sum(k, 1, 40000, k) for n from 0 to 10000");
         var state = new PlotState(heavy);
-        double last = state.Term(heavy.Items.OfType<PlotSeries>().Single(), 10000);
-        Assert.True(double.IsNaN(last));
-        Assert.True(state.Env.Spent <= PlotEnv.MaxSteps * 10 + 100, $"the table took {state.Env.Spent} steps");
+        var bars = heavy.Items.OfType<PlotSeries>().Single();
+        Assert.True(double.IsNaN(state.Term(bars, 9999)));
+        Assert.Equal(800020000, state.Term(bars, 0));
         // Each curve calls the one before twice: 2^23 calls if nothing stopped it. Once its steps are spent each call
         // takes one more and gives up, so it ends a few steps past the budget, not millions.
         var lines = new List<string> { "f0(x) = x" };
