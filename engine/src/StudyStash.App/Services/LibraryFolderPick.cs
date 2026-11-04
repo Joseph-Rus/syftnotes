@@ -80,7 +80,7 @@ public static class LibraryFolderPick
         {
             // The answer isn't remembered, so the question comes back at the next start until the copying is done.
             host.Log($"[library] couldn't finish with the notes folder: {done.Failure!.Kind}");
-            return bringIn || inUse ? done : Outcome<List<BringInCount>>.Failed(NotFinished);
+            return bringIn || inUse ? done : Outcome<List<BringInCount>>.Failed(NotFinished(others.Count));
         }
         host.Log($"[library] brought in: {string.Join("; ", done.Value!.Select(d => $"{d.New} new, {d.Here} here, {d.Both} both, {d.Deleted} deleted, {d.Files} files"))}");
         host.Save(s =>
@@ -99,8 +99,8 @@ public static class LibraryFolderPick
     public static string? FolderInUse(AppHost host) => LibraryHere.Existing(host.Home)?.PoolDir;
 
     /// <summary>The folder was switched, but the lectures from the other one couldn't be copied in yet.</summary>
-    public static readonly Failure NotFinished = new(FailureKind.Refused,
-        "Syft Notes uses this folder now, but couldn't copy your lectures over from the other one yet. Try again.");
+    public static Failure NotFinished(int others) => new(FailureKind.Refused,
+        $"Syft Notes uses this folder now, but couldn't copy your lectures over from {(others > 1 ? "the others" : "the other one")} yet. Try again.");
 
     /// <summary>What bringing in the other folders' notes would do, with <paramref name="picked"/> as the folder the
     /// library uses: one count per other folder. Changes nothing.</summary>

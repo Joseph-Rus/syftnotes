@@ -130,8 +130,9 @@ public static class LibraryBringIn
                 string rel = inside.Rel(row.MdPath!)!;
                 if (!File.Exists(row.MdPath))
                 {
-                    // Its file is gone from there: the row looks for it here from now on (the lecture is in its row).
-                    if (apply) store.Refile(row.Id, Path.Combine(into, rel));
+                    // Its file is gone from there: the row looks for it here from now on (the lecture is in its row), at a
+                    // path no other lecture's file is at.
+                    if (apply) store.Refile(row.Id, FreeFor(Path.Combine(into, rel), row.Id));
                     continue;
                 }
                 string text = Text(row.MdPath!);
@@ -218,9 +219,21 @@ public static class LibraryBringIn
                 if (!Under(mine, store.PoolDir)) continue;
                 string target = Path.Combine(into, Path.GetRelativePath(store.PoolDir, mine));
                 string other = Path.Combine(from, Path.GetRelativePath(store.PoolDir, mine));
-                if (File.Exists(target) || !File.Exists(other)) continue;
+                if (!File.Exists(other)) continue;
                 copiedFiles.Add(Path.GetFullPath(other));
-                if (apply) Store.PutWhole(target, temp => File.Copy(other, temp), overwrite: false);
+                if (File.Exists(target))
+                {
+                    if (SameBytes(target, other)) continue;
+                    // A different file of that name here (this folder's own): this attachment's comes in beside it, and
+                    // the attachment is pointed at it, so it never opens or removes the other.
+                    string file = Core.Attachments.FreeName(Py.Parent(target), Path.GetFileName(target));
+                    if (apply)
+                    {
+                        Store.PutWhole(Path.Combine(Py.Parent(target), file), temp => File.Copy(other, temp), overwrite: false);
+                        store.SetAttachmentFile(a.Id, file);
+                    }
+                }
+                else if (apply) Store.PutWhole(target, temp => File.Copy(other, temp), overwrite: false);
                 n++;
             }
             return n;
@@ -379,6 +392,28 @@ public static class LibraryBringIn
         Store.PutWhole(path, temp => File.Copy(other, temp), overwrite: false);
         store.SetState(key, path);
         return true;
+    }
+
+    /// <summary><paramref name="want"/> when nothing is there or the note file there is lecture <paramref name="id"/>'s;
+    /// otherwise the first free "name (2).md" beside it.</summary>
+    static string FreeFor(string want, string id)
+    {
+        string path = want;
+        for (int i = 2; File.Exists(path) && Read(path)?.Id != id; i++)
+            path = Path.Combine(Py.Parent(want), $"{Path.GetFileNameWithoutExtension(want)} ({i}).md");
+        return path;
+    }
+
+    static bool SameBytes(string a, string b)
+    {
+        try
+        {
+            return new FileInfo(a).Length == new FileInfo(b).Length && Sha(a) == Sha(b);
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException)
+        {
+            return false;
+        }
     }
 
     /// <summary>Whether <paramref name="dir"/> has a file of this size and SHA-256 already.</summary>

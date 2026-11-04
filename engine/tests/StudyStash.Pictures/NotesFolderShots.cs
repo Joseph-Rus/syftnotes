@@ -21,7 +21,7 @@ public class NotesFolderShots
         var model = new NotesFolderPickModel(found, home, (_, _, progress, _) =>
             {
                 // The switch went through but the copying didn't: what the student reads then.
-                if (failed) return Task.FromResult(Services.Outcome<List<BringInCount>>.Failed(Services.LibraryFolderPick.NotFinished));
+                if (failed) return Task.FromResult(Services.Outcome<List<BringInCount>>.Failed(Services.LibraryFolderPick.NotFinished(1)));
                 if (!copying) return Task.FromResult(Services.Outcome<List<BringInCount>>.Answered([Counted(found[1].Path)]));
                 // Part-way through a big folder: it says how far, and never finishes in the picture.
                 progress(120, 400);

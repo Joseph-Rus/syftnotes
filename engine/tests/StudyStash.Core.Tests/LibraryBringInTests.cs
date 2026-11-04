@@ -236,4 +236,45 @@ public sealed class LibraryBringInTests
         Assert.Equal(0, LibraryBringIn.PointingInto(main.Store, personal));
         Assert.StartsWith(school, main.Store.Get("old")!.MdPath);
     }
+
+    /// <summary>Copying in after a switch never points one lecture or attachment at another's file: a lecture whose file
+    /// is gone from the old folder, and an attachment whose name the new folder has for a different file, each get a
+    /// free name, so deleting them never deletes the other.</summary>
+    [Fact]
+    public void A_lecture_or_attachment_never_takes_over_another_file()
+    {
+        using var dir = new TempDir();
+        string home = dir["home"];
+        string school = Path.Combine(home, "OneDrive - Example University", "Documents", "Study Stash");
+        string personal = Path.Combine(home, "OneDrive", "Documents", "Study Stash");
+        // X was filed in the old folder, and its file has gone from there since.
+        using (var before = new Library(dir, "main", personal)) File.Delete(before.File("x", "Thermodynamics", "Entropy", "X's notes."));
+        using var main = new Library(dir, "main", school);
+        // Y: this folder's own lecture of the same class, day and title.
+        string y = main.File("y", "Thermodynamics", "Entropy", "Y's notes.");
+        string yText = File.ReadAllText(y);
+        // An attachment listed here whose file is in the old folder, where this folder has a different file of its name.
+        var slides = new Attachment("slides", "slides.pdf", "slides.pdf", "Thermodynamics", null, 3, "application/pdf", "2026-09-14");
+        main.Store.AddAttachment(slides);
+        string theirs = Path.Combine(personal, "Thermodynamics", Store.AttachmentsFolder, "slides.pdf");
+        string ours = Path.Combine(school, "Thermodynamics", Store.AttachmentsFolder, "slides.pdf");
+        foreach (var (path, words) in new[] { (theirs, "%PDF old folder's slides"), (ours, "%PDF this folder's own slides") })
+        {
+            Directory.CreateDirectory(Path.GetDirectoryName(path)!);
+            File.WriteAllText(path, words);
+        }
+
+        var did = LibraryBringIn.Refile(main.Store, main.Cfg, personal, home);
+
+        Assert.Equal(1, did.Files);
+        Assert.NotEqual(y, main.Store.Get("x")!.MdPath);
+        Assert.True(main.Store.Trash("x"));
+        Assert.Equal(yText, File.ReadAllText(y));
+        var moved = main.Store.GetAttachment("slides")!;
+        Assert.NotEqual("slides.pdf", moved.File);
+        Assert.Equal("%PDF old folder's slides", File.ReadAllText(main.Store.AttachmentPath(moved)));
+        Assert.True(main.Store.RemoveAttachment("slides"));
+        Assert.Equal("%PDF this folder's own slides", File.ReadAllText(ours));
+        Assert.Equal(0, LibraryBringIn.Refile(main.Store, main.Cfg, personal, home).Files);
+    }
 }
