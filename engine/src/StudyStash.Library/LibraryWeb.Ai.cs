@@ -432,7 +432,7 @@ public sealed partial class LibraryWeb
         })));
 
         // Notes an AI the library doesn't run wrote: an AI app through Syft Notes' connection (from "app", which the
-        // student can switch off in Settings → AI apps, checked here on every save), or a chat the student pasted them
+        // student can switch off in Settings → Your AI → Advanced settings, checked here on every save), or a chat the student pasted them
         // from ("paste"). replace: the lecture's own notes may be replaced (they're kept, to put back).
         app.MapPost("/api/v2/ai/rewrite/{lecture}/save", Http.Handle(ctx => ApiAsync(ctx, async () =>
         {
