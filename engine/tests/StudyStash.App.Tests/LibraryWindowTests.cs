@@ -116,6 +116,90 @@ public class LibraryWindowTests
         Assert.False(m.HasAnswer);
     }
 
+    /// <summary>On Home the panel opens the moment a question is sent, with the question and "Asking …" in it, and the
+    /// bar glides into the panel's foot then and there. It used to sit at the foot of the page until the answer came:
+    /// docked, the bar is narrow enough to stack, and measured at one width while arranged at another it kept the
+    /// layout going until the layout gave up on the page. Closing it the same way left the bar a small card at the
+    /// panel's corner until another page opened.</summary>
+    [AvaloniaTheory]
+    [InlineData(SkinKind.Mac)]
+    [InlineData(SkinKind.Win)]
+    public async Task On_Home_the_bar_glides_into_the_panel_as_the_question_is_sent(SkinKind skin)
+    {
+        var answer = new TaskCompletionSource<AskReply?>();
+        var ai = new FakeAiLibrary { Overview = AiDemo.Overview(), OnAskStream = (_, _, _) => answer.Task };
+        var ask = new AiAskModel(ai) { Place = new AskPlace("home") };
+        ask.OnlyScopes("all");
+        await ask.Load();
+        var m = Demo.Semester(Demo.Page.Home);
+        m.Overview!.Ask = ask;
+        Action<double>? step = null;
+        Action? done = null;
+        var was = AskSplit.Animate;
+        AskSplit.Animate = (_, _, s, d) => { (step, done) = (s, d); s(0); return new Stopped(); };
+        var view = Library(skin, m);
+        var w = Host(view, skin);
+        try
+        {
+            w.Width = 1248;
+            w.Height = 720;
+            Dispatcher.UIThread.RunJobs();
+            var split = view.GetVisualDescendants().OfType<AskSplit>().Single(s => s.IsEffectivelyVisible);
+            var bar = split.Bar!;
+            double rest = bar.Bounds.X;
+
+            ask.Question = "What is k-means?";
+            var asking = ask.AskCommand.ExecuteAsync(null);
+            Assert.NotNull(step);
+            for (int frame = 1; frame <= 10; frame++)
+            {
+                step!(1 - Math.Pow(1 - frame / 10.0, 3));
+                Dispatcher.UIThread.RunJobs();
+                if (frame == 3) Assert.True(bar.Bounds.X > rest + 1, $"mid-glide the bar should be on its way, at {bar.Bounds.X} from {rest}");
+            }
+            done!();
+            Dispatcher.UIThread.RunJobs();
+
+            // Still no answer: the panel is open with the question and the thinking line, and the bar is at its foot.
+            Assert.False(answer.Task.IsCompleted);
+            Assert.True(split.Beside);
+            var panel = new Rect(split.Bounds.Width - AskSplit.PanelWidth(split.Bounds.Width), 0, AskSplit.PanelWidth(split.Bounds.Width), split.Bounds.Height);
+            Assert.True(panel.Contains(bar.Bounds), $"the bar {bar.Bounds} isn't docked in the panel {panel}");
+            var thread = view.GetVisualDescendants().OfType<ScrollViewer>().First(s => s.Name == "Thread");
+            Assert.Contains(thread.GetVisualDescendants().OfType<TextBlock>(), t => t.Text == AiWords.Thinking(ask.EngineName) && t.IsEffectivelyVisible);
+            Assert.Contains(thread.GetVisualDescendants().OfType<PageText>(), t => t.Text == "What is k-means?" && t.IsEffectivelyVisible);
+
+            answer.SetResult(new AskReply("A way to group points around centres.", [], "gemini", "Gemini"));
+            await asking;
+            Dispatcher.UIThread.RunJobs();
+
+            // Close: the bar glides back to the middle of the page's foot, full width again, with no page change.
+            step = null;
+            ask.CloseAnswerCommand.Execute(null);
+            Assert.NotNull(step);
+            for (int frame = 1; frame <= 10; frame++)
+            {
+                step!(1 - Math.Pow(1 - frame / 10.0, 3));
+                Dispatcher.UIThread.RunJobs();
+            }
+            done!();
+            Dispatcher.UIThread.RunJobs();
+            Assert.False(split.Beside);
+            Assert.True(Math.Abs(bar.Bounds.Center.X - split.Bounds.Width / 2) < 1, $"the bar {bar.Bounds} should be back in the middle of {split.Bounds.Width}");
+            Assert.True(Math.Abs(bar.Bounds.X - rest) < 1, $"the bar should be back where it rested, at {rest}: {bar.Bounds}");
+        }
+        finally
+        {
+            AskSplit.Animate = was;
+            w.Close();
+        }
+    }
+
+    sealed class Stopped : IDisposable
+    {
+        public void Dispose() { }
+    }
+
     [AvaloniaTheory]
     [InlineData(SkinKind.Mac)]
     [InlineData(SkinKind.Win)]

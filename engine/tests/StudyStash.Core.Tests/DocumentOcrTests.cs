@@ -33,8 +33,12 @@ public class DocumentOcrTests
     {
         if (!OperatingSystem.IsMacOS()) return;
         string? text = await DocumentText.ExtractAsync(Fixture(name), NoCache, default);
-        SaysTheNotes(text);
-        Assert.True(text!.IndexOf("Midterm", StringComparison.OrdinalIgnoreCase) < text.IndexOf("averages", StringComparison.OrdinalIgnoreCase));
+        // What the name promises: the page is read top to bottom. Three words Vision reads the same in every version
+        // and format, in the order they're written down the page; the exact reading of the rest ("n log n" came out as
+        // "nogn" from a HEIC on one macOS) is Vision's, not ours.
+        Assert.NotNull(text);
+        int[] at = new[] { "Midterm", "Mitochondria", "averages" }.Select(w => text.IndexOf(w, StringComparison.OrdinalIgnoreCase)).ToArray();
+        Assert.True(at.All(i => i >= 0) && at[0] < at[1] && at[1] < at[2], $"not read top to bottom: {text}");
     }
 
     /// <summary>A PDF like one an iPad exports: each page the handwriting as a picture, perhaps a typed title above it.</summary>
