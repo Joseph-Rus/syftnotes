@@ -911,26 +911,35 @@ public sealed partial class Store : IDisposable
                 Exec("UPDATE notes SET class_name=?, classified_by=?, confidence=1.0 WHERE id=?", className, by, noteId);
                 return string.IsNullOrEmpty(row.MdPath) ? null : row.MdPath;
             }
-            string? old = string.IsNullOrEmpty(row.MdPath) ? null : row.MdPath;
-            var m = Meeting(row);
-            string summary = row.SummaryMd ?? "", model = row.SummaryModel ?? "";
-            // What was written in the note file itself (in another app, or by an AI working in the folder) and not taken
-            // in yet goes with it: its summary taken in first (the older one kept as a version), and the file's own text
-            // moved, in its new class. A file that can't be read throws, and nothing moves.
-            string? edited = null;
-            bool crlf = false;
-            if (old is not null)
-            {
-                var was = new Classification(row.ClassName ?? "", row.Confidence ?? 1, row.ClassifiedBy ?? "", row.LectureTitle ?? "", JsonList(row.Topics));
-                edited = EditedFile(old, m, was, summary, model, out crlf);
-                if (edited is not null && TakeInSummary(row, m, summary, model, edited) is { } theirs) summary = theirs;
-            }
-            var c = new Classification(className, 1.0, by, row.LectureTitle ?? "", JsonList(row.Topics));
-            string? moved = edited is null ? null : Notes.WithClass(edited, row.ClassName ?? "", className);
-            string newPath = Save(m, c, summary, model, row.Error ?? "", fileText: moved is not null && crlf ? moved.Replace("\n", "\r\n") : moved);
-            DropEmptyDir(old, newPath);
-            return newPath;
+            return Refile(row, new Classification(className, 1.0, by, row.LectureTitle ?? "", JsonList(row.Topics)), null,
+                text => Notes.WithClass(text, row.ClassName ?? "", className));
         }
+    }
+
+    /// <summary>A filed lecture's note file written again where it belongs now that its class or title changed
+    /// (<paramref name="c"/>; <paramref name="change"/> changes the lecture itself). What was written in the file itself
+    /// (in another app, or by an AI working in the folder) and not taken in yet goes with it: its summary taken in first
+    /// (the older one kept as a version), and the file's own text moved, changed by <paramref name="sameInFile"/> to say
+    /// the same. A file that can't be read throws, and nothing moves. Where the file is now.</summary>
+    string Refile(NoteRow row, Classification c, Action<Meeting>? change, Func<string, string> sameInFile)
+    {
+        string? old = string.IsNullOrEmpty(row.MdPath) ? null : row.MdPath;
+        var m = Meeting(row);
+        string summary = row.SummaryMd ?? "", model = row.SummaryModel ?? "";
+        string? edited = null;
+        bool crlf = false;
+        if (old is not null)
+        {
+            var was = new Classification(row.ClassName ?? "", row.Confidence ?? 1, row.ClassifiedBy ?? "", row.LectureTitle ?? "", JsonList(row.Topics));
+            edited = EditedFile(old, m, was, summary, model, out crlf);
+            if (edited is not null && TakeInSummary(row, m, summary, model, edited) is { } theirs) summary = theirs;
+        }
+        change?.Invoke(m);
+        // The file's own text is written in the library's place before the old file goes, so a write that fails loses nothing.
+        string? moved = edited is null ? null : sameInFile(edited);
+        string path = Save(m, c, summary, model, row.Error ?? "", fileText: moved is not null && crlf ? moved.Replace("\n", "\r\n") : moved);
+        DropEmptyDir(old, path);
+        return path;
     }
 
     /// <summary>What became of renaming a lecture.</summary>
@@ -948,14 +957,13 @@ public sealed partial class Store : IDisposable
             var row = Get(noteId);
             if (row is null) return Renamed.Gone;
             if (row.Status is Queued or Working) return Renamed.Busy;
-            string? old = string.IsNullOrEmpty(row.MdPath) ? null : row.MdPath;
-            var m = Meeting(row);
-            m.Title = title;
-            m.Raw[Core.Meeting.TitleBy] = Core.Meeting.ByHand;
             var c = new Classification(string.IsNullOrEmpty(row.ClassName) ? Configs.Unsorted : row.ClassName, row.Confidence ?? 0,
                 row.ClassifiedBy ?? "", title, JsonList(row.Topics));
-            string path = Save(m, c, row.SummaryMd ?? "", row.SummaryModel ?? "", row.Error ?? "");
-            DropEmptyDir(old, path);
+            Refile(row, c, m =>
+            {
+                m.Title = title;
+                m.Raw[Core.Meeting.TitleBy] = Core.Meeting.ByHand;
+            }, text => Notes.WithTitle(text, row.LectureTitle is { Length: > 0 } was ? was : row.Title ?? "", title));
             return Renamed.Done;
         }
     }

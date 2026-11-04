@@ -86,6 +86,25 @@ public static partial class Notes
         return (bom ? "\uFEFF" : "") + string.Join("\n", lines);
     }
 
+    /// <summary>A note file for a lecture renamed from <paramref name="from"/> to <paramref name="to"/>: its front matter's
+    /// <c>title:</c> and <c>lecture_title:</c> and the heading at its top (as <see cref="Render"/> writes them, and only while
+    /// the heading still says the old title) say the new one, every other line as it is.</summary>
+    public static string WithTitle(string text, string from, string to) => Lines(text, lines =>
+    {
+        int end = FrontMatterEnd(lines);
+        for (int i = 1; i < end; i++)
+        {
+            if (lines[i].StartsWith("title: ", StringComparison.Ordinal)) lines[i] = $"title: {PyJson.Dumps(to)}";
+            else if (lines[i].StartsWith("lecture_title: ", StringComparison.Ordinal)) lines[i] = $"lecture_title: {PyJson.Dumps(to)}";
+        }
+        for (int i = end + 1; i < lines.Length; i++)
+        {
+            if (lines[i].Trim().Length == 0) continue;
+            if (lines[i] == "# " + from) lines[i] = "# " + to; // a heading the student changed stays theirs
+            break;
+        }
+    });
+
     /// <summary>A note file whose summary says who wrote it as <paramref name="writer"/> ("_Written by … from the
     /// transcript._" under it, as <see cref="Render"/> writes it; with no writer, no such line), every other line as it
     /// is. As it is, for a file with no summary.</summary>
