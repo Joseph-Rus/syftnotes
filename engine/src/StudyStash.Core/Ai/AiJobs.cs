@@ -838,7 +838,7 @@ public sealed class AiJobs(string home, Func<string>? ollamaHost = null)
     {
         var settings = Settings;
         string who = engine is { Length: > 0 } e ? e : settings.For("ask").Provider;
-        if (who != "ollama" && settings.Fallback && Engines.KnownUnusableWhy(who, settings, Checks) is not null) who = "ollama";
+        if (who != "ollama" && CanFallBack(settings) && Engines.KnownUnusableWhy(who, settings, Checks) is not null) who = "ollama";
         if (who != "ollama" || (!cfg.OllamaEnabled && Providers is null)) return false;
         lock (warming)
         {
@@ -856,8 +856,8 @@ public sealed class AiJobs(string home, Func<string>? ollamaHost = null)
 
     /// <summary>
     /// Answer a question with a chosen engine (the request's, or ai.json's "ask" pick): when it's known unusable
-    /// (not installed, not signed in, hit its limit) and <see cref="AiSettings.Fallback"/> is on, Ollama answers up
-    /// front; otherwise it's tried for real, under <see cref="AskTimeout"/>, and only falls back on a timeout or an
+    /// (not installed, not signed in, hit its limit) and <see cref="AiSettings.Fallback"/> is on and Ollama is installed,
+    /// Ollama answers up front; otherwise it's tried for real, under <see cref="AskTimeout"/>, and only falls back on a timeout or an
     /// error (never mid-run: that's the pipeline's own job). Every engine that's actually run has its result
     /// recorded (<see cref="Record"/>).
     /// <para><paramref name="answerSoFar"/>, when given, hears the answer as it's written (all of it so far, each
@@ -936,10 +936,14 @@ public sealed class AiJobs(string home, Func<string>? ollamaHost = null)
             why = timedOut ? $"{Engines.Name(engine)} didn't respond in time." : $"{Engines.Name(engine)} didn't answer: {ex.Message}";
             if (!CanFallBack(settings))
             {
-                // Nothing to fall back to: the engine's own trouble comes back, in plain words, not an Ollama that isn't here.
+                string name = Engines.Name(engine);
                 if (timedOut) throw new InvalidOperationException(why, ex);
-                if (SetupChat.Classify(ex.Message) == ChatProblem.Offline) throw new InvalidOperationException(Engines.CouldntBeReached(Engines.Name(engine)), ex);
-                throw;
+                // Fallback switched off: the AI's own error comes back as it is. Otherwise Ollama just isn't here, and the
+                // student is told what's wrong with the AI in plain words (its raw text stays in its record and as the inner
+                // exception), not that an Ollama they never set up isn't installed.
+                if (!settings.Fallback) throw;
+                throw new InvalidOperationException(SetupChat.Classify(ex.Message) == ChatProblem.Offline ? Engines.CouldntBeReached(name)
+                    : Engines.KnownUnusableWhy(engine, Settings, Checks) ?? Engines.DidntAnswer(name), ex);
             }
             fellBack = true;
             engine = "ollama";
