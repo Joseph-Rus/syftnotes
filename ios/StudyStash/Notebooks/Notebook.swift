@@ -313,7 +313,9 @@ final class NotebookStore {
         if let old = n.attachmentID, old != added.first?.id { try? await api.deleteAttachment(old) }
         guard var latest = notebook(id) else { return }
         latest.attachmentID = added.first?.id
-        latest.savedAt = made
+        // Dates are kept to the second on disk: one changed in the same second its PDF was made still reads as changed
+        // when it's opened again.
+        latest.savedAt = latest.updated > made ? min(made, latest.updated.addingTimeInterval(-1)) : made
         save(latest)
     }
 

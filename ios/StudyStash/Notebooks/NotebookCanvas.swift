@@ -143,16 +143,18 @@ final class NotebookCanvas: NSObject {
         guard let n = notebook else { return }
         layOut(n)
         var strokes: [PKStroke] = []
+        written = [:]
         for (i, p) in n.pages.enumerated() {
-            strokes += store.drawing(n, p).transformed(using: CGAffineTransform(translationX: frames[i].minX, y: frames[i].minY)).strokes
+            let placed = store.drawing(n, p).transformed(using: CGAffineTransform(translationX: frames[i].minX, y: frames[i].minY)).strokes
+            // What the page's file holds, placed as `flush` will see it: a page that no longer holds just that (a stroke
+            // that fell onto the next page when this one got shorter) is written again.
+            written[p.id] = Self.signature(placed)
+            strokes += placed
         }
         settingDrawing = true
         canvas.drawing = PKDrawing(strokes: strokes)
         settingDrawing = false
-        // What each page holds now, as `flush` will see it, so only a page written on is written again.
-        let pages = strokesByPage()
-        written = Dictionary(zip(n.pages.map(\.id), pages.map(Self.signature)), uniquingKeysWith: { a, _ in a })
-        noteLastPage(pages)
+        noteLastPage(strokesByPage())
         canvas.undoManager?.removeAllActions()
         refreshUndo()
         pageCount = n.pages.count
