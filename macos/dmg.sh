@@ -2,7 +2,11 @@
 # stage_dmg, the one place a Syft Notes DMG is made. Sourced (never run) by macos/build-app.sh, which makes the
 # first, ad hoc signed DMG, and by macos/sign-release.sh, which makes it again around the Developer ID signed and
 # notarized app. The caller sets OUT (a scratch folder these stage and mount under) and calls
-#   stage_dmg "<path>/Study Stash.app" "Syft Notes" "<path>/Syft-Notes.dmg"
+#   stage_dmg "<path>/Syft Notes.app" "Syft Notes" "<path>/Syft-Notes.dmg"
+# The disk holds "Syft Notes.app", a link to /Applications, and a hidden link "Study Stash.app" to the app: an older
+# copy's updater (0.22 and before) looks on the disk for the bundle by the name it has itself, Study Stash.app, and
+# copies it out through the link (ditto follows it); the new app then renames itself (MacRename.cs). Finder never
+# shows the hidden link, so a student sees one app to drag.
 
 # The DMG: a stage folder with the app plus a link to /Applications. The disk shows the app's icon when it opens
 # (.VolumeIcon.icns, flagged on the volume, which only a mounted read-write copy can take), and the .dmg file itself
@@ -41,8 +45,9 @@ stage_dmg() {
   mnt="$OUT/mount"
   rm -rf "$stage" "$rw" "$mnt"
   mkdir -p "$stage" "$mnt"
-  ditto "$app_path" "$stage/Study Stash.app"
+  ditto "$app_path" "$stage/Syft Notes.app"
   ln -s /Applications "$stage/Applications"
+  ln -s "Syft Notes.app" "$stage/Study Stash.app"
   # How the disk opens (tools/dmg/make_ds_store.py): one small window, the app on the left and the Applications
   # folder on the right, so the one thing to do is to drag the left one onto the right one. A saved Finder layout
   # (a .DS_Store), so no Finder scripting runs while the DMG is built.
@@ -52,6 +57,8 @@ stage_dmg() {
   hdi create -volname "$volname" -srcfolder "$stage" -ov -format UDRW "$rw"
   if hdiutil attach -quiet -nobrowse -mountpoint "$mnt" "$rw"; then
     SetFile -a C "$mnt" 2>/dev/null || true
+    # Hidden on the mounted disk itself, so the flag is the disk's own.
+    chflags -h hidden "$mnt/Study Stash.app"
     # A volume something is still looking at won't let go: asked three times, then made to. One that's no longer
     # mounted is done ("No such file or directory": CI's runner sometimes lets go of it by itself, 0.18.5's run).
     hdi detach "$mnt" || hdiutil detach -force "$mnt" || ! mount | grep -qF " on $mnt ("

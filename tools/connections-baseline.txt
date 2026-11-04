@@ -1,6 +1,6 @@
 # Today's counts for tools/check-connections.sh: each may go down, never up. Lower a line when a change brings it down.
 sleeps 7
-engine-state-strings 58
+engine-state-strings 0
 shell-in-viewmodels 0
 shell-in-services 0
 windows-by-hand 6

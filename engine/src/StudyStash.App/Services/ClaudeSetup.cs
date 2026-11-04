@@ -421,6 +421,9 @@ public sealed class ClaudeSetup
     /// <summary>The places this app doesn't read that may hold a copy of Syft Notes' entry (Claude Desktop's older folders).</summary>
     IReadOnlyList<string> OthersOf(string id) => id == "claude-desktop" ? Desktop.Others : [];
 
+    /// <summary>The program Syft Notes' entry in this app's settings starts, or null when there's none.</summary>
+    public string? CommandOf(string id) => ReadText(ConfigOf(id)) is { } text ? EntryIn(id, text)?.Command : null;
+
     public AiAppState State(string id)
     {
         string path = ConfigOf(id);
