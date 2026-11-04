@@ -172,7 +172,7 @@
                 <StackPanel Orientation="Horizontal" Spacing="8">
                   <c:Icon Classes="chip" Classes.rec="{Binding Glyph, Converter={x:Static c:Converters.Records}}" Glyph="{Binding Glyph}" Size="18" VerticalAlignment="Center" />
                   <TextBlock Text="{Binding Title}" ToolTip.Tip="{Binding Title}" c:Tips.WhenCut="True" FontSize="{DynamicResource FontBody}" VerticalAlignment="Center" MaxWidth="420" TextTrimming="CharacterEllipsis" />
-                  <TextBlock Classes="meta" Text="{Binding Meta}" IsVisible="{Binding Meta, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" FontSize="{DynamicResource FontCaption}"
+                  <TextBlock Classes="meta" Text="{Binding Meta}" IsVisible="{Binding Meta, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" FontFamily="avares://StudyStash/Assets/Fonts#Atkinson Hyperlegible Next, Lucida Grande, .AppleSystemUIFont" FontSize="{DynamicResource FontCaption}"
                              VerticalAlignment="Center" />
                 </StackPanel>
               </Button>

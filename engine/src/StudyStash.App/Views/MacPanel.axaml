@@ -53,7 +53,7 @@
               <c:SyftCell Width="10" Height="10" Fill="{DynamicResource Recording}" VerticalAlignment="Center" />
               <TextBlock Grid.Column="2" Text="{Binding RecordLabel}" ToolTip.Tip="{Binding RecordLabel}" c:Tips.WhenCut="True" FontSize="{DynamicResource FontBodyStrong}" FontWeight="SemiBold"
                          VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
-              <TextBlock Grid.Column="3" Text="{Binding RecordShortcut}" FontSize="{DynamicResource FontCaption}" Opacity="0.75" Margin="8,0,0,0" VerticalAlignment="Center" />
+              <TextBlock Grid.Column="3" Text="{Binding RecordShortcut}" FontFamily="avares://StudyStash/Assets/Fonts#Atkinson Hyperlegible Next, Lucida Grande, .AppleSystemUIFont" FontSize="{DynamicResource FontCaption}" Opacity="0.75" Margin="8,0,0,0" VerticalAlignment="Center" />
             </Grid>
           </Button>
           <Button Name="SwitchClass" AutomationProperties.Name="Switch class" Grid.Column="4" Classes="drop-quiet" Width="34" Height="34"
@@ -157,7 +157,7 @@
           <Grid ColumnDefinitions="Auto,8,*,Auto">
             <c:Icon Glyph="search" Size="14" VerticalAlignment="Center" />
             <TextBlock Grid.Column="2" Text="Search notes and lectures" FontSize="{DynamicResource FontCaption}" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
-            <TextBlock Grid.Column="3" Text="{Binding SearchShortcut}" FontSize="{DynamicResource FontCaption}" Foreground="{DynamicResource InkSubtle}" Margin="6,0,0,0" VerticalAlignment="Center" />
+            <TextBlock Grid.Column="3" Text="{Binding SearchShortcut}" FontFamily="avares://StudyStash/Assets/Fonts#Atkinson Hyperlegible Next, Lucida Grande, .AppleSystemUIFont" FontSize="{DynamicResource FontCaption}" Foreground="{DynamicResource InkSubtle}" Margin="6,0,0,0" VerticalAlignment="Center" />
           </Grid>
         </Button>
         <Grid ColumnDefinitions="Auto,8,*" Margin="10,0" IsVisible="{Binding ShowStatus}">
