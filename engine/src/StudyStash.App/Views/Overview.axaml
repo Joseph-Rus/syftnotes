@@ -39,6 +39,18 @@
       <Setter Property="Margin" Value="0,16,0,0" />
       <Setter Property="HorizontalAlignment" Value="Left" />
     </Style>
+    <!-- Record's small menu (B): a chevron after a hairline inside the pill. A press on it opens the menu, not a recording. -->
+    <Style Selector="Button.record-more">
+      <Setter Property="Theme" Value="{StaticResource Surface}" />
+      <Setter Property="Width" Value="36" />
+      <Setter Property="Height" Value="40" />
+      <Setter Property="Padding" Value="0" />
+      <Setter Property="c:Cell.Round" Value="True" />
+      <Setter Property="Foreground" Value="{DynamicResource InkMuted}" />
+    </Style>
+    <Style Selector="Button.record-more:pointerover">
+      <Setter Property="Foreground" Value="{DynamicResource Ink}" />
+    </Style>
     <!-- A folder's rail: 272 beside its notes, or the page's width under them (narrow) -->
     <Style Selector="StackPanel.ov-rail">
       <Setter Property="Width" Value="272" />
@@ -77,6 +89,15 @@
               <TextBlock Text="Attach" VerticalAlignment="Center" />
             </StackPanel>
           </Button>
+          <!-- A lecture that already happened (A, a button of its own): pick a recording or a lecture video; it's written down
+               here, then your AI writes the notes -->
+          <Button Name="AddRecording" Classes="btn" Command="{Binding AddRecordingCommand}" IsVisible="{Binding ShowAddButton}"
+                  ToolTip.Tip="{x:Static vm:FromFileWords.AddTip}" AutomationProperties.Name="{x:Static vm:FromFileWords.AddButton}">
+            <StackPanel Orientation="Horizontal" Spacing="8">
+              <c:Icon Glyph="upload" Size="16" VerticalAlignment="Center" />
+              <TextBlock Text="{x:Static vm:FromFileWords.AddButton}" VerticalAlignment="Center" />
+            </StackPanel>
+          </Button>
           <!-- Record from here: into this folder on its page; on Home, into the event that's on, or Unsorted. Red is
                only the dot; while something records the pill is ringed in red, its dot a stop square, with the folder,
                the level and the time. Then a click on the pill opens the recording's page, and only the stop square
@@ -94,6 +115,30 @@
                           VerticalAlignment="Center" IsVisible="{Binding Running}" />
               <TextBlock Text="{Binding Elapsed}" FontWeight="Medium" Foreground="{DynamicResource InkMuted}" VerticalAlignment="Center" IsVisible="{Binding Recording}" />
               <TextBlock Classes="kbd" Text="{Binding RecordKeys}" FontSize="{DynamicResource FontCaption}" VerticalAlignment="Center" Margin="2,0,0,0" IsVisible="{Binding Idle}" />
+              <!-- (B) A small menu on Record: Record now, or add a recording you already have -->
+              <StackPanel Orientation="Horizontal" Spacing="2" IsVisible="{Binding ShowRecordMenu}" Margin="-2,0,-10,0">
+                <Border Width="1" Height="24" Background="{DynamicResource Line}" VerticalAlignment="Center" />
+                <Button Name="RecordMenu" Classes="record-more" ToolTip.Tip="More ways to add a lecture" AutomationProperties.Name="More ways to add a lecture">
+                  <c:Icon Glyph="expand_more" Size="16" VerticalAlignment="Center" />
+                  <Button.Flyout>
+                    <Flyout Placement="BottomEdgeAlignedRight" VerticalOffset="10" FlyoutPresenterClasses="bare">
+                      <Border Classes="menu" Width="296">
+                        <StackPanel>
+                          <Button Name="MenuRecord" Classes="menu-item" Click="OnPicked" HorizontalAlignment="Stretch" HorizontalContentAlignment="Stretch" Command="{Binding RecordCommand}">
+                            <Grid ColumnDefinitions="*,Auto">
+                              <TextBlock Text="{x:Static vm:FromFileWords.MenuRecord}" VerticalAlignment="Center" />
+                              <TextBlock Grid.Column="1" Classes="kbd" Text="{Binding RecordKeys}" FontSize="{DynamicResource FontCaption}" VerticalAlignment="Center" />
+                            </Grid>
+                          </Button>
+                          <Button Name="MenuAdd" Classes="menu-item" Click="OnPicked" HorizontalAlignment="Stretch" HorizontalContentAlignment="Stretch" Command="{Binding AddRecordingCommand}">
+                            <TextBlock Text="{x:Static vm:FromFileWords.MenuAdd}" VerticalAlignment="Center" />
+                          </Button>
+                        </StackPanel>
+                      </Border>
+                    </Flyout>
+                  </Button.Flyout>
+                </Button>
+              </StackPanel>
             </StackPanel>
           </Button>
         </StackPanel>
@@ -345,6 +390,20 @@
               ToolTip.Tip="{x:Static s:SupportAsk.HomeTip}" Margin="0,36,0,0" />
     </StackPanel>
   </ScrollViewer>
+  <!-- A recording dragged over the page: the page is veiled and ringed, and a card says it will be added as a lecture (other
+       files attach, as before) -->
+  <Border Name="DropHint" IsVisible="{Binding IsDropping}" IsHitTestVisible="False" Margin="{DynamicResource Inset3}" CornerRadius="{DynamicResource RadiusPanel}"
+          Background="{DynamicResource Scrim}" BorderBrush="{DynamicResource Ink}" BorderThickness="2">
+    <Border Background="{DynamicResource Surface}" CornerRadius="{DynamicResource RadiusPanel}" BoxShadow="{DynamicResource ShadowFloat}" Padding="{DynamicResource Inset6}"
+            HorizontalAlignment="Center" VerticalAlignment="Center" MaxWidth="400">
+      <StackPanel Spacing="{DynamicResource Space2}">
+        <c:Icon Glyph="upload" Size="28" HorizontalAlignment="Center" />
+        <TextBlock Classes="h2" Text="{x:Static vm:FromFileWords.DropTitle}" HorizontalAlignment="Center" TextAlignment="Center" />
+        <TextBlock Name="DropName" Text="{Binding DroppingName}" FontWeight="Bold" HorizontalAlignment="Center" TextTrimming="CharacterEllipsis" />
+        <TextBlock Text="{x:Static vm:FromFileWords.Next}" Foreground="{DynamicResource InkMuted}" HorizontalAlignment="Center" TextAlignment="Center" TextWrapping="Wrap" />
+      </StackPanel>
+    </Border>
+  </Border>
   <!-- The page fades out under Ask, so what scrolls beneath never collides with it -->
   <Border Name="Fade" Height="120" VerticalAlignment="Bottom" IsHitTestVisible="False" IsVisible="{Binding HasAsk}" />
   </Panel>
