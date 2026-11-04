@@ -275,6 +275,7 @@ public class LibraryWebTests
         Assert.Equal(["cs101", "intro"], back.Classes[0].Aliases);
         Assert.Equal(["CS 101", "Chem 1A"], cfg.ClassNames()); // the running app sees it right away
 
+        Sql(cfg, "UPDATE notes SET summary_md='## Summary' WHERE id='n1'"); // "Rewrite all" rewrites the lectures that have one
         r = await c.PostForm("/settings/resummarize-all");
         Assert.Equal("/settings?queued=1", r.Headers.Location!.OriginalString);
         Assert.Equal("queued", store.Get("n1")!.Status);

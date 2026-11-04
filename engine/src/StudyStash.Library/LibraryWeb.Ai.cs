@@ -176,6 +176,17 @@ public sealed partial class LibraryWeb
         }
     }
 
+    /// <summary>The free AI just picked for notes, sorting or Ask, on a library nobody chose a model for, whose built-in one
+    /// isn't here: the model it works with now (one already on this computer) becomes the library's own, so every job
+    /// that asks for the free model, and Settings naming it, agree.</summary>
+    async Task ChooseFreeModelAsync()
+    {
+        if (Engines.FreeModelChosen(cfg) || await Jobs.Checks.OllamaModels(cfg.OllamaHost) is not { } have
+            || Engines.UsableFreeModel(cfg, have) is not { } usable || usable == cfg.EffectiveSummaryModel) return;
+        cfg.OllamaModel = usable;
+        Configs.Save(cfg);
+    }
+
     void MapAi(WebApplication app)
     {
         app.MapGet("/api/v2/ai/engines", Http.Handle(ctx => ApiAsync(ctx, async () => AiJson(await AiOverviewAsync()))));
@@ -196,14 +207,7 @@ public sealed partial class LibraryWeb
             foreach (string? id in new[] { notes, ask, diagrams })
                 if (id is not null && overview.Engines.FirstOrDefault(e => e.Id == id) is { Installed: false } row)
                     return Http.Detail(409, $"{row.Name} isn't set up on your library's computer.");
-            // The free AI picked for a library nobody chose a model for, whose built-in one isn't here: the model it
-            // writes with now (one already on this computer) becomes the library's own.
-            if (notes == "ollama" && !Engines.FreeModelChosen(cfg) && await Jobs.Checks.OllamaModels(cfg.OllamaHost) is { } have
-                && Engines.UsableFreeModel(cfg, have) is { } usable && usable != cfg.EffectiveSummaryModel)
-            {
-                cfg.OllamaModel = usable;
-                Configs.Save(cfg);
-            }
+            if (notes == "ollama" || ask == "ollama") await ChooseFreeModelAsync();
             var settings = AiSettings.Load(cfg.Home);
             bool hadNotesAi = settings.NotesChosen;
             if (notes is not null) settings.ByJob["notes"] = new AiChoice(notes);
