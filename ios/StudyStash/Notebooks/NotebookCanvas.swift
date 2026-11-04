@@ -26,7 +26,7 @@ final class NotebookCanvas: NSObject {
     /// Fingers draw right now (no Pencil, or the student chose so).
     private(set) var fingersDraw = true
 
-    @ObservationIgnored let canvas = PKCanvasView()
+    @ObservationIgnored let canvas = InkCanvas()
     @ObservationIgnored let picker = PKToolPicker()
     /// What Apple's pens are shown for. Not the canvas: a phone showed the keyboard (made first responder, the canvas
     /// asks for one whenever a menu opens over it).
@@ -116,7 +116,7 @@ final class NotebookCanvas: NSObject {
 
         let center = NotificationCenter.default
         for name in [Notification.Name.NSUndoManagerDidCloseUndoGroup, .NSUndoManagerDidUndoChange, .NSUndoManagerDidRedoChange] {
-            observers.append(center.addObserver(forName: name, object: nil, queue: .main) { [weak self] _ in
+            observers.append(center.addObserver(forName: name, object: canvas.undoManager, queue: .main) { [weak self] _ in
                 MainActor.assumeIsolated { self?.refreshUndo() }
             })
         }
@@ -479,6 +479,15 @@ extension NotebookCanvas: PKToolPickerObserver {
 
 extension NotebookCanvas: UIGestureRecognizerDelegate {
     func gestureRecognizer(_ g: UIGestureRecognizer, shouldRecognizeSimultaneouslyWith other: UIGestureRecognizer) -> Bool { true }
+}
+
+/// The page, with an undo history of its own. The window's is shared with every text field in the window (Ask's bar
+/// beside a lecture): the notebook's Undo could reach typing there, and a notebook laid out again cleared theirs.
+/// Apple's pens, the system's undo gestures and ⌘Z find this one too (the first responder, `ToolsResponder`, is inside
+/// the canvas).
+final class InkCanvas: PKCanvasView {
+    private let history = UndoManager()
+    override var undoManager: UndoManager? { history }
 }
 
 /// Holds first responder while a notebook is open, so Apple's pens show, and never asks for a keyboard.
