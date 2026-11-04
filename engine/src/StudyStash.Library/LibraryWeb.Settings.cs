@@ -173,7 +173,7 @@ public sealed partial class LibraryWeb
             ["classes"] = new JsonArray(cfg.Classes.Select(c => (JsonNode?)new JsonObject
             {
                 ["name"] = c.Name, ["aliases"] = new JsonArray(c.Aliases.Select(a => (JsonNode?)a).ToArray()), ["description"] = c.Description,
-                ["group"] = c.Group,
+                ["description_by"] = c.DescriptionBy, ["group"] = c.Group,
                 ["folder"] = store.ClassDir(c.Name), ["lectures"] = counts.GetValueOrDefault(c.Name, 0),
             }).ToArray()),
             ["course_names"] = CourseNamesJson(),
@@ -288,8 +288,11 @@ public sealed partial class LibraryWeb
                 if (!seen.Add(cls)) return Http.Detail(400, $"There are two classes called {cls}.");
                 var aliases = (item["aliases"] as JsonArray)?.Select(Text).OfType<string>().Where(a => a.Length > 0).Distinct().ToList() ?? [];
                 // A class's sidebar folder: as sent, else what it had (under this name, or the one it's renamed from).
-                string group = Text(item["group"]) ?? cfg.Classes.FirstOrDefault(c => c.Name == cls || c.Name == Text(item["was"]))?.Group ?? "";
-                classes.Add(new ClassDef(cls, aliases, Text(item["description"]) ?? "", group.Trim()));
+                var had = cfg.Classes.FirstOrDefault(c => c.Name == cls || c.Name == Text(item["was"]));
+                string group = Text(item["group"]) ?? had?.Group ?? "";
+                // What it covers, as the AI or Canvas wrote it, stays theirs until the student changes it.
+                var (about, by) = ClassTopics.Kept(had, Text(item["description"]) ?? "", Text(item["description_by"]));
+                classes.Add(new ClassDef(cls, aliases, about, group.Trim()) { DescriptionBy = by });
                 if (Text(item["was"]) is { Length: > 0 } was && was != cls && cfg.Classes.Any(c => c.Name == was)) renames.Add(new ClassRenameStep(was, cls, 0, ""));
             }
             // "known": the classes the app's Settings had when it opened. One it never had (added from somewhere else

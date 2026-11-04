@@ -16,6 +16,20 @@ public sealed partial class LibraryClassRow : ObservableObject
     [ObservableProperty] public partial string Name { get; set; } = "";
     [ObservableProperty] public partial string Aliases { get; set; } = "";
     [ObservableProperty] public partial string Description { get; set; } = "";
+    /// <summary>Who wrote what it covers when the student didn't: "ai" or "canvas" (<see cref="ClassTopics"/>); typing
+    /// in the box makes it theirs.</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(DescriptionMark), nameof(HasDescriptionMark))]
+    public partial string DescriptionBy { get; set; } = "";
+    /// <summary>"Written by your AI" or "From Canvas", quietly under the box, while it isn't the student's.</summary>
+    public string DescriptionMark => ClassTopics.Mark(DescriptionBy);
+    public bool HasDescriptionMark => DescriptionMark.Length > 0;
+
+    partial void OnDescriptionChanged(string oldValue, string newValue)
+    {
+        if (oldValue.Trim() != newValue.Trim()) DescriptionBy = "";
+    }
+
     /// <summary>The name the library knows it by ("" for a class just added here): a different <see cref="Name"/> is a
     /// rename, which takes its lectures, folder and Canvas course with it.</summary>
     public string Was { get; set; } = "";
@@ -426,13 +440,13 @@ public sealed partial class LibrarySettingsModel : ObservableObject
             int i = 0;
             var classes = (s["classes"] as JsonArray ?? []).OfType<JsonObject>().Select(c => new LibraryClassRow
             {
-                Name = Str(c["name"]), Was = Str(c["name"]), Description = Str(c["description"]), Folder = Str(c["folder"]),
+                Name = Str(c["name"]), Was = Str(c["name"]), Description = Str(c["description"]), DescriptionBy = Str(c["description_by"]), Folder = Str(c["folder"]),
                 Aliases = string.Join(", ", (c["aliases"] as JsonArray ?? []).Select(Str).Where(a => a.Length > 0)),
                 Lectures = c["lectures"] is JsonValue cl && cl.TryGetValue(out int k) ? k : 0, Dot = Skin.ClassDot(i++),
             }).ToList();
             knownClasses = [.. classes.Select(c => c.Name)];
             // What was just typed comes back as it was sent: keep those rows (and the field being typed in).
-            if (!Same(Classes, classes, c => $"{c.Name.Trim()}\n{Tidy(c.Aliases)}\n{c.Description.Trim()}"))
+            if (!Same(Classes, classes, c => $"{c.Name.Trim()}\n{Tidy(c.Aliases)}\n{c.Description.Trim()}\n{c.DescriptionBy}"))
             {
                 Classes.Clear();
                 foreach (var c in classes) Classes.Add(c);
@@ -699,6 +713,8 @@ public sealed partial class LibrarySettingsModel : ObservableObject
             ["was"] = c.Was,
             ["aliases"] = new JsonArray(c.Aliases.Split(',').Select(a => a.Trim()).Where(a => a.Length > 0).Select(a => (JsonNode?)a).ToArray()),
             ["description"] = c.Description.Trim(),
+            // Left as the AI or Canvas wrote it: the library keeps its own copy, which may be newer than this one.
+            ["description_by"] = c.DescriptionBy,
         }).ToArray()),
     };
 

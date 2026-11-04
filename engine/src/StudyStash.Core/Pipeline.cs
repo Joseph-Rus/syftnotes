@@ -44,6 +44,10 @@ public sealed class Pipeline(Config cfg, Store store, SortChatFn? chat = null,
 
     public Config Cfg { get; } = cfg;
 
+    /// <summary>Each class's "What it covers", written for the student between lectures (<see cref="ClassTopics"/>):
+    /// a finished Canvas sync or a filed lecture says it's worth a look.</summary>
+    public ClassTopics Topics { get; } = new(cfg, store, chat, log);
+
     /// <summary>The id of the lecture being written right now.</summary>
     public string? Current => current;
 
@@ -178,6 +182,7 @@ public sealed class Pipeline(Config cfg, Store store, SortChatFn? chat = null,
         log(path is null
             ? $"[pipeline] '{m.Title}' changed while it was being written; not saving the old result"
             : $"[pipeline] filed '{m.Title}' \u2192 {c.ClassName} ({c.By} {Py.FormatFixed(c.Confidence, 2)})");
+        if (path is not null) Topics.Due();
         if (path is not null && filed is not null)
         {
             try
@@ -267,6 +272,7 @@ public sealed class Pipeline(Config cfg, Store store, SortChatFn? chat = null,
             try
             {
                 await RunPendingAsync(stop);
+                await Topics.RunAsync(stop);
             }
             catch (Exception e)
             {
