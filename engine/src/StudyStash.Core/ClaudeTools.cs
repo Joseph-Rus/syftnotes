@@ -229,6 +229,16 @@ public sealed class RemoteLibrary(string serverUrl, Func<string> key, HttpClient
 
     static string Q(string? s) => Uri.EscapeDataString(s ?? "");
 
+    /// <summary>Starts a bring-in job in the library (<see cref="LibraryBringIn.Route"/>: kind, into, from, refile), or
+    /// gets the one already running there. Null from a library older than this.</summary>
+    public async Task<BringInStatus?> StartFolderJobAsync(JsonObject ask, CancellationToken stop = default) =>
+        BringInStatus.FromJson(await SendAsync(HttpMethod.Post, "/folders/job", ask, stop) as JsonObject);
+
+    /// <summary>The bring-in job running in the library, or the last one; null when it has had none since it started
+    /// (or is older than this).</summary>
+    public async Task<BringInStatus?> FolderJobAsync(CancellationToken stop = default) =>
+        BringInStatus.FromJson(await SendAsync(HttpMethod.Get, "/folders/job", stop: stop) as JsonObject);
+
     /// <summary>The library's name and classes. A library from before /api/v2 (the Python engine) answers 404.</summary>
     public async Task<JsonObject> OverviewAsync() =>
         await SendAsync(HttpMethod.Get, "/library") as JsonObject ?? throw new LibraryRefusedException(404, "This library is older than the app: update it to browse it here.");

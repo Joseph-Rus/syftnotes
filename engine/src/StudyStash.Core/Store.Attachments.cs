@@ -206,6 +206,13 @@ public sealed partial class Store
     public List<Attachment> PhotosOf(string noteId) =>
         [.. ListAttachments(noteId: noteId).Where(a => a.IsPhoto && a.Type.StartsWith("image/", StringComparison.Ordinal)).OrderBy(a => a.Taken, StringComparer.Ordinal)];
 
+    /// <summary>The attachment's file in its class's Attachments folder is now <paramref name="file"/> (a copy brought
+    /// in beside a different file of its old name).</summary>
+    public void SetAttachmentFile(string id, string file)
+    {
+        lock (gate) Exec("UPDATE attachments SET file=? WHERE id=?", file, id);
+    }
+
     /// <summary>Removes an attachment: its file and its row. False when there's no such attachment.</summary>
     public bool RemoveAttachment(string id)
     {
@@ -222,6 +229,8 @@ public sealed partial class Store
             {
             }
             Exec("DELETE FROM attachments WHERE id=?", id);
+            // One brought in from another library folder (LibraryBringIn) stays removed when that folder is brought in again.
+            if (id.StartsWith("folder-", StringComparison.Ordinal)) Exec("INSERT OR IGNORE INTO deleted(id, deleted_at) VALUES(?,?)", id, Now());
             return true;
         }
     }
