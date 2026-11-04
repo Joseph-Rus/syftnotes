@@ -194,6 +194,9 @@ public static class Engines
     public static string NotesNeedSignIn(string name) =>
         $"{NotesBecause}{name}{SignInAgain} Sign in from Settings → Your AI, and they're written then.";
 
+    /// <summary>An AI that couldn't be reached, as a student is told wherever it shows: the setup chats, Ask.</summary>
+    public static string CouldntBeReached(string brand) => $"{brand} couldn't be reached. Check your internet connection.";
+
     /// <summary>Why a lecture has no notes yet when no AI is chosen to write them: its reason on every page, until a first
     /// AI is chosen (<see cref="Store.RequeueNoAi"/> then writes them).</summary>
     public const string NotesNeedAnAi = "Your notes aren't written yet because no AI writes them. Choose one in Settings → Your AI, and they're written then.";

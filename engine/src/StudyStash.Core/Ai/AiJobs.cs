@@ -249,7 +249,11 @@ public sealed class AiJobs(string home, Func<string>? ollamaHost = null)
     /// pre-flight check only, before the run starts; a job already under way never changes engines mid-run (the
     /// pipeline's own retry does that, not this).</summary>
     bool NotesOnOllama(AiSettings settings) =>
-        settings.NotesChosen && (settings.Local("notes") || (settings.Fallback && Checks.OllamaInstalled() && Engines.KnownUnusableWhy(settings.For("notes").Provider, settings, Checks) is not null));
+        settings.NotesChosen && (settings.Local("notes") || (CanFallBack(settings) && Engines.KnownUnusableWhy(settings.For("notes").Provider, settings, Checks) is not null));
+
+    /// <summary>Whether a job whose AI can't answer may go to Ollama instead: Fallback is on, and Ollama is on this
+    /// computer to take it (a student on Gemini alone never set it up).</summary>
+    bool CanFallBack(AiSettings settings) => settings.Fallback && Checks.OllamaInstalled();
 
     /// <summary>What an engine's notes may draw: Ollama's small models keep to flowcharts; the CLI engines, whose
     /// SVG holds together, may draw what's spatial too.</summary>
@@ -864,7 +868,7 @@ public sealed class AiJobs(string home, Func<string>? ollamaHost = null)
         bool fellBack = false;
         string why = "";
 
-        if (settings.Fallback && Engines.KnownUnusableWhy(asked, settings, Checks) is { } preflight)
+        if (CanFallBack(settings) && Engines.KnownUnusableWhy(asked, settings, Checks) is { } preflight)
         {
             engine = "ollama";
             fellBack = true;
@@ -923,8 +927,15 @@ public sealed class AiJobs(string home, Func<string>? ollamaHost = null)
             if (ex is OperationCanceledException && ct.IsCancellationRequested) throw; // the caller gave up; not ours to paper over
             bool timedOut = ex is OperationCanceledException;
             Record(engine, false, timedOut ? "timed out" : ex.Message);
-            if (engine == "ollama" || !settings.Fallback) throw;
+            if (engine == "ollama") throw;
             why = timedOut ? $"{Engines.Name(engine)} didn't respond in time." : $"{Engines.Name(engine)} didn't answer: {ex.Message}";
+            if (!CanFallBack(settings))
+            {
+                // Nothing to fall back to: the engine's own trouble comes back, in plain words, not an Ollama that isn't here.
+                if (timedOut) throw new InvalidOperationException(why, ex);
+                if (SetupChat.Classify(ex.Message) == ChatProblem.Offline) throw new InvalidOperationException(Engines.CouldntBeReached(Engines.Name(engine)), ex);
+                throw;
+            }
             fellBack = true;
             engine = "ollama";
             using var cts2 = CancellationTokenSource.CreateLinkedTokenSource(ct);
