@@ -189,12 +189,13 @@ public sealed partial class ExamPrep(string home)
          "required":["guide","questions"]}
         """)!.AsObject();
 
-    /// <summary>What the AI is asked for an exam's prep: the lectures numbered, each with its flags and notes.</summary>
-    public static string Prompt(string className, string title, DateTimeOffset? when, IReadOnlyList<StudyLecture> lectures, int questions = 12)
+    /// <summary>What the AI is asked for an exam's prep: the lectures numbered, each with its flags and notes. The
+    /// exam's day is the student's, in <paramref name="zone"/>: a midterm at 11:59 PM Monday is on Monday, not Tuesday in UTC.</summary>
+    public static string Prompt(string className, string title, DateTimeOffset? when, TimeZoneInfo zone, IReadOnlyList<StudyLecture> lectures, int questions = 12)
     {
         var sb = new StringBuilder();
         sb.Append($"A student in {className} has \"{title}\"")
-          .Append(when is { } w ? $" on {w.ToString("dddd d MMMM", CultureInfo.InvariantCulture)}" : "")
+          .Append(when is { } w ? $" on {TimeZoneInfo.ConvertTime(w, zone).ToString("dddd d MMMM", CultureInfo.InvariantCulture)}" : "")
           .Append(". Below are the lectures it covers, numbered. Write two things.\n\n")
           .Append("1. \"guide\": a study guide in Markdown. Start with \"## What the lecturer said to know\", listing everything ")
           .Append("they said would be on the exam (or to know, or to write down), with the lecture and moment. Then a section a ")
