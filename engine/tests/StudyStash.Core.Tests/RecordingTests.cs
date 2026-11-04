@@ -1119,15 +1119,23 @@ public class RecordingTests
     {
         using var dir = new TempDir();
         var store = new LectureStore(dir.Path);
-        foreach (var (id, days, state) in new[] { ("rec-old", 40, LectureState.Filed), ("rec-new", 2, LectureState.Filed), ("rec-waiting", 40, LectureState.Sending) })
+        // A lecture and how old its sound is (the sound's own file time): a recording's is as old as the lecture, but one
+        // dated 40 days back that was brought in from a file the day before has a sound a day old.
+        foreach (var (id, days, state, soundDays) in new[]
+        {
+            ("rec-old", 40, LectureState.Filed, 40), ("rec-new", 2, LectureState.Filed, 2), ("rec-waiting", 40, LectureState.Sending, 40),
+            ("rec-from-file", 40, LectureState.Filed, 1),
+        })
         {
             store.Add(new Lecture { Id = id, Started = Tuesday.AddDays(-days).ToString("yyyy-MM-dd'T'HH:mm:sszzz"), State = state });
-            using var w = new WavWriter(store.AudioPath(id));
+            using (new WavWriter(store.AudioPath(id))) { }
+            File.SetLastWriteTimeUtc(store.AudioPath(id), Tuesday.AddDays(-soundDays).UtcDateTime);
         }
         Assert.Equal(1, store.PruneAudio(30, Tuesday));
         Assert.False(File.Exists(store.AudioPath("rec-old")));
         Assert.True(File.Exists(store.AudioPath("rec-new")));
         Assert.True(File.Exists(store.AudioPath("rec-waiting")));
+        Assert.True(File.Exists(store.AudioPath("rec-from-file")));
         Assert.NotNull(store.Get("rec-old"));
     }
 
