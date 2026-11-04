@@ -202,7 +202,7 @@ public class LibraryCanvasTests
             {
                 lock (ui) return check();
             }
-            feed.Updated += () =>
+            feed.Updated += _ =>
             {
                 lock (ui)
                 {
