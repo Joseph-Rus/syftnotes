@@ -11,7 +11,8 @@ namespace StudyStash.Core;
 /// <list type="bullet">
 /// <item>Windows (an Inno Setup install): Velopack's Setup.exe for this processor is downloaded and checked, then
 /// windows/bridge.ps1 takes over once the app has quit: Setup.exe --silent, the Run entries and shortcuts (taskbar pins
-/// too) pointed at the new program, the Inno uninstaller, the Start-menu entry put back, the app opened again.</item>
+/// too) pointed at the new program, the app opened again; the new copy then deletes the old folder and its Apps-list
+/// entry itself (the app's NewPlace), without the Inno uninstaller.</item>
 /// <item>Linux (the tarball's folder): the AppImage is downloaded and checked, put in ~/Applications and tried once
 /// (it needs FUSE, which some systems don't have); if it runs, it goes in the applications menu and on the PATH in the
 /// old copy's place, the old folder goes, and the AppImage opens.</item>
@@ -170,9 +171,9 @@ public static class Bridge
     /// <summary>Moves this copy over to Velopack's install of <paramref name="release"/>. True once it's under way:
     /// the caller quits, and what does the move opens the app again. False leaves this copy as it is.</summary>
     /// <paramref name="pid"/> is the app's own process, which the move waits for; <paramref name="relaunchArgs"/> what
-    /// the new copy opens with.
+    /// the new copy opens with, asked at the moment the move starts.
     public static async Task<bool> ApplyAsync(Release release, string home, UpdateHost host, Func<bool> ready, Action<string> log,
-        int pid, IReadOnlyList<string> relaunchArgs, string? userHome = null, LinuxMenu? menu = null)
+        int pid, Func<IReadOnlyList<string>> relaunchArgs, string? userHome = null, LinuxMenu? menu = null)
     {
         if (AssetFor(host) is not { } asset) return false;
         log($"Moving to {release.Tag}, installed the new way...");
@@ -186,9 +187,9 @@ public static class Bridge
     }
 
     static async Task<(bool Ok, bool Retry, string? Why)> WindowsAsync(Release release, string home, UpdateHost host, string asset, Func<bool> ready,
-        Action<string> log, int pid, IReadOnlyList<string> relaunchArgs)
+        Action<string> log, int pid, Func<IReadOnlyList<string>> relaunchArgs)
     {
-        // The Inno uninstaller the move runs, and its entry: without them there's nothing to move over from.
+        // The Inno install's entry and uninstaller: without them there's nothing to move over from.
         if (!InnoInstalled())
         {
             log("This copy's Setup entry is missing, so it can't move to the new installer here.");
@@ -209,7 +210,7 @@ public static class Bridge
             log($"Couldn't get the move ready: {e.Message}");
             return (false, false, null);
         }
-        // The last moment to put it off: once the script starts, the old copy is uninstalled.
+        // The last moment to put it off: once the script starts, the old copy is replaced.
         if (!ready())
         {
             log(Updates.PutOff);
@@ -222,7 +223,7 @@ public static class Bridge
             host.SpawnDetached(["powershell.exe", "-NoProfile", "-ExecutionPolicy", "Bypass", "-WindowStyle", "Hidden", "-File", script,
                 "-Setup", setup, "-WaitPid", pid.ToString(CultureInfo.InvariantCulture), "-Log", logPath,
                 "-OldExe", Path.Combine(host.AppDir, "StudyStash.exe"), "-FailedFile", FailedFile(home), "-Tag", release.Tag,
-                "-OpenArgs", string.Join(' ', relaunchArgs.Select(a => a.Contains(' ') ? $"\"{a}\"" : a))]);
+                "-OpenArgs", string.Join(' ', relaunchArgs().Select(a => a.Contains(' ') ? $"\"{a}\"" : a))]);
         }
         catch (Exception e) when (e is System.ComponentModel.Win32Exception or IOException or InvalidOperationException)
         {
@@ -244,7 +245,7 @@ public static class Bridge
     }
 
     static async Task<(bool Ok, bool Retry, string? Why)> LinuxAsync(Release release, UpdateHost host, string asset, Func<bool> ready, Action<string> log,
-        int pid, IReadOnlyList<string> relaunchArgs, string userHome, LinuxMenu menu)
+        int pid, Func<IReadOnlyList<string>> relaunchArgs, string userHome, LinuxMenu menu)
     {
         string place = AppImagePlace(userHome);
         string fresh = place + ".new";
@@ -297,7 +298,7 @@ public static class Bridge
         Updates.StopBackground(Updates.LinuxProgram(host.AppDir), host);
         log($"Installed {release.Tag} as {place}.");
         const string script = "exe=\"$1\"; old=\"$2\"; shift 2; tail --pid=\"$0\" -f /dev/null; rm -rf -- \"$old\"; exec \"$exe\" \"$@\"";
-        host.SpawnDetached(["/bin/sh", "-c", script, pid.ToString(CultureInfo.InvariantCulture), place, host.AppDir, .. relaunchArgs]);
+        host.SpawnDetached(["/bin/sh", "-c", script, pid.ToString(CultureInfo.InvariantCulture), place, host.AppDir, .. relaunchArgs()]);
         return (true, false, null);
     }
 

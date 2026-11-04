@@ -41,7 +41,7 @@ static class MoveSheet
                     foreach (var (home, run) in background.All())
                         if (run.Count > 0 && run[0].StartsWith(plan.From.TrimEnd('/') + "/", StringComparison.Ordinal)) background.Stop(home);
                 },
-                Machine.Run, Updates.SpawnDetached, Environment.ProcessId, args, Program.Log);
+                Updates.SpawnDetached, Environment.ProcessId, args, Program.Log);
         }
         catch (Exception e) when (e is IOException or UnauthorizedAccessException or System.ComponentModel.Win32Exception or InvalidOperationException)
         {

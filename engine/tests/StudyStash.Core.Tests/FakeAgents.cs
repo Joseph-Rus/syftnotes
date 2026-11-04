@@ -10,7 +10,8 @@ namespace StudyStash.Core.Tests;
 /// is the sign-in), and runs a "turn" the way <c>claude -p</c> / <c>codex exec</c> would: it writes down its
 /// arguments, the names (never the values) of its environment variables and its input, then prints
 /// <c>replay-N.jsonl</c> (or <c>replay.jsonl</c>) line by line. Files beside it change what it does: <c>broken</c>
-/// (its --version fails), <c>login-fails</c>, <c>sleep</c> (seconds to wait before answering), <c>exit</c>,
+/// (its --version fails), <c>login-fails</c>, <c>login-delay</c> (seconds its sign-in takes; one that ends by itself leaves
+/// <c>login-done</c>), <c>sleep</c> (seconds to wait before answering), <c>exit</c>,
 /// <c>refuse</c> (an argument it doesn't know, as an older version: a turn given it stops with clap's error). The fake
 /// agy also answers <c>models</c> (its status), <c>-p=/usage</c> (its sign-in, then <c>usage.json</c>; with a
 /// <c>region</c> file, Google's refusal for the country) and plain <c>agy</c>, its sign-in as the real one shows it (the
@@ -92,6 +93,14 @@ public static class FakeAgents
         return Directory.Exists(dir) ? Directory.GetFiles(dir).Length : 0;
     }
 
+    /// <summary>How many times the fake claude's status was asked and said signed out: a file of its own in <c>looks</c>
+    /// for each, written once the answer is settled, for the reason <see cref="Logins"/> gives.</summary>
+    public static int SignedOutLooks(string bin)
+    {
+        string dir = Path.Combine(bin, "looks");
+        return Directory.Exists(dir) ? Directory.GetFiles(dir).Length : 0;
+    }
+
     /// <summary>How many turns the fake has taken: an empty file of its own in <c>turns</c> for each, counted, never read,
     /// for the reason <see cref="Logins"/> gives (a count read from one file failed on Windows with the file in use).</summary>
     public static int Turns(string bin)
@@ -110,7 +119,7 @@ public static class FakeAgents
         fi
         if [ "{{id}}" = claude ] && [ "$1" = auth ] && [ "$2" = status ]; then
           if [ -f "$D/signed-in" ]; then echo '{"loggedIn":true,"authMethod":"claude.ai","subscriptionType":"pro","email":"someone@example.com","orgId":"org-fake"}'; exit 0; fi
-          echo '{"loggedIn":false}'; exit 1
+          mkdir -p "$D/looks" && : > "$D/looks/$$"; echo '{"loggedIn":false}'; exit 1
         fi
         if [ "{{id}}" = codex ] && [ "$1" = login ] && [ "$2" = status ]; then
           if [ -f "$D/signed-in" ]; then echo "Logged in using an API key - sk-proj-***FAKEKEY42"; exit 0; fi
@@ -173,7 +182,7 @@ public static class FakeAgents
             echo "https://auth.example.com/oauth/authorize?response_type=code&redirect_uri=http%3A%2F%2Flocalhost%3A1455%2Fauth%2Fcallback&state=fake"
           fi
           sleep "$(cat "$D/login-delay" 2>/dev/null || echo 1)"
-          touch "$D/signed-in"; echo "Signed in."; exit 0
+          touch "$D/signed-in" "$D/login-done"; echo "Signed in."; exit 0
         fi
         mkdir -p "$D/turns"; n=$(( $(ls "$D/turns" | wc -l) + 1 )); : > "$D/turns/$n"; echo $$ > "$D/pid-$n"
         for a in "$@"; do printf '%s\n' "$a"; done > "$D/argv-$n.txt"
@@ -235,7 +244,7 @@ public static class FakeAgents
         }
         if ($ID -eq 'claude' -and $argv[0] -eq 'auth' -and $argv[1] -eq 'status') {
           if (Test-Path "$D\signed-in") { '{"loggedIn":true,"authMethod":"claude.ai","subscriptionType":"pro","email":"someone@example.com","orgId":"org-fake"}'; exit 0 }
-          '{"loggedIn":false}'; exit 1
+          New-Item -ItemType File -Force -Path "$D\looks\$([guid]::NewGuid())" | Out-Null; '{"loggedIn":false}'; exit 1
         }
         if ($ID -eq 'codex' -and $argv[0] -eq 'login' -and $argv[1] -eq 'status') {
           if (Test-Path "$D\signed-in") { 'Logged in using an API key - sk-proj-***FAKEKEY42'; exit 0 }
@@ -305,7 +314,7 @@ public static class FakeAgents
           }
           $delay = 1; if (Test-Path "$D\login-delay") { $delay = [int](Get-Content "$D\login-delay") }
           Start-Sleep -Seconds $delay
-          New-Item -ItemType File -Force "$D\signed-in" | Out-Null; 'Signed in.'; exit 0
+          New-Item -ItemType File -Force "$D\signed-in","$D\login-done" | Out-Null; 'Signed in.'; exit 0
         }
         $n = 1 + @(Get-ChildItem "$D\turns" -File -ErrorAction SilentlyContinue).Count
         New-Item -ItemType File -Force -Path "$D\turns\$n" | Out-Null
