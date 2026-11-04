@@ -85,6 +85,20 @@ public class DueMineTests
         using var again = await site.Client.DeleteAsync($"/api/v2/due/mine/{taskId}");
         Assert.Equal(System.Net.HttpStatusCode.NotFound, again.StatusCode);
 
+        // Past, an exam is simply behind the student (not overdue, not missing, not to hand in: the same rule as an in-class quiz that
+        // happened, so Home's count and Ask agree) yet still on the calendar's day; a to-do not ticked off is overdue.
+        await Add(new { title = "Statistics final", what = "exam", @class = "", day = "2025-09-22", time = "09:00" });
+        var past = await Add(new { title = "Return library books", what = "task", @class = "", day = "2025-09-23", time = "" });
+        Assert.Equal(("Return library books", "Overdue", "overdue", 1), (Rows(past, "overdue").Single()["name"]!.GetValue<string>(), Rows(past, "overdue").Single()["label"]!.GetValue<string>(),
+            Rows(past, "overdue").Single()["status"]!.GetValue<string>(), (int)past["to_hand_in"]!));
+        Assert.Equal(["Statistics final"], past["behind"]!.AsArray().Select(i => i!["name"]!.GetValue<string>()));
+        Assert.DoesNotContain(past["groups"]!.AsArray().SelectMany(g => g!["items"]!.AsArray()), i => i!["name"]!.GetValue<string>() == "Statistics final");
+        Assert.Equal(["Return library books"], Assignments.Upcoming(Assignments.Shown(dir.Path), TimeZoneInfo.ConvertTime(FakeCanvas.DesignNow, FakeCanvas.Zone).DateTime, 7).Select(a => a.Name));
+        string lateAsked = await Asked();
+        Assert.Contains("- Overdue, was due Tue 23 Sep 2025, 11:59 PM: Return library books (own to-do)", lateAsked);
+        Assert.DoesNotContain("Statistics final", lateAsked);
+        Assert.DoesNotContain("missing", lateAsked);
+
         // What isn't a day or a title is refused, in words.
         using var junk = await site.Client.PostAsJsonAsync("/api/v2/due/mine", new { title = "", what = "exam", @class = "", day = "", time = "" });
         Assert.Equal(System.Net.HttpStatusCode.BadRequest, junk.StatusCode);

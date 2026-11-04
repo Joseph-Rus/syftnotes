@@ -417,6 +417,9 @@ public static class CanvasApi
         public IReadOnlyList<Group> Groups { get; init; } = [];
         /// <summary>What the student hid in Syft Notes: in none of the groups, listed apart for "Show hidden".</summary>
         public IReadOnlyList<Item> Hidden { get; init; } = [];
+        /// <summary>The student's own exams and study sessions whose time has gone: behind them, in none of the groups, but still
+        /// on the calendar's days.</summary>
+        public IReadOnlyList<Item> Behind { get; init; } = [];
     }
 
     public sealed record Group
@@ -460,6 +463,9 @@ public static class CanvasApi
 
         /// <summary>The student's own item, not Canvas's.</summary>
         public bool Own => Kind == Core.Canvas.DueMine.Kind;
+
+        /// <summary>Their own exam or study session, which is behind them once its time has passed (a to-do stays theirs until ticked off).</summary>
+        public bool OwnEvent => Own && What is "exam" or "study";
     }
 
     public sealed record AssignmentsResponse

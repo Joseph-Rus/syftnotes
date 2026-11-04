@@ -76,7 +76,9 @@ public sealed partial class DueCalendarModel : ObservableObject
         sources = s with { OpenOwn = item => Own.Edit(item, s.Zone) };
         var dots = s.Classes.GroupBy(c => c.Name).ToDictionary(g => g.Key, g => g.First().Dot);
         dot = name => dots.TryGetValue(name, out var d) ? d : Brushes.Gray;
+        // Their own exams and study sessions that are over stay on their day, not struck through: they were never handed in.
         all = [.. (s.Due?.Groups ?? []).SelectMany(g => g.Items.Select(i => (i, Done: g.Key == "handed_in" || !CanvasWords.ToHandIn(i))))
+            .Concat((s.Due?.Behind ?? []).Select(i => (i, Done: false)))
             .Where(x => x.i.DueAt is not null).GroupBy(x => (x.i.Class, x.i.Id)).Select(g => g.First())];
         var today = Today;
         month = new DateTime(today.Year, today.Month, 1);
@@ -182,7 +184,7 @@ public sealed partial class DueCalendarModel : ObservableObject
     IEnumerable<(CanvasApi.Item Item, bool Done)> Showing => all.Where(x => Class is null || x.Item.Class == Class);
 
     /// <summary>Past its day and not handed in: it says so, in words, on the day it was due.</summary>
-    bool IsMissing(CanvasApi.Item i, bool done) => !done && (i.Missing || i.Status is "missing" or "overdue" or "past due" || Local(i.DueAt!.Value).Date < Today);
+    bool IsMissing(CanvasApi.Item i, bool done) => !done && !i.OwnEvent && (i.Missing || i.Status is "missing" or "overdue" or "past due" || Local(i.DueAt!.Value).Date < Today);
 
     CalendarItem ItemFor(CanvasApi.Item i, bool done)
     {
@@ -190,14 +192,16 @@ public sealed partial class DueCalendarModel : ObservableObject
         bool missing = IsMissing(i, done);
         string time = at.ToString("h:mm tt", CultureInfo.InvariantCulture);
         // The end of the day is when most things are due, so it goes unsaid, except today: "Tonight 11:59 PM".
-        string sub = missing ? "Missing" : done ? ""
+        // Their own to-do is overdue, never "missing" (that's for work that wasn't handed in).
+        string late = i.Own ? "Overdue" : "Missing";
+        string sub = missing ? late : done ? ""
             : at.Date == Today ? $"{(at.Hour >= 17 ? "Tonight" : "Today")} {time}"
             : at is { Hour: 23, Minute: 59 } ? "" : time;
         // The student's own item has its small kind word in front, in place of Canvas's link: "Exam · 9:00 AM".
         if (i.Own) sub = sub.Length > 0 ? $"{Kit.OwnDueFormModel.WordFor(i.What)} · {sub}" : Kit.OwnDueFormModel.WordFor(i.What);
         string cls = ClassNames.Display(i.Class);
         bool ticked = i.Mark == "done";
-        string state = ticked ? Kit.DueMarkModel.DoneState : done ? "Handed in" : missing ? "Missing" : "";
+        string state = ticked ? Kit.DueMarkModel.DoneState : done ? "Handed in" : missing ? late : "";
         string day = OverviewModel.Day(i.DueAt!.Value, sources.Now, sources.Zone);
         string said = string.Join(", ", new[] { i.Name, cls, i.AllDay ? $"due {day}" : $"due {day} at {time}", state }.Where(w => w.Length > 0));
         return new CalendarItem(i.Class, i.Id, i.Name, sub, missing, done, dot(i.Class), cls.Length > 0 ? $"{i.Name}, {cls}" : i.Name, said,

@@ -557,6 +557,9 @@ public sealed partial class OverviewModel : ObservableObject
     static IEnumerable<CanvasApi.Item> StillToHandIn(CanvasApi.DueResponse? due) =>
         due is null ? [] : due.Groups.Where(g => g.Key != "handed_in").SelectMany(g => g.Items).Where(CanvasWords.ToHandIn);
 
+    /// <summary>Their own exams and study sessions that are over (<see cref="CanvasApi.DueResponse.Behind"/>): on their day, nowhere else.</summary>
+    static IEnumerable<CanvasApi.Item> BehindThem(CanvasApi.DueResponse? due) => due?.Behind ?? [];
+
     static IEnumerable<CanvasApi.Item> HandedIn(CanvasApi.DueResponse? due) =>
         due is null ? [] : due.Groups.Where(g => g.Key == "handed_in").SelectMany(g => g.Items);
 
@@ -570,7 +573,7 @@ public sealed partial class OverviewModel : ObservableObject
     /// <summary>A deadline in the week's planner: under its day it shows only the time; in the Late column, the day it was due.</summary>
     static OverviewDue DueRow(CanvasApi.Item i, Sources s, Func<string, IBrush> dot, bool classLabel, bool done = false)
     {
-        bool late = !done && LateBefore(i, s);
+        bool late = !done && !i.OwnEvent && LateBefore(i, s);
         string when = done ? (i.Mark == "done" ? Kit.DueMarkModel.DoneState : "Handed in")
             : i.DueAt is not { } d ? "No due date"
             : late ? $"Was due {Words(Local(d, s), Local(d, s).Year == Local(s.Now, s).Year ? "ddd d" : "d MMM yyyy")}"
@@ -676,14 +679,26 @@ public sealed partial class OverviewModel : ObservableObject
             }
             else first = $"{Count(that.Count)} {Kind(that, plural: true)} due {on}";
         }
-        string then = !missing && first.Length > 0 ? "" : late.Count switch
-        {
-            0 => "",
-            1 => first.Length > 0 ? $"and {late[0].Name} is still missing" : $"{late[0].Name} is still missing",
-            _ => first.Length > 0 ? $"and {Count(late.Count).ToLowerInvariant()} are still missing" : $"{Count(late.Count)} {Kind(late, plural: true)} are still missing",
-        };
+        string then = !missing && first.Length > 0 ? "" : Lateness(late, afterFirst: first.Length > 0);
         if (first.Length == 0 && then.Length == 0) return "";
         return first.Length > 0 && then.Length > 0 ? $"{first}, {then}." : $"{first}{then}.";
+    }
+
+    /// <summary>What's late, in words: Canvas work that wasn't handed in is "still missing", the student's own to-do is "overdue"
+    /// (never "missing"); "" when nothing is. <paramref name="afterFirst"/>: it follows what's due next, so it begins "and".</summary>
+    static string Lateness(List<CanvasApi.Item> late, bool afterFirst)
+    {
+        string Group(List<CanvasApi.Item> rows, string one, string many) => rows.Count switch
+        {
+            0 => "",
+            1 => $"{rows[0].Name} {one}",
+            _ => afterFirst ? $"{Count(rows.Count).ToLowerInvariant()} {many}" : $"{Count(rows.Count)} {Kind(rows, plural: true)} {many}",
+        };
+        var parts = new[]
+        {
+            Group([.. late.Where(i => !i.Own)], "is still missing", "are still missing"), Group([.. late.Where(i => i.Own)], "is overdue", "are overdue"),
+        }.Where(p => p.Length > 0).ToList();
+        return parts.Count == 0 ? "" : (afterFirst ? "and " : "") + string.Join(", and ", parts);
     }
 
     /// <summary>
@@ -716,6 +731,7 @@ public sealed partial class OverviewModel : ObservableObject
         bool Wanted(string cls) => only is null || cls == only;
         var open = StillToHandIn(s.Due).Where(i => Wanted(i.Class)).ToList();
         var done = HandedIn(s.Due).Where(i => Wanted(i.Class)).ToList();
+        var over = BehindThem(s.Due).Where(i => Wanted(i.Class)).ToList();
         var days = new List<WeekDay>();
         var late = today >= weekStart && today < weekStart.AddDays(7)
             ? open.Where(i => LateBefore(i, s) && (i.DueAt is not { } d || Local(d, s).Date < weekStart)).OrderBy(i => i.DueAt ?? DateTimeOffset.MinValue).ToList()
@@ -737,7 +753,7 @@ public sealed partial class OverviewModel : ObservableObject
             foreach (var m in (s.Events ?? []).Where(m => m.Class is { } c && Wanted(c) && Local(m.Start, s).Date == date).OrderBy(m => m.Start))
                 day.Meetings.Add(new WeekMeeting(Words(Local(m.Start, s), "h:mm"), ClassNames.Short(m.Class!), dot(m.Class!),
                     s.Lectures.Any(l => l.Class == m.Class && l.Date is { } at && at >= m.Start.AddMinutes(-45) && at <= m.End.AddMinutes(45))));
-            var due = open.Where(i => i.DueAt is { } d && Local(d, s).Date == date).Select(i => (Item: i, Done: false))
+            var due = open.Concat(over).Where(i => i.DueAt is { } d && Local(d, s).Date == date).Select(i => (Item: i, Done: false))
                 .Concat(done.Where(i => i.DueAt is { } d && Local(d, s).Date == date).Select(i => (Item: i, Done: true)))
                 .OrderBy(x => x.Item.DueAt).Select(x => DueRow(x.Item, s, dot, only is null, done: x.Done)).ToList();
             Fill(day, due);
@@ -936,7 +952,7 @@ public sealed partial class OverviewModel : ObservableObject
             soon = away <= 7;
             when = away <= 1 ? $"{Day(d, s.Now, s.Zone)}, {Time(d, s.Zone)}" : away <= 14 ? $"{Day(d, s.Now, s.Zone)}, in {away} days" : Day(d, s.Now, s.Zone);
         }
-        return new RailDue(i.Name, when, soon, late, first, $"{i.Name}, {(late ? "missing, " : "due ")}{when}", () => s.OpenAssignment?.Invoke(i.Class, i.Id));
+        return new RailDue(i.Name, when, soon, late, first, $"{i.Name}, {(late ? i.Own ? "overdue, " : "missing, " : "due ")}{when}", () => s.OpenAssignment?.Invoke(i.Class, i.Id));
     }
 
     /// <summary>A Canvas class's lists, in the rail: each opens that list.</summary>

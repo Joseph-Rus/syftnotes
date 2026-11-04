@@ -115,4 +115,25 @@ public class DueOwnUiTests
             window.Close(); // a failure leaves no dialog layer behind for the next test
         }
     }
+
+    /// <summary>Past, their exam is simply behind them, on its day and not struck through; their to-do not ticked off is overdue. Neither
+    /// reads "missing", which is for Canvas work that wasn't handed in.</summary>
+    [Fact]
+    public void A_past_exam_stays_on_its_day_and_a_past_todo_is_overdue_never_missing()
+    {
+        var zone = TimeZoneInfo.CreateCustomTimeZone("Test", TimeSpan.FromHours(-5), "Test", "Test");
+        var exam = new CanvasApi.Item { Class = "", Id = "1", Name = "Statistics final", Kind = "mine", What = "exam", Status = "open", DueAt = new DateTimeOffset(2026, 11, 2, 9, 0, 0, TimeSpan.FromHours(-5)) };
+        var todo = new CanvasApi.Item { Class = "", Id = "2", Name = "Return library books", Kind = "mine", What = "task", Status = "overdue", AllDay = true, DueAt = new DateTimeOffset(2026, 11, 3, 23, 59, 0, TimeSpan.FromHours(-5)) };
+        var sources = new OverviewModel.Sources
+        {
+            Now = new DateTimeOffset(2026, 11, 4, 10, 0, 0, TimeSpan.FromHours(-5)), Zone = zone,
+            Due = new CanvasApi.DueResponse { ToHandIn = 1, Groups = [new CanvasApi.Group { Key = "overdue", Items = [todo] }], Behind = [exam] },
+        };
+
+        Assert.Equal("Return library books is overdue.", OverviewModel.DueSentence(sources));
+        var shown = new DueCalendarModel(sources).Cells.SelectMany(c => c.Shown).ToDictionary(i => i.Title);
+        Assert.Equal(("Exam · 9:00 AM", false, false), (shown["Statistics final"].Sub, shown["Statistics final"].Missing, shown["Statistics final"].Done));
+        Assert.Equal(("To do · Overdue", true), (shown["Return library books"].Sub, shown["Return library books"].Missing));
+        Assert.Equal(["Exam · 9:00 AM"], OverviewModel.WeekOf(sources, _ => Avalonia.Media.Brushes.Gray, new DateTime(2026, 11, 1)).SelectMany(d => d.Deadlines).Where(d => d.Title == "Statistics final").Select(d => d.When));
+    }
 }

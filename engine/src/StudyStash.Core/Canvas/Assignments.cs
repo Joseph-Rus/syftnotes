@@ -88,6 +88,7 @@ public static class Assignments
         "excused" => "Excused",
         "no submission" => "Nothing to hand in",
         "closed" => "Closed",
+        "overdue" => "Overdue",
         _ => status,
     };
 
@@ -223,18 +224,22 @@ public static class Assignments
         SharedFile.Write(PathIn(home), JsonSerializer.Serialize(items.ToList(), Options));
     }
 
+    /// <summary>Takes nothing to hand in and its time has gone (<paramref name="now"/> is wall-clock, like <see cref="Assignment.Due"/>):
+    /// an in-class quiz that already happened, or an exam or study session the student put on their own list
+    /// (<see cref="DueMine.IsEvent"/>). It is simply behind them; unlike work that wasn't handed in, it is never overdue or missing.</summary>
+    public static bool Behind(Assignment a, DateTime now) =>
+        (a.Status == "no submission" || DueMine.IsEvent(a)) && a.Due.Length > 0 && DateTime.Parse(a.Due, CultureInfo.InvariantCulture) < now;
+
     /// <summary>Still to hand in at <paramref name="now"/> (wall-clock, like <see cref="Assignment.Due"/>): not done, and not
-    /// work that takes nothing to hand in once its time has gone (an in-class quiz that already happened). That goes with
-    /// what's behind you and keeps its "Nothing to hand in" label; one still to come stays where it is. The class list, the
-    /// Due groups and their count all ask this, so they agree. (Decided when the list is read, not when it's synced: a quiz
-    /// held at 10:00 stops being "to hand in" at 10:00, not at the next sync.)</summary>
-    public static bool ToHandIn(Assignment a, DateTime now) =>
-        !a.Done && !(a.Status == "no submission" && a.Due.Length > 0 && DateTime.Parse(a.Due, CultureInfo.InvariantCulture) < now);
+    /// <see cref="Behind"/>. That goes with what's behind you and keeps its "Nothing to hand in" label; one still to come stays
+    /// where it is. The class list, the Due groups and their count all ask this, so they agree. (Decided when the list is read, not
+    /// when it's synced: a quiz held at 10:00 stops being "to hand in" at 10:00, not at the next sync.)</summary>
+    public static bool ToHandIn(Assignment a, DateTime now) => !a.Done && !Behind(a, now);
 
     /// <summary>What's still to do, soonest first: open, past due or missing, due within <paramref name="days"/> (or
     /// overdue), plus anything with no due date that's open.</summary>
     public static List<Assignment> Upcoming(IEnumerable<Assignment> all, DateTime now, int days = 14, string? className = null) =>
-        all.Where(a => (className is null || a.ClassName == className) && !a.Done && a.Status != "no submission")
+        all.Where(a => (className is null || a.ClassName == className) && !a.Done && a.Status != "no submission" && !Behind(a, now))
             // By calendar day: "within a week" includes the whole of the seventh day.
             .Where(a => a.Due.Length == 0 || DateTime.Parse(a.Due, CultureInfo.InvariantCulture) < now.Date.AddDays(days + 1))
             .Where(a => a.Due.Length == 0 || a.Status != "past due" || DateTime.Parse(a.Due, CultureInfo.InvariantCulture) >= now.AddDays(-21))
