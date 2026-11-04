@@ -251,4 +251,15 @@ public class ReviewTests
         Assert.False(lib.Cfg.IsClass(Configs.Unsorted));
         Assert.False(lib.Cfg.IsClass(""));
     }
+
+    [Fact]
+    public async Task With_no_AI_chosen_and_no_Ollama_the_cards_say_to_choose_an_AI_in_plain_words()
+    {
+        // A fresh library on a computer without Ollama: making cards (or a listen, or an exam prep) asks the student
+        // to choose an AI, as Ask does, instead of Ollama's "isn't installed" with its download link.
+        using var t = new TempDir();
+        var ai = new AiJobs(t.Path) { Checks = new FakeChecks().Build() };
+        var e = await Assert.ThrowsAsync<InvalidOperationException>(() => ai.PlanAsync("ask", "Make cards.", new System.Text.Json.Nodes.JsonObject()));
+        Assert.Equal("This needs an AI: choose one in Settings → Your AI.", e.Message);
+    }
 }

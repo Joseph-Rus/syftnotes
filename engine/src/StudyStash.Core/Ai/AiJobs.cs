@@ -132,6 +132,9 @@ public sealed class AiJobs(string home, Func<string>? ollamaHost = null)
     {
         var settings = Settings;
         var choice = settings.For(job);
+        // No AI chosen and no Ollama here: say so in Ask's words, not Ollama's "isn't installed" with its download link.
+        if (!settings.Picked(job) && Providers is null && !Checks.OllamaInstalled())
+            throw new InvalidOperationException("This needs an AI: choose one in Settings → Your AI.");
         var provider = Provider(choice.Provider);
         // Only the notes take the speed Settings sets for Claude Code: sorting and answers stay as set up.
         var how = job == "notes" ? AiSpeed.ForNotes(choice.Provider, choice.Model, settings.Speed) : new AiSpeed.How(choice.Model, "", false);
