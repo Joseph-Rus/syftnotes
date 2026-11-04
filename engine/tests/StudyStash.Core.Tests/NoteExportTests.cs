@@ -96,6 +96,22 @@ public class NoteExportTests
     }
 
     [Fact]
+    public void A_lecture_with_no_notes_written_downloads_what_the_student_typed_as_its_page_shows_it()
+    {
+        // No AI yet (or too short for notes): what the student typed while it recorded is the page's notes, under
+        // "What you wrote", so a download holds them too and isn't an empty page.
+        using var dir = new TempDir();
+        var (_, store) = Library(dir);
+        store.Enqueue(new Meeting("lec-3") { Title = "Photosynthesis", Date = "2026-11-04", PrivateNotes = "# Photosynthesis\n- light reactions in thylakoid" });
+        var lecture = new LibraryReader(new Config("", ""), store).Lecture("lec-3")!;
+
+        var file = NoteExport.Lecture(lecture, transcript: false, DrawMermaid);
+
+        Assert.Contains("*What you wrote*\n\n# Photosynthesis\n- light reactions in thylakoid", file.Markdown);
+        Assert.DoesNotContain("_No notes yet._", file.Markdown);
+    }
+
+    [Fact]
     public void A_mermaid_block_that_parses_is_kept_canonical_with_its_picture_saved_beside_it_and_never_linked()
     {
         using var dir = new TempDir();
