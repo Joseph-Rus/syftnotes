@@ -36,14 +36,17 @@ public static partial class DocumentText
         var listed = Xml(z, "ppt/presentation.xml")?.Root?.Element(PresentationNs + "sldIdLst")?.Elements(PresentationNs + "sldId");
         var rels = Relationships(z, "ppt/presentation.xml");
         if (listed is null || rels is null) return null;
-        var slides = listed.Select(s => rels.FirstOrDefault(r => r.Id == (string?)s.Attribute(OfficeRelationshipNs + "id")).Target).ToList();
-        return slides.All(s => s is not null && z.GetEntry(s) is not null) ? slides! : null;
+        var targets = new Dictionary<string, string>();
+        foreach (var (relId, _, relTarget) in rels) targets.TryAdd(relId, relTarget);
+        var slides = listed.Select(s => (string?)s.Attribute(OfficeRelationshipNs + "id") is { } id && targets.TryGetValue(id, out string? target) ? target : null).ToList();
+        return slides.All(s => s is not null && z.GetEntry(s) is not null) ? slides.OfType<string>().ToList() : null;
     }
 
-    /// <summary>The slides by the number in their file names: the order for a file with no usable list.</summary>
+    /// <summary>The slides by the number in their file names (one too big to be a number last): the order for a file
+    /// with no usable list.</summary>
     static List<string> NumberOrder(ZipArchive z) =>
         [.. z.Entries.Select(e => SlideName().Match(e.FullName)).Where(m => m.Success)
-            .OrderBy(m => int.Parse(m.Groups[1].Value, System.Globalization.CultureInfo.InvariantCulture)).Select(m => m.Value)];
+            .OrderBy(m => int.TryParse(m.Groups[1].Value, System.Globalization.CultureInfo.InvariantCulture, out int n) ? n : int.MaxValue).Select(m => m.Value)];
 
     /// <summary>The part holding a slide's speaker notes: the one the slide points to (notes are numbered in the order
     /// they were made, not like their slide), or without a list of what it points to, the one numbered like it.</summary>
@@ -75,16 +78,18 @@ public static partial class DocumentText
         return string.Join('/', names);
     }
 
-    /// <summary>A part of the file read as XML; null when it isn't there or isn't well formed.</summary>
+    /// <summary>A part of the file read as XML; null when it isn't there, isn't well formed or can't be read (the slides
+    /// are then read by their numbers, as for a file without these parts).</summary>
     static XDocument? Xml(ZipArchive z, string name)
     {
         if (z.GetEntry(name) is not { } e) return null;
         try
         {
-            using var reader = XmlReader.Create(e.Open(), OfficeXml);
+            using var stream = e.Open();
+            using var reader = XmlReader.Create(stream, OfficeXml);
             return XDocument.Load(reader);
         }
-        catch (XmlException)
+        catch (Exception ex) when (ex is XmlException or InvalidDataException or IOException)
         {
             return null;
         }
