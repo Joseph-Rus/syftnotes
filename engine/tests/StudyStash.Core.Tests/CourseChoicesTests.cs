@@ -54,6 +54,8 @@ public class CourseChoicesTests
     [InlineData("""{"name": "Orientation and Mobility", "course_code": "SPED 455" """ + ThisFall + AsStudent + "}", true, "")]
     [InlineData("""{"name": "Fluids Lab", "course_code": "ME 330", "restrict_enrollments_to_course_dates": true, "start_at": "2026-09-01T00:00:00Z", "end_at": "2026-12-01T00:00:00Z", "term": {"name": "Spring 2026", "start_at": "2026-01-10T00:00:00Z", "end_at": "2026-05-10T00:00:00Z"}""" + AsStudent + "}", true, "")]
     [InlineData("""{"name": "Genetics", "course_code": "BIO 300", "start_at": "2026-08-20T00:00:00Z", "end_at": "2016-12-15T00:00:00Z", "term": {"name": "Default Term"}""" + AsStudent + "}", true, "")]
+    [InlineData("""{"name": "Physics I", "course_code": "PHYS 101", "term": {"name": "Fall 2025"}""" + AsStudent + "}", false, CourseChoices.PastTerm)]
+    [InlineData("""{"name": "Student Success Seminar", "course_code": "FYE 101" """ + ThisFall + AsStudent + "}", true, "")]
     [InlineData("""{"name": "Chapel", "course_code": "CHPL 100" """ + ThisFall + AsStudent + "}", false, CourseChoices.NotAClass)]
     [InlineData("""{"name": "New Student Orientation", "course_code": "NSO" """ + ThisFall + AsStudent + "}", false, CourseChoices.NotAClass)]
     [InlineData("""{"name": "Sandbox - Practice", "course_code": "SBX-1", "term": {"name": "Default Term"}, "enrollments": [{"type": "teacher", "enrollment_state": "active"}]}""", false, CourseChoices.NotAClass)]
