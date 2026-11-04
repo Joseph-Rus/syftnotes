@@ -150,6 +150,8 @@ public static class CanvasView
                 ["announcements"] = index?.Announcements.Count ?? 0, ["announcements_new"] = newAnnouncements,
             },
             ["files_hidden"] = index?.FilesHidden ?? false,
+            // The student's grade in the class when Canvas shares it; null when it doesn't (or before a sync that asked).
+            ["grade"] = index?.Grade is { } grade ? new JsonObject { ["score"] = grade.Score, ["letter"] = grade.Letter } : null,
             ["scout"] = new JsonObject { ["state"] = scout.State, ["files"] = scout.Files, ["when"] = When(scout.When), ["report"] = scout.Report },
         };
     }

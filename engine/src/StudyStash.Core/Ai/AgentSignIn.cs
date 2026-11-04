@@ -94,6 +94,8 @@ public sealed class AgentSignIn : IDisposable
     /// <summary>How many times Syft Notes handed its page to the browser opener, in this run of the sign-in.</summary>
     public int Opened => Volatile.Read(ref opened);
     public bool Running => child is { HasExited: false };
+    /// <summary>How this run's sign-in ended (its exit code), once it has; null while it runs, or when it never started.</summary>
+    int? ended;
     /// <summary>The sign-in's process, while it runs (CI looks for windows of its own).</summary>
     internal int? ProcessId => child?.Id;
 
@@ -110,6 +112,7 @@ public sealed class AgentSignIn : IDisposable
         GaveUp = false;
         Region = false;
         CodeRefused = false;
+        ended = null;
         // A new run shows a new page: it's opened too ("Try again" runs the same sign-in again).
         Volatile.Write(ref opened, 0);
         // A fresh end to wait on, unless "again" made one already (so a wait never takes the old one's end for this one's).
@@ -178,6 +181,7 @@ public sealed class AgentSignIn : IDisposable
                 else if (s.WantsTerminal || DateTime.UtcNow - at < QuickFail) Stuck = true;
                 else GaveUp = true;
             }
+            if (ReferenceEquals(child, t)) ended = code;
             done.TrySetResult();
         });
         return true;
@@ -318,14 +322,20 @@ public sealed class AgentSignIn : IDisposable
 
     /// <summary>Waits until it's signed in (true), checking every <see cref="Every"/> and when the sign-in stops, or
     /// until <paramref name="ct"/> ends the wait, or the sign-in stopped without it (false: <see cref="GaveUp"/>,
-    /// <see cref="Region"/> or <see cref="Stuck"/>). <paramref name="changed"/> hears each check's answer.</summary>
+    /// <see cref="Region"/> or <see cref="Stuck"/>). <paramref name="changed"/> hears each check's answer.
+    /// <para>When the status says signed in at the very first look, before the sign-in can have done anything, it may be
+    /// an old sign-in its maker no longer takes, or a status that misreports. A sign-in that stops by itself once it's
+    /// done (Claude Code's, Codex's) then counts only when it ends cleanly and the status still says signed in.</para></summary>
     public async Task<bool> WaitAsync(CancellationToken ct, Action<AgentSignedIn>? changed = null)
     {
+        bool? first = null;
         while (!ct.IsCancellationRequested)
         {
             var now = await Task.Run(Check, CancellationToken.None);
             changed?.Invoke(now);
-            if (now.SignedIn)
+            first ??= now.SignedIn;
+            bool untilItEnds = first == true && !cli.StaysOpen;
+            if (now.SignedIn && !untilItEnds)
             {
                 // Plain agy goes on to its chat once it's signed in: nothing more is wanted from it.
                 if (cli.StaysOpen) Stop();
@@ -345,7 +355,7 @@ public sealed class AgentSignIn : IDisposable
             // It stopped: one last look, and the wait ends unless it's signed in (a sign-in that finished stops too).
             var last = await Task.Run(Check, CancellationToken.None);
             changed?.Invoke(last);
-            if (last.SignedIn) return true;
+            if (last.SignedIn && (!untilItEnds || ended == 0)) return true;
             if (!Region && !Stuck && !CodeRefused) GaveUp = true;
             return false;
         }
