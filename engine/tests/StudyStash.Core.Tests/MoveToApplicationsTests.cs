@@ -24,7 +24,7 @@ public class MoveToApplicationsTests
         string home = Path.Combine(t.Path, "home");
         string vols = Path.Combine(t.Path, "Volumes");
         var dmg = MoveToApplications.Plan(Make(vols, "Syft Notes"), home, true, vols);
-        Assert.Equal("/Applications/Study Stash.app", dmg!.Dest);
+        Assert.Equal("/Applications/Syft Notes.app", dmg!.Dest);
         Assert.Equal(Path.Combine(vols, "Syft Notes"), dmg.Volume);
         var moved = MoveToApplications.Plan(Make(t.Path, "x/AppTranslocation/ABC/d"), home, true, vols);
         Assert.NotNull(moved);
@@ -39,7 +39,7 @@ public class MoveToApplicationsTests
         using var t = new TempDir();
         string home = Path.Combine(t.Path, "home");
         var plan = MoveToApplications.Plan(Make(home, "Downloads"), home, false);
-        Assert.Equal(Path.Combine(home, "Applications", "Study Stash.app"), plan!.Dest);
+        Assert.Equal(Path.Combine(home, "Applications", "Syft Notes.app"), plan!.Dest);
     }
 
     [Fact]
@@ -82,7 +82,7 @@ public class MoveToApplicationsTests
         bool went = MoveToApplications.Offer(baseDir, home, home, () => true, (_, _, _) => new ProcResult(1, ""),
             _ => throw new InvalidOperationException("nothing starts"), 1, _ => { }, applicationsWritable: false, otherCopyRunning: () => false);
         Assert.False(went);
-        Assert.False(Directory.Exists(Path.Combine(home, "Applications", "Study Stash.app.new")));
+        Assert.False(Directory.Exists(Path.Combine(home, "Applications", "Syft Notes.app.new")));
     }
 
     [Fact]
@@ -101,7 +101,7 @@ public class MoveToApplicationsTests
         }
         bool went = MoveToApplications.Offer(baseDir, home, home, () => true, Run, a => spawned = a, 4242, _ => { }, applicationsWritable: false, otherCopyRunning: () => false);
         Assert.True(went);
-        string dest = Path.Combine(home, "Applications", "Study Stash.app");
+        string dest = Path.Combine(home, "Applications", "Syft Notes.app");
         Assert.True(File.Exists(Path.Combine(dest, "Contents", "Info.plist")));
         Assert.Equal(["sh", "4242", dest, ""], spawned!.Skip(3).ToArray());
         Assert.Contains("/usr/bin/caffeinate -w", spawned![2]);

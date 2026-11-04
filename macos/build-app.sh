@@ -1,5 +1,5 @@
 #!/bin/sh
-# Builds "Study Stash.app": one universal bundle (D1: macos/launcher.c hosts .NET in-process, so the same running
+# Builds "Syft Notes.app": one universal bundle (D1: macos/launcher.c hosts .NET in-process, so the same running
 # executable works on Apple silicon and Intel), then the one download, Syft-Notes.dmg. The app has no role of its own:
 # setup asks what the computer is for, and Settings can change it later (docs/one-download.md).
 #   sh macos/build-app.sh [out-dir]      default: dist/mac
@@ -16,11 +16,12 @@ OUT=${1:-"$ROOT/dist/mac"}
 VERSION=$(sed -n 's:.*<StudyStashVersion>\(.*\)</StudyStashVersion>.*:\1:p' "$ROOT/engine/Directory.Build.props")
 [ -n "$VERSION" ] || { echo "build-app.sh: no StudyStashVersion in engine/Directory.Build.props" >&2; exit 1; }
 
-APP="$OUT/Study Stash.app"
+APP="$OUT/Syft Notes.app"
 MACOS="$APP/Contents/MacOS"
+RES="$APP/Contents/Resources"
 
 rm -rf "$OUT"
-mkdir -p "$MACOS" "$APP/Contents/Resources"
+mkdir -p "$MACOS" "$RES"
 
 # The phone app (web/) is built first, so each publish carries it beside the app as web/ (the library serves it at
 # /app/). It needs Node and npm; without them the build stops rather than ship a library whose Add a phone leads
@@ -32,16 +33,21 @@ fi
 [ -f "$ROOT/web/dist/index.html" ] || { echo "build-app.sh: the phone app didn't build (web/dist)" >&2; exit 1; }
 
 # One self-contained publish per architecture; the two trees can't be lipo-merged (System.Private.CoreLib and the
-# R2R framework assemblies differ), so both ship whole and macos/launcher.c picks its tree at run time (D1).
+# R2R framework assemblies differ), so both ship whole and macos/launcher.c picks its tree at run time (D1). Each tree
+# lives in Contents/Resources/<arch>, with Contents/MacOS/<arch> a link to it, so the launcher finds it where it always
+# did: a file in Resources is sealed in the bundle's signature by its hash, where one in MacOS that isn't a Mach-O (the
+# .dll files) keeps its signature in extended attributes, which Velopack's update packages don't carry (the Velopack
+# trial, docs/LIBRARIES.md phase 5: the bundle stays valid after an update only this way).
 for arch in arm64 x64; do
   dotnet publish "$ROOT/engine/src/StudyStash.App" -c Release -r "osx-$arch" --self-contained true \
-    -p:DebugType=None -o "$MACOS/$arch" --nologo -v quiet
+    -p:DebugType=None -o "$RES/$arch" --nologo -v quiet
   # Whisper.net ships every platform's native libraries; each tree keeps only its own.
-  for d in "$MACOS/$arch"/runtimes/*; do
+  for d in "$RES/$arch"/runtimes/*; do
     [ "$(basename "$d")" = "macos-$arch" ] || rm -rf "$d"
   done
+  ln -s "../Resources/$arch" "$MACOS/$arch"
 done
-rm -f "$MACOS/x64/ggml-metal.metal"   # no Metal on Intel
+rm -f "$RES/x64/ggml-metal.metal"   # no Metal on Intel
 
 # D6: the transcription model is never bundled. The one model file that is: the live words' small Whisper in the
 # Intel tree (models/live-whisper-*.bin, 43.5 MB), so an Intel Mac shows the first words with no download.
@@ -66,7 +72,7 @@ tree_minos() {
     mode == "min"   && /^ *version/ { print $2; mode = ""; next }
   '
 }
-MINOS=$( { tree_minos "$MACOS/arm64"; tree_minos "$MACOS/x64"; } | sort -t. -k1,1n -k2,2n | tail -1)
+MINOS=$( { tree_minos "$RES/arm64"; tree_minos "$RES/x64"; } | sort -t. -k1,1n -k2,2n | tail -1)
 [ -n "$MINOS" ] || MINOS=12.0
 
 # The launcher: the one universal binary in the bundle, built for both trees' minimum OS (D1).
@@ -82,7 +88,7 @@ rm -rf "$OUT/AppIcon.iconset"
 sed -e "s/__VERSION__/$VERSION/g" -e "s/__MINOS__/$MINOS/g" \
   "$HERE/Info.plist" > "$APP/Contents/Info.plist"
 printf 'APPL????' > "$APP/Contents/PkgInfo"
-# The name Finder and the Dock show (the bundle's own file name stays Study Stash.app: see Info.plist).
+# The name Finder and the Dock show (see Info.plist).
 mkdir -p "$APP/Contents/Resources/en.lproj"
 printf '"CFBundleDisplayName" = "Syft Notes";\n"CFBundleName" = "Syft Notes";\n' > "$APP/Contents/Resources/en.lproj/InfoPlist.strings"
 
@@ -98,8 +104,8 @@ sign_tree() {
     codesign --force --options runtime --sign - "$f"
   done
 }
-sign_tree "$MACOS/arm64"
-sign_tree "$MACOS/x64"
+sign_tree "$RES/arm64"
+sign_tree "$RES/x64"
 codesign --force --options runtime --sign - "$MACOS/StudyStash"
 codesign --force --options runtime --entitlements "$HERE/StudyStash.entitlements" --sign - "$APP"
 codesign --verify --deep --strict --verbose=2 "$APP"
