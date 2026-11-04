@@ -287,9 +287,8 @@ public class LibraryWindowTests
         Assert.True(m.HasDeleted && m.HasToast);
         Assert.Equal("Deleted “Recursion and the call stack”", m.ToastSaid);
 
-        // "Deleted · Undo" goes by itself once its minutes are up.
-        await Task.Delay(400, TestContext.Current.CancellationToken);
-        Assert.False(m.HasToast);
+        // "Deleted · Undo" goes by itself once its minutes are up (50 ms here).
+        await Wait.UntilAsync(() => !m.HasToast, "the deleted toast going by itself");
 
         // The last one under its heading: the heading goes too.
         await m.DeleteCommand.ExecuteAsync(rows[2]);
@@ -334,8 +333,9 @@ public class LibraryWindowTests
         m.SayMoved(new NoteMove("c", "CS 101", ""));
         Assert.Equal("Moved to Unsorted.", m.ToastSaid);
         Assert.False(m.CanDismissToast);
-        await Task.Delay(400, TestContext.Current.CancellationToken); // the move's own few seconds
-        Assert.Equal("Deleted “Stack frames and scope”", m.ToastSaid);
+        // The move's own few seconds (50 ms here), then the deletion behind it shows again. Waited on, not slept: a
+        // busy CI Mac was still showing the move after a fixed 400 ms (main's run 41762571248).
+        await Wait.UntilAsync(() => m.ToastSaid == "Deleted “Stack frames and scope”", "the deletion's toast back after the move's");
         Assert.True(m.CanDismissToast);
         await m.UndoToastCommand.ExecuteAsync(null);
         Assert.Equal(["b"], undone);
