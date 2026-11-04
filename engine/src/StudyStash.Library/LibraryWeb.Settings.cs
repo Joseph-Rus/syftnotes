@@ -26,7 +26,9 @@ public sealed partial class LibraryWeb
         {
             var body = await Http.JsonBodyAsync(ctx.Request);
             if (body is null) return Http.Detail(422, "send the settings to change as a JSON object");
-            return ChangeSettings(body) is { } refused ? refused : Http.Json(await SettingsJsonAsync());
+            if (ChangeSettings(body) is { } refused) return refused;
+            if (Text(body["sort_engine"]) == "ollama") await ChooseFreeModelAsync();
+            return Http.Json(await SettingsJsonAsync());
         })));
         // A class's own folders: link one on this computer (a project's repo, say) or let it go. The folder stays where
         // it is; it's listed on the class's home, searched, and read by the AI like the folders in Settings.
