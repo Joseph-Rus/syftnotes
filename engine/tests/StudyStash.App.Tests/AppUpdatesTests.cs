@@ -23,12 +23,14 @@ public class AppUpdatesTests
         bool installerRelaunches = false,
         Action? quit = null,
         List<UpdateNews>? told = null,
-        Func<Release, bool>? moves = null)
+        Func<Release, bool>? moves = null,
+        Func<Task<Release?>>? latestNow = null)
     {
         log ??= [];
         return new AppUpdates
         {
             Latest = latest ?? (() => Task.FromResult<Release?>(null)),
+            LatestNow = latestNow,
             Idle = idleNow ?? (() => idle),
             Enabled = () => enabled,
             Automatic = () => automatic,
@@ -238,6 +240,24 @@ public class AppUpdatesTests
         Assert.Equal(0, applied);
         Assert.Equal(UpdateNewsKind.Ready, Assert.Single(told).Kind);
         Assert.Equal("relaunching", await updates.NowAsync());
+        Assert.Equal(1, applied);
+    }
+
+    /// <summary>Update now asks GitHub afresh: the background rounds' hour-old answer may not know a release that
+    /// came out since, and the student would be told they're up to date.</summary>
+    [Fact]
+    public async Task Update_now_asks_for_the_newest_release_afresh_not_the_hour_old_answer()
+    {
+        int applied = 0, fresh = 0;
+        var updates = Updates_(
+            latest: () => Task.FromResult<Release?>(null), // the cached answer from before the release
+            latestNow: () => { fresh++; return Task.FromResult<Release?>(Release()); },
+            apply: (_, _, _, _) => { applied++; return Task.FromResult(true); });
+
+        Assert.Equal("up to date", await updates.RoundAsync());
+        Assert.Equal(0, fresh);
+        Assert.Equal("relaunching", await updates.NowAsync());
+        Assert.Equal(1, fresh);
         Assert.Equal(1, applied);
     }
 

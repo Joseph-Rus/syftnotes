@@ -177,7 +177,9 @@ public sealed class AppUpdates
         Release? release;
         try
         {
-            release = await Latest();
+            // The student pressed Update now: ask GitHub, not the hour-old answer the background rounds share, or a
+            // release out for less than an hour would be said to be up to date.
+            release = await (asked ? LatestNow ?? Latest : Latest)();
         }
         catch (Exception e) when (e is HttpRequestException or TaskCanceledException or System.Text.Json.JsonException)
         {
