@@ -272,15 +272,18 @@ public class DiagramsAfterFilingTests
     {
         using var rig = new Rig();
         bool busy = true; // filing wakes the queue while its notes still count as being written
+        int looks = 0; // each time the queue asks whether notes are being written
         rig.Jobs = new DiagramJobs(rig.Cfg, rig.Store, rig.Ai, rig.Say)
         {
-            NotesBusy = () => busy, Pause = TimeSpan.FromMinutes(10), YieldCheck = TimeSpan.FromMilliseconds(50),
+            NotesBusy = () => { Interlocked.Increment(ref looks); return busy; }, Pause = TimeSpan.FromMinutes(10), YieldCheck = TimeSpan.FromMilliseconds(50),
         };
         using var stop = new CancellationTokenSource();
         var queue = rig.Jobs.Start(stop.Token);
 
         await rig.FileAsync();
-        await Task.Delay(300); // it looked, saw notes being written, and rests
+        // It looked, saw notes being written, and rests: asked again on its short beat (the asks before that were the
+        // first pass and the wake from filing).
+        Assert.True(await Waiting.UntilAsync(() => Volatile.Read(ref looks) >= 4, 10), "the queue never looked again");
         Assert.Equal(0, rig.Claude.Designs);
         busy = false; // the notes are done, and nothing says so
         await rig.AskedAsync();
@@ -349,6 +352,33 @@ public class DiagramsAfterFilingTests
         Assert.DoesNotContain("```mermaid", rig.File());
         Assert.Contains("switched off before its diagrams went in", rig.Logged());
         Assert.False(rig.Jobs.Adding("lec-1"));
+    }
+
+    [Fact]
+    public async Task Rewritten_notes_still_get_their_diagrams_when_the_queue_cant_save_its_job_file()
+    {
+        // Seen on a Windows runner: the job file was held by another program just as the new notes' job replaced the old
+        // one, the save threw, and the older pass was never stopped, so the new pass never ran.
+        using var rig = new Rig();
+        var oldPass = new TaskCompletionSource<string>(TaskCreationOptions.RunContinuationsAsynchronously);
+        rig.Claude.Design = (_, ct) => oldPass.Task.WaitAsync(ct);
+        await rig.FileAsync();
+        var running = rig.Jobs.RunPendingAsync();
+        await rig.AskedAsync();
+
+        // The job's file can't be replaced (a folder stands where it goes: the same IOException a locked file gives).
+        string file = Directory.EnumerateFiles(Path.Combine(rig.Cfg.Home, "diagram-jobs"), "*.json").Single();
+        File.Delete(file);
+        Directory.CreateDirectory(file);
+
+        var newPass = new TaskCompletionSource<string>(TaskCreationOptions.RunContinuationsAsynchronously);
+        rig.Claude.Design = (_, _) => newPass.Task;
+        rig.Jobs.Queue("lec-1", "claude");
+        await rig.AskedAsync();
+        newPass.SetResult(Reply(("Key points", "The renin chain")));
+        Assert.Equal(2, await running);
+        Assert.Equal(DiagramDesign.Insert(Notes, [Designed("Key points")]), rig.Row().SummaryMd);
+        oldPass.SetResult("");
     }
 
     [Fact]
