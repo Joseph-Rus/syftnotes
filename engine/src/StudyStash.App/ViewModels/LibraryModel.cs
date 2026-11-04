@@ -696,7 +696,7 @@ public sealed partial class LibraryModel : ObservableObject
 
     async Task HideDeletedAfterAWhile(LectureDeletion d)
     {
-        await Poll.AfterAsync(DeletedShows);
+        await Poll.AfterAsync(DeletedShows, clock: Clock);
         Forget(d);
     }
 
@@ -758,9 +758,14 @@ public sealed partial class LibraryModel : ObservableObject
 
     async Task HideMovedAfterAWhile(NoteMove move)
     {
-        await Poll.AfterAsync(UndoShows);
-        if (Moved == move) Moved = null;
+        await Poll.AfterAsync(UndoShows, clock: Clock);
+        // This very move, not one that reads the same: a note moved, put back and moved to the same place again has its
+        // own few seconds (the first one's timer took the second toast away early).
+        if (ReferenceEquals(Moved, move)) Moved = null;
     }
+
+    /// <summary>The clock the toasts' few seconds and minutes are timed on; tests move a fake one.</summary>
+    public TimeProvider Clock { get; init; } = TimeProvider.System;
 
     /// <summary>The toast at the page's foot: what just happened, and Undo.</summary>
     public string ToastSaid => Moved?.Said ?? Deleted?.Said ?? "";
