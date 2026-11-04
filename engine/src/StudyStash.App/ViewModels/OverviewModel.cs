@@ -162,6 +162,12 @@ public sealed partial class OverviewModel : ObservableObject
 {
     /// <summary>How many notes Home's list shows at a time; scrolling to its end brings the next page.</summary>
     public const int PageSize = 20;
+
+    /// <summary>When the library can't list the notes for Home (<paramref name="folder"/> null, with its Unsorted filter)
+    /// or a folder: the page stays as it is only when that very page is the one showing (it was being read again);
+    /// any other opening (another page, Back or Forward to it) says the library can't be reached, never "No notes yet".</summary>
+    public static bool KeepsPageWhenListFails(OverviewModel? showing, string? folder, bool unsorted) =>
+        showing is not null && (folder is null ? showing.IsHome && showing.OnlyUnsorted == unsorted : showing.IsFolder && showing.ClassName == folder);
     /// <summary>How many events Up next shows.</summary>
     public const int UpNextRows = 4;
     /// <summary>How many deadlines a folder's rail shows.</summary>
