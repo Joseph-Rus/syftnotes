@@ -920,6 +920,13 @@ public sealed class AiJobs(string home, Func<string>? ollamaHost = null)
             return answer;
         }
 
+        // A run that failed, said in plain words (see AskFailure): its raw text stays in the AI's record and as the inner exception.
+        InvalidOperationException Failed(string who, Exception ex)
+        {
+            Record(who, false, ex is OperationCanceledException ? "timed out" : ex.Message);
+            return new InvalidOperationException(AskFailure(who, ex), ex);
+        }
+
         JsonObject result;
         using var cts = CancellationTokenSource.CreateLinkedTokenSource(ct);
         cts.CancelAfter(AskTimeout);
@@ -935,24 +942,29 @@ public sealed class AiJobs(string home, Func<string>? ollamaHost = null)
         }
         catch (Exception ex) when (ex is InvalidOperationException or HttpRequestException or TimeoutException && shown.Length > 0)
         {
-            Record(engine, false, ex.Message);
-            throw new InvalidOperationException(AskFailure(engine, ex), ex); // what it wrote stays on screen above this
+            throw Failed(engine, ex); // what it wrote stays on screen above this
         }
         catch (Exception ex) when (ex is InvalidOperationException or InvalidDataException or HttpRequestException or TimeoutException or OperationCanceledException)
         {
             if (ex is OperationCanceledException && ct.IsCancellationRequested) throw; // the caller gave up; not ours to paper over
-            bool timedOut = ex is OperationCanceledException;
-            Record(engine, false, timedOut ? "timed out" : ex.Message);
-            if (engine == "ollama") throw;
-            why = AskFailure(engine, ex);
-            // Nothing to fall back to (switched off, or Ollama isn't here): the student is told what's wrong with the AI in
-            // plain words, and its raw text stays in its record and as the inner exception.
-            if (!CanFallBack(settings)) throw new InvalidOperationException(why, ex);
+            var failed = Failed(engine, ex);
+            // Ollama has nothing to fall back to, nor has an AI when fallback is off or Ollama isn't here: the student is
+            // told what's wrong in plain words.
+            if (engine == "ollama" || !CanFallBack(settings)) throw failed;
+            why = failed.Message;
             fellBack = true;
             engine = "ollama";
             using var cts2 = CancellationTokenSource.CreateLinkedTokenSource(ct);
             cts2.CancelAfter(AskTimeout);
-            result = await RunAsync(engine, cts2);
+            try
+            {
+                result = await RunAsync(engine, cts2);
+            }
+            catch (Exception ex2) when (ex2 is InvalidOperationException or InvalidDataException or HttpRequestException or TimeoutException
+                || (ex2 is OperationCanceledException && !ct.IsCancellationRequested))
+            {
+                throw Failed(engine, ex2); // the first AI failed and Ollama did too
+            }
         }
 
         var sources = (result["sources"] as JsonArray ?? []).Select(s => new AskSource(

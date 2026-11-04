@@ -217,6 +217,31 @@ public class AiApiTests
     }
 
     [Fact]
+    public async Task Ollama_failing_an_Ask_says_so_in_plain_words_whether_it_was_picked_or_fell_back_to()
+    {
+        using var dir = new TempDir();
+        var cfg = Cfg(dir);
+        using var store = new Store(cfg.DbPath, cfg.PoolDir);
+        var claude = new ScriptedAi("claude", "Claude") { Script = [AiEvent.Error("INTERNAL: upstream closed")] };
+        var ollama = new ScriptedAi("ollama") { Script = [AiEvent.Error("llama runner process has terminated: exit status 2")] };
+        var ai = new AiJobs(cfg.Home)
+        {
+            Providers = id => id switch { "claude" => claude, "ollama" => ollama, _ => new ScriptedAi(id) },
+            Checks = new FakeChecks().Installed("claude").Ollama().Build(),
+        };
+        await using var site = await Site(cfg, store, ai);
+        var remote = new AiRemote("http://localhost", "pw", site.Client);
+
+        // Asked outright; then after Claude failed too (Ollama is tried next, and fails the same way).
+        foreach (string engine in new[] { "ollama", "claude" })
+        {
+            var refused = await Assert.ThrowsAsync<LibraryRefusedException>(() =>
+                remote.AskAsync(new AskRequest("What happened?") { Engine = engine, Live = "Something happened today." }));
+            Assert.Equal((503, Engines.DidntAnswer("Ollama")), (refused.Status, refused.Message));
+        }
+    }
+
+    [Fact]
     public async Task Signing_in_is_refused_away_from_the_librarys_own_computer()
     {
         using var dir = new TempDir();
