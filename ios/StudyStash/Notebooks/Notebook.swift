@@ -302,14 +302,19 @@ final class NotebookStore {
     }
 
     /// Save it to the library: the PDF into its class (and lecture), replacing the copy saved before.
+    /// It's written in while it's on its way (the notebook open sends what was waiting): what's marked as saved is the
+    /// notebook as it is now, saved as of when its PDF was made, so a page added or a rename meanwhile is kept, and is
+    /// still to be sent. One deleted meanwhile stays deleted.
     func upload(_ id: UUID, api: APIClient) async throws {
-        guard var n = notebooks.first(where: { $0.id == id }) else { return }
+        guard let n = notebooks.first(where: { $0.id == id }) else { return }
         let name = n.title.replacingOccurrences(of: "/", with: "-") + ".pdf"
+        let made = Date.now
         let added = try await api.upload(files: [(name, "application/pdf", pdfData(n))], class: n.className, lecture: n.lectureID)
         if let old = n.attachmentID, old != added.first?.id { try? await api.deleteAttachment(old) }
-        n.attachmentID = added.first?.id
-        n.savedAt = .now
-        save(n)
+        guard var latest = notebook(id) else { return }
+        latest.attachmentID = added.first?.id
+        latest.savedAt = made
+        save(latest)
     }
 
     // MARK: PDFs to write on
