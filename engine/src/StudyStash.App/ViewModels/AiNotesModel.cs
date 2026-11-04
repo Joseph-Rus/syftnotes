@@ -336,6 +336,7 @@ public sealed partial class AiNotesModel : ObservableObject, IDisposable
                 {
                     // The library answered, and said no (the lecture was deleted on another device, say): asking again
                     // wouldn't change that, so the page stops checking and says what it said.
+                    Offline = false; // it answered
                     Say = ex.Message;
                     return;
                 }

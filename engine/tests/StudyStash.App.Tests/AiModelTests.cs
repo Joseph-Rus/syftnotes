@@ -1487,6 +1487,7 @@ public class AiNotesModelTests
             OnRewrite = _ => ++checks switch
             {
                 1 => new RewriteInfo("lec-1", "working"),
+                2 => throw new HttpRequestException("down for a moment"), // out of reach first, then refused
                 _ => throw new LibraryRefusedException(404, "That lecture isn't in your library any more."),
             },
         };
@@ -1495,12 +1496,14 @@ public class AiNotesModelTests
         await model.Load("lec-1", "## Summary\nOld notes.", "Claude Code", "2026-09-29T09:00:00");
 
         ticks.Release();
+        await Wait.UntilAsync(() => model.Offline, "offline after the check that didn't get through", TimeSpan.FromSeconds(2));
+        ticks.Release();
         await Wait.UntilAsync(() => model.Say is not null, "the refusal said", TimeSpan.FromSeconds(2));
         Assert.False(model.Offline); // the library answered: it isn't out of reach
         ticks.Release(5);
         // Checking stopped: nobody is waiting on the next tick, so the released ticks stay unused.
         await Wait.UntilAsync(() => ticks.CurrentCount == 5, "no more checks", TimeSpan.FromSeconds(2));
-        Assert.Equal(2, checks);
+        Assert.Equal(3, checks);
         model.Dispose();
     }
 }
