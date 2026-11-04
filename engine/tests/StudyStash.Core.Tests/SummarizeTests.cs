@@ -276,7 +276,7 @@ public class SummarizeTests
         Assert.Equal(["n1"], store.ListNotes().Select(r => r.Id));
         var m = store.Meeting(store.Get("n1")!);
         Assert.Equal(("Sam", "membranes", "osmosis talk"), (m.Owner, m.NotesMarkdown, m.Transcript));
-        Assert.Equal(1, store.RequeueAll());
+        Assert.True(store.Requeue("n1")); // "Try again": this old lecture has no summary for "Rewrite all" to rewrite
         await new Pipeline(cfg, store, log: Quiet).RunPendingAsync();
         var row = store.Get("n1")!;
         Assert.Equal("done", row.Status);

@@ -914,7 +914,7 @@ public sealed partial class LibraryWeb
             + "<p class=\"group-foot\">Set with auto_update in config.toml.</p>"
             + "<div class=\"group-head\">Rewrite every summary</div><div class=\"group\">"
             + "<form class=\"row\" method=\"post\" action=\"/settings/resummarize-all\" data-confirm=\"Rewrite all "
-            + $"{c.Total} summaries with {Ui.Esc(NotesWriter)}? This can take a while.\">"
+            + $"{store.SummaryCount()} summaries with {Ui.Esc(NotesWriter)}? This can take a while.\">"
             + $"<span class=\"grow\">Rewrite all summaries with {Ui.Esc(NotesWriter)}</span>"
             + "<button>Rewrite all</button></form></div>"
             + "<p class=\"group-foot\">Useful after switching models. Lectures stay readable while they are "
