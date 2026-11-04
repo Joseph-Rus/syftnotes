@@ -705,31 +705,19 @@ public class RecordingTests
         using (var wav = new WavWriter(path)) wav.Write(Enumerable.Range(0, Sound.Rate).Select(i => (float)Math.Sin(i / 9.0) * 0.4f).ToArray());
         var sound = Sound.ReadWav(path);
 
-        double Play(int speed, int samples, out List<float> got)
-        {
-            var heard = new List<float>();
-            using var mic = new FileMicrophone(path, speed);
-            Assert.Equal(speed, mic.Speed);
-            mic.Samples += b =>
-            {
-                lock (heard) heard.AddRange(b);
-            };
-            var took = Stopwatch.StartNew();
-            mic.Start();
-            Assert.True(SpinWait.SpinUntil(() =>
-            {
-                lock (heard) return heard.Count >= samples;
-            }, 10000));
-            double seconds = took.Elapsed.TotalSeconds;
-            mic.Stop();
-            lock (heard) got = [.. heard];
-            return seconds;
-        }
-
-        // Four seconds of sound at 4×: the file's sound, in order, round again. (How long it takes isn't asserted: a
-        // busy CI machine made that fail for no reason.)
-        Play(4, 4 * Sound.Rate, out var fastSound);
-        for (int i = 0; i < 4 * Sound.Rate; i++) Assert.Equal(sound[i % sound.Length], fastSound[i]);
+        // Its own clock, stepped here: a busy CI machine's thread pool once ran the real 100 ms beat late for 10 s.
+        var clock = new Microsoft.Extensions.Time.Testing.FakeTimeProvider();
+        var heard = new List<float>();
+        using var mic = new FileMicrophone(path, 4, clock);
+        Assert.Equal(4, mic.Speed);
+        mic.Samples += heard.AddRange;
+        mic.Start();
+        // Four seconds of sound at 4× is ten beats, 100 ms apart: one second.
+        for (int beat = 0; beat < 10; beat++) clock.Advance(TimeSpan.FromMilliseconds(100));
+        mic.Stop();
+        // The file's sound, in order, round again, and nothing more.
+        Assert.Equal(4 * Sound.Rate, heard.Count);
+        for (int i = 0; i < heard.Count; i++) Assert.Equal(sound[i % sound.Length], heard[i]);
         Assert.Equal(1, new FileMicrophone(path, 0).Speed);
     }
 

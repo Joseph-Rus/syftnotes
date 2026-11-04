@@ -1110,7 +1110,7 @@ public sealed partial class GuidedSetupModel : ObservableObject, IDisposable
         ChatProblemKind = kind;
         ChatProblemText = kind switch
         {
-            ChatProblem.Offline => $"{Brand} couldn't be reached. Check your internet connection.",
+            ChatProblem.Offline => Engines.CouldntBeReached(Brand),
             ChatProblem.Region => RegionWords,
             ChatProblem.Limit => $"{Brand} is at its usage limit until {UntilWords(Engines.UntilFrom(said, services.Now()))}. You can finish by hand; what's done stays done.",
             ChatProblem.NoAnswer => $"{Brand} didn't answer.",
