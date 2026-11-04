@@ -50,8 +50,9 @@ public static partial class Shell
     /// With something else recording it asks first, as an event does.</summary>
     static void ContinueRecording(string id)
     {
-        // The name on the note's page is the library's own, as it stands now: the recording goes by it.
-        string? title = library.Note is { Live: false, Local: false } shown && shown.Id == id ? shown.TitleNow : null;
+        // The name and folder on the note's page are the library's own, as they stand now: the recording goes by them.
+        var shown = library.Note is { Live: false, Local: false } page && page.Id == id ? page : null;
+        string? title = shown?.TitleNow, cls = shown?.ClassName;
         if (host.Recorder.Current is { } live)
         {
             if (live.Id == id)
@@ -64,11 +65,11 @@ public static partial class Shell
             {
                 if (!await AskAsync(new ConfirmAsk($"Stop recording {now} and keep recording this one?", SavedSoFar, "Stop and switch", "Keep recording"))) return;
                 StopRecording(stay: true);
-                await BeginAsync(() => host.ContinueAsync(id, title), openPage: true);
+                await BeginAsync(() => host.ContinueAsync(id, title, cls), openPage: true);
             }, "ContinueRecording");
             return;
         }
-        Run(() => BeginAsync(() => host.ContinueAsync(id, title), openPage: true), "Begin");
+        Run(() => BeginAsync(() => host.ContinueAsync(id, title, cls), openPage: true), "Begin");
     }
 
     static async Task<bool> BeginAsync(Func<Task<RecordStart>> begin, bool openPage)
