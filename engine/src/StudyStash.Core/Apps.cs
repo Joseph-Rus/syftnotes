@@ -114,6 +114,15 @@ public static class Apps
 
     public static string? MacBundleOf(string? baseDir = null) => MacBundleOf(baseDir, out _);
 
+    /// <summary>Velopack installed the copy in <paramref name="baseDir"/>: its manifest, sq.version, is beside the
+    /// program (Windows' current\ folder, an AppImage's usr/bin, a Mac bundle's Contents/MacOS).</summary>
+    public static bool VelopackInstalled(string? baseDir = null)
+    {
+        baseDir ??= AppContext.BaseDirectory;
+        if (File.Exists(Path.Combine(baseDir, "sq.version"))) return true;
+        return EnclosingMacBundle(baseDir) is { } app && File.Exists(Path.Combine(app, "Contents", "MacOS", "UpdateMac"));
+    }
+
     /// <summary>D4's "is this an installed copy" check on Windows: a folder with an uninstaller beside the exe (the
     /// Setup.exe wrote one at install time). The folder, or null for a build folder.</summary>
     public static string? WindowsInstallOf(string? baseDir = null)
@@ -175,7 +184,7 @@ public static class Apps
         TryDeleteFolder(old);
     }
 
-    internal static void TryDeleteFolder(string dir)
+    public static void TryDeleteFolder(string dir)
     {
         try
         {
