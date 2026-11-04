@@ -1107,7 +1107,8 @@ public static partial class Shell
         quick.Query = "";
         Run(() => SearchAsync(""), "Search");
         var pointer = Floating.Pointer();
-        var (_, scale) = quickWindow.WorkArea(pointer);
+        var (area, scale) = quickWindow.WorkArea(pointer);
+        quick.FitTo(area.Height / scale, Floating.ShadowRoom);
         var size = quickWindow.Measured(scale);
         int room = (int)(Floating.ShadowRoom * scale);
         quickWindow.Put(Placement.QuickPanel(pointer, quickWindow.ScreenList(), size, room));
