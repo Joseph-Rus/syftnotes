@@ -159,6 +159,14 @@ public class NoAiYetTests
         local.Save(cfg.Home);
         ai.MarkSignedIn("codex");
         Assert.Equal(("ollama", "claude", 2), Now());
+
+        // Only sorting set to the free AI: a new sign-in still writes the notes and answers, and sorting stays on it.
+        var sortOnly = new AiSettings { Provider = "claude" };
+        sortOnly.ByJob["sort"] = new AiChoice("ollama");
+        sortOnly.Save(cfg.Home);
+        ai.MarkSignedIn("gemini");
+        Assert.Equal(("gemini", "gemini", 3), Now());
+        Assert.Equal("ollama", AiSettings.Load(cfg.Home).For("sort").Provider);
     }
 
     [Fact]

@@ -42,12 +42,14 @@ public sealed class AiJobs(string home, Func<string>? ollamaHost = null)
         bool back = Engines.LooksLikeAuth(s.Tests.GetValueOrDefault(id, ""));
         s.Tests[id] = "works";
         bool Uses(string job, string ai) => s.Picked(job) && s.For(job).Provider == ai;
-        bool chosen = id != "ollama" && !AiSettings.Jobs.Any(job => Uses(job, id) || Uses(job, "ollama"));
+        // The jobs a sign-in hands over (sorting stays where it was): none may be one the student set to the free AI.
+        string[] moved = ["notes", "ask", "agent"];
+        bool chosen = id != "ollama" && !AiSettings.Jobs.Any(job => Uses(job, id)) && !moved.Any(job => Uses(job, "ollama"));
         if (chosen)
         {
             s.Provider = id;
             // As Settings' own pick does (/api/v2/ai/defaults): the notes, Ask, and the chat that answers with Ask.
-            foreach (string job in new[] { "notes", "ask", "agent" }) s.ByJob[job] = new AiChoice(id);
+            foreach (string job in moved) s.ByJob[job] = new AiChoice(id);
         }
         s.Save(home);
         if (chosen) NotesAiChosen?.Invoke();
