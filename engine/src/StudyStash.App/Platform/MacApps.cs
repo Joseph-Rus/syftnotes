@@ -1,3 +1,4 @@
+using StudyStash.App.Services.Kit;
 using System.Diagnostics;
 using System.Runtime.InteropServices;
 
@@ -51,12 +52,7 @@ public static class MacApps
     {
         if (!OperatingSystem.IsMacOS()) return false;
         foreach (IntPtr app in Running(bundleId)) SendByte(app, sel_registerName("terminate"));
-        var until = DateTime.UtcNow + QuitWait;
-        while (IsRunning(bundleId))
-        {
-            if (DateTime.UtcNow > until) return false;
-            await Task.Delay(250, ct);
-        }
+        if (!await Poll.UntilAsync(() => !IsRunning(bundleId), TimeSpan.FromMilliseconds(250), QuitWait, ct)) return false;
         try
         {
             using var open = Process.Start(new ProcessStartInfo("/usr/bin/open") { ArgumentList = { "-b", bundleId }, UseShellExecute = false, CreateNoWindow = true });
