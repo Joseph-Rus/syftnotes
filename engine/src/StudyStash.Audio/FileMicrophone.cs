@@ -6,13 +6,14 @@ namespace StudyStash.Audio;
 /// A pretend microphone that plays a WAV file, round again: to try recording without a microphone
 /// (STUDYSTASH_MIC_FILE=speech.wav), and in tests. Nothing is heard from the room. It plays in real time, or
 /// <see cref="Speed"/> times faster (STUDYSTASH_MIC_SPEED), so the self-test records minutes of lecture in seconds.
+/// Its 100 ms beat comes from <paramref name="clock"/> (the system's, unless a test steps its own).
 /// </summary>
-public sealed class FileMicrophone(string wavPath, int speed = 1) : IAudioSource
+public sealed class FileMicrophone(string wavPath, int speed = 1, TimeProvider? clock = null) : IAudioSource
 {
     const int Block = Sound.Rate / 10; // 100 ms, as often as a sound card hands over sound
     readonly float[] sound = Sound.ReadWav(wavPath);
     readonly Lock gate = new();
-    Timer? timer;
+    ITimer? timer;
     long at;
 
     public string Name => "Sound file";
@@ -29,7 +30,7 @@ public sealed class FileMicrophone(string wavPath, int speed = 1) : IAudioSource
 
     public void Start()
     {
-        lock (gate) timer ??= new Timer(_ => Tick(), null, 0, 100);
+        lock (gate) timer ??= (clock ?? TimeProvider.System).CreateTimer(_ => Tick(), null, TimeSpan.Zero, TimeSpan.FromMilliseconds(100));
     }
 
     void Tick()

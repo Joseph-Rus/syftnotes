@@ -101,6 +101,21 @@ public class AttachmentsModelTests
     }
 
     [Fact]
+    public async Task A_lecture_with_a_handout_heads_its_list_Attachments_not_Whiteboard_photos()
+    {
+        var lib = new FakeLibrary();
+        lib.Kept.Add(Item("a", "Syllabus.pdf"));
+        using var model = new AttachmentsModel(lib, "CS 101", "l1");
+        Assert.Equal("Whiteboard photos", model.HeaderText);
+        var changed = new List<string?>();
+        model.PropertyChanged += (_, e) => changed.Add(e.PropertyName);
+        await model.LoadAsync();
+        // The page shows the new heading only if it hears it changed (it kept "Whiteboard photos" over a PDF before).
+        Assert.Contains(nameof(model.HeaderText), changed);
+        Assert.Equal(AttachmentWords.Heading, model.HeaderText);
+    }
+
+    [Fact]
     public async Task Attaching_sends_the_files_for_the_lecture_and_lists_them()
     {
         using var dir = new TempHome();
