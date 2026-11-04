@@ -23,7 +23,8 @@ public sealed class SignInCodeShots
     {
         var box = window
             ? new SignInCodeModel("Gemini", "Google", (_, _) => Task.FromResult(Outcome.Done), openAgain: () => { }, tryAgain: () => { })
-            : new SignInCodeModel("Gemini", "Google", (_, _) => Task.FromResult(Outcome.Done)) { Code = sent ? "4/0AVGzR1Bx-example-code" : code };
+            : new SignInCodeModel("Gemini", "Google", (_, _) => Task.FromResult(Outcome.Done));
+        box.Code = sent ? "4/0AVGzR1Bx-example-code" : code;
         if (sent) box.Send.Command.Execute(null);
         return box;
     }
@@ -54,7 +55,8 @@ public sealed class SignInCodeShots
                 Shot.Take($"{look}-15-sign-in-code", skin, t, () => new SignInCodePage { DataContext = Box(window: true), DrawChrome = true }, size: new Size(608, 420));
                 Shot.Take($"{look}-15-sign-in-code-didnt-work", skin, t, () =>
                 {
-                    var box = Box(window: true);
+                    // As it really goes: a code sent, then turned down by Google.
+                    var box = Box(sent: true, window: true);
                     box.Stop(AiWords.CodeDidntWork);
                     return new SignInCodePage { DataContext = box, DrawChrome = true };
                 }, size: new Size(608, 420));
