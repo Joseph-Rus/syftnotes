@@ -252,6 +252,13 @@ public static partial class Shell
                 Notify(new Notice { Title = title, Text = text, Stay = NoticeTimes.Advice });
                 break;
             }
+            case UpdateNewsKind.Failed when news.Why is { } why:
+            {
+                // The move to the new way of updating (Bridge.cs): its own words, FUSE's on Linux.
+                var (title, text, action) = NoticeWords.MoveFailed(why, Engine.Version);
+                Notify(new Notice { Title = title, Text = text, ActionLabel = action, Act = action is null ? null : () => Dialogs.OpenUrl(page), Stay = NoticeTimes.Advice });
+                break;
+            }
             case UpdateNewsKind.Failed:
             {
                 var (title, text, action) = NoticeWords.UpdateFailed(v, Engine.Version);

@@ -48,7 +48,7 @@ public static class VelopackUpdates
     /// <summary>Downloads the newest release for this computer and, if <paramref name="ready"/> still says so (a lecture
     /// may have started during the download), hands it to Velopack's updater, which applies it once this process quits
     /// and opens the app again with <paramref name="relaunchArgs"/>. False leaves this version as it is.</summary>
-    public static async Task<bool> ApplyAsync(Release release, Func<bool> ready, Action stopBackground, IReadOnlyList<string> relaunchArgs, Action<string> log)
+    public static async Task<bool> ApplyAsync(Release release, Func<bool> ready, Func<Action> stopBackground, IReadOnlyList<string> relaunchArgs, Action<string> log)
     {
         if (Manager is not { } m) return false;
         UpdateInfo? update;
@@ -76,7 +76,8 @@ public static class VelopackUpdates
         }
         // The background library runs this copy's program: it stops first, so nothing holds the files being replaced,
         // and the app starts it again from the new version when it opens.
-        stopBackground();
+        // stopBackground gives back what starts them again, if the install never gets going.
+        var startBackground = stopBackground();
         try
         {
             m.WaitExitThenApplyUpdates(update.TargetFullRelease, silent: true, restart: true, [.. relaunchArgs]);
@@ -84,6 +85,7 @@ public static class VelopackUpdates
         catch (Exception e) when (e is IOException or InvalidOperationException or System.ComponentModel.Win32Exception)
         {
             log($"Install failed: {e.Message}");
+            startBackground();
             return false;
         }
         log($"Installing {update.TargetFullRelease.Version} once Syft Notes has quit.");

@@ -169,7 +169,9 @@ public sealed partial class PanelModel : ObservableObject
     /// <summary>A newer version this computer can install ("0.12.0"), or null: the dropdown's Update row.</summary>
     [ObservableProperty] public partial string? UpdateVersion { get; set; }
     public bool HasUpdate => UpdateVersion is { Length: > 0 };
-    public string UpdateWords => $"Update to {UpdateVersion}";
+    /// <summary>The update is only the move to the new way of updating, at this version.</summary>
+    public bool UpdateIsMove { get; set; }
+    public string UpdateWords => UpdateIsMove ? "Finish updating" : $"Update to {UpdateVersion}";
     partial void OnUpdateVersionChanged(string? value)
     {
         OnPropertyChanged(nameof(HasUpdate));

@@ -116,15 +116,25 @@ public sealed class AppUpdates
     /// <summary>A newer release this copy could install, as the last round or Check now found it (null when up to
     /// date): the menu bar's and Settings' Update now show while there is one.</summary>
     public Release? Found { get; private set; }
+    /// <summary><see cref="Found"/> is only the move to the new installer, at this version (the menu bar's and
+    /// Settings' words say "finish updating", not "update to" the version the student has).</summary>
+    public bool FoundIsMove { get; private set; }
+
     /// <summary>Said (from the updater's thread) whenever <see cref="Found"/> changes.</summary>
     public event Action? FoundChanged;
 
     void Saw(Release? release)
     {
-        if (release?.Tag == Found?.Tag) return;
+        bool move = release is not null && !Updates.IsNewer(release) && Moves(release);
+        if (release?.Tag == Found?.Tag && move == FoundIsMove) return;
         Found = release;
+        FoundIsMove = move;
         FoundChanged?.Invoke();
     }
+
+    /// <summary>Why the move to Velopack's install failed here (Bridge.FailedWhy: "fuse" when the AppImage needs FUSE),
+    /// or null: the Failed notice says it in its own words.</summary>
+    public Func<string?> FailedWhy { get; init; } = () => null;
 
     readonly SemaphoreSlim oneAtATime = new(1, 1);
     readonly HashSet<string> told = [];
@@ -222,7 +232,7 @@ public sealed class AppUpdates
             if (!Idle()) return Waiting;
             Log("[update] install failed");
             asked = false;
-            Once(new(UpdateNewsKind.Failed, release));
+            Once(new(UpdateNewsKind.Failed, release, moving ? FailedWhy() ?? "" : null));
             return Failed;
         }
         asked = false;
@@ -271,7 +281,7 @@ public sealed class AppUpdates
         }
         if (CantInstall() is { } why) return new(CantHere, release, why);
         Saw(release);
-        return new(Available, release);
+        return new(Available, release, FoundIsMove ? MoveOnly : null);
     }
 
     /// <summary>Update now (Settings, or the notification's Update): the newest release installs now, auto_update or
@@ -424,7 +434,11 @@ public sealed class AppUpdates
         // the student is told, stay as below. A copy installed the old way (Inno Setup, the tarball) moves over to it.
         bool velopack = VelopackUpdates.Installed;
         Program.Log(velopack ? "[update] updates come through Velopack" : $"[update] updates the old way ({(updateHost.AppDir.Length > 0 ? updateHost.AppDir : "not installed")})");
-        void StopBackground() => Updates.StopBackground(Platform.Desktop.Program, updateHost);
+        Action StopBackground()
+        {
+            var stopped = Updates.StopBackground(Platform.Desktop.Program, updateHost);
+            return () => Updates.StartBackground(stopped, updateHost);
+        }
         var updates = new AppUpdates
         {
             Latest = () => Updates.CachedLatestAsync(),
@@ -444,6 +458,7 @@ public sealed class AppUpdates
             // Velopack's updater, like Setup.exe, opens the app again itself once it has swapped the new version in.
             InstallerRelaunches = velopack || updateHost.System == "Windows",
             Moves = release => !velopack && Bridge.Offers(release, updateHost, home: host.Home),
+            FailedWhy = () => !velopack && updateHost.System is "Windows" or "Linux" ? Bridge.FailedWhy(host.Home) : null,
             RelaunchAndQuit = () =>
             {
                 SpawnWaiter(updateHost, relaunchArgs);

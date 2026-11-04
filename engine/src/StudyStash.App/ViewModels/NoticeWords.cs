@@ -116,6 +116,16 @@ public static class NoticeWords
     public static (string Title, string Text, string Action) MoveReady() =>
         ("Syft Notes has one more step to finish updating", "It moves to its new way of updating. That takes about a minute, then Syft Notes opens again by itself.", "Finish");
 
+    /// <summary>The move to the new way of updating didn't happen: <paramref name="why"/> is Bridge.NeedsFuse when the
+    /// computer needs FUSE first (Linux), or anything else. A move isn't tried again for a week, unless FUSE turns up.</summary>
+    public static (string Title, string Text, string? Action) MoveFailed(string why, string running) => why == Bridge.NeedsFuse
+        ? ("Syft Notes needs one thing to keep updating",
+           $"Your computer needs FUSE to run the new Syft Notes. In a terminal, run: sudo apt install libfuse2 (on Ubuntu 24.04, libfuse2t64). You're still on {Plain(running)}, which keeps working, and it finishes updating once FUSE is there.",
+           null)
+        : ("Syft Notes couldn't finish updating",
+           $"You're still on {Plain(running)}, which keeps working. It tries again in a week, or you can download the new version now.",
+           "Download");
+
     /// <summary>A new version is out but this copy can't replace itself: <paramref name="why"/> says what to do, and
     /// the button gets the download.</summary>
     public static (string Title, string Text, string Action) UpdateBlocked(string version, string why) =>
@@ -154,6 +164,7 @@ public static class NoticeWords
     /// can install it. "This laptop" and "your library" are told apart, since the library has an Updates row of its own.</summary>
     public static (string Line, bool CanUpdate) UpdateChecked(UpdateCheck found, string running) => found.Result switch
     {
+        AppUpdates.Available when found.Why == AppUpdates.MoveOnly => ("Syft Notes has one more step to finish updating: it moves to its new way of updating.", true),
         AppUpdates.Available => ($"Version {Newer(found)} is out. This laptop has {Plain(running)}.", true),
         AppUpdates.CantHere => ($"Version {Newer(found)} is out. {found.Why}", false),
         AppUpdates.UpToDate => ($"Syft Notes {Plain(running)} on this laptop, the newest.", false),

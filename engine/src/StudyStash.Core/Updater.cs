@@ -145,9 +145,18 @@ public static partial class Updates
     public static bool ChecksumMatches(string file, string asset, IReadOnlyDictionary<string, string>? checksums) => ChecksumOk(file, asset, checksums);
 
     /// <summary>Stops the background libraries running <paramref name="exe"/> (they start again from the new copy).</summary>
-    public static void StopBackground(string exe, UpdateHost host)
+    public static IReadOnlyList<string> StopBackground(string exe, UpdateHost host)
     {
-        foreach (string h in BackgroundRunning(exe, host)) host.Background!.Stop(h);
+        var homes = BackgroundRunning(exe, host);
+        foreach (string h in homes) host.Background!.Stop(h);
+        return homes;
+    }
+
+    /// <summary>Starts again the background libraries <see cref="StopBackground"/> stopped, when what they were
+    /// stopped for didn't happen.</summary>
+    public static void StartBackground(IReadOnlyList<string> homes, UpdateHost host)
+    {
+        foreach (string h in homes) host.Background?.Start(h);
     }
 
     static bool ChecksumOk(string file, string asset, IReadOnlyDictionary<string, string>? checksums)

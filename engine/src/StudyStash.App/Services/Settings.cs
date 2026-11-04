@@ -501,7 +501,8 @@ public sealed partial class SettingsModel : ObservableObject, IDisposable
         UpdateHereLine = $"Syft Notes {Version} on this laptop";
         // A newer version the app already knows of: Update now is there straight away, no Check now first.
         if (AppUpdates.Current?.Found is { } found)
-            (UpdateHereLine, CanUpdateHere) = NoticeWords.UpdateChecked(new UpdateCheck(AppUpdates.Available, found), Version);
+            (UpdateHereLine, CanUpdateHere) = NoticeWords.UpdateChecked(
+                new UpdateCheck(AppUpdates.Available, found, AppUpdates.Current.FoundIsMove ? AppUpdates.MoveOnly : null), Version);
         ColourTheme = host.Settings.Theme;
         Appearance = host.Settings.Appearance;
         advice = host.Advice;

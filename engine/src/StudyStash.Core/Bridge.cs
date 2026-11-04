@@ -38,6 +38,9 @@ public static class Bridge
         _ => null,
     };
 
+    const string FuseWords = "The new Syft Notes (an AppImage) doesn't run on this computer yet: it needs FUSE. On Ubuntu and "
+        + "Debian, install it with: sudo apt install libfuse2 (libfuse2t64 on Ubuntu 24.04). This copy stays until then.";
+
     /// <summary>Where the AppImage goes: ~/Applications, where AppImages are kept.</summary>
     public static string AppImagePlace(string userHome) => Path.Combine(userHome, "Applications", "SyftNotes.AppImage");
 
@@ -62,7 +65,7 @@ public static class Bridge
     public static bool Offers(Release release, UpdateHost host, string? running = null, Architecture? arch = null, string? home = null) =>
         AssetFor(host, arch) is { } asset && release.Assets?.GetValueOrDefault(asset) is { Length: > 0 }
         && Updates.Compare(release.Version, Updates.ParseVersion(running ?? Engine.Version)) >= 0
-        && !(home is not null && FailedLately(home, release.Tag));
+        && !(home is not null && FailedLately(home, release.Tag, host.System));
 
     /// <summary>How long a release whose move failed here is left alone before it's tried again.</summary>
     public static readonly TimeSpan RetryAfter = TimeSpan.FromDays(7);
@@ -70,30 +73,60 @@ public static class Bridge
     /// <summary>Where a failed move is remembered: the release's tag (the move's script writes it too, windows/bridge.ps1).</summary>
     public static string FailedFile(string home) => Path.Combine(home, "bridge-failed.txt");
 
-    /// <summary>Remembers that the move to <paramref name="tag"/> failed here.</summary>
-    public static void Failed(string home, string tag)
+    /// <summary>Why a move failed, as <see cref="FailedFile"/> says after the tag: the AppImage needs FUSE, which this
+    /// computer doesn't have yet.</summary>
+    public const string NeedsFuse = "fuse";
+
+    /// <summary>Remembers that the move to <paramref name="tag"/> failed here, and why (<see cref="NeedsFuse"/>, or
+    /// nothing).</summary>
+    public static void Failed(string home, string tag, string? why = null)
     {
         try
         {
-            File.WriteAllText(FailedFile(home), tag);
+            File.WriteAllText(FailedFile(home), why is null ? tag : $"{tag} {why}");
         }
         catch (Exception e) when (e is IOException or UnauthorizedAccessException)
         {
         }
     }
 
-    static bool FailedLately(string home, string tag)
+    /// <summary>Why the last move failed here (<see cref="NeedsFuse"/>, or "" for any other reason), or null when
+    /// none has.</summary>
+    public static string? FailedWhy(string home)
     {
         try
         {
             string file = FailedFile(home);
-            return File.Exists(file) && File.ReadAllText(file).Trim() == tag && DateTime.UtcNow - File.GetLastWriteTimeUtc(file) < RetryAfter;
+            if (!File.Exists(file)) return null;
+            string[] words = File.ReadAllText(file).Trim().Split(' ', 2);
+            return words.Length > 1 ? words[1] : "";
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException)
+        {
+            return null;
+        }
+    }
+
+    static bool FailedLately(string home, string tag, string system)
+    {
+        try
+        {
+            string file = FailedFile(home);
+            if (!File.Exists(file)) return false;
+            string[] words = File.ReadAllText(file).Trim().Split(' ', 2);
+            if (words[0] != tag || DateTime.UtcNow - File.GetLastWriteTimeUtc(file) >= RetryAfter) return false;
+            // Waiting for FUSE: tried again as soon as it's there, not a week later.
+            return !(words.Length > 1 && words[1] == NeedsFuse && system == "Linux" && FuseReady());
         }
         catch (Exception e) when (e is IOException or UnauthorizedAccessException)
         {
             return false;
         }
     }
+
+    /// <summary>Whether this Linux computer can run an AppImage: the FUSE device, and its mount helper.</summary>
+    public static bool FuseReady() =>
+        File.Exists("/dev/fuse") && (Machine.Which("fusermount") is not null || Machine.Which("fusermount3") is not null);
 
     /// <summary>Downloads the move's file and checks it against the release's SHA256SUMS.txt; null (and said) when
     /// either fails.</summary>
@@ -143,26 +176,26 @@ public static class Bridge
     {
         if (AssetFor(host) is not { } asset) return false;
         log($"Moving to {release.Tag}, installed the new way...");
-        var (ok, retry) = host.System == "Windows"
+        var (ok, retry, why) = host.System == "Windows"
             ? await WindowsAsync(release, home, host, asset, ready, log, pid, relaunchArgs)
             : await LinuxAsync(release, host, asset, ready, log, pid, relaunchArgs, userHome ?? Py.UserHome(), menu ?? new LinuxMenu());
         // Put off for a lecture, or a download that didn't come: the next round tries again. Anything else is
         // remembered, so the move isn't tried again for a week.
-        if (!ok && !retry) Failed(home, release.Tag);
+        if (!ok && !retry) Failed(home, release.Tag, why);
         return ok;
     }
 
-    static async Task<(bool Ok, bool Retry)> WindowsAsync(Release release, string home, UpdateHost host, string asset, Func<bool> ready,
+    static async Task<(bool Ok, bool Retry, string? Why)> WindowsAsync(Release release, string home, UpdateHost host, string asset, Func<bool> ready,
         Action<string> log, int pid, IReadOnlyList<string> relaunchArgs)
     {
         // The Inno uninstaller the move runs, and its entry: without them there's nothing to move over from.
         if (!InnoInstalled())
         {
             log("This copy's Setup entry is missing, so it can't move to the new installer here.");
-            return (false, false);
+            return (false, false, null);
         }
         string dir = Path.Combine(host.TempDir, "Syft Notes move");
-        if (await FetchAsync(release, host, asset, Path.Combine(dir, asset), log) is not { } setup) return (false, true);
+        if (await FetchAsync(release, host, asset, Path.Combine(dir, asset), log) is not { } setup) return (false, true, null);
         string script = Path.Combine(dir, "bridge.ps1");
         try
         {
@@ -174,13 +207,13 @@ public static class Bridge
         catch (Exception e) when (e is IOException or UnauthorizedAccessException)
         {
             log($"Couldn't get the move ready: {e.Message}");
-            return (false, false);
+            return (false, false, null);
         }
         // The last moment to put it off: once the script starts, the old copy is uninstalled.
         if (!ready())
         {
             log(Updates.PutOff);
-            return (false, true);
+            return (false, true, null);
         }
         string logPath = Path.Combine(home, "logs", "update.log");
         try
@@ -194,10 +227,10 @@ public static class Bridge
         catch (Exception e) when (e is System.ComponentModel.Win32Exception or IOException or InvalidOperationException)
         {
             log($"Couldn't start the move: {e.Message}");
-            return (false, false);
+            return (false, false, null);
         }
         log($"Moving to {release.Tag} once Syft Notes has quit (log: {logPath}).");
-        return (true, false);
+        return (true, false, null);
     }
 
     /// <summary>Inno Setup's uninstall entry for Syft Notes on this account (its AppId).</summary>
@@ -210,12 +243,19 @@ public static class Bridge
             && File.Exists(u.Trim('"').Split("\" ")[0].Trim('"'));
     }
 
-    static async Task<(bool Ok, bool Retry)> LinuxAsync(Release release, UpdateHost host, string asset, Func<bool> ready, Action<string> log,
+    static async Task<(bool Ok, bool Retry, string? Why)> LinuxAsync(Release release, UpdateHost host, string asset, Func<bool> ready, Action<string> log,
         int pid, IReadOnlyList<string> relaunchArgs, string userHome, LinuxMenu menu)
     {
         string place = AppImagePlace(userHome);
         string fresh = place + ".new";
-        if (await FetchAsync(release, host, asset, fresh, log) is null) return (false, true);
+        // An AppImage runs through FUSE, which some systems don't have: nothing is downloaded until it's there, and
+        // this copy stays and says what to install (the app tells the student, NoticeWords.MoveNeedsFuse).
+        if (!FuseReady())
+        {
+            log(FuseWords);
+            return (false, false, NeedsFuse);
+        }
+        if (await FetchAsync(release, host, asset, fresh, log) is null) return (false, true, null);
         try
         {
             if (!OperatingSystem.IsWindows()) File.SetUnixFileMode(fresh, UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute
@@ -225,22 +265,20 @@ public static class Bridge
         {
             TryDelete(fresh);
             log($"Couldn't get the move ready: {e.Message}");
-            return (false, false);
+            return (false, false, null);
         }
-        // An AppImage runs through FUSE, which some systems don't have: then this copy stays, says what to install, and
-        // isn't tried again for a week (Failed).
+        // Tried once before anything changes: one that doesn't run here leaves this copy as it is.
         if (host.VersionOf(fresh) is not { } v || Updates.Compare(Updates.ParseVersion(v), release.Version) != 0)
         {
             TryDelete(fresh);
-            log("The new Syft Notes (an AppImage) doesn't run on this computer yet: it needs FUSE. On Ubuntu and Debian, "
-                + "install it with: sudo apt install libfuse2 (libfuse2t64 on Ubuntu 24.04). This copy stays until then.");
-            return (false, false);
+            log(FuseWords);
+            return (false, false, NeedsFuse);
         }
         if (!ready())
         {
             TryDelete(fresh);
             log(Updates.PutOff);
-            return (false, true);
+            return (false, true, null);
         }
         try
         {
@@ -251,7 +289,7 @@ public static class Bridge
         {
             TryDelete(fresh);
             log($"Install failed: {e.Message}");
-            return (false, false);
+            return (false, false, null);
         }
         // The background library runs the old program: it stops now, and the AppImage registers it again on its first
         // start (NewPlace). The old folder goes once this process has quit (this process still loads code from it):
@@ -260,7 +298,7 @@ public static class Bridge
         log($"Installed {release.Tag} as {place}.");
         const string script = "exe=\"$1\"; old=\"$2\"; shift 2; tail --pid=\"$0\" -f /dev/null; rm -rf -- \"$old\"; exec \"$exe\" \"$@\"";
         host.SpawnDetached(["/bin/sh", "-c", script, pid.ToString(CultureInfo.InvariantCulture), place, host.AppDir, .. relaunchArgs]);
-        return (true, false);
+        return (true, false, null);
     }
 
     static void TryDelete(string path)
