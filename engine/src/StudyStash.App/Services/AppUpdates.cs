@@ -36,7 +36,7 @@ public sealed record UpdateNews(UpdateNewsKind Kind, Release Release, string? Wh
 public sealed record UpdateCheck(string Result, Release? Release = null, string? Why = null);
 
 /// <summary>
-/// The running app checking for a new release on its own (D4): 10 minutes after it starts, then every 6 hours,
+/// The running app checking for a new release on its own (D4): 2 minutes after it starts, then every hour,
 /// installing it once nothing is recording, paused or transcribing, then quitting so the new copy starts in its
 /// place. It also notices when a newer copy has already been swapped onto disk by someone else - the CLI's
 /// `studystash update`, or the library page's "Update now" - and relaunches into it once idle, with no download of
@@ -47,7 +47,7 @@ public sealed record UpdateCheck(string Result, Release? Release = null, string?
 public sealed class AppUpdates
 {
     /// <summary>How often the idle-wait loop looks again while an update is ready but the student is mid-lecture,
-    /// instead of waiting the full six hours for the next round.</summary>
+    /// instead of waiting the full hour for the next round.</summary>
     public static readonly TimeSpan IdleRecheck = TimeSpan.FromMinutes(1);
 
     // What a round comes to.
@@ -250,7 +250,7 @@ public sealed class AppUpdates
         return Relaunching;
     }
 
-    /// <summary>Says <paramref name="news"/> once per version while this copy runs (a round every six hours, or
+    /// <summary>Says <paramref name="news"/> once per version while this copy runs (a round every hour, or
     /// every minute while it waits, never says it again).</summary>
     void Once(UpdateNews news)
     {
@@ -292,7 +292,7 @@ public sealed class AppUpdates
         string result = await RoundAsync();
         if (result == Waiting)
         {
-            // Look again in a minute, not in six hours.
+            // Look again in a minute, not in an hour.
             try
             {
                 napping?.Cancel();
@@ -308,7 +308,7 @@ public sealed class AppUpdates
         return result;
     }
 
-    /// <summary>Rounds forever: the first one 10 minutes after the app starts, then every 6 hours; while a round
+    /// <summary>Rounds forever: the first one 2 minutes after the app starts, then every hour; while a round
     /// keeps saying to wait for the student, the next one comes a minute later instead.</summary>
     public async Task RunAsync(CancellationToken stop)
     {
