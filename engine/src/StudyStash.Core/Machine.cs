@@ -54,14 +54,15 @@ public static partial class Machine
     }
 
     /// <summary>A command's output, read as it comes on a thread of its own, so what's been printed can be had before the
-    /// pipe has ended.</summary>
+    /// pipe has ended. It only ever reads what is already in the pipe (never a read that waits for more), so it can be
+    /// asked at any moment whether anything is left, on Windows too, where asking waits behind a read in flight.</summary>
     sealed class OutputSoFar
     {
         readonly Stream from;
         readonly System.Text.Encoding encoding;
         readonly MemoryStream got = new();
         readonly object gate = new();
-        bool ended, reading;
+        bool stopped, ended;
 
         public OutputSoFar(StreamReader reader)
         {
@@ -77,14 +78,22 @@ public static partial class Machine
             {
                 while (true)
                 {
-                    lock (gate) reading = true;
-                    int n = from.Read(buffer);
+                    int waiting = Waiting(from);
+                    if (waiting > 0)
+                    {
+                        // There already, so this doesn't wait; asked for a whole buffer so none of it stays in the stream's own.
+                        int n = from.Read(buffer, 0, buffer.Length);
+                        if (n <= 0) return;
+                        lock (gate) got.Write(buffer, 0, n);
+                        continue;
+                    }
+                    if (waiting < 0) return; // the pipe has ended
                     lock (gate)
                     {
-                        reading = false;
-                        if (n <= 0) break;
-                        got.Write(buffer, 0, n);
-                        Monitor.PulseAll(gate);
+                        // The command has stopped: all it printed was in the pipe before that, and the pipe is empty
+                        // (looked at again after the stop was seen, so the last of it isn't missed).
+                        if (stopped && Waiting(from) == 0) return;
+                        if (!stopped) Monitor.Wait(gate, TimeSpan.FromMilliseconds(20)); // or until it stops
                     }
                 }
             }
@@ -102,28 +111,29 @@ public static partial class Machine
             }
         }
 
-        /// <summary>All it printed, once the command has stopped: when the pipe has ended, or when the reader waits on it
-        /// and nothing more is in it (something the command started holds it open). <paramref name="atMost"/> only bounds
-        /// a reader that never gets to run.</summary>
+        /// <summary>All it printed, once the command has stopped: what's in the pipe then, read to its end, without waiting
+        /// for whatever the command started that still holds the pipe. <paramref name="atMost"/> only bounds a reader that
+        /// never gets to run.</summary>
         public string Take(TimeSpan atMost)
         {
             var until = DateTime.UtcNow + atMost;
+            byte[] bytes;
             lock (gate)
             {
-                while (!ended && !(reading && NothingWaiting(from)))
-                {
-                    var left = until - DateTime.UtcNow;
-                    if (left <= TimeSpan.Zero) break;
-                    // Woken when it reads more or the pipe ends; looked at again now and then while it's between reads.
-                    Monitor.Wait(gate, left < TimeSpan.FromMilliseconds(50) ? left : TimeSpan.FromMilliseconds(50));
-                }
-                return encoding.GetString(got.GetBuffer(), 0, (int)got.Length);
+                stopped = true;
+                Monitor.PulseAll(gate);
+                while (!ended && until - DateTime.UtcNow is var left && left > TimeSpan.Zero) Monitor.Wait(gate, left);
+                bytes = got.ToArray();
             }
+            // Read as the command's own reader would have (a byte-order mark at its start isn't text).
+            using var text = new StreamReader(new MemoryStream(bytes), encoding);
+            return text.ReadToEnd();
         }
     }
 
-    /// <summary>Whether a pipe has nothing in it to read right now (also true when that can't be told: it has broken).</summary>
-    static bool NothingWaiting(Stream pipe)
+    /// <summary>How many bytes are in a pipe to be read right now, without waiting: 0 for none yet, -1 once it has ended
+    /// (or broken).</summary>
+    static int Waiting(Stream pipe)
     {
         System.Runtime.InteropServices.SafeHandle? handle = pipe switch
         {
@@ -131,13 +141,20 @@ public static partial class Machine
             System.IO.Pipes.PipeStream p => p.SafePipeHandle,
             _ => null,
         };
-        if (handle is null || handle.IsInvalid || handle.IsClosed) return true;
-        if (OperatingSystem.IsWindows()) return !PeekNamedPipe(handle, IntPtr.Zero, 0, IntPtr.Zero, out uint waiting, IntPtr.Zero) || waiting == 0;
+        if (handle is null || handle.IsInvalid || handle.IsClosed) return -1;
+        if (OperatingSystem.IsWindows())
+            return PeekNamedPipe(handle, IntPtr.Zero, 0, IntPtr.Zero, out uint available, IntPtr.Zero) ? (int)Math.Min(available, int.MaxValue) : -1;
         var fd = new PollFd { Fd = (int)handle.DangerousGetHandle(), Events = PollIn };
-        return poll(ref fd, 1, 0) <= 0 || (fd.Revents & PollIn) == 0;
+        int ready;
+        do ready = poll(ref fd, 1, 0);
+        while (ready < 0 && System.Runtime.InteropServices.Marshal.GetLastPInvokeError() == 4); // EINTR: ask again
+        if (ready < 0) return -1;
+        if (ready == 0) return 0;
+        if ((fd.Revents & PollIn) != 0) return 4096; // something to read (a read of it returns what's there, or 0 at its end)
+        return (fd.Revents & (PollHup | PollErr | PollNval)) != 0 ? -1 : 0;
     }
 
-    const short PollIn = 0x1;
+    const short PollIn = 0x1, PollErr = 0x8, PollHup = 0x10, PollNval = 0x20;
 
     [System.Runtime.InteropServices.StructLayout(System.Runtime.InteropServices.LayoutKind.Sequential)]
     struct PollFd
@@ -148,7 +165,7 @@ public static partial class Machine
     }
 
     [System.Runtime.InteropServices.DllImport("libc", SetLastError = true)]
-    static extern int poll(ref PollFd fds, uint count, int timeoutMs);
+    static extern int poll(ref PollFd fds, nuint count, int timeoutMs);
 
     [System.Runtime.InteropServices.DllImport("kernel32.dll", SetLastError = true)]
     static extern bool PeekNamedPipe(System.Runtime.InteropServices.SafeHandle pipe, IntPtr buffer, uint size, IntPtr read, out uint available, IntPtr left);
