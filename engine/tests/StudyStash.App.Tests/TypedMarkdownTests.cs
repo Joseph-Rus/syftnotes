@@ -145,6 +145,45 @@ public class TypedMarkdownTests
     }
 
     [AvaloniaFact]
+    public void A_dash_typed_on_a_bullet_that_is_already_there_is_that_bullet_not_a_second_one()
+    {
+        var editor = new TypedEditor { Width = 600 };
+        var w = Show(editor);
+        try
+        {
+            void Type(string text)
+            {
+                foreach (char c in text) w.KeyTextInput(c.ToString());
+                Settle();
+            }
+            editor.Fields[0].Focus();
+            Settle();
+            // "- " makes the bullet; Return carries it on, so the next line is already a bullet before a word is typed.
+            Type("- first");
+            w.KeyPress(Avalonia.Input.Key.Enter, RawInputModifiers.None, PhysicalKey.None, null);
+            Settle();
+            // A student who types "- " there anyway (or "* ") still has the one bullet, in the editor and as saved.
+            Type("- second");
+            w.KeyPress(Avalonia.Input.Key.Enter, RawInputModifiers.None, PhysicalKey.None, null);
+            Settle();
+            Type("* third");
+            // The same one level in.
+            w.KeyPress(Avalonia.Input.Key.Enter, RawInputModifiers.None, PhysicalKey.None, null);
+            w.KeyPress(Avalonia.Input.Key.Tab, RawInputModifiers.None, PhysicalKey.None, null);
+            Settle();
+            Type("- inner");
+            Assert.Equal("- first\n- second\n- third\n  - inner", editor.Text);
+            Assert.Equal(["first", "second", "third", "inner"], editor.Fields.Select(f => f.Text));
+            Assert.Equal(["•", "•", "•", "◦"], editor.Markers);
+            Assert.Equal("- ==first==\n- ==second==\n- ==third==\n  - ==inner==", StudyStash.App.ViewModels.TypedNotes.AllMine(editor.Text));
+        }
+        finally
+        {
+            w.Close();
+        }
+    }
+
+    [AvaloniaFact]
     public void Editing_the_written_notes_carries_lists_on_and_takes_the_bold_key()
     {
         var notes = new MarkdownBox { Width = 600, AcceptsReturn = true, TextWrapping = TextWrapping.Wrap, WholeNotes = true, Text = "## Cell division\n- mitosis" };

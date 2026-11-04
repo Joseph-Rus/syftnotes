@@ -158,6 +158,9 @@ public sealed partial class TypedEditor : UserControl
 
     static bool IsList(Kind kind) => kind is Kind.Bullet or Kind.Numbered or Kind.Task;
 
+    /// <summary>A bullet's words without a "- " (or "* ") typed at their start: that's the bullet's own mark.</summary>
+    static string WithoutMark(string words) => BulletLead().Match(words) is { Success: true } mark ? words[mark.Length..] : words;
+
     string Compose() => string.Join("\n", lines.Select(l => l.Lead + (l.Box.Text ?? "")));
 
     /// <summary>The lines, made again from text (it was set from outside: a recording's page opening; or several
@@ -400,8 +403,14 @@ public sealed partial class TypedEditor : UserControl
         (Kind Kind, string Lead, string Words)? now = null;
         if (code) { }
         else if (line.Kind == Kind.Plain && Parse(text, typing: true) is { Kind: not Kind.Plain } plainNow) now = plainNow;
-        else if (line.Kind == Kind.Bullet && Box().Match(text) is { Success: true } box)
-            now = (Kind.Task, line.Lead + (box.Groups[1].Value is "x" or "X" ? "[x] " : "[ ] "), text[box.Length..]);
+        else if (line.Kind == Kind.Bullet)
+        {
+            // A "- " (or "* ") typed in a bullet is that bullet's own mark, not a second one; "[ ] " after it makes a checkbox.
+            string rest = WithoutMark(text);
+            if (Box().Match(rest) is { Success: true } box)
+                now = (Kind.Task, line.Lead + (box.Groups[1].Value is "x" or "X" ? "[x] " : "[ ] "), rest[box.Length..]);
+            else if (rest != text) now = (Kind.Bullet, line.Lead, rest);
+        }
         if (now is { } becomes)
         {
             int caret = line.Box.CaretIndex, gone = text.Length - becomes.Words.Length;
@@ -429,8 +438,9 @@ public sealed partial class TypedEditor : UserControl
     {
         string text = line.Box.Text ?? "";
         int caret = line.Box.CaretIndex;
+        string bare = line.Kind is Kind.Bullet or Kind.Task ? WithoutMark(text) : text;
         string words = text.StartsWith(line.Lead, StringComparison.Ordinal) ? text[line.Lead.Length..]
-            : Box().Match(text) is { Success: true } box ? text[box.Length..] : text;
+            : Box().Match(bare) is { Success: true } box ? bare[box.Length..] : bare;
         busy = true;
         try
         {
