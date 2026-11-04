@@ -233,7 +233,12 @@ public sealed partial class Store : IDisposable
         MigrateNotesVersions();
     }
 
-    public void Dispose() => conn.Dispose();
+    /// <summary>Closes the database once whatever is using it now is done: a background job (an attachment being read)
+    /// may still be mid-query when the library stops. Anything after that finds it closed.</summary>
+    public void Dispose()
+    {
+        lock (gate) conn.Dispose();
+    }
 
     void Migrate()
     {
