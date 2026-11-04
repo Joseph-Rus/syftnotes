@@ -5,16 +5,17 @@ using NAudio.Wave;
 namespace StudyStash.Audio;
 
 /// <summary>
-/// A recording made somewhere else (a voice memo from the phone: .m4a, .mp3, .wav…) turned into what Whisper and the
-/// recorder use: 16 kHz, mono, 16-bit WAV. A Mac has it built in (afconvert, the Core Audio converter); Windows reads
-/// it with Media Foundation; anywhere else it needs ffmpeg.
+/// A recording made somewhere else (a voice memo from the phone: .m4a, .mp3, .wav…, or a video, whose sound alone is
+/// taken: .mp4, .mov) turned into what Whisper and the recorder use: 16 kHz, mono, 16-bit WAV. A Mac has it built in
+/// (afconvert, the Core Audio converter); Windows reads it with Media Foundation; anywhere else it needs ffmpeg.
 /// </summary>
 public static class AudioFiles
 {
-    public const string CantRead = "Syft Notes couldn't read that recording. Voice Memos' .m4a, .mp3 and .wav all work.";
+    public const string CantRead = "Syft Notes couldn't read that recording. Sound files (.m4a, .mp3, .wav) and videos (.mp4, .mov) work.";
 
     /// <summary>Converts <paramref name="input"/> to a 16 kHz mono WAV at <paramref name="output"/>. Throws
-    /// InvalidOperationException, with words for the student, when it can't.</summary>
+    /// InvalidOperationException, with words for the student, when it can't; what the tool itself said is the inner
+    /// exception's, for the log.</summary>
     public static void ToRecording(string input, string output)
     {
         if (OperatingSystem.IsMacOS()) Run("/usr/bin/afconvert", ["-f", "WAVE", "-d", "LEI16@16000", "-c", "1", input, output]);
@@ -47,7 +48,7 @@ public static class AudioFiles
                 p.Kill(entireProcessTree: true);
                 throw new InvalidOperationException(CantRead);
             }
-            if (p.ExitCode != 0) throw new InvalidOperationException($"{CantRead} ({err.Result.Trim().Split('\n')[0]})");
+            if (p.ExitCode != 0) throw new InvalidOperationException(CantRead, new InvalidOperationException(err.Result.Trim().Split('\n')[0]));
         }
     }
 
