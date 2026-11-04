@@ -601,13 +601,23 @@ public sealed partial class Store : IDisposable
         }
     }
 
-    /// <summary>The lecture whose row has <paramref name="path"/> as its note file (in this disk's letters), or null.</summary>
-    public string? IdAt(string path)
+    /// <summary>Writes lecture <paramref name="id"/>'s note file afresh from its row (its notes, title and class; its
+    /// transcript too when the row has the lecture whole) at <paramref name="want"/>, or "name (2).md" beside a file that's
+    /// there, and points the row at it: for a lecture whose file is gone. Where it went.</summary>
+    public string WriteFromRow(string id, string want)
     {
         lock (gate)
         {
-            using var cmd = Command("SELECT id FROM notes WHERE md_path=?" + (OperatingSystem.IsLinux() ? "" : " COLLATE NOCASE") + " LIMIT 1", Py.NormPath(path));
-            return cmd.ExecuteScalar() as string;
+            var row = Get(id) ?? throw new InvalidOperationException("no such lecture");
+            var m = Meeting(row with { MdPath = null });
+            var c = new Classification(string.IsNullOrEmpty(row.ClassName) ? Configs.Unsorted : row.ClassName, row.Confidence ?? 0,
+                row.ClassifiedBy ?? "", row.LectureTitle ?? "", JsonList(row.Topics));
+            string text = Notes.Render(m, c, row.SummaryMd ?? "", row.SummaryModel ?? "");
+            string path = Py.NormPath(want);
+            for (int i = 2; File.Exists(path); i++) path = Path.Combine(Py.Parent(want), $"{Path.GetFileNameWithoutExtension(want)} ({i}).md");
+            WriteWhole(path, OperatingSystem.IsWindows() ? text.Replace("\n", "\r\n") : text);
+            Exec("UPDATE notes SET md_path=? WHERE id=?", path, id);
+            return path;
         }
     }
 
