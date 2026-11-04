@@ -176,6 +176,22 @@ public class TypedMarkdownTests
             Assert.Equal(["first", "second", "third", "inner"], editor.Fields.Select(f => f.Text));
             Assert.Equal(["•", "•", "•", "◦"], editor.Markers);
             Assert.Equal("- ==first==\n- ==second==\n- ==third==\n  - ==inner==", StudyStash.App.ViewModels.TypedNotes.AllMine(editor.Text));
+
+            // Lines pasted at a new bullet's start: the first one's "- " is that bullet's, as when it's typed.
+            w.KeyPress(Avalonia.Input.Key.Enter, RawInputModifiers.None, PhysicalKey.None, null);
+            Settle();
+            editor.Insert("- a\n- b");
+            Settle();
+            Assert.EndsWith("  - inner\n  - a\n- b", editor.Text);
+            // An edit in front of a " - " already in the words keeps the minus: "x - 5" with the x deleted.
+            w.KeyPress(Avalonia.Input.Key.Enter, RawInputModifiers.None, PhysicalKey.None, null);
+            Settle();
+            Type("x - 5");
+            var five = editor.Fields[^1];
+            five.CaretIndex = 1;
+            w.KeyPress(Avalonia.Input.Key.Back, RawInputModifiers.None, PhysicalKey.None, null);
+            Settle();
+            Assert.Equal(" - 5", five.Text);
         }
         finally
         {
