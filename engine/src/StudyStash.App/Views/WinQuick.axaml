@@ -76,65 +76,71 @@
         </Panel>
       </Border>
 
-      <!-- The answer -->
-      <Border IsVisible="{Binding Answering}" Margin="12,0" Padding="16" CornerRadius="{DynamicResource RadiusCard}" Background="{DynamicResource SurfaceRaised}">
-        <StackPanel Spacing="8">
-          <TextBlock Text="From your notes" FontSize="{DynamicResource FontCaption}" Foreground="{DynamicResource Fg2}" />
-          <c:SyftLoader Kind="HoppingBits" Size="24" IsVisible="{Binding Thinking}" HorizontalAlignment="Left" />
-          <c:NoteView Compact="True" BodySize="{DynamicResource FontSubtitle}" BodyLineHeight="24" Markdown="{Binding Answer}" />
+      <!-- Scrolls inside the panel when there is more than the screen has room for; the keys below stay in view -->
+      <ScrollViewer MaxHeight="{Binding ResultsMaxHeight}" HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
+        <StackPanel>
+        <!-- The answer -->
+        <Border IsVisible="{Binding Answering}" Margin="12,0" Padding="16" CornerRadius="{DynamicResource RadiusCard}" Background="{DynamicResource SurfaceRaised}">
+          <StackPanel Spacing="8">
+            <TextBlock Text="From your notes" FontSize="{DynamicResource FontCaption}" Foreground="{DynamicResource Fg2}" />
+            <c:SyftLoader Kind="HoppingBits" Size="24" IsVisible="{Binding Thinking}" HorizontalAlignment="Left" />
+            <c:NoteView Compact="True" BodySize="{DynamicResource FontSubtitle}" BodyLineHeight="24" Markdown="{Binding Answer}" />
+          </StackPanel>
+        </Border>
+
+        <c:PageText IsVisible="{Binding HasNote}" Text="{Binding Note}" FontSize="{DynamicResource FontBody}" Foreground="{DynamicResource InkMuted}" Margin="16,4,16,12" TextWrapping="Wrap" />
+
+        <!-- Results, or the answer's sources -->
+        <ItemsControl ItemsSource="{Binding Rows}" Margin="4,0,4,8" Classes.answer="{Binding Answering}">
+          <ItemsControl.ItemTemplate>
+            <DataTemplate x:DataType="vm:QuickRow">
+              <Panel>
+                <TextBlock IsVisible="{Binding IsHeader}" Text="{Binding Title}" FontSize="{DynamicResource FontBody}" FontWeight="SemiBold" Classes="header" Classes.first="{Binding First}" />
+                <Button IsVisible="{Binding Selectable}" Classes="qrow" Classes.selected="{Binding Selected}"
+                        Command="{Binding $parent[UserControl].((vm:QuickModel)DataContext).OpenCommand}" CommandParameter="{Binding}">
+                  <Panel>
+                    <!-- A lecture -->
+                    <Grid IsVisible="{Binding IsLecture}" Height="40" Margin="12,0" ColumnDefinitions="Auto,12,*,Auto">
+                      <c:Swatch Classes="dot" Small="True" Fill="{Binding Dot}" VerticalAlignment="Center" />
+                      <TextBlock Grid.Column="2" Text="{Binding Title}" ToolTip.Tip="{Binding Title}" c:Tips.WhenCut="True" FontSize="{DynamicResource FontBody}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
+                      <TextBlock Grid.Column="3" Classes="meta lecture" Classes.strong="{Binding Strong}" Text="{Binding Meta}" FontSize="{DynamicResource FontCaption}" VerticalAlignment="Center" Margin="12,0,0,0" />
+                    </Grid>
+                    <!-- A passage from notes -->
+                    <Grid IsVisible="{Binding IsPassage}" Margin="12,8" ColumnDefinitions="Auto,12,*">
+                      <c:Swatch Classes="dot" Small="True" Fill="{Binding Dot}" VerticalAlignment="Top" Margin="0,6,0,0" />
+                      <StackPanel Grid.Column="2">
+                        <c:Marked Source="{Binding Title}" Terms="{Binding $parent[UserControl].((vm:QuickModel)DataContext).Query}" Mark="{DynamicResource Hl}"
+                                  MarkWeight="SemiBold" FontSize="{DynamicResource FontBody}" LineHeight="19.6" TextWrapping="Wrap" />
+                        <TextBlock Classes="meta" Text="{Binding Sub}" ToolTip.Tip="{Binding Sub}" c:Tips.WhenCut="True" FontSize="{DynamicResource FontCaption}" Foreground="{DynamicResource InkMuted}" Margin="0,2,0,0" TextTrimming="CharacterEllipsis" />
+                      </StackPanel>
+                    </Grid>
+                    <!-- A class -->
+                    <Grid IsVisible="{Binding IsClass}" Height="40" Margin="12,0" ColumnDefinitions="Auto,12,*,Auto">
+                      <c:Swatch Classes="dot" Small="True" Fill="{Binding Dot}" VerticalAlignment="Center" />
+                      <TextBlock Grid.Column="2" Text="{Binding Title}" FontSize="{DynamicResource FontBody}" VerticalAlignment="Center" />
+                      <TextBlock Grid.Column="3" Classes="meta" Text="{Binding Meta}" FontSize="{DynamicResource FontCaption}" Foreground="{DynamicResource InkMuted}" VerticalAlignment="Center" />
+                    </Grid>
+                    <!-- An action -->
+                    <Grid IsVisible="{Binding IsAction}" Height="40" Margin="10,0" ColumnDefinitions="Auto,12,*,Auto">
+                      <c:Icon Glyph="{Binding Glyph}" Size="18" Foreground="{DynamicResource Fg2}" />
+                      <TextBlock Grid.Column="2" Text="{Binding Title}" FontSize="{DynamicResource FontBody}" VerticalAlignment="Center" />
+                      <TextBlock Grid.Column="3" Classes="meta" Text="{Binding Meta}" FontSize="{DynamicResource FontCaption}" Foreground="{DynamicResource InkMuted}" VerticalAlignment="Center" />
+                    </Grid>
+                    <!-- A source of an answer -->
+                    <Grid IsVisible="{Binding IsSource}" Height="40" Margin="12,0" ColumnDefinitions="Auto,12,*,Auto">
+                      <c:Icon Classes="source" Glyph="play_circle" Size="18" Foreground="{DynamicResource Fg2}" />
+                      <TextBlock Grid.Column="2" Text="{Binding Title}" ToolTip.Tip="{Binding Title}" c:Tips.WhenCut="True" FontSize="{DynamicResource FontBody}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
+                      <TextBlock Grid.Column="3" Classes="meta num" Text="{Binding Meta}" FontSize="{DynamicResource FontCaption}" Foreground="{DynamicResource InkMuted}" VerticalAlignment="Center" />
+                    </Grid>
+                  </Panel>
+                </Button>
+              </Panel>
+            </DataTemplate>
+          </ItemsControl.ItemTemplate>
+        </ItemsControl>
+
         </StackPanel>
-      </Border>
-
-      <c:PageText IsVisible="{Binding HasNote}" Text="{Binding Note}" FontSize="{DynamicResource FontBody}" Foreground="{DynamicResource InkMuted}" Margin="16,4,16,12" TextWrapping="Wrap" />
-
-      <!-- Results, or the answer's sources -->
-      <ItemsControl ItemsSource="{Binding Rows}" Margin="4,0,4,8" Classes.answer="{Binding Answering}">
-        <ItemsControl.ItemTemplate>
-          <DataTemplate x:DataType="vm:QuickRow">
-            <Panel>
-              <TextBlock IsVisible="{Binding IsHeader}" Text="{Binding Title}" FontSize="{DynamicResource FontBody}" FontWeight="SemiBold" Classes="header" Classes.first="{Binding First}" />
-              <Button IsVisible="{Binding Selectable}" Classes="qrow" Classes.selected="{Binding Selected}"
-                      Command="{Binding $parent[UserControl].((vm:QuickModel)DataContext).OpenCommand}" CommandParameter="{Binding}">
-                <Panel>
-                  <!-- A lecture -->
-                  <Grid IsVisible="{Binding IsLecture}" Height="40" Margin="12,0" ColumnDefinitions="Auto,12,*,Auto">
-                    <c:Swatch Classes="dot" Small="True" Fill="{Binding Dot}" VerticalAlignment="Center" />
-                    <TextBlock Grid.Column="2" Text="{Binding Title}" ToolTip.Tip="{Binding Title}" c:Tips.WhenCut="True" FontSize="{DynamicResource FontBody}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
-                    <TextBlock Grid.Column="3" Classes="meta lecture" Classes.strong="{Binding Strong}" Text="{Binding Meta}" FontSize="{DynamicResource FontCaption}" VerticalAlignment="Center" Margin="12,0,0,0" />
-                  </Grid>
-                  <!-- A passage from notes -->
-                  <Grid IsVisible="{Binding IsPassage}" Margin="12,8" ColumnDefinitions="Auto,12,*">
-                    <c:Swatch Classes="dot" Small="True" Fill="{Binding Dot}" VerticalAlignment="Top" Margin="0,6,0,0" />
-                    <StackPanel Grid.Column="2">
-                      <c:Marked Source="{Binding Title}" Terms="{Binding $parent[UserControl].((vm:QuickModel)DataContext).Query}" Mark="{DynamicResource Hl}"
-                                MarkWeight="SemiBold" FontSize="{DynamicResource FontBody}" LineHeight="19.6" TextWrapping="Wrap" />
-                      <TextBlock Classes="meta" Text="{Binding Sub}" ToolTip.Tip="{Binding Sub}" c:Tips.WhenCut="True" FontSize="{DynamicResource FontCaption}" Foreground="{DynamicResource InkMuted}" Margin="0,2,0,0" TextTrimming="CharacterEllipsis" />
-                    </StackPanel>
-                  </Grid>
-                  <!-- A class -->
-                  <Grid IsVisible="{Binding IsClass}" Height="40" Margin="12,0" ColumnDefinitions="Auto,12,*,Auto">
-                    <c:Swatch Classes="dot" Small="True" Fill="{Binding Dot}" VerticalAlignment="Center" />
-                    <TextBlock Grid.Column="2" Text="{Binding Title}" FontSize="{DynamicResource FontBody}" VerticalAlignment="Center" />
-                    <TextBlock Grid.Column="3" Classes="meta" Text="{Binding Meta}" FontSize="{DynamicResource FontCaption}" Foreground="{DynamicResource InkMuted}" VerticalAlignment="Center" />
-                  </Grid>
-                  <!-- An action -->
-                  <Grid IsVisible="{Binding IsAction}" Height="40" Margin="10,0" ColumnDefinitions="Auto,12,*,Auto">
-                    <c:Icon Glyph="{Binding Glyph}" Size="18" Foreground="{DynamicResource Fg2}" />
-                    <TextBlock Grid.Column="2" Text="{Binding Title}" FontSize="{DynamicResource FontBody}" VerticalAlignment="Center" />
-                    <TextBlock Grid.Column="3" Classes="meta" Text="{Binding Meta}" FontSize="{DynamicResource FontCaption}" Foreground="{DynamicResource InkMuted}" VerticalAlignment="Center" />
-                  </Grid>
-                  <!-- A source of an answer -->
-                  <Grid IsVisible="{Binding IsSource}" Height="40" Margin="12,0" ColumnDefinitions="Auto,12,*,Auto">
-                    <c:Icon Classes="source" Glyph="play_circle" Size="18" Foreground="{DynamicResource Fg2}" />
-                    <TextBlock Grid.Column="2" Text="{Binding Title}" ToolTip.Tip="{Binding Title}" c:Tips.WhenCut="True" FontSize="{DynamicResource FontBody}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
-                    <TextBlock Grid.Column="3" Classes="meta num" Text="{Binding Meta}" FontSize="{DynamicResource FontCaption}" Foreground="{DynamicResource InkMuted}" VerticalAlignment="Center" />
-                  </Grid>
-                </Panel>
-              </Button>
-            </Panel>
-          </DataTemplate>
-        </ItemsControl.ItemTemplate>
-      </ItemsControl>
+      </ScrollViewer>
 
       <!-- Keys, on the footer band -->
       <Border Height="40" Background="{DynamicResource SurfaceSunken}" BorderBrush="{DynamicResource Border}" BorderThickness="0,1,0,0">
