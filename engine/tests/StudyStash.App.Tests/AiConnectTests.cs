@@ -1,6 +1,7 @@
 using System.Text.Json.Nodes;
 using Avalonia.Headless.XUnit;
 using StudyStash.App.Services;
+using StudyStash.App.Services.Stores;
 using StudyStash.App.ViewModels;
 using StudyStash.Core;
 using StudyStash.Core.Ai;
@@ -156,6 +157,31 @@ public class AiConnectTests
         Assert.StartsWith("Syft Notes couldn't reach claude.ai", done.Words);
         Assert.DoesNotContain(lib.Calls, c => c.StartsWith("sign-in", StringComparison.Ordinal));
         Assert.False(File.Exists(apps.DesktopConfig));
+    }
+
+    [AvaloniaTheory]
+    [InlineData("gemini", "not_signed_in")] // the library still has an earlier sign-in that ran out
+    [InlineData("claude", "unchecked")]
+    [InlineData("codex", "unchecked")]
+    public async Task An_AI_signed_in_during_setup_is_connected_in_settings_with_no_second_connect(string id, string before)
+    {
+        // Setup signs in with the AI's own sign-in, which the library never sees, then runs Settings' Connect through the
+        // app's one AI store: the library checks it (no second sign-in), and Settings → Your AI, open all along, follows.
+        using var home = new TempHome();
+        var lib = new FakeAiLibrary { Overview = Fresh() with { Engines = [new EngineInfo(id, AiConnect.Brand(id), before) { Installed = true }] } };
+        var store = new AiStatusStore(lib);
+        using var settings = new AiEnginesModel(store) { Here = true };
+        await settings.Load();
+        Assert.NotEqual("Connected", settings.Engines.Single(r => r.Id == id).StateWords);
+        var connect = new AiConnect(lib) { Apps = Apps(home, []), WaitForSignIn = false, SignedInHere = true };
+
+        var done = await store.ConnectAsync(connect, id, ct: TestContext.Current.CancellationToken);
+
+        Assert.True(done.Ok, done.Words);
+        Assert.Equal(AiEngineState.Ready, store.For(id)!.State);
+        Assert.Contains($"check:{id}", lib.Calls);
+        Assert.DoesNotContain($"sign-in:{id}", lib.Calls);
+        Assert.Equal("Connected", settings.Engines.Single(r => r.Id == id).StateWords); // no Connect pressed there
     }
 
     [AvaloniaFact]

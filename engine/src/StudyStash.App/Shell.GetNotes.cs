@@ -112,11 +112,12 @@ public static partial class Shell
         if (host.Remote() is not { } lib) return false;
         try
         {
-            if (await Ai().DefaultsAsync(notes: engine, ask: engine) is null)
+            if (await host.AiStatus.Library.DefaultsAsync(notes: engine, ask: engine) is not { } now)
             {
                 host.Log("[notes] the library runs an older Syft Notes: it can't be told which AI writes the notes");
                 return false;
             }
+            host.AiStatus.Take(now); // every screen says who writes the notes now
             await WriteNotesAsync(true);
             host.Save(s => s.SetupAi = engine);
             var queued = await lib.SettingsAsync(HttpMethod.Post, "/write-missing");
