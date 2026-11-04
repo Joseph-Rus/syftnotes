@@ -567,16 +567,21 @@ public sealed class AiJobs(string home, Func<string>? ollamaHost = null)
         return ollamaSorts ? null : notes;
     }
 
+    /// <summary>The AI that the last sort went to ("gemini", "ollama"…): what a lecture's <c>classified_by</c> names.</summary>
+    public string SortedWith { get; private set; } = "ollama";
+
     /// <summary>Sorting into classes.</summary>
     public async Task<string> SortAsync(Config cfg, string prompt, JsonObject schema)
     {
         var settings = Settings;
         if (await SortFollowsNotesAsync(settings, cfg, Checks) is { } follows)
         {
+            SortedWith = follows;
             string text = await AnswerWithAsync(follows, settings.For("notes").Model, prompt
                 + "\n\nAnswer with only a JSON object that fits this JSON schema, and nothing else:\n" + schema.ToJsonString(), CancellationToken.None);
             return FirstObject(text) ?? throw new InvalidDataException("the answer wasn't JSON");
         }
+        SortedWith = settings.For("sort").Provider;
         if (settings.Local("sort") && Providers is null) return await Classify.OllamaChatAsync(cfg, prompt, schema);
         return await JsonAnswerAsync("sort", prompt, schema); // another engine's pick, or a test's fake Ollama
     }
