@@ -171,7 +171,7 @@ public class AppUpdatesTests
             told: told);
 
         Assert.Equal("install failed", await updates.RoundAsync());
-        Assert.Equal("install failed", await updates.RoundAsync()); // six hours later: tried again, not said again
+        Assert.Equal("install failed", await updates.RoundAsync()); // an hour later: tried again, not said again
         Assert.False(quit);
         Assert.Equal(UpdateNewsKind.Failed, Assert.Single(told).Kind);
     }
