@@ -59,7 +59,6 @@ public sealed partial class LibraryWeb
                 return;
             }
             var reading = store.UnreadAttachments().Select(a => a.Id).ToHashSet();
-            LibraryBringIn.ListOwn(store, cfg);
             foreach (var (asked, bring) in from.Select(f => (f, true)).Concat(refile.Select(f => (f, false))))
             {
                 // A folder asked for that this library can't use is said, never passed over: the switch isn't finished.
