@@ -218,6 +218,13 @@ public sealed class FunnelFilms
         public IReadOnlyList<Browser> Browsers { get; init; } = [Services.Browsers.Chrome];
         /// <summary>The add-on finds Canvas this long after the student's Allow (they sign in meanwhile).</summary>
         public TimeSpan SignInTakes { get; init; } = TimeSpan.FromSeconds(3);
+        /// <summary>Never: the student's browser opens the store's page and nothing is added (the step stays on its store steps).</summary>
+        public bool AddOnComes { get; init; } = true;
+        /// <summary>False: the add-on checks in but never finds the student's Canvas (it is at the school's own address, which
+        /// the add-on can't find by itself).</summary>
+        public bool FindsCanvas { get; init; } = true;
+        /// <summary>How far the add-on step's clock has been moved on (a stills' way of letting a minute and a half pass).</summary>
+        public TimeSpan Later;
 
         public FilmLibrary? Lib;
         public AddOnStandIn? AddOn;
@@ -259,7 +266,7 @@ public sealed class FunnelFilms
             setup.OnGetStarted = () => FirstRun.AfterLibraryAsync(setup, Host, Lib!.Remote, () => FirstRun.Detect(c => AgentInstall.Find(c, Pc.Which), FirstRun.Status), Lib.WriteNotesAsync);
             Funnel = new FunnelModel(setup, new FunnelServices
             {
-                MakeAddOn = () => new AddOnModel(Context!, Watch!),
+                MakeAddOn = () => new AddOnModel(Context!, Watch!, () => DateTimeOffset.UtcNow + Later),
                 MakeCanvas = async () =>
                 {
                     var c = new CanvasConnectModel(Context!, Watch!, forSetup: true);
@@ -299,9 +306,15 @@ public sealed class FunnelFilms
         /// checks in, then, once they're signed in to Canvas, finds it and starts reading it.</summary>
         async Task AddInBrowserAsync()
         {
+            if (!AddOnComes) return;
             await Task.Delay(TimeSpan.FromSeconds(2.5));
             AddOn = new AddOnStandIn(Lib!.Url, Canvas);
             await AddOn.AddedAsync();
+            if (!FindsCanvas)
+            {
+                AddOn.Run();
+                return;
+            }
             await Task.Delay(SignInTakes);
             await AddOn.FoundAsync(School);
             AddOn.Run();
@@ -602,6 +615,63 @@ public sealed class FunnelFilms
             await ConnectAsync(run, "ContinueWithGoogle", "Google's own sign-in · no terminal (a stand-in signs in after 5 s)");
             await HomeAsync(run, "Home: your classes, and Gemini writes the notes");
             Assert.Contains("Edge store", run.Opened);
+        }
+        finally
+        {
+            Look(SkinKind.Mac);
+        }
+    }
+
+    // --- 6 · Canvas at the school's own address: the typing way under the Canvas line --------------------------------------
+
+    /// <summary>Connect your classes with the add-on checked in and no Canvas found (the student's is at the school's own
+    /// address, which the add-on can't find by itself), a minute and a half on; or, with <paramref name="addOnComes"/>
+    /// false, the store's steps with that minute and a half gone: the funnel's own view drawn as stills, light and dark
+    /// (the store's steps, light only).</summary>
+    static async Task OwnAddressAsync(SkinKind skin, bool addOnComes, string name)
+    {
+        Look(skin);
+        using var pc = new StandIns();
+        using var host = FilmParts.Host(pc["app"]);
+        using var desk = new Desk("06-" + name, pc, ThemeVariant.Light, "first run, Canvas at the school's own address · stand-in add-on (it never finds a Canvas) · throwaway library", Note);
+        await using var run = new Run
+        {
+            Pc = pc, Host = host, Desk = desk, Canvas = Canvas(), Skin = skin, AddOnComes = addOnComes, FindsCanvas = false,
+            Browsers = skin == SkinKind.Mac ? [Services.Browsers.Chrome] : [Services.Browsers.Edge, Services.Browsers.Chrome],
+        };
+        run.Start();
+        await WelcomeAsync(run);
+        run.Desk.Press(run.View.Part<Button>("IAmAStudent"));
+        await run.Desk.UntilAsync(() => run.Funnel.AddOn is not null, "Connect your classes");
+        var addOn = run.Funnel.AddOn!;
+        run.Desk.Press(run.View.Part<Button>("AddToBrowser"));
+        if (addOnComes)
+        {
+            await run.Desk.UntilAsync(() => addOn.IsAsking, "the add-on asks to connect", TimeSpan.FromSeconds(40));
+            run.Desk.Press(run.View.Part<Button>("AllowAddOn"));
+            await run.Desk.UntilAsync(() => addOn.LookingForCanvas, "the add-on checks in", TimeSpan.FromSeconds(40));
+            run.Desk.Hold(1.0);
+        }
+        else await run.Desk.UntilAsync(() => addOn.Waiting && !addOn.IsAsking, "the store's steps");
+        Assert.False(addOn.OfferTyping);
+        run.Later = AddOnModel.SlowAfter;
+        await run.Desk.UntilAsync(() => addOn.OfferTyping, "the typing way offered", TimeSpan.FromSeconds(40));
+        run.Desk.Hold(0.5);
+        Assert.Equal(addOnComes, addOn.LookingForCanvas);
+        foreach (var variant in addOnComes ? new[] { ThemeVariant.Light, ThemeVariant.Dark } : [ThemeVariant.Light])
+            Shot.Take(name, skin, variant, () => skin == SkinKind.Mac ? new MacFunnel { DataContext = run.Funnel, DrawChrome = true } : new WinFunnel { DataContext = run.Funnel, DrawChrome = true },
+                size: new Size(820, 920));
+    }
+
+    [AvaloniaFact]
+    public async Task Own_address_stills()
+    {
+        Assert.SkipUnless(FilmParts.On && Environment.GetEnvironmentVariable("STUDYSTASH_SHOTS") is { Length: > 0 }, "Stills, not a test: STUDYSTASH_FILM=1 and STUDYSTASH_SHOTS naming a folder, on a Mac.");
+        try
+        {
+            await OwnAddressAsync(SkinKind.Mac, addOnComes: true, "own-address-mac");
+            await OwnAddressAsync(SkinKind.Win, addOnComes: true, "own-address-win");
+            await OwnAddressAsync(SkinKind.Mac, addOnComes: false, "store-wait-mac");
         }
         finally
         {
