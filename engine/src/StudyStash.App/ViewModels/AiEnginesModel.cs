@@ -506,7 +506,7 @@ public sealed partial class AiEnginesModel : ObservableObject, IDisposable
             OnPropertyChanged(nameof(SelectedAskName));
             // A sign-in the press said was going that has stopped since (or never started): the line says so, as its row does.
             if (Say?.StartsWith("Finish signing in to ", StringComparison.Ordinal) == true
-                && overview.Engines.FirstOrDefault(e => AiStatusStore.SignInOf(e) is SignInPhase.GaveUp or SignInPhase.Region or SignInPhase.Stuck) is { } stopped)
+                && overview.Engines.FirstOrDefault(e => SignInPhase.Stopped(AiStatusStore.SignInOf(e))) is { } stopped)
                 Say = AiWords.SignInSaid(AiWords.PlainName(stopped.Id, stopped.Name), stopped.SignIn);
             // Or it worked (learned here, or from the problem card on the same page): the line says so, not "Finish…".
             else if (Say is { } said && overview.Engines.FirstOrDefault(e => said == AiSignIns.StartedWords(e.Id)) is { } done
@@ -644,7 +644,7 @@ public sealed partial class AiEnginesModel : ObservableObject, IDisposable
                 : status.State == AiEngineState.Failed ? $"{name} didn't work last time. Fix checks it and signs you in if it needs to."
                 : broken is not null ? $"{broken.Words} isn't reading your lectures yet. Fix connects it."
                 : AiWords.ConnectAbout(e.Id);
-            action = signIn is SignInPhase.GaveUp or SignInPhase.Stuck || said?.SignIn is SignInPhase.GaveUp or SignInPhase.Stuck ? "Try again"
+            action = SignInPhase.TryAgain(signIn) || SignInPhase.TryAgain(said?.SignIn) ? "Try again"
                 : signIn == SignInPhase.Region ? "" : "Fix";
             if (signIn == SignInPhase.Stuck || said?.SignIn == SignInPhase.Stuck || installStopped.Contains(e.Id)) link = "Get help";
         }
