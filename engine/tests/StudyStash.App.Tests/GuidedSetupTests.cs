@@ -117,7 +117,7 @@ public sealed class GuidedSetupTests
                     AiApps[at] = AiApps[at] with { Added = true };
                     return new AiAppChange(true, "");
                 },
-                ConnectAppsOf = id =>
+                Connect = id =>
                 {
                     AppsOf.Add(id);
                     return Task.CompletedTask;
