@@ -15,9 +15,9 @@ public interface IVoiceMemoLibrary
 
 /// <summary>
 /// Voice memos sent from the phone, written down here: each waiting memo is taken (so no other computer does it too),
-/// fetched, turned into the recordings' own sound (16 kHz mono WAV, <see cref="Convert"/>) and added to this
-/// computer's lectures as recorded and waiting for Whisper, which writes it down and sends it on to the library the
-/// way any recording goes. The library is told which lecture it became, or why it couldn't be one.
+/// fetched, and made a lecture waiting for Whisper (<see cref="LectureFromFile"/>: its sound turned into the recordings'
+/// own, 16 kHz mono WAV, by <see cref="Convert"/>), which writes it down and sends it on to the library the way any
+/// recording goes. The library is told which lecture it became, or why it couldn't be one.
 /// </summary>
 public sealed class VoiceMemoImport(LectureStore store, Func<IVoiceMemoLibrary?> library, Action<string, string> convert,
     Func<string> owner, Func<string> computer, Action? transcribe = null, Action<string>? log = null, Func<DateTimeOffset>? clock = null)
@@ -79,7 +79,7 @@ public sealed class VoiceMemoImport(LectureStore store, Func<IVoiceMemoLibrary?>
             catch (Exception e) when (e is InvalidOperationException or IOException or InvalidDataException or LibraryRefusedException or HttpRequestException or UnauthorizedAccessException)
             {
                 error = e.Message;
-                say($"[memo] {id}: couldn't bring it in: {e.Message}");
+                say($"[memo] {id}: couldn't bring it in: {e.Message}{(e.InnerException is { } why ? $" ({why.Message})" : "")}");
             }
             await lib.FinishVoiceMemoAsync(id, lecture?.Id, error, stop);
             if (lecture is null) continue;
@@ -95,45 +95,16 @@ public sealed class VoiceMemoImport(LectureStore store, Func<IVoiceMemoLibrary?>
     {
         string name = Py.AsString(memo["name"]) ?? "memo.m4a";
         string download = Path.Combine(Path.GetTempPath(), $"studystash-memo-{id}{Path.GetExtension(name)}");
-        var at = now();
-        string lectureId = Lecture.NewId(at);
-        string wav = store.AudioPath(lectureId);
         try
         {
             await lib.DownloadVoiceMemoAsync(id, download, stop);
-            Directory.CreateDirectory(Path.GetDirectoryName(wav)!);
-            Convert(download, wav);
-            double seconds = Sound.WavSeconds(wav);
-            if (seconds < 1) throw new InvalidDataException("The recording has no sound in it.");
             // When it was sent stands in for when it was recorded: Voice Memos doesn't say, and it's usually the same day.
-            var sent = DateTimeOffset.TryParse(Py.AsString(memo["added"]), CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal, out var a) ? a.ToLocalTime() : at;
-            var lecture = new Lecture
-            {
-                Id = lectureId, Started = sent.ToString("yyyy-MM-dd'T'HH:mm:sszzz", CultureInfo.InvariantCulture),
-                ClassName = Py.AsString(memo["class"]) ?? "", Title = Py.AsString(memo["title"]) ?? "", Owner = owner(),
-                Seconds = seconds, State = LectureState.Transcribing,
-            };
-            return store.Add(lecture);
-        }
-        catch
-        {
-            TryDelete(wav);
-            throw;
+            var sent = DateTimeOffset.TryParse(Py.AsString(memo["added"]), CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal, out var a) ? a.ToLocalTime() : now();
+            return LectureFromFile.Add(store, Convert, download, Py.AsString(memo["class"]) ?? "", Py.AsString(memo["title"]) ?? "", sent, owner());
         }
         finally
         {
-            TryDelete(download);
-        }
-    }
-
-    static void TryDelete(string path)
-    {
-        try
-        {
-            if (File.Exists(path)) File.Delete(path);
-        }
-        catch (Exception e) when (e is IOException or UnauthorizedAccessException)
-        {
+            LectureFromFile.TryDelete(download);
         }
     }
 }
