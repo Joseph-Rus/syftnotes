@@ -31,12 +31,16 @@ public partial class DueCalendar : UserControl
         if (e.PropertyName == nameof(OwnDueFormModel.IsOpen) && form is { IsOpen: true } open) UiTasks.Run(() => ShowFormAsync(open), "show the Due form");
     }
 
+    int shows;
+
     async Task ShowFormAsync(OwnDueFormModel open)
     {
+        int mine = ++shows;
         if (TopLevel.GetTopLevel(this) is Window window && ConfirmLayer.For(window) is { } layer)
             await layer.ShowAsync(new OwnDueForm { DataContext = open });
-        // A click outside ended it, or nowhere could show it: the model learns it is closed.
-        open.Close();
+        // A click outside ended it, or nowhere could show it: the model learns it is closed. (Not when the form has been opened
+        // again meanwhile, a question over it answered no: a dialog layer lets go of the closed form a moment late.)
+        if (mine == shows) open.Close();
     }
 
     /// <summary>A pick in one of the calendar's menus closes the menu it was in.</summary>
