@@ -5,6 +5,7 @@ using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Input.Platform;
 using Avalonia.Media;
+using StudyStash.App.Controls;
 using StudyStash.App.Controls.Rich;
 using StudyStash.App.Services;
 using StudyStash.App.ViewModels;
@@ -174,9 +175,9 @@ public static partial class Shell
             return;
         }
         library.Empty = null;
-        AskForSupportIfDue(host.Classes().Sum(c => c.Lectures) + unsorted);
         Run(() => HearNotesWriterAsync(), "HearNotesWriter");
         await ReshowAsync();
+        AskForSupportIfDue(host.Classes().Sum(c => c.Lectures) + unsorted);
     }
 
     /// <summary>The page the window is on, read again: a note filed, a class linked, the library back. No step in
@@ -195,14 +196,16 @@ public static partial class Shell
         }
     }
 
-    /// <summary>The library window asks for a tip atop the lecture list when <see cref="SupportAsk.Due"/> says it's
-    /// time (the library holds a few lectures, nothing is recording, setup isn't open), and puts the ask away when not.</summary>
+    /// <summary>The library window asks for a tip in a popup over itself when <see cref="SupportAsk.Due"/> says it's
+    /// time (the library holds a few lectures, nothing is recording, setup isn't open), once a session at most, and
+    /// only while the window shows, nothing else is over it and no note is being edited.</summary>
     static void AskForSupportIfDue(int lectures)
     {
+        if (mainWindow is not { IsVisible: true } w || ConfirmLayer.For(w) is not { IsOpen: false } layer || library.Notes is { Editing: true }) return;
         bool due = SupportAsk.Due(host.Settings, lectures, recording: host.Recorder.Current is not null,
             settingUp: setupWindow?.IsVisible == true, DateTimeOffset.Now);
-        if (due) library.AskForSupport(last: SupportAsk.IsLast(host.Settings));
-        else library.Support = null;
+        if (due && library.AskForSupport(last: SupportAsk.IsLast(host.Settings)) is { } ask)
+            Run(() => SupportAskDialog.ShowAsync(layer, ask), "AskForSupport");
     }
 
     /// <summary>A note's page: a lecture, a meeting or a recording, filling the pane. One that's being recorded shows
