@@ -53,6 +53,18 @@ public static partial class Machine
         }
     }
 
+    /// <summary>Done when <paramref name="p"/> itself has ended. <see cref="Process.WaitForExitAsync"/> also waits for its
+    /// redirected output to end, which something it started can hold open long after it has gone (on Windows a child
+    /// inherits it, and git's background helpers live on).</summary>
+    public static async Task ExitedAsync(Process p, CancellationToken stop)
+    {
+        var ended = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        p.EnableRaisingEvents = true;
+        p.Exited += (_, _) => ended.TrySetResult();
+        if (p.HasExited) ended.TrySetResult();
+        await ended.Task.WaitAsync(stop);
+    }
+
     /// <summary>A command's output, read as it comes on a thread of its own, so what's been printed can be had before the
     /// pipe has ended. It only ever reads what is already in the pipe (never a read that waits for more), so it can be
     /// asked at any moment whether anything is left, on Windows too, where asking waits behind a read in flight.</summary>
