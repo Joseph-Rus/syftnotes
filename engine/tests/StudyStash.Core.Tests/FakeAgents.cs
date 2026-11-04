@@ -10,7 +10,8 @@ namespace StudyStash.Core.Tests;
 /// is the sign-in), and runs a "turn" the way <c>claude -p</c> / <c>codex exec</c> would: it writes down its
 /// arguments, the names (never the values) of its environment variables and its input, then prints
 /// <c>replay-N.jsonl</c> (or <c>replay.jsonl</c>) line by line. Files beside it change what it does: <c>broken</c>
-/// (its --version fails), <c>login-fails</c>, <c>sleep</c> (seconds to wait before answering), <c>exit</c>,
+/// (its --version fails), <c>login-fails</c>, <c>login-delay</c> (seconds its sign-in takes; one that ends by itself leaves
+/// <c>login-done</c>), <c>sleep</c> (seconds to wait before answering), <c>exit</c>,
 /// <c>refuse</c> (an argument it doesn't know, as an older version: a turn given it stops with clap's error). The fake
 /// agy also answers <c>models</c> (its status), <c>-p=/usage</c> (its sign-in, then <c>usage.json</c>; with a
 /// <c>region</c> file, Google's refusal for the country) and plain <c>agy</c>, its sign-in as the real one shows it (the
@@ -173,7 +174,7 @@ public static class FakeAgents
             echo "https://auth.example.com/oauth/authorize?response_type=code&redirect_uri=http%3A%2F%2Flocalhost%3A1455%2Fauth%2Fcallback&state=fake"
           fi
           sleep "$(cat "$D/login-delay" 2>/dev/null || echo 1)"
-          touch "$D/signed-in"; echo "Signed in."; exit 0
+          touch "$D/signed-in" "$D/login-done"; echo "Signed in."; exit 0
         fi
         mkdir -p "$D/turns"; n=$(( $(ls "$D/turns" | wc -l) + 1 )); : > "$D/turns/$n"; echo $$ > "$D/pid-$n"
         for a in "$@"; do printf '%s\n' "$a"; done > "$D/argv-$n.txt"
@@ -305,7 +306,7 @@ public static class FakeAgents
           }
           $delay = 1; if (Test-Path "$D\login-delay") { $delay = [int](Get-Content "$D\login-delay") }
           Start-Sleep -Seconds $delay
-          New-Item -ItemType File -Force "$D\signed-in" | Out-Null; 'Signed in.'; exit 0
+          New-Item -ItemType File -Force "$D\signed-in","$D\login-done" | Out-Null; 'Signed in.'; exit 0
         }
         $n = 1 + @(Get-ChildItem "$D\turns" -File -ErrorAction SilentlyContinue).Count
         New-Item -ItemType File -Force -Path "$D\turns\$n" | Out-Null
