@@ -296,7 +296,7 @@ public sealed partial class AppHost : IDisposable, IProblemSource
         KeepModelInUse();
         Lectures = new LectureStore(home);
         Recorder.Recover(Lectures, this.log);
-        Recorder = new Recorder(Lectures, OpenMic, log: this.log);
+        Recorder = new Recorder(Lectures, OpenMic, log: this.log, micAllowed: () => MicAccess() == Audio.MicAccess.Allowed);
         Captions = new LiveCaptioner(() => Recorder.Current, Recorder.Recent, LiveHearer, this.log) { Watched = () => liveWordsWatched };
         // Too slow is judged for each lecture afresh (an app.json from a 0.11 build before it may still say
         // "live_words_too_slow": nothing reads it, and the next save leaves it out).
