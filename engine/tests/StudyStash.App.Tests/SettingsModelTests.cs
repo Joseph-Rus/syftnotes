@@ -91,8 +91,9 @@ public class SettingsModelTests
         };
         host.Start();
         using var model = SettingsModel.Make(host);
-        await Task.Delay(300);
-        Assert.True(File.Exists(store.AudioPath("rec-old"))); // 0 keeps every recording
+        // 0 keeps every recording: the same look the app takes at start, asked here and now instead of slept on.
+        Assert.Equal(0, host.Lectures.PruneAudio(host.Settings.KeepAudioDays, DateTimeOffset.Now));
+        Assert.True(File.Exists(store.AudioPath("rec-old")));
 
         model.KeepAudio = "7";
 
