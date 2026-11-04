@@ -128,7 +128,9 @@ public sealed partial class Store
                     // (A file from before a too-short recording's file said so has the older words where its notes
                     // would be: nobody has touched that one either.)
                     string written = Notes.Render(m, c, current, model);
-                    if (text != written && text != written.Replace(Notes.TooShortForNotes, Notes.NoNotesReturned))
+                    // (And a file from before notes that never came back left nothing there has that line under Notes.)
+                    if (text != written && text.Replace($"\n## Notes\n\n{Notes.NoNotesReturned}\n", "") != written
+                        && text != written.Replace(Notes.TooShortForNotes, Notes.NoNotesReturned))
                     {
                         edited = text;
                         crlf = bytes.AsSpan().IndexOf("\r\n"u8) >= 0; // its own line endings stay
