@@ -263,6 +263,12 @@ public static class Cli
                 if (ai.AgentReady().Ok)
                     scout.Queue(classes.Where(c => !s.Scouts.ContainsKey(c) && !File.Exists(Path.Combine(store.ClassDir(c), "Canvas", "canvas-recipe.md"))).ToArray());
             };
+            // After a sync, each class with nothing said about what it covers gets its topics from Canvas (ClassTopics).
+            canvas.Synced += _ =>
+            {
+                pipeline.Topics.Due();
+                pipeline.Wake();
+            };
             // The phone over Google Drive (docs/phone-google.md): its link runs here, in the library, so the phone is
             // answered whenever the library runs, the app open or not. It starts once the app has connected an account.
             string? driveFolder = Option("--drive-folder") is { Length: > 0 } df ? Path.GetFullPath(df) : null;

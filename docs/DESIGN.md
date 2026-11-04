@@ -47,7 +47,10 @@ laptop                                          library (a Mac mini, say — any
    will add them), sorts it into a class (the recorded class or
    a title match wins outright; otherwise the AI reads the notes against each class's name, other
    names, what it covers and its Canvas course's name, and picks one with a strict schema, or it goes
-   to Unsorted), and saves it as Markdown under `<library folder>/<Class>/`: the lecture is **filed**
+   to Unsorted; a class whose "what it covers" the student left empty gets one written for them, between
+   lectures, by `ClassTopics`: from its Canvas course once that's synced, again from what its lectures covered
+   after three more are filed (at most once a day), by the sorting AI or, with none, from Canvas's own words,
+   marked so in Settings and never over what the student typed), and saves it as Markdown under `<library folder>/<Class>/`: the lecture is **filed**
    (status `done`), readable in the app, on the phone, in Ask, search and a Markdown download.
 5. **Diagrams, after.** Filing hands the lecture to `DiagramJobs` (`Pipeline`'s `filed`, with
    `AiJobs.TakeDiagramsFollow` saying whether a designer adds them). A job is a file in

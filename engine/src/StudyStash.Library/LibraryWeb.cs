@@ -866,6 +866,7 @@ public sealed partial class LibraryWeb
                 + $"<input type=\"text\" name=\"class_aliases_{i}\" value=\"{Ui.Esc(string.Join(", ", k.Aliases))}\" placeholder=\"Other names\" aria-label=\"Other names, comma separated\">"
                 + remove
                 + $"<input class=\"wide\" type=\"text\" name=\"class_desc_{i}\" value=\"{Ui.Esc(k.Description)}\" placeholder=\"What it covers (helps the AI)\" aria-label=\"Description\">"
+                + (ClassTopics.Mark(k.DescriptionBy) is { Length: > 0 } mark ? $"<span class=\"wide muted small\">{mark}</span>" : "")
                 // What it's called now, so typing a new name renames it (its lectures and folder go with it) instead of
                 // adding a class. Last, since the row's styles count its inputs by position.
                 + (k.Name.Length > 0 ? $"<input type=\"hidden\" name=\"class_was_{i}\" value=\"{Ui.Esc(k.Name)}\">" : "")
@@ -943,8 +944,10 @@ public sealed partial class LibraryWeb
             if (name.Length == 0 || name == Configs.Unsorted || seen.Contains(name) || f.Get($"class_remove_{i}") == "1") continue;
             var aliases = f.Get($"class_aliases_{i}").Split(',').Select(Py.Strip).Where(a => a.Length > 0).ToList();
             // The page doesn't show a class's sidebar folder ("Clubs"), so it keeps the one it had.
-            string group = cfg.Classes.FirstOrDefault(c => c.Name == name || (was.Length > 0 && c.Name == was))?.Group ?? "";
-            classes.Add(new ClassDef(name, aliases, Py.Strip(f.Get($"class_desc_{i}")), group));
+            var had = cfg.Classes.FirstOrDefault(c => c.Name == name || (was.Length > 0 && c.Name == was));
+            string group = had?.Group ?? "";
+            var (about, by) = ClassTopics.Kept(had, Py.Strip(f.Get($"class_desc_{i}")));
+            classes.Add(new ClassDef(name, aliases, about, group) { DescriptionBy = by });
             seen.Add(name);
             if (was.Length > 0 && was != name && cfg.Classes.Any(c => c.Name == was)) renames.Add(new ClassRenameStep(was, name, 0, ""));
         }
