@@ -792,19 +792,12 @@
                           <TextBlock Classes="row-title" Text="Use just this computer" />
                           <TextBlock Classes="row-sub" Text="{Binding JustThisComputerLine}" TextWrapping="Wrap" />
                         </StackPanel>
-                        <Button Grid.Column="1" Classes="btn sm act" Margin="12,0,0,0" IsVisible="{Binding !ConfirmingBecomeLibrary}" Command="{Binding AskBecomeLibraryCommand}">
+                        <Button Grid.Column="1" Classes="btn sm act" Margin="12,0,0,0" Command="{Binding BecomeLibraryCommand}" IsEnabled="{Binding !Switching}">
                           <TextBlock Text="Use just this computer…" />
                         </Button>
                       </Grid>
                     </Border>
                   </Border>
-                  <StackPanel Spacing="8" IsVisible="{Binding ConfirmingBecomeLibrary}">
-                    <TextBlock Classes="say" MaxWidth="560" Text="{Binding BecomeLibraryQuestion}" />
-                    <StackPanel Orientation="Horizontal" Spacing="8">
-                      <Button Classes="btn sm" Command="{Binding CancelBecomeLibraryCommand}" IsEnabled="{Binding !Switching}"><TextBlock Text="Cancel" /></Button>
-                      <Button Classes="btn sm ink" Command="{Binding ConfirmBecomeLibraryCommand}" IsEnabled="{Binding !Switching}"><TextBlock Text="Use just this computer" /></Button>
-                    </StackPanel>
-                  </StackPanel>
                 </StackPanel>
                 <!-- A library: use a library on another computer instead, handing everything over first -->
                 <StackPanel Spacing="8" IsVisible="{Binding IsLibraryRole}">
@@ -817,21 +810,13 @@
                       </StackPanel>
                     </Border>
                   </Border>
-                  <Grid ColumnDefinitions="*,10,160" MaxWidth="480" HorizontalAlignment="Left" Margin="0,4,0,0" IsVisible="{Binding !ConfirmingBecomeLaptop}">
+                  <Grid ColumnDefinitions="*,10,160" MaxWidth="480" HorizontalAlignment="Left" Margin="0,4,0,0">
                     <Border Classes="field"><TextBox Classes="bare" Text="{Binding BecomeLaptopAddress}" PlaceholderText="http://mac-mini:8787" /></Border>
                     <Border Grid.Column="2" Classes="field"><TextBox Classes="bare" Text="{Binding BecomeLaptopPassword}" PasswordChar="•" PlaceholderText="Its password" /></Border>
                   </Grid>
-                  <Button Classes="btn sm" HorizontalAlignment="Left" IsVisible="{Binding !ConfirmingBecomeLaptop}" Command="{Binding AskBecomeLaptopCommand}">
+                  <Button Classes="btn sm" HorizontalAlignment="Left" Command="{Binding BecomeLaptopCommand}" IsEnabled="{Binding !Switching}">
                     <TextBlock Text="Become a laptop" />
                   </Button>
-                  <StackPanel Spacing="8" IsVisible="{Binding ConfirmingBecomeLaptop}">
-                    <TextBlock Classes="say" MaxWidth="560"
-                               Text="Everything in this library goes to that address first, so nothing is left behind; if that library can't take it all, nothing changes here. Then this computer stops being the library: its lectures, notes and settings stay right where they are, ready for it to be the library again any time." />
-                    <StackPanel Orientation="Horizontal" Spacing="8">
-                      <Button Classes="btn sm" Command="{Binding CancelBecomeLaptopCommand}" IsEnabled="{Binding !Switching}"><TextBlock Text="Cancel" /></Button>
-                      <Button Classes="btn sm ink" Command="{Binding ConfirmBecomeLaptopCommand}" IsEnabled="{Binding !Switching}"><TextBlock Text="Switch" /></Button>
-                    </StackPanel>
-                  </StackPanel>
                 </StackPanel>
                 <!-- How far bringing (or handing on) a library has got, then what came -->
                 <TextBlock Classes="say" Text="{Binding BringLine}" IsVisible="{Binding BringLine, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
@@ -867,7 +852,7 @@
                                 <c:Icon IsVisible="{Binding Here}" Glyph="check_circle" Filled="True" Size="18" Foreground="{DynamicResource Ink}" HorizontalAlignment="Right" />
                                 <!-- Downloaded and not in use: its own Remove (asks first, under the list) -->
                                 <Button Classes="btn sm" IsVisible="{Binding CanRemove}" AutomationProperties.Name="{Binding RemoveSaid}" ToolTip.Tip="{Binding RemoveSaid}"
-                                        Command="{Binding $parent[UserControl].((s:SettingsModel)DataContext).AskRemoveModelCommand}" CommandParameter="{Binding}">
+                                        Command="{Binding $parent[UserControl].((s:SettingsModel)DataContext).RemoveModelCommand}" CommandParameter="{Binding}">
                                   <TextBlock Text="Remove" />
                                 </Button>
                               </StackPanel>
@@ -883,14 +868,7 @@
                   <Border Width="{Binding ModelBarWidth}" />
                 </Border>
                 <c:PageText Classes="say" Text="{Binding ModelLine}" />
-                <!-- A model no longer in use (after a switch) stays until the student presses its Remove in the list. -->
-                <StackPanel Spacing="8" Margin="0,8,0,0" IsVisible="{Binding ConfirmingRemove}">
-                  <TextBlock Classes="say" Text="{Binding RemoveQuestion}" Margin="0" MaxWidth="480" />
-                  <StackPanel Orientation="Horizontal" Spacing="8">
-                    <Button Classes="btn sm" Command="{Binding KeepSpareCommand}"><TextBlock Text="Keep" /></Button>
-                    <Button Classes="btn sm ink" Command="{Binding RemoveSpareCommand}"><TextBlock Text="Remove" /></Button>
-                  </StackPanel>
-                </StackPanel>
+                <!-- A model no longer in use (after a switch) stays until the student presses its Remove in the list (it asks first). -->
                 <!-- When a lecture is written down: one choice, the model's cards' look. -->
                 <TextBlock Classes="section" Text="When it's written down" />
                 <StackPanel Width="480" HorizontalAlignment="Left" ClipToBounds="False">
@@ -1118,31 +1096,9 @@
                               <TextBlock Classes="row-title" Text="Use Canvas course names" />
                               <TextBlock Classes="row-sub" Text="{Binding Lib.CourseNamesSub}" TextWrapping="Wrap" />
                             </StackPanel>
-                            <Button Grid.Column="1" Classes="btn sm act" Command="{Binding Lib.AskUseCourseNamesCommand}" IsEnabled="{Binding Lib.CanUseCourseNames}" IsVisible="{Binding !Lib.ConfirmingCourseNames}"><TextBlock Text="Preview…" /></Button>
-                            <StackPanel Grid.Column="1" Classes="act" Orientation="Horizontal" Spacing="8" IsVisible="{Binding Lib.ConfirmingCourseNames}">
-                              <Button Classes="btn sm" Command="{Binding Lib.CancelUseCourseNamesCommand}"><TextBlock Text="Cancel" /></Button>
-                              <Button Classes="btn sm ink" Command="{Binding Lib.UseCourseNamesCommand}" IsEnabled="{Binding Lib.CanUseCourseNames}"><TextBlock Text="{Binding Lib.RenameLabel}" /></Button>
-                            </StackPanel>
+                            <Button Grid.Column="1" Classes="btn sm act" Command="{Binding Lib.UseCourseNamesCommand}" IsEnabled="{Binding Lib.CanUseCourseNames}"><TextBlock Text="Rename…" /></Button>
                           </Grid>
                         </Border>
-                        <ItemsControl ItemsSource="{Binding Lib.CourseNames}" IsVisible="{Binding Lib.ConfirmingCourseNames}">
-                          <ItemsControl.ItemTemplate>
-                            <DataTemplate x:DataType="vm:CourseNameRow">
-                              <StackPanel>
-                                <Border Classes="rowsep" />
-                                <Border Classes="row">
-                                  <Grid ColumnDefinitions="*,Auto">
-                                    <StackPanel Spacing="2" VerticalAlignment="Center">
-                                      <TextBlock Classes="row-title" Text="{Binding To}" ToolTip.Tip="{Binding To}" c:Tips.WhenCut="True" TextTrimming="CharacterEllipsis" />
-                                      <TextBlock Classes="row-sub" Text="{Binding Now}" ToolTip.Tip="{Binding Now}" c:Tips.WhenCut="True" TextTrimming="CharacterEllipsis" />
-                                    </StackPanel>
-                                    <TextBlock Grid.Column="1" Classes="row-sub act" Text="{Binding Meta}" VerticalAlignment="Center" />
-                                  </Grid>
-                                </Border>
-                              </StackPanel>
-                            </DataTemplate>
-                          </ItemsControl.ItemTemplate>
-                        </ItemsControl>
                       </StackPanel>
                     </Border>
                     <ItemsControl ItemsSource="{Binding Lib.Classes}" Margin="0,8,0,0">
@@ -1291,11 +1247,7 @@
                             <TextBlock Classes="row-title" Text="{Binding Lib.RewriteTitle}" />
                             <TextBlock Classes="row-sub" Text="{Binding Lib.RewriteSub}" />
                           </StackPanel>
-                          <Button Grid.Column="1" Classes="btn sm act" Command="{Binding Lib.AskRewriteAllCommand}" IsVisible="{Binding !Lib.ConfirmingRewrite}"><TextBlock Text="Rewrite all…" /></Button>
-                          <StackPanel Grid.Column="1" Classes="act" Orientation="Horizontal" Spacing="8" IsVisible="{Binding Lib.ConfirmingRewrite}">
-                            <Button Classes="btn sm" Command="{Binding Lib.CancelRewriteAllCommand}"><TextBlock Text="Cancel" /></Button>
-                            <Button Classes="btn sm ink" Command="{Binding Lib.RewriteAllCommand}"><TextBlock Text="Rewrite them all" /></Button>
-                          </StackPanel>
+                          <Button Grid.Column="1" Classes="btn sm act" Command="{Binding Lib.RewriteAllCommand}"><TextBlock Text="Rewrite all…" /></Button>
                         </Grid>
                       </Border>
                     </Border>

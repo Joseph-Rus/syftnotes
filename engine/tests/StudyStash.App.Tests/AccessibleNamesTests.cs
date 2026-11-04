@@ -43,7 +43,7 @@ public class AccessibleNamesTests
         var home = new TempHome();
         var host = new AppHost(home.Path);
         var library = new FakeLibrarySettings();
-        var model = SettingsModel.Make(host, ai: AiDemo.DemoLibrary(), canvas: CanvasFixtures.Context(CanvasShots.ConnectedLibrary()), library: () => library.Call);
+        var model = SettingsModel.Make(host, ai: AiDemo.DemoLibrary(), canvas: CanvasFixtures.Context(Scenes.ConnectedLibrary()), library: () => library.Call);
         await model.Engines.Load();
         await model.Access.Load();
         await model.Canvas.LoadAsync();
@@ -101,7 +101,7 @@ public class AccessibleNamesTests
             ((App)Application.Current!).UseSkin(skin);
             var m = SetupModel.For(skin, AppRole.Both);
             m.Ai = AiDemo.Setup();
-            m.Canvas = await CanvasShots.SetupStepAsync("found");
+            m.Canvas = await Scenes.SetupStepAsync("found");
             var view = skin == SkinKind.Mac ? (Control)new MacSetup { DataContext = m } : new WinSetup { DataContext = m };
             var window = new Window { Width = 900, Height = 900, Content = view };
             window.Show();
@@ -137,7 +137,7 @@ public class AccessibleNamesTests
         try
         {
             ((App)Application.Current!).UseSkin(skin);
-            var g = GuidedSetupShots.Guided(skin);
+            var g = Scenes.Guided(skin);
             var view = skin == SkinKind.Mac ? (Control)new MacGuidedSetup { DataContext = g } : new WinGuidedSetup { DataContext = g };
             var window = new Window { Width = 900, Height = 800, Content = view };
             window.Show();

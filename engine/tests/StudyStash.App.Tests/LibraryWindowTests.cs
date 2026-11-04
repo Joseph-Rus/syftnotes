@@ -8,6 +8,7 @@ using Avalonia.Threading;
 using Avalonia.VisualTree;
 using StudyStash.App.Controls;
 using StudyStash.App.ViewModels;
+using StudyStash.App.ViewModels.Kit;
 using StudyStash.App.Views;
 using StudyStash.Core.Ai;
 
@@ -222,9 +223,9 @@ public class LibraryWindowTests
 
     /// <summary>CS 101's page, three lectures in two weeks, the first of them also open on its own page when
     /// <paramref name="open"/>.</summary>
-    static LibraryModel Lectures(bool open = false)
+    static LibraryModel Lectures(bool open = false, IConfirm? confirm = null)
     {
-        var m = new LibraryModel { UndoShows = TimeSpan.FromMilliseconds(50), DeletedShows = TimeSpan.FromMilliseconds(50) };
+        var m = new LibraryModel { Confirmer = confirm ?? new FakeConfirm(), UndoShows = TimeSpan.FromMilliseconds(50), DeletedShows = TimeSpan.FromMilliseconds(50) };
         m.Classes.Add(new ClassItem { Name = "CS 101", Count = 3, Selected = true });
         OverviewModel.LectureFacts L(string id, string title, int daysAgo) => new(id, title, "CS 101", Now.AddDays(-daysAgo), 3000, "", false);
         var sources = new OverviewModel.Sources
@@ -259,7 +260,8 @@ public class LibraryWindowTests
     [Fact]
     public async Task Deleting_asks_first_then_the_note_leaves_its_page_at_once()
     {
-        var m = Lectures();
+        var confirm = new FakeConfirm(answer: false);
+        var m = Lectures(confirm: confirm);
         var deleted = new List<LectureDeletion>();
         m.OnDelete = d =>
         {
@@ -269,17 +271,15 @@ public class LibraryWindowTests
         var rows = Rows(m);
 
         // A row's Delete asks about that lecture; Cancel leaves everything as it was.
-        m.DeleteCommand.Execute(rows[0]);
-        Assert.True(m.AskingDelete);
-        Assert.Equal(new LectureDeletion("a", "Recursion and the call stack", "CS 101"), m.Deleting);
-        Assert.Equal("Delete this lecture?", m.Deleting!.Ask);
-        m.CancelDeleteCommand.Execute(null);
-        Assert.False(m.AskingDelete);
+        await m.DeleteCommand.ExecuteAsync(rows[0]);
+        var asked = Assert.Single(confirm.Asked);
+        Assert.Equal(("Delete this lecture?", "Delete"), (asked.Title, asked.Yes));
+        Assert.Contains("“Recursion and the call stack”", asked.Text, StringComparison.Ordinal);
         Assert.Empty(deleted);
         Assert.Equal(3, Rows(m).Count);
 
-        m.DeleteCommand.Execute(rows[0]);
-        await m.ConfirmDeleteCommand.ExecuteAsync(null);
+        confirm.Answer = true;
+        await m.DeleteCommand.ExecuteAsync(rows[0]);
         Assert.Equal(["a"], deleted.Select(d => d.Id));
         Assert.DoesNotContain(Rows(m), n => n.Id == "a");
         Assert.True(Rows(m)[0].First); // the row that's first now has no hairline over it
@@ -292,8 +292,7 @@ public class LibraryWindowTests
         Assert.False(m.HasToast);
 
         // The last one under its heading: the heading goes too.
-        m.DeleteCommand.Execute(rows[2]);
-        await m.ConfirmDeleteCommand.ExecuteAsync(null);
+        await m.DeleteCommand.ExecuteAsync(rows[2]);
         Assert.Equal(["a", "c"], deleted.Select(d => d.Id));
         Assert.Single(m.Overview!.Groups);
 
@@ -302,15 +301,14 @@ public class LibraryWindowTests
         int left = 0;
         on.OnLeaveNote = () => left++;
         on.OnDelete = _ => Task.FromResult(true);
-        on.DeleteCommand.Execute(null);
-        Assert.Equal("a", on.Deleting!.Id);
-        await on.ConfirmDeleteCommand.ExecuteAsync(null);
+        await on.DeleteCommand.ExecuteAsync(null);
         Assert.Null(on.Note);
         Assert.Equal(1, left);
         // One that's still recording has no Delete: there's nothing in the library to delete yet.
-        var live = new LibraryModel { Note = new NoteModel { Id = "rec-1", Live = true } };
-        live.DeleteCommand.Execute(null);
-        Assert.False(live.AskingDelete);
+        var liveConfirm = new FakeConfirm();
+        var live = new LibraryModel { Confirmer = liveConfirm, Note = new NoteModel { Id = "rec-1", Live = true } };
+        await live.DeleteCommand.ExecuteAsync(null);
+        Assert.Empty(liveConfirm.Asked);
         Assert.False(live.ShowLectureTools);
     }
 
@@ -330,11 +328,9 @@ public class LibraryWindowTests
             undone.Add(d.Id);
             return Task.CompletedTask;
         };
-        m.DeleteCommand.Execute(Rows(m)[0]);
-        await m.ConfirmDeleteCommand.ExecuteAsync(null);
+        await m.DeleteCommand.ExecuteAsync(Rows(m)[0]);
         // A second one deleted, and a note moved, while the first can still be undone: neither takes its Undo away.
-        m.DeleteCommand.Execute(Rows(m)[0]);
-        await m.ConfirmDeleteCommand.ExecuteAsync(null);
+        await m.DeleteCommand.ExecuteAsync(Rows(m)[0]);
         m.SayMoved(new NoteMove("c", "CS 101", ""));
         Assert.Equal("Moved to Unsorted.", m.ToastSaid);
         Assert.False(m.CanDismissToast);
@@ -350,8 +346,7 @@ public class LibraryWindowTests
 
         // The library refuses: no "Deleted · Undo" (the host reads the page again and says why).
         m.OnDelete = _ => Task.FromResult(false);
-        m.DeleteCommand.Execute(Rows(m)[0]);
-        await m.ConfirmDeleteCommand.ExecuteAsync(null);
+        await m.DeleteCommand.ExecuteAsync(Rows(m)[0]);
         Assert.False(m.HasToast);
     }
 
@@ -375,8 +370,7 @@ public class LibraryWindowTests
             return Task.CompletedTask;
         };
 
-        m.DeleteCommand.Execute(null);
-        var deleting = m.ConfirmDeleteCommand.ExecuteAsync(null);
+        var deleting = m.DeleteCommand.ExecuteAsync(null);
         Assert.Equal(["b", "c"], m.Overview!.Notes.Select(n => n.Id)); // gone before the library has answered
         Assert.True(m.Overview.Notes[0].First);
         library.SetResult(true);
@@ -413,9 +407,10 @@ public class LibraryWindowTests
     [AvaloniaTheory]
     [InlineData(SkinKind.Mac)]
     [InlineData(SkinKind.Win)]
-    public async Task A_note_is_deleted_from_its_page_or_its_rows_menu_with_a_confirmation_in_the_window(SkinKind skin)
+    public async Task A_note_is_deleted_from_its_page_or_its_rows_menu_after_the_window_asks(SkinKind skin)
     {
-        var m = Lectures(open: true);
+        var confirm = new FakeConfirm();
+        var m = Lectures(open: true, confirm: confirm);
         var deleted = new List<string>();
         m.OnDelete = d =>
         {
@@ -432,21 +427,10 @@ public class LibraryWindowTests
             // The page's own tools, for the open note: Move to folder, Share, Delete.
             foreach (string tool in new[] { "Move", "Share", "DeleteLecture" }) Assert.True(Named<Button>(tool).IsEffectivelyVisible, tool);
             var delete = Named<Button>("DeleteLecture");
-            Assert.False(Named<Panel>("DeleteAsk").IsVisible);
-            delete.Command!.Execute(delete.CommandParameter);
+            await Assert.IsAssignableFrom<CommunityToolkit.Mvvm.Input.IAsyncRelayCommand>(delete.Command).ExecuteAsync(delete.CommandParameter);
             Dispatcher.UIThread.RunJobs();
-            var ask = Named<Panel>("DeleteAsk");
-            Assert.True(ask.IsEffectivelyVisible);
-            Assert.Contains(ask.GetVisualDescendants().OfType<TextBlock>(), t => t.Text == "Delete this lecture?");
-            Assert.Contains(ask.GetVisualDescendants().OfType<TextBlock>(), t => t.Text?.Contains("“Recursion and the call stack”", StringComparison.Ordinal) == true);
-            var cancel = ask.GetVisualDescendants().OfType<Button>().First(b => b.Name == "Cancel");
-            var confirm = ask.GetVisualDescendants().OfType<Button>().First(b => b.Name == "Confirm");
-            Assert.Equal(cancel.Bounds.Height, confirm.Bounds.Height);
-            Assert.Equal(cancel.TranslatePoint(default, view)!.Value.Y, confirm.TranslatePoint(default, view)!.Value.Y, 0.5);
-            await Assert.IsAssignableFrom<CommunityToolkit.Mvvm.Input.IAsyncRelayCommand>(confirm.Command).ExecuteAsync(null);
-            Dispatcher.UIThread.RunJobs();
+            Assert.Equal("Delete this lecture?", Assert.Single(confirm.Asked).Title);
             Assert.Equal(["a"], deleted);
-            Assert.False(Named<Panel>("DeleteAsk").IsVisible);
 
             // "Deleted · Undo" at the page's foot.
             var toast = Named<Border>("UndoToast");
@@ -457,6 +441,7 @@ public class LibraryWindowTests
             // On the folder's page, a row's context menu offers Delete too.
             var folder = Lectures();
             m.Overview = folder.Overview;
+            confirm.Answer = false;
             m.Overview!.OnDelete = row => m.DeleteCommand.Execute(row);
             Dispatcher.UIThread.RunJobs();
             var row = view.GetVisualDescendants().OfType<Button>().First(b => b.Name == "Row" && b.DataContext is NoteItem { Id: "c" });
@@ -465,18 +450,9 @@ public class LibraryWindowTests
             row.ContextMenu.Open(row);
             Dispatcher.UIThread.RunJobs();
             item.RaiseEvent(new Avalonia.Interactivity.RoutedEventArgs(MenuItem.ClickEvent));
-            Assert.Equal(new LectureDeletion("c", "Loops and invariants", "CS 101"), m.Deleting);
+            Assert.Contains("“Loops and invariants”", confirm.Asked[^1].Text, StringComparison.Ordinal); // asked about that row, and said no
+            Assert.Equal(["a"], deleted);
             row.ContextMenu.Close();
-
-            // A click beside the question is Cancel.
-            Dispatcher.UIThread.RunJobs();
-            var scrim = Named<Panel>("DeleteAsk");
-            var top = TopLevel.GetTopLevel(scrim)!;
-            var corner = scrim.TranslatePoint(new Point(10, 10), top)!.Value;
-            Avalonia.Headless.HeadlessWindowExtensions.MouseDown(top, corner, Avalonia.Input.MouseButton.Left);
-            Avalonia.Headless.HeadlessWindowExtensions.MouseUp(top, corner, Avalonia.Input.MouseButton.Left);
-            Dispatcher.UIThread.RunJobs();
-            Assert.False(m.AskingDelete);
         }
         finally
         {

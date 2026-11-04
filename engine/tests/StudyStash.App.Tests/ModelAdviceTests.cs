@@ -3,6 +3,7 @@ using System.Runtime.InteropServices;
 using Avalonia.Headless.XUnit;
 using StudyStash.App.Services;
 using StudyStash.App.ViewModels;
+using StudyStash.App.ViewModels.Kit;
 using StudyStash.Audio;
 
 namespace StudyStash.App.Tests;
@@ -235,14 +236,15 @@ public class ModelAdviceTests
     }
 
     [AvaloniaFact]
-    public void A_model_no_longer_in_use_is_removed_only_when_the_student_says_so()
+    public async Task A_model_no_longer_in_use_is_removed_only_when_the_student_says_so()
     {
         using var home = new TempHome();
         new AppSettings { SetupDone = true, Model = "small" }.Save(home.Path);
         PretendDownloaded(home.Path, WhisperModels.Base);
         var (host, _) = Host(home);
+        var confirm = new FakeConfirm();
         using (host)
-        using (var settings = SettingsModel.Make(host))
+        using (var settings = SettingsModel.Make(host, confirm: confirm))
         {
             Assert.Equal("Also on this computer: Whisper base (148 MB).", settings.SpareLine);
             // Each downloaded model has its own Remove in the list: not the one in use, and not Cactus Whistle, which
@@ -252,17 +254,15 @@ public class ModelAdviceTests
             Assert.False(settings.Models.Single(m => m.Model.Id == WhisperModels.Small.Id).CanRemove); // in use
             Assert.All(settings.Models.Where(m => m.Model.Bundled), m => Assert.False(m.CanRemove));
 
-            settings.AskRemoveModelCommand.Execute(baseRow);
-            Assert.True(settings.ConfirmingRemove);
-            Assert.Equal("Remove Whisper base from this computer? It frees 148 MB, and you can download it again here any time.", settings.RemoveQuestion);
-            settings.KeepSpareCommand.Execute(null);
-            Assert.True(WhisperModels.IsDownloaded(home.Path, WhisperModels.Base));
+            confirm.Answer = false;
+            await settings.RemoveModelCommand.ExecuteAsync(baseRow);
+            Assert.Equal(("Remove Whisper base?", "It leaves this computer and frees 148 MB. You can download it again here any time."), (confirm.Asked.Single().Title, confirm.Asked.Single().Text));
+            Assert.True(WhisperModels.IsDownloaded(home.Path, WhisperModels.Base)); // Keep leaves it
 
-            settings.AskRemoveModelCommand.Execute(baseRow);
-            settings.RemoveSpareCommand.Execute(null);
+            confirm.Answer = true;
+            await settings.RemoveModelCommand.ExecuteAsync(baseRow);
             Assert.False(File.Exists(WhisperModels.PathFor(home.Path, WhisperModels.Base)));
             Assert.Equal("", settings.SpareLine);
-            Assert.False(settings.ConfirmingRemove);
             Assert.False(settings.Models.Single(m => m.Model.Id == WhisperModels.Base.Id).CanRemove);
         }
     }
