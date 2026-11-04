@@ -940,7 +940,10 @@ public sealed partial class LibraryWeb
             string name = Py.Strip(f.Get($"class_name_{i}"));
             // A row shows the class it was rendered for; a page from before renames says only its name.
             if ((was.Length > 0 ? was : name) is { Length: > 0 } showed) shown.Add(showed);
-            if (name.Length == 0 || name == Configs.Unsorted || seen.Contains(name) || f.Get($"class_remove_{i}") == "1") continue;
+            bool remove = f.Get($"class_remove_{i}") == "1";
+            // A name cleared without the Remove switch: the class stays as it was.
+            if (name.Length == 0 && !remove && cfg.Classes.FirstOrDefault(c => c.Name == was) is { } kept && seen.Add(kept.Name)) classes.Add(kept);
+            if (name.Length == 0 || name == Configs.Unsorted || seen.Contains(name) || remove) continue;
             var aliases = f.Get($"class_aliases_{i}").Split(',').Select(Py.Strip).Where(a => a.Length > 0).ToList();
             // The page doesn't show a class's sidebar folder ("Clubs"), so it keeps the one it had.
             string group = cfg.Classes.FirstOrDefault(c => c.Name == name || (was.Length > 0 && c.Name == was))?.Group ?? "";
