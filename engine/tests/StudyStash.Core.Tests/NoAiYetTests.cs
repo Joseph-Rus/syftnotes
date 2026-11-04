@@ -152,6 +152,13 @@ public class NoAiYetTests
         ai.MarkSignedIn("claude");
         Assert.Equal(("gemini", "claude", 2), Now());
         Assert.Equal("gemini-3.8-pro", AiSettings.Load(cfg.Home).For("notes").Model);
+
+        // Notes chosen on the free AI on this computer: signing in to a new cloud AI never takes them over.
+        var local = AiSettings.Load(cfg.Home);
+        local.ByJob["notes"] = new AiChoice("ollama");
+        local.Save(cfg.Home);
+        ai.MarkSignedIn("codex");
+        Assert.Equal(("ollama", "claude", 2), Now());
     }
 
     [Fact]

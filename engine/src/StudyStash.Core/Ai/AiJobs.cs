@@ -33,15 +33,16 @@ public sealed class AiJobs(string home, Func<string>? ollamaHost = null)
     /// notes it couldn't write while it was signed out are written (<see cref="SignedInAgain"/>). The AI the student just
     /// signed in to, when it's a new one, is the one they want: it writes their notes and answers their questions from
     /// now on, whatever was chosen before, so nobody has to go to Settings to pick it. Signing back in to an AI already
-    /// used for something (a sign-in that had run out) is a repair: every pick, and its model, stays as it was. A usage
-    /// limit is left alone: signing in doesn't end one.</summary>
+    /// used for something (a sign-in that had run out) is a repair: every pick, and its model, stays as it was. A student
+    /// who chose the free AI on this computer for anything keeps it: signing in to a cloud AI never sends their
+    /// transcripts there by itself. A usage limit is left alone: signing in doesn't end one.</summary>
     public void MarkSignedIn(string id)
     {
         var s = Settings;
         bool back = Engines.LooksLikeAuth(s.Tests.GetValueOrDefault(id, ""));
         s.Tests[id] = "works";
-        bool inUse = AiSettings.Jobs.Any(job => s.Picked(job) && s.For(job).Provider == id);
-        bool chosen = id != "ollama" && !inUse;
+        bool Uses(string job, string ai) => s.Picked(job) && s.For(job).Provider == ai;
+        bool chosen = id != "ollama" && !AiSettings.Jobs.Any(job => Uses(job, id) || Uses(job, "ollama"));
         if (chosen)
         {
             s.Provider = id;
