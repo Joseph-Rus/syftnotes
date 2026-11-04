@@ -29,8 +29,11 @@ public sealed record EngineInfo(string Id, string Name, string State)
     /// <summary>The key's last four characters ("…a1b2"), to tell which one it is.</summary>
     public string KeyHint { get; init; } = "";
     /// <summary>Where the AI's own sign-in is while the student signs in from Syft Notes (<see cref="SignInPhase"/>:
-    /// waiting | gave_up | region | stuck); "" when none is going, and from a library that signs in in a terminal.</summary>
+    /// waiting | gave_up | region | stuck | bad_code); "" when none is going, and from a library that signs in in a terminal.</summary>
     public string SignIn { get; init; } = "";
+    /// <summary>Its sign-in, waiting now, ends on a code the student pastes into the app (Gemini's Google page does):
+    /// the app shows a box for it, and hands it back with <see cref="AiRemote.SendSignInCodeAsync"/>.</summary>
+    public bool PasteCode { get; init; }
 }
 
 /// <summary>kind: engine_offline | not_signed_in | model_missing | usage_limit (the app adds fell_back,
@@ -255,6 +258,9 @@ public interface IAiLibrary
     /// page that finishes by itself. Null from a library too old to. (The library still opens a terminal for an app
     /// from before every sign-in was hidden; this app never asks it to.)</summary>
     Task<AiSaid?> SignInAgainAsync(string engine) => Task.FromResult<AiSaid?>(null);
+    /// <summary>The code the student pasted from the sign-in page (<see cref="EngineInfo.PasteCode"/>), typed into the
+    /// sign-in going on the library's computer, which then finishes by itself. Null from a library too old to.</summary>
+    Task<AiSaid?> SendSignInCodeAsync(string engine, string code) => Task.FromResult<AiSaid?>(null);
     Task<AiSaid?> CheckAsync(string engine, string model = "");
     Task<AiOverview?> ModelAsync(string engine, string model);
     Task<AiOverview?> DismissAsync(string problemId);
@@ -416,6 +422,9 @@ public sealed class AiRemote(string serverUrl, Func<string> key, HttpClient? htt
 
     public async Task<AiSaid?> SignInAgainAsync(string engine) =>
         As<AiSaid>(await SendAsync(HttpMethod.Post, $"/engines/{Seg(engine)}/sign-in", new JsonObject { ["again"] = true }));
+
+    public async Task<AiSaid?> SendSignInCodeAsync(string engine, string code) =>
+        As<AiSaid>(await SendAsync(HttpMethod.Post, $"/engines/{Seg(engine)}/sign-in", new JsonObject { ["code"] = code }));
 
     public async Task<AiSaid?> CheckAsync(string engine, string model = "") => As<AiSaid>(await SendAsync(HttpMethod.Post,
         $"/engines/{Seg(engine)}/check", model.Length > 0 ? new JsonObject { ["model"] = model } : null));

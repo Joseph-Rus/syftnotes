@@ -12,8 +12,10 @@ namespace StudyStash.Core.Tests;
 /// <c>replay-N.jsonl</c> (or <c>replay.jsonl</c>) line by line. Files beside it change what it does: <c>broken</c>
 /// (its --version fails), <c>login-fails</c>, <c>sleep</c> (seconds to wait before answering), <c>exit</c>,
 /// <c>refuse</c> (an argument it doesn't know, as an older version: a turn given it stops with clap's error). The fake
-/// agy also answers <c>models</c> (its status) and <c>-p=/usage</c> (its sign-in, then <c>usage.json</c>; with a
-/// <c>region</c> file, Google's refusal for the country), and writes
+/// agy also answers <c>models</c> (its status), <c>-p=/usage</c> (its sign-in, then <c>usage.json</c>; with a
+/// <c>region</c> file, Google's refusal for the country) and plain <c>agy</c>, its sign-in as the real one shows it (the
+/// login method asked, then the page and a field for the code it ends on): it signs in by itself after
+/// <c>login-delay</c>, as if the code had been pasted, then stays open as plain agy does, and writes
 /// down the HOME each turn had (<c>home-N.txt</c>).
 /// </summary>
 public static class FakeAgents
@@ -117,6 +119,21 @@ public static class FakeAgents
         if [ "{{id}}" = gemini ] && [ "$1" = models ]; then
           if [ -f "$D/signed-in" ]; then echo "gemini-3.8-flash"; exit 0; fi
           echo "Error: Please sign in to view available models. Launch the CLI without arguments to sign in." >&2; exit 1
+        fi
+        if [ "{{id}}" = gemini ] && [ $# -eq 0 ]; then
+          mkdir -p "$D/logins" && : > "$D/logins/$$-$(date +%s)"
+          [ -f "$D/region" ] && { echo "Error: User location is not supported for the API use." >&2; exit 1; }
+          { [ -t 0 ] && [ ! -f "$D/login-fails" ]; } || { echo "Error: authentication required. Run 'agy' to log in, then retry." >&2; exit 1; }
+          echo " Welcome to the Antigravity CLI. You are currently not signed in."
+          printf ' Select login method:\n > 1. Google OAuth\n   2. Use a Google Cloud project\n'
+          read -r choice || exit 1
+          echo "Your browser should open automatically. If not:"
+          echo " https://accounts.example.com/o/oauth2/auth?redirect_uri=https%3A%2F%2Fagy.example.com%2Foauth-callback&state=fake"
+          echo " If you aren't automatically redirected, paste the authorization code below:"
+          sleep "$(cat "$D/login-delay" 2>/dev/null || echo 1)"
+          touch "$D/signed-in"; echo "Signed in."
+          # As plain agy does, it stays open (its chat) until it's stopped.
+          read -r more; exit 0
         fi
         if [ "{{id}}" = gemini ] && [ "$1" = "-p=/usage" ]; then
           echo "$HOME" > "$D/usage-home.txt"
@@ -225,6 +242,24 @@ public static class FakeAgents
         if ($ID -eq 'gemini' -and $argv[0] -eq 'models') {
           if (Test-Path "$D\signed-in") { 'gemini-3.8-flash'; exit 0 }
           [Console]::Error.WriteLine('Error: Please sign in to view available models. Launch the CLI without arguments to sign in.'); exit 1
+        }
+        if ($ID -eq 'gemini' -and $argv.Count -eq 0) {
+          New-Item -ItemType File -Force -Path "$D\logins\$([guid]::NewGuid())" | Out-Null
+          if (Test-Path "$D\region") { [Console]::Error.WriteLine('Error: User location is not supported for the API use.'); exit 1 }
+          if ([Console]::IsInputRedirected -or (Test-Path "$D\login-fails")) { [Console]::Error.WriteLine("Error: authentication required. Run 'agy' to log in, then retry."); exit 1 }
+          ' Welcome to the Antigravity CLI. You are currently not signed in.'
+          ' Select login method:'
+          ' > 1. Google OAuth'
+          '   2. Use a Google Cloud project'
+          $choice = [Console]::ReadLine()
+          'Your browser should open automatically. If not:'
+          ' https://accounts.example.com/o/oauth2/auth?redirect_uri=https%3A%2F%2Fagy.example.com%2Foauth-callback&state=fake'
+          " If you aren't automatically redirected, paste the authorization code below:"
+          $delay = 1; if (Test-Path "$D\login-delay") { $delay = [int](Get-Content "$D\login-delay") }
+          Start-Sleep -Seconds $delay
+          New-Item -ItemType File -Force "$D\signed-in" | Out-Null; 'Signed in.'
+          # As plain agy does, it stays open (its chat) until it's stopped.
+          $more = [Console]::ReadLine(); exit 0
         }
         if ($ID -eq 'gemini' -and $argv[0] -eq '-p=/usage') {
           Set-Content "$D\usage-home.txt" $env:USERPROFILE
