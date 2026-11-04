@@ -696,11 +696,11 @@ and Canvas work. Set it up in **Settings → Your AI**; what AI apps may read is
 settings** there.
 
 - **AI apps on this computer** (Claude Desktop, Claude Code, ChatGPT, Gemini CLI): choose **Connect**
-  next to the app. Syft Notes adds itself to that app's own settings file, keeping everything else
+  on their AI's card. Syft Notes adds itself to that app's own settings file, keeping everything else
   in it (and a copy of it as it was, `….syft-notes-backup`). The app has to be quit and opened
-  again to load it: on a Mac the row has a **Reopen** button that does that for you. The row then
+  again to load it: on a Mac the card has a **Reopen** button that does that for you. The card then
   turns to **Connected** by itself (ChatGPT's, once you start a chat in Codex).
-  **Disconnect** takes only Syft Notes back out. The **ChatGPT** row is the ChatGPT desktop app
+  **Disconnect** takes only Syft Notes back out. The **ChatGPT** card covers the ChatGPT desktop app
   (the one with Codex built in) and Codex in the terminal or your editor: they share one settings
   file. The app starts Syft Notes itself and reads your library through this computer, so this
   works on a computer on its own: no Tailscale, no internet address, and no password goes into the
