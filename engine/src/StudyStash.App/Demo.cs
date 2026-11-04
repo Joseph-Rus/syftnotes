@@ -249,6 +249,26 @@ public static class Demo
         """;
 
     /// <summary>The pages of the design's own sample (the handoff's reference pages and screenshots).</summary>
+    /// <summary>The Due list after the student ticked off <paramref name="done"/> (it moves to Handed in, ticked) and hid
+    /// <paramref name="hide"/> (it leaves the groups for <c>Hidden</c>), as the library sends it.</summary>
+    static CanvasApi.DueResponse Marked(CanvasApi.DueResponse due, string? done, string? hide)
+    {
+        var all = due.Groups.SelectMany(g => g.Items).ToList();
+        var ticked = all.FirstOrDefault(i => i.Id == done) is { } d ? d with { Mark = "done", MarkedDone = null } : null;
+        var hid = all.FirstOrDefault(i => i.Id == hide) is { } h ? h with { Mark = "hidden" } : null;
+        var groups = due.Groups.Select(g => g with { Items = [.. g.Items.Where(i => i.Id != done && i.Id != hide)] }).ToList();
+        if (ticked is not null)
+        {
+            int at = groups.FindIndex(g => g.Key == "handed_in");
+            groups[at] = groups[at] with { Items = [ticked, .. groups[at].Items] };
+        }
+        return due with
+        {
+            Groups = groups, Hidden = hid is null ? [] : [hid],
+            ToHandIn = due.ToHandIn - (done is not null ? 1 : 0) - (hide is not null ? 1 : 0),
+        };
+    }
+
     public enum Page { Home, HomeUnsorted, Due, DueWeek, FolderClass, FolderClub, Note, NoteOnlyMine, Recording, CanvasLists }
 
     /// <summary>
@@ -258,7 +278,10 @@ public static class Demo
     /// </summary>
     /// <param name="go">Makes the sample one to click through: where a click that leads somewhere (a folder, a note,
     /// an event to record, Stop) asks to go. Null for a still picture, where nothing leads anywhere.</param>
-    public static LibraryModel Semester(Page page = Page.Home, bool recording = false, bool narrow = false, Action<Page>? go = null)
+    /// <param name="done">The id of a Due item (d1 is the missing one) the student ticked off in Syft Notes.</param>
+    /// <param name="hidden">The id of a Due item the student hid.</param>
+    /// <param name="quiet">No class or meeting left today, so Home's sentence is about what's due (and missing).</param>
+    public static LibraryModel Semester(Page page = Page.Home, bool recording = false, bool narrow = false, Action<Page>? go = null, string? done = null, string? hidden = null, bool quiet = false)
     {
         (string Name, string Hue, int Notes, string Group)[] folders =
         [
@@ -291,6 +314,7 @@ public static class Demo
             At("Computer Architecture", "Computer Architecture", 1, 10.5), At(ml, ml, 2, 9.5), At("Theory of Computation", "Theory of Computation", 2, 13),
             At("Data Mining", "Data Mining", 3, 8.75), At("Computer Architecture", "Computer Architecture", 3, 10.5), At("ACM", "ACM", 3, 18), At(ml, ml, 4, 9.5),
         };
+        if (quiet) events.RemoveAll(e => TimeZoneInfo.ConvertTime(e.Start, zone).Date == TimeZoneInfo.ConvertTime(now, zone).Date && e.End > now);
         m.ComingUp.Show(true, [.. events.Where(e => e.End > now).Take(2).Select(e =>
         {
             bool soon = e.Start - now <= OverviewModel.Soon;
@@ -333,6 +357,7 @@ public static class Demo
                 },
             ],
         };
+        if (done is not null || hidden is not null) due = Marked(due, done, hidden);
         OverviewModel.LectureFacts L(string id, string title, string c, int day, double hour, double min, string summary) =>
             new(id, title, c, monday.AddDays(day).AddHours(hour), min * 60, summary, false, monday.AddDays(day).AddHours(hour).ToString("o"));
         var everything = new List<OverviewModel.LectureFacts>
@@ -380,6 +405,7 @@ public static class Demo
             OpenLecture = (_, _) => go?.Invoke(Page.Note),
             OpenDue = _ => go?.Invoke(Page.Due),
             RecordEvent = _ => go?.Invoke(Page.Recording),
+            Mark = (_, _, _, _, _) => Task.FromResult(Outcome.Done),
         };
         var recorder = new RecorderModel { ClassName = ml, ClassDot = Dot("Blue"), Elapsed = "12:04", Levels = PillWave };
         if (go is not null)

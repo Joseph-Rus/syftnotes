@@ -9,11 +9,15 @@ namespace StudyStash.App.ViewModels;
 
 /// <summary>Something due, on its day in the calendar: its name (marked with its class's highlighter), a line under it
 /// only when there's something to say ("Tonight 11:59 PM", a time that isn't the end of the day, "Missing"), and
-/// whether it was handed in (then it's struck through).</summary>
-public sealed record CalendarItem(string Class, string Id, string Title, string Sub, bool Missing, bool Done, IBrush Dot, string Tip, string Said, Action Open)
+/// whether it was handed in (then it's struck through, and ticked when the student ticked it off here).</summary>
+public sealed record CalendarItem(string Class, string Id, string Title, string Sub, bool Missing, bool Done, IBrush Dot, string Tip, string Said, Action Open, bool Ticked = false)
 {
     public bool HasSub => Sub.Length > 0;
 }
+
+/// <summary>Something the student hid from Due, in the list under the calendar that "Show hidden" opens: its name with
+/// its class's highlighter, when it is (was) due, and Undo to bring it back.</summary>
+public sealed record HiddenDue(string Class, string Kind, string Id, string Title, string When, string ClassLabel, IBrush Dot, string Said);
 
 /// <summary>One day of the month's grid: its number ("12", or "1 Oct" on a month's first day), whether it's today or
 /// outside the month showing, and what's due on it: two shown, the rest behind "2 more".</summary>
@@ -52,9 +56,13 @@ public sealed partial class DueCalendarModel : ObservableObject
     readonly Func<string, IBrush> dot;
     readonly List<(CanvasApi.Item Item, bool Done)> all;
 
+    /// <summary>"Mark done", "Hide" and "Undo", for the rows under the calendar and anything that marks from it.</summary>
+    public Kit.DueMarkModel Marks { get; }
+
     public DueCalendarModel(OverviewModel.Sources s)
     {
         sources = s;
+        Marks = new Kit.DueMarkModel(s.Mark);
         var dots = s.Classes.GroupBy(c => c.Name).ToDictionary(g => g.Key, g => g.First().Dot);
         dot = name => dots.TryGetValue(name, out var d) ? d : Brushes.Gray;
         all = [.. (s.Due?.Groups ?? []).SelectMany(g => g.Items.Select(i => (i, Done: g.Key == "handed_in" || !CanvasWords.ToHandIn(i))))
@@ -79,6 +87,25 @@ public sealed partial class DueCalendarModel : ObservableObject
     public ObservableCollection<CalendarCell> Cells { get; } = [];
     public ObservableCollection<WeekDay> Week { get; } = [];
     public ObservableCollection<CalendarFilter> Filters { get; } = [];
+    /// <summary>What the student hid, for the class showing (or every class).</summary>
+    public ObservableCollection<HiddenDue> Hidden { get; } = [];
+    public bool HasHidden => Hidden.Count > 0;
+    /// <summary>The list of hidden things is open under the calendar ("Show hidden (2)" opens it).</summary>
+    [ObservableProperty] public partial bool ShowingHidden { get; set; }
+    public bool HiddenOpen => HasHidden && ShowingHidden;
+    public string HiddenToggle => ShowingHidden ? Kit.DueMarkModel.HideListLabel : $"{Kit.DueMarkModel.ShowHiddenLabel} ({Hidden.Count})";
+
+    partial void OnShowingHiddenChanged(bool value)
+    {
+        OnPropertyChanged(nameof(HiddenOpen));
+        OnPropertyChanged(nameof(HiddenToggle));
+    }
+
+    [RelayCommand]
+    void ToggleHidden() => ShowingHidden = !ShowingHidden;
+
+    [RelayCommand]
+    Task Unhide(HiddenDue row) => Marks.SetAsync(row.Class, row.Kind, row.Id, "");
     /// <summary>Sun to Sat, as Canvas's calendar has them: the grid's heading.</summary>
     public string[] Days { get; } = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
     /// <summary>The grid's rows this month: five, or six when the month runs over.</summary>
@@ -131,6 +158,7 @@ public sealed partial class DueCalendarModel : ObservableObject
     {
         month = before.month;
         week = before.week;
+        ShowingHidden = before.ShowingHidden;
         if (WeekView != before.WeekView) WeekView = before.WeekView;
         else Build();
     }
@@ -155,9 +183,10 @@ public sealed partial class DueCalendarModel : ObservableObject
             : at.Date == Today ? $"{(at.Hour >= 17 ? "Tonight" : "Today")} {time}"
             : at is { Hour: 23, Minute: 59 } ? "" : time;
         string cls = ClassNames.Display(i.Class);
-        string state = done ? "Handed in" : missing ? "Missing" : "";
+        bool ticked = i.Mark == "done";
+        string state = ticked ? Kit.DueMarkModel.DoneState : done ? "Handed in" : missing ? "Missing" : "";
         string said = string.Join(", ", new[] { i.Name, cls, $"due {OverviewModel.Day(i.DueAt!.Value, sources.Now, sources.Zone)} at {time}", state }.Where(w => w.Length > 0));
-        return new CalendarItem(i.Class, i.Id, i.Name, sub, missing, done, dot(i.Class), $"{i.Name}, {cls}", said, () => sources.OpenAssignment?.Invoke(i.Class, i.Id));
+        return new CalendarItem(i.Class, i.Id, i.Name, sub, missing, done, dot(i.Class), $"{i.Name}, {cls}", said, () => sources.OpenAssignment?.Invoke(i.Class, i.Id), ticked);
     }
 
     void Build()
@@ -202,6 +231,14 @@ public sealed partial class DueCalendarModel : ObservableObject
             string cls = name;
             Filters.Add(new CalendarFilter(cls, ClassNames.Display(cls), dot(cls), Class == cls, new RelayCommand(() => Class = cls)));
         }
+        Hidden.Clear();
+        foreach (var i in (sources.Due?.Hidden ?? []).Where(i => Class is null || i.Class == Class))
+            Hidden.Add(new HiddenDue(i.Class, i.Kind, i.Id, i.Name, i.DueAt is { } at ? CanvasWords.Full(at, sources.Zone, sources.Now) : "No due date",
+                ClassNames.Display(i.Class), dot(i.Class), $"{i.Name}, {ClassNames.Display(i.Class)}, hidden"));
+        if (Hidden.Count == 0) ShowingHidden = false;
+        OnPropertyChanged(nameof(HasHidden));
+        OnPropertyChanged(nameof(HiddenOpen));
+        OnPropertyChanged(nameof(HiddenToggle));
         OnPropertyChanged(nameof(Rows));
         OnPropertyChanged(nameof(Heading));
         OnPropertyChanged(nameof(PreviousTip));
