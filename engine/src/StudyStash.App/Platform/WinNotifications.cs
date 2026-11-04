@@ -123,6 +123,13 @@ public sealed unsafe class WinNotifications : ISystemNotifications
         command.SetValue("", $"\"{program}\" --open \"%1\"");
     }
 
+    /// <summary>The program a <c>studystash:</c> link opens now, or null when none is registered.</summary>
+    public static string? LinkProgram()
+    {
+        using var command = Registry.CurrentUser.OpenSubKey($@"Software\Classes\{NoticeLinks.Scheme}\shell\open\command");
+        return StudyStash.Core.Moves.RunProgram(command?.GetValue("") as string);
+    }
+
     /// <summary>Takes back what <see cref="RegisterApp"/> wrote (a test's own id; the app's stays until it's
     /// uninstalled).</summary>
     public static void UnregisterApp(string appId) =>
