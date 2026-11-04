@@ -517,6 +517,11 @@
   <Style Selector="Button.record.recording /template/ Border#PART_Bg, Button.record.paused /template/ Border#PART_Bg">
     <Setter Property="BoxShadow" Value="{DynamicResource RecordRing}" />
   </Style>
+  <!-- Ready to record, the stop square is only the red dot: a screen reader doesn't hear "Stop recording" inside
+       "Start recording". -->
+  <Style Selector="Button.record:not(.recording):not(.paused) Button#StopRecording">
+    <Setter Property="AutomationProperties.AccessibilityView" Value="Raw" />
+  </Style>
   <!-- Ready to record, the red cell alone, in the middle of its room; recording or paused it fills it (about as much
        red as the round dot it replaced), and its centre shows: Stop, or the red centre. -->
   <Style Selector="Border.record-dot">

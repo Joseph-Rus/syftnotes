@@ -175,6 +175,7 @@ public sealed partial class AttachmentsModel(IAttachmentLibrary library, string?
             OnPropertyChanged(nameof(HasPhotos));
         }
         OnPropertyChanged(nameof(HasItems));
+        OnPropertyChanged(nameof(HeaderText));
         OnPropertyChanged(nameof(ShowHeader));
     }
 
@@ -299,6 +300,7 @@ public sealed partial class AttachmentsModel(IAttachmentLibrary library, string?
     {
         Items.Remove(item);
         OnPropertyChanged(nameof(HasItems));
+        OnPropertyChanged(nameof(HeaderText));
         OnPropertyChanged(nameof(ShowHeader));
         try
         {
