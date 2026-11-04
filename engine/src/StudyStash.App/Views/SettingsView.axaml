@@ -18,6 +18,7 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:s="using:StudyStash.App.Services"
+             xmlns:canvas="using:StudyStash.Core.Canvas"
              xmlns:rich="using:StudyStash.Core.Rich"
              xmlns:app="using:StudyStash.App"
              xmlns:c="using:StudyStash.App.Controls"
@@ -1108,7 +1109,7 @@
                           <Border Classes="group" Margin="0" Padding="16,12">
                             <Grid ColumnDefinitions="Auto,12,3*,8,2*,8,Auto" RowDefinitions="Auto,6,Auto,6,Auto">
                               <c:Swatch Small="True" Fill="{Binding Dot}" VerticalAlignment="Center"/>
-                              <Border Grid.Column="2" Classes="field"><TextBox Classes="bare" Text="{Binding Name}" FontWeight="Medium" VerticalAlignment="Center" LostFocus="OnClassLostFocus" AutomationProperties.Name="Class name" /></Border>
+                              <Border Grid.Column="2" Classes="field"><TextBox Classes="bare" Text="{Binding Name}" FontWeight="Medium" VerticalAlignment="Center" LostFocus="OnClassLostFocus" AutomationProperties.Name="Class name" MaxLength="{x:Static canvas:CourseNames.MaxLength}" /></Border>
                               <Border Grid.Column="4" Classes="field"><TextBox Classes="bare" Text="{Binding Aliases}" PlaceholderText="Other names, like cs101" VerticalAlignment="Center" LostFocus="OnClassLostFocus" /></Border>
                               <Button Grid.Column="6" Theme="{StaticResource Surface}" Width="30" Height="30" CornerRadius="{DynamicResource RadiusControl}" HorizontalContentAlignment="Center"
                                       Command="{Binding $parent[UserControl].((s:SettingsModel)DataContext).Lib.RemoveClassCommand}" CommandParameter="{Binding}" ToolTip.Tip="Remove the class (its lectures stay)" AutomationProperties.Name="Remove the class">
@@ -1126,7 +1127,7 @@
                     <Border Classes="group" Margin="0" Padding="16,12">
                       <Grid ColumnDefinitions="Auto,12,3*,8,2*,8,Auto">
                         <Ellipse Width="8" Height="8" Fill="{DynamicResource Fill2}" VerticalAlignment="Center" />
-                        <Border Grid.Column="2" Classes="field"><TextBox Name="NewLibraryClass" Classes="bare" Text="{Binding Lib.NewClass}" PlaceholderText="A new class" VerticalAlignment="Center" /></Border>
+                        <Border Grid.Column="2" Classes="field"><TextBox Name="NewLibraryClass" Classes="bare" Text="{Binding Lib.NewClass}" PlaceholderText="A new class" VerticalAlignment="Center" AutomationProperties.Name="A new class" MaxLength="{x:Static canvas:CourseNames.MaxLength}" /></Border>
                         <TextBlock Grid.Column="4" Classes="row-sub" Text="Its other names and what it covers come next." VerticalAlignment="Center" TextWrapping="Wrap" />
                         <Button Grid.Column="6" Classes="btn sm" Command="{Binding Lib.AddClassCommand}" VerticalAlignment="Center"><TextBlock Text="Add" /></Button>
                       </Grid>

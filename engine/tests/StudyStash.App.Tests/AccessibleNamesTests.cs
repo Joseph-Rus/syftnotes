@@ -91,6 +91,28 @@ public class AccessibleNamesTests
         }
     }
 
+    [AvaloniaFact]
+    public async Task A_new_class_name_stops_at_the_longest_the_library_takes()
+    {
+        // The library refuses a class name over CourseNames.MaxLength, and says so at the top of the page, out of sight
+        // of the Add box: the box takes no more than that, so Add never seems to do nothing.
+        var (model, host, home) = await SettingsAsync();
+        using (home)
+        using (host)
+        using (model)
+        {
+            var view = new SettingsView { DataContext = model };
+            var window = new Window { Width = 900, Height = 1400, Content = view };
+            window.Show();
+            model.Section = "Classes";
+            Dispatcher.UIThread.RunJobs();
+            var box = view.FindControl<TextBox>("NewLibraryClass")!;
+            Assert.Equal(StudyStash.Core.Canvas.CourseNames.MaxLength, box.MaxLength);
+            Assert.Equal("A new class", Said(box));
+            window.Close();
+        }
+    }
+
     [AvaloniaTheory]
     [InlineData(SkinKind.Mac)]
     [InlineData(SkinKind.Win)]
