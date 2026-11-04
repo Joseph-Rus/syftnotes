@@ -52,6 +52,7 @@ final class NotebookTests: XCTestCase {
         let undo = app.buttons["notebook.undo"], redo = app.buttons["notebook.redo"]
         expect(undo, "Undo")
         XCTAssertFalse(undo.isEnabled, "nothing to undo yet")
+        choosePen(app)
         let desk = page(app, "notebook")
         desk.coordinate(withNormalizedOffset: CGVector(dx: 0.3, dy: 0.42))
             .press(forDuration: 0.1, thenDragTo: desk.coordinate(withNormalizedOffset: CGVector(dx: 0.7, dy: 0.47)))
@@ -111,6 +112,16 @@ final class NotebookTests: XCTestCase {
         expect(app.menuItems.firstMatch, "the menu over the page")
         XCTAssertTrue(app.buttons["Lasso"].exists, "the pens still there with the menu open")
         XCTAssertFalse(app.keyboards.firstMatch.exists, "no keyboard with the menu")
+        choosePen(app)
+    }
+
+    /// Apple's pens remember their tool from one launch to the next: a test that writes picks the Pen first (one that
+    /// left the lasso chosen made the next run's line a lasso).
+    private func choosePen(_ app: XCUIApplication) {
+        let pen = app.buttons["Pen"]
+        guard pen.waitForExistence(timeout: 3) else { return }
+        if !pen.isSelected { pen.tap() }
+        XCTAssertTrue(pen.isSelected, "the Pen chosen")
     }
 
     private func waitUntil(_ timeout: Double = 5, _ ok: () -> Bool) -> Bool {
