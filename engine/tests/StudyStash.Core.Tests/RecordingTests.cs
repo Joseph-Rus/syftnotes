@@ -271,7 +271,7 @@ public class RecordingTests
     }
 
     [Fact]
-    public void A_filed_lecture_is_picked_up_again_and_its_sound_added_to()
+    public async Task A_filed_lecture_is_picked_up_again_and_its_sound_added_to()
     {
         using var dir = new TempDir();
         var store = new LectureStore(dir.Path);
@@ -294,7 +294,7 @@ public class RecordingTests
         Assert.Equal("Data Mining", again.ClassName); // where the library put it
         Assert.False(again.SpeakersDone); // told apart again, over all of it
         mic!.Play(6);
-        SpinWait.SpinUntil(() => rec.Elapsed > 12.99, 10000);
+        Assert.True(await Waiting.UntilAsync(() => rec.Elapsed > 12.99), $"the recording reached only {rec.Elapsed:0.00} s");
         Assert.InRange(rec.Elapsed, 12.99, 13.01);
         var done = rec.Stop()!;
         Assert.Equal(LectureState.Transcribing, done.State);
@@ -320,12 +320,14 @@ public class RecordingTests
         var again = rec.Continue("rec-old");
         Assert.Equal(600, again.AudioStart);
         Assert.True(again.SpeakersDone); // the old part's sound is gone: no telling voices apart over it
-        mic!.Play(30);
-        SpinWait.SpinUntil(() => rec.Elapsed > 629.99, 10000);
-        Assert.InRange(rec.Elapsed, 629.99, 630.01); // the time goes on from the old part's end
+        // Six seconds, past the five a picked-up lecture needs to count (KeepAtLeastSeconds): thirty took the background
+        // writer past this wait's limit when every test ran at once. Waited on until it's all written, and said if it isn't.
+        mic!.Play(6);
+        Assert.True(await Waiting.UntilAsync(() => rec.Elapsed > 605.99), $"the recording reached only {rec.Elapsed:0.00} s");
+        Assert.InRange(rec.Elapsed, 605.99, 606.01); // the time goes on from the old part's end
         var done = rec.Stop()!;
-        Assert.InRange(done.Seconds, 629.99, 630.01);
-        Assert.InRange(Sound.WavSeconds(store.AudioPath("rec-old")), 29.99, 30.01);
+        Assert.InRange(done.Seconds, 605.99, 606.01);
+        Assert.InRange(Sound.WavSeconds(store.AudioPath("rec-old")), 5.99, 6.01);
 
         var whisper = new FakeWhisper();
         var worker = new TranscriptionWorker(store, () => whisper, () => null);
@@ -334,8 +336,8 @@ public class RecordingTests
         Assert.Equal(LectureState.Sending, l.State);
         Assert.Equal("what was said last week", l.Segments[0].Text);
         Assert.True(l.Segments.Count > 1);
-        Assert.All(l.Segments.Skip(1), sg => Assert.InRange(sg.Start, 600, 630)); // on the end of the transcript
-        Assert.InRange(l.TranscribedSeconds, 629.99, 630.01);
+        Assert.All(l.Segments.Skip(1), sg => Assert.InRange(sg.Start, 600, 606)); // on the end of the transcript
+        Assert.InRange(l.TranscribedSeconds, 605.99, 606.01);
         Assert.Equal("typed last week", l.Notes);
         Assert.Equal("rec-old", (string)l.Payload()["id"]!); // the same note, sent again
     }
@@ -863,6 +865,26 @@ public class RecordingTests
         return store.Add(new Lecture { Id = id, Started = started, State = state, ClassName = "CS 101", Seconds = seconds });
     }
 
+    /// <summary>The first moment of a recording: its file is made but the header is still in the writer's buffer. Whisper has
+    /// nothing to hear yet, and the log doesn't say it couldn't read the recording.</summary>
+    [Fact]
+    public async Task A_recording_that_has_only_just_begun_is_not_read_and_not_complained_about()
+    {
+        using var dir = new TempDir();
+        var store = new LectureStore(dir.Path);
+        var live = store.Add(new Lecture { Id = "rec-new", Started = "2026-09-22T10:00:00-07:00", State = LectureState.Recording, ClassName = "CS 101" });
+        File.WriteAllBytes(store.AudioPath(live.Id), []);
+        var log = new List<string>();
+        var worker = new TranscriptionWorker(store, () => new FakeWhisper(), () => live, log.Add);
+        Assert.False(await worker.StepAsync(default));
+        Assert.DoesNotContain(log, l => l.Contains("couldn't read the recording"));
+
+        // A file Whisper can't make sense of once it has a header's worth is still said.
+        File.WriteAllBytes(store.AudioPath(live.Id), new byte[WavWriter.HeaderBytes]);
+        Assert.False(await worker.StepAsync(default));
+        Assert.Contains(log, l => l.Contains("couldn't read the recording"));
+    }
+
     [Fact]
     public async Task Whisper_that_wont_load_leaves_lectures_waiting_and_says_why()
     {
@@ -1119,15 +1141,23 @@ public class RecordingTests
     {
         using var dir = new TempDir();
         var store = new LectureStore(dir.Path);
-        foreach (var (id, days, state) in new[] { ("rec-old", 40, LectureState.Filed), ("rec-new", 2, LectureState.Filed), ("rec-waiting", 40, LectureState.Sending) })
+        // A lecture and how old its sound is (the sound's own file time): a recording's is as old as the lecture, but one
+        // dated 40 days back that was brought in from a file the day before has a sound a day old.
+        foreach (var (id, days, state, soundDays) in new[]
+        {
+            ("rec-old", 40, LectureState.Filed, 40), ("rec-new", 2, LectureState.Filed, 2), ("rec-waiting", 40, LectureState.Sending, 40),
+            ("rec-from-file", 40, LectureState.Filed, 1),
+        })
         {
             store.Add(new Lecture { Id = id, Started = Tuesday.AddDays(-days).ToString("yyyy-MM-dd'T'HH:mm:sszzz"), State = state });
-            using var w = new WavWriter(store.AudioPath(id));
+            using (new WavWriter(store.AudioPath(id))) { }
+            File.SetLastWriteTimeUtc(store.AudioPath(id), Tuesday.AddDays(-soundDays).UtcDateTime);
         }
         Assert.Equal(1, store.PruneAudio(30, Tuesday));
         Assert.False(File.Exists(store.AudioPath("rec-old")));
         Assert.True(File.Exists(store.AudioPath("rec-new")));
         Assert.True(File.Exists(store.AudioPath("rec-waiting")));
+        Assert.True(File.Exists(store.AudioPath("rec-from-file")));
         Assert.NotNull(store.Get("rec-old"));
     }
 

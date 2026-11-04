@@ -249,7 +249,9 @@ public sealed class AiJobs(string home, Func<string>? ollamaHost = null)
     /// pre-flight check only, before the run starts; a job already under way never changes engines mid-run (the
     /// pipeline's own retry does that, not this).</summary>
     bool NotesOnOllama(AiSettings settings) =>
-        settings.NotesChosen && (settings.Local("notes") || (settings.Fallback && Checks.OllamaInstalled() && Engines.KnownUnusableWhy(settings.For("notes").Provider, settings, Checks) is not null));
+        settings.NotesChosen && (settings.Local("notes") || (CanFallBack(settings) && Engines.KnownUnusableWhy(settings.For("notes").Provider, settings, Checks) is not null));
+
+    bool CanFallBack(AiSettings settings) => Engines.CanFallBack(settings, Checks);
 
     /// <summary>What an engine's notes may draw: Ollama's small models keep to flowcharts; the CLI engines, whose
     /// SVG holds together, may draw what's spatial too.</summary>
@@ -829,7 +831,7 @@ public sealed class AiJobs(string home, Func<string>? ollamaHost = null)
     {
         var settings = Settings;
         string who = engine is { Length: > 0 } e ? e : settings.For("ask").Provider;
-        if (who != "ollama" && settings.Fallback && Engines.KnownUnusableWhy(who, settings, Checks) is not null) who = "ollama";
+        if (who != "ollama" && CanFallBack(settings) && Engines.KnownUnusableWhy(who, settings, Checks) is not null) who = "ollama";
         if (who != "ollama" || (!cfg.OllamaEnabled && Providers is null)) return false;
         lock (warming)
         {
@@ -847,8 +849,8 @@ public sealed class AiJobs(string home, Func<string>? ollamaHost = null)
 
     /// <summary>
     /// Answer a question with a chosen engine (the request's, or ai.json's "ask" pick): when it's known unusable
-    /// (not installed, not signed in, hit its limit) and <see cref="AiSettings.Fallback"/> is on, Ollama answers up
-    /// front; otherwise it's tried for real, under <see cref="AskTimeout"/>, and only falls back on a timeout or an
+    /// (not installed, not signed in, hit its limit) and <see cref="AiSettings.Fallback"/> is on and Ollama is installed,
+    /// Ollama answers up front; otherwise it's tried for real, under <see cref="AskTimeout"/>, and only falls back on a timeout or an
     /// error (never mid-run: that's the pipeline's own job). Every engine that's actually run has its result
     /// recorded (<see cref="Record"/>).
     /// <para><paramref name="answerSoFar"/>, when given, hears the answer as it's written (all of it so far, each
@@ -864,7 +866,7 @@ public sealed class AiJobs(string home, Func<string>? ollamaHost = null)
         bool fellBack = false;
         string why = "";
 
-        if (settings.Fallback && Engines.KnownUnusableWhy(asked, settings, Checks) is { } preflight)
+        if (CanFallBack(settings) && Engines.KnownUnusableWhy(asked, settings, Checks) is { } preflight)
         {
             engine = "ollama";
             fellBack = true;
@@ -923,8 +925,19 @@ public sealed class AiJobs(string home, Func<string>? ollamaHost = null)
             if (ex is OperationCanceledException && ct.IsCancellationRequested) throw; // the caller gave up; not ours to paper over
             bool timedOut = ex is OperationCanceledException;
             Record(engine, false, timedOut ? "timed out" : ex.Message);
-            if (engine == "ollama" || !settings.Fallback) throw;
+            if (engine == "ollama") throw;
             why = timedOut ? $"{Engines.Name(engine)} didn't respond in time." : $"{Engines.Name(engine)} didn't answer: {ex.Message}";
+            if (!CanFallBack(settings))
+            {
+                string name = Engines.Name(engine);
+                if (timedOut) throw new InvalidOperationException(why, ex);
+                // Fallback switched off: the AI's own error comes back as it is. Otherwise Ollama just isn't here, and the
+                // student is told what's wrong with the AI in plain words (its raw text stays in its record and as the inner
+                // exception), not that an Ollama they never set up isn't installed.
+                if (!settings.Fallback) throw;
+                throw new InvalidOperationException(SetupChat.Classify(ex.Message) == ChatProblem.Offline ? Engines.CouldntBeReached(name)
+                    : Engines.KnownUnusableWhy(engine, Settings, Checks) ?? Engines.DidntAnswer(name), ex);
+            }
             fellBack = true;
             engine = "ollama";
             using var cts2 = CancellationTokenSource.CreateLinkedTokenSource(ct);

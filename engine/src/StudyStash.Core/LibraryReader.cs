@@ -200,14 +200,31 @@ public sealed partial class LibraryReader(Config cfg, Store store)
         foreach (var r in Store.Search(query, 50).Where(r => className is null || r.ClassName == className).Take(limit)) lectures.Add(Summary(r));
         var passages = (JsonArray)result["passages"]!;
         if (Passages.AllWords(query) is string match)
-            foreach (var hit in Store.SearchPassages(match, className, limit: limit * 2).Take(limit * 2)) passages.Add(PassageJson(hit.Note, hit.Passage));
+            foreach (var hit in Store.SearchPassages(match, className, limit: limit * 2).Take(limit * 2)) passages.Add(PassageJson(hit.Note, hit.Passage, HitAt(hit.Note, hit.Passage, query)));
         var classes = (JsonArray)result["classes"]!;
         foreach (var c in ((JsonArray)Overview()["classes"]!).OfType<JsonObject>())
             if (c["name"]!.GetValue<string>().Contains(query, StringComparison.OrdinalIgnoreCase)) classes.Add(c.DeepClone());
         return result;
     }
 
-    static JsonObject PassageJson(NoteRow note, Passage p) => new()
+    /// <summary>When the words were said: a transcript passage spans about a minute, so its start can be a line or
+    /// three before the hit. This is the start of the first line of it that holds the most of the query's words (the
+    /// passage's own start when none does, or when it isn't a timed transcript's).</summary>
+    double? HitAt(NoteRow note, Passage p, string query)
+    {
+        if (p.Start is not double start || p.Kind != Passage.TranscriptKind) return p.Start;
+        var words = Passages.Words(query);
+        if (words.Count == 0) return start;
+        var best = TimedText.Parse(Store.Meeting(note).Transcript)
+            .Where(l => l.Start >= start && l.Start < start + 120 && p.Text.Contains(l.Text, StringComparison.Ordinal))
+            .Select(l => (Line: l, Held: words.Count(w => l.Text.Contains(w, StringComparison.OrdinalIgnoreCase))))
+            .Where(x => x.Held > 0)
+            .OrderByDescending(x => x.Held)
+            .FirstOrDefault();
+        return best.Line?.Start ?? start;
+    }
+
+    static JsonObject PassageJson(NoteRow note, Passage p, double? at) => new()
     {
         ["id"] = note.Id,
         ["title"] = !string.IsNullOrEmpty(note.LectureTitle) ? note.LectureTitle : note.Title,
@@ -215,7 +232,7 @@ public sealed partial class LibraryReader(Config cfg, Store store)
         ["date"] = note.Date,
         ["kind"] = p.Kind,
         ["section"] = p.Section,
-        ["at"] = p.Start,
+        ["at"] = at,
         ["text"] = p.Text,
     };
 

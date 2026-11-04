@@ -238,6 +238,41 @@ public class DocumentTextTests
         Assert.Equal("One: sorting\n\nTwo: Big O\nO(n log n)\n\nSay merge sort is stable\n\nTen: recap", text);
     }
 
+    const string OfficeNs = "http://schemas.openxmlformats.org/officeDocument/2006/relationships";
+
+    static string Rels(params (string Id, string Kind, string Target)[] rels) =>
+        """<?xml version="1.0" encoding="UTF-8"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">"""
+        + string.Concat(rels.Select(r => $"""<Relationship Id="{r.Id}" Type="{OfficeNs}/{r.Kind}" Target="{r.Target}"/>""")) + "</Relationships>";
+
+    [Fact]
+    public async Task Pages_come_one_per_slide_in_the_decks_order_with_notes_and_one_per_PDF_page()
+    {
+        using var dir = new TempDir();
+        // The deck shows slide2, slide1, a slide of only a picture, then slide4. Slide1's notes are notesSlide2 (the notes
+        // are numbered as they were made, not like their slides), and slide2 has none.
+        Zip(dir["week 3.pptx"],
+            ("ppt/presentation.xml", $"""<?xml version="1.0" encoding="UTF-8"?><p:presentation xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main" xmlns:r="{OfficeNs}"><p:sldIdLst><p:sldId id="256" r:id="rId12"/><p:sldId id="257" r:id="rId11"/><p:sldId id="258" r:id="rId13"/><p:sldId id="259" r:id="rId14"/></p:sldIdLst></p:presentation>"""),
+            ("ppt/_rels/presentation.xml.rels", Rels(("rId11", "slide", "slides/slide1.xml"), ("rId12", "slide", "slides/slide2.xml"), ("rId13", "slide", "slides/slide3.xml"), ("rId14", "slide", "/ppt/slides/slide4.xml"))),
+            ("ppt/slides/slide1.xml", SlideXml("One: sorting")), ("ppt/slides/_rels/slide1.xml.rels", Rels(("rId1", "notesSlide", "../notesSlides/notesSlide2.xml"))),
+            ("ppt/slides/slide2.xml", SlideXml("Two: Big O", "O(n log n)")), ("ppt/slides/_rels/slide2.xml.rels", Rels(("rId1", "slideLayout", "../slideLayouts/slideLayout1.xml"))),
+            ("ppt/slides/slide3.xml", SlideXml()), ("ppt/slides/slide4.xml", SlideXml("Four: recap")),
+            ("ppt/notesSlides/notesSlide2.xml", SlideXml("Say merge sort is stable")));
+        // Page 2 is only a picture of handwriting, which the stand-in for text recognition reads.
+        TypedPdf(dir["lab.pdf"], ["Lab 2: Titration"], [], ["Record the endpoint volume"]);
+        var options = NoCache with { PageReader = (_, _, _, _) => new Dictionary<int, string> { [1] = "Burette reads 12.4 mL" } };
+
+        Assert.Equal(["Two: Big O\nO(n log n)", "One: sorting\n\nSay merge sort is stable", "", "Four: recap"], await DocumentText.PagesAsync(dir["week 3.pptx"], options, default));
+        Assert.Equal("Two: Big O\nO(n log n)\n\nOne: sorting\n\nSay merge sort is stable\n\nFour: recap", await DocumentText.ExtractAsync(dir["week 3.pptx"], options, default));
+        var pages = await DocumentText.PagesAsync(dir["lab.pdf"], options, default);
+        Assert.Equal(["Lab 2: Titration", "Burette reads 12.4 mL", "Record the endpoint volume"], pages);
+        Assert.Equal(string.Join("\n\n", pages!), await DocumentText.ExtractAsync(dir["lab.pdf"], options, default));
+        Assert.Equal(["Lab 2: Titration"], await DocumentText.PagesAsync(dir["lab.pdf"], options with { MaxPages = 1 }, default));
+
+        File.WriteAllText(dir["todo.md"], "# Midterm");
+        Assert.Null(await DocumentText.PagesAsync(dir["todo.md"], options, default));
+        Assert.Null(await DocumentText.PagesAsync(dir["missing.pdf"], options, default));
+    }
+
     [Fact]
     public async Task Plain_text_is_read_as_it_is_tidied()
     {
