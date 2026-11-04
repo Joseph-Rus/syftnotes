@@ -233,7 +233,7 @@ public sealed partial class SettingsChatModel(SettingsChatServices services) : O
         {
             ChatProblem.Auth => $"{Brand} isn't signed in on this computer. Run setup to sign in again.",
             ChatProblem.Plan => $"Your {Brand} plan doesn't include {Cli?.Name}. Run setup to use another AI.",
-            ChatProblem.Offline => $"{Brand} couldn't be reached. Check your internet connection.",
+            ChatProblem.Offline => Engines.CouldntBeReached(Brand),
             ChatProblem.Limit => $"{Brand} is at its usage limit until {GuidedSetupModel.UntilWords(Engines.UntilFrom(said, services.Now()))}. You can still change anything here yourself.",
             ChatProblem.NoAnswer => $"{Brand} didn't answer. Try again.",
             ChatProblem.Guard => $"Syft Notes stopped {Brand}: it tried to use a tool it isn't allowed here.",
