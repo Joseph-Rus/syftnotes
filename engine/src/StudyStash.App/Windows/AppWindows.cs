@@ -39,6 +39,17 @@ public sealed record WindowSpec(string Key, string Title, Control View)
     public bool AppForward { get; init; } = true;
     /// <summary>A Mac shows the app in the Dock (and ⌘Tab) while it's open.</summary>
     public bool InDock { get; init; } = true;
+
+    // What <see cref="AppWindows.MakeFloating"/> passes on to the <see cref="Floating"/> it makes (see there for each).
+    public bool CloseOnDeactivate { get; init; }
+    public bool KeepClear { get; init; }
+    public bool OverFullScreen { get; init; }
+    public bool ClickThrough { get; init; }
+    public bool SteadySize { get; init; }
+    public bool ClicksOnPanelOnly { get; init; }
+    public bool Notification { get; init; }
+    /// <summary>A floating window comes up taking the keyboard (false: the recorder's card, a notification).</summary>
+    public bool ShowActivated { get; init; } = true;
 }
 
 /// <summary>
@@ -108,6 +119,24 @@ public static class AppWindows
         Dress(w, spec.Key, spec.InDock, spec.Activate, spec.AppForward);
         return w;
     }
+
+    /// <summary>A <see cref="Floating"/> window for <paramref name="spec"/> (its key is unused): the dropdown, the
+    /// recorder and its card, the quick panel, a notification. Not shown, and not counted open for the Dock: the caller
+    /// keeps it and shows it when it wants, over and over.</summary>
+    public static Floating MakeFloating(WindowSpec spec) => new()
+    {
+        Content = spec.View, Title = spec.Title, ShowActivated = spec.ShowActivated,
+        CloseOnDeactivate = spec.CloseOnDeactivate, KeepClear = spec.KeepClear, OverFullScreen = spec.OverFullScreen,
+        ClickThrough = spec.ClickThrough, SteadySize = spec.SteadySize, ClicksOnPanelOnly = spec.ClicksOnPanelOnly,
+        Notification = spec.Notification,
+    };
+
+    /// <summary>A window that is never shown, only there to give <paramref name="content"/> the app's styles and the
+    /// light look while it's laid out and drawn (the PDF of a lecture's notes). Not counted open for the Dock.</summary>
+    public static Window MakeOffScreen(Control content) => new()
+    {
+        Content = content, RequestedThemeVariant = Avalonia.Styling.ThemeVariant.Light, ShowInTaskbar = false, ShowActivated = false,
+    };
 
     /// <summary>Dresses a window made elsewhere (<see cref="BrowserChoiceWindow"/>) as the app's, and counts it open
     /// under <paramref name="key"/> until it closes.</summary>
