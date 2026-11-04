@@ -442,6 +442,22 @@ public static class ModelDownload
     }
 }
 
+/// <summary>
+/// Loads a whisper.cpp model, one at a time in this process. The live words' model and the transcript's each load
+/// their own, and when the two loads overlapped on a Windows PC's graphics card (Vulkan) the app crashed in whisper.cpp
+/// every time: a recording stopped about 5 seconds in, as its first live pass loaded the live words' model, did it.
+/// Only loading takes turns; the two models hear sound at the same time as before.
+/// </summary>
+internal static class WhisperLoads
+{
+    static readonly Lock Gate = new();
+
+    public static WhisperFactory FromPath(string modelPath, bool gpu)
+    {
+        lock (Gate) return WhisperFactory.FromPath(modelPath, new WhisperFactoryOptions { UseGpu = gpu });
+    }
+}
+
 /// <summary>Whisper (whisper.cpp) on this computer: Metal on Apple silicon, Vulkan on a Windows graphics card, the
 /// processor elsewhere.</summary>
 public sealed class WhisperTranscriber : ITranscriber
@@ -454,7 +470,7 @@ public sealed class WhisperTranscriber : ITranscriber
     /// <param name="gpu">False keeps it on the processor even where there's a GPU (to measure a computer without one).</param>
     public WhisperTranscriber(string modelPath, string language = "", bool gpu = true)
     {
-        factory = WhisperFactory.FromPath(modelPath, new WhisperFactoryOptions { UseGpu = gpu });
+        factory = WhisperLoads.FromPath(modelPath, gpu);
         this.gpu = gpu;
         fixedLanguage = language is "auto" ? "" : language;
     }
