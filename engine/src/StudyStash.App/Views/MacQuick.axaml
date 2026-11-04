@@ -104,7 +104,7 @@
       </c:Glass.IsVisible>
       <StackPanel>
         <!-- Scrolls inside the panel when there is more than the screen has room for; the chips below stay in view -->
-        <ScrollViewer MaxHeight="{Binding ResultsMaxHeight}" HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
+        <ScrollViewer Name="Results" MaxHeight="{Binding ResultsMaxHeight}" HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
           <StackPanel>
             <!-- The answer -->
             <StackPanel IsVisible="{Binding Answering}" Spacing="10" Margin="14,10,14,14">

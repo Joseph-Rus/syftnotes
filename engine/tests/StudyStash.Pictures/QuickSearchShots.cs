@@ -5,6 +5,7 @@ using Avalonia.Headless.XUnit;
 using Avalonia.Media;
 using Avalonia.Media.Imaging;
 using Avalonia.Styling;
+using Avalonia.VisualTree;
 using StudyStash.App.Controls;
 using StudyStash.App.ViewModels;
 using StudyStash.App.Views;
@@ -60,13 +61,36 @@ public class QuickSearchShots
             Avalonia.Threading.Dispatcher.UIThread.RunJobs();
             window.UpdateLayout();
             Assert.True(view.Bounds.Bottom <= work, $"{skin}: the panel ends at {view.Bounds.Bottom:0} on a screen {work:0} usable");
-            Save(window, $"quick-search-{(skin == SkinKind.Mac ? "mac" : "win")}-{(variant == ThemeVariant.Dark ? "dark" : "light")}.png");
+            string name = $"quick-search-{(skin == SkinKind.Mac ? "mac" : "win")}-{(variant == ThemeVariant.Dark ? "dark" : "light")}";
+            Save(window, $"{name}.png");
+            // A passage chosen: its line under the title takes the chosen row's muted colour, readable on the lilac.
+            model.Move(4);
+            QuickKeys.Reveal((UserControl)view, model);
+            Avalonia.Threading.Dispatcher.UIThread.RunJobs();
+            window.UpdateLayout();
+            var chosen = view.GetVisualDescendants().OfType<Button>().Single(b => b.DataContext == model.Selected && b.IsEffectivelyVisible);
+            var line = chosen.GetVisualDescendants().OfType<TextBlock>().First(t => t.Classes.Contains("meta") && t.IsEffectivelyVisible);
+            Assert.True(view.TryFindResource("SelectedMuted", variant, out object? muted), "no SelectedMuted");
+            Assert.Equal(ColourOf(muted), ColourOf(line.Foreground));
+            Save(window, $"{name}-passage.png");
             // Arrow down to the last row: it scrolls into view.
             for (int i = 0; i < 20; i++) model.Move(1);
             QuickKeys.Reveal((UserControl)view, model);
             Avalonia.Threading.Dispatcher.UIThread.RunJobs();
             window.UpdateLayout();
-            Save(window, $"quick-search-{(skin == SkinKind.Mac ? "mac" : "win")}-{(variant == ThemeVariant.Dark ? "dark" : "light")}-end.png");
+            Save(window, $"{name}-end.png");
+            // A new set of results (another letter typed, the panel opened again) starts at the top, its first row in view.
+            var results = ((UserControl)view).FindControl<ScrollViewer>("Results")!;
+            results.ScrollToEnd(); // as the wheel would (a Mac's last rows are chips, outside the list)
+            window.UpdateLayout();
+            Assert.True(results.Offset.Y > 0, $"{skin}: never scrolled");
+            var rows = model.Rows.ToList();
+            model.Rows.Clear();
+            foreach (var r in rows) model.Rows.Add(r);
+            model.SelectFirst();
+            Avalonia.Threading.Dispatcher.UIThread.RunJobs();
+            window.UpdateLayout();
+            Assert.Equal(0, results.Offset.Y);
             window.Close();
         }
     }
@@ -98,6 +122,13 @@ public class QuickSearchShots
             window.Close();
         }
     }
+
+    static Color? ColourOf(object? paint) => paint switch
+    {
+        ISolidColorBrush b => b.Color,
+        Color c => c,
+        _ => null,
+    };
 
     static void Save(Window window, string name)
     {

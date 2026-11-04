@@ -1,3 +1,4 @@
+using System.Collections.Specialized;
 using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.VisualTree;
@@ -19,6 +20,19 @@ public static class QuickKeys
 
     public static void Attach(UserControl view, TextBox box)
     {
+        // A new set of results (another letter typed, the panel opened again, an answer) starts at the top, its first
+        // row in view: the results' scroll would otherwise stay where the last set was left.
+        QuickModel? watched = null;
+        void Top(object? sender, NotifyCollectionChangedEventArgs e)
+        {
+            if (e.Action == NotifyCollectionChangedAction.Reset && view.FindControl<ScrollViewer>("Results") is { } results) results.Offset = default;
+        }
+        view.DataContextChanged += (_, _) =>
+        {
+            if (watched is not null) watched.Rows.CollectionChanged -= Top;
+            watched = view.DataContext as QuickModel;
+            if (watched is not null) watched.Rows.CollectionChanged += Top;
+        };
         box.AddHandler(InputElement.KeyDownEvent, async (_, e) =>
         {
             if (view.DataContext is not QuickModel m) return;
