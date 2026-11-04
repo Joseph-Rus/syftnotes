@@ -24,4 +24,19 @@ public class MachineRunTests
         // Taken because the pipe was empty, not because the timeout ran out (that's a minute; this is moments).
         Assert.True(took.Elapsed < TimeSpan.FromSeconds(45), $"took {took.Elapsed.TotalSeconds:0.0} s: it waited for the helper or the timeout");
     }
+
+    /// <summary>A command that prints a lot: all of it comes back, and quickly (reading it a little at a time, waiting
+    /// between, would take minutes and run into the timeout, and come back as nothing).</summary>
+    [Fact]
+    public void A_command_that_prints_a_lot_comes_back_whole()
+    {
+        const int size = 4 * 1024 * 1024;
+        var (exe, args) = OperatingSystem.IsWindows()
+            ? ("powershell.exe", new[] { "-NoProfile", "-Command", $"[Console]::Out.Write('a' * {size})" })
+            : ("/bin/sh", new[] { "-c", $"head -c {size} /dev/zero | tr '\\0' a" });
+        var r = Machine.Run(exe, args, TimeSpan.FromSeconds(20));
+
+        Assert.NotNull(r);
+        Assert.Equal(size, r.Stdout.Trim().Length);
+    }
 }

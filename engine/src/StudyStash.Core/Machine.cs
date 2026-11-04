@@ -74,11 +74,17 @@ public static partial class Machine
         void Read()
         {
             var buffer = new byte[4096];
+            bool read = false;
             try
             {
                 while (true)
                 {
                     int waiting = Waiting(from);
+                    // Right after a read, a command printing a lot fills the pipe again in moments (Windows' holds only
+                    // about 4 KB): it's looked at again at once for a little while, not after a whole wait.
+                    for (var spin = new SpinWait(); waiting == 0 && read && spin.Count < 200; spin.SpinOnce(sleep1Threshold: -1))
+                        waiting = Waiting(from);
+                    read = waiting > 0;
                     if (waiting > 0)
                     {
                         // There already, so this doesn't wait; asked for a whole buffer so none of it stays in the stream's own.
