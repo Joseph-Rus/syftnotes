@@ -25,6 +25,7 @@ first time you need it (docs/ARCHITECTURE.md section 3 says how), not inside you
 | A window | `AppWindows.Open(new WindowSpec { ... })`. Never `new Window` |
 | Which page is open | `PageState` (one record, swapped in one assignment) |
 | The AI's sign-in or ready state, anywhere | `AiStatusStore` on `AppHost`: never fetch it or keep a copy in a screen |
+| A sign-in whose page ends on a code to paste (Gemini's) | `SignInCodeModel` + `Views/SignInCode.axaml`; the code goes to `AgentSignIn.SendCodeAsync` |
 | Canvas state | `CanvasWatch` (`Hurry()` while a screen waits) |
 | A call to the library | `LibraryApi` / `LibraryCall.Run`, which gives an `Outcome` with offline, too-old and refused already in plain words |
 | A button that does async work | `AsyncAction` (busy, error and cancel in one place) |

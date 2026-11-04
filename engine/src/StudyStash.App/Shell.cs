@@ -544,6 +544,8 @@ public static partial class Shell
 
     static void Wire()
     {
+        // A sign-in the library runs whose page ends on a code (Gemini's): the box for it, whichever button started it.
+        host.AiStatus.WantsCodeChanged += SignInCodeWanted;
         panel.OnRecord = ToggleRecording;
         panel.OnStop = () => StopRecording();
         panel.OnPause = TogglePause;
