@@ -9,48 +9,48 @@ extension NotebookCanvas {
     /// again, showing `page` (the one showing now, if nil).
     func changePages(showing page: Int? = nil, _ change: (inout Notebook) -> Void) {
         flush()
-        guard let id, var n = NotebookStore.shared.notebook(id) else { return }
+        guard let id, var n = store.notebook(id) else { return }
         change(&n)
         n.updated = .now
-        NotebookStore.shared.save(n)
+        store.save(n)
         load(scrollTo: page ?? current)
     }
 
     /// A page on the notebook's paper, after page `index` (or at the end).
     @discardableResult
     func addPage(after index: Int? = nil) -> Int {
-        guard let id, let n = NotebookStore.shared.notebook(id) else { return 0 }
+        guard let id, let n = store.notebook(id) else { return 0 }
         let at = min((index ?? n.pages.count - 1) + 1, n.pages.count)
         changePages(showing: at) { $0.pages.insert(Notebook.Page($0.newPages), at: at) }
         return at
     }
 
     func duplicatePage(_ index: Int) {
-        guard let id, let n = NotebookStore.shared.notebook(id), n.pages.indices.contains(index) else { return }
+        guard let id, let n = store.notebook(id), n.pages.indices.contains(index) else { return }
         flush()
         var copy = n.pages[index]
         copy.id = UUID()
-        NotebookStore.shared.copyInk(n, from: n.pages[index].id, to: copy.id)
+        store.copyInk(n, from: n.pages[index].id, to: copy.id)
         changePages(showing: index + 1) { $0.pages.insert(copy, at: index + 1) }
     }
 
     func deletePage(_ index: Int) {
-        guard let id, let n = NotebookStore.shared.notebook(id), n.pages.count > 1, n.pages.indices.contains(index) else { return }
+        guard let id, let n = store.notebook(id), n.pages.count > 1, n.pages.indices.contains(index) else { return }
         let gone = n.pages[index].id
         changePages(showing: min(index, n.pages.count - 2)) { $0.pages.remove(at: index) }
-        NotebookStore.shared.removeInk(n, gone)
+        store.removeInk(n, gone)
     }
 
     /// Move page `from` to be page `to`.
     func movePage(_ from: Int, to: Int) {
-        guard let id, let n = NotebookStore.shared.notebook(id), n.pages.indices.contains(from), n.pages.indices.contains(to), from != to
+        guard let id, let n = store.notebook(id), n.pages.indices.contains(from), n.pages.indices.contains(to), from != to
         else { return }
         changePages(showing: to) { $0.pages.insert($0.pages.remove(at: from), at: to) }
     }
 
     /// This page's paper (or every page's that isn't a PDF's); new pages come on it from now on.
     func applyPaper(_ t: Notebook.Template, to index: Int?) {
-        guard let id, let n = NotebookStore.shared.notebook(id) else { return }
+        guard let id, let n = store.notebook(id) else { return }
         let targets = index.map { [$0] } ?? Array(n.pages.indices)
         let resized = targets.contains { i in
             n.pages.indices.contains(i) && n.pages[i].pdf == nil && Notebook.PageSize(n.pages[i].size) != t.size
@@ -69,14 +69,14 @@ extension NotebookCanvas {
             // Same sizes: the paper is drawn again under the ink, and undo carries on.
             flush()
             changed.updated = .now
-            NotebookStore.shared.save(changed)
+            store.save(changed)
             repaint()
         }
     }
 
     /// A PDF's pages (slides, a handout) after page `index`, to write on.
     func addPDF(_ url: URL, after index: Int) -> Bool {
-        guard let id, let n = NotebookStore.shared.notebook(id), let pages = NotebookStore.shared.pages(fromPDF: url, for: n) else { return false }
+        guard let id, let n = store.notebook(id), let pages = store.pages(fromPDF: url, for: n) else { return false }
         let at = min(index + 1, n.pages.count)
         changePages(showing: at) { $0.pages.insert(contentsOf: pages, at: at) }
         return true

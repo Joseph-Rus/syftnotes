@@ -30,6 +30,50 @@ import UIKit
         #expect(again == n)
     }
 
+    /// What's written is on disk moments after each stroke, with the notebook still open (the app can be stopped any
+    /// time), and at once when the app goes to the background; the notebooks opened afresh have it, on its own page.
+    @Test func strokesWrittenAreKeptWithoutClosing() async throws {
+        let folder = FileManager.default.temporaryDirectory.appending(path: "notebooks-\(UUID().uuidString)")
+        defer { try? FileManager.default.removeItem(at: folder) }
+        let store = NotebookStore(folder: folder)
+        var n = Notebook.blank(title: "Week 6", className: nil, lecture: nil)
+        n.pages.append(Notebook.Page(.standard))
+        store.save(n)
+        let canvas = NotebookCanvas(store: store)
+        canvas.attach(n.id)
+        func write(page: Int, y: CGFloat) {
+            let top = canvas.frames[page].minY
+            let points = (0..<20).map { i in
+                PKStrokePoint(location: CGPoint(x: 100 + CGFloat(i) * 4, y: top + y), timeOffset: Double(i) * 0.01,
+                              size: CGSize(width: 3, height: 3), opacity: 1, force: 1, azimuth: 0, altitude: .pi / 2)
+            }
+            var d = canvas.canvas.drawing
+            d.strokes.append(PKStroke(ink: PKInk(.pen, color: .black), path: PKStrokePath(controlPoints: points, creationDate: .now)))
+            canvas.canvas.drawing = d
+            // As PencilKit tells it when a stroke ends.
+            canvas.canvasViewDrawingDidChange(canvas.canvas)
+        }
+        func onDisk(_ page: Int) -> PKDrawing {
+            let fresh = NotebookStore(folder: folder)
+            guard let m = fresh.notebook(n.id) else { return PKDrawing() }
+            return fresh.drawing(m, m.pages[page])
+        }
+
+        // A line on page 2, the notebook left open: saved soon after, by itself.
+        write(page: 1, y: 200)
+        let deadline = ContinuousClock.now + .seconds(5)
+        while onDisk(1).strokes.isEmpty, ContinuousClock.now < deadline { try await Task.sleep(for: .milliseconds(50)) }
+        #expect(onDisk(1).strokes.count == 1)
+        // In the page's own units, not the canvas's.
+        #expect(abs(onDisk(1).bounds.midY - 200) < 4)
+
+        // A line on page 1, then the app goes to the background straight away (what the editor does then).
+        write(page: 0, y: 120)
+        canvas.flush()
+        #expect(onDisk(0).strokes.count == 1)
+        #expect(onDisk(1).strokes.count == 1)
+    }
+
     @Test func aPDFsPagesComeInAtTheirOwnSizes() throws {
         let folder = FileManager.default.temporaryDirectory.appending(path: "notebooks-\(UUID().uuidString)")
         defer { try? FileManager.default.removeItem(at: folder) }
