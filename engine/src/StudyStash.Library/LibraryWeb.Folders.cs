@@ -44,26 +44,42 @@ public sealed partial class LibraryWeb
     {
         try
         {
-            var found = LibraryFolders.Find(cfg.PoolDir);
+            // The usual places, and the folders asked about (a folder named by hand once is in none of them): each counts
+            // only if it really holds a library, or if lectures here still point inside it.
+            var found = LibraryFolders.FindWith(cfg.PoolDir, [.. from, .. refile, .. into is null ? Array.Empty<string>() : [into]]);
+            string? Usable(string asked) => Known(found, asked) ?? (LibraryBringIn.PointingInto(store, asked) > 0 ? asked : null);
             string home = Py.UserHome();
             if (job.Kind == BringInJob.Look)
             {
-                string target = Known(found, into) ?? cfg.PoolDir;
+                string target = into is { Length: > 0 } && Usable(into) is { } t ? t : cfg.PoolDir;
                 foreach (string f in from)
-                    if (Known(found, f) is { } dir && !SameFolder(dir, target)) job.Add(LibraryBringIn.Plan(store, cfg, target, dir, home, job.Progress));
+                    if (Usable(f) is { } dir && !SameFolder(dir, target)) job.Add(LibraryBringIn.Plan(store, cfg, target, dir, home, job.Progress));
+                job.End();
+                return;
             }
-            else
+            var reading = store.UnreadAttachments().Select(a => a.Id).ToHashSet();
+            LibraryBringIn.ListOwn(store, cfg);
+            foreach (var (asked, bring) in from.Select(f => (f, true)).Concat(refile.Select(f => (f, false))))
             {
-                var reading = store.UnreadAttachments().Select(a => a.Id).ToHashSet();
-                LibraryBringIn.ListOwn(store, cfg);
-                foreach (string f in from)
-                    if (Known(found, f) is { } dir && !SameFolder(dir, cfg.PoolDir)) job.Add(LibraryBringIn.Apply(store, cfg, dir, home, job.Progress));
-                foreach (string f in refile)
-                    if (Known(found, f) is { } dir && !SameFolder(dir, cfg.PoolDir)) job.Add(LibraryBringIn.Refile(store, cfg, dir, home, job.Progress));
-                // The attached files that came in are read for their words, as an upload's are.
-                foreach (var a in store.UnreadAttachments().Where(a => !reading.Contains(a.Id))) ReadLater(a);
+                // A folder asked for that this library can't use is said, never passed over: the switch isn't finished.
+                if (Usable(asked) is not { } dir)
+                {
+                    job.End($"no library at a folder asked for ({asked.Length} characters)");
+                    return;
+                }
+                if (SameFolder(dir, cfg.PoolDir))
+                {
+                    // The library answering still reads that folder (another copy's library, started before the switch).
+                    job.End("the library still uses a folder asked to leave");
+                    return;
+                }
+                job.Add(bring ? LibraryBringIn.Apply(store, cfg, dir, home, job.Progress) : LibraryBringIn.Refile(store, cfg, dir, home, job.Progress));
             }
-            job.End();
+            // The attached files that came in are read for their words, as an upload's are.
+            foreach (var a in store.UnreadAttachments().Where(a => !reading.Contains(a.Id))) ReadLater(a);
+            // Done only when no lecture, listed or in the trash, is still filed inside a folder it was asked to leave.
+            int left = from.Concat(refile).Sum(f => LibraryBringIn.PointingInto(store, f));
+            job.End(left == 0 ? null : $"{left} lectures still filed in a folder asked to leave");
         }
         catch (Exception e)
         {

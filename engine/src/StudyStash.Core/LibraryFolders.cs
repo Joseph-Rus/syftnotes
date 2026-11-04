@@ -31,9 +31,13 @@ public static partial class LibraryFolders
 
     /// <summary>The library folders on this computer, the one in use (<paramref name="inUse"/>, config.toml's
     /// pool_dir) first, then the newest first.</summary>
-    public static List<LibraryFolder> Find(string? inUse) =>
-        Find(inUse, Places(inUse, Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), Py.UserHome(),
-            Machine.Platform, Environment.GetEnvironmentVariable));
+    public static List<LibraryFolder> Find(string? inUse) => FindWith(inUse, []);
+
+    /// <summary><see cref="Find(string?)"/>, with <paramref name="also"/> looked at too: each counts only if it really
+    /// holds a library, as the others do (a folder named by hand once, outside the usual places).</summary>
+    public static List<LibraryFolder> FindWith(string? inUse, IEnumerable<string> also) =>
+        Find(inUse, [.. Places(inUse, Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), Py.UserHome(),
+            Machine.Platform, Environment.GetEnvironmentVariable), .. also]);
 
     /// <summary>Which of <paramref name="places"/> hold a library, each place once however it's reached (a link or a
     /// junction to the same folder, or the same path in another case where the system ignores case).</summary>

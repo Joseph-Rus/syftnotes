@@ -41,5 +41,10 @@ public sealed class LibraryFolderPickTests
         Assert.Equal(before.Item2, Files(older));
         Assert.Null(host.Settings.NotesFoldersSeen);
         Assert.NotNull(LibraryFolderPick.ToAsk(host, Find));
+        // Picking the row the window still tags "In use now" goes by config.toml, not the tag: it switches back.
+        var back = await LibraryFolderPick.UseAsync(host, asked.Single(f => f.InUse), asked, ct: TestContext.Current.CancellationToken);
+        Assert.Equal(LibraryFolderPick.NotFinished, back.Failure);
+        Assert.True(LibraryFolderPick.IsInUse(Configs.Load(home.Path).PoolDir, inUse));
+        Assert.Null(host.Settings.NotesFoldersSeen);
     }
 }

@@ -15,7 +15,8 @@ public sealed partial class NotesFolderRow : ObservableObject
     public required string Where { get; init; }
     public required string Detail { get; init; }
     public string Path => Folder.Path;
-    public bool InUse => Folder.InUse;
+    /// <summary>"In use now": the folder config.toml has, kept up to date after the student presses a button.</summary>
+    [ObservableProperty] public partial bool InUse { get; set; }
     [ObservableProperty] public partial bool IsPicked { get; set; }
     public required IRelayCommand Pick { get; init; }
     public required IRelayCommand Show { get; init; }
@@ -44,6 +45,7 @@ public sealed partial class NotesFolderPickModel : ObservableObject
 
     readonly UseFolder use;
     readonly PlanFolder plan;
+    readonly Func<string?>? folderInUse;
     readonly Dictionary<string, string> whereOf;
 
     /// <param name="found">The library folders, the one in use first (<see cref="LibraryFolders.Find(string?)"/>).</param>
@@ -53,11 +55,13 @@ public sealed partial class NotesFolderPickModel : ObservableObject
     /// <param name="plan">What bringing in the others' notes would do, with the pick as the library's folder.</param>
     /// <param name="reveal">Shows a folder in Finder or File Explorer.</param>
     /// <param name="today">For the year: a date this year leaves it out.</param>
+    /// <param name="folderInUse">The folder config.toml has now, read after each button so "In use now" stays true.</param>
     public NotesFolderPickModel(IReadOnlyList<LibraryFolder> found, string userHome, UseFolder use,
-        PlanFolder plan, Action<string> reveal, DateOnly? today = null)
+        PlanFolder plan, Action<string> reveal, DateOnly? today = null, Func<string?>? folderInUse = null)
     {
         this.use = use;
         this.plan = plan;
+        this.folderInUse = folderInUse;
         var now = today ?? DateOnly.FromDateTime(DateTime.Now);
         string home = LibraryFolders.Real(userHome);
         var names = found.Select(f => LibraryFolders.Where(f.Path, home)).ToList();
@@ -70,7 +74,7 @@ public sealed partial class NotesFolderPickModel : ObservableObject
             whereOf[f.Path] = where;
             row = new NotesFolderRow
             {
-                Folder = f, Where = where, Detail = Detail(f, now), IsPicked = f.InUse,
+                Folder = f, Where = where, Detail = Detail(f, now), IsPicked = f.InUse, InUse = f.InUse,
                 Pick = new RelayCommand(() => PickRow(row!)),
                 Show = new RelayCommand(() => reveal(f.Path)),
             };
@@ -156,6 +160,9 @@ public sealed partial class NotesFolderPickModel : ObservableObject
         Progress = null;
         var outcome = await use(Picked.Folder, bringIn, Report(copying: true), ct);
         Progress = null;
+        // A switch that went through but didn't finish moves "In use now" all the same.
+        if (folderInUse?.Invoke() is { } now)
+            foreach (var r in Rows) r.InUse = LibraryFolderPick.IsInUse(now, r.Path);
         if (!outcome.Ok) return outcome;
         if (!bringIn)
         {

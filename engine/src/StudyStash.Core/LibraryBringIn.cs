@@ -98,14 +98,16 @@ public static class LibraryBringIn
         readonly HashSet<string> copied = new(LibraryFolders.Comparer);
         /// <summary>The other folder's attached files already copied in for attachments listed here.</summary>
         readonly HashSet<string> copiedFiles = new(LibraryFolders.Comparer);
+        readonly Inside inside = new(from);
 
         void Step() => progress?.Invoke(++done, total);
 
         public BringInCount Go()
         {
-            if (Under(into, from) || Under(from, into) || !Directory.Exists(from)) return Count();
+            if (Under(into, from) || Under(from, into)) return Count();
+            // A folder gone since still has its rows pointed here (their files went with it), so none is left pointing there.
             var own = mode == Mode.Refile ? [] : NoteFiles(into);
-            var rows = store.ListNotes().Where(r => !string.IsNullOrEmpty(r.MdPath) && Under(r.MdPath, from)).ToList();
+            var rows = store.ListNotes().Where(r => !string.IsNullOrEmpty(r.MdPath) && inside.Rel(r.MdPath) is not null).ToList();
             var theirs = mode == Mode.Refile ? [] : NoteFiles(from);
             var attached = mode == Mode.Refile ? [] : AttachedFiles(from);
             var listedAttachments = store.ListAttachments();
@@ -125,13 +127,18 @@ public static class LibraryBringIn
             foreach (var row in rows)
             {
                 Step();
-                if (!File.Exists(row.MdPath)) continue;
+                string rel = inside.Rel(row.MdPath!)!;
+                if (!File.Exists(row.MdPath))
+                {
+                    // Its file is gone from there: the row looks for it here from now on (the lecture is in its row).
+                    if (apply) store.Refile(row.Id, Path.Combine(into, rel));
+                    continue;
+                }
                 string text = Text(row.MdPath!);
-                string rel = Path.GetRelativePath(from, row.MdPath!);
                 if (apply) store.Refile(row.Id, CopyIn(text, Path.Combine(into, rel)));
                 fresh++;
                 planned[row.Id] = text;
-                copied.Add(Path.GetFullPath(row.MdPath!));
+                copied.Add(Path.GetFullPath(Path.Combine(from, rel)));
             }
             // The other folder's own lectures.
             foreach (var file in theirs)
@@ -147,10 +154,10 @@ public static class LibraryBringIn
             foreach (string rel in loose)
             {
                 Step();
-                if (CopyLoose(Path.Combine(from, rel), Path.Combine(into, rel), apply)) files++;
+                if (CopyLoose(store, rel, Path.Combine(from, rel), Path.Combine(into, rel), apply)) files++;
             }
             // A lecture in the trash that was filed in the other folder comes back, if restored, into this one.
-            if (apply) store.RepointTrash(path => Under(path, from) ? Path.Combine(into, Path.GetRelativePath(from, path)) : null);
+            if (apply) store.RepointTrash(path => inside.Rel(path) is { } rel ? Path.Combine(into, rel) : null);
             return Count();
         }
 
@@ -333,9 +340,10 @@ public static class LibraryBringIn
     }
 
     /// <summary>Copies <paramref name="other"/> to <paramref name="want"/>, or beside it as "name (2).ext" when that's a
-    /// different file; nothing when a copy is there already. Whether it copied (or, not <paramref name="apply"/>ing,
-    /// would).</summary>
-    static bool CopyLoose(string other, string want, bool apply)
+    /// different file; nothing when a copy is there already, or this file (this path, these bytes) came over once
+    /// before: a capture filed since, or a note the student deleted or edited, stays as the student left it. Whether it
+    /// copied (or, not <paramref name="apply"/>ing, would).</summary>
+    static bool CopyLoose(Store store, string rel, string other, string want, bool apply)
     {
         string sha;
         long size;
@@ -348,20 +356,28 @@ public static class LibraryBringIn
         {
             return false;
         }
+        string key = "bring-in:" + Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(rel.Replace('\\', '/').ToLowerInvariant() + "/" + sha)))[..32];
+        if (store.GetState(key) is not null) return false;
         string stem = Path.GetFileNameWithoutExtension(want), ext = Path.GetExtension(want), dir = Py.Parent(want);
         string path = want;
         for (int i = 2; File.Exists(path); i++)
         {
             try
             {
-                if (new FileInfo(path).Length == size && Sha(path) == sha) return false;
+                if (new FileInfo(path).Length == size && Sha(path) == sha)
+                {
+                    if (apply) store.SetState(key, path);
+                    return false;
+                }
             }
             catch (Exception e) when (e is IOException or UnauthorizedAccessException)
             {
             }
             path = Path.Combine(dir, $"{stem} ({i}){ext}");
         }
-        if (apply) Store.PutWhole(path, temp => File.Copy(other, temp), overwrite: false);
+        if (!apply) return true;
+        Store.PutWhole(path, temp => File.Copy(other, temp), overwrite: false);
+        store.SetState(key, path);
         return true;
     }
 
@@ -581,6 +597,32 @@ public static class LibraryBringIn
     static string Short(string where) => where.Split(" › ")[0];
 
     /// <summary>Whether <paramref name="path"/> is inside <paramref name="dir"/> (or is it).</summary>
+    /// <summary>How many lectures, listed or in the trash, still have their file inside <paramref name="dir"/> (reached by
+    /// any path, links followed): what a switch away from it has to bring to 0.</summary>
+    public static int PointingInto(Store store, string dir)
+    {
+        var inside = new Inside(dir);
+        return store.NoteFiles().Count(p => inside.Rel(p) is not null) + store.TrashPaths().Count(p => inside.Rel(p) is not null);
+    }
+
+    /// <summary>Paths inside a folder however they're written: as written, or with every link followed (a row written
+    /// as ~/Notes link/Study Stash/… is inside ~/OneDrive/Documents/Study Stash when the link goes there).</summary>
+    sealed class Inside(string dir)
+    {
+        readonly string real = LibraryFolders.Real(dir);
+        readonly Dictionary<string, string> parents = new(LibraryFolders.Comparer);
+
+        /// <summary><paramref name="path"/> relative to the folder, or null when it isn't inside it.</summary>
+        public string? Rel(string path)
+        {
+            if (Under(path, dir)) return Path.GetRelativePath(dir, path);
+            string parent = Py.Parent(path);
+            if (!parents.TryGetValue(parent, out string? realParent)) parents[parent] = realParent = LibraryFolders.Real(parent);
+            string full = Path.Combine(realParent, Path.GetFileName(path));
+            return Under(full, real) ? Path.GetRelativePath(real, full) : null;
+        }
+    }
+
     static bool Under(string path, string dir)
     {
         string p = Path.GetFullPath(path).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
