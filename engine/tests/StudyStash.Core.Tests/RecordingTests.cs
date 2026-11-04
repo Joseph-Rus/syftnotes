@@ -271,7 +271,7 @@ public class RecordingTests
     }
 
     [Fact]
-    public void A_filed_lecture_is_picked_up_again_and_its_sound_added_to()
+    public async Task A_filed_lecture_is_picked_up_again_and_its_sound_added_to()
     {
         using var dir = new TempDir();
         var store = new LectureStore(dir.Path);
@@ -294,7 +294,7 @@ public class RecordingTests
         Assert.Equal("Data Mining", again.ClassName); // where the library put it
         Assert.False(again.SpeakersDone); // told apart again, over all of it
         mic!.Play(6);
-        SpinWait.SpinUntil(() => rec.Elapsed > 12.99, 10000);
+        Assert.True(await Waiting.UntilAsync(() => rec.Elapsed > 12.99), $"the recording reached only {rec.Elapsed:0.00} s");
         Assert.InRange(rec.Elapsed, 12.99, 13.01);
         var done = rec.Stop()!;
         Assert.Equal(LectureState.Transcribing, done.State);
@@ -320,12 +320,14 @@ public class RecordingTests
         var again = rec.Continue("rec-old");
         Assert.Equal(600, again.AudioStart);
         Assert.True(again.SpeakersDone); // the old part's sound is gone: no telling voices apart over it
-        mic!.Play(30);
-        SpinWait.SpinUntil(() => rec.Elapsed > 629.99, 10000);
-        Assert.InRange(rec.Elapsed, 629.99, 630.01); // the time goes on from the old part's end
+        // Six seconds, past the five a picked-up lecture needs to count (KeepAtLeastSeconds): thirty took the background
+        // writer past this wait's limit when every test ran at once. Waited on until it's all written, and said if it isn't.
+        mic!.Play(6);
+        Assert.True(await Waiting.UntilAsync(() => rec.Elapsed > 605.99), $"the recording reached only {rec.Elapsed:0.00} s");
+        Assert.InRange(rec.Elapsed, 605.99, 606.01); // the time goes on from the old part's end
         var done = rec.Stop()!;
-        Assert.InRange(done.Seconds, 629.99, 630.01);
-        Assert.InRange(Sound.WavSeconds(store.AudioPath("rec-old")), 29.99, 30.01);
+        Assert.InRange(done.Seconds, 605.99, 606.01);
+        Assert.InRange(Sound.WavSeconds(store.AudioPath("rec-old")), 5.99, 6.01);
 
         var whisper = new FakeWhisper();
         var worker = new TranscriptionWorker(store, () => whisper, () => null);
@@ -334,8 +336,8 @@ public class RecordingTests
         Assert.Equal(LectureState.Sending, l.State);
         Assert.Equal("what was said last week", l.Segments[0].Text);
         Assert.True(l.Segments.Count > 1);
-        Assert.All(l.Segments.Skip(1), sg => Assert.InRange(sg.Start, 600, 630)); // on the end of the transcript
-        Assert.InRange(l.TranscribedSeconds, 629.99, 630.01);
+        Assert.All(l.Segments.Skip(1), sg => Assert.InRange(sg.Start, 600, 606)); // on the end of the transcript
+        Assert.InRange(l.TranscribedSeconds, 605.99, 606.01);
         Assert.Equal("typed last week", l.Notes);
         Assert.Equal("rec-old", (string)l.Payload()["id"]!); // the same note, sent again
     }
