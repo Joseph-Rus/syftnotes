@@ -358,10 +358,13 @@ public class FunnelTests
         var rig = await SyncAsync();
         var (sync, handler) = (rig.Sync, rig.Handler);
         Assert.Equal(StageState.Done, sync.Find.State);
-        Assert.Equal("4 found", sync.Find.Detail);
+        // Canvas lists four courses and one isn't brought in: the first line counts the three that are, the same three
+        // the sync counts ("1 of 3" below), never "4 found" and then "3 of 3".
+        Assert.Equal("3 found", sync.Find.Detail);
         // The ticked courses became classes, and the sync was asked for.
         var chose = Assert.Single(handler.Requests, r => r.Path == "/api/v2/canvas/choose");
         Assert.Contains("4201", chose.Body);
+        Assert.DoesNotContain("4204", chose.Body);
         Assert.Contains(handler.Requests, r => r.Path == "/api/v2/canvas" && r.Body == """{"sync":true}""");
         Assert.Equal(StageState.Working, sync.Due.State);
         Assert.Equal("Waiting for Chrome to start", sync.Due.Detail);

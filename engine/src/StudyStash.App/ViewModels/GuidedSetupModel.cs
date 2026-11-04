@@ -791,6 +791,7 @@ public sealed partial class GuidedSetupModel : ObservableObject, IDisposable
         PlanProblem = ChatProblem.None;
         signIn ??= services.SignIn(Cli, exe);
         var s = signIn;
+        s.Log ??= services.Log;
         SignInStuck = false;
         s.Start();
         // Gemini's page ends on a code: the box for it shows while the sign-in waits, and hands it to this sign-in.

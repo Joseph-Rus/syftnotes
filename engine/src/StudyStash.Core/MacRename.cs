@@ -54,11 +54,12 @@ public static class MacRename
 
     /// <summary>Waits for <paramref name="pid"/> to quit (caffeinate -w blocks until it exits), then opens the app at
     /// <paramref name="app"/> with the arguments this copy had (--background when it was an update's relaunch, so no
-    /// window opens).</summary>
-    internal static IReadOnlyList<string> Reopen(int pid, string app, IReadOnlyList<string> args) =>
+    /// window opens). With a <paramref name="from"/>, only once it's gone: a move that didn't happen opens nothing.</summary>
+    internal static IReadOnlyList<string> Reopen(int pid, string from, string app, IReadOnlyList<string> args) =>
     [
-        "/bin/sh", "-c", "app=\"$1\"; shift; /usr/bin/caffeinate -w \"$0\"; exec /usr/bin/open \"$app\" --args \"$@\"",
-        pid.ToString(System.Globalization.CultureInfo.InvariantCulture), app, .. args,
+        "/bin/sh", "-c",
+        "from=\"$1\"; app=\"$2\"; shift 2; /usr/bin/caffeinate -w \"$0\"; [ -n \"$from\" ] && [ -e \"$from\" ] && exit 0; exec /usr/bin/open \"$app\" --args \"$@\"",
+        pid.ToString(System.Globalization.CultureInfo.InvariantCulture), from, app, .. args,
     ];
 
     /// <summary>
@@ -67,7 +68,8 @@ public static class MacRename
     /// running from the bundle about to go (an older one still open) holds the plan off until it's quit: deleting it
     /// under that copy would leave it running from nothing. <paramref name="stopBackground"/> stops this copy's own
     /// background library (the phone answered with the app closed) before its bundle moves; the app starts it again
-    /// from the new place.
+    /// from the new place. The waiter starts before this copy's own bundle moves or goes: from then on this process can't
+    /// load any more of its code (starting a process needs System.IO.Pipes, not loaded yet), so it only returns and quits.
     /// </summary>
     public static bool Run(RenamePlan plan, Func<string, bool> runningFrom, Action stopBackground, Runner run,
         Action<IReadOnlyList<string>> spawn, int pid, IReadOnlyList<string> args, Action<string> log)
@@ -86,6 +88,8 @@ public static class MacRename
                 return false;
             }
             stopBackground();
+            // A newer copy already in place opens whatever happens to this one; a moved one only if it really moved.
+            spawn(Reopen(pid, plan.OpenInstead ? "" : plan.From, plan.To, args));
             if (plan.OpenInstead)
             {
                 // The newer copy is already in place: this one goes, and that one opens.
@@ -101,10 +105,10 @@ public static class MacRename
         }
         catch (Exception e) when (e is IOException or UnauthorizedAccessException)
         {
+            // The waiter opens nothing while the old bundle is still there; this copy carries on from it.
             log("[rename] couldn't rename the app: " + e.Message);
             return false;
         }
-        spawn(Reopen(pid, plan.To, args));
         return true;
     }
 }
