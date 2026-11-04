@@ -7,8 +7,8 @@ The Canvas extension is one set of files (`extension/`) that runs in two familie
   Chromium load the folder Syft Notes writes ("Load unpacked", see [canvas.md](canvas.md#the-extension)).
 - **Firefox and the browsers built on it** (Zen, LibreWolf, Waterfox). This page.
 
-Version 1.6 is published on addons.mozilla.org (submitted 2026-10-06, public by the listing's own date on
-2026-10-09): [Syft Notes for Canvas](https://addons.mozilla.org/firefox/addon/study-stash-for-canvas/).
+Version 1.8 is published on addons.mozilla.org (1.6 was submitted 2026-10-06 and public by the listing's own date on
+2026-10-09; 1.8 went in on 2026-11-02). The repo's copy is now 1.9, which Mozilla doesn't serve yet: [Syft Notes for Canvas](https://addons.mozilla.org/firefox/addon/study-stash-for-canvas/).
 `Extension.FirefoxPublishedAt` names that page, so from Syft Notes 0.16.3 the Canvas step offers Firefox and the
 browsers built on it. This page is what's built, what a student sees, how it was tried, and what publishing took.
 
@@ -17,7 +17,7 @@ browsers built on it. This page is what's built, what a student sees, how it was
 Firefox only keeps an add-on that Mozilla has signed. It can load a folder ("Load Temporary Add-on" in
 `about:debugging`), but that copy is gone the next time Firefox starts, and Canvas would stop syncing without a word.
 So the Firefox copy is a packed, signed add-on, and it's connected the way a Chrome Web Store copy is: the student
-pastes a code from Syft Notes.
+pastes a code from Syft Notes (from 1.8 it connects itself, [below](#18-nothing-to-paste)).
 
 ## What's built
 
@@ -149,7 +149,7 @@ to "do you need to submit source code": the scripts and the popup are hand-writt
 - **Add-on URL (slug)**: `study-stash-for-canvas`, so the page is
   `https://addons.mozilla.org/firefox/addon/study-stash-for-canvas/`.
 - **Description**: what it does (copies your Canvas courses into your own Syft Notes library), that it only reads and
-  uses your own sign-in, that it does nothing until you paste a code from Syft Notes, and that nothing goes anywhere
+  uses your own sign-in, that it does nothing until you connect it to Syft Notes, and that nothing goes anywhere
   except your library.
 - **License**: the repo's.
 - **Privacy policy**: required, because it sends data out of the browser. The site's privacy page says what's read
