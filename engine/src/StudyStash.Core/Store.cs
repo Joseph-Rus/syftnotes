@@ -1144,6 +1144,27 @@ public sealed partial class Store : IDisposable
         }
     }
 
+    /// <summary>Each lecture in the trash whose file was at a path <paramref name="map"/> knows (one in a library folder
+    /// no longer in use) will be restored to where <paramref name="map"/> says instead. How many.</summary>
+    public int RepointTrash(Func<string, string?> map)
+    {
+        lock (gate)
+        {
+            var moved = new List<(string Id, string Row)>();
+            using (var cmd = Command("SELECT id, row_json FROM trash"))
+            using (var r = cmd.ExecuteReader())
+                while (r.Read())
+                {
+                    if (r.IsDBNull(1) || JsonNode.Parse(r.GetString(1)) is not JsonObject row) continue;
+                    if (Py.AsString(row["md_path"]) is not { Length: > 0 } path || map(path) is not { } to) continue;
+                    row["md_path"] = Py.NormPath(to);
+                    moved.Add((r.GetString(0), row.ToJsonString()));
+                }
+            foreach (var (id, row) in moved) Exec("UPDATE trash SET row_json=? WHERE id=?", row, id);
+            return moved.Count;
+        }
+    }
+
     /// <summary>Writes <paramref name="text"/> as the whole of <paramref name="path"/> or not at all: into a hidden file
     /// beside it, then renamed into place, so a crash or a full disk never leaves half a note file.</summary>
     public static void WriteWhole(string path, string text) =>

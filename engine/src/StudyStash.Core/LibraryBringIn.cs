@@ -87,7 +87,9 @@ public static class LibraryBringIn
     sealed class Run(Store store, Config cfg, string into, string from, string userHome, Mode mode, Action<int, int>? progress)
     {
         readonly bool apply = mode != Mode.Plan;
-        int fresh, here, both, deleted, classes, files;
+        int fresh, here, both, deleted, files;
+        /// <summary>The classes this library hasn't got that come in (each once, however many lectures bring it).</summary>
+        readonly HashSet<string> newClasses = new(StringComparer.OrdinalIgnoreCase);
         int done, total;
         readonly HashSet<string> gone = store.DeletedIds();
         /// <summary>A dry run's memory of what it would have listed: id → its note file's text.</summary>
@@ -114,7 +116,7 @@ public static class LibraryBringIn
             {
                 if (Read(file) is { } note && store.Get(note.Id) is null && !gone.Contains(note.Id))
                 {
-                    if (apply) classes += Enlist(store, cfg, note, note.Text, note.Path, apply: true);
+                    if (apply) Enlist(store, cfg, note, note.Text, note.Path, apply: true, newClasses);
                     else planned.TryAdd(note.Id, note.Text);
                 }
                 Step();
@@ -138,6 +140,17 @@ public static class LibraryBringIn
                 Theirs(file);
             }
             files = ListedAttachments(listedAttachments) + OtherAttachments(attached);
+            // What the student wrote by hand in the other folder (captures waiting in the Inbox, notes filed into a class's
+            // Notes): the folder in use is where they're read, so they come too. The Canvas mirror is fetched again.
+            var loose = LooseFiles(from);
+            total += loose.Count;
+            foreach (string rel in loose)
+            {
+                Step();
+                if (CopyLoose(Path.Combine(from, rel), Path.Combine(into, rel), apply)) files++;
+            }
+            // A lecture in the trash that was filed in the other folder comes back, if restored, into this one.
+            if (apply) store.RepointTrash(path => Under(path, from) ? Path.Combine(into, Path.GetRelativePath(from, path)) : null);
             return Count();
         }
 
@@ -160,7 +173,7 @@ public static class LibraryBringIn
             }
             if (mine is null)
             {
-                if (row is null) classes += Enlist(store, cfg, note, note.Text, null, apply);
+                if (row is null) Enlist(store, cfg, note, note.Text, null, apply, newClasses);
                 else if (apply) store.Refile(row.Id, CopyIn(note.Text, Path.Combine(into, Path.GetRelativePath(from, note.Path))));
                 fresh++;
                 planned[note.Id] = note.Text;
@@ -179,12 +192,12 @@ public static class LibraryBringIn
                 return;
             }
             var copy = note.Beside(copyId, Short(LibraryFolders.Where(from, userHome)));
-            classes += Enlist(store, cfg, copy, copy.Text, null, apply);
+            Enlist(store, cfg, copy, copy.Text, null, apply, newClasses);
             planned[copyId] = copy.Text;
             both++;
         }
 
-        BringInCount Count() => new(from, fresh, here, both, deleted, classes, files);
+        BringInCount Count() => new(from, fresh, here, both, deleted, newClasses.Count, files);
 
         /// <summary>Attached files a listed attachment is missing here, copied from the same place in the other folder
         /// (an attachment state.db already lists, whose file the folder the library used before has).</summary>
@@ -230,7 +243,9 @@ public static class LibraryBringIn
                     continue;
                 }
                 if (HasCopy(dir, size, sha)) continue;
-                string id = "folder-" + sha[..24];
+                // The same file attached to two classes is one attachment in each: the id is the class's and the file's.
+                string id = "folder-" + Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(clsFolder.ToLowerInvariant() + "/" + sha)))[..24];
+                if (gone.Contains(id)) continue; // removed by the student once: it stays removed
                 if (store.GetAttachment(id) is not null || planned.ContainsKey(id)) continue;
                 planned[id] = "";
                 n++;
@@ -292,6 +307,64 @@ public static class LibraryBringIn
         return found;
     }
 
+    /// <summary>The files a student wrote by hand in a library folder, relative to it: the Inbox's captures, and the
+    /// notes filed into each class's Notes folder. Hidden ones left out.</summary>
+    static List<string> LooseFiles(string root)
+    {
+        var found = new List<string>();
+        var options = new EnumerationOptions { IgnoreInaccessible = true, RecurseSubdirectories = true };
+        try
+        {
+            var dirs = new List<string> { Path.Combine(root, "Inbox") };
+            dirs.AddRange(new DirectoryInfo(root).EnumerateDirectories("*", new EnumerationOptions { IgnoreInaccessible = true })
+                .Where(d => !d.Name.StartsWith('.') && !d.Attributes.HasFlag(FileAttributes.ReparsePoint))
+                .Select(d => Path.Combine(d.FullName, "Notes")));
+            foreach (string dir in dirs.Where(Directory.Exists))
+                found.AddRange(new DirectoryInfo(dir).EnumerateFiles("*", options)
+                    .Where(f => !Path.GetRelativePath(root, f.FullName).Split(Path.DirectorySeparatorChar).Any(part => part.StartsWith('.')))
+                    .Select(f => Path.GetRelativePath(root, f.FullName)));
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException)
+        {
+            // Gone, or turned away part-way: what was found stands.
+        }
+        found.Sort(StringComparer.Ordinal);
+        return found;
+    }
+
+    /// <summary>Copies <paramref name="other"/> to <paramref name="want"/>, or beside it as "name (2).ext" when that's a
+    /// different file; nothing when a copy is there already. Whether it copied (or, not <paramref name="apply"/>ing,
+    /// would).</summary>
+    static bool CopyLoose(string other, string want, bool apply)
+    {
+        string sha;
+        long size;
+        try
+        {
+            size = new FileInfo(other).Length;
+            sha = Sha(other);
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException)
+        {
+            return false;
+        }
+        string stem = Path.GetFileNameWithoutExtension(want), ext = Path.GetExtension(want), dir = Py.Parent(want);
+        string path = want;
+        for (int i = 2; File.Exists(path); i++)
+        {
+            try
+            {
+                if (new FileInfo(path).Length == size && Sha(path) == sha) return false;
+            }
+            catch (Exception e) when (e is IOException or UnauthorizedAccessException)
+            {
+            }
+            path = Path.Combine(dir, $"{stem} ({i}){ext}");
+        }
+        if (apply) Store.PutWhole(path, temp => File.Copy(other, temp), overwrite: false);
+        return true;
+    }
+
     /// <summary>Whether <paramref name="dir"/> has a file of this size and SHA-256 already.</summary>
     static bool HasCopy(string dir, long size, string sha)
     {
@@ -318,7 +391,7 @@ public static class LibraryBringIn
     /// <summary>Lists <paramref name="note"/> in its class (added to the library when it hasn't got it) with
     /// <paramref name="text"/> as its file: at <paramref name="at"/>, or where its class, day and title put it in this
     /// library's folder (a free name when that's taken). How many classes it added (0 or 1).</summary>
-    static int Enlist(Store store, Config cfg, NoteFile note, string text, string? at, bool apply)
+    static int Enlist(Store store, Config cfg, NoteFile note, string text, string? at, bool apply, HashSet<string>? newClasses = null)
     {
         string cls = note.Class;
         int added = 0;
@@ -330,6 +403,7 @@ public static class LibraryBringIn
             else if (cls.Length is > 0 and <= 60)
             {
                 added = 1;
+                newClasses?.Add(cls);
                 if (apply)
                 {
                     cfg.Classes.Add(new ClassDef(cls, [], ""));
@@ -520,9 +594,10 @@ public static class LibraryBringIn
 /// One run of <see cref="LibraryBringIn"/> in the library, which the app asks after while it goes (a big OneDrive folder
 /// takes longer than one request may): what it is (<see cref="Look"/>, or <see cref="Bring"/>), how far it has got, and
 /// once it ends, what each folder did or would do, or why it stopped. The library runs one at a time: asking for
-/// another while one runs gets the one running.
+/// another while one runs gets the one running, which says whose it is (<see cref="Asked"/>), so the app waits for it to
+/// end and asks again rather than taking another's counts for its own.
 /// </summary>
-public sealed class BringInJob(string kind)
+public sealed class BringInJob(string kind, string asked)
 {
     /// <summary>What bringing in would do (nothing changes).</summary>
     public const string Look = "look";
@@ -538,6 +613,8 @@ public sealed class BringInJob(string kind)
 
     public string Id { get; } = Guid.NewGuid().ToString("N");
     public string Kind { get; } = kind;
+    /// <summary>The asker's own id for the job it wanted.</summary>
+    public string Asked { get; } = asked;
     public bool Running { get { lock (gate) return running; } }
 
     public void Progress(int doneNow, int totalNow)
@@ -561,17 +638,17 @@ public sealed class BringInJob(string kind)
         lock (gate)
             return new JsonObject
             {
-                ["id"] = Id, ["kind"] = Kind, ["running"] = running, ["done"] = done, ["total"] = total, ["error"] = error,
+                ["id"] = Id, ["kind"] = Kind, ["asked"] = Asked, ["running"] = running, ["done"] = done, ["total"] = total, ["error"] = error,
                 ["results"] = new JsonArray([.. results.Select(r => (JsonNode)r.Json())]),
             };
     }
 }
 
 /// <summary>A <see cref="BringInJob"/> as the app reads it.</summary>
-public sealed record BringInStatus(string Id, string Kind, bool Running, int Done, int Total, string? Error, List<BringInCount> Results)
+public sealed record BringInStatus(string Id, string Kind, string Asked, bool Running, int Done, int Total, string? Error, List<BringInCount> Results)
 {
     public static BringInStatus? FromJson(JsonObject? o) => o?["id"] is null ? null : new(
-        Py.AsString(o["id"]) ?? "", Py.AsString(o["kind"]) ?? "", o["running"] is JsonValue r && r.TryGetValue(out bool b) && b,
+        Py.AsString(o["id"]) ?? "", Py.AsString(o["kind"]) ?? "", Py.AsString(o["asked"]) ?? "", o["running"] is JsonValue r && r.TryGetValue(out bool b) && b,
         o["done"] is JsonValue d && d.TryGetValue(out int dn) ? dn : 0, o["total"] is JsonValue t && t.TryGetValue(out int tn) ? tn : 0,
         Py.AsString(o["error"]), [.. (o["results"] as JsonArray ?? []).OfType<JsonObject>().Select(BringInCount.FromJson)]);
 }

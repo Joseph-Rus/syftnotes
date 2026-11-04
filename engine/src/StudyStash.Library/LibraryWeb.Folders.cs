@@ -20,8 +20,9 @@ public sealed partial class LibraryWeb
         {
             lock (folderGate) return Http.Json(folderJob?.Json() ?? []);
         }));
-        // {kind: look|bring, into (look: the folder the student would use), from: [folders to bring in], refile: [folders
-        // whose listed lectures' files to copy in]}: the job started, or the one already running.
+        // {asked: the asker's id for it, kind: look|bring, into (look: the folder the student would use), from: [folders to
+        // bring in], refile: [folders whose listed lectures' files to copy in]}: the job started, or the one already
+        // running (its own "asked" tells the asker it isn't theirs).
         app.MapPost(LibraryBringIn.Route, Http.Handle(ctx => ApiAsync(ctx, async () =>
         {
             var body = await Http.JsonBodyAsync(ctx.Request) ?? [];
@@ -29,7 +30,7 @@ public sealed partial class LibraryWeb
             lock (folderGate)
             {
                 if (folderJob is { Running: true } running) return Http.Json(running.Json());
-                var job = folderJob = new BringInJob(kind);
+                var job = folderJob = new BringInJob(kind, Py.AsString(body["asked"]) ?? "");
                 var from = (body["from"] as JsonArray ?? []).Select(Py.AsString).OfType<string>().ToList();
                 var refile = (body["refile"] as JsonArray ?? []).Select(Py.AsString).OfType<string>().ToList();
                 string? into = Py.AsString(body["into"]);

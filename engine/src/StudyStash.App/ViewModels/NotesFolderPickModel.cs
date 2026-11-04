@@ -133,7 +133,7 @@ public sealed partial class NotesFolderPickModel : ObservableObject
     [ObservableProperty] public partial AsyncAction? SummaryAction { get; private set; }
 
     /// <summary>The window's height for this many rows (its width is the view's own).</summary>
-    public double WantedHeight => 330 + Rows.Count * 84;
+    public double WantedHeight => 360 + Rows.Count * 84; // room for the progress line above the buttons
 
     /// <summary>The pick was used: the window closes.</summary>
     public Action? OnDone { get; set; }

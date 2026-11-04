@@ -10,7 +10,7 @@ namespace StudyStash.App.Pictures;
 /// from before, and the bring-in's summary and result: a picture of each, in each look, light and dark.</summary>
 public class NotesFolderShots
 {
-    static NotesFolderPick View(NotesFolderStep step = NotesFolderStep.Pick, bool copying = false)
+    static NotesFolderPick View(NotesFolderStep step = NotesFolderStep.Pick, bool copying = false, bool looking = false)
     {
         string home = OperatingSystem.IsWindows() ? @"C:\Users\ada" : "/Users/ada";
         LibraryFolder[] found =
@@ -25,11 +25,18 @@ public class NotesFolderShots
                 progress(120, 400);
                 return new TaskCompletionSource<Services.Outcome<List<BringInCount>>>().Task;
             },
-            (_, _, _) => Task.FromResult(Services.Outcome<List<BringInCount>>.Answered([Counted(found[1].Path)])), _ => { }, new DateOnly(2026, 11, 3));
+            (_, progress, _) =>
+            {
+                if (!looking) return Task.FromResult(Services.Outcome<List<BringInCount>>.Answered([Counted(found[1].Path)]));
+                // Looking through a big folder from the pick page: the longest progress line there is.
+                progress(812, 1484);
+                return new TaskCompletionSource<Services.Outcome<List<BringInCount>>>().Task;
+            }, _ => { }, new DateOnly(2026, 11, 3));
         if (step != NotesFolderStep.Pick) (step == NotesFolderStep.Summary ? model.Look : model.Bring).Command.Execute(null);
         if (copying) model.Bring.Command.Execute(null);
+        if (looking) model.Look.Command.Execute(null);
         Assert.Equal(step, model.Step);
-        Assert.Equal(copying, model.Busy);
+        Assert.Equal(copying || looking, model.Busy);
         return new NotesFolderPick { DataContext = model, Height = model.WantedHeight };
     }
 
@@ -43,11 +50,13 @@ public class NotesFolderShots
             foreach (var step in new[] { NotesFolderStep.Pick, NotesFolderStep.Summary, NotesFolderStep.Done })
             {
                 string name = step switch { NotesFolderStep.Pick => "notes-folder", NotesFolderStep.Summary => "notes-folder-summary", _ => "notes-folder-done" };
-                Shot.Take("mac-" + name, SkinKind.Mac, t, () => View(step), size: new Avalonia.Size(708, 580));
-                Shot.Take("win-" + name, SkinKind.Win, t, () => View(step), size: new Avalonia.Size(708, 580));
+                Shot.Take("mac-" + name, SkinKind.Mac, t, () => View(step), size: new Avalonia.Size(708, 620));
+                Shot.Take("win-" + name, SkinKind.Win, t, () => View(step), size: new Avalonia.Size(708, 620));
             }
-            Shot.Take("mac-notes-folder-copying", SkinKind.Mac, t, () => View(NotesFolderStep.Summary, copying: true), size: new Avalonia.Size(708, 580));
-            Shot.Take("win-notes-folder-copying", SkinKind.Win, t, () => View(NotesFolderStep.Summary, copying: true), size: new Avalonia.Size(708, 580));
+            Shot.Take("mac-notes-folder-looking", SkinKind.Mac, t, () => View(looking: true), size: new Avalonia.Size(708, 620));
+            Shot.Take("win-notes-folder-looking", SkinKind.Win, t, () => View(looking: true), size: new Avalonia.Size(708, 620));
+            Shot.Take("mac-notes-folder-copying", SkinKind.Mac, t, () => View(NotesFolderStep.Summary, copying: true), size: new Avalonia.Size(708, 620));
+            Shot.Take("win-notes-folder-copying", SkinKind.Win, t, () => View(NotesFolderStep.Summary, copying: true), size: new Avalonia.Size(708, 620));
         }
     }
 }
