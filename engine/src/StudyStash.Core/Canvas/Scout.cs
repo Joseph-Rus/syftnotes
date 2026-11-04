@@ -48,6 +48,12 @@ public sealed class Scout(string home, Func<string, string> classDir, AiJobs ai,
         Finish with up to 8 lines: the recipe in one line, what you downloaded, and what lives outside Canvas.
         """;
 
+    /// <summary>Which classes a sync that just finished should explore: those never explored, and those whose last
+    /// try failed (offline, say) and have no recipe yet, so a failure is tried again with the next sync instead of
+    /// waiting for the student to press Explore again.</summary>
+    public static string[] ToExplore(IEnumerable<string> synced, IReadOnlyDictionary<string, ScoutReport> reports, Func<string, bool> hasRecipe) =>
+        synced.Where(c => !hasRecipe(c) && !(reports.TryGetValue(c, out var r) && r.Ok)).ToArray();
+
     /// <summary>Queue classes to explore. Starts working through them unless it already is.</summary>
     public void Queue(params string[] classes)
     {
