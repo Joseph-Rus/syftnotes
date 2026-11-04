@@ -246,10 +246,21 @@ public sealed partial class LibraryWeb
         app.MapGet("/api/v2/canvas/classes", (HttpContext ctx) => Api(ctx, () =>
             Http.Json(CanvasView.Classes(cfg.ClassNames(), Canvas.Settings, cfg.Home, ScoutOf, Canvas.Clock()))));
         app.MapGet("/api/v2/canvas/due", (HttpContext ctx) => Api(ctx, () => Http.Json(DueList())));
+        // The student's own mark on a Due item, in Syft Notes only (Canvas is never asked): "done", "hidden", or "" to take it back.
+        // The answer is the Due list as it now stands, so the app changes everywhere at once.
+        app.MapPost("/api/v2/canvas/mark", Http.Handle(ctx => ApiAsync(ctx, async () =>
+        {
+            var body = await Http.JsonBodyAsync(ctx.Request);
+            string cls = S(body?["class"]), kind = S(body?["kind"]) is { Length: > 0 } k ? k : "assignment", mark = S(body?["mark"]);
+            if (!cfg.ClassNames().Contains(cls) || body?["id"] is not JsonValue id || !id.TryGetValue(out long itemId)) return Http.Detail(400, "unknown assignment");
+            if (mark is not ("" or DueMarks.Done or DueMarks.Hidden)) return Http.Detail(400, "mark is done, hidden or empty");
+            DueMarks.Set(cfg.Home, cls, kind, itemId, mark, Canvas.Clock());
+            return Http.Json(DueList());
+        })));
         app.MapGet("/api/v2/canvas/assignments", (HttpContext ctx, string? @class) => Api(ctx, () =>
         {
             if (@class is null || !cfg.ClassNames().Contains(@class)) return Http.Detail(400, "unknown class");
-            var mine = Assignments.Load(cfg.Home).Where(a => a.ClassName == @class).ToList();
+            var mine = Assignments.Shown(cfg.Home).Where(a => a.ClassName == @class).ToList();
             return Http.Json(CanvasView.ForClass(@class, mine, id => Canvas.Crawl.AssignmentFolder(@class, id)));
         }));
         app.MapGet("/api/v2/canvas/assignment", (HttpContext ctx, string? @class, long? id) => Api(ctx, () =>
@@ -291,7 +302,7 @@ public sealed partial class LibraryWeb
         app.MapGet("/api/v2/canvas/notifications", (HttpContext ctx, long? after) => Api(ctx, () =>
         {
             var soonNow = Canvas.Clock();
-            CanvasNotifications.EnsureDueSoon(cfg.Home, Assignments.Upcoming(Assignments.Load(cfg.Home), TimeZoneInfo.ConvertTime(soonNow, Canvas.Zone).DateTime, 1), soonNow, Canvas.Zone);
+            CanvasNotifications.EnsureDueSoon(cfg.Home, Assignments.Upcoming(Assignments.Shown(cfg.Home), TimeZoneInfo.ConvertTime(soonNow, Canvas.Zone).DateTime, 1), soonNow, Canvas.Zone);
             var (last, items) = CanvasNotifications.Since(cfg.Home, after ?? 0);
             return Http.Json(CanvasView.Notifications(last, items));
         }));
@@ -353,7 +364,7 @@ public sealed partial class LibraryWeb
         app.MapGet("/api/v2/canvas/agent-courses", (HttpContext ctx) => Api(ctx, () => Http.Json(Canvas.Courses())));
         app.MapGet("/api/v2/assignments", (HttpContext ctx, string? @class, int? days) => Api(ctx, () =>
         {
-            var all = Assignments.Load(cfg.Home);
+            var all = Assignments.Shown(cfg.Home);
             var list = days is int d ? Assignments.Upcoming(all, DateTime.Now, d, @class) : all.Where(a => @class is null || a.ClassName == @class).ToList();
             return Http.Json(new JsonArray(list.Select(a => (JsonNode)AssignmentJson(a)).ToArray()));
         }));
@@ -614,7 +625,7 @@ public sealed partial class LibraryWeb
     {
         var c = Context(role, "due", ("/", cfg.PoolName));
         var s = Canvas.Settings;
-        var upcoming = Assignments.Upcoming(Assignments.Load(cfg.Home), DateTime.Now, 30);
+        var upcoming = Assignments.Upcoming(Assignments.Shown(cfg.Home), DateTime.Now, 30);
         string state = s.NeedsLogin || s.Error.Length > 0 ? $"<div class=\"notice\"><div>{Ui.Esc(s.Error)}</div></div>" : "";
         string synced = DateTimeOffset.TryParse(s.LastSync, out var t) ? $"Synced from Canvas {Ui.Esc(t.LocalDateTime.ToString("ddd d MMM, h:mm tt", CultureInfo.InvariantCulture))}." : "Not synced yet.";
         string body = $"<h1>Due</h1><p class=\"sub\">{synced}</p>{state}"
@@ -629,7 +640,7 @@ public sealed partial class LibraryWeb
     string ClassCanvas(string name)
     {
         if (!CanvasOn || !Canvas.Settings.Courses.ContainsKey(name)) return "";
-        var mine = Assignments.Load(cfg.Home).Where(a => a.ClassName == name).ToList();
+        var mine = Assignments.Shown(cfg.Home).Where(a => a.ClassName == name).ToList();
         var todo = Assignments.Upcoming(mine, DateTime.Now, 30);
         int done = mine.Count(a => a.Done);
         string cq = Ui.Quote(name, "");
@@ -779,14 +790,16 @@ public sealed partial class LibraryWeb
     });
 
     /// <summary>The Due list, as the app's and the phone's Due tabs show it (and Ask is told): every class's assignments,
-    /// with a planner to-do that has no assignment of its own riding along as a "todo" row (kind, never graded).</summary>
+    /// with a planner to-do that has no assignment of its own riding along as a "todo" row (kind, never graded). The student's
+    /// marks are on them (<see cref="DueMarks"/>); what they hid comes apart as <c>hidden</c>.</summary>
     JsonObject DueList()
     {
-        var all = Assignments.Load(cfg.Home).ToList();
+        var marks = DueMarks.Load(cfg.Home);
+        var all = DueMarks.Apply(Assignments.Load(cfg.Home), marks);
         var graded = all.ToList();
         foreach (string cls in cfg.ClassNames())
             if (CourseIndex.Load(cfg.Home, cls) is { } index)
-                all.AddRange(Assignments.Todos(cls, index.Todos, graded, Canvas.Zone));
+                all.AddRange(DueMarks.Apply(Assignments.Todos(cls, index.Todos, graded, Canvas.Zone), marks));
         return CanvasView.Due(all, Canvas.Settings.LastDone, Canvas.Clock(), Canvas.Zone, Canvas.Crawl.AssignmentFolder);
     }
 }

@@ -1,6 +1,7 @@
 using System.Globalization;
 using System.Text.Json;
 using System.Text.Json.Nodes;
+using System.Text.Json.Serialization;
 
 namespace StudyStash.Core.Canvas;
 
@@ -15,13 +16,16 @@ namespace StudyStash.Core.Canvas;
 /// <param name="Comments">How many comments others (the grader) left; null in a list saved before it was counted.</param>
 /// <param name="MarkedDone">Marked done in Canvas's planner.</param>
 /// <param name="MarkedDoneAt">When it was marked done, Canvas's UTC ISO; "" when it wasn't.</param>
+/// <param name="Mark">What the student did about it in Syft Notes (never in Canvas): "done", "hidden" or "". Put on by
+/// <see cref="DueMarks.Apply"/>, never saved with the list.</param>
+/// <param name="MarkAt">When they did, UTC ISO; "" when they haven't.</param>
 public sealed record Assignment(string ClassName, long Id, string Name, string Due, double? Points, string Status,
     double? Score, string Submitted, string Url, bool Late = false, bool Missing = false, bool Excused = false, string Grade = "",
     string GradedAt = "", string GradingType = "", string Kind = "assignment", string DueAt = "", int? Comments = null,
-    bool MarkedDone = false, string MarkedDoneAt = "")
+    bool MarkedDone = false, string MarkedDoneAt = "", [property: JsonIgnore] string Mark = "", [property: JsonIgnore] string MarkAt = "")
 {
-    /// <summary>Handed in, doesn't need anything more, or the student ticked it off themselves.</summary>
-    public bool Done => Status is "graded" or "submitted" or "excused" or "late" or "closed" || MarkedDone;
+    /// <summary>Handed in, doesn't need anything more, or the student ticked it off themselves (in Canvas's planner, or here).</summary>
+    public bool Done => Status is "graded" or "submitted" or "excused" or "late" or "closed" || MarkedDone || Mark == DueMarks.Done;
 }
 
 /// <summary>Something that changed on Canvas between two syncs, in the design's words ("Graded: CS 101 · Problem set 4
@@ -183,6 +187,8 @@ public static class Assignments
 
     public static string PathIn(string home) => Path.Combine(home, "canvas_assignments.json");
 
+    /// <summary>What the last sync saved, as Canvas said it, for what writes the list back (the sync, a class renamed or
+    /// forgotten). Anything that shows it uses <see cref="Shown"/>.</summary>
     public static List<Assignment> Load(string home)
     {
         try
@@ -194,6 +200,11 @@ public static class Assignments
             return [];
         }
     }
+
+    /// <summary>The list as the student sees it: the saved list with their own marks on it (<see cref="DueMarks"/>), and what
+    /// they hid left out. Every list the app, Ask, notifications and Claude's tools show comes from here.</summary>
+    public static List<Assignment> Shown(string home) =>
+        [.. DueMarks.Apply(Load(home), DueMarks.Load(home)).Where(a => a.Mark != DueMarks.Hidden)];
 
     public static void Save(string home, IEnumerable<Assignment> items)
     {

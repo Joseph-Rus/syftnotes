@@ -167,7 +167,7 @@ public sealed class LocalLibrary(LibraryReader reader, Canvas.CanvasSync? canvas
                 return result;
             }
             default: // "assignments": what's still due, everywhere or in one class
-                var all = Canvas.Assignments.Load(home ?? "");
+                var all = Canvas.Assignments.Shown(home ?? "");
                 var list = Canvas.Assignments.Upcoming(all, DateTime.Now, body?["days"] is JsonValue d && d.TryGetValue(out int n) ? n : 14, cls);
                 return new JsonArray(list.Select(a => (JsonNode)new JsonObject
                 {
