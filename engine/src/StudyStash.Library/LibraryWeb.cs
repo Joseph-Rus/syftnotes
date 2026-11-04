@@ -942,9 +942,9 @@ public sealed partial class LibraryWeb
             if ((was.Length > 0 ? was : name) is { Length: > 0 } showed) shown.Add(showed);
             if (name.Length == 0 || name == Configs.Unsorted || seen.Contains(name) || f.Get($"class_remove_{i}") == "1") continue;
             var aliases = f.Get($"class_aliases_{i}").Split(',').Select(Py.Strip).Where(a => a.Length > 0).ToList();
-            // The page doesn't show a class's sidebar folder ("Clubs"), so it keeps the one it had.
-            string group = cfg.Classes.FirstOrDefault(c => c.Name == name || (was.Length > 0 && c.Name == was))?.Group ?? "";
-            classes.Add(new ClassDef(name, aliases, Py.Strip(f.Get($"class_desc_{i}")), group));
+            // The page doesn't show a class's sidebar folder ("Clubs") or its colour, so it keeps the ones it had.
+            var had = cfg.Classes.FirstOrDefault(c => c.Name == name || (was.Length > 0 && c.Name == was));
+            classes.Add(new ClassDef(name, aliases, Py.Strip(f.Get($"class_desc_{i}")), had?.Group ?? "", had?.Color ?? -1));
             seen.Add(name);
             if (was.Length > 0 && was != name && cfg.Classes.Any(c => c.Name == was)) renames.Add(new ClassRenameStep(was, name, 0, ""));
         }
