@@ -1489,12 +1489,21 @@ public static partial class Shell
             Find = SelfTest.Dir is not null ? _ => AgentFound.None : cli => AgentInstall.Find(cli),
             AiApps = aiApps.DesktopStates,
             ConnectAiApp = aiApps.Connect,
-            // An AI got ready here (setup's AI step, a lecture's Get study notes): its apps on this computer get Syft Notes too.
-            ConnectAppsOf = id => Task.Run(() =>
+            // An AI signed in here (setup's AI step, a lecture's Get study notes): Settings' own Connect for it, through the
+            // one AI store, so Settings → Your AI and every other screen say it's connected at once.
+            Connect = async id =>
             {
-                foreach (var app in aiApps.StatesOf(id))
-                    if (app.Installed && !app.Good) aiApps.Connect(app.Id);
-            }),
+                try
+                {
+                    var done = await host.AiStatus.ConnectAsync(new AiConnect(host.AiStatus.Library) { Apps = aiApps, WaitForSignIn = false, SignedInHere = true }, id);
+                    host.Log($"[setup] {AiConnect.Brand(id)} connected: {(done.Ok ? "yes" : done.Words)}");
+                }
+                catch (Exception e) when (e is IOException or UnauthorizedAccessException)
+                {
+                    // An app's settings file it couldn't write: Settings' card says what's left, and Fix puts it right.
+                    host.Log($"[setup] connecting {AiConnect.Brand(id)}'s apps: {e.Message}");
+                }
+            },
             Downloading = () => host.Downloading?.Fraction,
             Log = host.Log,
         };

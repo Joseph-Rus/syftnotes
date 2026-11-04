@@ -48,9 +48,10 @@ public sealed class GuidedServices
     public Func<IReadOnlyList<AiAppState>> AiApps { get; init; } = () => [];
     /// <summary>Adds Syft Notes to one of those apps' settings, as Settings → AI tool access's Connect does.</summary>
     public Func<string, AiAppChange>? ConnectAiApp { get; init; }
-    /// <summary>Once an AI is ready here, adds Syft Notes to every app of it on this computer (Claude: the Claude app and
-    /// Claude Code), in the file each reads, as its Connect in Settings does; null: none are touched.</summary>
-    public Func<string, Task>? ConnectAppsOf { get; init; }
+    /// <summary>Once an AI is signed in here, Settings → Your AI's own Connect for it (<see cref="AiConnect"/>, through the
+    /// app's AI store): Syft Notes added to every app of it on this computer, and the library's check, so every screen
+    /// says it's connected with no second Connect. Never throws; null: nothing is connected (a test).</summary>
+    public Func<string, Task>? Connect { get; init; }
 
     public AgentInstall MakeInstaller(AgentCliInfo cli) =>
         Installer?.Invoke(cli) ?? new AgentInstall(cli, Windows, Path.Combine(Home, "logs", "setup-install.log"));
@@ -87,7 +88,7 @@ public sealed partial class GuidedSetupModel : ObservableObject, IDisposable
     string session = "";
     string lastPrompt = "";
     string? question;
-    bool chatStarted, opened;
+    bool chatStarted, opened, connecting;
     /// <summary>The ChatGPT and Claude apps on this computer: asked when the window opens and after a Connect.</summary>
     IReadOnlyList<AiAppState> aiApps = [];
     /// <summary>Codex's plan check worked only with the student's own config.toml read (its sign-in is kept there): the
@@ -537,7 +538,7 @@ public sealed partial class GuidedSetupModel : ObservableObject, IDisposable
         {
             // Asked for from the notes step, which has each AI's own button: back there.
             StopWork();
-            BackToNotes(ready: false);
+            LeaveForNotes();
             return;
         }
         save(s => s.SetupAi = engine);
@@ -571,21 +572,39 @@ public sealed partial class GuidedSetupModel : ObservableObject, IDisposable
             return;
         }
         await ToSignInAsync();
-        if (AiReady && Screen == GuidedScreen.SignIn) BackToNotes();
+        if (AiReady && Screen == GuidedScreen.SignIn) await BackToNotesAsync();
     }
 
-    /// <summary>Back to the by-hand step that asked, the AI ready (or the student gave up on it: <paramref name="ready"/>
-    /// false, and nothing is picked).</summary>
-    void BackToNotes(bool ready = true)
+    /// <summary>The AI is ready: connected all the way first, by Settings' own Connect (<see cref="GuidedServices.Connect"/>),
+    /// with the ready line showing meanwhile; then back to the by-hand step that asked, with it picked.</summary>
+    async Task BackToNotesAsync()
     {
         string id = forNotes;
+        if (id.Length == 0 || connecting) return;
+        if (services.Connect is { } connect)
+        {
+            connecting = true;
+            try
+            {
+                await connect(id);
+            }
+            finally
+            {
+                connecting = false;
+            }
+            if (forNotes != id) return; // Back was pressed meanwhile
+        }
+        LeaveForNotes();
+        ReadyForNotes?.Invoke(id);
+    }
+
+    /// <summary>Back to the by-hand step that asked, nothing picked yet (the student gave up on the AI, or it's ready and
+    /// <see cref="BackToNotesAsync"/> picks it).</summary>
+    void LeaveForNotes()
+    {
         forNotes = "";
         Notify(nameof(ForNotes), nameof(ByHandLabel));
         Screen = GuidedScreen.Manual;
-        if (!ready) return;
-        // Connected all the way, as Connect in Settings does it: its apps here read the lectures too.
-        if (services.ConnectAppsOf is { } apps) _ = apps(id);
-        ReadyForNotes?.Invoke(id);
     }
 
     void ByHandAt(string item)
@@ -593,7 +612,7 @@ public sealed partial class GuidedSetupModel : ObservableObject, IDisposable
         if (ForNotes)
         {
             StopWork();
-            BackToNotes(ready: false);
+            LeaveForNotes();
             return;
         }
         if (!AiReady && settings().SetupAi is not ("claude" or "codex" or "gemini" or "ollama")) save(s => s.SetupAi = "manual");
@@ -644,7 +663,7 @@ public sealed partial class GuidedSetupModel : ObservableObject, IDisposable
                 await ToSignInOrChatAsync();
                 break;
             case GuidedScreen.SignIn when AiReady && ForNotes:
-                BackToNotes();
+                await BackToNotesAsync();
                 break;
             case GuidedScreen.SignIn when AiReady:
                 StartChat("[Syft Notes] Setup was opened.");
@@ -753,7 +772,7 @@ public sealed partial class GuidedSetupModel : ObservableObject, IDisposable
     {
         await ToSignInAsync();
         if (!AiReady || Screen != GuidedScreen.SignIn) return;
-        if (ForNotes) BackToNotes();
+        if (ForNotes) await BackToNotesAsync();
         else StartChat("[Syft Notes] Setup was opened.");
     }
 
@@ -849,7 +868,7 @@ public sealed partial class GuidedSetupModel : ObservableObject, IDisposable
             AiReady = true;
             // Got ready from a lecture's page (or setup's notes step): signed in and checked, it goes straight back
             // there to write the notes, with no Continue to press.
-            if (ForNotes && Screen == GuidedScreen.SignIn) BackToNotes();
+            if (ForNotes && Screen == GuidedScreen.SignIn) await BackToNotesAsync();
             return;
         }
         switch (check.Problem)
