@@ -277,7 +277,7 @@ public sealed partial class LibraryWeb
             Admin = role == "admin", Current = current, Password = cfg.PoolPassword.Length > 0, Back = back, Nonce = options.Nonce(),
             Chat = ChatOn,
             Inbox = ChatOn ? (Directory.Exists(Path.Combine(cfg.PoolDir, "Inbox")) ? Directory.EnumerateFiles(Path.Combine(cfg.PoolDir, "Inbox"), "*.md").Count() : 0) : null,
-            Due = CanvasOn ? StudyStash.Core.Canvas.Assignments.Upcoming(StudyStash.Core.Canvas.Assignments.Load(cfg.Home), DateTime.Now, 7).Count : null,
+            Due = CanvasOn ? StudyStash.Core.Canvas.Assignments.Upcoming(StudyStash.Core.Canvas.Assignments.Shown(cfg.Home), DateTime.Now, 7).Count : null,
         };
     }
 
