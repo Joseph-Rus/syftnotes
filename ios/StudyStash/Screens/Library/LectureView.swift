@@ -579,7 +579,7 @@ struct LectureView: View {
             if player.started { playerPill }
             if let l {
                 HStack(spacing: 10) {
-                    AskBarButton(placeholder: "Ask about this \(noun(l))", scope: compact ? nil : "This \(noun(l))") { asking = true }
+                    AskBarButton(placeholder: "Ask about this \(noun(l))", scope: narrow ? nil : "This \(noun(l))") { asking = true }
                         .accessibilityLabel("Ask about this \(noun(l))")
                     Button { studying = true } label: { Label("Study", icon: "flashcards") }
                         .buttonStyle(StudyButtonStyle())
