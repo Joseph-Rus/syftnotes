@@ -100,7 +100,7 @@ public static class ClassRename
         var aliases = def.Aliases.Append(from).Append(st.Code)
             .Where(a => a.Length > 0 && !a.Equals(to, StringComparison.OrdinalIgnoreCase))
             .Distinct(StringComparer.OrdinalIgnoreCase).ToList();
-        cfg.Classes[cfg.Classes.IndexOf(def)] = new ClassDef(to, aliases, def.Description);
+        cfg.Classes[cfg.Classes.IndexOf(def)] = new ClassDef(to, aliases, def.Description, color: def.Color);
         Configs.Save(cfg);
 
         CanvasSettings.Update(home, s =>

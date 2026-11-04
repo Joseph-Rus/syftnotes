@@ -315,6 +315,38 @@ public class LibrarySettingsApiTests
         Assert.Equal(["CS 101"], Configs.Load(cfg.Home).Classes.Select(c => c.Name));
     }
 
+    /// <summary>A class keeps its colour: one saved before colours were kept has the one its place gave it, removing a
+    /// class in the middle changes no other class's, and a class added next takes the colour that came free.</summary>
+    [Fact]
+    public async Task Removing_a_class_in_the_middle_leaves_the_others_colours_as_they_were()
+    {
+        using var dir = new TempDir();
+        var (cfg, store) = Library(dir);
+        using var _s = store;
+        cfg.Classes.AddRange([new ClassDef("HIST 210"), new ClassDef("MATH 221")]);
+        // A config from before: no class has a colour written down.
+        File.WriteAllText(cfg.ConfigPath, string.Join("\n", File.ReadAllLines(Configs.Save(cfg)).Where(l => !l.StartsWith("color = ", StringComparison.Ordinal))));
+        var loaded = Configs.Load(cfg.Home);
+        await using var site = await Site(loaded, store);
+        Dictionary<string, int> Colors() => new LibraryReader(Configs.Load(cfg.Home), store).Overview()["classes"]!.AsArray()
+            .ToDictionary(c => c!["name"]!.GetValue<string>(), c => c!["color"]!.GetValue<int>());
+        Assert.Equal(new Dictionary<string, int> { ["CS 101"] = 0, ["BIO 110"] = 1, ["HIST 210"] = 2, ["MATH 221"] = 3 }, Colors());
+
+        await Json(await site.Client.SendAsync(Req(HttpMethod.Post, "/api/v2/settings", new
+        {
+            classes = new object[] { new { name = "CS 101", was = "CS 101" }, new { name = "HIST 210", was = "HIST 210" }, new { name = "MATH 221", was = "MATH 221" } },
+            known = new[] { "CS 101", "BIO 110", "HIST 210", "MATH 221" },
+        })));
+        Assert.Equal(new Dictionary<string, int> { ["CS 101"] = 0, ["HIST 210"] = 2, ["MATH 221"] = 3 }, Colors());
+
+        await Json(await site.Client.SendAsync(Req(HttpMethod.Post, "/api/v2/settings", new
+        {
+            classes = new object[] { new { name = "CS 101", was = "CS 101" }, new { name = "HIST 210", was = "HIST 210" }, new { name = "MATH 221", was = "MATH 221" }, new { name = "PHYS 150", was = "" } },
+            known = new[] { "CS 101", "HIST 210", "MATH 221" },
+        })));
+        Assert.Equal(new Dictionary<string, int> { ["CS 101"] = 0, ["HIST 210"] = 2, ["MATH 221"] = 3, ["PHYS 150"] = 1 }, Colors());
+    }
+
     [Fact]
     public async Task Saving_the_library_page_keeps_classes_it_never_showed_and_every_class_s_folder()
     {

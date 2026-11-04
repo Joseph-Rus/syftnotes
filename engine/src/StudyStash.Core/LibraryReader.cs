@@ -19,7 +19,7 @@ public sealed partial class LibraryReader(Config cfg, Store store)
     /// <summary>What the laptop says it is recording (see <see cref="RecordingNow"/>).</summary>
     public RecordingNow Recording { get; init; } = new();
 
-    /// <summary>The library's name, its classes (in the order they were added: their dot colors follow it), and how
+    /// <summary>The library's name, its classes (in the order they were added, each with the colour it keeps), and how
     /// much is waiting.</summary>
     public JsonObject Overview()
     {
@@ -27,13 +27,14 @@ public sealed partial class LibraryReader(Config cfg, Store store)
         var counts = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
         foreach (var (cls, n) in Store.ClassesSummary()) counts[cls] = counts.GetValueOrDefault(cls) + n;
         var classes = new JsonArray();
-        int index = 0;
+        int index = 0, next = Cfg.Classes.Select(c => c.Color + 1).Append(Cfg.Classes.Count).Max();
         var canvas = Canvas.CanvasSettings.Load(Cfg.Home);
         var linked = Ai.Folders.Load(Cfg.Home);
         foreach (var c in Cfg.Classes)
+        {
             classes.Add(new JsonObject
             {
-                ["name"] = c.Name, ["lectures"] = counts.GetValueOrDefault(c.Name), ["color"] = index++, ["description"] = c.Description,
+                ["name"] = c.Name, ["lectures"] = counts.GetValueOrDefault(c.Name), ["color"] = c.Color >= 0 ? c.Color : index, ["description"] = c.Description,
                 // The sidebar section it's in: "" for Classes, else one of the student's own folders ("Projects").
                 ["group"] = c.Group,
                 // Folders on the library's computer that go with it (a project's repo, say), not part of the library.
@@ -46,9 +47,11 @@ public sealed partial class LibraryReader(Config cfg, Store store)
                 // Its other names (one it had before a rename, say), so a laptop's lectures filed under an old name can follow it.
                 ["aliases"] = new JsonArray(c.Aliases.Select(a => (JsonNode?)a).ToArray()),
             });
+            index++;
+        }
         // Lectures filed under a class since removed from the config still show, after the rest.
         foreach (var (name, n) in counts.Where(kv => !kv.Key.Equals(Configs.Unsorted, StringComparison.OrdinalIgnoreCase) && Cfg.Classes.All(c => !c.Name.Equals(kv.Key, StringComparison.OrdinalIgnoreCase))))
-            classes.Add(new JsonObject { ["name"] = name, ["lectures"] = n, ["color"] = index++ });
+            classes.Add(new JsonObject { ["name"] = name, ["lectures"] = n, ["color"] = next++ });
         var status = Store.StatusCounts();
         return new JsonObject
         {
