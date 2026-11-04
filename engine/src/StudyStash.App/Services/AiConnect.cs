@@ -67,7 +67,7 @@ public sealed class AiConnect(IAiLibrary library)
     /// that writes the notes.</summary>
     public bool WaitForSignIn { get; init; } = true;
     /// <summary>The student has just signed in here with the AI's own sign-in, which the library doesn't see (setup's
-    /// install and sign-in screens): an AI the library still has as signed out is checked before it's signed in again.</summary>
+    /// install and sign-in screens): an AI the library still has as signed out is checked, and never signed in again here.</summary>
     public bool SignedInHere { get; init; }
 
     /// <summary>AIs whose last sign-in happened where Syft Notes can't see it finish: checked before signing in again.</summary>
@@ -128,6 +128,10 @@ public sealed class AiConnect(IAiLibrary library)
                 overview = (await library.CheckAsync(id))?.Overview ?? await library.EnginesAsync();
                 engine = overview?.Engines.FirstOrDefault(e => e.Id == id);
             }
+            // Signed in here moments ago, yet the library still can't use it: no browser page nobody asked for. Settings
+            // and Home offer Sign in, as for any AI signed out.
+            if (SignedInHere && Is(engine, AiEngineState.NotSignedIn))
+                return new ConnectOutcome(false, $"{brand} isn't signed in on your library. Sign in from Settings → Your AI.") { Apps = apps, Overview = overview };
             if (Is(engine, AiEngineState.NotSignedIn))
             {
                 Say(ConnectStep.SigningIn, $"Signing in to {brand}… finish in your browser.");
