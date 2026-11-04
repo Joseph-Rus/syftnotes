@@ -84,10 +84,10 @@ public static class Demo
 
     /// <summary>The sample library with a lecture's page open (CS 101's "Recursion and the call stack"); with
     /// <paramref name="due"/> a "Due" item is in the sidebar; with <paramref name="answered"/> a long answer sits above
-    /// the ask bar; with <paramref name="deleting"/> the window asks before deleting the open lecture, and with
+    /// the ask bar; with
     /// <paramref name="deleted"/> "Deleted · Undo" shows at the page's foot; <paramref name="askingSupport"/> is Home
     /// with the ask for a tip on it.</summary>
-    public static LibraryModel Library(bool due = false, bool answered = false, bool deleting = false, bool deleted = false, bool askingSupport = false)
+    public static LibraryModel Library(bool due = false, bool answered = false, bool deleted = false, bool askingSupport = false)
     {
         var m = new LibraryModel { Status = "Library connected", DrawChrome = true, UnsortedCount = 2 };
         if (due) m.Classes.Add(new ClassItem { Name = "Due", IsDue = true, Count = 3 });
@@ -113,7 +113,6 @@ public static class Demo
                     + "of the short questions come straight from them.",
                 Byline = "Claude · from 12:40, 31:05 and 58:20",
             });
-        if (deleting) m.Deleting = new LectureDeletion("lec-recursion", "Recursion and the call stack", "CS 101");
         if (deleted) m.Deleted = new LectureDeletion("lec-frames", "Stack frames and scope", "CS 101");
         if (askingSupport)
         {

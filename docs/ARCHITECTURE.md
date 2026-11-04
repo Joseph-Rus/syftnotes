@@ -87,7 +87,7 @@ flowchart LR
 | Self-test route | hard-coded `NextCommand` order | SelfTest.cs:314–411, 422–470 |
 | Windows built by hand | 7 `new Window` blocks + a hand-kept Dock list | Shell.cs:1086,1315,1430,1723; Shell.Canvas.cs:374; Shell.GetNotes.cs:40. `UpdateDock` (Shell.cs:1781) leaves out the Get-ready window |
 | Mac/Win copies | 38 pairs; 12 differ in under 15% of lines (2,814 lines each side) | MacGuidedSetup 699 lines / 34 differ, MacFunnel 377/16, MacSetup 534/65, MacGetReady 154/14 |
-| Confirmations | 1 shared `ConfirmCard` (library only), 7 hand-made `Confirming*` flags, own delete dialogs | LibraryModel.cs:305; Settings.cs:138,140,189; LibrarySettingsModel.cs:219,247 |
+| Confirmations (before `lib-dialoghost`) | 1 shared `ConfirmCard` (library only), 7 hand-made `Confirming*` flags, own delete dialogs | LibraryModel.cs:305; Settings.cs:138,140,189; LibrarySettingsModel.cs:219,247 |
 | Copy / open URL hooks | 5 `Copy` hooks, 12 `OpenUrl` hooks, 2 ways to reveal a folder | SetupModel.cs:795, AiAccessModel.cs:149; CanvasContext.cs:72 vs `Machine.Open` |
 | Wording spread | 1,034 literal strings in 71 .axaml files; "library offline" in 24 files with two wordings; "No AI for now" in 11 files; brand names mapped in ~8 places | AiConnect.cs:70, AiWords.cs:155,179 |
 | Time/count formatting | ~10 "when/ago" helpers, 17 inline plurals | Shell.cs:2057, Shell.Library.cs:366, CanvasWords.cs:38–59, OverviewModel.cs:514 |
@@ -100,12 +100,13 @@ build it here, as described, the first time a change needs it, instead of making
 
 | Piece | Status |
 |---|---|
-| `CanvasWatch` (the one shared Canvas store), `Tips.WhenCut`, `BySkin`, `Icon`, `AppMark`/`SyftMark`, `SyftLoader`, `ConfirmCard` | exist |
+| `CanvasWatch` (the one shared Canvas store), `Tips.WhenCut`, `BySkin`, `Icon`, `AppMark`/`SyftMark`, `SyftLoader` | exist |
 | `UiTasks.Run` / `RunQuietly` (work started without waiting: logged, and the student told), `Windows/AppWindows` (every window), `PageState` (which page is open) | in review: branch `toolkit-shell` |
 | `Poll`, `LibraryApi` + `Outcome`, `AsyncAction`, `AiStatusStore` (items 1–4) | in review: branch `toolkit-ai-status` |
 | **DI**: `AppServices` (AppServices.cs, Microsoft.Extensions.DependencyInjection) is the composition root: `AppStart`, `TimeProvider`, `IMessenger`, `AppHost` and what it owns (`LibraryClients`, `AiStatusStore`), `CanvasLink` (the one Canvas context and watch, made again for a new library), `ToolkitHooks` (connects `UiTasks` and `AppWindows`), and the view-model factories `AskFactory` and `CanvasModels`. Built once with `AppServices.Checked` (ValidateOnBuild, ValidateScopes) in `Shell.Start`; `AppServicesTests` resolves every registration | in review: branch `app-di` |
 | **Messenger**: `IMessenger` (`WeakReferenceMessenger.Default`) with the message records in Messages.cs (`ToastRequested`, `QuitRequested`, `SettingsRequested`, `SetupAgainRequested`, `CanvasConnectRequested`, `ShortcutsPaused`, `ShortcutsWordsRequest`…); Shell listens in Shell.Messages.cs. Services send instead of calling Shell | in review: branch `app-di` |
-| `StepFlow`, `Words/` catalogue, `StatusRow`, `AppActions`, `Confirm`, `Format`, shared Mac/Win views (items 5–12) | to build (section 5) |
+| **Confirm** (`ViewModels/Kit/Confirm.cs`, `Controls/ConfirmLayer.cs`, `Views/ConfirmDialog.axaml`): `IConfirm.AskAsync(ConfirmAsk)` over DialogHost.Avalonia; every window made by `AppWindows.Make` carries a dialog layer | in review: branch `lib-dialoghost` |
+| `StepFlow`, `Words/` catalogue, `StatusRow`, `AppActions`, `Format`, shared Mac/Win views (items 5–12) | to build (section 5) |
 
 
 Shared view-model pieces go in `ViewModels/Kit/`, shared controls in `Controls/`, stores in `Services/Stores/`, and
@@ -183,9 +184,11 @@ all words in `Words/`. Each piece has one focused test.
    `OpenUrl`, `RevealFolder`, `CopyAsync(text)` (it says "Copied" through the catalogue), `Toast(...)`,
    `ShowSettings(section)`, `ShowCanvasConnect()`. It replaces 12 `OpenUrl` and 5 `Copy` hooks and services calling
    Shell. *Test:* none; tests pass a fake.
-10. **Confirm** (`ViewModels/Kit/Confirm.cs` + `Controls/ConfirmHost`). `Task<bool> AskAsync(ConfirmAsk)` grows from
-    LibraryModel's `ConfirmAsk` and `ConfirmCard`; each window has one `ConfirmHost`. *First:* the 7 `Confirming*`
-    flags, then the delete-lecture dialog. *Test:* Escape answers false.
+10. **Confirm** (`ViewModels/Kit/Confirm.cs` + `Controls/ConfirmLayer.cs`). `Task<bool> AskAsync(ConfirmAsk)`, taken as an
+    `IConfirm`; each window `AppWindows.Make` builds has one dialog layer (a DialogHost round its view; `ConfirmLayer.ViewOf(window)` is
+    the view inside it), and a question opens over the window the student is in. Safe button focused, Escape and a click outside
+    answer no, the veil is the `Scrim` token. Done: the 7 `Confirming*` flags, the library window's stop-and-switch question and
+    the delete-lecture dialog. *Test:* Escape answers false, a yes runs once (`ConfirmTests`); a view model's test gives `FakeConfirm`.
 11. **Format** (`Words/Format.cs`). `When(at, now, zone)`, `Ago`, `Clock` (TimedText), `Size(bytes)`,
     `Count(n, noun)`. *First:* `Shell.When`, `Shell.NoteWhen`, the CanvasWords date helpers, `PhoneGoogleModel.Plural`.
     *Test:* one table of cases.
@@ -227,7 +230,7 @@ brings one down, lower its line in the same change. Rules without a count are ke
     *Check:* grep.
 13. **The look comes from the Syft look's tokens (`Skin.cs`).** Colours by meaning (`Accent`/`OnAccent` ink on paper,
     paper on ink in dark; `Recording` coral, only for recording; `Selected`/`OnSelected` lilac with ink; `Progress`
-    sky on `ProgressTrack`; `Highlight` mustard; `SurfaceRaised` the mesh; `Border`, `TextMuted`, `TextFade1`–`3`),
+    sky on `ProgressTrack`; `Highlight` mustard; `SurfaceRaised` the mesh; `Scrim` the window's ground at 75 % over a page while a question waits; `Border`, `TextMuted`, `TextFade1`–`3`),
     text by the type scale (`FontCaption` 12, `FontBody`/`FontBodyStrong` 14, `FontSubtitle` 16, `FontTitle` 20,
     `FontDisplay` 28), gaps by `Space1`–`Space8` and `Inset1`–`Inset8` (4-point), corners by `RadiusCell`,
     `RadiusControl`, `RadiusCard`, `RadiusPanel`, and every button's corners by `c:Cell.Round` (the logo's cell, 27 % of
