@@ -26,7 +26,8 @@
       <Button Name="FinishSignIn" Grid.Column="2" Classes="btn sm ink" VerticalAlignment="Center" Command="{Binding Send.Command}"
               IsEnabled="{Binding CanSend}" Content="Finish signing in" />
     </Grid>
-    <StackPanel Orientation="Horizontal" Spacing="8" IsVisible="{Binding Sent}">
+    <!-- Only while it's really signing in: not once the sign-in stopped (the code didn't work, or it waited too long). -->
+    <StackPanel Orientation="Horizontal" Spacing="8" IsVisible="{Binding Sending, Converter={x:Static c:Converters.NotEmpty}}">
       <c:SyftLoader Kind="HoppingBits" Size="16" VerticalAlignment="Center" />
       <TextBlock Classes="say" Text="{Binding Sending}" VerticalAlignment="Center" />
     </StackPanel>
