@@ -85,6 +85,39 @@ public sealed class GeminiSignInTests
         }
     }
 
+    /// <summary>A real sign-in on Windows opened Google's page in a brand-new empty Firefox profile: the browser agy
+    /// opens takes agy's home (Syft Notes' folder) as the student's. agy finds its opener on its PATH, so the sign-in's
+    /// PATH gives it stand-ins that open nothing, and Syft Notes opens the page in the student's own browser.</summary>
+    [Fact]
+    public async Task Geminis_page_opens_in_the_students_own_browser_never_from_agy()
+    {
+        using var home = new TempHome();
+        using var agyHome = Antigravity.Use(home["agy"]);
+        string exe = StudyStash.Core.Tests.FakeAgents.WriteCli(home["bin"], "gemini");
+        File.WriteAllText(Path.Combine(home["bin"], "login-delay"), "30"); // it waits for the code, as the real one does
+        var pages = new List<string>();
+        using var signIn = new AgentSignIn(AgentCli.Gemini, exe)
+        {
+            OpenPage = p =>
+            {
+                lock (pages) pages.Add(p);
+                return true;
+            },
+        };
+        Assert.True(signIn.Start());
+        await Wait.UntilAsync(() =>
+        {
+            lock (pages) return pages.Count > 0;
+        }, "Syft Notes opening Gemini's page");
+        lock (pages) Assert.Equal(["https://accounts.example.com/o/oauth2/auth?redirect_uri=https%3A%2F%2Fagy.example.com%2Foauth-callback&state=fake"], pages);
+        string openers = Path.Combine(home["bin"], "openers.txt");
+        await Wait.UntilAsync(() => File.Exists(openers), "the openers agy finds");
+        var found = File.ReadAllLines(openers).Where(l => l.Trim().Length > 0).ToList();
+        Assert.NotEmpty(found);
+        Assert.All(found, f => Assert.StartsWith(Path.Combine(Antigravity.Home(), "openers-off"), f.Trim(), StringComparison.OrdinalIgnoreCase));
+        signIn.Stop();
+    }
+
     [Fact]
     public void Where_only_words_can_be_given_the_sign_in_line_names_study_stashs_own_home()
     {

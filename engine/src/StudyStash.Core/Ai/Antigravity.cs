@@ -78,6 +78,33 @@ public static class Antigravity
 
     public static Dictionary<string, string> HomeEnv() => HomeEnv(Home(), OperatingSystem.IsWindows());
 
+    /// <summary>
+    /// A folder in Syft Notes' own home for agy with stand-ins, that open nothing, for the programs agy opens the
+    /// browser with (it finds them on its PATH: <c>rundll32</c> on Windows, <c>open</c> on a Mac, <c>xdg-open</c> on
+    /// Linux). It goes first on the sign-in's PATH, so agy never opens the browser itself and Syft Notes opens its page
+    /// (<see cref="AgentSignIn.OpenPage"/>). A browser agy starts takes agy's home as the student's: on Windows (agy
+    /// 1.5.0) Firefox made a brand-new empty profile in this folder, signed in to nothing, with no saved passwords. The
+    /// Windows stand-in is a batch file that ends cmd.exe at once, so the rest of the address, which cmd.exe cuts at
+    /// each &amp;, never runs.
+    /// </summary>
+    public static string OpenersOff()
+    {
+        string dir = Path.Combine(Home(), "openers-off");
+        Directory.CreateDirectory(dir);
+        if (OperatingSystem.IsWindows())
+        {
+            File.WriteAllText(Path.Combine(dir, "rundll32.cmd"), "@exit 0\r\n");
+            return dir;
+        }
+        foreach (string name in new[] { "open", "xdg-open" })
+        {
+            string path = Path.Combine(dir, name);
+            File.WriteAllText(path, "#!/bin/sh\nexit 0\n");
+            File.SetUnixFileMode(path, UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute);
+        }
+        return dir;
+    }
+
     public static string SettingsPath(string home) => Path.Combine(home, ".gemini", "antigravity-cli", "settings.json");
     public static string McpConfigPath(string home) => Path.Combine(home, ".gemini", "config", "mcp_config.json");
     public static string AgentPath(string home, string name) => Path.Combine(home, ".gemini", "config", "agents", name, "agent.md");
