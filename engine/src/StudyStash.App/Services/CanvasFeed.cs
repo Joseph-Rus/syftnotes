@@ -47,9 +47,14 @@ public sealed class CanvasFeed : IDisposable
     public event Action<IReadOnlySet<string>?>? Updated;
 
     /// <summary>The classes a sync finished between two reads: those it had left before and hasn't now. Null when no
-    /// sync was running at the first read, so anything may have changed.</summary>
-    public static IReadOnlySet<string>? Finished(IReadOnlyList<string>? leftBefore, CanvasApi.State now) =>
-        leftBefore is null ? null : leftBefore.Except(now.Syncing?.Classes ?? []).ToHashSet();
+    /// sync was running at the first read, or when a new sync started between the two (it names a class the first
+    /// hadn't left), so anything may have changed.</summary>
+    public static IReadOnlySet<string>? Finished(IReadOnlyList<string>? leftBefore, CanvasApi.State now)
+    {
+        if (leftBefore is null) return null;
+        if (now.Syncing is { } s && s.Classes.Except(leftBefore).Any()) return null;
+        return leftBefore.Except(now.Syncing?.Classes ?? []).ToHashSet();
+    }
 
     /// <summary>What the state says about Canvas's data: the library's own revision (a sync finished, a course was
     /// linked or chosen) or, from an older library, when it last synced; and how many classes a running sync has left,

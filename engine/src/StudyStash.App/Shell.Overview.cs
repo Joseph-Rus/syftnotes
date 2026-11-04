@@ -134,7 +134,12 @@ public static partial class Shell
         var sources = OverviewSources(lectures);
         // Read again and nothing changed: the page stays as it is.
         string stamp = $"folder|{name}|{info?.ToJsonString()}|{host.Settings.LibraryHere}|{sources.Stamp()}";
-        if (library.Overview is { IsFolder: true } shown && shown.ClassName == name && shown.Stamp == stamp) return;
+        if (library.Overview is { IsFolder: true } shown && shown.ClassName == name && shown.Stamp == stamp)
+        {
+            // The page stays, but its Files catch up (a file attached from elsewhere): nothing else reads them again.
+            if (shown.Files is { } kept) Run(() => kept.LoadAsync(), "files.Load");
+            return;
+        }
         var page = OverviewModel.ForClass(facts, sources);
         page.Stamp = stamp;
         page.AddLinks(facts, row is null ? null : tab =>
