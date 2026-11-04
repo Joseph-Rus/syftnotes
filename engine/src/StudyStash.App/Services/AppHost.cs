@@ -1058,18 +1058,23 @@ public sealed partial class AppHost : IDisposable, IProblemSource
 
     /// <summary>Keep recording a lecture that stopped (minutes or days ago): what's recorded now is added to the end of
     /// its transcript, and its notes are written again. The microphone is asked for as Record asks.
-    /// <paramref name="title"/> is what the library calls the note now, when the app has just read it.</summary>
-    public Task<RecordStart> ContinueAsync(string id, string? title = null) => MicThenAsync(() => ContinueRecording(id, title));
+    /// <paramref name="title"/> and <paramref name="className"/> are what the library calls the note now and the folder
+    /// it's in ("" for none), when the app has just read them.</summary>
+    public Task<RecordStart> ContinueAsync(string id, string? title = null, string? className = null) =>
+        MicThenAsync(() => ContinueRecording(id, title, className));
 
-    public Lecture ContinueRecording(string id, string? title = null)
+    public Lecture ContinueRecording(string id, string? title = null, string? className = null)
     {
         if (!ModelReady) throw new InvalidOperationException("Download the transcription model first (Settings → Recording).");
-        // The note may have been renamed in the library since it was filed: its name there is the one its page goes by
-        // while it records again. A title typed on the recording the first time gives way to it too, or it would go
-        // back to the library as the student's newest and replace the one they chose since.
-        if (title is { Length: > 0 })
+        // The note may have been renamed or moved in the library since it was filed: its name and folder there are the
+        // ones its page, the sidebar and the pill go by while it records again (not Unsorted, from before it was moved).
+        // A title typed on the recording the first time gives way to it too, or it would go back to the library as the
+        // student's newest and replace the one they chose since.
+        if (title is { Length: > 0 } || className is not null)
             Lectures.Update(id, x =>
             {
+                if (className is not null) x.ClassName = x.FiledClass = className;
+                if (title is not { Length: > 0 }) return;
                 x.FiledTitle = title;
                 if (x.TitleTyped) x.Title = title;
             });
