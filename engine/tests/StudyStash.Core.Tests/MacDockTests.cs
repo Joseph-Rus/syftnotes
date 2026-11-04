@@ -124,4 +124,26 @@ public class MacDockTests
         Assert.NotNull(fix.Problem);
         Assert.Same(before, fix.Plist);
     }
+
+    [Fact]
+    public void A_failed_read_tries_again_next_start_and_a_read_Dock_is_only_looked_at_once()
+    {
+        using var home = new TempDir();
+        var calls = new List<string>();
+        ProcResult? export = null;
+        ProcResult? Run(string exe, IReadOnlyList<string> args, TimeSpan _)
+        {
+            calls.Add(string.Join(' ', args));
+            return export;
+        }
+
+        MacDock.Repair(home.Path, App, Run, _ => { });
+        Assert.False(File.Exists(home[MacDock.DoneFile]));
+        // Read this time, with nothing pinned to the old app: done, and the Dock is never written or restarted.
+        export = new ProcResult(0, Encoding.UTF8.GetString(Dock(Tile("file:///System/Applications/Mail.app/", "com.apple.mail", label: "Mail"))));
+        MacDock.Repair(home.Path, App, Run, _ => { });
+        MacDock.Repair(home.Path, App, Run, _ => { });
+        Assert.True(File.Exists(home[MacDock.DoneFile]));
+        Assert.Equal(["export com.apple.dock -", "export com.apple.dock -"], calls);
+    }
 }
