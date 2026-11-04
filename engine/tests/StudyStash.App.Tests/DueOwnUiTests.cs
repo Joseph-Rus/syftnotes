@@ -131,6 +131,18 @@ public class DueOwnUiTests
         };
 
         Assert.Equal("Return library books is overdue.", OverviewModel.DueSentence(sources));
+        // With what's due next and Canvas work missing as well: one "and", before the last.
+        var tonight = new CanvasApi.Item { Class = "CS 101", Id = "3", Name = "Reading quiz 6", Kind = "quiz", Status = "open", DueAt = new DateTimeOffset(2026, 11, 4, 23, 59, 0, TimeSpan.FromHours(-5)) };
+        var missing = new CanvasApi.Item { Class = "CS 101", Id = "4", Name = "Asynchronous Lecture 5", Kind = "assignment", Status = "missing", Missing = true, DueAt = new DateTimeOffset(2026, 10, 30, 23, 59, 0, TimeSpan.FromHours(-5)) };
+        CanvasApi.DueResponse Due(params CanvasApi.Item[] items) => new()
+        {
+            Groups = [new CanvasApi.Group { Key = "overdue", Items = [.. items.Where(i => i.Status != "open")] }, new CanvasApi.Group { Key = "week", Items = [.. items.Where(i => i.Status == "open")] }],
+        };
+        Assert.Equal(["Reading quiz 6 is due tonight, Asynchronous Lecture 5 is still missing, and Return library books is overdue.",
+                "Reading quiz 6 is due tonight, and Return library books is overdue.",
+                "Asynchronous Lecture 5 is still missing, and Return library books is overdue."],
+            [OverviewModel.DueSentence(sources with { Due = Due(tonight, missing, todo) }), OverviewModel.DueSentence(sources with { Due = Due(tonight, todo) }),
+                OverviewModel.DueSentence(sources with { Due = Due(missing, todo) })]);
         var shown = new DueCalendarModel(sources).Cells.SelectMany(c => c.Shown).ToDictionary(i => i.Title);
         Assert.Equal(("Exam · 9:00 AM", false, false), (shown["Statistics final"].Sub, shown["Statistics final"].Missing, shown["Statistics final"].Done));
         Assert.Equal(("To do · Overdue", true), (shown["Return library books"].Sub, shown["Return library books"].Missing));

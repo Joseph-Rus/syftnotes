@@ -679,14 +679,15 @@ public sealed partial class OverviewModel : ObservableObject
             }
             else first = $"{Count(that.Count)} {Kind(that, plural: true)} due {on}";
         }
-        string then = !missing && first.Length > 0 ? "" : Lateness(late, afterFirst: first.Length > 0);
-        if (first.Length == 0 && then.Length == 0) return "";
-        return first.Length > 0 && then.Length > 0 ? $"{first}, {then}." : $"{first}{then}.";
+        var parts = new List<string>();
+        if (first.Length > 0) parts.Add(first);
+        if (missing || first.Length == 0) parts.AddRange(Lateness(late, afterFirst: first.Length > 0));
+        return parts.Count == 0 ? "" : Join(parts) + ".";
     }
 
-    /// <summary>What's late, in words: Canvas work that wasn't handed in is "still missing", the student's own to-do is "overdue"
-    /// (never "missing"); "" when nothing is. <paramref name="afterFirst"/>: it follows what's due next, so it begins "and".</summary>
-    static string Lateness(List<CanvasApi.Item> late, bool afterFirst)
+    /// <summary>What's late, in words, one part each: Canvas work that wasn't handed in is "still missing", the student's own to-do is
+    /// "overdue" (never "missing"). <paramref name="afterFirst"/>: it follows what's due next, so a crowd is just counted.</summary>
+    static List<string> Lateness(List<CanvasApi.Item> late, bool afterFirst)
     {
         string Group(List<CanvasApi.Item> rows, string one, string many) => rows.Count switch
         {
@@ -694,12 +695,19 @@ public sealed partial class OverviewModel : ObservableObject
             1 => $"{rows[0].Name} {one}",
             _ => afterFirst ? $"{Count(rows.Count).ToLowerInvariant()} {many}" : $"{Count(rows.Count)} {Kind(rows, plural: true)} {many}",
         };
-        var parts = new[]
+        return [.. new[]
         {
             Group([.. late.Where(i => !i.Own)], "is still missing", "are still missing"), Group([.. late.Where(i => i.Own)], "is overdue", "are overdue"),
-        }.Where(p => p.Length > 0).ToList();
-        return parts.Count == 0 ? "" : (afterFirst ? "and " : "") + string.Join(", and ", parts);
+        }.Where(p => p.Length > 0)];
     }
+
+    /// <summary>The parts of a sentence, one "and" before the last: "A, and B" for two, "A, B, and C" for three.</summary>
+    static string Join(IReadOnlyList<string> parts) => parts.Count switch
+    {
+        1 => parts[0],
+        2 => $"{parts[0]}, and {parts[1]}",
+        _ => $"{string.Join(", ", parts.Take(parts.Count - 1))}, and {parts[^1]}",
+    };
 
     /// <summary>
     /// Home's sentence or two, the most pressing first: what's on or about to start ("Capstone team sync starts in 11
