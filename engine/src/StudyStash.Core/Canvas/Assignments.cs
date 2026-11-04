@@ -201,10 +201,18 @@ public static class Assignments
         }
     }
 
-    /// <summary>The list as the student sees it: the saved list with their own marks on it (<see cref="DueMarks"/>), and what
-    /// they hid left out. Every list the app, Ask, notifications and Claude's tools show comes from here.</summary>
-    public static List<Assignment> Shown(string home) =>
-        [.. DueMarks.Apply(Load(home), DueMarks.Load(home)).Where(a => a.Mark != DueMarks.Hidden)];
+    /// <summary>The saved list with the student's own marks on it (<see cref="DueMarks"/>; a hidden one stays, as <c>Mark</c>
+    /// "hidden"), for the classes still linked to a Canvas course. Un-ticking a course leaves its rows in the file until the
+    /// next sync; they are gone from here at once, so every list drops them together.</summary>
+    public static List<Assignment> Marked(string home)
+    {
+        var linked = CanvasSettings.Load(home).Courses.Keys.ToHashSet();
+        return DueMarks.Apply(Load(home).Where(a => linked.Contains(a.ClassName)), DueMarks.Load(home));
+    }
+
+    /// <summary>The list as the student sees it: <see cref="Marked"/> with what they hid left out. Every list the app, Ask,
+    /// notifications and Claude's tools show comes from here.</summary>
+    public static List<Assignment> Shown(string home) => [.. Marked(home).Where(a => a.Mark != DueMarks.Hidden)];
 
     public static void Save(string home, IEnumerable<Assignment> items)
     {
