@@ -201,12 +201,27 @@ public sealed class WindowsSound : IAudioSource
 /// forever (the window's).</summary>
 internal static class Opening
 {
-    /// <summary>Runs <paramref name="open"/> on a pool thread and waits up to <paramref name="limit"/>. Its own
+    /// <summary>Runs <paramref name="open"/> on a thread of its own and waits up to <paramref name="limit"/>. Its own
     /// exception comes back as it was thrown; past the limit <paramref name="late"/>'s is thrown instead, and whatever
     /// <paramref name="open"/> opens after all is closed with <paramref name="close"/>.</summary>
     public static T Within<T>(TimeSpan limit, Func<T> open, Action<T> close, Func<Exception> late)
     {
-        var opening = Task.Run(open);
+        // Its own thread, never one of the shared pool's: when they're all busy (an app starting up, a test machine
+        // running everything at once), a pool work item can wait seconds to start, and that wait was read as the sound
+        // driver not answering ("The microphone didn't start", a CI runner, PR #139).
+        var done = new TaskCompletionSource<T>(TaskCreationOptions.RunContinuationsAsynchronously);
+        new Thread(() =>
+        {
+            try
+            {
+                done.SetResult(open());
+            }
+            catch (Exception e)
+            {
+                done.SetException(e);
+            }
+        }) { IsBackground = true, Name = "Syft Notes: opening the microphone" }.Start();
+        var opening = done.Task;
         if (!((IAsyncResult)opening).AsyncWaitHandle.WaitOne(limit))
         {
             _ = opening.ContinueWith(t =>
