@@ -262,6 +262,7 @@ public sealed partial class AiNotesModel : ObservableObject, IDisposable
 
     void Apply(RewriteInfo info)
     {
+        Offline = false; // the library answered
         if (info.Current is { } cur)
         {
             written = cur.Markdown;
@@ -313,8 +314,8 @@ public sealed partial class AiNotesModel : ObservableObject, IDisposable
         pollCts = null;
     }
 
-    /// <summary>Asks again every few seconds while <see cref="Polls"/>. A call that fails shows Offline and is tried again
-    /// on the next tick (Offline clears when one works); however the loop ends, it clears <c>pollCts</c> if that is still
+    /// <summary>Asks again every few seconds while <see cref="Polls"/>. A call that doesn't reach the library shows Offline and
+    /// is tried again on the next tick (Offline clears when one works); one the library refuses stops it; however the loop ends, it clears <c>pollCts</c> if that is still
     /// its own, so the next <see cref="Apply"/> can start it again.</summary>
     async Task PollLoop(CancellationToken ct)
     {
@@ -329,8 +330,16 @@ public sealed partial class AiNotesModel : ObservableObject, IDisposable
                 {
                     info = await library.RewriteAsync(LectureId);
                 }
+                catch (LibraryRefusedException ex)
+                {
+                    // The library answered, and said no (the lecture was deleted on another device, say): asking again
+                    // wouldn't change that, so the page stops checking and says what it said.
+                    Say = ex.Message;
+                    return;
+                }
                 catch (Exception e) when (LibraryCall.Handled(e, "[ai-notes] PollLoop"))
                 {
+                    // Not reached this time: the next check tries again.
                     Offline = true;
                     continue;
                 }
@@ -340,7 +349,6 @@ public sealed partial class AiNotesModel : ObservableObject, IDisposable
                     OlderLibrary = true;
                     return;
                 }
-                Offline = false;
                 Apply(info);
             }
         }
