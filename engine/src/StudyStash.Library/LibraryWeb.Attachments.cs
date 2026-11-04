@@ -276,39 +276,50 @@ public sealed partial class LibraryWeb
     static bool KeepsPages(Attachment a) => TestSwitches.On && Attachments.KindOf(a.Name, a.Type) == Attachments.Slides;
 
     /// <summary>Reads an attachment's words in the background, then keeps them (none: it's marked as having none). A deck
-    /// (<see cref="KeepsPages"/>) has its pages kept too; with <paramref name="words"/> false only those are read (a deck
-    /// that came before pages were kept, read the first time its lecture's attachments are listed).</summary>
+    /// (<see cref="KeepsPages"/>) has its pages kept too, and a PDF or .pptx deck is read once, its words being its pages
+    /// joined; with <paramref name="words"/> false only the pages are read (a deck that came before pages were kept, read
+    /// the first time its lecture's attachments are listed). A deck whose file isn't there keeps no pages (they stay
+    /// unset), so the next time its lecture is listed they're read again; so does one whose reading took too long, once
+    /// the library starts again. One that can't be read at all (it won't open, or isn't a PDF or .pptx) keeps an empty
+    /// list, for good.</summary>
     void ReadLater(Attachment a, bool words = true)
     {
         bool pages = KeepsPages(a) && readingPages.TryAdd(a.Id, 0);
         if (!words && !pages) return;
         var read = options.ReadDocument ?? DocumentText.ExtractAsync;
         string path = store.AttachmentPath(a);
+        // A test's stand-in for reading words reads them alone.
+        bool once = pages && options.ReadDocument is null && DocumentText.HasPages(path);
         _ = Task.Run(async () =>
         {
             await readingOne.WaitAsync();
+            IReadOnlyList<string>? deck = null;
             try
             {
-                if (words)
-                {
-                    string? text = await ReadOrNull(a, path, ct => read(path, ct));
-                    Keep(() => store.SetAttachmentText(a.Id, text));
-                }
                 if (pages)
                 {
-                    var deck = await ReadOrNull(a, path, ct => DocumentText.PagesAsync(path, new DocumentTextOptions(), ct));
-                    Keep(() => store.SetAttachmentPages(a.Id, deck ?? []));
+                    deck = await ReadOrNull<IReadOnlyList<string>>(a, path, async ct => await DocumentText.PagesAsync(path, new DocumentTextOptions(), ct) ?? []);
+                    // Kept before the words mark the deck Read, so it is never seen Read with its pages still to come.
+                    if (deck is { } kept) Keep(() => store.SetAttachmentPages(a.Id, kept));
+                }
+                if (words)
+                {
+                    string? text = once ? DocumentText.WordsOf(deck) : await ReadOrNull(a, path, ct => read(path, ct));
+                    Keep(() => store.SetAttachmentText(a.Id, text));
                 }
             }
             finally
             {
                 readingOne.Release();
-                if (pages) readingPages.TryRemove(a.Id, out _);
+                // A deck whose file is there but couldn't be read in time stays in the set, so a file that always takes
+                // too long isn't read over and over, holding up the others.
+                if (pages && (deck is not null || !File.Exists(path))) readingPages.TryRemove(a.Id, out _);
             }
         });
     }
 
-    /// <summary>What <paramref name="read"/> gets from the file within ten minutes; null when it isn't there or can't be read.</summary>
+    /// <summary>What <paramref name="read"/> gets from the file within ten minutes; null when it isn't there, can't be
+    /// read or the time ran out.</summary>
     static async Task<T?> ReadOrNull<T>(Attachment a, string path, Func<CancellationToken, Task<T?>> read) where T : class
     {
         try

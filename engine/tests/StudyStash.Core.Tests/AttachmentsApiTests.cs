@@ -3,6 +3,7 @@ using System.Net;
 using System.Net.Http.Headers;
 using System.Text;
 using System.Text.Json.Nodes;
+using StudyStash.Core.Ai;
 using StudyStash.Library;
 
 namespace StudyStash.Core.Tests;
@@ -502,7 +503,11 @@ public class AttachmentsApiTests
         // And one on a lecture with no timed transcript (n1's is plain text), its pages already kept.
         store.AddAttachment(new Attachment("plain", "Cells.pptx", "Oceans.pptx", "BIO 110", "n1", 100, PptxType, "2026-09-01T00:00:00Z", "words", Attachment.Read));
         store.SetAttachmentPages("plain", ["Cells", "Membranes\nlipids"]);
-        await using var site = await Site(cfg, store);
+        // No stand-in for reading words: decks are read for real, once.
+        await using var site = await Site(cfg, store, new LibraryWebOptions
+        {
+            ListModels = _ => Task.FromResult<List<(string, double)>?>([]), Latest = _ => Task.FromResult<Release?>(null),
+        });
 
         async Task<JsonObject> Listed(string lecture) =>
             (JsonObject)Assert.Single((JsonArray)(await Json(await site.Client.SendAsync(Req(HttpMethod.Get, $"/api/v2/attachments?lecture={lecture}"))))["attachments"]!)!;
@@ -526,5 +531,33 @@ public class AttachmentsApiTests
         var plain = ((JsonArray)(await Listed("n1"))["slides"]!).Select(s => (JsonObject)s!).ToList();
         Assert.Equal(["Cells", "Membranes"], plain.Select(s => s["title"]!.GetValue<string>()));
         Assert.All(plain, s => Assert.Null(s["at"]));
+
+        // A deck attached now is read once: its pages are kept, and its words are those pages joined, as reading it for
+        // its words alone gives them.
+        var sent = await Upload(site, Form([("Oceans.pptx", Pptx(deck))], lecture: "n2"));
+        string sentId = sent["attachments"]![0]!["id"]!.GetValue<string>();
+        await Read(store, sentId);
+        Assert.Equal(deck, store.AttachmentPages(sentId));
+        Assert.Equal(await DocumentText.ExtractAsync(store.AttachmentPath(store.GetAttachment(sentId)!), new DocumentTextOptions(), default), store.GetAttachment(sentId)!.Text);
+        Assert.StartsWith("Coral reefs\npolyps", store.GetAttachment(sentId)!.Text);
+
+        // A deck whose file isn't there when it's read (its lecture was being filed under another class: its file is in
+        // CS 101, its row still says BIO 110) keeps no pages, not an empty list, so it gets them when listed again.
+        store.Save(new Meeting("n3") { Title = "Rivers", Date = "2026-09-03", Transcript = "Rivers carry silt down to their deltas." },
+            new Classification("BIO 110", 1, "folder"), "## Summary\nRivers.", "qwen3");
+        string[] rivers = ["Rivers\nsource, mouth", "Deltas\nsilt, distributary"];
+        File.WriteAllBytes(Path.Combine(store.AttachmentsDir("CS 101"), "Rivers.pptx"), Pptx(rivers));
+        store.AddAttachment(new Attachment("moved", "Rivers.pptx", "Rivers.pptx", "BIO 110", "n3", 100, PptxType, "2026-09-03T00:00:00Z", "words", Attachment.Read));
+        Assert.Null((await Listed("n3"))["slides"]);
+        store.SetClass("n3", "CS 101");
+        for (var until = DateTime.UtcNow.AddSeconds(10); ; await Task.Delay(20))
+        {
+            var kept = store.AttachmentPages("moved");
+            Assert.True(kept is null || kept.Count > 0, "a file that wasn't there must not be kept as a deck with no pages");
+            if (kept is not null || DateTime.UtcNow > until) break;
+            await Listed("n3");
+        }
+        Assert.Equal(rivers, store.AttachmentPages("moved"));
+        Assert.Equal(["Rivers", "Deltas"], ((JsonArray)(await Listed("n3"))["slides"]!).Select(s => s!["title"]!.GetValue<string>()));
     }
 }
