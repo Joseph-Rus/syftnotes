@@ -11,9 +11,10 @@ namespace StudyStash.Core.Ai;
 /// <para>
 /// Syft Notes runs it with a home of its own (<see cref="Home"/>: agy keeps everything under <c>~/.gemini</c>, and reads
 /// its home from HOME, or USERPROFILE on Windows), so nothing of the student's own agy (their MCP servers, plugins,
-/// skills, hooks, rules, settings) ever runs inside Syft Notes' work, and Syft Notes never writes theirs. The sign-in
-/// is kept in that home too (agy 1.4.5 keeps it there, <c>antigravity-cli/antigravity-oauth-token</c>, which Syft Notes
-/// never reads): a student signs in to Gemini for Syft Notes once, in setup, and its notes and its setup chat use that.
+/// skills, hooks, rules, settings) ever runs inside Syft Notes' work, and Syft Notes never writes theirs. Its sign-in
+/// isn't kept in that home. agy 1.5.0 keeps one sign-in, shared with the student's own agy, in the computer's password
+/// store (the Keychain on a Mac, Credential Manager on Windows), so Syft Notes never clears it without telling the
+/// student.
 /// </para>
 /// <para>
 /// The setup chat runs in that home as an agent of its own (<see cref="SetupAgent"/>): Antigravity's default prompt and
@@ -93,16 +94,22 @@ public static class Antigravity
         Directory.CreateDirectory(dir);
         if (OperatingSystem.IsWindows())
         {
-            File.WriteAllText(Path.Combine(dir, "rundll32.cmd"), "@exit 0\r\n");
+            Write(Path.Combine(dir, "rundll32.cmd"), "@exit 0\r\n");
             return dir;
         }
         foreach (string name in new[] { "open", "xdg-open" })
         {
             string path = Path.Combine(dir, name);
-            File.WriteAllText(path, "#!/bin/sh\nexit 0\n");
+            Write(path, "#!/bin/sh\nexit 0\n");
             File.SetUnixFileMode(path, UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute);
         }
         return dir;
+
+        // Only when it isn't there already as it should be (each sign-in asks).
+        static void Write(string path, string text)
+        {
+            if (!File.Exists(path) || File.ReadAllText(path) != text) File.WriteAllText(path, text);
+        }
     }
 
     public static string SettingsPath(string home) => Path.Combine(home, ".gemini", "antigravity-cli", "settings.json");
