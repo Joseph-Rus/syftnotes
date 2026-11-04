@@ -865,6 +865,26 @@ public class RecordingTests
         return store.Add(new Lecture { Id = id, Started = started, State = state, ClassName = "CS 101", Seconds = seconds });
     }
 
+    /// <summary>The first moment of a recording: its file is made but the header is still in the writer's buffer. Whisper has
+    /// nothing to hear yet, and the log doesn't say it couldn't read the recording.</summary>
+    [Fact]
+    public async Task A_recording_that_has_only_just_begun_is_not_read_and_not_complained_about()
+    {
+        using var dir = new TempDir();
+        var store = new LectureStore(dir.Path);
+        var live = store.Add(new Lecture { Id = "rec-new", Started = "2026-09-22T10:00:00-07:00", State = LectureState.Recording, ClassName = "CS 101" });
+        File.WriteAllBytes(store.AudioPath(live.Id), []);
+        var log = new List<string>();
+        var worker = new TranscriptionWorker(store, () => new FakeWhisper(), () => live, log.Add);
+        Assert.False(await worker.StepAsync(default));
+        Assert.DoesNotContain(log, l => l.Contains("couldn't read the recording"));
+
+        // A file Whisper can't make sense of once it has a header's worth is still said.
+        File.WriteAllBytes(store.AudioPath(live.Id), new byte[WavWriter.HeaderBytes]);
+        Assert.False(await worker.StepAsync(default));
+        Assert.Contains(log, l => l.Contains("couldn't read the recording"));
+    }
+
     [Fact]
     public async Task Whisper_that_wont_load_leaves_lectures_waiting_and_says_why()
     {
