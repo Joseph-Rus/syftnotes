@@ -56,6 +56,8 @@ final class NotebookCanvas: NSObject {
     @ObservationIgnored private var lastInked = false
     @ObservationIgnored private var grounds: [CALayer] = []
     @ObservationIgnored private var laidOutSize: CGSize = .zero
+    /// Apple's pens should show (nothing is over the page).
+    @ObservationIgnored private var toolsWanted = false
     @ObservationIgnored nonisolated(unsafe) private var observers: [NSObjectProtocol] = []
     /// Pulled up past the last page: add a page (the editor does it, so it's said the same way).
     @ObservationIgnored var onPullToAdd: (() -> Void)?
@@ -89,8 +91,9 @@ final class NotebookCanvas: NSObject {
         hint.isHidden = true
         canvas.addSubview(hint)
 
-        // The Pencil draws; whether a finger does is the student's (FingerMode). A Pencil's first touch tells.
-        let watcher = PencilWatcher { [weak self] in self?.sawPencil() }
+        // The Pencil draws; whether a finger does is the student's (FingerMode). A Pencil's first touch tells, and a touch
+        // that writes brings Apple's pens back if something else took them.
+        let watcher = TouchWatcher { [weak self] pencil in self?.touched(pencil: pencil) }
         watcher.delegate = self
         canvas.addGestureRecognizer(watcher)
         // Two fingers tapped undo, three redo, as in other notebook apps.
@@ -109,6 +112,9 @@ final class NotebookCanvas: NSObject {
         if let zoom = DebugLaunch.value("-notebook-zoom").flatMap(Double.init) { zoomFactor = zoom }
 
         picker.stateAutosaveName = "notebook"
+        // Whether a finger draws is the notebook's own (More's "Draw with your finger"): the pens' switch for it did
+        // nothing once a Pencil had written.
+        picker.showsDrawingPolicyControls = false
         picker.colorUserInterfaceStyle = .light
         picker.addObserver(canvas)
         picker.addObserver(self)
@@ -399,6 +405,7 @@ final class NotebookCanvas: NSObject {
 
     /// Apple's pens, shown while the page is written on (hidden under a sheet or popover).
     func showTools(_ on: Bool) {
+        toolsWanted = on
         picker.setVisible(on, forFirstResponder: tools)
         if on { tools.becomeFirstResponder() }
     }
@@ -423,6 +430,14 @@ final class NotebookCanvas: NSObject {
         case .auto: canvas.drawingPolicy = pencil ? .pencilOnly : .default
         }
         fingersDraw = canvas.drawingPolicy != .pencilOnly
+    }
+
+    /// The page written on: Apple's pens come back if something else took them while the page was showing (a text
+    /// field beside the notebook, the menu over a lasso's selection), so the Pencil's double-tap and squeeze work
+    /// again. A finger that only scrolls leaves a text field beside it as it is.
+    private func touched(pencil: Bool) {
+        if pencil { sawPencil() }
+        if toolsWanted, pencil || fingersDraw, !tools.isFirstResponder { showTools(true) }
     }
 
     private func sawPencil() {
@@ -499,21 +514,20 @@ final class ToolsResponder: UIView {
     override var inputView: UIView? { nothing }
 }
 
-/// Watches for an Apple Pencil touching the canvas, and lets every touch through.
-private final class PencilWatcher: UIGestureRecognizer {
-    private let saw: () -> Void
+/// Watches touches on the canvas, and lets every one through: says whether each first touch was an Apple Pencil's.
+private final class TouchWatcher: UIGestureRecognizer {
+    private let touched: (_ pencil: Bool) -> Void
 
-    init(saw: @escaping () -> Void) {
-        self.saw = saw
+    init(touched: @escaping (_ pencil: Bool) -> Void) {
+        self.touched = touched
         super.init(target: nil, action: nil)
-        allowedTouchTypes = [NSNumber(value: UITouch.TouchType.pencil.rawValue)]
         cancelsTouchesInView = false
         delaysTouchesBegan = false
         delaysTouchesEnded = false
     }
 
     override func touchesBegan(_ touches: Set<UITouch>, with event: UIEvent) {
-        if touches.contains(where: { $0.type == .pencil }) { saw() }
+        touched(touches.contains { $0.type == .pencil })
         state = .failed
     }
 }
