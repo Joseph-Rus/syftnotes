@@ -3,6 +3,7 @@ using Avalonia.Controls;
 using Avalonia.Layout;
 using StudyStash.App.Controls;
 using StudyStash.App.Platform;
+using StudyStash.App.ViewModels.Kit;
 using StudyStash.App.Views;
 
 namespace StudyStash.App.Windows;
@@ -53,7 +54,7 @@ public sealed record WindowSpec(string Key, string Title, Control View)
 
 /// <summary>
 /// Every one of the app's own windows (the library, setup, Settings, Connect Canvas, Get ready, the browser question)
-/// is made here, the same way: the app's title bar drawn into the window, its text look (<see cref="Look"/>), its menu
+/// is made here, the same way: a dialog layer for <see cref="Confirm"/>'s questions, the app's title bar drawn into the window, its text look (<see cref="Look"/>), its menu
 /// and ⌘, (<see cref="AppMenu"/>), a Mac's traffic lights in the header (<see cref="MacTitleBar"/>) and Windows' Mica
 /// and caption buttons (<see cref="WinChrome"/>), so none is missing one. It knows which are open, for the Dock.
 /// The floating ones (the dropdown, the recorder, the quick panel, toasts) are <see cref="Floating"/>.
@@ -101,9 +102,11 @@ public static class AppWindows
     {
         var w = new Window
         {
-            Title = spec.Title, Content = spec.View,
+            Title = spec.Title,
             ExtendClientAreaToDecorationsHint = true, ExtendClientAreaTitleBarHeightHint = Skin.Current == SkinKind.Mac ? WindowHeader.MacHeight : 32,
         };
+        // The view sits in the window's dialog layer, which is where Confirm asks its questions.
+        w.Content = ConfirmLayer.Wrap(w, spec.View);
         if (spec.Kind == WindowKind.Dialog)
         {
             w.CanResize = false;
@@ -111,7 +114,7 @@ public static class AppWindows
         }
         if (spec.MinSize.Width > 0) w.MinWidth = spec.MinSize.Width;
         if (spec.MinSize.Height > 0) w.MinHeight = spec.MinSize.Height;
-        if (spec.Size == WindowSize.Follow) Follow(w, spec.View, () => w.Content == spec.View);
+        if (spec.Size == WindowSize.Follow) Follow(w, spec.View, () => ConfirmLayer.ViewOf(w) == spec.View);
         else if (spec.Size == WindowSize.Centred) Centre(w, spec.Centred);
         Dress(w, spec.Key, spec.InDock, spec.Activate, spec.AppForward);
         return w;

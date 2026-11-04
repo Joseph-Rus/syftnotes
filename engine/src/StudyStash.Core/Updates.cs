@@ -108,6 +108,9 @@ public static partial class Updates
 
     static readonly HttpClient Http = CreateHttp();
 
+    /// <summary>The one client the updater asks GitHub with (it has the User-Agent GitHub wants).</summary>
+    internal static HttpClient SharedHttp => Http;
+
     static HttpClient CreateHttp()
     {
         var http = new HttpClient { Timeout = TimeSpan.FromSeconds(10) };
@@ -118,6 +121,9 @@ public static partial class Updates
     /// <summary>STUDYSTASH_LATEST, for a copy under test that mustn't ask GitHub: "off" means no check (no release
     /// known), a version such as "v0.6.0" pretends that's the newest release. Unset or empty, GitHub is asked.</summary>
     public const string LatestVariable = "STUDYSTASH_LATEST";
+
+    /// <summary>The switch that points the release check at another address (test helpers only).</summary>
+    public const string ReleasesUrlVariable = "STUDYSTASH_RELEASES_URL";
 
     /// <summary>What <see cref="LatestVariable"/> says: (false, null) when it's unset, so GitHub is asked; (true, null)
     /// for "off"; (true, a release) for a version. A pretend release has nothing to download, so nothing installs.</summary>
@@ -135,7 +141,9 @@ public static partial class Updates
     public static async Task<Release?> LatestAsync(HttpClient? http = null)
     {
         if (http is null && Pretend(TestSwitches.Get(LatestVariable)) is (true, var pretend)) return pretend;
-        using var request = new HttpRequestMessage(HttpMethod.Get, LatestApi);
+        // STUDYSTASH_RELEASES_URL (test helpers only): a release in GitHub's shape served by the Velopack bridge test
+        // (.github/workflows/velopack-bridge.yml) on its throwaway runner, in place of GitHub's.
+        using var request = new HttpRequestMessage(HttpMethod.Get, http is null && TestSwitches.Get(ReleasesUrlVariable) is { Length: > 0 } url ? url : LatestApi);
         request.Headers.TryAddWithoutValidation("Accept", "application/vnd.github+json");
         using var r = await (http ?? Http).SendAsync(request);
         if (r.StatusCode == HttpStatusCode.NotFound) return null;

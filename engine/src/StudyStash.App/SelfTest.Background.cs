@@ -45,7 +45,7 @@ public static partial class SelfTest
 
         // Settings → Phone with the switch on.
         Shell.ShowSettings();
-        if ((Shell.Windows.Settings?.Content as Control)?.DataContext is SettingsModel sm)
+        if (SettingsOpen() is SettingsModel sm)
         {
             sm.Section = "Phone";
             await Settle();
