@@ -444,7 +444,7 @@ public sealed partial class LibraryWeb
         TimeSpan? wait = settings.SeenWithKey.Length == 0 ? Canvas.FirstContactWait : null;
         var found = new Dictionary<string, string>();
         var info = new Dictionary<string, CourseInfo>();
-        string? next = "/api/v1/courses?enrollment_state=active&include[]=term&per_page=100";
+        string? next = "/api/v1/courses?enrollment_state=active&include[]=term&include[]=concluded&per_page=100";
         for (int page = 0; page < 20 && next is not null; page++)
         {
             var r = await Canvas.FetchAsync(next, "json", timeout: wait);
@@ -455,8 +455,7 @@ public sealed partial class LibraryWeb
                 {
                     string sid = id.ToJsonString();
                     found[sid] = name;
-                    info[sid] = new CourseInfo(S(c["course_code"]), name, S(c["term"]?["name"]),
-                        TermStart: S(c["term"]?["start_at"]), TermEnd: S(c["term"]?["end_at"]), CourseStart: S(c["start_at"]), CourseEnd: S(c["end_at"]));
+                    info[sid] = CourseChoices.Read(c);
                 }
             next = r["next_page"] is JsonValue nv ? S(nv) : null;
         }
