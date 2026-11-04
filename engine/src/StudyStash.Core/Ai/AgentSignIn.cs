@@ -4,7 +4,8 @@ namespace StudyStash.Core.Ai;
 /// Signing in to Claude Code, Codex or Antigravity CLI, for guided setup and for every Sign in button in Syft Notes, with
 /// the provider's own sign-in: <c>claude auth login</c>, <c>codex login</c> or <c>agy</c> runs in a terminal
 /// nobody sees (<see cref="HiddenTerminal"/>), so a sign-in made for a terminal works without one ever showing, and it
-/// opens the browser itself. Syft Notes never sees the password or a token. Gemini's page ends on a code to paste
+/// opens the browser itself (Gemini's doesn't: Syft Notes opens its page, <see cref="AgentCliInfo.OpenersOff"/>). Syft
+/// Notes never sees the password or a token. Gemini's page ends on a code to paste
 /// (<see cref="AgentCliInfo.TakesCode"/>): the student pastes it into Syft Notes' box, which types it into the sign-in
 /// (<see cref="SendCodeAsync"/>) and keeps it nowhere. What the sign-in shows is read the
 /// way a person would read it (<see cref="SignInScreen"/>), its few simple questions answered the safe way; whether it's
@@ -18,9 +19,9 @@ namespace StudyStash.Core.Ai;
 /// <para>
 /// The sign-in page's address goes one place only: the system's browser opener, here (<see cref="OpenPage"/>), and only
 /// for a page that finishes by itself (<see cref="SignInScreen.FinishesByItself"/>) or one whose code the student pastes
-/// back into Syft Notes (Gemini's), when the sign-in said it couldn't open the browser, or the student asked for the
-/// page again. It is never shown, logged, saved or put in the overview. Claude Code's printed page ends on a code to
-/// paste, which Syft Notes doesn't take: its sign-in is run again instead.
+/// back into Syft Notes (Gemini's), when the sign-in said it couldn't open the browser or its own openers are off, or
+/// the student asked for the page again. It is never shown, logged, saved or put in the overview. Claude Code's
+/// printed page ends on a code to paste, which Syft Notes doesn't take: its sign-in is run again instead.
 /// </para>
 /// </summary>
 public sealed class AgentSignIn : IDisposable
@@ -32,6 +33,8 @@ public sealed class AgentSignIn : IDisposable
     SignInScreen? screen;
     DateTime started;
     int opened;
+    /// <summary>This run's PATH has its stand-in browser openers first (<see cref="AgentCliInfo.OpenersOff"/>).</summary>
+    volatile bool openersOff;
     TaskCompletionSource exited = new(TaskCreationOptions.RunContinuationsAsynchronously);
 
     public AgentSignIn(AgentCliInfo cli, string exe)
@@ -52,6 +55,9 @@ public sealed class AgentSignIn : IDisposable
     /// <summary>The system's browser opener every sign-in starts with: the tests make it one that opens nothing, so no
     /// test can open a browser on the computer it runs on.</summary>
     internal static Func<string, bool> Browser { get; set; } = SystemBrowser;
+    /// <summary>A line in the app's log (its stand-in browser openers couldn't be written, so it opens the browser
+    /// itself).</summary>
+    public Action<string>? Log { get; set; }
     /// <summary>Each line the sign-in showed, plain: for CI's record of the real CLIs, which takes the addresses out
     /// before keeping anything. Nothing in the app listens.</summary>
     internal Action<string>? Shown { get; init; }
@@ -85,9 +91,11 @@ public sealed class AgentSignIn : IDisposable
     }
     /// <summary>Whether its page finishes signing in by itself (so it's one Syft Notes may open).</summary>
     public bool PageFinishesByItself => screen?.PageFinishesByItself ?? false;
-    /// <summary>How many times Syft Notes handed its page to the browser opener.</summary>
+    /// <summary>How many times Syft Notes handed its page to the browser opener, in this run of the sign-in.</summary>
     public int Opened => Volatile.Read(ref opened);
     public bool Running => child is { HasExited: false };
+    /// <summary>How this run's sign-in ended (its exit code), once it has; null while it runs, or when it never started.</summary>
+    int? ended;
     /// <summary>The sign-in's process, while it runs (CI looks for windows of its own).</summary>
     internal int? ProcessId => child?.Id;
 
@@ -104,22 +112,42 @@ public sealed class AgentSignIn : IDisposable
         GaveUp = false;
         Region = false;
         CodeRefused = false;
+        ended = null;
+        // A new run shows a new page: it's opened too ("Try again" runs the same sign-in again).
+        Volatile.Write(ref opened, 0);
         // A fresh end to wait on, unless "again" made one already (so a wait never takes the old one's end for this one's).
         if (exited.Task.IsCompleted) exited = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         var launch = OperatingSystem.IsWindows() ? WindowsCommand.For([exe, .. cli.SignInArgs]) : new Launch(exe, [.. cli.SignInArgs]);
-        var env = HiddenTerminal.Environment([
-            new("PATH", AiProvider.SearchPath()),
-            new("CLAUDECODE", null), // started from inside Claude Code, claude would refuse to nest
-            // Windows PowerShell, which a sign-in may run to open the browser, finds its own modules (PowerShell 7's
-            // module path, handed down when Syft Notes was started from it, leaves it without Start-Process).
-            .. OperatingSystem.IsWindows() ? [new KeyValuePair<string, string?>("PSModulePath", null)] : Array.Empty<KeyValuePair<string, string?>>(),
-            .. cli.Env().Select(e => new KeyValuePair<string, string?>(e.Key, e.Value)),
-        ]);
         var s = new SignInScreen();
         if (Shown is { } shown) s.Line += shown;
+        // Its own browser openers first, when they're off: Syft Notes opens its page instead. When they can't be
+        // written, it opens the browser itself, as it did before.
+        string path = AiProvider.SearchPath();
+        openersOff = false;
+        if (cli.OpenersOff is { } off)
+        {
+            try
+            {
+                path = off() + Path.PathSeparator + path;
+                openersOff = true;
+            }
+            catch (Exception e) when (e is IOException or UnauthorizedAccessException)
+            {
+                Log?.Invoke($"[sign-in] {cli.Name} opens the browser itself: its stand-in openers couldn't be written "
+                    + $"({e.GetType().Name})");
+            }
+        }
         HiddenTerminal t;
         try
         {
+            var env = HiddenTerminal.Environment([
+                new("PATH", path),
+                new("CLAUDECODE", null), // started from inside Claude Code, claude would refuse to nest
+                // Windows PowerShell, which a sign-in may run to open the browser, finds its own modules (PowerShell 7's
+                // module path, handed down when Syft Notes was started from it, leaves it without Start-Process).
+                .. OperatingSystem.IsWindows() ? [new KeyValuePair<string, string?>("PSModulePath", null)] : Array.Empty<KeyValuePair<string, string?>>(),
+                .. cli.Env().Select(e => new KeyValuePair<string, string?>(e.Key, e.Value)),
+            ]);
             t = HiddenTerminal.Start(launch, env);
         }
         catch (Exception e) when (e is IOException or DllNotFoundException or EntryPointNotFoundException or System.ComponentModel.Win32Exception)
@@ -153,19 +181,21 @@ public sealed class AgentSignIn : IDisposable
                 else if (s.WantsTerminal || DateTime.UtcNow - at < QuickFail) Stuck = true;
                 else GaveUp = true;
             }
+            if (ReferenceEquals(child, t)) ended = code;
             done.TrySetResult();
         });
         return true;
     }
 
-    /// <summary>What the sign-in showed: the questions it asks answered, and its page opened when it said it couldn't open
-    /// the browser itself (only a page that finishes by itself, once).</summary>
+    /// <summary>What the sign-in showed: the questions it asks answered, and its page opened, once, when it said it
+    /// couldn't open the browser itself or its browser openers are off (<see cref="AgentCliInfo.OpenersOff"/>), and
+    /// it's a page Syft Notes may open.</summary>
     void Showed(HiddenTerminal t, SignInScreen s, string text)
     {
         string reply;
         lock (s) reply = s.Read(text);
         if (reply.Length > 0) t.Type(reply);
-        if (s.NoBrowser && MayOpen(s) && s.Page is { } page && Interlocked.CompareExchange(ref opened, 1, 0) == 0)
+        if ((s.NoBrowser || openersOff) && MayOpen(s) && s.Page is { } page && Interlocked.CompareExchange(ref opened, 1, 0) == 0)
             _ = Task.Run(() => OpenPage(page));
         // A code turned down: the sign-in waits for a key to go back to its start, with a new page. It's stopped
         // instead, and the student is told to try again.
@@ -292,14 +322,20 @@ public sealed class AgentSignIn : IDisposable
 
     /// <summary>Waits until it's signed in (true), checking every <see cref="Every"/> and when the sign-in stops, or
     /// until <paramref name="ct"/> ends the wait, or the sign-in stopped without it (false: <see cref="GaveUp"/>,
-    /// <see cref="Region"/> or <see cref="Stuck"/>). <paramref name="changed"/> hears each check's answer.</summary>
+    /// <see cref="Region"/> or <see cref="Stuck"/>). <paramref name="changed"/> hears each check's answer.
+    /// <para>When the status says signed in at the very first look, before the sign-in can have done anything, it may be
+    /// an old sign-in its maker no longer takes, or a status that misreports. A sign-in that stops by itself once it's
+    /// done (Claude Code's, Codex's) then counts only when it ends cleanly and the status still says signed in.</para></summary>
     public async Task<bool> WaitAsync(CancellationToken ct, Action<AgentSignedIn>? changed = null)
     {
+        bool? first = null;
         while (!ct.IsCancellationRequested)
         {
             var now = await Task.Run(Check, CancellationToken.None);
             changed?.Invoke(now);
-            if (now.SignedIn)
+            first ??= now.SignedIn;
+            bool untilItEnds = first == true && !cli.StaysOpen;
+            if (now.SignedIn && !untilItEnds)
             {
                 // Plain agy goes on to its chat once it's signed in: nothing more is wanted from it.
                 if (cli.StaysOpen) Stop();
@@ -319,7 +355,7 @@ public sealed class AgentSignIn : IDisposable
             // It stopped: one last look, and the wait ends unless it's signed in (a sign-in that finished stops too).
             var last = await Task.Run(Check, CancellationToken.None);
             changed?.Invoke(last);
-            if (last.SignedIn) return true;
+            if (last.SignedIn && (!untilItEnds || ended == 0)) return true;
             if (!Region && !Stuck && !CodeRefused) GaveUp = true;
             return false;
         }

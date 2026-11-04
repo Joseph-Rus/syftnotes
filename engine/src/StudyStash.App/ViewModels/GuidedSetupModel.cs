@@ -48,9 +48,10 @@ public sealed class GuidedServices
     public Func<IReadOnlyList<AiAppState>> AiApps { get; init; } = () => [];
     /// <summary>Adds Syft Notes to one of those apps' settings, as Settings → AI tool access's Connect does.</summary>
     public Func<string, AiAppChange>? ConnectAiApp { get; init; }
-    /// <summary>Once an AI is ready here, adds Syft Notes to every app of it on this computer (Claude: the Claude app and
-    /// Claude Code), in the file each reads, as its Connect in Settings does; null: none are touched.</summary>
-    public Func<string, Task>? ConnectAppsOf { get; init; }
+    /// <summary>Once an AI is signed in here, Settings → Your AI's own Connect for it (<see cref="AiConnect"/>, through the
+    /// app's AI store), run in the background: its apps here get Syft Notes, and the library checks it, so every screen
+    /// says it's connected with no second Connect. Null: nothing is connected (a test).</summary>
+    public Func<string, Task>? Connect { get; init; }
 
     public AgentInstall MakeInstaller(AgentCliInfo cli) =>
         Installer?.Invoke(cli) ?? new AgentInstall(cli, Windows, Path.Combine(Home, "logs", "setup-install.log"));
@@ -93,6 +94,11 @@ public sealed partial class GuidedSetupModel : ObservableObject, IDisposable
     /// <summary>Codex's plan check worked only with the student's own config.toml read (its sign-in is kept there): the
     /// chat's turns read it too, or each would say the sign-in didn't work.</summary>
     bool keepUserConfig;
+    /// <summary>The AI whose signed-in account is on a plan it can't be used with: its next sign-in runs for real, so the
+    /// student can pick another account (its wait takes the new one: <see cref="AgentSignIn.WaitAsync"/>), never the same
+    /// account's check again. "" for none. Only Claude and ChatGPT: signed in, agy goes straight to its chat, and on a Mac
+    /// and Windows its one sign-in is shared with the student's own agy.</summary>
+    string another = "";
 
     public GuidedSetupModel(SetupModel setup, GuidedServices services, Func<AppSettings> settings, Action<Action<AppSettings>> save)
     {
@@ -411,12 +417,17 @@ public sealed partial class GuidedSetupModel : ObservableObject, IDisposable
 
     partial void OnAiReadyChanged(bool value)
     {
+        if (value) another = "";
         Notify(nameof(CanContinue), nameof(ShowReady), nameof(HasAllowance));
         Refresh();
     }
     partial void OnAllowanceWordsChanged(string value) => Notify(nameof(HasAllowance));
     partial void OnSignInProblemChanged(string? value) => Notify(nameof(HasSignInProblem));
-    partial void OnPlanProblemChanged(ChatProblem value) => Notify(nameof(HasPlanProblem), nameof(PlanIsPlan), nameof(ShowOpenSignIn));
+    partial void OnPlanProblemChanged(ChatProblem value)
+    {
+        if (value == ChatProblem.Plan && !Cli.StaysOpen) another = Cli.Id;
+        Notify(nameof(HasPlanProblem), nameof(PlanIsPlan), nameof(ShowOpenSignIn));
+    }
     partial void OnBusyChanged(bool value) => Notify(nameof(CanType));
     partial void OnChatProblemTextChanged(string? value) => Notify(nameof(HasChatProblem));
     partial void OnRoleChosenChanged(bool value) => Refresh();
@@ -583,8 +594,8 @@ public sealed partial class GuidedSetupModel : ObservableObject, IDisposable
         Notify(nameof(ForNotes), nameof(ByHandLabel));
         Screen = GuidedScreen.Manual;
         if (!ready) return;
-        // Connected all the way, as Connect in Settings does it: its apps here read the lectures too.
-        if (services.ConnectAppsOf is { } apps) _ = apps(id);
+        // Connected all the way, by Settings' own Connect, in the background: the store turns every screen Connected.
+        if (services.Connect is { } connect) UiTasks.Run(() => connect(id), $"setup: connect {id}");
         ReadyForNotes?.Invoke(id);
     }
 
@@ -713,7 +724,7 @@ public sealed partial class GuidedSetupModel : ObservableObject, IDisposable
     Task TryAgain() => Screen switch
     {
         GuidedScreen.Install => InstallCommand.ExecuteAsync(null),
-        GuidedScreen.SignIn => PlanProblem != ChatProblem.None ? CheckPlanAsync() : OpenSignInAsync(),
+        GuidedScreen.SignIn => PlanProblem != ChatProblem.None && !PlanNeedsAnother ? CheckPlanAsync() : OpenSignInAsync(),
         _ => RetryTurnAsync(),
     };
 
@@ -757,10 +768,17 @@ public sealed partial class GuidedSetupModel : ObservableObject, IDisposable
         else StartChat("[Syft Notes] Setup was opened.");
     }
 
-    /// <summary>The sign-in screen: already signed in goes straight to the plan check.</summary>
+    /// <summary>The sign-in screen: already signed in goes straight to the plan check, unless that account couldn't be
+    /// used (<see cref="another"/>): then its sign-in starts again, for another.</summary>
     async Task ToSignInAsync()
     {
         ResetSignIn();
+        if (another == Cli.Id)
+        {
+            Screen = GuidedScreen.SignIn;
+            await OpenSignInAsync();
+            return;
+        }
         CheckingSignIn = true;
         Screen = GuidedScreen.SignIn;
         AgentSignedIn now;
@@ -789,8 +807,10 @@ public sealed partial class GuidedSetupModel : ObservableObject, IDisposable
         if (Found.Exe is not { } exe) return;
         SignInProblem = null;
         PlanProblem = ChatProblem.None;
+        SignedIn = false;
         signIn ??= services.SignIn(Cli, exe);
         var s = signIn;
+        s.Log ??= services.Log;
         SignInStuck = false;
         s.Start();
         // Gemini's page ends on a code: the box for it shows while the sign-in waits, and hands it to this sign-in.
@@ -828,8 +848,12 @@ public sealed partial class GuidedSetupModel : ObservableObject, IDisposable
     [RelayCommand]
     void GetHelp() => services.OpenUrl(AiWords.HelpPage);
 
+    /// <summary>"Check again" on a plan the account doesn't have: a sign-in again, where the student picks another
+    /// account (or the same one, upgraded). On any other problem, the same check again.</summary>
     [RelayCommand]
-    Task CheckAgain() => CheckPlanAsync();
+    Task CheckAgain() => PlanNeedsAnother ? OpenSignInAsync() : CheckPlanAsync();
+
+    bool PlanNeedsAnother => PlanIsPlan && another == Cli.Id;
 
     /// <summary>One tiny turn with no tools, to catch a plan that doesn't include the CLI before the chat starts.</summary>
     async Task CheckPlanAsync()
@@ -1108,7 +1132,7 @@ public sealed partial class GuidedSetupModel : ObservableObject, IDisposable
         ChatProblemKind = kind;
         ChatProblemText = kind switch
         {
-            ChatProblem.Offline => $"{Brand} couldn't be reached. Check your internet connection.",
+            ChatProblem.Offline => Engines.CouldntBeReached(Brand),
             ChatProblem.Region => RegionWords,
             ChatProblem.Limit => $"{Brand} is at its usage limit until {UntilWords(Engines.UntilFrom(said, services.Now()))}. You can finish by hand; what's done stays done.",
             ChatProblem.NoAnswer => $"{Brand} didn't answer.",
