@@ -27,14 +27,14 @@ public sealed partial class Store
         CREATE INDEX IF NOT EXISTS attachments_class ON attachments(class_name);
         """);
 
-    /// <summary>The photo columns, added to a library made before whiteboard photos.</summary>
+    /// <summary>The photo columns (and a deck's pages), added to a library made before them.</summary>
     void MigrateAttachments()
     {
         var cols = new HashSet<string>();
         using (var cmd = Command("PRAGMA table_info(attachments)"))
         using (var r = cmd.ExecuteReader())
             while (r.Read()) cols.Add(r.GetString(r.GetOrdinal("name")));
-        foreach (string c in new[] { "taken", "kind" })
+        foreach (string c in new[] { "taken", "kind", "pages" })
             if (!cols.Contains(c)) Exec($"ALTER TABLE attachments ADD COLUMN {c} TEXT");
     }
 
@@ -178,6 +178,35 @@ public sealed partial class Store
         {
             bool none = string.IsNullOrWhiteSpace(text);
             return Exec("UPDATE attachments SET text=?, state=? WHERE id=?", none ? "" : text, none ? Attachment.Unread : Attachment.Read, id) > 0;
+        }
+    }
+
+    /// <summary>At most this much of a slide's words is kept: its title and points, not a page of small print.</summary>
+    public const int MaxPageChars = 2_000;
+
+    /// <summary>A deck's pages, one string per slide in the deck's order (<see cref="Ai.DocumentText.PagesAsync"/>),
+    /// each cut to <see cref="MaxPageChars"/>; none when it had none to read. False when it's been removed meanwhile.</summary>
+    public bool SetAttachmentPages(string id, IReadOnlyList<string> pages)
+    {
+        string json = System.Text.Json.JsonSerializer.Serialize(pages.Select(p => Py.Head(p, MaxPageChars)).ToList());
+        lock (gate) return Exec("UPDATE attachments SET pages=? WHERE id=?", json, id) > 0;
+    }
+
+    /// <summary>A deck's pages as <see cref="SetAttachmentPages"/> kept them; null when they haven't been read yet.</summary>
+    public List<string>? AttachmentPages(string id)
+    {
+        lock (gate)
+        {
+            using var cmd = Command("SELECT pages FROM attachments WHERE id=?", id);
+            if (cmd.ExecuteScalar() is not string json) return null;
+            try
+            {
+                return System.Text.Json.JsonSerializer.Deserialize<List<string>>(json);
+            }
+            catch (System.Text.Json.JsonException)
+            {
+                return null; // read again
+            }
         }
     }
 

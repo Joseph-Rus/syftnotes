@@ -1,3 +1,4 @@
+using System.IO.Compression;
 using System.Net;
 using System.Net.Http.Headers;
 using System.Text;
@@ -463,5 +464,67 @@ public class AttachmentsApiTests
         await using var site = await Site(cfg, store);
         await Read(store, "a1");
         Assert.Equal("Mitosis.", store.GetAttachment("a1")!.Text);
+    }
+
+    /// <summary>A PowerPoint with these slides, each line of one a paragraph.</summary>
+    static byte[] Pptx(params string[] slides)
+    {
+        var bytes = new MemoryStream();
+        using (var zip = new ZipArchive(bytes, ZipArchiveMode.Create, leaveOpen: true))
+            for (int i = 0; i < slides.Length; i++)
+            {
+                using var w = new StreamWriter(zip.CreateEntry($"ppt/slides/slide{i + 1}.xml").Open());
+                w.Write("<p:sld>" + string.Concat(slides[i].Split('\n').Select(l => $"<a:p><a:t>{WebUtility.HtmlEncode(l)}</a:t></a:p>")) + "</p:sld>");
+            }
+        return bytes.ToArray();
+    }
+
+    [Fact]
+    public async Task A_decks_slides_are_listed_with_when_each_was_taught()
+    {
+        using var dir = new TempDir();
+        var (cfg, store) = Library(dir);
+        using var owned = store;
+        // Three minutes each on reefs, kelp and tides, then reminders; the deck's last slide was never spoken about.
+        string[] topics = ["Coral reefs\npolyps, zooxanthellae, bleaching", "Kelp forests\nholdfast, stipe, urchins, otters", "Tides\nlunar gravity, spring, neap"];
+        var said = topics.SelectMany((topic, t) => Enumerable.Range(0, 18).Select(i =>
+        {
+            var words = topic.Split([' ', ',', '\n'], StringSplitOptions.RemoveEmptyEntries);
+            return $"[{TimedText.Clock(t * 180 + i * 10)}] {words[2 * i % words.Length]} with {words[(2 * i + 1) % words.Length]} matters";
+        })).Concat(Enumerable.Range(0, 60).Select(i => $"[{TimedText.Clock(540 + i * 10)}] reminders about the field trip and the lab report"));
+        store.Save(new Meeting("n2") { Title = "Oceans", Date = "2026-09-02", Transcript = string.Join('\n', said) },
+            new Classification("BIO 110", 1, "folder"), "## Summary\nOceans.", "qwen3");
+        string[] deck = [.. topics, "Deep sea vents\nchemosynthesis, tubeworms, hydrothermal"];
+        File.WriteAllBytes(Path.Combine(store.AttachmentsDir("BIO 110"), "Oceans.pptx"), Pptx(deck));
+        const string PptxType = "application/vnd.openxmlformats-officedocument.presentationml.presentation";
+        // A deck attached before pages were kept: its words are read, its pages aren't yet.
+        store.AddAttachment(new Attachment("old", "Oceans.pptx", "Oceans.pptx", "BIO 110", "n2", 100, PptxType, "2026-09-02T00:00:00Z", "words", Attachment.Read));
+        // And one on a lecture with no timed transcript (n1's is plain text), its pages already kept.
+        store.AddAttachment(new Attachment("plain", "Cells.pptx", "Oceans.pptx", "BIO 110", "n1", 100, PptxType, "2026-09-01T00:00:00Z", "words", Attachment.Read));
+        store.SetAttachmentPages("plain", ["Cells", "Membranes\nlipids"]);
+        await using var site = await Site(cfg, store);
+
+        async Task<JsonObject> Listed(string lecture) =>
+            (JsonObject)Assert.Single((JsonArray)(await Json(await site.Client.SendAsync(Req(HttpMethod.Get, $"/api/v2/attachments?lecture={lecture}"))))["attachments"]!)!;
+
+        // Asked for first, the old deck has no times yet and its pages are read in the background, then kept.
+        var first = await Listed("n2");
+        Assert.True(first.ContainsKey("slides"));
+        Assert.Null(first["slides"]);
+        for (var until = DateTime.UtcNow.AddSeconds(10); store.AttachmentPages("old") is null && DateTime.UtcNow < until;) await Task.Delay(20);
+        Assert.Equal(deck, store.AttachmentPages("old"));
+
+        var slides = ((JsonArray)(await Listed("n2"))["slides"]!).Select(s => (JsonObject)s!).ToList();
+        Assert.Equal([1, 2, 3, 4], slides.Select(s => s["n"]!.GetValue<int>()));
+        Assert.Equal(["Coral reefs", "Kelp forests", "Tides", "Deep sea vents"], slides.Select(s => s["title"]!.GetValue<string>()));
+        var at = slides.Select(s => s["at"]?.GetValue<double>()).ToList();
+        Assert.InRange(at[0]!.Value, 0, 179);
+        Assert.InRange(at[1]!.Value, 180, 359);
+        Assert.InRange(at[2]!.Value, 360, 539);
+        Assert.Null(at[3]);
+
+        var plain = ((JsonArray)(await Listed("n1"))["slides"]!).Select(s => (JsonObject)s!).ToList();
+        Assert.Equal(["Cells", "Membranes"], plain.Select(s => s["title"]!.GetValue<string>()));
+        Assert.All(plain, s => Assert.Null(s["at"]));
     }
 }
