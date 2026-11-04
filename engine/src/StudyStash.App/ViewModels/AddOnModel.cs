@@ -15,8 +15,8 @@ namespace StudyStash.App.ViewModels;
 /// have happened the step is done (<see cref="OnDone"/>). No school address, no code, no word the student wouldn't use.
 /// The store's add-on may turn out older than 1.8 (a stale answer, a store that rolled back): one that checks in with an
 /// older version sends the student to the step that asks for the school's address at once (<see cref="OnTypeInstead"/>),
-/// and when nothing has come a minute and a half after the store's page opened, that step is offered right there
-/// (<see cref="OfferTyping"/>).
+/// and when nothing has come a minute and a half after the store's page opened, or no Canvas has been found that long
+/// after the add-on checked in, that step is offered right there (<see cref="OfferTyping"/>).
 /// </summary>
 public sealed partial class AddOnModel : ObservableObject, IDisposable
 {
@@ -26,8 +26,11 @@ public sealed partial class AddOnModel : ObservableObject, IDisposable
     IDisposable? hurry;
     bool told;
     DateTimeOffset? addedAt;
+    DateTimeOffset? lookingAt;
 
-    /// <summary>How long after the store's page opened, with no add-on heard from, the typing way is offered.</summary>
+    /// <summary>How long after the store's page opened, with no add-on heard from, the typing way is offered; and how long
+    /// after the add-on checked in, with no Canvas found yet (Canvas at the school's own address, which the add-on can't
+    /// find by itself).</summary>
     public static readonly TimeSpan SlowAfter = TimeSpan.FromSeconds(90);
 
     public AddOnModel(CanvasContext context, CanvasWatch watch, Func<DateTimeOffset>? clock = null)
@@ -44,7 +47,8 @@ public sealed partial class AddOnModel : ObservableObject, IDisposable
     public Action? OnTypeInstead { get; set; }
 
     /// <summary>Nothing has come since the store's page opened (a store still serving an older add-on, or the student
-    /// stuck): "Type your school's Canvas address instead" shows in the step.</summary>
+    /// stuck), or the add-on checked in and still finds no Canvas (a school's own address): "Type your school's Canvas
+    /// address instead" shows in the step.</summary>
     [ObservableProperty] public partial bool OfferTyping { get; set; }
 
     /// <summary>Both are done: the add-on checked in, and the library knows the student's Canvas.</summary>
@@ -174,7 +178,8 @@ public sealed partial class AddOnModel : ObservableObject, IDisposable
             OnTypeInstead?.Invoke();
             return;
         }
-        if (Waiting && !IsAsking && addedAt is { } at && clock() - at >= SlowAfter) OfferTyping = true;
+        if (LookingForCanvas) lookingAt ??= clock();
+        if ((Waiting && !IsAsking ? addedAt : LookingForCanvas ? lookingAt : null) is { } since && clock() - since >= SlowAfter) OfferTyping = true;
         if (IsDone && !told)
         {
             told = true;

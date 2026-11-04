@@ -282,6 +282,29 @@ public class FunnelTests
     }
 
     [AvaloniaFact]
+    public async Task With_the_add_on_checked_in_and_no_canvas_found_a_minute_and_a_half_later_the_typing_way_is_offered()
+    {
+        var handler = new FakeLibrary()
+            .Json(HttpMethod.Post, "/api/v2/canvas/pair", """{"until":"2025-09-25T17:44:00Z"}""")
+            .Json(HttpMethod.Get, "/api/v2/canvas/state", """{"state": "not_set_up", "url": "", "extension": {"connected": false}}""");
+        var context = CanvasFixtures.Context(handler);
+        var watch = new CanvasWatch(context);
+        var now = DateTimeOffset.Parse("2026-11-02T09:00:00Z");
+        using var addOn = new AddOnModel(context, watch, () => now);
+        await addOn.AddCommand.ExecuteAsync(null);
+
+        // It checks in quickly, but a school at its own address (canvas.example.edu) is never found by it.
+        now += TimeSpan.FromSeconds(30);
+        handler.Json(HttpMethod.Get, "/api/v2/canvas/state", """{"state": "not_set_up", "url": "", "extension": {"connected": true, "browser": "Chrome"}}""");
+        await watch.RefreshAsync();
+        Assert.True(addOn.LookingForCanvas);
+        Assert.False(addOn.OfferTyping);
+        now += AddOnModel.SlowAfter;
+        await watch.RefreshAsync();
+        Assert.True(addOn.OfferTyping);
+    }
+
+    [AvaloniaFact]
     public async Task That_wasn_t_me_tells_the_library_no_and_puts_Add_back()
     {
         var handler = new FakeLibrary()
