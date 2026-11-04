@@ -89,8 +89,10 @@ public static class Desktop
     /// they load.</summary>
     internal static bool SystemChangesOff { get; set; } = StudyStash.Core.TestSwitches.Get("STUDYSTASH_SELFTEST") is { Length: > 0 };
 
-    /// <summary>The program to start: the app bundle's executable (a Mac), or StudyStash.exe.</summary>
-    public static string Program => Environment.ProcessPath ?? "StudyStash";
+    /// <summary>The program to start: the app bundle's executable (a Mac), StudyStash.exe, or on Linux the AppImage
+    /// itself ($APPIMAGE), never the folder it's mounted on while it runs, which is gone once it quits.</summary>
+    public static string Program => OperatingSystem.IsLinux() && Environment.GetEnvironmentVariable("APPIMAGE") is { Length: > 0 } image
+        ? image : Environment.ProcessPath ?? "StudyStash";
 
     /// <summary>The login item's name for a settings folder: the usual folder is "com.study-stash.app" (a LaunchAgent)
     /// and "Study Stash" (the Run key); any other folder gets its own, so a second profile never replaces the real one.</summary>
@@ -181,6 +183,24 @@ public static class Desktop
         if (OperatingSystem.IsWindows()) return Registry.CurrentUser.OpenSubKey(RunKey)?.GetValue(value) is string;
         if (OperatingSystem.IsLinux()) return File.Exists(AutostartEntry(label));
         return false;
+    }
+
+    /// <summary>The program the login item for this settings folder starts, or null when there's none (or it can't be
+    /// read): a LaunchAgent's first argument, a Run value's first word, an autostart entry's Exec.</summary>
+    public static string? LoginProgram(string home)
+    {
+        if (SystemChangesOff) return null;
+        var (label, value) = LoginName(home);
+        try
+        {
+            if (OperatingSystem.IsMacOS()) return File.Exists(LaunchAgent(label)) ? Moves.PlistProgram(File.ReadAllText(LaunchAgent(label))) : null;
+            if (OperatingSystem.IsWindows()) return Moves.RunProgram(Registry.CurrentUser.OpenSubKey(RunKey)?.GetValue(value) as string);
+            if (OperatingSystem.IsLinux()) return File.Exists(AutostartEntry(label)) ? Moves.ExecProgram(File.ReadAllText(AutostartEntry(label))) : null;
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException or System.Security.SecurityException)
+        {
+        }
+        return null;
     }
 
     /// <summary>Start (or stop starting) when you log in, quietly: to the menu bar or tray, no window. Only when the
@@ -376,7 +396,7 @@ public static class Desktop
                 {
                     try
                     {
-                        await Task.Delay(500, stop);
+                        await Services.Kit.Poll.AfterAsync(TimeSpan.FromMilliseconds(500), stop);
                     }
                     catch (OperationCanceledException)
                     {

@@ -19,8 +19,11 @@ public sealed class CanvasLibraryException(int status, string detail) : Exceptio
 /// null); any other failure throws <see cref="CanvasLibraryException"/> with the library's own detail when it sent
 /// one. View models never talk to this directly — they read a <see cref="CanvasContext"/>.
 /// </summary>
-public sealed class CanvasClient(string serverUrl, string key, HttpClient? http = null)
+public sealed class CanvasClient(string serverUrl, Func<string> key, HttpClient? http = null)
 {
+    /// <summary>With a password that stays as it is for as long as this is used (tests).</summary>
+    public CanvasClient(string serverUrl, string key, HttpClient? http = null) : this(serverUrl, () => key, http) { }
+
     static readonly HttpClient Shared = new() { Timeout = TimeSpan.FromSeconds(150) };
     readonly HttpClient client = http ?? Shared;
     readonly string canvasRoot = serverUrl.TrimEnd('/') + "/api/v2/canvas";
@@ -33,7 +36,7 @@ public sealed class CanvasClient(string serverUrl, string key, HttpClient? http 
     async Task<HttpResponseMessage> SendRawAsync(HttpMethod method, string url, JsonNode? body, CancellationToken stop)
     {
         using var request = new HttpRequestMessage(method, url);
-        if (key.Length > 0) request.Headers.TryAddWithoutValidation("Authorization", "Bearer " + key);
+        if (key() is { Length: > 0 } password) request.Headers.TryAddWithoutValidation("Authorization", "Bearer " + password);
         if (body is not null) request.Content = new StringContent(body.ToJsonString(), Encoding.UTF8, "application/json");
         return await client.SendAsync(request, stop);
     }

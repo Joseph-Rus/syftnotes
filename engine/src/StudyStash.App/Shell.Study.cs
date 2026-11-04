@@ -1,3 +1,4 @@
+using StudyStash.App.Services;
 using StudyStash.App.ViewModels;
 using StudyStash.Core.Study;
 
@@ -47,7 +48,7 @@ public static partial class Shell
         {
             if (await Study().ReviewAsync(limit: 1) is { } state) library.StudyDue = state.Counts.Due;
         }
-        catch
+        catch (Exception e) when (LibraryCall.Handled(e, "[study] CountStudyAsync"))
         {
         }
     }
@@ -94,7 +95,7 @@ public static partial class Shell
                 if (ReferenceEquals(library.Note, note)) note.NameFlags(named);
             }
         }
-        catch
+        catch (Exception e) when (LibraryCall.Handled(e, "[study] NameFlagsAsync"))
         {
         }
     }

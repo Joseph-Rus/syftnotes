@@ -187,8 +187,18 @@ public sealed class LocalLibrary(LibraryReader reader, Canvas.CanvasSync? canvas
 /// The library over its API (/api/v2), with the laptop's password: what the Syft Notes app shows, and what Claude
 /// reads through <c>Syft Notes mcp</c> on a laptop.
 /// </summary>
-public sealed class RemoteLibrary(string serverUrl, string key, HttpClient? http = null) : ILibrarySource, IAttachmentLibrary, IVoiceMemoLibrary
+public sealed class RemoteLibrary(string serverUrl, Func<string> key, HttpClient? http = null) : ILibrarySource, IAttachmentLibrary, IVoiceMemoLibrary
 {
+    /// <summary>With a password that stays as it is for as long as this is used (Claude's MCP server, tests).</summary>
+    public RemoteLibrary(string serverUrl, string key, HttpClient? http = null) : this(serverUrl, () => key, http) { }
+
+    /// <summary>Signs a request with the library's password as it is now (the app changes it while windows are open).</summary>
+    void Authorize(HttpRequestMessage request)
+    {
+        string password = key();
+        if (password.Length > 0) request.Headers.TryAddWithoutValidation("Authorization", "Bearer " + password);
+    }
+
     static readonly HttpClient Shared = new() { Timeout = TimeSpan.FromSeconds(150) };
     readonly HttpClient client = http ?? Shared;
     readonly string root = serverUrl.TrimEnd('/') + "/api/v2";
@@ -202,7 +212,7 @@ public sealed class RemoteLibrary(string serverUrl, string key, HttpClient? http
     async Task<JsonNode?> SendAsync(HttpMethod method, string path, JsonNode? body = null, CancellationToken stop = default)
     {
         using var request = new HttpRequestMessage(method, root + path);
-        if (key.Length > 0) request.Headers.TryAddWithoutValidation("Authorization", "Bearer " + key);
+        Authorize(request);
         if (Computer.Length > 0) request.Headers.TryAddWithoutValidation("X-Study-Stash-Computer", Computer);
         if (body is not null) request.Content = new StringContent(body.ToJsonString(), Encoding.UTF8, "application/json");
         using var r = await client.SendAsync(request, stop);
@@ -330,7 +340,7 @@ public sealed class RemoteLibrary(string serverUrl, string key, HttpClient? http
     public async Task DownloadVoiceMemoAsync(string id, string path, CancellationToken stop = default)
     {
         using var request = new HttpRequestMessage(HttpMethod.Get, $"{root}/voice-memos/{Q(id)}/audio");
-        if (key.Length > 0) request.Headers.TryAddWithoutValidation("Authorization", "Bearer " + key);
+        Authorize(request);
         using var r = await client.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, stop);
         if (!r.IsSuccessStatusCode) throw new LibraryRefusedException((int)r.StatusCode, r.StatusCode == HttpStatusCode.NotFound ? "The recording isn't on your library any more." : r.ReasonPhrase ?? "");
         await using var file = File.Create(path);
@@ -397,7 +407,7 @@ public sealed class RemoteLibrary(string serverUrl, string key, HttpClient? http
                 form.Add(new StreamContent(file), "file", Path.GetFileName(path));
             }
             using var request = new HttpRequestMessage(HttpMethod.Post, root + "/attachments") { Content = form };
-            if (key.Length > 0) request.Headers.TryAddWithoutValidation("Authorization", "Bearer " + key);
+            Authorize(request);
             if (Computer.Length > 0) request.Headers.TryAddWithoutValidation("X-Study-Stash-Computer", Computer);
             using var r = await client.SendAsync(request, stop);
             string text = await r.Content.ReadAsStringAsync(stop);
@@ -420,7 +430,7 @@ public sealed class RemoteLibrary(string serverUrl, string key, HttpClient? http
     public async Task DownloadAttachmentAsync(string id, string path, CancellationToken stop = default)
     {
         using var request = new HttpRequestMessage(HttpMethod.Get, root + $"/attachments/{Q(id)}/raw");
-        if (key.Length > 0) request.Headers.TryAddWithoutValidation("Authorization", "Bearer " + key);
+        Authorize(request);
         using var r = await client.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, stop);
         if (!r.IsSuccessStatusCode) throw new LibraryRefusedException((int)r.StatusCode, r.StatusCode == HttpStatusCode.NotFound ? "It isn't on your library any more." : r.ReasonPhrase ?? "");
         Directory.CreateDirectory(Path.GetDirectoryName(path)!);
@@ -503,7 +513,7 @@ public sealed class RemoteLibrary(string serverUrl, string key, HttpClient? http
         {
             Content = new StringContent(body.ToJsonString(), Encoding.UTF8, "application/json"),
         };
-        if (key.Length > 0) request.Headers.TryAddWithoutValidation("Authorization", "Bearer " + key);
+        Authorize(request);
         using var r = await ChatClient.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, stop);
         if (r.StatusCode == HttpStatusCode.NotFound) return false;
         if (!r.IsSuccessStatusCode) throw new LibraryRefusedException((int)r.StatusCode, r.ReasonPhrase ?? "");

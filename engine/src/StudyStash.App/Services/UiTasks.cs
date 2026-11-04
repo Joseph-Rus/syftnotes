@@ -36,14 +36,15 @@ internal static class UiTasks
     }
 
     /// <summary>Runs <paramref name="work"/> to the end and never throws: a failure goes to <paramref name="write"/> and
-    /// <paramref name="say"/>; cancellation goes nowhere.</summary>
+    /// <paramref name="say"/>; a real cancellation goes nowhere (a timeout is no cancellation).</summary>
     internal static async Task Guard(Func<Task> work, string what, Action<string> write, Action say)
     {
         try
         {
             await work();
         }
-        catch (OperationCanceledException)
+        // A request that timed out is a TaskCanceledException too, but nobody cancelled it: that's a failure like any other.
+        catch (OperationCanceledException e) when (e.InnerException is not TimeoutException)
         {
         }
         catch (Exception e)

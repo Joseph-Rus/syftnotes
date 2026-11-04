@@ -1,3 +1,4 @@
+using StudyStash.App.Services;
 using System.Collections.ObjectModel;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
@@ -54,7 +55,7 @@ public sealed partial class AiAskModel
         {
             recipes = await library.RecipesAsync();
         }
-        catch
+        catch (Exception e) when (LibraryCall.Handled(e, "[ai-ask] LoadRecipesAsync"))
         {
             return;
         }
@@ -126,7 +127,7 @@ public sealed partial class AiAskModel
         {
             saved = await library.SaveRecipeAsync(RecipeName.Trim(), RecipePrompt);
         }
-        catch
+        catch (Exception e) when (LibraryCall.Handled(e, "[ai-ask] SaveRecipe"))
         {
             return;
         }
@@ -142,7 +143,7 @@ public sealed partial class AiAskModel
         {
             left = await library.DeleteRecipeAsync(recipe.Id);
         }
-        catch
+        catch (Exception e) when (LibraryCall.Handled(e, "[ai-ask] DeleteRecipe"))
         {
             return;
         }

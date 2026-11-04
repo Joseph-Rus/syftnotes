@@ -1,3 +1,4 @@
+using StudyStash.App.Services.Kit;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using System.Text.Json.Serialization;
@@ -491,11 +492,7 @@ public sealed partial class AppHost : IDisposable, IProblemSource
     public Stores.AiStatusStore AiStatus => LazyInitializer.EnsureInitialized(ref aiStatus, () => new Stores.AiStatusStore(() => Api.Ai, Clock));
 
     /// <summary>The library over its API, once one is set up.</summary>
-    public RemoteLibrary? Remote()
-    {
-        var cc = Client();
-        return cc.ServerUrl.Length > 0 ? new RemoteLibrary(cc.ServerUrl, cc.PoolKey) : null;
-    }
+    public RemoteLibrary? Remote() => Api.Library;
 
     /// <summary>The transcription model: the one the environment names, else the one picked in setup or Settings, else
     /// the one for this computer (<see cref="Advice"/>).</summary>
@@ -754,7 +751,7 @@ public sealed partial class AppHost : IDisposable, IProblemSource
         running.Add(Task.Run(() => count.RunAsync(stop.Token)));
     }
 
-    static readonly HttpClient countHttp = new() { Timeout = TimeSpan.FromSeconds(20) };
+    internal static readonly HttpClient countHttp = new() { Timeout = TimeSpan.FromSeconds(20) };
 
     /// <summary>The daily count, once the app has started (Settings' switch deletes its code).</summary>
     public DailyCount? Counter { get; private set; }
@@ -846,7 +843,7 @@ public sealed partial class AppHost : IDisposable, IProblemSource
             }
             try
             {
-                await Task.Delay(TimeSpan.FromSeconds(Library == LibraryState.Connected ? 20 : 10), stop.Token);
+                await Poll.AfterAsync(TimeSpan.FromSeconds(Library == LibraryState.Connected ? 20 : 10), stop.Token);
             }
             catch (OperationCanceledException)
             {
@@ -1052,9 +1049,20 @@ public sealed partial class AppHost : IDisposable, IProblemSource
                 if (x.TitleTyped) x.Title = title;
             });
         var l = Recorder.Continue(id);
+        RecorderStarted();
+        return l;
+    }
+
+    /// <summary>What follows a recorder that has started, whether it's a new lecture or one kept going: the computer
+    /// stays awake, Whisper starts on it (after class, it lets go of a model still loaded), and the library is told
+    /// what is recording, now and every 30 seconds, so a phone's photos know which lecture they belong to.</summary>
+    void RecorderStarted()
+    {
         awake ??= new KeepAwake("Recording a lecture");
         Whisper.Wake();
-        return l;
+        TellLibraryRecording(true);
+        beat?.Dispose();
+        beat = new Timer(_ => TellLibraryRecording(false), null, TimeSpan.FromSeconds(30), TimeSpan.FromSeconds(30));
     }
 
     async Task<RecordStart> MicThenAsync(Func<Lecture> start)
@@ -1089,12 +1097,7 @@ public sealed partial class AppHost : IDisposable, IProblemSource
         if (waits && Downloading is null) _ = DownloadModelAsync();
         var calendar = CalendarStart(className, forEvent);
         var l = WithEvent(Recorder.Start(calendar.ClassName, Client().DisplayName, afterClass: !Settings.LiveTranscript, waitsForModel: waits), calendar);
-        awake ??= new KeepAwake("Recording a lecture");
-        // Live, Whisper starts on it; after class, the look lets go of a model still loaded from the lecture before.
-        Whisper.Wake();
-        TellLibraryRecording(true);
-        beat?.Dispose();
-        beat = new Timer(_ => TellLibraryRecording(false), null, TimeSpan.FromSeconds(30), TimeSpan.FromSeconds(30));
+        RecorderStarted();
         return l;
     }
 
@@ -1390,7 +1393,7 @@ public sealed partial class AppHost : IDisposable, IProblemSource
         Changed?.Invoke();
         using (var waiting = CancellationTokenSource.CreateLinkedTokenSource(cts.Token))
         {
-            await Task.WhenAny(Task.Delay(wait, waiting.Token), now.Task);
+            await Task.WhenAny(Poll.AfterAsync(wait, waiting.Token), now.Task);
             await waiting.CancelAsync();
         }
         cts.Token.ThrowIfCancellationRequested();
