@@ -275,4 +275,26 @@ public class AppUpdatesTests
 
         Assert.False(Configs.LoadClient(home.Path).AutoUpdate);
     }
+
+    [Fact]
+    public void An_update_brings_the_library_window_back_only_when_it_was_open()
+    {
+        Assert.Equal(["--background"], AppUpdates.RelaunchWith(Configs.DefaultHome, windowOpen: false));
+        Assert.Empty(AppUpdates.RelaunchWith(Configs.DefaultHome, windowOpen: true));
+        Assert.Equal(["--home", "/notes"], AppUpdates.RelaunchWith("/notes", windowOpen: true));
+    }
+
+    [Fact]
+    public void The_Windows_waiter_has_no_argument_list_when_the_app_comes_back_with_no_arguments()
+    {
+        // Start-Process refuses an empty -ArgumentList, which would leave the student with no app at all.
+        var spawned = new List<IReadOnlyList<string>>();
+        var host = new UpdateHost { System = "Windows", AppDir = @"C:\Apps\Syft Notes", SpawnDetached = spawned.Add };
+
+        AppUpdates.SpawnWaiter(host, []);
+        AppUpdates.SpawnWaiter(host, ["--background"]);
+
+        Assert.DoesNotContain("-ArgumentList", spawned[0][^1]);
+        Assert.Contains("-ArgumentList '--background'", spawned[1][^1]);
+    }
 }
