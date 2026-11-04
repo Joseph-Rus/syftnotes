@@ -21,7 +21,10 @@ extension NotebookCanvas {
     func addPage(after index: Int? = nil) -> Int {
         guard let id, let n = store.notebook(id) else { return 0 }
         let at = min((index ?? n.pages.count - 1) + 1, n.pages.count)
-        changePages(showing: at) { $0.pages.insert(Notebook.Page($0.newPages), at: at) }
+        let page = Notebook.Page(n.newPages)
+        // At the end, what can be undone stays.
+        if at == n.pages.count, appendPage(page) { return at }
+        changePages(showing: at) { $0.pages.insert(page, at: at) }
         return at
     }
 
