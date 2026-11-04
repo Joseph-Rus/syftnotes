@@ -41,6 +41,11 @@ public static partial class DiagramMoment
     public static IReadOnlyList<string> Stems(string label) =>
         [.. NotWord().Split(label.ToLowerInvariant()).Where(w => w.Length >= 3 && !Common.Contains(w)).Select(w => w.Length > 5 ? w[..Math.Max(4, w.Length - 2)] : w).Distinct()];
 
+    /// <summary>Text as its words, lower case, with a space before and after each, so " " + a stem finds a word that
+    /// starts with that stem.</summary>
+    public static string Spaced(string text) =>
+        " " + string.Join(' ', NotWord().Split(text.ToLowerInvariant()).Where(w => w.Length > 0)) + " ";
+
     /// <summary>
     /// Where <paramref name="label"/> was said: the transcript's lines (each read with the one after it, since a phrase
     /// can run across two) that hold most of its words, the rarer words counting for more, best first; at most
@@ -51,11 +56,11 @@ public static partial class DiagramMoment
     {
         var stems = Stems(label);
         if (stems.Count == 0 || lines.Count == 0) return [];
-        var text = lines.Select(l => " " + string.Join(' ', NotWord().Split(l.Text.ToLowerInvariant())) + " ").ToList();
+        var text = lines.Select(l => Spaced(l.Text)).ToList();
         // A word on every other line says little about where this one was said.
         var weight = stems.ToDictionary(s => s, s => 1 / Math.Log(2 + text.Count(t => t.Contains(" " + s, StringComparison.Ordinal))));
         double whole = weight.Values.Sum();
-        string phrase = " " + string.Join(' ', NotWord().Split(label.ToLowerInvariant()).Where(w => w.Length > 0)) + " ";
+        string phrase = Spaced(label);
         double Score(string said)
         {
             double score = stems.Where(s => said.Contains(" " + s, StringComparison.Ordinal)).Sum(s => weight[s]) / whole;

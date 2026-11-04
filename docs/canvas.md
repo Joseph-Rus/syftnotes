@@ -483,12 +483,17 @@ land: they fill `CourseIndex`, and every builder here reads straight from it.
 
 - `GET /api/v2/canvas/classes` → one row per class in this library, linked or not: `[{"class","linked",
   "canvas":{"id","code","name","term","url"}|null, "suggested":{"id","name"}|null,"last_sync","counts":
-  {"to_hand_in","done","modules","files","announcements","announcements_new"},"files_hidden","scout":
-  {"state":"done|exploring|waiting|failed|never","files","when","report"}}]`. `suggested` (only when a class isn't
+  {"to_hand_in","done","modules","files","announcements","announcements_new"},"files_hidden","grade":
+  {"score","letter"}|null,"scout":{"state":"done|exploring|waiting|failed|never","files","when","report"}}]`. `suggested` (only when a class isn't
   linked) is `CourseMatch.Suggest`'s best guess from the school's course list: a shared number ("CS 101" ~
   "COMP 101") or a shared word, one a prefix of the other ("CALC" ~ "Calculus"); it's shown, never linked, by
   itself. `announcements_new` is unread-on-Canvas **and** not opened in Syft Notes: `CanvasSeen`
-  (`home/canvas_seen.json`) narrows Canvas's own `read_state` further, per student, per class.
+  (`home/canvas_seen.json`) narrows Canvas's own `read_state` further, per student, per class. `grade` is the
+  student's own overall grade, Canvas's `computed_current_score` and `_grade` (what's graded so far; `letter` is ""
+  when the course has no grading scheme). It comes from the course request that already names the course, which now
+  also asks `include[]=total_scores`: the student enrollment that comes back with it is `CourseIndex.Grade`. It's null
+  when the course hides final grades, when nothing is graded yet, and before a sync that asked; a course whose answer
+  carries none clears the old grade. `/enrollments` is still never requested (`DeniesOtherPeople`).
 - `GET /api/v2/canvas/due` → `{"synced","to_hand_in","next":item|null,"groups":[{"key","label","items":[item]}]}`
   across every class, groups in order **Overdue** (not done, due before now) / **This week** (due before the eighth
   day from now) / **Later** / **No due date** / **Handed in** (submitted, graded, excused, or marked done in Canvas's
