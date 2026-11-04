@@ -172,6 +172,7 @@ public sealed partial class Store : IDisposable
 
     // A note is in the library once it has a file, even while it is being written again.
     const string Filed = "md_path IS NOT NULL AND class_name IS NOT NULL";
+    const string HasSummary = Filed + " AND COALESCE(summary_md, '') <> ''";
 
     const string Schema = """
 
@@ -442,9 +443,12 @@ public sealed partial class Store : IDisposable
             return Exec("UPDATE notes SET status=?, updated_at=? WHERE status=? AND COALESCE(summary_md, '')=''", Queued, Now(), Done);
     }
 
+    /// <summary>"Rewrite every summary": the lectures that have one (<see cref="SummaryCount"/> counts the same), queued to
+    /// be written again; one that failed to rewrite is tried again, a lecture with no summary is not (it has its own "Try
+    /// again", and <see cref="RequeueMissing"/> writes the ones filed without notes). How many.</summary>
     public int RequeueAll()
     {
-        lock (gate) return Exec("UPDATE notes SET status=?, updated_at=? WHERE status IN (?, ?)", Queued, Now(), Done, Failed);
+        lock (gate) return Exec($"UPDATE notes SET status=?, updated_at=? WHERE status IN (?, ?) AND {HasSummary}", Queued, Now(), Done, Failed);
     }
 
     public void MarkFailed(string noteId, string error)
@@ -582,7 +586,7 @@ public sealed partial class Store : IDisposable
     {
         lock (gate)
         {
-            using var cmd = Command($"SELECT COUNT(*) FROM notes WHERE {Filed} AND COALESCE(summary_md, '') <> ''");
+            using var cmd = Command($"SELECT COUNT(*) FROM notes WHERE {HasSummary}");
             return Convert.ToInt32(cmd.ExecuteScalar(), System.Globalization.CultureInfo.InvariantCulture);
         }
     }
