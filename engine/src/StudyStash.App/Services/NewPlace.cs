@@ -13,7 +13,7 @@ namespace StudyStash.App.Services;
 /// Windows' notification name and link are written on their first use. A Mac Dock icon pinned to the old bundle is
 /// pointed at the new one, once. An AppImage puts itself in the applications menu. Nothing changes for a build folder,
 /// the self-test, or a connection to another copy someone keeps on purpose. On Windows the Inno Setup install the move
-/// left behind goes (<see cref="ClearOldInstall"/>). Settings, lectures and Documents are never touched.
+/// left behind goes (<see cref="ClearOldInstall"/>), and its studystash: link opens this copy. Settings, lectures and Documents are never touched.
 /// </summary>
 public static class NewPlace
 {
@@ -99,8 +99,18 @@ public static class NewPlace
         if (!installed) return;
         try
         {
-            // First, so the old copy is gone by the time the AI apps' connections name this one.
-            if (OperatingSystem.IsWindows() && ClearOldInno(home, InnoKey) is { } cleared) Program.Log("[moved] " + cleared);
+            if (OperatingSystem.IsWindows())
+            {
+                // First, so the old copy is gone by the time the AI apps' connections name this one.
+                if (ClearOldInno(home, InnoKey) is { } cleared) Program.Log("[moved] " + cleared);
+                // The studystash: link (a click on a notification) the old copy registered opens this one; Velopack's
+                // uninstall takes it once it names this copy, as Inno's uninstaller took the old one's.
+                if (Moves.OldProgram(WinNotifications.LinkProgram(), Desktop.Program))
+                {
+                    WinNotifications.RegisterLink("Syft Notes", Desktop.Program);
+                    Program.Log("[moved] studystash: links now open " + Desktop.Program);
+                }
+            }
             foreach (string line in Run(ClaudeSetup.ThisComputer(home), home, Desktop.Program, () => Desktop.LoginProgram(home),
                          () => Desktop.StartAtLogin(true, home), BackgroundLibrary.ThisComputer()))
                 Program.Log("[moved] " + line);
