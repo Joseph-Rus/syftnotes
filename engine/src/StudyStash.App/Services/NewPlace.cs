@@ -58,6 +58,8 @@ public static class NewPlace
     {
         if (!Moves.OldInstallFolder(folder, running)) return null;
         string old = Path.TrimEndingDirectorySeparator(Path.GetFullPath(folder!));
+        if (Directory.Exists(old) && Moves.IsLink(old))
+            return $"the old install in {old} is a link to another folder, so it's left as it is";
         if (Moves.DeleteOldInstall(old) is { } held)
             return $"the old install in {old} is still there ({Path.GetFileName(held)} is in use); trying again next start";
         try

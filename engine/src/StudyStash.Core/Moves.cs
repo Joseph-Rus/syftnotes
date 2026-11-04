@@ -60,14 +60,23 @@ public static class Moves
     /// <summary>Deletes the old install's folder (<see cref="OldInstallFolder"/> says it is one), without its
     /// uninstaller: null once it's gone, or the first file that couldn't go. Nothing is touched while its program or
     /// uninstaller is running (neither is ever stopped); a file that's held open is skipped, and Inno's own files go
-    /// last, one at a time, so a folder only partly deleted is found and tried again on the next start.</summary>
+    /// last, one at a time, so a folder only partly deleted is found and tried again on the next start. A link inside
+    /// it (a junction, a symbolic link) goes as a link: what it points at is never touched, and a folder that is a link
+    /// itself is left alone (<see cref="IsLink"/>).</summary>
     public static string? DeleteOldInstall(string folder)
     {
         if (!Directory.Exists(folder)) return null;
+        if (IsLink(folder)) return folder;
         string[] marks = InnoMarks.Select(m => Path.Combine(folder, m)).ToArray();
         if (marks.FirstOrDefault(InUse) is { } running) return running;
+        // Never through a link: its target isn't the install.
+        var walk = new EnumerationOptions { RecurseSubdirectories = true, AttributesToSkip = FileAttributes.ReparsePoint };
+        var here = new EnumerationOptions { AttributesToSkip = 0 };
         string? held = null;
-        foreach (string file in Directory.EnumerateFiles(folder, "*", SearchOption.AllDirectories).ToList())
+        string[] dirs = [folder, .. Directory.EnumerateDirectories(folder, "*", walk)];
+        foreach (string link in dirs.SelectMany(d => Directory.EnumerateFileSystemEntries(d, "*", here)).Where(IsLink).ToList())
+            if (!TryUnlink(link)) held ??= link;
+        foreach (string file in Directory.EnumerateFiles(folder, "*", walk).ToList())
             if (!marks.Contains(file, StringComparer.OrdinalIgnoreCase) && !TryDelete(file)) held ??= file;
         if (held is not null) return held;
         foreach (string mark in marks)
@@ -83,12 +92,41 @@ public static class Moves
         }
     }
 
+    /// <summary>Whether <paramref name="path"/> is a link (a junction or a symbolic link) rather than a real file or
+    /// folder; one that can't be read counts as a link, so it's left alone.</summary>
+    public static bool IsLink(string path)
+    {
+        try
+        {
+            return File.GetAttributes(path).HasFlag(FileAttributes.ReparsePoint);
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException)
+        {
+            return true;
+        }
+    }
+
     static bool TryDelete(string file)
     {
         try
         {
             File.SetAttributes(file, FileAttributes.Normal);
             File.Delete(file);
+            return true;
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException)
+        {
+            return false;
+        }
+    }
+
+    /// <summary>Removes a link itself, never what it points at (a folder's link is removed as an empty folder).</summary>
+    static bool TryUnlink(string link)
+    {
+        try
+        {
+            if (new FileInfo(link).Attributes.HasFlag(FileAttributes.Directory)) Directory.Delete(link, recursive: false);
+            else File.Delete(link);
             return true;
         }
         catch (Exception e) when (e is IOException or UnauthorizedAccessException)
