@@ -7,8 +7,9 @@ namespace StudyStash.Library;
 
 /// <summary>A student with two library folders on this computer (<see cref="LibraryFolders"/>): what bringing in the
 /// other's notes would do, and doing it (<see cref="LibraryBringIn"/>), as a job the app asks after (a big OneDrive
-/// folder takes longer than one request may). One job at a time. Only a folder this computer's own look finds is read,
-/// never a path a request names on its own. Every route needs the library's password, like the rest of the API.</summary>
+/// folder takes longer than one request may). One job at a time. A folder named is read only if it holds a Syft Notes
+/// library, or lectures here are filed inside it; the computer's usual places are never looked through. Every route
+/// needs the library's password, like the rest of the API.</summary>
 public sealed partial class LibraryWeb
 {
     readonly Lock folderGate = new();
@@ -44,10 +45,10 @@ public sealed partial class LibraryWeb
     {
         try
         {
-            // The usual places, and the folders asked about (a folder named by hand once is in none of them): each counts
-            // only if it really holds a library, or if lectures here still point inside it.
-            var found = LibraryFolders.FindWith(cfg.PoolDir, [.. from, .. refile, .. into is null ? Array.Empty<string>() : [into]]);
-            string? Usable(string asked) => Known(found, asked) ?? (LibraryBringIn.PointingInto(store, asked) > 0 ? asked : null);
+            // Only the folders asked about are looked at, never the computer's usual places: each counts if it really holds
+            // a library, or if lectures here are still filed inside it.
+            string? Usable(string asked) =>
+                asked.Length > 0 && (LibraryFolders.Find(null, [asked]).Count > 0 || LibraryBringIn.PointingInto(store, asked) > 0) ? asked : null;
             string home = Py.UserHome();
             if (job.Kind == BringInJob.Look)
             {
@@ -91,8 +92,4 @@ public sealed partial class LibraryWeb
     }
 
     static bool SameFolder(string a, string b) => LibraryFolders.Comparer.Equals(LibraryFolders.Real(a), LibraryFolders.Real(b));
-
-    /// <summary>The library folder this computer has at <paramref name="path"/>, or null when there's none there.</summary>
-    static string? Known(List<LibraryFolder> found, string? path) =>
-        path is { Length: > 0 } ? found.FirstOrDefault(f => SameFolder(f.Path, path))?.Path : null;
 }
