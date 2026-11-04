@@ -128,7 +128,8 @@ import UIKit
     }
 
     /// A notebook closed while the library couldn't be reached goes with the recordings waiting, when the library
-    /// answers (the app coming back): opening a notebook no longer sends it. One open to write in waits to be closed.
+    /// answers (the app coming back): opening a notebook no longer sends it. While the library doesn't answer, no PDF
+    /// is drawn for it (that held up every launch offline); one open to write in waits to be closed.
     @Test func aNotebookKeptOfflineIsSentWhenTheLibraryAnswers() async throws {
         let store = NotebookStore.shared
         let points = (0..<20).map { i in
@@ -151,6 +152,12 @@ import UIKit
         let session = URLSessionConfiguration.ephemeral
         session.protocolClasses = [AnsweringLibrary.self]
         let api = APIClient(base: URL(string: "http://answering.test")!, session: URLSession(configuration: session))
+
+        // The library away: nothing drawn or sent.
+        AnsweringLibrary.state.withLock { $0 = (answers: false, uploads: 0) }
+        await RecordingStore.shared.sendWaiting(api: api)
+        #expect(AnsweringLibrary.state.withLock { $0.uploads } == 0)
+        #expect(store.notebook(kept.id)?.needsSaving == true)
 
         // The library back: the closed one goes, the open one waits.
         AnsweringLibrary.state.withLock { $0 = (answers: true, uploads: 0) }

@@ -491,10 +491,11 @@ extension NotebookStore {
 
     /// Every notebook with something in it that changed since it last reached the library (closed while it couldn't
     /// be reached), sent now with the recordings waiting (the app coming back, its refresh). Not one open to write in:
-    /// it goes when it's closed.
+    /// it goes when it's closed. Each one's PDF is drawn first, so nothing is drawn unless the library answers.
     func sendWaiting(api: APIClient) async {
         let waiting = notebooks.filter { $0.needsSaving && !open.contains($0.id) && !Self.sending.contains($0.id) && !isBlank($0) }
         guard !waiting.isEmpty else { return }
+        do { _ = try await api.me() } catch let e as APIError where e.unreachable { return } catch {}
         for n in waiting where !open.contains(n.id) {
             _ = await send(n.id, api: api, waitingAtMost: .seconds(120))
         }
