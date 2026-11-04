@@ -66,6 +66,15 @@ public class MathTextTests
     [InlineData(@"\begin{equation*} x = 1 \end{equation*}", " x = 1 ")]
     [InlineData(@"\begin{array}{cc} a & b \\ c & d \end{array}", @"\begin{matrix} a & b \\ c & d \end{matrix}")]
     [InlineData(@"\begin{cases} a & b \end{cases}", @"\begin{cases} a & b \end{cases}")]
+    // A hyphen inside \text stays a hyphen; a "+" with nothing after it takes no operator gap; a "+" with something after it is left alone.
+    [InlineData(@"k\text{-means}++", "k\\text{\u2010means}\\!+\\!+")]
+    [InlineData(@"\text{k-means++}", "\\text{k\u2010means\\!+\\!+}")]
+    [InlineData(@"O(n++) + 1", @"O(n\!+\!+) + 1")]
+    [InlineData(@"a-b+c, x^{2}+1", @"a-b+c, x^{2}+1")]
+    // A single "+" with nothing after it is a charge or an index, which CSharpMath already sets close: left alone.
+    [InlineData(@"Ca^{2+}, x_{n+}", @"Ca^{2+}, x_{n+}")]
+    // Commands inside \text are still rewritten.
+    [InlineData(@"\text{see \textbf{bold} here}", @"\text{see \mathbf{bold} here}")]
     // A rewrite inside a group still applies (nested).
     [InlineData(@"\frac{\dfrac{a}{b}}{c}", @"\frac{\frac{a}{b}}{c}")]
     // Untouched, per the "supported as is" list.

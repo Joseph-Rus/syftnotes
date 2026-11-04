@@ -51,7 +51,8 @@ public static class MathText
     /// </summary>
     public static string Prepare(string latex) => string.IsNullOrEmpty(latex) ? latex ?? "" : RewriteLatex(latex, 0);
 
-    static string RewriteLatex(string s, int depth)
+    /// <param name="text">Inside <c>\text{…}</c>: a hyphen is a hyphen, and "++" is never an operator.</param>
+    static string RewriteLatex(string s, int depth, bool text = false)
     {
         if (depth > MaxRewriteDepth) return s;
         var sb = new StringBuilder(s.Length + 8);
@@ -59,6 +60,16 @@ public static class MathText
         while (i < s.Length)
         {
             char c = s[i];
+            if (c == '+' && Pluses(s, i) is var run && run >= 2 && AfterOperand(sb) && (text || NothingFollows(s, i + run)))
+            {
+                // "n++", "k-means++": two or more plus signs with nothing to add to sit close, not with an operator's gaps.
+                for (int k = 0; k < run; k++) sb.Append("\\!+");
+                i += run;
+                continue;
+            }
+            // Inside \text a hyphen is a hyphen: CSharpMath reads "-" as the minus sign, with an operator's gaps around it
+            // (k - means); the Unicode hyphen is an ordinary character it draws as typed.
+            if (c == '-' && text) { sb.Append('\u2010'); i++; continue; }
             if (c != '\\') { sb.Append(c); i++; continue; }
             if (i + 1 >= s.Length) { sb.Append(c); break; }
             int start = i + 1, j = start;
@@ -91,6 +102,9 @@ public static class MathText
                 case "not" when i < s.Length && s[i] == '=':
                     i++;
                     sb.Append("\\neq");
+                    break;
+                case "text":
+                    sb.Append("\\text{").Append(RewriteLatex(Argument(s, ref i), depth + 1, text: true)).Append('}');
                     break;
                 case "textbf" or "textit":
                 {
@@ -172,6 +186,35 @@ public static class MathText
             }
         }
         return sb.ToString();
+    }
+
+    /// <summary>How many plus signs in a row start at <paramref name="at"/>.</summary>
+    static int Pluses(string s, int at)
+    {
+        int n = 0;
+        while (at + n < s.Length && s[at + n] == '+') n++;
+        return n;
+    }
+
+    /// <summary>True when only spaces, then the end of the group or a closing bracket, comma or equals sign, come after
+    /// <paramref name="from"/>: plus signs just before it have nothing to add to, as in "n++" or "k-means++".</summary>
+    static bool NothingFollows(string s, int from)
+    {
+        int i = from;
+        while (i < s.Length && s[i] == ' ') i++;
+        return i >= s.Length || ")]},;=".Contains(s[i]) || s.AsSpan(i).StartsWith("\\right");
+    }
+
+    /// <summary>True when what's written so far ends in something a "+" can follow (a letter, digit or closing bracket,
+    /// another "+") and isn't already tightened.</summary>
+    static bool AfterOperand(StringBuilder sb)
+    {
+        int n = sb.Length;
+        while (n > 0 && sb[n - 1] == ' ') n--;
+        if (n == 0) return false;
+        if (n >= 2 && sb[n - 2] == '\\' && sb[n - 1] == '!') return false;
+        char p = sb[n - 1];
+        return char.IsLetterOrDigit(p) || "})]'+".Contains(p);
     }
 
     /// <summary>An optional <c>[…]</c> argument (balanced on brackets), or null when there isn't one; never throws
