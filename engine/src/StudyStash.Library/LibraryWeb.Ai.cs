@@ -77,6 +77,13 @@ public sealed partial class LibraryWeb
             if (sent.Length > 0) LibraryChats.AddAskTurn(chat, request.Question, sent, stopped: true);
             if (turn is not null) LibraryChats.End(chat.Id, turn);
         }
+        // The chat is free before the answer's last line goes out: the app reads "done" and may ask the next question
+        // at once, which came in before this request's own end (where it used to be freed) on a busy computer and was
+        // refused as "still answering a question asked on another device". (Ending a turn twice is harmless.)
+        void FreeTheChat()
+        {
+            if (chat is not null && turn is not null) LibraryChats.End(chat.Id, turn);
+        }
         void SoFar(string answer)
         {
             lines.Writer.TryWrite(answer.StartsWith(sent, StringComparison.Ordinal)
@@ -89,13 +96,21 @@ public sealed partial class LibraryWeb
             try
             {
                 var reply = await Jobs.AskAsync(request, Reader, cfg, ctx.RequestAborted, SoFar);
-                if (EndsNow()) reply = Kept(chat, request.Question, reply);
+                if (EndsNow())
+                {
+                    reply = Kept(chat, request.Question, reply);
+                    FreeTheChat();
+                }
                 lines.Writer.TryWrite(new JsonObject { ["kind"] = "done", ["reply"] = JsonSerializer.SerializeToNode(reply, AiRemote.Options) });
             }
             catch (Exception e) when (e is HttpRequestException or TimeoutException or InvalidOperationException or InvalidDataException)
             {
                 // What came before it stopped is kept, as the app shows it.
-                if (chat is not null && sent.Length > 0 && EndsNow()) LibraryChats.AddAskTurn(chat, request.Question, sent, stopped: true);
+                if (chat is not null && EndsNow())
+                {
+                    if (sent.Length > 0) LibraryChats.AddAskTurn(chat, request.Question, sent, stopped: true);
+                    FreeTheChat();
+                }
                 lines.Writer.TryWrite(new JsonObject { ["kind"] = "error", ["status"] = 503, ["detail"] = e.Message });
             }
             catch (OperationCanceledException) when (ctx.RequestAborted.IsCancellationRequested)
