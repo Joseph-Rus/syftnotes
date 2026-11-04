@@ -4,6 +4,7 @@ using Avalonia.Controls;
 using Avalonia.Headless.XUnit;
 using Avalonia.Styling;
 using Avalonia.Threading;
+using Avalonia.VisualTree;
 using SkiaSharp;
 using StudyStash.App.Controls;
 using StudyStash.App.ViewModels;
@@ -64,6 +65,34 @@ public class PhotoStripTests
         }
         finally
         {
+            if (Directory.Exists(dir)) Directory.Delete(dir, recursive: true);
+        }
+    }
+
+    /// <summary>The photos are decoded on a worker thread, so they have to find their way back: each thumbnail in the strip,
+    /// and the picture a note embeds under its words.</summary>
+    [AvaloniaFact]
+    public async Task A_photo_arrives_in_the_strip_and_in_the_notes_once_decoded()
+    {
+        string dir = Path.Combine(Path.GetTempPath(), "photo-strip-" + Guid.NewGuid().ToString("N"));
+        var files = new AttachmentsModel(new Board(), "Machine Learning", "n1") { CacheDir = dir };
+        var note = new NoteView { Width = 600, Markdown = "On the board:\n\n![Whiteboard at 11:04](attachment:p1)\n\nAfter it." };
+        var window = new Window { Width = 700, Height = 800, Content = note };
+        NoteView.PhotoSource = files.PhotoFileAsync;
+        try
+        {
+            await files.LoadAsync();
+            window.Show();
+            await Wait.UntilAsync(() =>
+            {
+                Dispatcher.UIThread.RunJobs();
+                return files.Photos.All(p => p.Thumb is not null) && note.GetVisualDescendants().OfType<Image>().Any(i => i.Source is not null && i.IsVisible);
+            }, "the photos to be decoded");
+        }
+        finally
+        {
+            NoteView.PhotoSource = null;
+            window.Close();
             if (Directory.Exists(dir)) Directory.Delete(dir, recursive: true);
         }
     }
