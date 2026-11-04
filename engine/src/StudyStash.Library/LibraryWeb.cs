@@ -169,7 +169,7 @@ public sealed partial class LibraryWeb
     readonly Sessions sessions;
     readonly PasswordTries tries;
 
-    LibraryWeb(Config cfg, Store store, Pipeline pipeline, LibraryWebOptions options)
+    internal LibraryWeb(Config cfg, Store store, Pipeline pipeline, LibraryWebOptions options)
     {
         this.cfg = cfg;
         this.store = store;

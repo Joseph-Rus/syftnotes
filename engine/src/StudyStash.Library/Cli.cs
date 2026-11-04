@@ -255,13 +255,13 @@ public static class Cli
             var indexing = fileIndex.RunAsync(Console.WriteLine, stop.Token);
             // Canvas, through the Chrome extension: one queue for the sync and for AIs' reads.
             var canvas = new StudyStash.Core.Canvas.CanvasSync(home, c => store.ClassDir(c)) { KnownClass = c => cfg.ClassNames().Contains(c) };
-            // After a sync, an AI explores each class it hasn't explored yet (Settings can ask again).
+            // After a sync, an AI explores each class it hasn't explored yet, and tries again where it failed (Settings can ask again).
             var scout = new StudyStash.Core.Canvas.Scout(home, c => store.ClassDir(c), ai);
             canvas.Synced += classes =>
             {
-                var s = StudyStash.Core.Canvas.CanvasSettings.Load(home);
                 if (ai.AgentReady().Ok)
-                    scout.Queue(classes.Where(c => !s.Scouts.ContainsKey(c) && !File.Exists(Path.Combine(store.ClassDir(c), "Canvas", "canvas-recipe.md"))).ToArray());
+                    scout.Queue(StudyStash.Core.Canvas.Scout.ToExplore(classes, StudyStash.Core.Canvas.CanvasSettings.Load(home).Scouts,
+                        c => File.Exists(Path.Combine(store.ClassDir(c), "Canvas", "canvas-recipe.md")), DateTimeOffset.Now));
             };
             // The phone over Google Drive (docs/phone-google.md): its link runs here, in the library, so the phone is
             // answered whenever the library runs, the app open or not. It starts once the app has connected an account.
