@@ -1,3 +1,4 @@
+using StudyStash.App.Services.Kit;
 using System.Collections.ObjectModel;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
@@ -439,7 +440,7 @@ public sealed partial class AiAccessModel : ObservableObject
         {
             for (var i = 0; i < 12 && !ct.IsCancellationRequested; i++)
             {
-                await (Delay?.Invoke(TimeSpan.FromSeconds(5)) ?? Task.Delay(TimeSpan.FromSeconds(5), ct));
+                await (Delay?.Invoke(TimeSpan.FromSeconds(5)) ?? Poll.AfterAsync(TimeSpan.FromSeconds(5), ct));
                 if (ct.IsCancellationRequested) return;
                 ToolAccessInfo? info;
                 try

@@ -1,3 +1,4 @@
+using StudyStash.App.Services.Kit;
 using System.Collections.ObjectModel;
 using System.Linq;
 using Avalonia.Media;
@@ -695,7 +696,7 @@ public sealed partial class LibraryModel : ObservableObject
 
     async Task HideDeletedAfterAWhile(LectureDeletion d)
     {
-        await Task.Delay(DeletedShows);
+        await Poll.AfterAsync(DeletedShows);
         Forget(d);
     }
 
@@ -757,7 +758,7 @@ public sealed partial class LibraryModel : ObservableObject
 
     async Task HideMovedAfterAWhile(NoteMove move)
     {
-        await Task.Delay(UndoShows);
+        await Poll.AfterAsync(UndoShows);
         if (Moved == move) Moved = null;
     }
 
