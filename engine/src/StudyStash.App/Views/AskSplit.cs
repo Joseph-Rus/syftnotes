@@ -262,11 +262,21 @@ public sealed class AskSplit : Panel
         if (wasSheet != asSheet) Mark();
         double panel = PanelWidth(w);
         page?.Measure(new Size(Beside ? w - panel - Gutter : w, h));
-        if (bar is not null) MeasureBar(BarAt(w, h, open).Width);
+        if (bar is not null) MeasureBar(BarWidth(w, h));
         sheet.Padding = new Thickness(0, 0, 0, BarRoom());
         sheet.BorderThickness = new Thickness(asSheet ? 0 : 1, 0, 0, 0);
         sheet.Measure(new Size(panel, h));
         return new Size(w, h);
+    }
+
+    /// <summary>The bar's width now: where it's got to mid-glide, else where it rests or docks. Measure and arrange both
+    /// use it: measured at its docked width and arranged at its glide width, a bar that stacks in the panel changed its
+    /// height in every pass, the split asked for another pass each time, and the layout gave up on it, so the bar sat at
+    /// the foot of the page until the answer came in and made the page lay itself out again.</summary>
+    double BarWidth(double w, double h)
+    {
+        double to = BarAt(w, h, open).Width;
+        return eased < 1 && barFrom.Width > 0 ? barFrom.Width + (to - barFrom.Width) * eased : to;
     }
 
     /// <summary>The room the docked bar takes at the panel's foot, which the thread ends above.</summary>
@@ -311,7 +321,7 @@ public sealed class AskSplit : Panel
             // Mid-glide the bar is laid out at the width it's got to (it's small), its foot moving from where it was.
             var to = BarAt(w, h, open);
             double e = eased < 1 && barFrom.Width > 0 ? eased : 1;
-            double width = e < 1 ? barFrom.Width + (to.Width - barFrom.Width) * e : to.Width;
+            double width = BarWidth(w, h);
             MeasureBar(width);
             double tall = bar.DesiredSize.Height, foot = e < 1 ? barFrom.Bottom + (to.Bottom - barFrom.Bottom) * e : to.Bottom;
             double x = e < 1 ? barFrom.X + (to.X - barFrom.X) * e : to.X;
