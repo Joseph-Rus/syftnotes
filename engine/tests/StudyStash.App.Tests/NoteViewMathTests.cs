@@ -157,6 +157,17 @@ public class NoteViewMathTests
     }
 
     [AvaloniaFact]
+    public void A_definitions_term_keeps_its_maths()
+    {
+        // Gemini writes terms like these: the term column used to drop the formula, leaving "-means clustering" and an
+        // empty cell.
+        var note = new NoteView { Markdown = "## Definitions\n\n- **$k$-means clustering**: groups points.\n- **$k\\text{-means}++$**: spreads the starting centres." };
+        var window = Show(note);
+        Assert.Equal(["k", "k\\text{-means}++"], MathViews(note).Select(m => m.Latex));
+        window.Close();
+    }
+
+    [AvaloniaFact]
     public void A_tall_inline_formula_is_lifted_onto_its_own_line()
     {
         var note = new NoteView
