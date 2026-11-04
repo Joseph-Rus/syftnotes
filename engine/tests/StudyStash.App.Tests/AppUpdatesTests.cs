@@ -261,6 +261,27 @@ public class AppUpdatesTests
         Assert.Equal(1, applied);
     }
 
+    /// <summary>Update now pressed during a lecture: one fresh GitHub call for the press, and the one-minute rounds
+    /// that wait for the lecture keep that answer, so a long lecture can't run into GitHub's hourly limit.</summary>
+    [Fact]
+    public async Task Update_now_during_a_lecture_asks_GitHub_once_and_installs_when_the_lecture_ends()
+    {
+        bool idle = false;
+        int applied = 0, fresh = 0;
+        var updates = Updates_(
+            idleNow: () => idle,
+            latest: () => Task.FromResult<Release?>(null), // the cached answer from before the release
+            latestNow: () => { fresh++; return Task.FromResult<Release?>(Release()); },
+            apply: (_, _, _, _) => { applied++; return Task.FromResult(true); });
+
+        Assert.Equal("waiting until you're done recording", await updates.NowAsync());
+        for (int minute = 0; minute < 90; minute++) Assert.Equal("waiting until you're done recording", await updates.RoundAsync());
+        idle = true;
+        Assert.Equal("relaunching", await updates.RoundAsync());
+        Assert.Equal(1, fresh);
+        Assert.Equal(1, applied);
+    }
+
     [Fact]
     public async Task A_newer_copy_already_on_disk_relaunches_without_checking_for_a_release()
     {
