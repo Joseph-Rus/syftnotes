@@ -352,6 +352,15 @@ public class CanvasExtensionTests
         // The page's Make the folder (a student loading it): this library's address and the extension's own key.
         await site.PostForm("/login", ("password", Password), ("next", "/"));
         Assert.Contains("Make the folder", await site.Text("/settings"));
+
+        // A folder that can't be made (a file is where it would go) is said in words, and the button is still there to try again.
+        File.WriteAllText(folder, "");
+        Assert.Equal("/settings?canvas=folder-failed#canvas", (await site.PostForm("/settings/canvas/extension")).Headers.Location!.OriginalString);
+        string failed = await site.Text("/settings?canvas=folder-failed");
+        Assert.Contains("Syft Notes couldn't make the folder. Check there's space on this computer, then try again.", failed);
+        Assert.Contains("Make the folder", failed);
+        File.Delete(folder);
+
         Assert.Equal("/settings#canvas", (await site.PostForm("/settings/canvas/extension")).Headers.Location!.OriginalString);
         Assert.True(Extension.Ready(folder));
         Assert.Equal(new ExtensionConnection("http://127.0.0.1:8790", CanvasSettings.ExtensionKey(cfg.Home), "https://canvas.test"), Extension.Connection(folder));
