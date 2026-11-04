@@ -86,6 +86,13 @@ public class DueMarksTests
         Assert.Equal(plain.State, undone.State);
         Assert.Contains($"{lecture5} (missing)", undone.Asked);
 
+        // A class no longer linked to Canvas (its course un-ticked and kept) has its rows in the file until the next sync: they leave
+        // every list at once, the same way.
+        CanvasSettings.Update(dir.Path, s => s.Courses.Remove("CS 101"));
+        var unlinked = await Read(JsonNode.Parse(await site.Text("/api/v2/canvas/due"))!.AsObject());
+        Assert.Equal("overdue [] handed in [] hidden [] to hand in 0 Home []", unlinked.State);
+        Assert.DoesNotContain("Homework 4", unlinked.Asked);
+
         // The marks are the student's own: Canvas's saved list is untouched, and a mark that isn't one is refused.
         Assert.Equal(before, File.ReadAllText(Assignments.PathIn(dir.Path)));
         using var junk = await site.Client.PostAsJsonAsync("/api/v2/canvas/mark", new { @class = "CS 101", id = 9101, kind = "assignment", mark = "deleted" });
