@@ -1,6 +1,7 @@
 using System.ComponentModel;
 using System.Text.Json.Nodes;
 using Avalonia.Threading;
+using StudyStash.App.Services.Stores;
 using StudyStash.App.ViewModels;
 using StudyStash.Audio;
 using StudyStash.Core;
@@ -174,7 +175,7 @@ public sealed class GuidedSetup : ISetupDriver, IGuidedActions
         try
         {
             var overview = await host.Api.Ai.EnginesAsync();
-            return overview?.Engines.FirstOrDefault(e => e.Id == engine) is { State: "not_installed" or "not_signed_in" }
+            return overview?.Engines.FirstOrDefault(e => e.Id == engine) is { } found && AiStatusStore.StateOf(found) is AiEngineState.NotInstalled or AiEngineState.NotSignedIn
                 ? $"{Engines.Name(engine)} isn't set up on this {Device}. The student can add it in Settings → Your AI, with an API key from Google AI Studio or Google's Antigravity app."
                 : null;
         }

@@ -15,6 +15,10 @@ public static class Syft
 {
     public static readonly Color Lilac = Color.Parse("#CDBDFF");
     public static readonly Color Sky = Color.Parse("#A3DAF2");
+    /// <summary>Sky a step deeper, for progress bars: the brand sky is too faint on the light mesh to read at a glance.</summary>
+    public static readonly Color SkyDeep = Color.Parse("#64B4DE");
+    /// <summary>The same step in dark, still bright on the dark mesh.</summary>
+    public static readonly Color SkyDeepDark = Color.Parse("#7CC8EC");
     public static readonly Color Coral = Color.Parse("#FF6E4E");
     public static readonly Color Mustard = Color.Parse("#FFC943");
     public static readonly Color Ink = Color.Parse("#16131D");
