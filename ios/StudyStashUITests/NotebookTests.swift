@@ -1,6 +1,6 @@
 import XCTest
 
-/// Writing by hand: a new notebook from Attach, its paper chosen, then changed, and a page added, with real taps on
+/// Writing by hand: a new notebook from Attach, its paper chosen, then changed, and pages added, with real taps on
 /// the demo library. The same on an iPhone (Paper and Add a page are in the bar's More) and an iPad (in the bar).
 @MainActor
 final class NotebookTests: XCTestCase {
@@ -61,11 +61,25 @@ final class NotebookTests: XCTestCase {
         redo.tap()
         XCTAssertTrue(waitUntil { undo.isEnabled }, "done again")
 
+        // A page added at the end: the line can still be undone (and is done again, so the notebook isn't empty).
+        if app.buttons["notebook.addPage"].exists {
+            app.buttons["notebook.addPage"].tap()
+        } else {
+            tap(app.buttons["notebook.more"], "the bar's More")
+            tap(app.buttons["Add a page after this one"], "More's Add a page after this one")
+        }
+        expect(text(app, containing: "page 3 of 3"), "page 3 of 3 under the title")
+        XCTAssertTrue(undo.isEnabled, "the line can still be undone after a page is added")
+        undo.tap()
+        XCTAssertTrue(waitUntil { !undo.isEnabled && redo.isEnabled }, "the line undone after a page was added")
+        redo.tap()
+        XCTAssertTrue(waitUntil { undo.isEnabled }, "done again")
+
         // The pages, each on Cornell notes.
         XCTAssertFalse(app.keyboards.firstMatch.exists, "no keyboard over the notebook")
         tap(app.buttons["notebook.pages"], "Pages")
         expect(element(app, "Page 1, Cornell notes"), "page 1 on Cornell notes in the pages")
-        expect(element(app, "Page 2, Cornell notes, showing"), "page 2, showing, on Cornell notes")
+        expect(element(app, "Page 3, Cornell notes, showing"), "page 3, showing, on Cornell notes")
         // A phone's pages are a sheet of their own: closed first.
         if app.navigationBars["Pages"].exists {
             app.navigationBars["Pages"].buttons["Done"].tap()
@@ -76,6 +90,27 @@ final class NotebookTests: XCTestCase {
         tap(app.buttons["Done"].firstMatch, "the notebook's Done")
         expect(page(app, "home"), "Home again", timeout: 12)
         expect(app.buttons["Calculus II notes, \(Self.today), in Calculus II"], "the notebook on Home's shelf, in Calculus II")
+    }
+
+    /// Apple's pens stay while a menu is open over the page (the lasso's), so a selection can be recoloured.
+    func testPensStayOverTheLassosMenu() {
+        let app = XCUIApplication()
+        app.launchArguments = ["-demo", "-quiet", "-show", "notebook"]
+        app.launch()
+        let desk = page(app, "notebook")
+        expect(desk, "the sample notebook")
+        tap(app.buttons["Lasso"], "the pens' lasso")
+        desk.coordinate(withNormalizedOffset: CGVector(dx: 0.12, dy: 0.12))
+            .press(forDuration: 0.05, thenDragTo: desk.coordinate(withNormalizedOffset: CGVector(dx: 0.9, dy: 0.14)))
+        desk.coordinate(withNormalizedOffset: CGVector(dx: 0.9, dy: 0.14))
+            .press(forDuration: 0.05, thenDragTo: desk.coordinate(withNormalizedOffset: CGVector(dx: 0.88, dy: 0.3)))
+        // A tap on the page opens its menu (tapped again if the first only ends the lasso).
+        for _ in 0..<3 where !app.menuItems.firstMatch.waitForExistence(timeout: 2) {
+            desk.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.2)).tap()
+        }
+        expect(app.menuItems.firstMatch, "the menu over the page")
+        XCTAssertTrue(app.buttons["Lasso"].exists, "the pens still there with the menu open")
+        XCTAssertFalse(app.keyboards.firstMatch.exists, "no keyboard with the menu")
     }
 
     private func waitUntil(_ timeout: Double = 5, _ ok: () -> Bool) -> Bool {
