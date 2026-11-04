@@ -211,6 +211,14 @@ public static class Assignments
         SharedFile.Write(PathIn(home), JsonSerializer.Serialize(items.ToList(), Options));
     }
 
+    /// <summary>Still to hand in at <paramref name="now"/> (wall-clock, like <see cref="Assignment.Due"/>): not done, and not
+    /// work that takes nothing to hand in once its time has gone (an in-class quiz that already happened). That goes with
+    /// what's behind you and keeps its "Nothing to hand in" label; one still to come stays where it is. The class list, the
+    /// Due groups and their count all ask this, so they agree. (Decided when the list is read, not when it's synced: a quiz
+    /// held at 10:00 stops being "to hand in" at 10:00, not at the next sync.)</summary>
+    public static bool ToHandIn(Assignment a, DateTime now) =>
+        !a.Done && !(a.Status == "no submission" && a.Due.Length > 0 && DateTime.Parse(a.Due, CultureInfo.InvariantCulture) < now);
+
     /// <summary>What's still to do, soonest first: open, past due or missing, due within <paramref name="days"/> (or
     /// overdue), plus anything with no due date that's open.</summary>
     public static List<Assignment> Upcoming(IEnumerable<Assignment> all, DateTime now, int days = 14, string? className = null) =>

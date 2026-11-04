@@ -130,9 +130,9 @@ public static class CanvasView
         var info = s.CourseInfo.GetValueOrDefault(idText);
         string title = titles.GetValueOrDefault(idText) ?? (index is { Name.Length: > 0 } ? CourseNames.Title(index.Name, index.Code) : "");
         string shortCode = CourseNames.ShortCode(index?.Code is { Length: > 0 } c ? c : info?.Code ?? "", index?.Name ?? info?.Name ?? "");
-        var done_ = DueMarks.Apply((index?.Assignments ?? []).Select(a => Assignments.From(cls, a, now)), marks ?? [])
-            .Where(a => a.Mark != DueMarks.Hidden).Select(a => a.Done).ToList();
-        int toHandIn = done_.Count(d => !d), done = done_.Count(d => d);
+        var mine = DueMarks.Apply((index?.Assignments ?? []).Select(a => Assignments.From(cls, a, now)), marks ?? [])
+            .Where(a => a.Mark != DueMarks.Hidden).ToList();
+        int toHandIn = mine.Count(a => Assignments.ToHandIn(a, TimeZoneInfo.ConvertTime(now, TimeZoneInfo.Local).DateTime)), done = mine.Count - toHandIn;
         int newAnnouncements = index?.Announcements.Count(a => !a.ReadOnCanvas) ?? 0;
         return new JsonObject
         {
@@ -195,10 +195,11 @@ public static class CanvasView
     {
         var all = everything.Where(a => a.Mark != DueMarks.Hidden).ToList();
         var now = TimeZoneInfo.ConvertTime(nowOffset, zone).DateTime;
-        bool Overdue(Assignment a) => !a.Done && DueOf(a) is { } d && d < now;
-        bool Week(Assignment a) => !a.Done && DueOf(a) is { } d && d >= now && d < now.Date.AddDays(8);
-        bool Later(Assignment a) => !a.Done && DueOf(a) is { } d && d >= now.Date.AddDays(8);
-        bool Undated(Assignment a) => !a.Done && DueOf(a) is null;
+        bool ToHandIn(Assignment a) => Assignments.ToHandIn(a, now);
+        bool Overdue(Assignment a) => ToHandIn(a) && DueOf(a) is { } d && d < now;
+        bool Week(Assignment a) => ToHandIn(a) && DueOf(a) is { } d && d >= now && d < now.Date.AddDays(8);
+        bool Later(Assignment a) => ToHandIn(a) && DueOf(a) is { } d && d >= now.Date.AddDays(8);
+        bool Undated(Assignment a) => ToHandIn(a) && DueOf(a) is null;
         bool HandedIn(Assignment a) => a.Done && RecentOf(a, zone) is { } r && r >= now.AddDays(-7);
 
         JsonNode Row(Assignment a) => ItemJson(a, folderOf(a.ClassName, a.Id));
@@ -227,11 +228,12 @@ public static class CanvasView
         };
     }
 
-    /// <summary>One class's assignments: still to hand in (soonest first), and done (most recently due first).</summary>
-    public static JsonObject ForClass(string cls, IReadOnlyList<Assignment> mine, Func<long, string?> folderOf)
+    /// <summary>One class's assignments: still to hand in (soonest first), and the rest, done or behind you (most recently
+    /// due first). <paramref name="now"/> is the wall clock the due dates are in.</summary>
+    public static JsonObject ForClass(string cls, IReadOnlyList<Assignment> mine, Func<long, string?> folderOf, DateTime now)
     {
-        var toHandIn = mine.Where(a => !a.Done).OrderBy(a => DueOf(a) ?? DateTime.MaxValue).ThenBy(a => a.Name, StringComparer.Ordinal).ToList();
-        var done = mine.Where(a => a.Done).OrderByDescending(a => DueOf(a) ?? DateTime.MinValue).ToList();
+        var toHandIn = mine.Where(a => Assignments.ToHandIn(a, now)).OrderBy(a => DueOf(a) ?? DateTime.MaxValue).ThenBy(a => a.Name, StringComparer.Ordinal).ToList();
+        var done = mine.Where(a => !Assignments.ToHandIn(a, now)).OrderByDescending(a => DueOf(a) ?? DateTime.MinValue).ToList();
         JsonNode Row(Assignment a) => ItemJson(a, folderOf(a.Id));
         return new JsonObject
         {
