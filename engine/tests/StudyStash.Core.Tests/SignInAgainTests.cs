@@ -142,6 +142,11 @@ public class SignInAgainTests
     [Fact]
     public async Task After_a_quiet_spell_one_claude_signs_in_alone_and_the_next_waits_for_it()
     {
+        // Not on Windows: there the stand-in claude is a .cmd starting PowerShell, and on a busy CI runner (its slowest
+        // Core tests took over 300 s) it hadn't begun its first turn within the 20 s (main's run 41760701317). What's tested is the
+        // same C# everywhere (ClaudeProvider and SignInGate): it runs on the Mac and Linux, and the gate's own rules are
+        // checked on every system by The_sign_in_gate_lets_one_lead… below, on a clock the test sets.
+        Assert.SkipWhen(OperatingSystem.IsWindows(), "the stand-in claude is too slow to start on a busy Windows runner");
         using var dir = new TempDir();
         string bin = dir["claude"], exe = FakeAgents.WriteCli(bin, "claude");
         // Each run prints its first line, waits two seconds (as if renewing the sign-in), then begins to answer.
