@@ -200,57 +200,62 @@ public static class LibraryBringIn
         {
             int n = 0;
             // Each name in a class's Attachments, with every listed attachment that has it (two can: one added while each
-            // folder was in use). Two attachments never share one file.
+            // folder was in use). Two attachments never share one file, and no file here is left with none.
             foreach (var group in listed.Where(a => Under(store.AttachmentPath(a), store.PoolDir))
                          .GroupBy(a => Path.GetRelativePath(store.PoolDir, store.AttachmentPath(a)), LibraryFolders.Comparer))
             {
                 string target = Path.Combine(into, group.Key), other = Path.Combine(from, group.Key);
                 var rows = group.ToList();
-                bool targetHere = File.Exists(target), otherHere = File.Exists(other);
-                // The old file was taken once already (by an earlier run): settled. The attachment keeps what it has now,
-                // however the student changed it since, and the old file never comes in again.
-                if (otherHere && store.GetState(Taken + FolderId(Path.GetFileName(Py.Parent(Py.Parent(other))), Sha(other))) is not null)
+                string? here = Sha(target), there = Sha(other);
+                string taken = there is null ? "" : Taken + FolderId(Path.GetFileName(Py.Parent(Py.Parent(other))), there);
+                // Taken by an earlier run, and still here: settled, the attachment keeping what it has now (however the
+                // student changed it since).
+                if (here is not null && there is not null && store.GetState(taken) is not null)
                 {
                     copiedFiles.Add(Path.GetFullPath(other));
                     foreach (var _ in rows) Step();
                     continue;
                 }
-                long here = targetHere ? Length(target) : -1, there = otherHere ? Length(other) : -1;
-                bool same = targetHere && otherHere && SameBytes(target, other);
+                long hereSize = here is null ? -1 : new FileInfo(target).Length, thereSize = there is null ? -1 : new FileInfo(other).Length;
                 // The one that keeps the file here: the one listed with its size; else, unless one is proven to be the
                 // other folder's file (listed with that size), the first.
-                Attachment? keeper = !targetHere ? null
-                    : rows.FirstOrDefault(a => a.Size == here) ?? (same || !rows.Any(a => a.Size == there) ? rows[0] : null);
-                bool otherTaken = keeper is not null && same;
+                Attachment? keeper = here is null ? null
+                    : rows.FirstOrDefault(a => a.Size == hereSize) ?? (here == there || !rows.Any(a => a.Size == thereSize) ? rows[0] : null);
+                bool otherTaken = keeper is not null && here == there;
+                var reserved = new HashSet<string>(LibraryFolders.Comparer);
                 foreach (var a in rows)
                 {
                     Step();
-                    if (a == keeper || !otherHere) continue;
-                    if (keeper is null && !targetHere)
+                    if (a == keeper) continue;
+                    if (there is null)
+                    {
+                        // No file for it anywhere: a name of its own rather than the keeper's file.
+                        if (keeper is not null && apply) store.SetAttachmentFile(a.Id, Path.GetFileName(Store.FreeBeside(target, reserved: reserved)));
+                        continue;
+                    }
+                    if (keeper is null && here is null)
                     {
                         // Nothing here yet: the old folder's file comes to its own place.
                         if (apply) Store.PutWhole(target, temp => File.Copy(other, temp), overwrite: false);
-                        keeper = a;
-                        targetHere = true;
+                        (keeper, here) = (a, there);
                     }
-                    else
+                    else if (apply)
                     {
                         // This folder's file is another's: this one's comes in beside it, and the attachment points at it.
-                        string file = Core.Attachments.FreeName(Py.Parent(target), Path.GetFileName(target));
-                        if (apply)
-                        {
-                            Store.PutWhole(Path.Combine(Py.Parent(target), file), temp => File.Copy(other, temp), overwrite: false);
-                            store.SetAttachmentFile(a.Id, file);
-                        }
+                        string beside = Store.FreeBeside(target);
+                        Store.PutWhole(beside, temp => File.Copy(other, temp), overwrite: false);
+                        store.SetAttachmentFile(a.Id, Path.GetFileName(beside));
                     }
                     otherTaken = true;
                     n++;
                 }
+                // A file here every attachment moved off (one proven the old folder's): listed as the class's own.
+                if (keeper is null && here is not null && apply) Enroll(target, rows[0].ClassName, here);
                 // A file no listed attachment took comes in as its own (OtherAttachments); one taken never does, even
                 // after the attachment that took it is removed.
                 if (!otherTaken) continue;
                 copiedFiles.Add(Path.GetFullPath(other));
-                if (apply) store.SetState(Taken + FolderId(Path.GetFileName(Py.Parent(Py.Parent(other))), Sha(other)), "taken");
+                if (apply) store.SetState(taken, "taken");
             }
             return n;
         }
@@ -267,18 +272,8 @@ public static class LibraryBringIn
                 if (copiedFiles.Contains(Path.GetFullPath(other))) continue;
                 string clsFolder = Path.GetFileName(Py.Parent(Py.Parent(other)));
                 string dir = Path.Combine(into, clsFolder, Store.AttachmentsFolder);
-                string sha;
-                long size;
-                try
-                {
-                    size = new FileInfo(other).Length;
-                    sha = Sha(other);
-                }
-                catch (Exception e) when (e is IOException or UnauthorizedAccessException)
-                {
-                    continue;
-                }
-                if (HasCopy(dir, size, sha)) continue;
+                if (Sha(other) is not { } sha) continue;
+                if (Directory.Exists(dir) && Directory.EnumerateFiles(dir).Any(f => Sha(f) == sha)) continue;
                 // The same file attached to two classes is one attachment in each: the id is the class's and the file's.
                 string id = FolderId(clsFolder, sha);
                 // Removed by the student once, or taken once as a listed attachment's own file: it stays as it is.
@@ -287,17 +282,23 @@ public static class LibraryBringIn
                 planned[id] = "";
                 n++;
                 if (!apply) continue;
-                string cls = ClassFor(clsFolder);
-                string file = Core.Attachments.FreeName(store.AttachmentsDir(cls), Path.GetFileName(other));
-                string target = Path.Combine(store.AttachmentsDir(cls), file);
+                string target = Store.FreeBeside(Path.Combine(store.AttachmentsDir(ClassFor(clsFolder)), Path.GetFileName(other)));
                 Store.PutWhole(target, temp => File.Copy(other, temp), overwrite: false);
-                byte[] head = new byte[64];
-                int read;
-                using (var stream = File.OpenRead(target)) read = stream.Read(head);
-                store.AddAttachment(new Attachment(id, Path.GetFileName(other), file, cls, null, size,
-                    Core.Attachments.Sniff(head.AsSpan(0, read), file), File.GetLastWriteTimeUtc(other).ToString("o", CultureInfo.InvariantCulture)));
+                Enroll(target, ClassFor(clsFolder), sha, id, Path.GetFileName(other));
             }
             return n;
+        }
+
+        /// <summary>Lists the file at <paramref name="path"/> (in a class's Attachments here) as an attachment of
+        /// <paramref name="cls"/>, under <paramref name="id"/> (else one from its bytes).</summary>
+        void Enroll(string path, string cls, string sha, string? id = null, string? name = null)
+        {
+            byte[] head = new byte[64];
+            int read;
+            using (var stream = File.OpenRead(path)) read = stream.Read(head);
+            store.AddAttachment(new Attachment(id ?? FolderId(Path.GetFileName(Py.Parent(Py.Parent(path))), sha), name ?? Path.GetFileName(path),
+                Path.GetFileName(path), cls, null, new FileInfo(path).Length, Core.Attachments.Sniff(head.AsSpan(0, read), path),
+                File.GetLastWriteTimeUtc(path).ToString("o", CultureInfo.InvariantCulture)));
         }
 
         /// <summary>The class a folder of the other library is: one of this library's whose folder has that name, else
@@ -311,14 +312,9 @@ public static class LibraryBringIn
         /// it when anything else is there: where it is. Written whole or not at all.</summary>
         static string CopyIn(string id, string text, string want)
         {
-            string path = want;
-            for (int i = 2; File.Exists(path); i++)
-            {
-                // A copy already here is used only when it's proven this lecture's: its words, with its id.
-                if (Same(Text(path), text) && Read(path)?.Id == id) return path;
-                path = Path.Combine(Py.Parent(want), $"{Path.GetFileNameWithoutExtension(want)} ({i}).md");
-            }
-            Store.WriteWhole(path, text);
+            // A copy already here is used only when it's proven this lecture's: its words, with its id.
+            string path = Store.FreeBeside(want, p => Same(Text(p), text) && Read(p)?.Id == id);
+            if (!File.Exists(path)) Store.WriteWhole(path, text);
             return path;
         }
     }
@@ -376,40 +372,15 @@ public static class LibraryBringIn
     /// copied (or, not <paramref name="apply"/>ing, would).</summary>
     static bool CopyLoose(Store store, string rel, string other, string want, bool apply)
     {
-        string sha;
-        long size;
-        try
-        {
-            size = new FileInfo(other).Length;
-            sha = Sha(other);
-        }
-        catch (Exception e) when (e is IOException or UnauthorizedAccessException)
-        {
-            return false;
-        }
+        if (Sha(other) is not { } sha) return false;
         string key = "bring-in:" + Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(rel.Replace('\\', '/').ToLowerInvariant() + "/" + sha)))[..32];
         if (store.GetState(key) is not null) return false;
-        string stem = Path.GetFileNameWithoutExtension(want), ext = Path.GetExtension(want), dir = Py.Parent(want);
-        string path = want;
-        for (int i = 2; File.Exists(path); i++)
-        {
-            try
-            {
-                if (new FileInfo(path).Length == size && Sha(path) == sha)
-                {
-                    if (apply) store.SetState(key, path);
-                    return false;
-                }
-            }
-            catch (Exception e) when (e is IOException or UnauthorizedAccessException)
-            {
-            }
-            path = Path.Combine(dir, $"{stem} ({i}){ext}");
-        }
-        if (!apply) return true;
-        Store.PutWhole(path, temp => File.Copy(other, temp), overwrite: false);
+        string path = Store.FreeBeside(want, p => Sha(p) == sha);
+        bool copy = !File.Exists(path);
+        if (!apply) return copy;
+        if (copy) Store.PutWhole(path, temp => File.Copy(other, temp), overwrite: false);
         store.SetState(key, path);
-        return true;
+        return copy;
     }
 
     /// <summary>The id an attached file of the other folder's comes in with: its class folder's and its bytes'.</summary>
@@ -419,51 +390,18 @@ public static class LibraryBringIn
     /// <summary>Before a <see cref="FolderId"/> in sync_state: that file was taken as a listed attachment's own.</summary>
     const string Taken = "bring-in-taken:";
 
-    static long Length(string path)
+    /// <summary>A file's SHA-256, or null when it isn't there or can't be read.</summary>
+    static string? Sha(string path)
     {
         try
         {
-            return new FileInfo(path).Length;
+            using var stream = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite, 81920);
+            return Convert.ToHexStringLower(SHA256.HashData(stream));
         }
         catch (Exception e) when (e is IOException or UnauthorizedAccessException)
         {
-            return -1;
+            return null;
         }
-    }
-
-    static bool SameBytes(string a, string b)
-    {
-        try
-        {
-            return new FileInfo(a).Length == new FileInfo(b).Length && Sha(a) == Sha(b);
-        }
-        catch (Exception e) when (e is IOException or UnauthorizedAccessException)
-        {
-            return false;
-        }
-    }
-
-    /// <summary>Whether <paramref name="dir"/> has a file of this size and SHA-256 already.</summary>
-    static bool HasCopy(string dir, long size, string sha)
-    {
-        if (!Directory.Exists(dir)) return false;
-        foreach (var f in new DirectoryInfo(dir).EnumerateFiles())
-        {
-            try
-            {
-                if (f.Length == size && Sha(f.FullName) == sha) return true;
-            }
-            catch (Exception e) when (e is IOException or UnauthorizedAccessException)
-            {
-            }
-        }
-        return false;
-    }
-
-    static string Sha(string path)
-    {
-        using var stream = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite, 81920);
-        return Convert.ToHexStringLower(SHA256.HashData(stream));
     }
 
     /// <summary>Lists <paramref name="note"/> in its class (added to the library when it hasn't got it) with
@@ -496,8 +434,7 @@ public static class LibraryBringIn
         {
             string name = $"{Notes.DatePrefix(m.Date)} {Notes.Slugify(m.Title)}";
             string dir = store.ClassDir(cls);
-            at = Path.Combine(dir, name + ".md");
-            for (int i = 2; File.Exists(at); i++) at = Path.Combine(dir, $"{name} ({i}).md");
+            at = Store.FreeBeside(Path.Combine(dir, name + ".md"));
         }
         store.Save(m, new Classification(cls, note.Confidence, note.By, note.LectureTitle, note.Topics), note.Summary, note.SummaryBy,
             at: at, keepText: text);

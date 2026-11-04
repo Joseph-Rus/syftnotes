@@ -240,11 +240,11 @@ public sealed partial class NotesFolderPickModel : ObservableObject
 
     static string Number(int n) => n switch { 2 => "two", 3 => "three", 4 => "four", 5 => "five", _ => n.ToString(CultureInfo.InvariantCulture) };
 
-    /// <summary>"12 lectures, last one Oct 2" (with the year when it isn't this one); "5000+ lectures" past the count.</summary>
+    /// <summary>"12 lectures, last one Oct 2" (with the year when it isn't this one).</summary>
     public static string Detail(LibraryFolder f, DateOnly today)
     {
         var en = CultureInfo.InvariantCulture;
-        string count = f.Capped ? $"{f.Lectures.ToString("N0", en)}+ lectures" : f.Lectures == 1 ? "1 lecture" : $"{f.Lectures.ToString("N0", en)} lectures";
+        string count = f.Lectures == 1 ? "1 lecture" : $"{f.Lectures.ToString("N0", en)} lectures";
         if (f.Newest is not { } day) return count;
         string when = day.ToString(day.Year == today.Year ? "MMM d" : "MMM d, yyyy", en);
         return $"{count}, last one {when}";
