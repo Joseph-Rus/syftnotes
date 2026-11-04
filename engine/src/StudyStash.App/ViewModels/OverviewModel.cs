@@ -4,6 +4,7 @@ using Avalonia.Media;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using StudyStash.App.Services;
+using StudyStash.App.ViewModels.Kit;
 
 namespace StudyStash.App.ViewModels;
 
@@ -176,6 +177,9 @@ public sealed partial class OverviewModel : ObservableObject
     public const int DayRows = 4;
     /// <summary>An event this close to starting says "In 11 minutes" rather than its day.</summary>
     public static readonly TimeSpan Soon = TimeSpan.FromMinutes(15);
+
+    /// <summary>How far down the page is scrolled: Back and Forward come back to it.</summary>
+    public ScrollPlace Scroll { get; } = new();
 
     public bool IsHome { get; init; }
     /// <summary>Due: the calendar of what's to hand in.</summary>
