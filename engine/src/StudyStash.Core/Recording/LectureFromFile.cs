@@ -31,21 +31,24 @@ public static class LectureFromFile
     /// the library keeps it. <paramref name="day"/> null is the day the file was last changed; either way the time of
     /// day is the file's, so lectures of one day sort in the order they were made. Converting an hours-long video takes a
     /// while: call this off the screen's thread.
-    /// Throws InvalidOperationException or InvalidDataException, with words for the student, when it can't.
+    /// Throws InvalidOperationException or InvalidDataException, with words for the student, when it can't. Cancelling
+    /// doesn't stop a conversion that's running; it only means the lecture isn't added (and the sound made for it is
+    /// removed), with an OperationCanceledException.
     /// </summary>
-    public static Lecture FromFile(LectureStore store, Action<string, string> convert, string path, string? className, string? title, DateOnly? day, string owner)
+    public static Lecture FromFile(LectureStore store, Action<string, string> convert, string path, string? className, string? title, DateOnly? day, string owner, CancellationToken cancel = default)
     {
+        cancel.ThrowIfCancellationRequested();
         if (!File.Exists(path)) throw new InvalidOperationException("Syft Notes can't find that file any more.");
         if (!CanRead(path)) throw new InvalidOperationException("That isn't a recording or video Syft Notes can read. Sound files (.m4a, .mp3, .wav) and videos (.mp4, .mov) work.");
         var changed = File.GetLastWriteTime(path);
         var started = new DateTimeOffset(day is { } d ? d.ToDateTime(TimeOnly.FromDateTime(changed)) : changed);
         string typed = (title ?? "").Trim();
-        return Add(store, convert, path, (className ?? "").Trim(), typed.Length > 0 ? typed : Path.GetFileNameWithoutExtension(path), started, owner, titleTyped: typed.Length > 0);
+        return Add(store, convert, path, (className ?? "").Trim(), typed.Length > 0 ? typed : Path.GetFileNameWithoutExtension(path), started, owner, titleTyped: typed.Length > 0, cancel);
     }
 
     /// <summary>The step every way in shares: the file's sound as the recorder's own, then the lecture in the store.
     /// Nothing is left behind when it fails.</summary>
-    internal static Lecture Add(LectureStore store, Action<string, string> convert, string path, string className, string title, DateTimeOffset started, string owner, bool titleTyped = false)
+    internal static Lecture Add(LectureStore store, Action<string, string> convert, string path, string className, string title, DateTimeOffset started, string owner, bool titleTyped = false, CancellationToken cancel = default)
     {
         string id = Lecture.NewId(started);
         string wav = store.AudioPath(id);
@@ -55,6 +58,7 @@ public static class LectureFromFile
             convert(path, wav);
             double seconds = Sound.WavSeconds(wav);
             if (seconds < 1) throw new InvalidDataException("The recording has no sound in it.");
+            cancel.ThrowIfCancellationRequested();
             return store.Add(new Lecture
             {
                 Id = id, Started = started.ToString("yyyy-MM-dd'T'HH:mm:sszzz", CultureInfo.InvariantCulture),

@@ -52,6 +52,11 @@ public class LectureFromFileTests
         Assert.Equal(new DateTimeOffset(changed), plain.StartedAt);
         Assert.Equal(2, store.All().Count);
 
+        // Cancelled after the sound was made, before the lecture was added: no lecture, and the sound made for it is gone.
+        using var cancel = new CancellationTokenSource();
+        Assert.Throws<OperationCanceledException>(() =>
+            LectureFromFile.FromFile(store, (from, to) => { Convert(from, to); cancel.Cancel(); }, source, null, null, null, "Sam", cancel.Token));
+
         // The file is as it was, and one this can't read is refused in words, leaving nothing behind.
         Assert.Equal(before, File.ReadAllBytes(source));
         Assert.Equal(changed, File.GetLastWriteTime(source));
