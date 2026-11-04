@@ -1115,7 +1115,7 @@
                                 <c:Icon Glyph="close" Size="15" Foreground="{DynamicResource Fg3}" />
                               </Button>
                               <Border Grid.Row="2" Grid.Column="2" Grid.ColumnSpan="3" Classes="field">
-                                <TextBox Classes="bare" Text="{Binding Description}" PlaceholderText="What it covers (it helps the AI sort)" VerticalAlignment="Center" LostFocus="OnClassLostFocus" />
+                                <TextBox Classes="bare" Text="{Binding Description}" PlaceholderText="What it covers (it helps the AI sort)" TextWrapping="Wrap" MaxLines="2" AcceptsReturn="False" VerticalAlignment="Center" LostFocus="OnClassLostFocus" />
                               </Border>
                               <TextBlock Grid.Row="3" Grid.Column="2" Grid.ColumnSpan="3" Classes="row-sub" Margin="0,4,0,0" Text="{Binding DescriptionMark}" IsVisible="{Binding HasDescriptionMark}" />
                               <TextBlock Grid.Row="5" Grid.Column="2" Grid.ColumnSpan="3" Classes="row-sub" Text="{Binding Meta}" ToolTip.Tip="{Binding Meta}" c:Tips.WhenCut="True" TextTrimming="PrefixCharacterEllipsis" />
