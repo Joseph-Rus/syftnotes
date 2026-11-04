@@ -131,7 +131,7 @@ public sealed class AiConnect(IAiLibrary library)
             // Signed in here moments ago, yet the library still can't use it: no browser page nobody asked for. Settings
             // and Home offer Sign in, as for any AI signed out.
             if (SignedInHere && Is(engine, AiEngineState.NotSignedIn))
-                return new ConnectOutcome(false, $"{brand} isn't signed in on your library. Sign in from Settings → Your AI.") { Apps = apps, Overview = overview };
+                return new ConnectOutcome(false, $"{brand} isn't signed in yet. Try again.") { Apps = apps, Overview = overview };
             if (Is(engine, AiEngineState.NotSignedIn))
             {
                 Say(ConnectStep.SigningIn, $"Signing in to {brand}… finish in your browser.");
