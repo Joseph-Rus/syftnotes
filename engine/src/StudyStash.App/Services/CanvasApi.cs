@@ -353,7 +353,16 @@ public static class CanvasApi
         public DateTimeOffset? LastSync { get; init; }
         public Counts Counts { get; init; } = new();
         public bool FilesHidden { get; init; }
+        /// <summary>The student's grade in the class when Canvas shares it; null when it doesn't (or from an older library).</summary>
+        public ClassGrade? Grade { get; init; }
         public Scout? Scout { get; init; }
+    }
+
+    public sealed record ClassGrade
+    {
+        public double Score { get; init; }
+        /// <summary>"A-"; "" when the course has no letter scheme.</summary>
+        public string Letter { get; init; } = "";
     }
 
     public sealed record Course
