@@ -445,11 +445,14 @@ jobs:
           if-no-files-found: ignore
 
   # The Mac app: one universal bundle for Apple silicon and Intel, started by its own launcher (D1); ad hoc signed with
-  # the microphone entitlement; the DMG (D2). Proved with the real self-test (D5): real windows open, the pretend
-  # microphone records, Whisper (Metal) hears the speech from inside the bundle. Only a release uploads the DMG.
-  # With the signing secrets (docs/signing.md) the app is signed with a Developer ID, notarized and stapled right after
-  # the build, and the DMG made again around it; the self-tests then run the signed app, with library validation on.
-  # Both self-tests (as a laptop, and as just this computer) run here, one after the other, on the one app built.
+  # the microphone entitlement; the DMG (D2). What ships is a student's copy, with no self-test, demo libraries or test
+  # switches in it (macos/build-app.sh stops if they are, and the DMG is checked); the self-test (D5), where real
+  # windows open, the pretend microphone records and Whisper (Metal) hears the speech from inside the bundle, runs a
+  # copy of the same code built with them (--test-helpers), which is never shipped. Only a release uploads the DMG.
+  # With the signing secrets (docs/signing.md) the student's app is signed with a Developer ID, notarized and stapled
+  # right after the build, and the DMG made again around it. The copy with the test helpers is signed the same way
+  # (not notarized), so the self-tests still run an app with library validation on.
+  # Both self-tests (as a laptop, and as just this computer) run here, one after the other, on the one test copy built.
   mac-app:
     name: Mac app (self-test, DMG)
     needs: [version]
@@ -477,7 +480,12 @@ jobs:
         shell: bash
         working-directory: web
         run: npm ci --no-audit --no-fund && npm run build
-      - name: Build Syft Notes.app and its one DMG
+      # No secret: this copy is never shipped.
+      - name: Build the copy the self-tests run (with the test helpers; never shipped)
+        env:
+          STUDYSTASH_SKIP_WEB: "1"
+        run: sh macos/build-app.sh --test-helpers dist/mac-test
+      - name: Build Syft Notes.app and its one DMG - the student's copy, with no test helpers
         # The laptop's Google sign-in secret (docs/phone-google.md) is built into the app; without it the app builds as
         # usual and Connect with Google says this copy can't connect.
         env:
@@ -509,12 +517,14 @@ jobs:
         run: |
           dotnet tool install -g vpk --version 1.2.161
           echo "$HOME/.dotnet/tools" >> "$GITHUB_PATH"
-      - name: Sign the app, notarize it if there is a key, and make the DMG again around it
+      - name: Sign the app, notarize it if there is a key, and make the DMG again around it (the test copy is signed too, never notarized)
         if: needs.version.outputs.mac_signing != 'off'
         env:
           # Set the repository variable STUDYSTASH_LIBRARY_VALIDATION to "off" to keep disable-library-validation (docs/signing.md).
           STUDYSTASH_LIBRARY_VALIDATION: ${{ vars.STUDYSTASH_LIBRARY_VALIDATION }}
-        run: sh macos/sign-release.sh dist/mac
+        run: |
+          STUDYSTASH_NOTARY_KEY='' STUDYSTASH_NOTARY_KEY_ID='' STUDYSTASH_NOTARY_ISSUER_ID='' sh macos/sign-release.sh dist/mac-test
+          sh macos/sign-release.sh dist/mac
       - name: The signature is the one this run was told to make
         if: needs.version.outputs.mac_signing != 'off'
         env:
@@ -556,10 +566,11 @@ jobs:
           [ -n "$V" ]
           softwareupdate --install-rosetta --agree-to-license 2>/dev/null || true
           [ "$(env -u DOTNET_ROOT arch -x86_64 "$APP/Contents/MacOS/StudyStash" version)" = "$V" ]
+      # The copy built with the test helpers: the student's has no self-test to run.
       - name: Self-test (D5) - real windows, the pretend mic, Whisper from inside the bundle
         if: needs.version.outputs.tested != 'true'
-        run: sh macos/selftest.sh "dist/mac/Syft Notes.app" "$RUNNER_TEMP/selftest/laptop"
-      # The second self-test, on the same app (it used to build it again on a Mac of its own): Just this computer.
+        run: sh macos/selftest.sh "dist/mac-test/Syft Notes.app" "$RUNNER_TEMP/selftest/laptop"
+      # The second self-test, on the same test copy (it used to build it again on a Mac of its own): Just this computer.
       # Then "Answer your phone when Syft Notes is closed" goes on with a stand-in phone (a real LaunchAgent, on this
       # throwaway Mac only), the app quits, and the library must still answer the phone, never be taken for the app
       # (opening Syft Notes still starts it), and leave nothing once removed.
@@ -569,7 +580,7 @@ jobs:
           STUDYSTASH_SELFTEST_FLOW: one-computer
           STUDYSTASH_SELFTEST_BACKGROUND: "1"
         run: |
-          sh macos/selftest.sh "dist/mac/Syft Notes.app" "$RUNNER_TEMP/selftest/one-computer"
+          sh macos/selftest.sh "dist/mac-test/Syft Notes.app" "$RUNNER_TEMP/selftest/one-computer"
           grep -q "^background library registered" "$RUNNER_TEMP/selftest/one-computer/selftest.txt" || { echo "the self-test didn't turn on answering with the app closed"; exit 1; }
           grep -q "^the phone got its answer with the app closed" "$RUNNER_TEMP/selftest/one-computer/background.txt" || { echo "the phone wasn't answered with the app closed"; exit 1; }
           # The background library is never taken for the app: with it running, opening the app still starts it.
@@ -577,11 +588,15 @@ jobs:
           for agent in "$HOME/Library/LaunchAgents/"com.study-stash.background.*.plist; do
             [ ! -e "$agent" ] || { echo "a LaunchAgent was left behind"; ls "$HOME/Library/LaunchAgents"; exit 1; }
           done
-      - name: The DMG holds the app with no role of its own (setup asks), and no model is bundled (D6)
+      - name: The DMG holds the student's app - with no self-test in it - with no role of its own (setup asks), and no model is bundled (D6)
         run: |
           mnt="$RUNNER_TEMP/mnt-dmg"
           mkdir -p "$mnt"
           hdiutil attach -nobrowse -readonly -noautoopen -mountpoint "$mnt" dist/mac/Syft-Notes.dmg
+          for arch in arm64 x64; do
+            [ "$(perl -0777 -ne 'print /s\0e\0l\0f\0t\0e\0s\0t\0\.\0t\0x\0t/ ? "self-test" : "clean"' "$mnt/Syft Notes.app/Contents/Resources/$arch/StudyStash.dll")" = clean ] \
+              || { hdiutil detach -quiet "$mnt"; echo "Syft-Notes.dmg's app ($arch) has the self-test in it" >&2; exit 1; }
+          done
           if /usr/libexec/PlistBuddy -c "Print :StudyStashRole" "$mnt/Syft Notes.app/Contents/Info.plist" >/dev/null 2>&1; then
             hdiutil detach -quiet "$mnt"
             echo "Syft-Notes.dmg's app still says a role" >&2
@@ -606,6 +621,14 @@ jobs:
             dist/mac/Syft-Notes.dmg
             dist/mac/velopack/osx
           retention-days: 30
+      # The copy with the test helpers, for the Intel Mac's self-test: never published (the release job downloads
+      # mac-installers only).
+      - uses: actions/upload-artifact@v7
+        if: needs.version.outputs.installers == 'true'
+        with:
+          name: mac-test-copy
+          path: dist/mac-test/Syft-Notes.dmg
+          retention-days: 1
       # What the self-test said and drew, every time; the whole folder (its home, recordings and a copy of the model:
       # 80 to 150 MB) only when something failed.
       - name: The self-test's words, logs and pictures
@@ -642,7 +665,8 @@ jobs:
           retention-days: 30
 
   # The Intel self-test (D5), for real: a physical Intel Mac, so the x64 tree runs natively (mac-app already checked
-  # it runs enough to print its version under Rosetta). A release only.
+  # it runs enough to print its version under Rosetta). A release only. The self-test runs the copy with the test
+  # helpers; the student's copy (the DMG that ships) is checked as signed and must print its version, here.
   mac-intel:
     name: Mac app self-test (Intel)
     needs: [version, mac-app]
@@ -657,23 +681,33 @@ jobs:
         with:
           name: mac-installers
           path: dist/mac
+      - uses: actions/download-artifact@v8
+        with:
+          name: mac-test-copy
+          path: dist/mac-test
       - uses: ./.github/actions/whisper-tiny
-      - name: Mount the DMG and copy the app out (artifacts lose exec bits, so it travels as a DMG)
+      - name: Mount the DMGs and copy the apps out (artifacts lose exec bits, so they travel as DMGs)
         run: |
-          mkdir -p "$RUNNER_TEMP/mnt"
-          hdiutil attach -nobrowse -readonly -noautoopen -mountpoint "$RUNNER_TEMP/mnt" dist/mac/Syft-Notes.dmg
-          ditto "$RUNNER_TEMP/mnt/Syft Notes.app" "$RUNNER_TEMP/Syft Notes.app"
-          hdiutil detach -quiet "$RUNNER_TEMP/mnt"
-          codesign --verify --deep --strict "$RUNNER_TEMP/Syft Notes.app"
+          for copy in mac mac-test; do
+            mkdir -p "$RUNNER_TEMP/mnt-$copy" "$RUNNER_TEMP/$copy"
+            hdiutil attach -nobrowse -readonly -noautoopen -mountpoint "$RUNNER_TEMP/mnt-$copy" "dist/$copy/Syft-Notes.dmg"
+            ditto "$RUNNER_TEMP/mnt-$copy/Syft Notes.app" "$RUNNER_TEMP/$copy/Syft Notes.app"
+            hdiutil detach -quiet "$RUNNER_TEMP/mnt-$copy"
+            codesign --verify --deep --strict "$RUNNER_TEMP/$copy/Syft Notes.app"
+          done
       - name: Signed as planned, and Gatekeeper accepts it, offline, on the Intel Mac that will run it
         if: needs.version.outputs.mac_signing != 'off'
         env:
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
           STUDYSTASH_LIBRARY_VALIDATION: ${{ vars.STUDYSTASH_LIBRARY_VALIDATION }}
           HOW: ${{ needs.version.outputs.mac_signing == 'rehearsal' && 'rehearsal' || (needs.version.outputs.mac_notarize == 'true' && 'notarized' || 'signed') }}
-        run: sh macos/verify-signing.sh "$RUNNER_TEMP/Syft Notes.app" dist/mac/Syft-Notes.dmg "$HOW"
-      - name: Self-test, natively on Intel
-        run: sh macos/selftest.sh "$RUNNER_TEMP/Syft Notes.app" "$RUNNER_TEMP/selftest"
+        run: sh macos/verify-signing.sh "$RUNNER_TEMP/mac/Syft Notes.app" dist/mac/Syft-Notes.dmg "$HOW"
+      - name: The student's copy starts natively on Intel and prints its version
+        run: |
+          V=$(sed -n 's:.*<StudyStashVersion>\(.*\)</StudyStashVersion>.*:\1:p' engine/Directory.Build.props)
+          [ "$(env -u DOTNET_ROOT "$RUNNER_TEMP/mac/Syft Notes.app/Contents/MacOS/StudyStash" version)" = "$V" ]
+      - name: Self-test, natively on Intel (the copy with the test helpers)
+        run: sh macos/selftest.sh "$RUNNER_TEMP/mac-test/Syft Notes.app" "$RUNNER_TEMP/selftest"
       # What the self-test said and drew, every time; the whole folder (its home, recordings and a copy of the model:
       # 80 to 150 MB) only when something failed.
       - name: The self-test's words, logs and pictures
