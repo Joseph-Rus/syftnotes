@@ -133,7 +133,8 @@ public sealed class LibraryHereTests
         finally { if (host.LocalLibrary is { } svc) await svc.StopAsync(); }
     }
 
-    static int FreePort()
+    /// <summary>A port free now, for a library a test makes to start from (never 8787, a real library's).</summary>
+    internal static int FreePort()
     {
         using var probe = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
         probe.Bind(new IPEndPoint(IPAddress.Loopback, 0));
