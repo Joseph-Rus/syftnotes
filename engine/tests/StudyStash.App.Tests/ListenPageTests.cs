@@ -83,6 +83,30 @@ public class ListenPageTests
         Assert.False(listen.Playing);
     }
 
+    /// <summary>A listen played to its very end stops there, once (it crashed the app with a stack overflow).</summary>
+    [AvaloniaFact]
+    public async Task A_listen_played_to_its_end_stops_there()
+    {
+        await using var lib = await StudyLibrary.StartAsync(l => l.Speech = new Voices());
+        lib.Answers.Add(Script);
+        using var cache = new TempDir();
+        var player = new FakePlayer();
+        var listen = new ListenModel(lib.Study, "v1", player, cache.Path) { LookEvery = TimeSpan.FromMilliseconds(30) };
+        await listen.LoadAsync();
+        await listen.MakeCommand.ExecuteAsync(null);
+        await Until(() => listen.Ready);
+
+        listen.Position = listen.Seconds - 0.4; // its last moment
+        await listen.PlayPauseCommand.ExecuteAsync(null);
+        Assert.True(listen.Playing);
+        await Until(() => !listen.Playing);
+
+        Assert.Equal(listen.Seconds, listen.Position);
+        Assert.Equal(1, player.Stopped);
+        Assert.Equal("Play", listen.PlaySaid);
+        listen.Dispose();
+    }
+
     [AvaloniaFact]
     public async Task A_listen_that_couldnt_be_made_offers_to_try_again()
     {
