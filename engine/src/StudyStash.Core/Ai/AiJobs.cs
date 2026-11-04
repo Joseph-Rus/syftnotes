@@ -31,15 +31,17 @@ public sealed class AiJobs(string home, Func<string>? ollamaHost = null)
 
     /// <summary>An AI's own status command said the student signed in: it's ready now, with no check to press, and the
     /// notes it couldn't write while it was signed out are written (<see cref="SignedInAgain"/>). The AI the student just
-    /// signed in to is the one they want: it writes their notes and answers their questions from now on, whatever was
-    /// chosen before, so nobody has to go to Settings to pick it (signing back in to the one already used changes
-    /// nothing). A usage limit is left alone: signing in doesn't end one.</summary>
+    /// signed in to, when it's a new one, is the one they want: it writes their notes and answers their questions from
+    /// now on, whatever was chosen before, so nobody has to go to Settings to pick it. Signing back in to an AI already
+    /// used for something (a sign-in that had run out) is a repair: every pick, and its model, stays as it was. A usage
+    /// limit is left alone: signing in doesn't end one.</summary>
     public void MarkSignedIn(string id)
     {
         var s = Settings;
         bool back = Engines.LooksLikeAuth(s.Tests.GetValueOrDefault(id, ""));
         s.Tests[id] = "works";
-        bool chosen = id != "ollama" && (s.For("notes").Provider != id || s.For("ask").Provider != id);
+        bool inUse = AiSettings.Jobs.Any(job => s.Picked(job) && s.For(job).Provider == id);
+        bool chosen = id != "ollama" && !inUse;
         if (chosen)
         {
             s.Provider = id;
