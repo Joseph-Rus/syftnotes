@@ -502,6 +502,10 @@ public sealed partial class OverviewModel : ObservableObject
         public Action<string>? RecordEvent { get; init; }
         /// <summary>Marks a Due item done or hidden in Syft Notes (or takes the mark back); null without a library.</summary>
         public DueMarker? Mark { get; init; }
+        /// <summary>Adds, changes and deletes the student's own Due items (the calendar's Add); null without a library.</summary>
+        public OwnDueEditor? Own { get; init; }
+        /// <summary>Opens one of the student's own Due items to change it; the calendar sets it to its form.</summary>
+        public Action<CanvasApi.Item>? OpenOwn { get; init; }
     }
 
     /// <summary>An event on a calendar: what, when, and the folder it's clearly for (null for none).</summary>
@@ -570,10 +574,16 @@ public sealed partial class OverviewModel : ObservableObject
         string when = done ? (i.Mark == "done" ? Kit.DueMarkModel.DoneState : "Handed in")
             : i.DueAt is not { } d ? "No due date"
             : late ? $"Was due {Words(Local(d, s), Local(d, s).Year == Local(s.Now, s).Year ? "ddd d" : "d MMM yyyy")}"
+            : i.Own ? OwnWhen(i, d, s.Zone)
             : Time(d, s.Zone);
         return new OverviewDue(i.Class, i.Id, i.Name, when, late, done, classLabel ? ClassNames.Display(i.Class) : "", dot(i.Class),
-            () => s.OpenAssignment?.Invoke(i.Class, i.Id), i.Mark == "done");
+            () => { if (i.Own) s.OpenOwn?.Invoke(i); else s.OpenAssignment?.Invoke(i.Class, i.Id); }, i.Mark == "done");
     }
+
+    /// <summary>What a student's own item says about when: its small kind word, then the time unless it is for the whole day
+    /// ("Exam · 9:00 AM", "To do").</summary>
+    public static string OwnWhen(CanvasApi.Item i, DateTimeOffset due, TimeZoneInfo zone) =>
+        i.AllDay ? Kit.OwnDueFormModel.WordFor(i.What) : $"{Kit.OwnDueFormModel.WordFor(i.What)} · {Time(due, zone)}";
 
     /// <summary>A note as a row of a list. Home's rows name their folder (and can be moved from there); a folder's don't.</summary>
     public static NoteItem Row(LectureFacts l, Sources s, Func<string, IBrush> dot, bool showFolder) => new()
@@ -596,9 +606,10 @@ public sealed partial class OverviewModel : ObservableObject
     /// <summary>"Two", "Eleven" as "11": a count as a sentence starts with it.</summary>
     static string Count(int n) => n >= 0 && n < Counts.Length ? Counts[n] : n.ToString(CultureInfo.InvariantCulture);
 
-    /// <summary>"assignment", or "quiz" when everything counted is one.</summary>
+    /// <summary>"assignment", or "quiz" when everything counted is one; "thing" when any is the student's own (an exam isn't an assignment).</summary>
     static string Kind(IReadOnlyList<CanvasApi.Item> items, bool plural)
     {
+        if (items.Any(i => i.Own)) return plural ? "things" : "thing";
         bool quizzes = items.Count > 0 && items.All(i => i.Kind == "quiz");
         return quizzes ? plural ? "quizzes" : "quiz" : plural ? "assignments" : "assignment";
     }
@@ -658,8 +669,10 @@ public sealed partial class OverviewModel : ObservableObject
             {
                 var at = Local(that[0].DueAt!.Value, s);
                 string day1 = day == today ? at.Hour >= 17 ? "tonight" : "today" : on;
-                // The end of the day is when most things are due, so it goes unsaid.
-                first = at is { Hour: 23, Minute: 59 } ? $"{that[0].Name} is due {day1}" : $"{that[0].Name} is due {day1} at {Words(at, "h:mm tt")}";
+                // The end of the day is when most things are due, so it goes unsaid. An exam or a study session of the student's own
+                // isn't "due": it's on that day.
+                string verb = that[0] is { Own: true, What: "exam" or "study" } ? "is" : "is due";
+                first = at is { Hour: 23, Minute: 59 } ? $"{that[0].Name} {verb} {day1}" : $"{that[0].Name} {verb} {day1} at {Words(at, "h:mm tt")}";
             }
             else first = $"{Count(that.Count)} {Kind(that, plural: true)} due {on}";
         }
@@ -750,7 +763,8 @@ public sealed partial class OverviewModel : ObservableObject
     public static OverviewModel Home(Sources s, bool onlyUnsorted = false)
     {
         var dot = DotsOf(s);
-        bool canvas = s.Due is not null && s.Canvas.Any(c => c.Linked);
+        // Canvas linked, or the student's own items to say (they work without Canvas).
+        bool canvas = s.Due is not null && (s.Canvas.Any(c => c.Linked) || StillToHandIn(s.Due).Any());
         var m = new OverviewModel
         {
             IsHome = true,

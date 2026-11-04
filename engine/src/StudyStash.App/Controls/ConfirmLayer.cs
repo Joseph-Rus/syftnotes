@@ -59,11 +59,21 @@ public sealed class ConfirmLayer
     public static ConfirmLayer? Pick() =>
         layers.Where(l => l.window.IsVisible).OrderByDescending(l => l.window.IsActive).ThenByDescending(l => l.lastActive).FirstOrDefault();
 
-    /// <summary>Asks over this window, which comes to the front first if it isn't there (the library open behind another
-    /// app: the question must not appear where the student isn't looking). The keyboard goes back to where it was afterwards.</summary>
+    /// <summary>Asks over this window: <see cref="ShowAsync"/> with the question as <see cref="ConfirmDialog"/> draws it.</summary>
     public async Task<bool> AskAsync(ConfirmAsk ask)
     {
-        if (Host.IsOpen) return false;
+        var dialog = new ConfirmDialog(ask);
+        dialog.Answered += yes => Host.CurrentSession?.Close(yes);
+        return await ShowAsync(dialog) is true;
+    }
+
+    /// <summary>Shows <paramref name="view"/> over this window, which comes to the front first if it isn't there (the library open
+    /// behind another app: the question must not appear where the student isn't looking). It lasts until the view closes its
+    /// <see cref="DialogHost"/> session, or a click outside does (null). The keyboard goes back to where it was afterwards. A
+    /// window shows one at a time: asked while one is showing, this answers null at once.</summary>
+    public async Task<object?> ShowAsync(Control view)
+    {
+        if (Host.IsOpen) return null;
         if (!window.IsActive)
         {
             AppWindows.Raise(window);
@@ -73,9 +83,7 @@ public sealed class ConfirmLayer
         // A window that has only just been shown is ready for the question a moment later.
         if (!Host.IsLoaded) await Dispatcher.UIThread.InvokeAsync(() => { }, DispatcherPriority.Loaded);
         var before = TopLevel.GetTopLevel(Host)?.FocusManager?.GetFocusedElement();
-        var dialog = new ConfirmDialog(ask);
-        dialog.Answered += yes => Host.CurrentSession?.Close(yes);
-        bool said = await DialogHost.Show(dialog, Host) is true;
+        var said = await DialogHost.Show(view, Host);
         if (before is Control c && c.IsEffectivelyVisible) Dispatcher.UIThread.Post(() => c.Focus());
         return said;
     }

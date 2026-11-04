@@ -252,15 +252,32 @@ public sealed partial class LibraryWeb
         {
             var body = await Http.JsonBodyAsync(ctx.Request);
             string cls = S(body?["class"]), kind = S(body?["kind"]) is { Length: > 0 } k ? k : "assignment", mark = S(body?["mark"]);
-            if (!cfg.ClassNames().Contains(cls) || body?["id"] is not JsonValue id || !id.TryGetValue(out long itemId)) return Http.Detail(400, "unknown assignment");
+            // The student's own items may be in no class.
+            bool known = kind == DueMine.Kind ? cls.Length == 0 || cfg.ClassNames().Contains(cls) : cfg.ClassNames().Contains(cls);
+            if (!known || body?["id"] is not JsonValue id || !id.TryGetValue(out long itemId)) return Http.Detail(400, "unknown assignment");
             if (mark is not ("" or DueMarks.Done or DueMarks.Hidden)) return Http.Detail(400, "mark is done, hidden or empty");
             DueMarks.Set(cfg.Home, cls, kind, itemId, mark, Canvas.Clock());
             return Http.Json(DueList());
         })));
+        // The student's own items on the Due list (an exam, a study session, a to-do), in Syft Notes only and with no Canvas needed:
+        // "id" (a number, absent for a new one), "title", "what" (exam, study or task), "class" ("" for none), "day" ("2026-11-05",
+        // or "" for no date) and "time" ("09:00" or ""). The answer is the Due list as it now stands.
+        app.MapPost("/api/v2/due/mine", Http.Handle(ctx => ApiAsync(ctx, async () =>
+        {
+            var body = await Http.JsonBodyAsync(ctx.Request);
+            string title = S(body?["title"]), what = S(body?["what"]), cls = S(body?["class"]), day = S(body?["day"]), time = S(body?["time"]);
+            long id = body?["id"] is JsonValue v && v.TryGetValue(out long given) ? given : 0;
+            if (DueMine.Problem(title, what, day, time) is { } problem) return Http.Detail(400, problem);
+            if (cls.Length > 0 && !cfg.ClassNames().Contains(cls)) return Http.Detail(400, "unknown class");
+            if (DueMine.Upsert(cfg.Home, DueMine.Make(id, title, what, cls, day, time, Canvas.Zone)) is null) return Http.Detail(404, "no such item");
+            return Http.Json(DueList());
+        })));
+        app.MapDelete("/api/v2/due/mine/{id:long}", (HttpContext ctx, long id) => Api(ctx, () =>
+            DueMine.Delete(cfg.Home, id) ? Http.Json(DueList()) : Http.Detail(404, "no such item")));
         app.MapGet("/api/v2/canvas/assignments", (HttpContext ctx, string? @class) => Api(ctx, () =>
         {
             if (@class is null || !cfg.ClassNames().Contains(@class)) return Http.Detail(400, "unknown class");
-            var mine = Assignments.Shown(cfg.Home).Where(a => a.ClassName == @class).ToList();
+            var mine = Assignments.Shown(cfg.Home).Where(a => a.ClassName == @class && a.Kind != DueMine.Kind).ToList();
             return Http.Json(CanvasView.ForClass(@class, mine, id => Canvas.Crawl.AssignmentFolder(@class, id), TimeZoneInfo.ConvertTime(Canvas.Clock(), Canvas.Zone).DateTime));
         }));
         app.MapGet("/api/v2/canvas/assignment", (HttpContext ctx, string? @class, long? id) => Api(ctx, () =>

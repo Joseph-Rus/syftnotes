@@ -163,18 +163,28 @@ public static class CanvasView
     // --- assignments and the Due list ---------------------------------------------------------------------------
 
     /// <summary>One assignment (or quiz/discussion folded into one), as the app's lists show it.</summary>
-    public static JsonObject ItemJson(Assignment a, string? folder) => new()
+    public static JsonObject ItemJson(Assignment a, string? folder)
     {
-        ["class"] = a.ClassName, ["id"] = a.Id, ["name"] = a.Name, ["kind"] = a.Kind, ["due"] = When(a.Due), ["due_at"] = When(a.DueAt),
-        ["points"] = a.Points, ["status"] = a.Status, ["label"] = Assignments.Label(a.Status, a.Late), ["score"] = a.Score,
-        ["grade"] = a.Grade, ["score_text"] = Assignments.ScoreText(a), ["late"] = a.Late, ["missing"] = a.Missing,
-        ["excused"] = a.Excused, ["submitted"] = When(a.Submitted), ["graded_at"] = When(a.GradedAt),
-        // When the student ticked it off in Canvas's planner (the flag is the status "marked_done"); null otherwise.
-        ["marked_done"] = a.MarkedDone ? When(a.MarkedDoneAt) : null,
-        // What the student did about it in Syft Notes alone ("done", "hidden", or ""): the one an Undo takes back.
-        ["mark"] = a.Mark,
-        ["url"] = a.Url, ["folder"] = folder,
-    };
+        var row = new JsonObject
+        {
+            ["class"] = a.ClassName, ["id"] = a.Id, ["name"] = a.Name, ["kind"] = a.Kind, ["due"] = When(a.Due), ["due_at"] = When(a.DueAt),
+            ["points"] = a.Points, ["status"] = a.Status, ["label"] = Assignments.Label(a.Status, a.Late), ["score"] = a.Score,
+            ["grade"] = a.Grade, ["score_text"] = Assignments.ScoreText(a), ["late"] = a.Late, ["missing"] = a.Missing,
+            ["excused"] = a.Excused, ["submitted"] = When(a.Submitted), ["graded_at"] = When(a.GradedAt),
+            // When the student ticked it off in Canvas's planner (the flag is the status "marked_done"); null otherwise.
+            ["marked_done"] = a.MarkedDone ? When(a.MarkedDoneAt) : null,
+            // What the student did about it in Syft Notes alone ("done", "hidden", or ""): the one an Undo takes back.
+            ["mark"] = a.Mark,
+            ["url"] = a.Url, ["folder"] = folder,
+        };
+        // What the student's own items add (exam | study | task, and a day with no time); a Canvas row carries neither.
+        if (a.Kind == DueMine.Kind)
+        {
+            row["what"] = a.What;
+            row["all_day"] = a.AllDay;
+        }
+        return row;
+    }
 
     static DateTime? DueOf(Assignment a) => a.Due.Length > 0 ? DateTime.Parse(a.Due, CultureInfo.InvariantCulture) : null;
 

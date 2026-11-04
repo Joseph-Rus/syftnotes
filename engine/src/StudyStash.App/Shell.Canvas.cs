@@ -40,6 +40,9 @@ public static partial class Shell
     /// <summary>Marks a Due item done or hidden in Syft Notes alone, through the one copy of the list (<see cref="CanvasFeed"/>).</summary>
     static DueMarker? CanvasMarker() => canvasFeed is { } feed ? (cls, kind, id, mark, stop) => feed.MarkAsync(cls, kind, id, mark, stop) : null;
 
+    /// <summary>Adds, changes and deletes the student's own Due items, through the same one copy of the list.</summary>
+    static OwnDueEditor? CanvasOwner() => canvasFeed is { } feed ? new OwnDueEditor((draft, stop) => feed.SaveOwnAsync(draft, stop), (id, stop) => feed.DeleteOwnAsync(id, stop)) : null;
+
     /// <summary>A new library, so a new Canvas context and watch: the old watch (already stopped) is let go, and the
     /// status line, what's due and Canvas's notifications follow the new one.</summary>
     static void OnCanvasMade(CanvasWatch? old, CanvasContext context, CanvasWatch watch)
@@ -244,11 +247,15 @@ public static partial class Shell
         panel.NextDue = CanvasQuick.NextDue(canvasDue, ctx.Clock.Zone, ctx.Clock.Now(), item => OpenDueItem(item.Class, item.Id));
     }
 
-    /// <summary>The sidebar's Due: there once a class is linked to Canvas, counting what's still to hand in.</summary>
+    /// <summary>Whether the sidebar has a Due tab: today only once a class is linked to Canvas. The student's own Due items (Add on the
+    /// calendar) don't need Canvas, so this is the one line to change to show the tab to everyone.</summary>
+    static bool DueTabShown => CanvasLinked;
+
+    /// <summary>The sidebar's Due (see <see cref="DueTabShown"/>), counting what's still to hand in.</summary>
     static void UpdateDueItem()
     {
         var item = library.Classes.FirstOrDefault(c => c.IsDue);
-        if (canvasDue is null || !CanvasLinked)
+        if (canvasDue is null || !DueTabShown)
         {
             if (item is not null) library.Classes.Remove(item);
             return;

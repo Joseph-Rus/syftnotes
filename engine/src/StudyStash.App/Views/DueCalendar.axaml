@@ -12,7 +12,7 @@
              x:DataType="vm:DueCalendarModel"
              ClipToBounds="False">
   <StackPanel Spacing="12">
-    <Grid ColumnDefinitions="Auto,Auto,Auto,Auto,*,Auto,8,Auto">
+    <Grid ColumnDefinitions="Auto,Auto,Auto,Auto,*,Auto,8,Auto,8,Auto">
       <Button Classes="icon-btn" Command="{Binding PreviousCommand}" ToolTip.Tip="{Binding PreviousTip}" AutomationProperties.Name="{Binding PreviousTip}">
         <c:Icon Glyph="chevron_left" Size="18" />
       </Button>
@@ -53,6 +53,9 @@
           <Button Classes="seg-item" Classes.on="{Binding WeekView}" Content="Week" Command="{Binding ShowWeekCommand}" />
         </StackPanel>
       </Border>
+      <!-- Something of the student's own: an exam, a study session, a to-do. It works without Canvas. -->
+      <Button Name="AddOwn" Grid.Column="9" Classes="btn sm ink" Content="{x:Static k:OwnDueFormModel.AddLabel}" Command="{Binding AddOwnCommand}"
+              IsVisible="{Binding CanAddOwn}" VerticalAlignment="Center" ToolTip.Tip="Add an exam, a study session or a to-do to your Due list" />
     </Grid>
 
     <!-- The month -->

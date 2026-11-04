@@ -158,7 +158,7 @@ public static partial class Shell
         // Monday on), and the newest hundred notes reach back well past those.
         var recorded = Events() is null ? [] : (await NotesAsync(lib, null, 100, null)) ?? [];
         if (turn != pageState.Turn) return;
-        var page = OverviewModel.ForDue(OverviewSources(recorded, WithTerm(CanvasLinked ? canvasDue : null, term)), dueOnly);
+        var page = OverviewModel.ForDue(OverviewSources(recorded, WithTerm(canvasDue, term)), dueOnly);
         if (library.Overview is { IsDuePage: true, Calendar: { } before } && page.Calendar is { } now) now.Resume(before);
         if (page.Calendar is { } calendar)
             calendar.PropertyChanged += (_, e) =>
@@ -294,10 +294,16 @@ public static partial class Shell
     /// the rubric, and what was handed in.</summary>
     static async Task ShowAssignmentPageAsync(string cls, string id)
     {
+        var row = canvasDue?.Groups.SelectMany(g => g.Items).FirstOrDefault(i => i.Class == cls && i.Id == id);
+        // The student's own item has no page of its own: it is changed from Due's calendar.
+        if (row is { Own: true })
+        {
+            await ShowDuePageAsync();
+            return;
+        }
         pageState = pageState.Next() with { Assignment = (cls, id), Class = cls };
         int turn = pageState.Turn;
         SelectInSidebar(cls);
-        var row = canvasDue?.Groups.SelectMany(g => g.Items).FirstOrDefault(i => i.Class == cls && i.Id == id);
         if (await AssignmentAsync(cls, id, row) is not { } page || turn != pageState.Turn)
         {
             // It's gone from Canvas (or the library can't be reached): Due is where it would have been.
@@ -526,7 +532,7 @@ public static partial class Shell
     }
 
     static OverviewModel.Sources OverviewSources(IReadOnlyList<OverviewModel.LectureFacts> lectures) =>
-        OverviewSources(lectures, CanvasLinked ? canvasDue : null);
+        OverviewSources(lectures, canvasDue);
 
     static OverviewModel.Sources OverviewSources(IReadOnlyList<OverviewModel.LectureFacts> lectures, CanvasApi.DueResponse? due)
     {
@@ -567,6 +573,7 @@ public static partial class Shell
             },
             RecordEvent = id => Run(() => RecordEventAsync(id), "RecordEvent"),
             Mark = CanvasMarker(),
+            Own = CanvasOwner(),
         };
     }
 
