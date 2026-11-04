@@ -14,9 +14,9 @@ namespace StudyStash.Core.Tests;
 /// <c>refuse</c> (an argument it doesn't know, as an older version: a turn given it stops with clap's error). The fake
 /// agy also answers <c>models</c> (its status), <c>-p=/usage</c> (its sign-in, then <c>usage.json</c>; with a
 /// <c>region</c> file, Google's refusal for the country) and plain <c>agy</c>, its sign-in as the real one shows it (the
-/// login method asked, then the page and a field for the code it ends on): it signs in by itself after
-/// <c>login-delay</c>, as if the code had been pasted, then stays open as plain agy does, and writes
-/// down the HOME each turn had (<c>home-N.txt</c>).
+/// login method asked, then the page and a field for the code it ends on): it writes down the browser openers its PATH
+/// finds (<c>openers.txt</c>), signs in by itself after <c>login-delay</c>, as if the code had been pasted, then stays
+/// open as plain agy does, and writes down the HOME each turn had (<c>home-N.txt</c>).
 /// </summary>
 public static class FakeAgents
 {
@@ -127,6 +127,8 @@ public static class FakeAgents
           echo " Welcome to the Antigravity CLI. You are currently not signed in."
           printf ' Select login method:\n > 1. Google OAuth\n   2. Use a Google Cloud project\n'
           read -r choice || exit 1
+          # The browser openers the real one would run, as its PATH finds them (never run here).
+          { command -v open; command -v xdg-open; } > "$D/openers.txt"
           echo "Your browser should open automatically. If not:"
           echo " https://accounts.example.com/o/oauth2/auth?redirect_uri=https%3A%2F%2Fagy.example.com%2Foauth-callback&state=fake"
           echo " If you aren't automatically redirected, paste the authorization code below:"
@@ -252,6 +254,8 @@ public static class FakeAgents
           ' > 1. Google OAuth'
           '   2. Use a Google Cloud project'
           $choice = [Console]::ReadLine()
+          # The browser opener the real one would run, as its PATH finds it (never run here).
+          (Get-Command rundll32 -CommandType Application | Select-Object -First 1).Source | Set-Content "$D\openers.txt"
           'Your browser should open automatically. If not:'
           ' https://accounts.example.com/o/oauth2/auth?redirect_uri=https%3A%2F%2Fagy.example.com%2Foauth-callback&state=fake'
           " If you aren't automatically redirected, paste the authorization code below:"

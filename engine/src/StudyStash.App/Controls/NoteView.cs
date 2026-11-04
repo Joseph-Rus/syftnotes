@@ -771,7 +771,7 @@ public sealed partial class NoteView : StackPanel
             cell.Bind(Border.BorderBrushProperty, cell.GetResourceObservable("Sep"));
             var name = Text("TextFont", 14, 1.5);
             name.FontWeight = FontWeight.SemiBold;
-            name.Text = Plain(term);
+            Fill(name, term);
             var meaning = Secondary(14);
             if (meaning is NoteText copied) copied.CopyJoin = ": ";
             Fill(meaning, p.Inline, skip: term, trimLead: true, fgKey: "Fg2");

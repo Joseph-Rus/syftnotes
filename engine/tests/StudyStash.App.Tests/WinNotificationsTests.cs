@@ -52,6 +52,17 @@ public class WinNotificationsTests(ITestOutputHelper output)
         Assert.Equal(link, NoticeLinks.For(id, what));
     }
 
+    /// <summary>Windows has no setting for an app until the first notification is shown, and says so with ERROR_NOT_FOUND:
+    /// that is "on", the default, not a refusal that sends every notice to the app's own cards.</summary>
+    [SupportedOSPlatform("windows")]
+    [Theory]
+    [InlineData(0, 0, NotificationState.Allowed)]
+    [InlineData(0, 2, NotificationState.Denied)]
+    [InlineData(unchecked((int)0x80070490), 0, NotificationState.Allowed)]
+    [InlineData(unchecked((int)0x80004005), 0, NotificationState.Unavailable)]
+    public void A_setting_Windows_has_not_listed_yet_is_on(int result, int setting, NotificationState state) =>
+        Assert.Equal(state, WinNotifications.StateFor(result, setting));
+
     [Fact]
     public void On_Windows_itself_its_notification_interfaces_answer_as_expected()
     {
