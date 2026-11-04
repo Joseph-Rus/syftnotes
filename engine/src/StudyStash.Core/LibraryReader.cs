@@ -104,7 +104,8 @@ public sealed partial class LibraryReader(Config cfg, Store store)
         result["no_notes"] = why;
         result["no_notes_why"] = why switch
         {
-            Summarize.NoNotesShort => Summarize.TooShortWords("This lecture"),
+            Summarize.NoNotesShort => result["seconds"]?.GetValue<double>() is { } ran && Summarize.HeardNothing(ran, Py.Strip(m.Transcript).Length)
+                ? Summarize.NothingHeardWords("This lecture", ran) : Summarize.TooShortWords("This lecture"),
             Summarize.NoNotesOff => Summarize.NotesOffWords("this lecture"),
             _ => null,
         };

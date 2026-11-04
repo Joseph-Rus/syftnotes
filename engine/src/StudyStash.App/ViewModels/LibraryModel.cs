@@ -99,8 +99,12 @@ public sealed partial class NoteModel : ObservableObject
 
     /// <summary>What the page says of a recording too short to have notes written (<see cref="Summarize.TooShort"/>):
     /// that it is and what notes take, where its words are, and what adds to them. Keep recording is named only where
-    /// the page has the button (<paramref name="canContinue"/>: it was recorded on this computer).</summary>
-    public static string TooShort(string noun, bool transcript, bool canContinue) => Summarize.TooShortWords($"This {noun}")
+    /// the page has the button (<paramref name="canContinue"/>: it was recorded on this computer). One that ran
+    /// <paramref name="seconds"/> long enough for speech and has no words says nothing was heard instead.</summary>
+    public static string TooShort(string noun, bool transcript, bool canContinue, double? seconds = null) =>
+        Summarize.HeardNothing(seconds, transcript ? 1 : 0)
+            ? Summarize.NothingHeardWords($"This {noun}", seconds!.Value) + (canContinue ? " Keep recording adds to it." : "")
+            : Summarize.TooShortWords($"This {noun}")
         + (transcript ? $" The transcript is in the Transcript tab{(canContinue ? "; Keep recording adds to it." : ".")}" : canContinue ? " Keep recording adds to it." : "");
 
     /// <summary>What the page says where the notes would be while the library writes none (<see cref="Summarize.NotesOn"/>
