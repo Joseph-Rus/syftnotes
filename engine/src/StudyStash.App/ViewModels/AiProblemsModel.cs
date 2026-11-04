@@ -32,9 +32,9 @@ public sealed class AiProblem
     public string Glyph => Severity switch { "err" => "✕", "warn" => "!", _ => "i" };
     /// <summary>Usage limit's "Dismiss" is a plain, no-fill button, unlike every other kind's single action
     /// (Start Ollama, Sign in, Download, Try again), which is a plain Raised pill.</summary>
-    public bool PrimaryIsPlain => Kind == "usage_limit";
+    public bool PrimaryIsPlain => Kind == AiProblemKind.UsageLimit;
     /// <summary>Only an access request's "Allow" is the tinted, primary pill.</summary>
-    public bool PrimaryIsAccent => Kind == "access_request";
+    public bool PrimaryIsAccent => Kind == AiProblemKind.AccessRequest;
     /// <summary>Windows draws no separate button for "Dismiss" (usage limit) or the button-less kinds (fell back) —
     /// its close × already covers those.</summary>
     public bool HasWinPrimaryButton => PrimaryWords.Length > 0 && !PrimaryIsPlain;
@@ -220,37 +220,37 @@ public sealed class AiProblemsModel : IDisposable
     /// <summary>An answer that fell back to Ollama: no action, just says why and who really answered.</summary>
     public void AddFellBack(string id, string fellBackToName, string why) => AddLocal(new AiProblem
     {
-        Id = id, Kind = "fell_back", Caption = AiWords.ProblemCaption("fell_back"),
-        Title = AiWords.ProblemTitle("fell_back", fellBackToName, ""), Message = why,
-        Icon = AiWords.ProblemIcon("fell_back"), ColorKey = AiWords.ProblemColorKey("fell_back"), Severity = AiWords.ProblemSeverity("fell_back"),
+        Id = id, Kind = AiProblemKind.FellBack, Caption = AiWords.ProblemCaption(AiProblemKind.FellBack),
+        Title = AiWords.ProblemTitle(AiProblemKind.FellBack, fellBackToName, ""), Message = why,
+        Icon = AiWords.ProblemIcon(AiProblemKind.FellBack), ColorKey = AiWords.ProblemColorKey(AiProblemKind.FellBack), Severity = AiWords.ProblemSeverity(AiProblemKind.FellBack),
     });
 
     /// <summary>The library isn't answering at all: "Try again" re-runs whatever the host passes in.</summary>
     public void AddLibraryOffline(Func<Task> retry, string id = "library-offline") => AddLocal(new AiProblem
     {
-        Id = id, Kind = "library_offline", Caption = AiWords.ProblemCaption("library_offline"),
-        Title = AiWords.ProblemTitle("library_offline", "", ""), Message = AiWords.ProblemMessage("library_offline", "", "", "", 0, "", Here),
-        Icon = AiWords.ProblemIcon("library_offline"), ColorKey = AiWords.ProblemColorKey("library_offline"), Severity = AiWords.ProblemSeverity("library_offline"),
-        PrimaryWords = AiWords.ProblemAction("library_offline"),
+        Id = id, Kind = AiProblemKind.LibraryOffline, Caption = AiWords.ProblemCaption(AiProblemKind.LibraryOffline),
+        Title = AiWords.ProblemTitle(AiProblemKind.LibraryOffline, "", ""), Message = AiWords.ProblemMessage(AiProblemKind.LibraryOffline, "", "", "", 0, "", Here),
+        Icon = AiWords.ProblemIcon(AiProblemKind.LibraryOffline), ColorKey = AiWords.ProblemColorKey(AiProblemKind.LibraryOffline), Severity = AiWords.ProblemSeverity(AiProblemKind.LibraryOffline),
+        PrimaryWords = AiWords.ProblemAction(AiProblemKind.LibraryOffline),
     }.Also(p => p.PrimaryCommand = new AsyncRelayCommand(retry)));
 
     /// <summary>A rewrite that failed, so it's visible even after leaving that lecture's page: "Try again" re-runs
     /// it with the same engine.</summary>
     public void AddRewriteFailed(string id, string engineName, string why, Func<Task> retry) => AddLocal(new AiProblem
     {
-        Id = id, Kind = "rewrite_failed", Caption = AiWords.ProblemCaption("rewrite_failed"),
-        Title = AiWords.ProblemTitle("rewrite_failed", engineName, ""), Message = AiWords.ProblemMessage("rewrite_failed", engineName, "", "", 0, why),
-        Icon = AiWords.ProblemIcon("rewrite_failed"), ColorKey = AiWords.ProblemColorKey("rewrite_failed"), Severity = AiWords.ProblemSeverity("rewrite_failed"),
-        PrimaryWords = AiWords.ProblemAction("rewrite_failed"),
+        Id = id, Kind = AiProblemKind.RewriteFailed, Caption = AiWords.ProblemCaption(AiProblemKind.RewriteFailed),
+        Title = AiWords.ProblemTitle(AiProblemKind.RewriteFailed, engineName, ""), Message = AiWords.ProblemMessage(AiProblemKind.RewriteFailed, engineName, "", "", 0, why),
+        Icon = AiWords.ProblemIcon(AiProblemKind.RewriteFailed), ColorKey = AiWords.ProblemColorKey(AiProblemKind.RewriteFailed), Severity = AiWords.ProblemSeverity(AiProblemKind.RewriteFailed),
+        PrimaryWords = AiWords.ProblemAction(AiProblemKind.RewriteFailed),
     }.Also(p => p.PrimaryCommand = new AsyncRelayCommand(retry)));
 
     /// <summary>A tool asking to read the library from another computer. Nothing calls this yet — no server sends
     /// one today — but the card is ready for when something does: Allow/Deny call the hooks the host supplies.</summary>
     public void AddAccessRequest(string id, string engineName, string from, Func<Task> allow, Func<Task> deny) => AddLocal(new AiProblem
     {
-        Id = id, Kind = "access_request", Caption = AiWords.ProblemCaption("access_request"),
-        Title = AiWords.ProblemTitle("access_request", engineName, ""), Message = AiWords.ProblemMessage("access_request", engineName, "", "", 0, from),
-        Icon = AiWords.ProblemIcon("access_request"), ColorKey = AiWords.ProblemColorKey("access_request"), Severity = AiWords.ProblemSeverity("access_request"),
+        Id = id, Kind = AiProblemKind.AccessRequest, Caption = AiWords.ProblemCaption(AiProblemKind.AccessRequest),
+        Title = AiWords.ProblemTitle(AiProblemKind.AccessRequest, engineName, ""), Message = AiWords.ProblemMessage(AiProblemKind.AccessRequest, engineName, "", "", 0, from),
+        Icon = AiWords.ProblemIcon(AiProblemKind.AccessRequest), ColorKey = AiWords.ProblemColorKey(AiProblemKind.AccessRequest), Severity = AiWords.ProblemSeverity(AiProblemKind.AccessRequest),
         PrimaryWords = "Allow", SecondaryWords = "Deny",
     }.Also(p => { p.PrimaryCommand = new AsyncRelayCommand(allow); p.SecondaryCommand = new AsyncRelayCommand(deny); }));
 

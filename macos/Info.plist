@@ -2,11 +2,11 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-    <!-- The bundle stays "Study Stash.app" (installed copies update in place by that name). macOS shows the English
-         name in en.lproj/InfoPlist.strings, "Syft Notes", only while these match the file's own name, so they say
-         Study Stash and Finder, the Dock, Launchpad and the menu bar all say Syft Notes. -->
-    <key>CFBundleName</key><string>Study Stash</string>
-    <key>CFBundleDisplayName</key><string>Study Stash</string>
+    <!-- The bundle is "Syft Notes.app" (until the Velopack bridge it was "Study Stash.app"; a copy an older updater
+         left under that name renames itself, MacRename.cs). The bundle id stays, so the microphone permission and the
+         login items carry over. -->
+    <key>CFBundleName</key><string>Syft Notes</string>
+    <key>CFBundleDisplayName</key><string>Syft Notes</string>
     <key>CFBundleDevelopmentRegion</key><string>en</string>
     <key>LSHasLocalizedDisplayName</key><true/>
     <key>CFBundleIdentifier</key><string>com.study-stash.app</string>

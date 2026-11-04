@@ -7,6 +7,7 @@ using Microsoft.AspNetCore.Hosting.Server.Features;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using StudyStash.App.Services;
+using StudyStash.App.ViewModels.Kit;
 using StudyStash.Core;
 using StudyStash.Library;
 
@@ -61,7 +62,7 @@ public sealed class SettingsRoleSwitchTests
     }
 
     [AvaloniaFact]
-    public void Asking_to_become_the_library_explains_what_happens_and_names_the_old_library()
+    public async Task Asking_to_become_the_library_explains_what_happens_and_names_the_old_library()
     {
         using var home = new TempHome();
         new AppSettings { SetupDone = true, Role = AppRole.Laptop }.Save(home.Path);
@@ -70,25 +71,28 @@ public sealed class SettingsRoleSwitchTests
         cc.PoolName = "Sam's library";
         Configs.SaveClient(cc);
         using var host = new AppHost(home.Path, log: _ => { });
-        using var model = SettingsModel.Make(host);
+        var confirm = new FakeConfirm(answer: false);
+        using var model = SettingsModel.Make(host, confirm: confirm);
 
-        model.AskBecomeLibraryCommand.Execute(null);
+        await model.BecomeLibraryCommand.ExecuteAsync(null);
 
-        Assert.True(model.ConfirmingBecomeLibrary);
-        Assert.Contains("Sam's library", model.BecomeLibraryQuestion, StringComparison.Ordinal);
+        Assert.Equal("Use just this computer?", confirm.Asked.Single().Title);
+        Assert.Contains("Sam's library", confirm.Asked.Single().Text, StringComparison.Ordinal);
+        Assert.Equal(AppRole.Laptop, host.Settings.Role); // a no changes nothing
     }
 
     [AvaloniaFact]
-    public void Asking_to_become_a_laptop_without_an_address_says_so_and_asks_nothing()
+    public async Task Asking_to_become_a_laptop_without_an_address_says_so_and_asks_nothing()
     {
         using var home = new TempHome();
         new AppSettings { SetupDone = true, Role = AppRole.Library }.Save(home.Path);
         using var host = new AppHost(home.Path, log: _ => { });
-        using var model = SettingsModel.Make(host);
+        var confirm = new FakeConfirm();
+        using var model = SettingsModel.Make(host, confirm: confirm);
 
-        model.AskBecomeLaptopCommand.Execute(null);
+        await model.BecomeLaptopCommand.ExecuteAsync(null);
 
-        Assert.False(model.ConfirmingBecomeLaptop);
+        Assert.Empty(confirm.Asked);
         Assert.Contains("address", model.SwitchSay, StringComparison.Ordinal);
     }
 
@@ -102,16 +106,14 @@ public sealed class SettingsRoleSwitchTests
         // to bring over (RoleSwitchTests covers that, with an old library on another host to bring lectures from).
         new AppSettings { SetupDone = true, Role = AppRole.Laptop }.Save(home["laptop"]);
         using var host = new AppHost(home["laptop"], log: _ => { });
-        using var model = SettingsModel.Make(host).WithLibraryHere(() => new LibraryHere { Command = [exe], Folder = home["new-pool"] });
+        using var model = SettingsModel.Make(host, confirm: new FakeConfirm()).WithLibraryHere(() => new LibraryHere { Command = [exe], Folder = home["new-pool"] });
         model.DisplayName = "Ada";
         try
         {
-            model.AskBecomeLibraryCommand.Execute(null);
-            await model.ConfirmBecomeLibraryCommand.ExecuteAsync(null);
+            await model.BecomeLibraryCommand.ExecuteAsync(null);
 
             Assert.Equal(AppRole.Both, host.Settings.Role);
             Assert.True(model.LibraryHere);
-            Assert.False(model.ConfirmingBecomeLibrary);
             Assert.Contains("Ada's library", model.SwitchSay, StringComparison.Ordinal);
         }
         finally
@@ -147,16 +149,13 @@ public sealed class SettingsRoleSwitchTests
 
         try
         {
-            using var model = SettingsModel.Make(host);
+            using var model = SettingsModel.Make(host, confirm: new FakeConfirm());
             model.BecomeLaptopAddress = newUrl;
             model.BecomeLaptopPassword = "new-pw";
 
-            model.AskBecomeLaptopCommand.Execute(null);
-            Assert.True(model.ConfirmingBecomeLaptop);
-            await model.ConfirmBecomeLaptopCommand.ExecuteAsync(null);
+            await model.BecomeLaptopCommand.ExecuteAsync(null);
 
             Assert.Equal(AppRole.Laptop, host.Settings.Role);
-            Assert.False(model.ConfirmingBecomeLaptop);
             Assert.False(model.LibraryHere);
             Assert.NotNull(newStore.Get("b1"));
         }

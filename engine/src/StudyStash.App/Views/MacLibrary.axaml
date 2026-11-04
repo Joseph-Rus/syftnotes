@@ -73,14 +73,6 @@
     <Panel Name="FolderAsk" IsVisible="{Binding AskingFolder}" Background="Transparent">
       <v:MacNewFolder HorizontalAlignment="Center" VerticalAlignment="Center" />
     </Panel>
-    <!-- "Delete this lecture?", over the window: a click outside it is Cancel -->
-    <Panel Name="DeleteAsk" IsVisible="{Binding AskingDelete}" Background="Transparent" PointerPressed="OnDeleteAskPressed">
-      <v:MacDeleteLecture HorizontalAlignment="Center" VerticalAlignment="Center" />
-    </Panel>
-    <!-- "Stop recording Data Mining and start Capstone team sync?", over the window: a click outside it is Cancel -->
-    <Panel Name="ConfirmAsk" IsVisible="{Binding AskingConfirm}" Background="Transparent" PointerPressed="OnConfirmAskPressed">
-      <v:ConfirmCard HorizontalAlignment="Center" VerticalAlignment="Center" />
-    </Panel>
     </Panel>
   </Border>
 </UserControl>

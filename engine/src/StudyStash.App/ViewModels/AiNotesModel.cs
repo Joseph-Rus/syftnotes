@@ -5,6 +5,7 @@ using CommunityToolkit.Mvvm.Input;
 using StudyStash.Core;
 using StudyStash.Core.Ai;
 using StudyStash.Core.Rich;
+using StudyStash.App.Services.Stores;
 
 namespace StudyStash.App.ViewModels;
 
@@ -123,8 +124,8 @@ public sealed partial class AiNotesModel : ObservableObject, IDisposable
     public bool IsFailed => State == RewriteState.Failed;
 
     /// <summary>The failed bar's words, built the same way the matching problem card would be, so the two agree.</summary>
-    public string FailedTitle => AiWords.ProblemTitle("rewrite_failed", EngineName, "");
-    public string FailedMessage => AiWords.ProblemMessage("rewrite_failed", EngineName, "", "", 0, Error);
+    public string FailedTitle => AiWords.ProblemTitle(AiProblemKind.RewriteFailed, EngineName, "");
+    public string FailedMessage => AiWords.ProblemMessage(AiProblemKind.RewriteFailed, EngineName, "", "", 0, Error);
     public string RewritingLead => $"Rewriting with {EngineName}…";
     /// <summary>What follows the lead: the current notes stay; or, while the library isn't answering the page's checks,
     /// that it's still trying (the rewrite goes on in the library either way).</summary>
@@ -242,7 +243,7 @@ public sealed partial class AiNotesModel : ObservableObject, IDisposable
 
     void BuildMenu(AiOverview overview)
     {
-        var usable = overview.Engines.Where(e => e.State != "not_installed").ToList();
+        var usable = overview.Engines.Where(e => AiStatusStore.StateOf(e) != AiEngineState.NotInstalled).ToList();
         var others = usable.Where(e => e.Id != WriterId);
         var ordered = others.Where(e => e.Id == Engine).Concat(others.Where(e => e.Id != Engine));
         var writer = usable.FirstOrDefault(e => e.Id == WriterId);
@@ -252,7 +253,8 @@ public sealed partial class AiNotesModel : ObservableObject, IDisposable
         foreach (var e in full)
         {
             bool isWriter = e.Id == WriterId;
-            var item = new EngineMenuItem(e.Id, e.Name, AiWords.RewriteEngineSubtitle(e.Id, e.State, isWriter), isWriter, AiWords.EngineUsable(e.State));
+            var state = AiStatusStore.StateOf(e);
+            var item = new EngineMenuItem(e.Id, e.Name, AiWords.RewriteEngineSubtitle(e.Id, state, isWriter), isWriter, AiWords.EngineUsable(state));
             item.Command = new AsyncRelayCommand(() => Rewrite(item.Id));
             Menu.Items.Add(item);
         }

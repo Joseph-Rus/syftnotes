@@ -435,8 +435,10 @@ sealed class SvgCanvas : Control
             {
                 hold = SvgPictures.Draw(make(themed));
             }
-            catch (Exception)
+            catch (Exception e)
             {
+                // Drawn as nothing; the name keeps this to one line per look, not one per frame.
+                Program.Log($"[svg] skipped a picture that wouldn't draw ({name}): {e.GetType().Name}: {e.Message}");
                 hold = null;
             }
             variants[name] = hold;
