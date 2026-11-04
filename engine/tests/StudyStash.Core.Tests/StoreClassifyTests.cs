@@ -272,6 +272,30 @@ public class StoreClassifyTests
     }
 
     [Fact]
+    public void Renaming_a_lecture_keeps_what_was_written_in_its_note_file()
+    {
+        using var dir = new TempDir();
+        using var store = new Store(dir["state.db"], dir["pool"]);
+        var m = new Meeting("lec-abcdef") { Title = "Cells", Date = "2026-09-02", Transcript = "[00:00] Cells divide." };
+        string path = store.Save(m, new Classification("Bio 110", 1, "rules"), "Cells divide by mitosis.", "Claude");
+        // Edited in the note file itself and not taken in yet: its summary changed, and a line of the student's own added.
+        Py.WriteText(path, Py.ReadText(path).Replace("Cells divide by mitosis.", "Cells divide by mitosis and meiosis.") + "\nMy own line.\n");
+
+        Assert.Equal(Store.Renamed.Done, store.SetTitle("lec-abcdef", "Cell division"));
+
+        string renamed = store.Get("lec-abcdef")!.MdPath!;
+        Assert.Equal("2026-09-02 Cell division.md", Path.GetFileName(renamed));
+        Assert.False(File.Exists(path));
+        string now = Py.ReadText(renamed);
+        Assert.Contains("Cells divide by mitosis and meiosis.", now);
+        Assert.Contains("My own line.", now);
+        Assert.Contains("title: \"Cell division\"", now);
+        Assert.Contains("\n# Cell division\n", now);
+        Assert.Equal("Cells divide by mitosis and meiosis.", store.Get("lec-abcdef")!.SummaryMd);
+        Assert.Contains(store.NotesVersions("lec-abcdef"), v => store.NotesVersion("lec-abcdef", v.Seq)!.Markdown == "Cells divide by mitosis.");
+    }
+
+    [Fact]
     public void Renaming_a_class_only_by_capitals_keeps_the_file()
     {
         // On a Mac or Windows "bio 110" and "Bio 110" are one folder: the Python engine deleted the file it had just
