@@ -2,7 +2,10 @@
 # Builds "Syft Notes.app": one universal bundle (D1: macos/launcher.c hosts .NET in-process, so the same running
 # executable works on Apple silicon and Intel), then the one download, Syft-Notes.dmg. The app has no role of its own:
 # setup asks what the computer is for, and Settings can change it later (docs/one-download.md).
-#   sh macos/build-app.sh [out-dir]      default: dist/mac
+#   sh macos/build-app.sh [--test-helpers] [out-dir]      default: dist/mac
+# What it makes is a student's copy: no self-test, no demo libraries, no STUDYSTASH_* test switches (TestHelpers=false,
+# engine/Directory.Build.props), and the build stops if the self-test is in it anyway. --test-helpers makes the copy
+# CI self-tests instead; that one is never shipped (windows/build.ps1 does the same with -TestHelpers).
 # STUDYSTASH_SKIP_WEB=1 uses web/dist as it is (CI builds it in a step of its own, with no secret in reach of npm).
 # Needs the .NET 10 SDK and the Xcode command line tools (clang, lipo, codesign, hdiutil, PlistBuddy, iconutil,
 # xcrun swift, vtool, ditto, SetFile, osascript). Publishing both architectures downloads their runtime packs on first use.
@@ -12,6 +15,8 @@ set -eu
 
 HERE=$(cd "$(dirname "$0")" && pwd)
 ROOT=$(cd "$HERE/.." && pwd)
+HELPERS=false
+if [ "${1:-}" = --test-helpers ]; then HELPERS=true; shift; fi
 OUT=${1:-"$ROOT/dist/mac"}
 VERSION=$(sed -n 's:.*<StudyStashVersion>\(.*\)</StudyStashVersion>.*:\1:p' "$ROOT/engine/Directory.Build.props")
 [ -n "$VERSION" ] || { echo "build-app.sh: no StudyStashVersion in engine/Directory.Build.props" >&2; exit 1; }
@@ -40,7 +45,11 @@ fi
 # trial, docs/LIBRARIES.md phase 5: the bundle stays valid after an update only this way).
 for arch in arm64 x64; do
   dotnet publish "$ROOT/engine/src/StudyStash.App" -c Release -r "osx-$arch" --self-contained true \
-    -p:DebugType=None -o "$RES/$arch" --nologo -v quiet
+    -p:DebugType=None -p:TestHelpers=$HELPERS -o "$RES/$arch" --nologo -v quiet
+  # A student's copy has no self-test in it: its selftest.txt is the one thing only the self-test writes (the assembly
+  # holds it as UTF-16).
+  [ "$HELPERS" = true ] || [ "$(perl -0777 -ne 'print /s\0e\0l\0f\0t\0e\0s\0t\0\.\0t\0x\0t/ ? "self-test" : "clean"' "$RES/$arch/StudyStash.dll")" = clean ] \
+    || { echo "build-app.sh: the student's copy ($arch) has the self-test in it" >&2; exit 1; }
   # Whisper.net ships every platform's native libraries; each tree keeps only its own.
   for d in "$RES/$arch"/runtimes/*; do
     [ "$(basename "$d")" = "macos-$arch" ] || rm -rf "$d"
