@@ -59,6 +59,7 @@ public static class MathText
         while (i < s.Length)
         {
             char c = s[i];
+            if (c == '+' && NothingFollows(s, i + 1) && AfterOperand(sb)) { sb.Append("\\!+"); i++; continue; }
             if (c != '\\') { sb.Append(c); i++; continue; }
             if (i + 1 >= s.Length) { sb.Append(c); break; }
             int start = i + 1, j = start;
@@ -92,6 +93,17 @@ public static class MathText
                     i++;
                     sb.Append("\\neq");
                     break;
+                case "text":
+                {
+                    // Inside \text a hyphen is a hyphen: CSharpMath reads "-" as the minus sign, with an operator's gaps
+                    // around it (k - means); the Unicode hyphen is an ordinary character it draws as typed.
+                    string arg = Argument(s, ref i).Replace('-', '\u2010');
+                    sb.Append("\\text{");
+                    for (int k = 0; k < arg.Length; k++)
+                        sb.Append(arg[k] == '+' && k > 0 && arg[k - 1] != '!' && NothingFollows(arg, k + 1) ? "\\!+" : arg[k].ToString());
+                    sb.Append('}');
+                    break;
+                }
                 case "textbf" or "textit":
                 {
                     string arg = Argument(s, ref i);
@@ -172,6 +184,27 @@ public static class MathText
             }
         }
         return sb.ToString();
+    }
+
+    /// <summary>True when only more plus signs and spaces, then the end of the group or a closing bracket, comma or equals
+    /// sign, come after <paramref name="from"/>: a "+" there has nothing to add to, as in "n++" or "k-means++".</summary>
+    static bool NothingFollows(string s, int from)
+    {
+        int i = from;
+        while (i < s.Length && (s[i] == '+' || s[i] == ' ')) i++;
+        return i >= s.Length || ")]},;=".Contains(s[i]) || s.AsSpan(i).StartsWith("\\right");
+    }
+
+    /// <summary>True when what's written so far ends in something a "+" can follow (a letter, digit or closing bracket,
+    /// another "+") and isn't already tightened.</summary>
+    static bool AfterOperand(StringBuilder sb)
+    {
+        int n = sb.Length;
+        while (n > 0 && sb[n - 1] == ' ') n--;
+        if (n == 0) return false;
+        if (n >= 2 && sb[n - 2] == '\\' && sb[n - 1] == '!') return false;
+        char p = sb[n - 1];
+        return char.IsLetterOrDigit(p) || "})]'+".Contains(p);
     }
 
     /// <summary>An optional <c>[…]</c> argument (balanced on brackets), or null when there isn't one; never throws
