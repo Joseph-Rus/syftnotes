@@ -79,6 +79,11 @@ public class CanvasToolsTests
         string remoteText = await ClaudeTools.GetAssignmentAsync(remote, "CS 101", "problem set 4");
         Assert.Contains("Stack traces: 8 / 10 · The frame for n = 1 is missing in 3b.", remoteText);
         Assert.Contains("Status: Graded · 18/20", remoteText);
+
+        // A mark the student made in Syft Notes is told to the AI the way the app shows it, both ways in.
+        DueMarks.Set(dir.Path, "CS 101", "assignment", 9002, "done", DateTimeOffset.UtcNow);
+        Assert.Contains("Status: Graded · 18/20 · marked done in Syft Notes", await ClaudeTools.GetAssignmentAsync(Local(dir, sync), "CS 101", "9002"));
+        Assert.Contains("Status: Graded · 18/20 · marked done in Syft Notes", await ClaudeTools.GetAssignmentAsync(remote, "CS 101", "9002"));
     }
 
     [Fact]

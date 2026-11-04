@@ -98,7 +98,10 @@ public class SignInInBrowserTests
         await rig.Remote.SignInAsync("claude");
         Assert.Equal(1, FakeAgents.Logins(rig.Bin));
 
-        // The student finishes in the browser: the AI's own status says so, and nobody presses anything.
+        // The student finishes in the browser: the AI's own status says so, and nobody presses anything. Only after the
+        // library's first look said signed out, as a real one does long before a student is done: a status that already
+        // says signed in at that first look waits for the sign-in to end by itself, which this one doesn't for 120 s.
+        await rig.UntilAsync("claude", _ => FakeAgents.SignedOutLooks(rig.Bin) >= 1);
         File.WriteAllText(Path.Combine(rig.Bin, "signed-in"), "");
         var ready = await rig.UntilAsync("claude", e => e.State == "ready");
         Assert.Equal("", ready.SignIn);

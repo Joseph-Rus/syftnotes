@@ -257,6 +257,7 @@ public sealed partial class CanvasSync
         string at = now.ToString("o", CultureInfo.InvariantCulture);
         var wall = TimeZoneInfo.ConvertTime(now, Zone).DateTime;
         var before = Assignments.Load(home);
+        var marks = DueMarks.Load(home);
         var order = CanvasSettings.Load(home).Courses.Keys.Concat(done.Sections.Keys).Distinct().ToList();
         var items = new List<Assignment>();
         var changes = new List<CanvasChange>();
@@ -271,7 +272,7 @@ public sealed partial class CanvasSync
             items.AddRange(rows);
             // A class's first sync finds everything new: that isn't news.
             if (had.Count > 0 || done.Before.GetValueOrDefault(cls)?.ReadAt.ContainsKey("assignments") == true)
-                changes.AddRange(Assignments.Diff(had, rows, wall));
+                changes.AddRange(Assignments.Diff(DueMarks.Apply(had, marks), DueMarks.Apply(rows, marks), wall)); // what the student hid is no news
             // Same for announcements: a class's first read of them is never news, only what's new since.
             if (done.Before.GetValueOrDefault(cls)?.ReadAt.ContainsKey("announcements") == true
                 && done.Indexes.GetValueOrDefault(cls) is { } withAnn)

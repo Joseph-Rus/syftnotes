@@ -283,8 +283,12 @@ public sealed class CanvasSettings
 public sealed record ScoutReport(bool Ok, string Report, string When, int Files);
 
 /// <summary>A Canvas course as Canvas names it, for matching it to a class and showing it in Settings, with when its
-/// term (and the course itself) starts and ends (ISO; "" where Canvas didn't say), for ticking this term's courses.</summary>
-public sealed record CourseInfo(string Code, string Name, string Term, string TermStart = "", string TermEnd = "", string CourseStart = "", string CourseEnd = "");
+/// term (and the course itself) starts and ends (ISO; "" where Canvas didn't say), for ticking this term's courses.
+/// <paramref name="Roles"/> is how the student is in it ("student", "teacher"…, space-separated; "" where Canvas didn't
+/// say), <paramref name="Concluded"/> whether Canvas says it's over, and <paramref name="CourseDates"/> whether the
+/// course's own dates, not its term's, decide when it runs.</summary>
+public sealed record CourseInfo(string Code, string Name, string Term, string TermStart = "", string TermEnd = "", string CourseStart = "", string CourseEnd = "",
+    string Roles = "", bool Concluded = false, bool CourseDates = false);
 
 /// <summary>Chrome's extension went from one version to a newer one at <paramref name="At"/> (ISO); dismissed once the
 /// student has seen it.</summary>
