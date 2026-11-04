@@ -239,6 +239,8 @@ public sealed partial class GuidedSetupModel : ObservableObject, IDisposable
     /// AI picked, not on to the chat. "" otherwise.</summary>
     string forNotes = "";
     public bool ForNotes => forNotes.Length > 0;
+    /// <summary>Settings' own Connect for an AI signed in here (<see cref="GuidedServices.Connect"/>); null when there's none.</summary>
+    public Func<string, Task>? Connect => services.Connect;
     /// <summary>It's ready (its id): the by-hand notes step looks at it again and picks it.</summary>
     public Action<string>? ReadyForNotes { get; set; }
     /// <summary>The quiet link at the foot of those screens: back to the step they came from.</summary>
@@ -581,7 +583,7 @@ public sealed partial class GuidedSetupModel : ObservableObject, IDisposable
     {
         string id = forNotes;
         if (id.Length == 0 || connecting) return;
-        if (services.Connect is { } connect)
+        if (Connect is { } connect)
         {
             connecting = true;
             try
