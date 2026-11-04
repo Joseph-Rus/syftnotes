@@ -9,4 +9,4 @@ fire-and-forget-in-shell 0
 mac-views 37
 literal-colours 5
 literal-font-sizes 240
-clients-by-hand 7
+clients-by-hand 1

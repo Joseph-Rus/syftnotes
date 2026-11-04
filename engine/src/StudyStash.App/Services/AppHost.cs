@@ -487,11 +487,7 @@ public sealed partial class AppHost : IDisposable, IProblemSource
     public Stores.AiStatusStore AiStatus => LazyInitializer.EnsureInitialized(ref aiStatus, () => new Stores.AiStatusStore(() => Api.Ai, Clock));
 
     /// <summary>The library over its API, once one is set up.</summary>
-    public RemoteLibrary? Remote()
-    {
-        var cc = Client();
-        return cc.ServerUrl.Length > 0 ? new RemoteLibrary(cc.ServerUrl, cc.PoolKey) : null;
-    }
+    public RemoteLibrary? Remote() => Api.Library;
 
     /// <summary>The transcription model: the one the environment names, else the one picked in setup or Settings, else
     /// the one for this computer (<see cref="Advice"/>).</summary>
@@ -750,7 +746,7 @@ public sealed partial class AppHost : IDisposable, IProblemSource
         running.Add(Task.Run(() => count.RunAsync(stop.Token)));
     }
 
-    static readonly HttpClient countHttp = new() { Timeout = TimeSpan.FromSeconds(20) };
+    internal static readonly HttpClient countHttp = new() { Timeout = TimeSpan.FromSeconds(20) };
 
     /// <summary>The daily count, once the app has started (Settings' switch deletes its code).</summary>
     public DailyCount? Counter { get; private set; }

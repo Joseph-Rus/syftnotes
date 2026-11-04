@@ -172,10 +172,9 @@ public sealed class GuidedSetup : ISetupDriver, IGuidedActions
     async Task<string?> NotReadyOnLibraryAsync(string engine)
     {
         if (host.Remote() is null) return "The library isn't reachable right now.";
-        var cc = host.Client();
         try
         {
-            var overview = await new AiRemote(cc.ServerUrl, cc.PoolKey).EnginesAsync();
+            var overview = await host.Api.Ai.EnginesAsync();
             return overview?.Engines.FirstOrDefault(e => e.Id == engine) is { } found && AiStatusStore.StateOf(found) is AiEngineState.NotInstalled or AiEngineState.NotSignedIn
                 ? $"{Engines.Name(engine)} isn't set up on this {Device}. The student can add it in Settings → Your AI, with an API key from Google AI Studio or Google's Antigravity app."
                 : null;
@@ -191,11 +190,10 @@ public sealed class GuidedSetup : ISetupDriver, IGuidedActions
     async Task<string?> WriteOnLibraryAsync(string engine)
     {
         if (host.Remote() is not { } lib) return "The library isn't reachable right now.";
-        var cc = host.Client();
         try
         {
             await lib.SettingsAsync(HttpMethod.Post, "", new JsonObject { ["notes"] = new JsonObject { ["write"] = engine != "none", ["sort"] = engine != "none" } });
-            if (engine != "none") await new AiRemote(cc.ServerUrl, cc.PoolKey).DefaultsAsync(notes: engine, ask: engine);
+            if (engine != "none") await host.Api.Ai.DefaultsAsync(notes: engine, ask: engine);
             return null;
         }
         catch (Exception e) when (e is HttpRequestException or TaskCanceledException or LibraryRefusedException or System.Text.Json.JsonException)
