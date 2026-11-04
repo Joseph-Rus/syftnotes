@@ -23,15 +23,31 @@ public static class DueMarks
 
     public static string PathIn(string home) => Path.Combine(home, "due_marks.json");
 
+    /// <summary>The student's marks. A file that can't be read isn't taken for "no marks" and then written over by the next
+    /// <see cref="Set"/>: it is kept beside as <c>due_marks.json.bad</c> (replacing an older one) and the marks start again.</summary>
     public static List<DueMark> Load(string home)
+    {
+        string path = PathIn(home);
+        if (TryRead(path) is { } marks) return marks;
+        lock (Gate)
+        {
+            if (TryRead(path) is { } mended) return mended; // a writer may have mended it since
+            Console.WriteLine("[canvas] Your Due marks couldn't be read, so they were kept aside as due_marks.json.bad and start again.");
+            if (File.Exists(path)) SharedFile.Replace(path, path + ".bad");
+            return [];
+        }
+    }
+
+    /// <summary>The marks in the file (none when there's no file), or null when it's there but isn't marks.</summary>
+    static List<DueMark>? TryRead(string path)
     {
         try
         {
-            return SharedFile.Read(PathIn(home)) is { } text ? JsonSerializer.Deserialize<List<DueMark>>(text, Options) ?? [] : [];
+            return SharedFile.Read(path) is { } text ? JsonSerializer.Deserialize<List<DueMark>>(text, Options) ?? [] : [];
         }
         catch (JsonException)
         {
-            return [];
+            return null;
         }
     }
 

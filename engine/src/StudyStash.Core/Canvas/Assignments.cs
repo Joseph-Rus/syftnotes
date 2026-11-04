@@ -156,14 +156,14 @@ public static class Assignments
 
     /// <summary>What changed between two syncs, in words: new assignments, moved due dates, new marks, new comments
     /// from the grader, work gone missing, and assignments Canvas no longer lists. <paramref name="now"/> is the
-    /// wall clock the due dates are in.</summary>
+    /// wall clock the due dates are in. A row the student hid (<see cref="DueMarks.Apply"/> put its mark on) says nothing.</summary>
     public static List<CanvasChange> Diff(IReadOnlyList<Assignment> before, IReadOnlyList<Assignment> after, DateTime now)
     {
         var old = before.GroupBy(a => (a.ClassName, a.Id)).ToDictionary(g => g.Key, g => g.First());
         var said = new List<CanvasChange>();
         void Say(string kind, Assignment a, string word, string what) =>
             said.Add(new CanvasChange(kind, a.ClassName, a.Name, $"{word}: {a.ClassName} · {a.Name}{(what.Length > 0 ? " · " + what : "")}", a.Id));
-        foreach (var a in after)
+        foreach (var a in after.Where(a => a.Mark != DueMarks.Hidden))
         {
             if (!old.TryGetValue((a.ClassName, a.Id), out var o))
             {
@@ -179,7 +179,7 @@ public static class Assignments
             if (a.Status == "missing" && o.Status != "missing") Say("missing", a, "Missing", a.Due.Length > 0 ? "was due " + Short(a.Due, now) : "");
         }
         var listed = after.Select(a => (a.ClassName, a.Id)).ToHashSet();
-        foreach (var o in before.Where(o => !listed.Contains((o.ClassName, o.Id)))) Say("removed", o, "Removed", "");
+        foreach (var o in before.Where(o => o.Mark != DueMarks.Hidden && !listed.Contains((o.ClassName, o.Id)))) Say("removed", o, "Removed", "");
         return said;
     }
 

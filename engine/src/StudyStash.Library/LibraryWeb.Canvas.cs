@@ -254,6 +254,10 @@ public sealed partial class LibraryWeb
             string cls = S(body?["class"]), kind = S(body?["kind"]) is { Length: > 0 } k ? k : "assignment", mark = S(body?["mark"]);
             if (!cfg.ClassNames().Contains(cls) || body?["id"] is not JsonValue id || !id.TryGetValue(out long itemId)) return Http.Detail(400, "unknown assignment");
             if (mark is not ("" or DueMarks.Done or DueMarks.Hidden)) return Http.Detail(400, "mark is done, hidden or empty");
+            // Only an item on this class's Due list can be marked; a mark already saved can still be taken back once its item has gone.
+            if (!DueRows().Any(a => a.ClassName == cls && a.Kind == kind && a.Id == itemId)
+                && !(mark.Length == 0 && DueMarks.Load(cfg.Home).Any(m => m.Class == cls && m.Kind == kind && m.Id == itemId)))
+                return Http.Detail(404, "That item isn't on your Due list, so it can't be marked.");
             DueMarks.Set(cfg.Home, cls, kind, itemId, mark, Canvas.Clock());
             return Http.Json(DueList());
         })));
@@ -792,7 +796,10 @@ public sealed partial class LibraryWeb
     /// <summary>The Due list, as the app's and the phone's Due tabs show it (and Ask is told): every class's assignments,
     /// with a planner to-do that has no assignment of its own riding along as a "todo" row (kind, never graded). The student's
     /// marks are on them (<see cref="DueMarks"/>); what they hid comes apart as <c>hidden</c>.</summary>
-    JsonObject DueList()
+    JsonObject DueList() => CanvasView.Due(DueRows(), Canvas.Settings.LastDone, Canvas.Clock(), Canvas.Zone, Canvas.Crawl.AssignmentFolder);
+
+    /// <summary>The rows of the Due list: every linked class's assignments and its planner to-dos, with the student's marks on them.</summary>
+    List<Assignment> DueRows()
     {
         var all = Assignments.Marked(cfg.Home);
         var graded = all.ToList();
@@ -800,6 +807,6 @@ public sealed partial class LibraryWeb
         foreach (string cls in cfg.ClassNames().Where(Canvas.Settings.Courses.ContainsKey))
             if (CourseIndex.Load(cfg.Home, cls) is { } index)
                 all.AddRange(DueMarks.Apply(Assignments.Todos(cls, index.Todos, graded, Canvas.Zone), marks));
-        return CanvasView.Due(all, Canvas.Settings.LastDone, Canvas.Clock(), Canvas.Zone, Canvas.Crawl.AssignmentFolder);
+        return all;
     }
 }
