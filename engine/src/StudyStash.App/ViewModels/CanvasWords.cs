@@ -90,10 +90,20 @@ public static class CanvasWords
 
     // ---- an item (Due list, a class's assignment tabs) ----
 
+    /// <summary>An item's score as the Due list says it ("18/20", "A-", "Complete"); "" when it has none yet.</summary>
+    public static string ScoreOf(CanvasApi.Item item) =>
+        // A score out of nothing ("0/0", Canvas's way of counting a syllabus quiz or attendance) says nothing.
+        !string.IsNullOrEmpty(item.ScoreText) && !(item.Points is null or 0 && item.ScoreText.EndsWith("/0", StringComparison.Ordinal)) ? item.ScoreText : "";
+
     /// <summary>What the right of a Due-list row shows: its score when it's graded, else its plain label.</summary>
-    public static string RightLabel(CanvasApi.Item item) =>
-        // A score out of nothing ("0/0", Canvas's way of counting a syllabus quiz or attendance) says nothing: its label does.
-        !string.IsNullOrEmpty(item.ScoreText) && !(item.Points is null or 0 && item.ScoreText.EndsWith("/0", StringComparison.Ordinal)) ? item.ScoreText : item.Label;
+    public static string RightLabel(CanvasApi.Item item) => ScoreOf(item) is { Length: > 0 } score ? score : item.Label;
+
+    /// <summary>A class's grade in its page's header: "Grade 91.2% · A-", or just the percentage when the course has no letters.</summary>
+    public static string GradeText(CanvasApi.ClassGrade grade)
+    {
+        string percent = grade.Score.ToString("0.##", CultureInfo.InvariantCulture);
+        return grade.Letter.Length > 0 ? $"Grade {percent}% · {grade.Letter}" : $"Grade {percent}%";
+    }
 
     /// <summary>Still to hand in (not yet submitted, and Canvas still takes it).</summary>
     public static bool ToHandIn(CanvasApi.Item item) => item.Status is "open" or "to_hand_in" or "past due" or "missing" or "overdue";

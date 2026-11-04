@@ -121,7 +121,7 @@ public static partial class Shell
         var info = (host.Overview?["classes"] as JsonArray ?? []).OfType<JsonObject>().FirstOrDefault(c => S(c["name"]) == name);
         var known = host.Classes().FirstOrDefault(c => c.Name == name);
         var facts = new ClassHomeFacts(name, DotFor(name), Math.Max(known.Lectures, lectures.Count), row?.Canvas?.ShortCode is { Length: > 0 } code ? code : null,
-            row?.Canvas?.Title is { Length: > 0 } title ? title : null, info is null ? null : S(info["description"]), row?.Counts, host.GroupOf(name));
+            row?.Canvas?.Title is { Length: > 0 } title ? title : null, info is null ? null : S(info["description"]), row?.Counts, host.GroupOf(name), row?.Grade);
         var page = OverviewModel.ForClass(facts, OverviewSources(lectures));
         page.AddLinks(facts, row is null ? null : tab =>
         {
