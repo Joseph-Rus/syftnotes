@@ -1474,7 +1474,18 @@ public static partial class Shell
             }
         },
         AlreadyHere = () => host.Settings.SetupAi is "claude" or "codex" or "gemini" ? host.Settings.SetupAi : "",
+        Connect = ConnectSignedInAsync,
     };
+
+    /// <summary>An AI the student signed in to here outside the library (setup's own sign-in, or one Get started found):
+    /// Settings' own Connect for it, through the one AI store, so Settings → Your AI and every other screen say it's
+    /// connected with no second Connect.</summary>
+    static async Task ConnectSignedInAsync(string id)
+    {
+        var connect = new AiConnect(host.AiStatus.Library) { Apps = ClaudeSetup.ThisComputer(host.Home), WaitForSignIn = false, SignedInHere = true };
+        var done = await host.AiStatus.ConnectAsync(connect, id);
+        host.Log($"[setup] {AiConnect.Brand(id)}: " + (!done.Ok ? done.Words : done.SignIn == Core.Ai.SignInPhase.Waiting ? "a sign-in is waiting" : "connected"));
+    }
 
     /// <summary>Guided setup's model for this window, reaching the app's own installer, hidden sign-in and pages.
     /// The self-test finds no AI's CLI at all, so it never installs one or reaches an account.</summary>
@@ -1489,21 +1500,8 @@ public static partial class Shell
             Find = SelfTest.Dir is not null ? _ => AgentFound.None : cli => AgentInstall.Find(cli),
             AiApps = aiApps.DesktopStates,
             ConnectAiApp = aiApps.Connect,
-            // An AI signed in here (setup's AI step, a lecture's Get study notes): Settings' own Connect for it, through the
-            // one AI store, so Settings → Your AI and every other screen say it's connected at once.
-            Connect = async id =>
-            {
-                try
-                {
-                    var done = await host.AiStatus.ConnectAsync(new AiConnect(host.AiStatus.Library) { Apps = aiApps, WaitForSignIn = false, SignedInHere = true }, id);
-                    host.Log($"[setup] {AiConnect.Brand(id)} connected: {(done.Ok ? "yes" : done.Words)}");
-                }
-                catch (Exception e) when (e is IOException or UnauthorizedAccessException)
-                {
-                    // An app's settings file it couldn't write: Settings' card says what's left, and Fix puts it right.
-                    host.Log($"[setup] connecting {AiConnect.Brand(id)}'s apps: {e.Message}");
-                }
-            },
+            // An AI signed in here (setup's AI step, a lecture's Get study notes): Settings' own Connect for it.
+            Connect = ConnectSignedInAsync,
             Downloading = () => host.Downloading?.Fraction,
             Log = host.Log,
         };

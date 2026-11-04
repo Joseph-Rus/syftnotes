@@ -51,6 +51,9 @@ public sealed class FunnelServices
     public Func<string, Task<bool>> UseAi { get; init; } = _ => Task.FromResult(true);
     /// <summary>What the library is for, once the student says.</summary>
     public Func<IReadOnlyList<string>, Task> SetUses { get; init; } = _ => Task.CompletedTask;
+    /// <summary>Settings → Your AI's own Connect for an AI signed in here (<see cref="GuidedServices.Connect"/>), run in the
+    /// background once it's picked; null: nothing is connected (a test).</summary>
+    public Func<string, Task>? Connect { get; init; }
     /// <summary>The AI Get started found signed in here on a plan ("claude"), already writing the notes; "" for none.</summary>
     public Func<string> AlreadyHere { get; init; } = () => "";
 }
@@ -427,13 +430,13 @@ public sealed partial class FunnelModel : ObservableObject, IDisposable
 
     /// <summary>"Continue with Claude": the AI Get started found here is the one, already writing the notes.</summary>
     [RelayCommand]
-    async Task UseAlreadyHere()
+    void UseAlreadyHere()
     {
-        if (!HasAlreadyHere || finishing) return;
+        if (!HasAlreadyHere) return;
         string id = AlreadyHere;
-        // Connected all the way, as an AI signed in on setup's own screens is: Settings says Connected, not "Not checked yet".
-        if ((Ready ??= services.MakeReady?.Invoke())?.Connect is { } connect) await connect(id);
         Finish(id);
+        // Connected all the way, as an AI signed in on setup's own screens is (in the background).
+        if (services.Connect is { } connect) UiTasks.Run(() => connect(id), $"setup: connect {id}");
     }
 
     /// <summary>"Skip" under the choices: never straight out with no AI; one more push to Gemini first.</summary>

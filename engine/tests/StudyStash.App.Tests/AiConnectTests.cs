@@ -1,6 +1,7 @@
 using System.Text.Json.Nodes;
 using Avalonia.Headless.XUnit;
 using StudyStash.App.Services;
+using StudyStash.App.Services.Kit;
 using StudyStash.App.Services.Stores;
 using StudyStash.App.ViewModels;
 using StudyStash.Core;
@@ -166,7 +167,8 @@ public class AiConnectTests
     public async Task An_AI_signed_in_during_setup_is_connected_in_settings_with_no_second_connect(string id, string before)
     {
         // Setup signs in with the AI's own sign-in, which the library never sees, then runs Settings' Connect through the
-        // app's one AI store: the library checks it (no second sign-in), and Settings → Your AI, open all along, follows.
+        // app's one AI store, in the background: the library checks it (no second sign-in), and Settings → Your AI, open
+        // all along, follows.
         using var home = new TempHome();
         var lib = new FakeAiLibrary { Overview = Fresh() with { Engines = [new EngineInfo(id, AiConnect.Brand(id), before) { Installed = true }] } };
         var store = new AiStatusStore(lib);
@@ -175,9 +177,11 @@ public class AiConnectTests
         Assert.NotEqual("Connected", settings.Engines.Single(r => r.Id == id).StateWords);
         var connect = new AiConnect(lib) { Apps = Apps(home, []), WaitForSignIn = false, SignedInHere = true };
 
-        var done = await store.ConnectAsync(connect, id, ct: TestContext.Current.CancellationToken);
+        ConnectOutcome? done = null;
+        UiTasks.Run(async () => done = await store.ConnectAsync(connect, id), "setup: connect");
 
-        Assert.True(done.Ok, done.Words);
+        Assert.True(await Poll.UntilAsync(() => done is not null, TimeSpan.FromMilliseconds(5), TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken));
+        Assert.True(done!.Ok, done.Words);
         Assert.Equal(AiEngineState.Ready, store.For(id)!.State);
         Assert.Contains($"check:{id}", lib.Calls);
         Assert.DoesNotContain($"sign-in:{id}", lib.Calls);

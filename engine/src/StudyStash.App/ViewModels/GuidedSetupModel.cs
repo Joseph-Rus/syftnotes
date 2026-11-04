@@ -49,8 +49,8 @@ public sealed class GuidedServices
     /// <summary>Adds Syft Notes to one of those apps' settings, as Settings → AI tool access's Connect does.</summary>
     public Func<string, AiAppChange>? ConnectAiApp { get; init; }
     /// <summary>Once an AI is signed in here, Settings → Your AI's own Connect for it (<see cref="AiConnect"/>, through the
-    /// app's AI store): Syft Notes added to every app of it on this computer, and the library's check, so every screen
-    /// says it's connected with no second Connect. Never throws; null: nothing is connected (a test).</summary>
+    /// app's AI store), run in the background: its apps here get Syft Notes, and the library checks it, so every screen
+    /// says it's connected with no second Connect. Null: nothing is connected (a test).</summary>
     public Func<string, Task>? Connect { get; init; }
 
     public AgentInstall MakeInstaller(AgentCliInfo cli) =>
@@ -88,7 +88,7 @@ public sealed partial class GuidedSetupModel : ObservableObject, IDisposable
     string session = "";
     string lastPrompt = "";
     string? question;
-    bool chatStarted, opened, connecting;
+    bool chatStarted, opened;
     /// <summary>The ChatGPT and Claude apps on this computer: asked when the window opens and after a Connect.</summary>
     IReadOnlyList<AiAppState> aiApps = [];
     /// <summary>Codex's plan check worked only with the student's own config.toml read (its sign-in is kept there): the
@@ -239,8 +239,6 @@ public sealed partial class GuidedSetupModel : ObservableObject, IDisposable
     /// AI picked, not on to the chat. "" otherwise.</summary>
     string forNotes = "";
     public bool ForNotes => forNotes.Length > 0;
-    /// <summary>Settings' own Connect for an AI signed in here (<see cref="GuidedServices.Connect"/>); null when there's none.</summary>
-    public Func<string, Task>? Connect => services.Connect;
     /// <summary>It's ready (its id): the by-hand notes step looks at it again and picks it.</summary>
     public Action<string>? ReadyForNotes { get; set; }
     /// <summary>The quiet link at the foot of those screens: back to the step they came from.</summary>
@@ -540,7 +538,7 @@ public sealed partial class GuidedSetupModel : ObservableObject, IDisposable
         {
             // Asked for from the notes step, which has each AI's own button: back there.
             StopWork();
-            LeaveForNotes();
+            BackToNotes(ready: false);
             return;
         }
         save(s => s.SetupAi = engine);
@@ -574,39 +572,21 @@ public sealed partial class GuidedSetupModel : ObservableObject, IDisposable
             return;
         }
         await ToSignInAsync();
-        if (AiReady && Screen == GuidedScreen.SignIn) await BackToNotesAsync();
+        if (AiReady && Screen == GuidedScreen.SignIn) BackToNotes();
     }
 
-    /// <summary>The AI is ready: connected all the way first, by Settings' own Connect (<see cref="GuidedServices.Connect"/>),
-    /// with the ready line showing meanwhile; then back to the by-hand step that asked, with it picked.</summary>
-    async Task BackToNotesAsync()
+    /// <summary>Back to the by-hand step that asked, the AI ready (or the student gave up on it: <paramref name="ready"/>
+    /// false, and nothing is picked).</summary>
+    void BackToNotes(bool ready = true)
     {
         string id = forNotes;
-        if (id.Length == 0 || connecting) return;
-        if (Connect is { } connect)
-        {
-            connecting = true;
-            try
-            {
-                await connect(id);
-            }
-            finally
-            {
-                connecting = false;
-            }
-            if (forNotes != id) return; // Back was pressed meanwhile
-        }
-        LeaveForNotes();
-        ReadyForNotes?.Invoke(id);
-    }
-
-    /// <summary>Back to the by-hand step that asked, nothing picked yet (the student gave up on the AI, or it's ready and
-    /// <see cref="BackToNotesAsync"/> picks it).</summary>
-    void LeaveForNotes()
-    {
         forNotes = "";
         Notify(nameof(ForNotes), nameof(ByHandLabel));
         Screen = GuidedScreen.Manual;
+        if (!ready) return;
+        // Connected all the way, by Settings' own Connect, in the background: the store turns every screen Connected.
+        if (services.Connect is { } connect) UiTasks.Run(() => connect(id), $"setup: connect {id}");
+        ReadyForNotes?.Invoke(id);
     }
 
     void ByHandAt(string item)
@@ -614,7 +594,7 @@ public sealed partial class GuidedSetupModel : ObservableObject, IDisposable
         if (ForNotes)
         {
             StopWork();
-            LeaveForNotes();
+            BackToNotes(ready: false);
             return;
         }
         if (!AiReady && settings().SetupAi is not ("claude" or "codex" or "gemini" or "ollama")) save(s => s.SetupAi = "manual");
@@ -665,7 +645,7 @@ public sealed partial class GuidedSetupModel : ObservableObject, IDisposable
                 await ToSignInOrChatAsync();
                 break;
             case GuidedScreen.SignIn when AiReady && ForNotes:
-                await BackToNotesAsync();
+                BackToNotes();
                 break;
             case GuidedScreen.SignIn when AiReady:
                 StartChat("[Syft Notes] Setup was opened.");
@@ -774,7 +754,7 @@ public sealed partial class GuidedSetupModel : ObservableObject, IDisposable
     {
         await ToSignInAsync();
         if (!AiReady || Screen != GuidedScreen.SignIn) return;
-        if (ForNotes) await BackToNotesAsync();
+        if (ForNotes) BackToNotes();
         else StartChat("[Syft Notes] Setup was opened.");
     }
 
@@ -870,7 +850,7 @@ public sealed partial class GuidedSetupModel : ObservableObject, IDisposable
             AiReady = true;
             // Got ready from a lecture's page (or setup's notes step): signed in and checked, it goes straight back
             // there to write the notes, with no Continue to press.
-            if (ForNotes && Screen == GuidedScreen.SignIn) await BackToNotesAsync();
+            if (ForNotes && Screen == GuidedScreen.SignIn) BackToNotes();
             return;
         }
         switch (check.Problem)
