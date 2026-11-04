@@ -25,6 +25,22 @@ static class Program
     [STAThread]
     public static int Main(string[] args)
     {
+        // First of all, so an error that ends any of what follows (Velopack's hooks, the engine's commands, the
+        // background library among them) leaves a line in logs/app.log: only its folder is needed, and only then.
+        int at = Array.IndexOf(args, "--home");
+        if (at >= 0 && at + 1 < args.Length) Home = Path.GetFullPath(Py.ExpandUser(args[at + 1]));
+        AppDomain.CurrentDomain.UnhandledException += (_, e) =>
+        {
+            // Made only on a crash: the self-test checks --home is a new, empty folder before anything touches it.
+            try
+            {
+                Directory.CreateDirectory(Path.Combine(Home, "logs"));
+            }
+            catch (Exception x) when (x is IOException or UnauthorizedAccessException)
+            {
+            }
+            Log($"[crash] {e.ExceptionObject}");
+        };
         // Velopack's installer and updater hooks first, as it asks (they end the process); nothing else is applied here.
         VelopackHooks.Run();
         // Linux: an AppImage copy takes itself off this account (it has no uninstaller of its own).
@@ -40,8 +56,6 @@ static class Program
             StudyStash.Library.Cli.VoicePack = home => new StudyStash.Audio.KokoroVoices(home);
             return StudyStash.Library.Cli.RunAsync(args).GetAwaiter().GetResult();
         }
-        int at = Array.IndexOf(args, "--home");
-        if (at >= 0 && at + 1 < args.Length) Home = Path.GetFullPath(Py.ExpandUser(args[at + 1]));
         // Gemini's agy (setup's sign-in, its check) runs in the same home of Syft Notes' own as the library's notes.
         StudyStash.Core.Ai.Antigravity.Home = () => StudyStash.Core.Ai.Antigravity.For(Home);
         Background = args.Contains("--background");
@@ -52,7 +66,6 @@ static class Program
         // run that follows never reaches the real network.
         if (SelfTest.Prepare(Home) is int refusal) return refusal;
         Directory.CreateDirectory(Path.Combine(Home, "logs"));
-        AppDomain.CurrentDomain.UnhandledException += (_, e) => Log($"[crash] {e.ExceptionObject}");
         TaskScheduler.UnobservedTaskException += (_, e) =>
         {
             Log($"[error] a background task failed: {e.Exception}");
