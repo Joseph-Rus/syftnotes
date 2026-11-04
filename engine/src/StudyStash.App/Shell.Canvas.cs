@@ -46,7 +46,7 @@ public static partial class Shell
         watch.Changed += OnCanvasChanged;
         canvasFeed?.Dispose();
         canvasFeed = new CanvasFeed(context, watch);
-        canvasFeed.Updated += () => Dispatcher.UIThread.Post(() => Run(() => CanvasUpdatedAsync(), "CanvasUpdated"));
+        canvasFeed.Updated += touched => Dispatcher.UIThread.Post(() => Run(() => CanvasUpdatedAsync(touched), "CanvasUpdated"));
         canvasNotifier = new CanvasNotifier(context) { OnOpen = OpenCanvasNotification };
     }
 
@@ -166,20 +166,24 @@ public static partial class Shell
         await CanvasUpdatedAsync();
     }
 
-    /// <summary>Newer Canvas data is in (a sync finished, a course was linked or chosen): the sidebar's Due and its
-    /// count, the dropdown's next due, Canvas's notifications, and the Due page or the open class's page, if the
-    /// window shows one.</summary>
-    static async Task CanvasUpdatedAsync()
+    /// <summary>Newer Canvas data is in (a sync finished a class, a course was linked or chosen): the sidebar's Due
+    /// and its count, the dropdown's next due, Canvas's notifications, and the page the window shows if it shows
+    /// Canvas's data. Only what <paramref name="touched"/> names is read again (null: any class may have changed):
+    /// a class's own Canvas page or folder page only when it's that class's news, and Due's term only for those
+    /// classes. A page read again the same stays as it is.</summary>
+    static async Task CanvasUpdatedAsync(IReadOnlySet<string>? touched = null)
     {
         if (quitting) return;
         UpdateNextDue();
         UpdateDueItem();
         // A sync's news (new work, a score, an announcement) shows now, not at the notifications' next minute.
         Run(() => PollCanvasNotificationsAsync(), "PollCanvasNotifications");
-        termAssignments = null;
+        ForgetTerm(touched);
         if (mainWindow?.IsVisible != true) return;
-        if (pageState.Overview is { } over) await ShowOverviewAsync(over);
-        else if (pageState.CanvasClass is { } name && library.CanvasClass is { } cls && CanvasClassRow(name) is { } row) await cls.LoadAsync(row);
+        bool Touched(string cls) => touched is null || touched.Contains(cls);
+        // Home and Due show every class's work; a folder's page only its own.
+        if (pageState.Overview is { } over) { if (over.Length == 0 || over == DueHome || Touched(over)) await ShowOverviewAsync(over); }
+        else if (pageState.CanvasClass is { } name && Touched(name) && library.CanvasClass is { } cls && CanvasClassRow(name) is { } row) await cls.LoadAsync(row);
     }
 
     /// <summary>Asks the library what's due and which classes are linked. False when it couldn't (no library, an
