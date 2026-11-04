@@ -28,7 +28,7 @@ public static partial class CourseChoices
     // Training" and "Orientation and Mobility" are classes.
     [GeneratedRegex(@"\b(?:sandbox|chapel|convocation|advising|advisement|student life|resource center|playground|practice course|test course)\b"
         + @"|\b(?:new|incoming|first[- ]year|freshman|transfer|international|graduate|online|students?|welcome)\s+(?:student\s+)?orientation\b"
-        + @"|^\W*orientation\b(?!\s+(?:and|&|to|in|of)\b)", RegexOptions.IgnoreCase)]
+        + @"|^\W*orientation\b(?!\s*(?:(?:and|to|in|of)\b|&))", RegexOptions.IgnoreCase)]
     private static partial Regex NotAClassWords();
 
     [GeneratedRegex(@"\b(Spring|Summer|Fall|Autumn|Winter)\b\D{0,3}((?:19|20)\d{2})\b|\b((?:19|20)\d{2})\D{0,3}\b(Spring|Summer|Fall|Autumn|Winter)\b", RegexOptions.IgnoreCase)]

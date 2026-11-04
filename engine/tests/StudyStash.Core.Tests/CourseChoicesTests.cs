@@ -51,6 +51,8 @@ public class CourseChoicesTests
     [InlineData("""{"name": "Athletic Training Clinical I", "course_code": "AT 210" """ + ThisFall + AsStudent + "}", true, "")]
     [InlineData("""{"name": "Statics", "course_code": "MECH 2010", "term": {"name": "Default Term"}""" + AsStudent + "}", true, "")]
     [InlineData("""{"name": "Statics", "course_code": "MECH 2010", "term": {"name": "Default Term"}, "enrollments": [{"type": "StudentEnrollment"}]}""", true, "")]
+    [InlineData("""{"name": "Orientation & Mobility", "course_code": "SPED 455" """ + ThisFall + AsStudent + "}", true, "")]
+    [InlineData("""{"name": "Marine Biology", "course_code": "BIO 250", "concluded": true, "term": {"name": "Summer 2026", "start_at": "2026-06-01T00:00:00Z", "end_at": "2026-09-24T17:00:00Z"}""" + AsStudent + "}", true, "")]
     [InlineData("""{"name": "Orientation and Mobility", "course_code": "SPED 455" """ + ThisFall + AsStudent + "}", true, "")]
     [InlineData("""{"name": "Fluids Lab", "course_code": "ME 330", "restrict_enrollments_to_course_dates": true, "start_at": "2026-09-01T00:00:00Z", "end_at": "2026-12-01T00:00:00Z", "term": {"name": "Spring 2026", "start_at": "2026-01-10T00:00:00Z", "end_at": "2026-05-10T00:00:00Z"}""" + AsStudent + "}", true, "")]
     [InlineData("""{"name": "Genetics", "course_code": "BIO 300", "start_at": "2026-08-20T00:00:00Z", "end_at": "2016-12-15T00:00:00Z", "term": {"name": "Default Term"}""" + AsStudent + "}", true, "")]
