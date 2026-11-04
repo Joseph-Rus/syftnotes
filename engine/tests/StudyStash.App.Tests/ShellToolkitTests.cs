@@ -31,6 +31,18 @@ public class UiTasksTests
         Assert.Equal(0, said);
         Assert.Empty(log);
     }
+
+    [Fact]
+    public async Task A_timed_out_request_is_logged_and_said_though_it_arrives_as_a_cancellation()
+    {
+        var log = new List<string>();
+        int said = 0;
+        // What HttpClient throws when its timeout runs out on a busy library.
+        await UiTasks.Guard(() => throw new TaskCanceledException("The request was canceled due to the configured HttpClient.Timeout", new TimeoutException()),
+            "ShowHome", log.Add, () => said++);
+        Assert.Equal(1, said);
+        Assert.Contains(log, l => l.Contains("ShowHome", StringComparison.Ordinal));
+    }
 }
 
 /// <summary>Leaving a page for another leaves nothing of the old one open: whatever the window knew about the last page
