@@ -116,4 +116,32 @@ public class AppCalendarTests
         Assert.Equal("", l.Title);
         Assert.Null(l.Event);
     }
+
+    /// <summary>Keep recording (and a planned note starting to record) tells the library what is recording, as a new
+    /// Record does, so a phone's photos taken meanwhile are the lecture's.</summary>
+    [Fact]
+    public async Task Keeping_a_lecture_going_tells_the_library_which_lecture_records()
+    {
+        await using var rig = await LibraryRig.StartAsync();
+        using var home = new TempHome();
+        new AppSettings { SetupDone = true, Role = AppRole.Laptop }.Save(home.Path);
+        var cc = Configs.LoadClient(home.Path);
+        cc.ServerUrl = rig.Url;
+        cc.PoolKey = LibraryRig.Password;
+        Configs.SaveClient(cc);
+        using var host = Host(home);
+        var now = DateTimeOffset.Now;
+        var done = new Lecture { Id = "rec-20260923-100212-abcdef", Started = now.AddDays(-1).ToString("o"), State = LectureState.Filed, ClassName = "CS 101" };
+        host.Lectures.Add(done);
+        File.WriteAllBytes(host.Lectures.AudioPath(done.Id), [1, 2, 3]);
+
+        var start = await host.ContinueAsync(done.Id);
+        Assert.Equal(done.Id, start.Lecture!.Id);
+        try
+        {
+            await Wait.UntilAsync(async () => (await host.Remote()!.OverviewAsync())["recording_now"]?["id"]?.GetValue<string>() == done.Id,
+                "the library to hear which lecture is recording", TimeSpan.FromSeconds(10));
+        }
+        finally { host.StopRecording(); }
+    }
 }
