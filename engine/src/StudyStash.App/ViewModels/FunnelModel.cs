@@ -427,9 +427,13 @@ public sealed partial class FunnelModel : ObservableObject, IDisposable
 
     /// <summary>"Continue with Claude": the AI Get started found here is the one, already writing the notes.</summary>
     [RelayCommand]
-    void UseAlreadyHere()
+    async Task UseAlreadyHere()
     {
-        if (HasAlreadyHere) Finish(AlreadyHere);
+        if (!HasAlreadyHere || finishing) return;
+        string id = AlreadyHere;
+        // Connected all the way, as an AI signed in on setup's own screens is: Settings says Connected, not "Not checked yet".
+        if ((Ready ??= services.MakeReady?.Invoke())?.Connect is { } connect) await connect(id);
+        Finish(id);
     }
 
     /// <summary>"Skip" under the choices: never straight out with no AI; one more push to Gemini first.</summary>
