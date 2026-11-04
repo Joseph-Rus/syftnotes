@@ -16,15 +16,19 @@ public static class CanvasMarkdown
         !string.IsNullOrEmpty(iso) && DateTimeOffset.TryParse(iso, CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal, out var t)
             ? TimeZoneInfo.ConvertTime(t, zone).ToString("ddd d MMM yyyy, h:mm tt", CultureInfo.InvariantCulture) : "";
 
-    /// <summary>The zone as it reads at <paramref name="at"/>, "Pacific Standard Time (UTC-08:00)" (the name is "PST"
-    /// on some computers; the offset is the same everywhere), said to the AI beside the times it's given so it never
-    /// takes them for UTC.</summary>
+    /// <summary>The zone at the moment <paramref name="at"/> (a due date), "PST (UTC-08:00)": its offset on that date, so
+    /// a time after a change to or from daylight saving isn't read an hour out. (The name is "Pacific Standard Time"
+    /// on Windows; the offset is the same everywhere.)</summary>
     public static string ZoneName(TimeZoneInfo zone, DateTimeOffset at)
     {
         string name = (zone.IsDaylightSavingTime(at) ? zone.DaylightName : zone.StandardName) is { Length: > 0 } n ? n : zone.Id;
         var offset = zone.GetUtcOffset(at);
         return $"{name} (UTC{(offset < TimeSpan.Zero ? '-' : '+')}{offset:hh\\:mm})";
     }
+
+    /// <summary>What a list of times for the AI says they are: the student's clock time on each one's own date, in a
+    /// zone named by its id (the same all year), never one offset for times on both sides of a daylight-saving change.</summary>
+    public static string LocalTimes(TimeZoneInfo zone) => $"local time in the student's time zone ({zone.Id}), daylight saving included";
 
     /// <summary>A file size the way the design writes it: "4 KB", "1.2 MB".</summary>
     public static string Size(long? bytes) => bytes switch
