@@ -172,9 +172,9 @@ jobs:
         run: |
           props=engine/Directory.Build.props
           sed -i "s:<StudyStashVersion>.*</StudyStashVersion>:<StudyStashVersion>$V1</StudyStashVersion>:" "$props"
-          sh linux/build.sh dist/v1 && sh linux/velopack-pack.sh dist/v1
+          sh linux/build.sh --test-helpers dist/v1 && sh linux/velopack-pack.sh dist/v1
           sed -i "s:<StudyStashVersion>.*</StudyStashVersion>:<StudyStashVersion>$V2</StudyStashVersion>:" "$props"
-          sh linux/build.sh dist/v2 && STUDYSTASH_VELOPACK_BASE="$PWD/dist/v1/velopack" sh linux/velopack-pack.sh dist/v2
+          sh linux/build.sh --test-helpers dist/v2 && STUDYSTASH_VELOPACK_BASE="$PWD/dist/v1/velopack" sh linux/velopack-pack.sh dist/v2
           git checkout -- "$props"
       - name: Install 0.22.1, update to the bridge, move to the AppImage, update again, uninstall
         env:
