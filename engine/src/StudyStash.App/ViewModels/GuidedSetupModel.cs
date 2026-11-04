@@ -93,6 +93,10 @@ public sealed partial class GuidedSetupModel : ObservableObject, IDisposable
     /// <summary>Codex's plan check worked only with the student's own config.toml read (its sign-in is kept there): the
     /// chat's turns read it too, or each would say the sign-in didn't work.</summary>
     bool keepUserConfig;
+    /// <summary>The AI whose signed-in account is on a plan it can't be used with: its next sign-in is for another account
+    /// (<see cref="AgentSignIn.StartAnother"/>), never the same account's check again. "" for none. Only Claude and ChatGPT
+    /// (<see cref="AgentCliInfo.SignsInAnother"/>).</summary>
+    string another = "";
 
     public GuidedSetupModel(SetupModel setup, GuidedServices services, Func<AppSettings> settings, Action<Action<AppSettings>> save)
     {
@@ -411,12 +415,17 @@ public sealed partial class GuidedSetupModel : ObservableObject, IDisposable
 
     partial void OnAiReadyChanged(bool value)
     {
+        if (value) another = "";
         Notify(nameof(CanContinue), nameof(ShowReady), nameof(HasAllowance));
         Refresh();
     }
     partial void OnAllowanceWordsChanged(string value) => Notify(nameof(HasAllowance));
     partial void OnSignInProblemChanged(string? value) => Notify(nameof(HasSignInProblem));
-    partial void OnPlanProblemChanged(ChatProblem value) => Notify(nameof(HasPlanProblem), nameof(PlanIsPlan), nameof(ShowOpenSignIn));
+    partial void OnPlanProblemChanged(ChatProblem value)
+    {
+        if (value == ChatProblem.Plan && Cli.SignsInAnother) another = Cli.Id;
+        Notify(nameof(HasPlanProblem), nameof(PlanIsPlan), nameof(ShowOpenSignIn));
+    }
     partial void OnBusyChanged(bool value) => Notify(nameof(CanType));
     partial void OnChatProblemTextChanged(string? value) => Notify(nameof(HasChatProblem));
     partial void OnRoleChosenChanged(bool value) => Refresh();
@@ -713,7 +722,7 @@ public sealed partial class GuidedSetupModel : ObservableObject, IDisposable
     Task TryAgain() => Screen switch
     {
         GuidedScreen.Install => InstallCommand.ExecuteAsync(null),
-        GuidedScreen.SignIn => PlanProblem != ChatProblem.None ? CheckPlanAsync() : OpenSignInAsync(),
+        GuidedScreen.SignIn => PlanProblem is not (ChatProblem.None or ChatProblem.Plan) ? CheckPlanAsync() : OpenSignInAsync(),
         _ => RetryTurnAsync(),
     };
 
@@ -757,10 +766,17 @@ public sealed partial class GuidedSetupModel : ObservableObject, IDisposable
         else StartChat("[Syft Notes] Setup was opened.");
     }
 
-    /// <summary>The sign-in screen: already signed in goes straight to the plan check.</summary>
+    /// <summary>The sign-in screen: already signed in goes straight to the plan check, unless that account couldn't be
+    /// used (<see cref="another"/>): then its sign-in starts again, for another.</summary>
     async Task ToSignInAsync()
     {
         ResetSignIn();
+        if (another == Cli.Id)
+        {
+            Screen = GuidedScreen.SignIn;
+            await OpenSignInAsync();
+            return;
+        }
         CheckingSignIn = true;
         Screen = GuidedScreen.SignIn;
         AgentSignedIn now;
@@ -789,10 +805,12 @@ public sealed partial class GuidedSetupModel : ObservableObject, IDisposable
         if (Found.Exe is not { } exe) return;
         SignInProblem = null;
         PlanProblem = ChatProblem.None;
+        SignedIn = false;
         signIn ??= services.SignIn(Cli, exe);
         var s = signIn;
         SignInStuck = false;
-        s.Start();
+        if (another == Cli.Id) s.StartAnother();
+        else s.Start();
         // Gemini's page ends on a code: the box for it shows while the sign-in waits, and hands it to this sign-in.
         CodeBox = Cli.TakesCode ? new SignInCodeModel(Brand, Cli.Maker, (code, ct) => SendCodeAsync(s, code, ct)) : null;
         WaitingSignIn = true;
@@ -828,8 +846,10 @@ public sealed partial class GuidedSetupModel : ObservableObject, IDisposable
     [RelayCommand]
     void GetHelp() => services.OpenUrl(AiWords.HelpPage);
 
+    /// <summary>"Check again" on a plan the account doesn't have: a sign-in again, where the student picks another
+    /// account (or the same one, upgraded). On any other problem, the same check again.</summary>
     [RelayCommand]
-    Task CheckAgain() => CheckPlanAsync();
+    Task CheckAgain() => PlanIsPlan ? OpenSignInAsync() : CheckPlanAsync();
 
     /// <summary>One tiny turn with no tools, to catch a plan that doesn't include the CLI before the chat starts.</summary>
     async Task CheckPlanAsync()
