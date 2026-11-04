@@ -207,6 +207,13 @@ public sealed partial class Store
         [.. ListAttachments(noteId: noteId).Where(a => a.IsPhoto && a.Type.StartsWith("image/", StringComparison.Ordinal)).OrderBy(a => a.Taken, StringComparer.Ordinal)];
 
     /// <summary>Removes an attachment: its file and its row. False when there's no such attachment.</summary>
+    /// <summary>The attachment's file in its class's Attachments folder is now <paramref name="file"/> (a copy brought
+    /// in beside a different file of its old name).</summary>
+    public void SetAttachmentFile(string id, string file)
+    {
+        lock (gate) Exec("UPDATE attachments SET file=? WHERE id=?", file, id);
+    }
+
     public bool RemoveAttachment(string id)
     {
         lock (gate)

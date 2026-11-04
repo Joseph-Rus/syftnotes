@@ -35,7 +35,7 @@ public sealed class LibraryFolderPickTests
         // The folder is switched, but with no library running nothing could be copied over: that's said, and the
         // answer isn't remembered, so it's asked again at the next start.
         Assert.False(outcome.Ok);
-        Assert.Equal(LibraryFolderPick.NotFinished, outcome.Failure);
+        Assert.Equal(LibraryFolderPick.NotFinished(1).Words, outcome.Failure?.Words);
         Assert.True(LibraryFolders.Comparer.Equals(LibraryFolders.Real(older), LibraryFolders.Real(Configs.Load(home.Path).PoolDir)));
         Assert.Equal(before.Item1, Files(inUse));
         Assert.Equal(before.Item2, Files(older));
@@ -43,7 +43,7 @@ public sealed class LibraryFolderPickTests
         Assert.NotNull(LibraryFolderPick.ToAsk(host, Find));
         // Picking the row the window still tags "In use now" goes by config.toml, not the tag: it switches back.
         var back = await LibraryFolderPick.UseAsync(host, asked.Single(f => f.InUse), asked, ct: TestContext.Current.CancellationToken);
-        Assert.Equal(LibraryFolderPick.NotFinished, back.Failure);
+        Assert.Equal(LibraryFolderPick.NotFinished(1).Words, back.Failure?.Words);
         Assert.True(LibraryFolderPick.IsInUse(Configs.Load(home.Path).PoolDir, inUse));
         Assert.Null(host.Settings.NotesFoldersSeen);
     }
