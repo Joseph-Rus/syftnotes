@@ -1,3 +1,7 @@
+using StudyStash.Core.Calendar.Ics;
+using StudyStash.Core.Canvas;
+using StudyStash.Library;
+
 namespace StudyStash.Core.Tests;
 
 /// <summary>"What's due this Sunday?" is answered from the Due list and today's date, which the library hands Ask with
@@ -32,5 +36,29 @@ public class AskAgendaTests
         var none = await reader.AskAsync("What's due this coming Sunday?", chat: (_, _) => { asked = true; return Task.FromResult("{}"); });
         Assert.False(asked);
         Assert.Equal(LibraryReader.NoAnswer, none["answer"]!.GetValue<string>());
+    }
+
+    /// <summary>Home said "due today at 10:15 AM" while Ask, told the same Due list, said 2:15 AM and overdue: the
+    /// agenda took the row's local time for UTC and converted it again. Windows' name for the zone, as on that PC.</summary>
+    [Fact]
+    public void The_agenda_gives_due_times_in_the_students_time_zone_and_names_it()
+    {
+        using var dir = new TempDir();
+        var zone = IcsZones.SystemZone("Pacific Standard Time")!;
+        var now = new DateTimeOffset(2026, 11, 4, 17, 0, 0, TimeSpan.Zero); // Wednesday, 9:00 AM in Pacific time
+        var cfg = new Config(dir.Path, dir["pool"]) { Classes = [new ClassDef("CS 101")] };
+        using var store = new Store(cfg.DbPath, cfg.PoolDir);
+        CanvasSettings.Update(dir.Path, s => s.Url = "https://canvas.example.edu");
+        const string dueAt = "2026-11-04T18:15:00Z";
+        Assignments.Save(dir.Path, [new Assignment("CS 101", 1, "Future of CS essay", Assignments.Local(dueAt, zone), 10, "open", null, "", "", DueAt: dueAt)]);
+        var sync = new CanvasSync(dir.Path, c => FakeCanvas.ClassDir(dir, c), _ => { }) { Clock = () => now, Zone = zone };
+        var web = new LibraryWeb(cfg, store, new Pipeline(cfg, store, log: _ => { }), new LibraryWebOptions { Canvas = sync });
+
+        string agenda = web.AskAgenda(null);
+
+        Assert.Contains("Today is Wednesday 4 November 2026, 9:00 AM, ", agenda);
+        Assert.Contains(" (UTC-08:00). Every time below is in that time zone.", agenda);
+        Assert.Contains("- Wed 4 Nov 2026, 10:15 AM: CS 101: Future of CS essay", agenda);
+        Assert.DoesNotContain("Overdue", agenda);
     }
 }

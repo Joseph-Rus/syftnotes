@@ -3,6 +3,7 @@ using System.Text;
 using System.Text.Json.Nodes;
 using StudyStash.Core;
 using StudyStash.Core.Calendar;
+using StudyStash.Core.Canvas;
 
 namespace StudyStash.Library;
 
@@ -22,14 +23,12 @@ public sealed partial class LibraryWeb
         var zone = Canvas.Zone;
         var now = TimeZoneInfo.ConvertTime(Canvas.Clock(), zone);
         var sb = new StringBuilder();
-        sb.Append("Today is ").Append(now.ToString("dddd d MMMM yyyy, h:mm tt", CultureInfo.InvariantCulture)).Append(".\n");
+        sb.Append("Today is ").Append(now.ToString("dddd d MMMM yyyy, h:mm tt", CultureInfo.InvariantCulture))
+            .Append(", ").Append(CanvasMarkdown.ZoneName(zone, now)).Append(". Every time below is in that time zone.\n");
         bool Mine(JsonNode? row) => onlyClass is null || Py.AsString(row?["class"]) == onlyClass;
-        string When(JsonNode? row)
-        {
-            string? iso = Py.AsString(row?["due"]) ?? Py.AsString(row?["due_at"]);
-            return DateTimeOffset.TryParse(iso, CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal, out var d)
-                ? TimeZoneInfo.ConvertTime(d, zone).ToString("ddd d MMM, h:mm tt", CultureInfo.InvariantCulture) : "no due date";
-        }
+        // due_at is Canvas's UTC time; the row's "due" is already the student's clock time, so converting it again
+        // put every due time hours out (8 hours early in Pacific time, and so "overdue" before it was).
+        string When(JsonNode? row) => CanvasMarkdown.When(Py.AsString(row?["due_at"]), zone) is { Length: > 0 } at ? at : "no due date";
         string Line(JsonNode? row, string prefix) =>
             $"- {prefix}{When(row)}: {Py.AsString(row?["class"])}: {Py.AsString(row?["name"])}{(row?["missing"]?.GetValue<bool>() == true ? " (missing)" : "")}";
         try
@@ -55,8 +54,7 @@ public sealed partial class LibraryWeb
             var events = (LibraryCalendar.Read(cfg.Home, EventClass.Of(cfg), DateTimeOffset.UtcNow)["events"] as JsonArray ?? [])
                 .Where(Mine).Select(e =>
                 {
-                    string at = DateTimeOffset.TryParse(Py.AsString(e?["start"]), CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal, out var d)
-                        ? TimeZoneInfo.ConvertTime(d, zone).ToString("ddd d MMM, h:mm tt", CultureInfo.InvariantCulture) : "";
+                    string at = CanvasMarkdown.When(Py.AsString(e?["start"]), zone);
                     string cls = Py.AsString(e?["class"]) is { Length: > 0 } c ? $" ({c})" : "";
                     return $"- {at}: {Py.AsString(e?["title"])}{cls}";
                 }).ToList();

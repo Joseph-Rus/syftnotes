@@ -16,6 +16,16 @@ public static class CanvasMarkdown
         !string.IsNullOrEmpty(iso) && DateTimeOffset.TryParse(iso, CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal, out var t)
             ? TimeZoneInfo.ConvertTime(t, zone).ToString("ddd d MMM yyyy, h:mm tt", CultureInfo.InvariantCulture) : "";
 
+    /// <summary>The zone as it reads at <paramref name="at"/>, "Pacific Standard Time (UTC-08:00)" (the name is "PST"
+    /// on some computers; the offset is the same everywhere), said to the AI beside the times it's given so it never
+    /// takes them for UTC.</summary>
+    public static string ZoneName(TimeZoneInfo zone, DateTimeOffset at)
+    {
+        string name = (zone.IsDaylightSavingTime(at) ? zone.DaylightName : zone.StandardName) is { Length: > 0 } n ? n : zone.Id;
+        var offset = zone.GetUtcOffset(at);
+        return $"{name} (UTC{(offset < TimeSpan.Zero ? '-' : '+')}{offset:hh\\:mm})";
+    }
+
     /// <summary>A file size the way the design writes it: "4 KB", "1.2 MB".</summary>
     public static string Size(long? bytes) => bytes switch
     {
