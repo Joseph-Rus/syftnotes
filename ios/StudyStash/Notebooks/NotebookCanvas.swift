@@ -28,8 +28,8 @@ final class NotebookCanvas: NSObject {
 
     @ObservationIgnored let canvas = InkCanvas()
     @ObservationIgnored let picker = PKToolPicker()
-    /// What Apple's pens are shown for. Not the canvas: a phone showed the keyboard (made first responder, the canvas
-    /// asks for one whenever a menu opens over it).
+    /// What Apple's pens are shown for while the page is written on (the canvas made first responder asks for a
+    /// keyboard on a phone). The canvas takes it for its menus, and the pens are shown for it too.
     @ObservationIgnored let tools = ToolsResponder()
     @ObservationIgnored private let underlay = UIView()
     @ObservationIgnored private let hint = UILabel()
@@ -44,6 +44,11 @@ final class NotebookCanvas: NSObject {
     @ObservationIgnored private var settingDrawing = false
     /// What each page's ink was when last written, so only a page that changed is written again.
     @ObservationIgnored private var written: [UUID: Int] = [:]
+    /// Pages written in a pause whose pictures (Home's shelf, the pages) aren't drawn again yet: drawing them at every
+    /// pause held up the writing. They're drawn at the next `flush` (closing, the pages opening, the app going away).
+    @ObservationIgnored private var unpictured: Set<UUID> = []
+    /// The pages' pictures are on screen beside the page (an iPad's pages sidebar): they follow each pause.
+    @ObservationIgnored var picturesShowing = false
     /// The bars over the canvas (title bar, home indicator), from SwiftUI.
     @ObservationIgnored private var chrome: UIEdgeInsets = .zero
     @ObservationIgnored private var obscured: CGFloat = 0
@@ -137,8 +142,8 @@ final class NotebookCanvas: NSObject {
         load(scrollTo: page ?? 0)
     }
 
-    /// Lay the pages out again and draw them from disk: after pages are added, moved, removed or resized. What was
-    /// undoable stops being (the strokes are where the pages put them now).
+    /// Lay the pages out again and draw them from disk: after pages are added (not at the end), moved, removed or
+    /// resized. What was undoable stops being (the strokes are where the pages put them now).
     func load(scrollTo page: Int?) {
         guard let n = notebook else { return }
         layOut(n)
@@ -166,37 +171,56 @@ final class NotebookCanvas: NSObject {
     /// The pages' places on the canvas, and a tile of paper under each.
     private func layOut(_ n: Notebook) {
         contentWidth = n.pages.map { CGFloat($0.width) }.max() ?? Notebook.letter.width
-        var y: CGFloat = 0
-        frames = n.pages.map { p in
-            defer { y += CGFloat(p.height) + Self.gap }
-            return CGRect(x: ((contentWidth - CGFloat(p.width)) / 2).rounded(), y: y, width: CGFloat(p.width), height: CGFloat(p.height))
-        }
-        contentHeight = max(y - Self.gap, 1)
+        frames = []
         underlay.layer.sublayers?.forEach { $0.removeFromSuperlayer() }
         tiles = []
         grounds = []
-        let screen = canvas.window?.screen.scale ?? canvas.traitCollection.displayScale
-        for (i, p) in n.pages.enumerated() {
-            let shadow = CALayer()
-            shadow.frame = frames[i]
-            shadow.backgroundColor = PaperDrawing.inks(p.colour).ground.cgColor
-            shadow.shadowColor = UIColor.black.cgColor
-            shadow.shadowOpacity = 0.14
-            shadow.shadowRadius = 3
-            shadow.shadowOffset = CGSize(width: 0, height: 1)
-            shadow.shadowPath = CGPath(rect: CGRect(origin: .zero, size: frames[i].size), transform: nil)
-            shadow.borderColor = UIColor(white: 0, alpha: 0.07).cgColor
-            shadow.borderWidth = 0.5
-            underlay.layer.addSublayer(shadow)
-            grounds.append(shadow)
-            let tile = PaperTile()
-            tile.frame = frames[i]
-            tile.contentsScale = max(screen, 1)
-            tile.set(p, pdf: store.pdf(n, p)?.pageRef)
-            underlay.layer.addSublayer(tile)
-            tiles.append(tile)
-        }
+        for p in n.pages { place(p, of: n) }
+        if n.pages.isEmpty { contentHeight = 1 }
+    }
+
+    /// A page under the others, on its paper.
+    private func place(_ p: Notebook.Page, of n: Notebook) {
+        let y = frames.last.map { $0.maxY + Self.gap } ?? 0
+        let frame = CGRect(x: ((contentWidth - CGFloat(p.width)) / 2).rounded(), y: y, width: CGFloat(p.width), height: CGFloat(p.height))
+        frames.append(frame)
+        contentHeight = max(frame.maxY, 1)
+        let shadow = CALayer()
+        shadow.frame = frame
+        shadow.backgroundColor = PaperDrawing.inks(p.colour).ground.cgColor
+        shadow.shadowColor = UIColor.black.cgColor
+        shadow.shadowOpacity = 0.14
+        shadow.shadowRadius = 3
+        shadow.shadowOffset = CGSize(width: 0, height: 1)
+        shadow.shadowPath = CGPath(rect: CGRect(origin: .zero, size: frame.size), transform: nil)
+        shadow.borderColor = UIColor(white: 0, alpha: 0.07).cgColor
+        shadow.borderWidth = 0.5
+        underlay.layer.addSublayer(shadow)
+        grounds.append(shadow)
+        let tile = PaperTile()
+        tile.frame = frame
+        tile.contentsScale = max(canvas.window?.screen.scale ?? canvas.traitCollection.displayScale, 1)
+        tile.set(p, pdf: store.pdf(n, p)?.pageRef)
+        underlay.layer.addSublayer(tile)
+        tiles.append(tile)
         underlay.bounds = CGRect(x: 0, y: 0, width: contentWidth, height: contentHeight)
+    }
+
+    /// A page added at the end (pulled up for, or added after the last): laid under the others, the writing and what
+    /// can be undone left as they are. False if the pages have to be laid out again (it's wider than the rest).
+    func appendPage(_ p: Notebook.Page) -> Bool {
+        flush()
+        guard var n = notebook, n.pages.count == frames.count, CGFloat(p.width) <= contentWidth else { return false }
+        n.pages.append(p)
+        n.updated = .now
+        store.save(n)
+        place(p, of: n)
+        written[p.id] = Self.signature([])
+        pageCount = n.pages.count
+        noteLastPage([[]])
+        zoomed()
+        go(to: n.pages.count - 1, animated: false)
+        return true
     }
 
     /// The paper of each page drawn again (its ruling or colour changed; the pages kept their sizes).
@@ -321,10 +345,19 @@ final class NotebookCanvas: NSObject {
 
     // MARK: ink
 
-    /// Write each page's ink that changed, now (closing, the pages view opening, the app going away).
-    func flush() {
+    /// Write each page's ink that changed, now (closing, the pages view opening, the app going away), and draw its
+    /// pictures again.
+    func flush() { write(pictures: true) }
+
+    private func write(pictures: Bool) {
         saveTask?.cancel()
         saveTask = nil
+        defer {
+            if pictures, !unpictured.isEmpty {
+                store.redrawPictures(unpictured)
+                unpictured = []
+            }
+        }
         guard dirty, let n = notebook, n.pages.count == frames.count else { return }
         dirty = false
         let pages = strokesByPage()
@@ -335,7 +368,8 @@ final class NotebookCanvas: NSObject {
             guard written[p.id] != sig else { continue }
             // Only a page written on is moved into its own units (its strokes measured again) and written.
             let ink = PKDrawing(strokes: pages[i]).transformed(using: CGAffineTransform(translationX: -frames[i].minX, y: -frames[i].minY))
-            store.setDrawing(ink, n, p)
+            store.setDrawing(ink, n, p, redraw: false)
+            unpictured.insert(p.id)
             written[p.id] = sig
             changed = true
         }
@@ -414,6 +448,9 @@ final class NotebookCanvas: NSObject {
     /// Apple's pens, shown while the page is written on (hidden under a sheet or popover).
     func showTools(_ on: Bool) {
         picker.setVisible(on, forFirstResponder: tools)
+        // The canvas takes first responder when a menu opens over the page (the lasso's): the pens stay for it, so a
+        // selection can be recoloured and the Pencil's double-tap still works.
+        picker.setVisible(on, forFirstResponder: canvas)
         if on { tools.becomeFirstResponder() }
     }
 
@@ -456,8 +493,8 @@ extension NotebookCanvas: PKCanvasViewDelegate {
         saveTask?.cancel()
         saveTask = Task { [weak self] in
             try? await Task.sleep(for: .seconds(0.5))
-            guard !Task.isCancelled else { return }
-            self?.flush()
+            guard !Task.isCancelled, let self else { return }
+            self.write(pictures: self.picturesShowing)
         }
     }
 
@@ -502,6 +539,9 @@ extension NotebookCanvas: UIGestureRecognizerDelegate {
 final class InkCanvas: PKCanvasView {
     private let history = UndoManager()
     override var undoManager: UndoManager? { history }
+    /// First responder for its menus (the lasso's), it brings no keyboard up.
+    private let nothing = UIView(frame: .zero)
+    override var inputView: UIView? { nothing }
 }
 
 /// Holds first responder while a notebook is open, so Apple's pens show, and never asks for a keyboard.

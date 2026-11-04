@@ -30,22 +30,30 @@ public sealed class AiJobs(string home, Func<string>? ollamaHost = null)
     public AiSignIns SignIns => signIns ??= new AiSignIns(Checks, MarkSignedIn) { Every = SignInEvery, Patience = SignInPatience };
 
     /// <summary>An AI's own status command said the student signed in: it's ready now, with no check to press, and the
-    /// notes it couldn't write while it was signed out are written (<see cref="SignedInAgain"/>). A usage limit is left
-    /// alone: signing in doesn't end one.</summary>
+    /// notes it couldn't write while it was signed out are written (<see cref="SignedInAgain"/>). The AI the student just
+    /// signed in to, when it's a new one, is the one they want: it writes their notes and answers their questions from
+    /// now on, whatever was chosen before, so nobody has to go to Settings to pick it. Signing back in to an AI already
+    /// used for something (a sign-in that had run out) is a repair: every pick, and its model, stays as it was. A usage
+    /// limit is left alone: signing in doesn't end one.</summary>
     public void MarkSignedIn(string id)
     {
         var s = Settings;
         bool back = Engines.LooksLikeAuth(s.Tests.GetValueOrDefault(id, ""));
         s.Tests[id] = "works";
-        // The first AI a student gets working, with none chosen yet, is the one that writes their notes (and answers).
-        bool first = !s.Picked("notes") && id != "ollama";
-        if (first) s.Provider = id;
+        bool inUse = AiSettings.Jobs.Any(job => s.Picked(job) && s.For(job).Provider == id);
+        bool chosen = id != "ollama" && !inUse;
+        if (chosen)
+        {
+            s.Provider = id;
+            // As Settings' own pick does (/api/v2/ai/defaults): the notes, Ask, and the chat that answers with Ask.
+            foreach (string job in new[] { "notes", "ask", "agent" }) s.ByJob[job] = new AiChoice(id);
+        }
         s.Save(home);
-        if (first) NotesAiChosen?.Invoke();
+        if (chosen) NotesAiChosen?.Invoke();
         if (back) SignedInAgain?.Invoke(id);
     }
 
-    /// <summary>An AI was chosen to write the notes where none was before: the library writes the notes it kept waiting.</summary>
+    /// <summary>An AI was just chosen to write the notes (signed in to): the library writes the notes it kept waiting.</summary>
     public event Action? NotesAiChosen;
 
     /// <summary>The library's start: an ai.json from before "nobody chosen yet" whose Ollama was only the old default
@@ -855,6 +863,16 @@ public sealed class AiJobs(string home, Func<string>? ollamaHost = null)
     static string AskModel(string engine, AiSettings settings, Config cfg) =>
         engine == "ollama" ? cfg.EffectiveSummaryModel : settings.Models.GetValueOrDefault(engine, "");
 
+    /// <summary>What a student is told when <paramref name="engine"/> failed an Ask, wherever it shows (the error, the line under
+    /// a half answer, the "came from Ollama" note): the plain sentences of the setup chats, never its raw text.</summary>
+    string AskFailure(string engine, Exception ex)
+    {
+        string name = Engines.Name(engine);
+        if (ex is OperationCanceledException or TimeoutException) return $"{name} didn't respond in time.";
+        return SetupChat.Classify(ex.Message) == ChatProblem.Offline ? Engines.CouldntBeReached(name)
+            : Engines.KnownUnusableWhy(engine, Settings, Checks) ?? Engines.DidntAnswer(name);
+    }
+
     /// <summary>
     /// Answer a question with a chosen engine (the request's, or ai.json's "ask" pick): when it's known unusable
     /// (not installed, not signed in, hit its limit) and <see cref="AiSettings.Fallback"/> is on and Ollama is installed,
@@ -926,7 +944,7 @@ public sealed class AiJobs(string home, Func<string>? ollamaHost = null)
         catch (Exception ex) when (ex is InvalidOperationException or HttpRequestException or TimeoutException && shown.Length > 0)
         {
             Record(engine, false, ex.Message);
-            throw new InvalidOperationException($"{Engines.Name(engine)} stopped partway through: {ex.Message}", ex);
+            throw new InvalidOperationException(AskFailure(engine, ex), ex); // what it wrote stays on screen above this
         }
         catch (Exception ex) when (ex is InvalidOperationException or InvalidDataException or HttpRequestException or TimeoutException or OperationCanceledException)
         {
@@ -934,18 +952,10 @@ public sealed class AiJobs(string home, Func<string>? ollamaHost = null)
             bool timedOut = ex is OperationCanceledException;
             Record(engine, false, timedOut ? "timed out" : ex.Message);
             if (engine == "ollama") throw;
-            why = timedOut ? $"{Engines.Name(engine)} didn't respond in time." : $"{Engines.Name(engine)} didn't answer: {ex.Message}";
-            if (!CanFallBack(settings))
-            {
-                string name = Engines.Name(engine);
-                if (timedOut) throw new InvalidOperationException(why, ex);
-                // Fallback switched off: the AI's own error comes back as it is. Otherwise Ollama just isn't here, and the
-                // student is told what's wrong with the AI in plain words (its raw text stays in its record and as the inner
-                // exception), not that an Ollama they never set up isn't installed.
-                if (!settings.Fallback) throw;
-                throw new InvalidOperationException(SetupChat.Classify(ex.Message) == ChatProblem.Offline ? Engines.CouldntBeReached(name)
-                    : Engines.KnownUnusableWhy(engine, Settings, Checks) ?? Engines.DidntAnswer(name), ex);
-            }
+            why = AskFailure(engine, ex);
+            // Nothing to fall back to (switched off, or Ollama isn't here): the student is told what's wrong with the AI in
+            // plain words, and its raw text stays in its record and as the inner exception.
+            if (!CanFallBack(settings)) throw new InvalidOperationException(why, ex);
             fellBack = true;
             engine = "ollama";
             using var cts2 = CancellationTokenSource.CreateLinkedTokenSource(ct);
