@@ -98,7 +98,7 @@ public sealed class GuidedSetupTests
             foreach (var m in WhisperModels.All) Models.Hold.Add(m.File);
             Host = new AppHost(Home.Path, mic ?? (() => throw new InvalidOperationException("no microphone in this test")), log: _ => { }, loginItems: Login,
                 models: new ModelSetting(null, Mirror: "https://mirror.example/models"), http: new HttpClient(Models));
-            Setup = Services.Setup.Make(Host, role, here: new LibraryHere { Command = [BuiltEngine()], Folder = Home["Syft Notes"] });
+            Setup = Services.Setup.Make(Host, role, here: new LibraryHere { Command = [BuiltEngine()], FirstPort = LibraryHereTests.FreePort(), Folder = Home["Syft Notes"] });
             Setup.Again = again;
             var services = new GuidedServices
             {

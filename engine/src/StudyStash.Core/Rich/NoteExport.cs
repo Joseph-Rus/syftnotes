@@ -44,6 +44,16 @@ public static class NoteExport
         new[] { "CON", "PRN", "AUX", "NUL" }.Concat(new[] { "COM", "LPT" }.SelectMany(p => "123456789¹²³".Select(d => p + d))),
         StringComparer.OrdinalIgnoreCase);
 
+    /// <summary>The notes a download holds, as the lecture's page shows them: the library's notes, or, when it has
+    /// written none (no AI yet, or too short), what the student typed while it recorded, under "What you wrote".</summary>
+    public static string Shown(JsonObject lecture)
+    {
+        string notes = S(lecture["notes"]);
+        if (notes.Trim().Length > 0) return notes;
+        string typed = S(lecture["typed"]).Trim();
+        return typed.Length > 0 ? "*What you wrote*\n\n" + typed : "";
+    }
+
     /// <summary>The lecture's Markdown file. <paramref name="mermaidSvg"/> draws a Mermaid flowchart it already knows
     /// parses (its source in, a standalone SVG out, or null when it couldn't be drawn) — the caller measures text in
     /// its own font, so the picture matches what the app would show. <paramref name="fileName"/> is the name it will
@@ -56,7 +66,7 @@ public static class NoteExport
         string className = S(lecture["class"]);
         string dateRaw = S(lecture["date"]);
         double seconds = lecture["seconds"] is JsonValue v && v.TryGetValue(out double s) ? s : 0;
-        string notes = S(lecture["notes"]);
+        string notes = Shown(lecture);
         string rawTranscript = S(lecture["transcript"]);
         var topics = (lecture["topics"] as JsonArray)?.Select(S).Where(x => x.Length > 0).ToList() ?? [];
 

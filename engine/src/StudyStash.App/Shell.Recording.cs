@@ -93,7 +93,9 @@ public static partial class Shell
         }
         catch (Exception e) when (e is InvalidOperationException or PlatformNotSupportedException)
         {
-            Toast("Couldn't start recording", e.Message, null, null);
+            // Said like a microphone that won't start, not as a passing toast: with notifications turned off a toast
+            // isn't shown at all, and Record seemed to do nothing (a nearly full disk).
+            Notify(NoticeWords.CouldntStart(e.Message, () => host.Recorder.Current is null));
             Refresh();
             return false;
         }
