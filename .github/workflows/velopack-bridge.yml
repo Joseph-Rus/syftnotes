@@ -1,0 +1,194 @@
+# The Velopack bridge, proved (docs/LIBRARIES.md, phase 5, step 2): on throwaway runners only, for each system, the
+# published release before the bridge (0.22.1) is installed and set up as a student's, updated to the bridge the way
+# its own updater does it, and then left to move itself over to Velopack's install; what a student relies on is checked
+# (start at login, the background library, the Start menu and a taskbar pin on Windows, the AI connections reaching the
+# library); then a later release installs Velopack to Velopack, and the uninstall leaves nothing of the app (settings and
+# lectures stay). It publishes nothing and reads no secret: the Mac copies are signed with a throwaway self-signed
+# identity (macos/signing-setup.sh selfsigned), the Windows and Linux ones aren't signed. The copies under test are
+# built with the test helpers, only so that they ask the runner's stand-in for GitHub (tools/velopack/fake-release.py)
+# and look for an update 5 seconds after they start. ci.yml makes, signs and publishes the real ones.
+name: Velopack bridge
+
+on:
+  # By hand only (gh workflow run velopack-bridge): it installs, updates and uninstalls on three throwaway runners.
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: velopack-bridge-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  VPK_VERSION: "1.2.161"
+  OLD: "v0.22.1"
+  V1: "0.90.0"
+  V2: "0.90.1"
+  DOTNET_NOLOGO: "1"
+  DOTNET_CLI_TELEMETRY_OPTOUT: "1"
+  STUDYSTASH_SKIP_WEB: "1"
+
+jobs:
+  windows:
+    name: Windows - 0.22.1's Inno install moves to Velopack, updates, uninstalls
+    runs-on: windows-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "10.0.x"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - name: The phone app (web/)
+        working-directory: web
+        run: npm ci --no-audit --no-fund && npm run build
+      - name: vpk, and Inno Setup 6 if this image lacks it
+        shell: pwsh
+        run: |
+          dotnet tool install -g vpk --version $env:VPK_VERSION
+          Add-Content $env:GITHUB_PATH "$env:USERPROFILE\.dotnet\tools"
+          if (-not (Test-Path "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe")) { choco install innosetup -y --no-progress }
+      - name: The release before the bridge, as published
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release download ${{ env.OLD }} -R ${{ github.repository }} -p Syft-Notes-Setup.exe -D old
+      - name: The bridge release (its Inno Setup.exe and Velopack's packages), and the release after it (Velopack's only)
+        shell: pwsh
+        run: |
+          $props = "engine\Directory.Build.props"
+          (Get-Content $props) -replace '<StudyStashVersion>.*</StudyStashVersion>', "<StudyStashVersion>$env:V1</StudyStashVersion>" | Set-Content $props
+          .\windows\build.ps1 -Out dist\v1 -TestHelpers
+          .\windows\velopack-pack.ps1 -Out dist\v1 -Rids win-x64
+          (Get-Content $props) -replace '<StudyStashVersion>.*</StudyStashVersion>', "<StudyStashVersion>$env:V2</StudyStashVersion>" | Set-Content $props
+          .\windows\build.ps1 -Out dist\v2 -TestHelpers -NoInstaller -Rids win-x64
+          $env:STUDYSTASH_VELOPACK_BASE = (Resolve-Path dist\v1\velopack).Path
+          .\windows\velopack-pack.ps1 -Out dist\v2 -Rids win-x64
+          git checkout -- $props
+      - name: Install 0.22.1, update to the bridge, move to Velopack, update again, uninstall
+        shell: pwsh
+        run: .\tools\velopack\bridge-windows.ps1 -Old old\Syft-Notes-Setup.exe -Bridge dist\v1\Syft-Notes-Setup.exe -V1Feed dist\v1\velopack\win-x64 -V2Feed dist\v2\velopack\win-x64 -V1 $env:V1 -V2 $env:V2
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: bridge-windows
+          path: results
+          retention-days: 14
+
+  mac:
+    name: Mac - 0.22.1's Study Stash.app becomes Syft Notes.app on Velopack, updates, uninstalls
+    runs-on: macos-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "10.0.x"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - name: The phone app (web/)
+        working-directory: web
+        run: npm ci --no-audit --no-fund && npm run build
+      - name: vpk
+        run: |
+          dotnet tool install -g vpk --version "$VPK_VERSION"
+          echo "$HOME/.dotnet/tools" >> "$GITHUB_PATH"
+      - name: The release before the bridge, as published
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release download "$OLD" -R "${{ github.repository }}" -p Syft-Notes.dmg -D old
+      - name: Signing - a throwaway self-signed identity
+        run: sh macos/signing-setup.sh selfsigned
+      - name: The bridge release (its DMG, holding Velopack's bundle), and the release after it
+        env:
+          STUDYSTASH_SIGN_REHEARSAL: "1"
+        run: |
+          props=engine/Directory.Build.props
+          sed -i '' "s:<StudyStashVersion>.*</StudyStashVersion>:<StudyStashVersion>$V1</StudyStashVersion>:" "$props"
+          sh macos/build-app.sh dist/v1 && sh macos/sign-release.sh dist/v1
+          sed -i '' "s:<StudyStashVersion>.*</StudyStashVersion>:<StudyStashVersion>$V2</StudyStashVersion>:" "$props"
+          sh macos/build-app.sh dist/v2 && STUDYSTASH_VELOPACK_BASE="$PWD/dist/v1/velopack" sh macos/sign-release.sh dist/v2
+          git checkout -- "$props"
+      - name: Signing - the keychain is removed
+        if: always()
+        run: sh macos/signing-setup.sh cleanup
+      - name: Install 0.22.1, update to the bridge, rename, update again, uninstall
+        env:
+          OLD_DMG: old/Syft-Notes.dmg
+          BRIDGE_DMG: dist/v1/Syft-Notes.dmg
+          V1_FEED: dist/v1/velopack/osx
+          V2_FEED: dist/v2/velopack/osx
+        run: sh tools/velopack/bridge-mac.sh
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: bridge-mac
+          path: results
+          retention-days: 14
+
+  linux:
+    name: Linux - 0.22.1's tarball install moves to the AppImage, updates, uninstalls
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "10.0.x"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - name: The phone app (web/)
+        working-directory: web
+        run: npm ci --no-audit --no-fund && npm run build
+      - name: vpk, mksquashfs, and what the app needs from a desktop (a virtual display, fonts)
+        run: |
+          dotnet tool install -g vpk --version "$VPK_VERSION"
+          echo "$HOME/.dotnet/tools" >> "$GITHUB_PATH"
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq --no-install-recommends squashfs-tools xvfb xauth libx11-6 libice6 libsm6 libfontconfig1 fonts-dejavu-core libpulse0
+      - name: The release before the bridge, as published
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release download "$OLD" -R "${{ github.repository }}" -p Syft-Notes-linux-x64.tar.gz -D old
+      - name: The bridge release (its tarball and AppImage), and the release after it
+        env:
+          STUDYSTASH_LINUX_RIDS: linux-x64
+        run: |
+          props=engine/Directory.Build.props
+          sed -i "s:<StudyStashVersion>.*</StudyStashVersion>:<StudyStashVersion>$V1</StudyStashVersion>:" "$props"
+          sh linux/build.sh dist/v1 && sh linux/velopack-pack.sh dist/v1
+          sed -i "s:<StudyStashVersion>.*</StudyStashVersion>:<StudyStashVersion>$V2</StudyStashVersion>:" "$props"
+          sh linux/build.sh dist/v2 && STUDYSTASH_VELOPACK_BASE="$PWD/dist/v1/velopack" sh linux/velopack-pack.sh dist/v2
+          git checkout -- "$props"
+      - name: Install 0.22.1, update to the bridge, move to the AppImage, update again, uninstall
+        env:
+          OLD_TARBALL: old/Syft-Notes-linux-x64.tar.gz
+          BRIDGE_TARBALL: dist/v1/Syft-Notes-linux-x64.tar.gz
+          V1_FEED: dist/v1/velopack/linux-x64
+          V2_FEED: dist/v2/velopack/linux-x64
+        run: |
+          Xvfb :99 -screen 0 1600x1000x24 > /dev/null 2>&1 &
+          export DISPLAY=:99
+          sh tools/velopack/bridge-linux.sh
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: bridge-linux
+          path: results
+          retention-days: 14

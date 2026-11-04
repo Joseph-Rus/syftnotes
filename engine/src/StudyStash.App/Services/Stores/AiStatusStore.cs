@@ -183,13 +183,17 @@ public sealed class AiStatusStore : IDisposable
     /// for it, whichever button started it), or it isn't waiting any more.</summary>
     public event Action<string?>? WantsCodeChanged;
 
+    /// <summary>Who writes the notes, as a student knows it ("Claude"): the AI the library is set to write notes with, or
+    /// "" until the library has said (or when none is chosen).</summary>
+    public string NotesWriter => Current is { Notes.Length: > 0 } now ? Core.Ai.Engines.Name(now.Notes) : "";
+
     /// <summary>One AI as the library last said it; null when it didn't mention it (or hasn't been asked).</summary>
     public AiEngineStatus? For(string id) => Current?.Engines.FirstOrDefault(e => e.Id == id) is { } e ? StatusOf(e) : null;
 
     public AiEngineStatus StatusOf(EngineInfo e)
     {
         var state = StateOf(e);
-        return new AiEngineStatus(e.Id, AiWords.PlainName(e.Id, e.Name), state, SignInOf(e), NextAction(e.Id, state), AiWords.EngineStateWords(e.State))
+        return new AiEngineStatus(e.Id, AiWords.PlainName(e.Id, e.Name), state, SignInOf(e), NextAction(e.Id, state), AiWords.EngineStateWords(state, e.State))
         {
             Engine = e,
         };

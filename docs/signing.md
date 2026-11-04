@@ -219,6 +219,17 @@ so on the run's summary. Some of a group's secrets but not all of them fails the
   with its `SignTool` and `SignedUninstaller` settings, so Setup.exe and `unins000.exe` are signed too. The installer
   is then installed, updated in place and uninstalled by the same tests as before, and its installed files are checked
   for signatures.
+- **Velopack (docs/LIBRARIES.md, phase 5).** On a Mac, `macos/sign-release.sh` signs the bundle inside out as above,
+  then `macos/velopack-pack.sh` hands it to `vpk pack`, which adds Velopack's updater (`UpdateMac`) and manifest,
+  signs those and the bundle again with the same identity, and notarizes and staples the bundle: vpk notarizes with a
+  `notarytool` profile, which the script makes from the same App Store Connect key in the run's own keychain
+  (`notarytool store-credentials`), so no new secret is needed. That stapled bundle is what the DMG holds and what the
+  update package carries. On Windows, `windows/velopack-pack.ps1` packs each processor's tree after
+  `sign-release.ps1`: with the Artifact Signing secrets it passes vpk `--azureTrustedSignFile` (a file naming only the
+  endpoint, account and profile; vpk's bundled signtool and Microsoft's dlib sign with the service principal in
+  `AZURE_TENANT_ID`, `AZURE_CLIENT_ID` and `AZURE_CLIENT_SECRET`), so Velopack's Setup.exe, `Update.exe` and the app's
+  files are signed; with a certificate file it signs through `windows/sign.ps1` (`--signTemplate`); with neither they're
+  unsigned, as Setup.exe is. Linux AppImages aren't signed.
 - **The publish step won't ship the wrong thing.** Installers a by-hand run signed with throwaway identities are
   never published, and are never reused by a release (`reuse_run`); installers built before you added the secrets
   (so unsigned) can't be reused by a release that is now supposed to be signed. It says which, and you run the
@@ -243,7 +254,7 @@ It publishes nothing and its installers can never be published.
 signs for real, notarizes, publishes nothing, and leaves the installers as run artifacts (`mac-installers`,
 `windows-installers`). Download them and check them on your own computers:
 
-    sh macos/verify-signing.sh "/Volumes/Syft Notes/Study Stash.app"    # after mounting the DMG
+    sh macos/verify-signing.sh "/Volumes/Syft Notes/Syft Notes.app"    # after mounting the DMG
     powershell -File windows\verify-signing.ps1 Syft-Notes-Setup.exe
 
 and open them the way a student would (download from a browser, so they're quarantined). If it passed, a later

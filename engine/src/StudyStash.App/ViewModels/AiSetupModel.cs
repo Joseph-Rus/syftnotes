@@ -2,6 +2,7 @@ using System.Collections.ObjectModel;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using StudyStash.App.Services;
+using StudyStash.App.Services.Stores;
 using StudyStash.App.ViewModels.Kit;
 using StudyStash.Core;
 using StudyStash.Core.Ai;
@@ -16,7 +17,7 @@ public sealed partial class AiSetupRow : ObservableObject
     public string Id { get; init; } = "";
     public string Name { get; init; } = "";
     public string About { get; init; } = "";
-    public string State { get; init; } = "";
+    public AiEngineState State { get; init; }
     /// <summary>The free AI that runs on the computer itself (Ollama): for someone comfortable with a big download, a
     /// slower computer while it works and simpler notes. Marked, so a student who isn't doesn't take it for the easy way.</summary>
     public bool Advanced { get; init; }
@@ -96,7 +97,7 @@ public sealed partial class AiSetupModel : ObservableObject
         foreach (string id in waiting)
         {
             var e = now.Engines.FirstOrDefault(x => x.Id == id);
-            if (e is { State: not "not_signed_in" }) await CheckAgainAsync(id);
+            if (e is not null && AiStatusStore.StateOf(e) != AiEngineState.NotSignedIn) await CheckAgainAsync(id);
             // It stopped without being signed in: said plainly, and its button tries again.
             else if (e is not null && SignInPhase.Stopped(e.SignIn))
                 Say = $"{AiWords.SignInTitle(AiWords.PlainName(e.Id, e.Name), e.SignIn)}. {AiWords.SignInAbout(AiWords.PlainName(e.Id, e.Name), e.SignIn)}";
@@ -200,7 +201,7 @@ public sealed partial class AiSetupModel : ObservableObject
     };
     /// <summary>Gemini's other way, where it isn't on this computer at all: Set it up on its row, which installs Google's
     /// Antigravity and signs in to it, with nothing to type.</summary>
-    public string KeyAlternative => KeyFor == "gemini" && SetUpPaid is not null && Engines.FirstOrDefault(r => r.Id == "gemini") is { State: "not_installed" }
+    public string KeyAlternative => KeyFor == "gemini" && SetUpPaid is not null && Engines.FirstOrDefault(r => r.Id == "gemini") is { State: AiEngineState.NotInstalled }
         ? "Or press Set it up on Gemini's row, and sign in with your Google account." : "";
     public bool HasKeyAlternative => KeyAlternative.Length > 0;
     /// <summary>Under Gemini's key box: what Google's free tier does with what's sent, and who can have a free key.</summary>
@@ -253,7 +254,7 @@ public sealed partial class AiSetupModel : ObservableObject
             if (said.Overview is not null) Apply(said.Overview);
             else await Load();
             Say = said.Said;
-            if (said.Overview?.Engines.FirstOrDefault(e => e.Id == id) is { State: "ready" } && Engines.FirstOrDefault(r => r.Id == id) is { CanWrite: true })
+            if (Is(said.Overview?.Engines.FirstOrDefault(e => e.Id == id), AiEngineState.Ready) && Engines.FirstOrDefault(r => r.Id == id) is { CanWrite: true })
             {
                 SelectedNotes = id;
                 KeyFor = "";
@@ -294,10 +295,13 @@ public sealed partial class AiSetupModel : ObservableObject
 
     /// <summary>It can write notes now: Ollama once installed (it may still need starting, or its model), a CLI
     /// that's installed and not known to be signed out.</summary>
-    static bool CanWrite(EngineInfo e) => e.Installed && (e.Id == "ollama" || e.State is not ("not_signed_in" or "not_installed"));
+    static bool CanWrite(EngineInfo e) => e.Installed && (e.Id == "ollama" || AiStatusStore.StateOf(e) is not (AiEngineState.NotSignedIn or AiEngineState.NotInstalled));
+
+    /// <summary>The library's AI is in this state (false when it didn't mention the AI).</summary>
+    static bool Is(EngineInfo? e, AiEngineState state) => e is not null && AiStatusStore.StateOf(e) == state;
 
     /// <summary>It writes notes as it is, with nothing more to press: the free AI only once its model is here too.</summary>
-    static bool WritesNow(EngineInfo e) => CanWrite(e) && (e.Id != "ollama" || e.State == "ready");
+    static bool WritesNow(EngineInfo e) => CanWrite(e) && (e.Id != "ollama" || Is(e, AiEngineState.Ready));
 
     /// <summary>Where the list opens, once (coming back to the step keeps what was picked on it): on what the library
     /// does now. Notes switched off ("No AI for now", chosen before) is that choice again. The library's own engine is
@@ -313,7 +317,7 @@ public sealed partial class AiSetupModel : ObservableObject
         if (overview.Engines.FirstOrDefault(e => e.Id == overview.Notes) is { } notes
             && (WritesNow(notes) || CanWrite(notes) && (ChosenBefore || overview.Pulling is not null)))
             return notes.Id;
-        if (overview.Engines.FirstOrDefault(e => e.State == "ready" && CanWrite(e)) is { } ready) return ready.Id;
+        if (overview.Engines.FirstOrDefault(e => Is(e, AiEngineState.Ready) && CanWrite(e)) is { } ready) return ready.Id;
         return OffersNoAi ? None : overview.Notes;
     }
 
@@ -343,43 +347,44 @@ public sealed partial class AiSetupModel : ObservableObject
         // The free AI being got ready (its app, starting it, its model), and whether there's still something to get.
         var working = overview.Pulling is { Why.Length: 0 } at ? at : null;
         var failed = overview.Pulling is { Why.Length: > 0 } stopped ? stopped : null;
-        bool freeNeedsWork = overview.Engines.FirstOrDefault(e => e.Id == "ollama") is { State: "not_installed" or "not_running" or "model_missing" };
+        bool freeNeedsWork = overview.Engines.FirstOrDefault(e => e.Id == "ollama") is { } free && AiStatusStore.StateOf(free) is AiEngineState.NotInstalled or AiEngineState.NotRunning or AiEngineState.ModelMissing;
         // Claude, ChatGPT or Gemini, not on this computer or not signed in, where the host gets them ready with buttons
         // (guided setup's screens: Syft Notes installs it and signs in, hidden; Gemini's sign-in is in Syft Notes' own
         // home for agy).
-        bool Buttons(EngineInfo e) => SetUpPaid is not null && e is { Id: "claude" or "codex" or "gemini", State: "not_installed" or "not_signed_in" };
+        bool Buttons(EngineInfo e) => SetUpPaid is not null && e is { Id: "claude" or "codex" or "gemini" } && AiStatusStore.StateOf(e) is AiEngineState.NotInstalled or AiEngineState.NotSignedIn;
         // Gemini, not here at all, where the host has no such screens: its one button is its API key.
-        bool GeminiKey(EngineInfo e) => TakesKeys && SetUpPaid is null && e is { Id: "gemini", State: "not_installed" };
+        bool GeminiKey(EngineInfo e) => TakesKeys && SetUpPaid is null && e.Id == "gemini" && Is(e, AiEngineState.NotInstalled);
         // Not a working pick: not here, signed out, or its last try failed (a plan other apps can't use, say).
-        bool NotReady(EngineInfo e) => e.State is "not_installed" or "not_signed_in" or "failed";
+        bool NotReady(EngineInfo e) => AiStatusStore.StateOf(e) is AiEngineState.NotInstalled or AiEngineState.NotSignedIn or AiEngineState.Failed;
         // A sign-in going from a row (the AI's own, hidden, in the student's browser): the row says it's waiting.
-        static bool SigningIn(EngineInfo e) => e is { State: "not_signed_in", SignIn: SignInPhase.Waiting };
+        static bool SigningIn(EngineInfo e) => AiStatusStore.SignInOf(e) == SignInPhase.Waiting;
         Engines.Clear();
         // Every AI shows, each with what gets it going: Claude, ChatGPT, Gemini and the free AI.
         foreach (var e in AiWords.InShownOrder(overview.Engines))
         {
+            var state = AiStatusStore.StateOf(e);
             var row = new AiSetupRow
             {
                 Id = e.Id,
                 Name = AiWords.SetupName(e.Id, e.Name, Machine.DeviceFor(Windows)),
-                About = AiWords.SetupAbout(e.Id, e.State, Machine.DeviceFor(Windows), e.SetUpGb, e.Small, e.HasKey),
-                State = e.State,
+                About = AiWords.SetupAbout(e.Id, state, Machine.DeviceFor(Windows), e.SetUpGb, e.Small, e.HasKey),
+                State = state,
                 Advanced = e.Id == "ollama",
                 OneButton = e.Id == "ollama" && freeNeedsWork || Buttons(e) || GeminiKey(e),
                 Working = e.Id == "ollama" && working is not null || SigningIn(e),
                 Progress = e.Id == "ollama" && working is not null ? AiWords.FreeAiProgress(working) : SigningIn(e) ? AiWords.SignInWaiting : "",
                 Fraction = working?.Fraction ?? 0,
                 Steady = working is { Step: "start" } || SigningIn(e),
-                ShowSignIn = e.State == "not_signed_in" && !Buttons(e),
+                ShowSignIn = state == AiEngineState.NotSignedIn && !Buttons(e),
                 ShowKeyLink = TakesKeys && e.Id is ("claude" or "codex" or "gemini") && NotReady(e) && !GeminiKey(e),
                 CanWrite = CanWrite(e),
                 Selected = e.Id == SelectedNotes,
                 First = Engines.Count == 0,
-                OpenLabel = (e.Id, e.State) switch
+                OpenLabel = (e.Id, state) switch
                 {
                     ("ollama", _) => failed is null ? "Set it up" : "Try again",
                     _ when GeminiKey(e) => "Add a key",
-                    (_, "not_signed_in") => "Sign in",
+                    (_, AiEngineState.NotSignedIn) => "Sign in",
                     _ when Buttons(e) => "Set it up",
                     _ => "",
                 },
@@ -498,7 +503,7 @@ public sealed partial class AiSetupModel : ObservableObject
                 }
                 if (overview.Pulling is null)
                 {
-                    if (free is { State: "ready" }) Say = $"{free.Name} is ready. It writes your notes.";
+                    if (free is { State: AiEngineState.Ready }) Say = $"{free.Name} is ready. It writes your notes.";
                     return;
                 }
             }
@@ -531,7 +536,7 @@ public sealed partial class AiSetupModel : ObservableObject
             await withButtons(row.Id);
             return;
         }
-        if (row.State == "not_signed_in") await SignInAsync(row.Id);
+        if (row.State == AiEngineState.NotSignedIn) await SignInAsync(row.Id);
     }
 
     /// <summary>Check again: looks at the engine afresh (after installing it, or signing in) and, when it can write
@@ -549,7 +554,7 @@ public sealed partial class AiSetupModel : ObservableObject
                 return;
             }
             string? said = null;
-            if (overview.Engines.FirstOrDefault(e => e.Id == id) is { Installed: true, State: "unchecked" or "not_signed_in" } && id != "ollama")
+            if (overview.Engines.FirstOrDefault(e => e.Id == id) is { Installed: true } here && AiStatusStore.StateOf(here) is AiEngineState.Unchecked or AiEngineState.NotSignedIn && id != "ollama")
             {
                 var check = await library.CheckAsync(id);
                 if (check is null)
@@ -571,7 +576,7 @@ public sealed partial class AiSetupModel : ObservableObject
             }
             else
             {
-                Say = said ?? (row?.State == "not_installed"
+                Say = said ?? (row?.State == AiEngineState.NotInstalled
                     ? $"{name} isn't on this {Device} yet."
                     : $"{name} isn't signed in yet. Press Sign in on its row.");
             }
@@ -625,12 +630,12 @@ public sealed partial class AiSetupModel : ObservableObject
     async Task<bool> CheckedAsync(string id)
     {
         if (id == "ollama" || Engines.FirstOrDefault(r => r.Id == id) is not { } row) return true;
-        if (row.State == "not_signed_in" || !row.CanWrite)
+        if (row.State == AiEngineState.NotSignedIn || !row.CanWrite)
         {
-            Say = NotWorking(row, row.State == "not_signed_in" ? "signed out" : "");
+            Say = NotWorking(row, row.State == AiEngineState.NotSignedIn ? "signed out" : "");
             return false;
         }
-        if (row.State is not ("unchecked" or "failed")) return true;
+        if (row.State is not (AiEngineState.Unchecked or AiEngineState.Failed)) return true;
         Say = $"Checking {row.Name} works…";
         AiSaid? check;
         try
@@ -649,7 +654,7 @@ public sealed partial class AiSetupModel : ObservableObject
             return true;
         }
         if (check.Overview is not null) Apply(check.Overview);
-        if (check.Overview?.Engines.FirstOrDefault(e => e.Id == id) is { State: "ready" })
+        if (Is(check.Overview?.Engines.FirstOrDefault(e => e.Id == id), AiEngineState.Ready))
         {
             Say = null;
             return true;

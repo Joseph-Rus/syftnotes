@@ -248,6 +248,14 @@ Each step is one branch, is safe to ship alone, and leaves the app working.
 2. `ai-store`: AiStatusStore on AppHost; AiProblemsModel and AiEnginesModel use it; ShareWith, Adopt and two
    SignInWatches go away.
 3. `ai-store-setup`: AiSetupModel, Shell's `NotesOff`/`notesWriter` and WelcomeCard `NeedsAi` read the store.
+   **Partly done (step 3a, `ai-store-step3`):** no screen compares an engine-state string any more (the
+   `engine-state-strings` count is 0): rows, cards, words, the demo and Shell's notes writer read the store's typed state
+   (`AiEngineState`, `AiProblemKind`, `AiStatusStore.NotesWriter`). **Still to do (3b):** screens that still keep their own
+   copy of the AI's state or fetch it themselves: `AiSetupModel` (its own overview fetches and its own `SignInWatch`; about 30
+   construction sites in `Shell.cs` and the tests), the Ask and Rewrite "Answer with" menus (`AiAskModel`, `AiNotesModel`
+   build theirs from one-off `EnginesAsync` calls, so a sign-in made in Settings while a lecture is open shows there only
+   after the lecture is opened again), `GuidedSetup`'s own `AiRemote`, `NotesOff` (read from the overview JSON) and
+   `WelcomeCardModel.NeedsAi` (from a setting).
 4. `ai-store-ready`: when guided setup's / Get-ready's sign-in ends, it refreshes the store, and `ReadyForNotes`
    reads it. The four sign-in flows become one `ActAsync`, plus the CLI's own login only where the library isn't
    involved yet.

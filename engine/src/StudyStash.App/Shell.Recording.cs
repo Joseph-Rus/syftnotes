@@ -301,10 +301,8 @@ public static partial class Shell
         l.FiledTitle.Length > 0 && !(l.TitleTyped && l.Title.Length > 0) ? l.FiledTitle : WorkingTitle(l);
 
     /// <summary>Who writes a lecture's notes, as the hint under the student's own names them ("Claude"): the AI the
-    /// library is set to write notes with, once the app has heard which; until then, "your library".</summary>
-    static string notesWriter = "";
-
-    static string NotesWriter() => notesWriter.Length > 0 ? notesWriter : "your library";
+    /// library is set to write notes with (the AI store's word, once it has heard which); until then, "your library".</summary>
+    static string NotesWriter() => host.AiStatus.NotesWriter is { Length: > 0 } writer ? writer : "your library";
 
     /// <summary>The library writes no notes (after setup's "No AI for now", or switched off in Settings → Notes and
     /// sorting): what's recorded is filed with its transcript and nothing more, so nothing here says notes are on
@@ -315,16 +313,12 @@ public static partial class Shell
     /// writes notes) gets its notes like any other.</summary>
     static string SavedSoFar => NotesOff ? "What's recorded so far is saved." : "What's recorded so far is saved, and its notes are written as usual.";
 
-    /// <summary>Asks the library which AI writes its notes (when the window is read: it can change in Settings).</summary>
+    /// <summary>Has the AI store look again, so <see cref="NotesWriter"/> names the AI the library writes notes with now
+    /// (when the window is read: it can change in Settings).</summary>
     static async Task HearNotesWriterAsync()
     {
-        try
-        {
-            if (host.Remote() is not null && await Ai().EnginesAsync() is { Notes.Length: > 0 } ai) notesWriter = Core.Ai.Engines.Name(ai.Notes);
-        }
-        catch (Exception e) when (e is HttpRequestException or TaskCanceledException or LibraryRefusedException or System.Text.Json.JsonException)
-        {
-        }
+        if (host.Remote() is null) return;
+        await host.AiStatus.RefreshAsync();
     }
 
     // --- what's typed while it records ---------------------------------------------------------------------------------
