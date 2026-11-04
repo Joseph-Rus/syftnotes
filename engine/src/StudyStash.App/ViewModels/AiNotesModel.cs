@@ -1,3 +1,4 @@
+using StudyStash.App.Services;
 using System.Collections.ObjectModel;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
@@ -126,6 +127,9 @@ public sealed partial class AiNotesModel : ObservableObject, IDisposable
     public string FailedTitle => AiWords.ProblemTitle(AiProblemKind.RewriteFailed, EngineName, "");
     public string FailedMessage => AiWords.ProblemMessage(AiProblemKind.RewriteFailed, EngineName, "", "", 0, Error);
     public string RewritingLead => $"Rewriting with {EngineName}…";
+    /// <summary>What follows the lead: the current notes stay; or, while the library isn't answering the page's checks,
+    /// that it's still trying (the rewrite goes on in the library either way).</summary>
+    public string RewritingDetail => Offline ? " Can't reach your library right now. Still trying." : " Your current notes stay until the new ones are ready.";
     public string ReadyLead => $"New notes from {EngineName} are ready.";
     public string DraftHeading => $"New notes from {EngineName}";
 
@@ -166,6 +170,8 @@ public sealed partial class AiNotesModel : ObservableObject, IDisposable
     }
 
     partial void OnErrorChanged(string value) => OnPropertyChanged(nameof(FailedMessage));
+
+    partial void OnOfflineChanged(bool value) => OnPropertyChanged(nameof(RewritingDetail));
 
     partial void OnMenuOpenChanged(bool value) => OnPropertyChanged(nameof(Dimmed));
 
@@ -219,7 +225,7 @@ public sealed partial class AiNotesModel : ObservableObject, IDisposable
             overview = await library.EnginesAsync();
             info = await library.RewriteAsync(LectureId);
         }
-        catch
+        catch (Exception e) when (LibraryCall.Handled(e, "[ai-notes] LoadOnce"))
         {
             Offline = true;
             return;
@@ -258,6 +264,7 @@ public sealed partial class AiNotesModel : ObservableObject, IDisposable
 
     void Apply(RewriteInfo info)
     {
+        Offline = false; // the library answered
         if (info.Current is { } cur)
         {
             written = cur.Markdown;
@@ -298,8 +305,9 @@ public sealed partial class AiNotesModel : ObservableObject, IDisposable
 
     void StartPolling()
     {
-        pollCts = new CancellationTokenSource();
-        _ = PollLoop(pollCts.Token);
+        var cts = new CancellationTokenSource();
+        pollCts = cts;
+        _ = PollLoop(cts.Token);
     }
 
     void StopPolling()
@@ -308,6 +316,9 @@ public sealed partial class AiNotesModel : ObservableObject, IDisposable
         pollCts = null;
     }
 
+    /// <summary>Asks again every few seconds while <see cref="Polls"/>. A call that doesn't reach the library shows Offline and
+    /// is tried again on the next tick (Offline clears when one works); one the library refuses stops it; however the loop ends, it clears <c>pollCts</c> if that is still
+    /// its own, so the next <see cref="Apply"/> can start it again.</summary>
     async Task PollLoop(CancellationToken ct)
     {
         try
@@ -321,11 +332,21 @@ public sealed partial class AiNotesModel : ObservableObject, IDisposable
                 {
                     info = await library.RewriteAsync(LectureId);
                 }
-                catch
+                catch (LibraryRefusedException ex)
                 {
-                    Offline = true;
+                    // The library answered, and said no (the lecture was deleted on another device, say): asking again
+                    // wouldn't change that, so the page stops checking and says what it said.
+                    Offline = false; // it answered
+                    Say = ex.Message;
                     return;
                 }
+                catch (Exception e) when (LibraryCall.Handled(e, "[ai-notes] PollLoop"))
+                {
+                    // Not reached this time: the next check tries again.
+                    Offline = true;
+                    continue;
+                }
+                if (ct.IsCancellationRequested) return;
                 if (info is null)
                 {
                     OlderLibrary = true;
@@ -337,6 +358,10 @@ public sealed partial class AiNotesModel : ObservableObject, IDisposable
         catch (OperationCanceledException)
         {
             // Cancel()/Dispose() stopped this on purpose.
+        }
+        finally
+        {
+            if (pollCts is { } mine && mine.Token == ct) pollCts = null;
         }
     }
 
@@ -361,7 +386,7 @@ public sealed partial class AiNotesModel : ObservableObject, IDisposable
         {
             Say = ex.Message;
         }
-        catch
+        catch (Exception e) when (LibraryCall.Handled(e, "[ai-notes] Rewrite"))
         {
             Offline = true;
         }
@@ -385,7 +410,7 @@ public sealed partial class AiNotesModel : ObservableObject, IDisposable
         {
             Say = ex.Message;
         }
-        catch
+        catch (Exception e) when (LibraryCall.Handled(e, "[ai-notes] Cancel"))
         {
             Offline = true;
         }
@@ -409,7 +434,7 @@ public sealed partial class AiNotesModel : ObservableObject, IDisposable
         {
             Say = ex.Message;
         }
-        catch
+        catch (Exception e) when (LibraryCall.Handled(e, "[ai-notes] KeepOld"))
         {
             Offline = true;
         }
@@ -446,7 +471,7 @@ public sealed partial class AiNotesModel : ObservableObject, IDisposable
         {
             Say = ex.Message;
         }
-        catch
+        catch (Exception e) when (LibraryCall.Handled(e, "[ai-notes] UseNew"))
         {
             Offline = true;
         }
@@ -523,7 +548,7 @@ public sealed partial class AiNotesModel : ObservableObject, IDisposable
         {
             Say = ex.Message;
         }
-        catch
+        catch (Exception e) when (LibraryCall.Handled(e, "[ai-notes] PutBack"))
         {
             Offline = true;
         }
@@ -579,7 +604,7 @@ public sealed partial class AiNotesModel : ObservableObject, IDisposable
         {
             Say = ex.Message;
         }
-        catch
+        catch (Exception e) when (LibraryCall.Handled(e, "[ai-notes] OpenHistory"))
         {
             Offline = true;
         }
@@ -621,7 +646,7 @@ public sealed partial class AiNotesModel : ObservableObject, IDisposable
         {
             PickedSummary = ex.Message;
         }
-        catch
+        catch (Exception e) when (LibraryCall.Handled(e, "[ai-notes] Pick"))
         {
             Offline = true;
         }
@@ -824,7 +849,7 @@ public sealed partial class AiNotesModel : ObservableObject, IDisposable
         {
             EditProblem = AiWords.EditRefused(ex.Status, ex.Message);
         }
-        catch
+        catch (Exception e) when (LibraryCall.Handled(e, "[ai-notes] SaveEdit"))
         {
             Offline = true;
             EditProblem = AiWords.EditOffline;
@@ -847,7 +872,7 @@ public sealed partial class AiNotesModel : ObservableObject, IDisposable
             editBase = written;
             return true;
         }
-        catch
+        catch (Exception e) when (LibraryCall.Handled(e, "[ai-notes] SeeWhatChanged"))
         {
             return false;
         }

@@ -1,3 +1,4 @@
+using StudyStash.App.Services;
 using System.Collections.ObjectModel;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
@@ -203,7 +204,7 @@ public sealed partial class FreeAiModel : ObservableObject
         {
             Say = Sentence(e.Message);
         }
-        catch
+        catch (Exception e) when (LibraryCall.Handled(e, "[free-ai] CopyForAi"))
         {
             Say = "Your library isn't answering. Try again in a moment.";
         }
@@ -304,7 +305,7 @@ public sealed partial class FreeAiModel : ObservableObject
         {
             PasteProblem = Sentence(e.Message);
         }
-        catch
+        catch (Exception e) when (LibraryCall.Handled(e, "[free-ai] SavePaste"))
         {
             PasteProblem = "Your library isn't answering, so nothing was saved. What you pasted is still here.";
         }

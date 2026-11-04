@@ -20,7 +20,7 @@
         <c:SyftLoader Kind="HoppingBits" Size="18" />
         <TextBlock Grid.Column="2" TextWrapping="Wrap" FontSize="13">
           <Run FontWeight="SemiBold" Text="{Binding RewritingLead}" />
-          <Run Foreground="{DynamicResource Fg2}" Text=" Your current notes stay until the new ones are ready." />
+          <Run Foreground="{DynamicResource Fg2}" Text="{Binding RewritingDetail}" />
         </TextBlock>
         <Button Grid.Column="4" Classes="ai-textbtn" Command="{Binding CancelCommand}" VerticalAlignment="Center">
           <TextBlock Classes="ai-bar-text" Text="Cancel" />
