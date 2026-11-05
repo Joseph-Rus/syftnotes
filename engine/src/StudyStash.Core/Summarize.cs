@@ -336,8 +336,7 @@ public static partial class Summarize
     /// so it's the system's sound settings.</summary>
     public static string NothingHeardWords(string it, double seconds) =>
         $"Nothing was heard. {it} ran {TimedText.Length(seconds)}, but Syft Notes heard no speech. Check that the right microphone is picked in "
-        + (Machine.Linux ? "your system's Sound settings, under Input" : OperatingSystem.IsWindows() ? "Settings → System → Sound → Input" : "System Settings → Sound → Input")
-        + ", and that it isn't muted.";
+        + RecordingWords.SoundInput + ", and that it isn't muted.";
 
     /// <summary>
     /// Whether a recording that just stopped will have notes written for it, as far as its length and what's been
