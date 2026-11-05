@@ -6,9 +6,9 @@ public sealed record MovePlan(string Source, string Dest, string? Volume);
 /// <summary>
 /// "Move Syft Notes to Applications" (the LetsMove pattern): a copy opened straight from its DMG, from Gatekeeper's
 /// translocation folder (a download opened from Downloads) or from Downloads or the Desktop offers once to move
-/// itself into /Applications (~/Applications when that isn't writable), ejects the DMG it came from, and opens the
-/// copy there. One already there that's as new or newer opens instead. A build folder, an app somewhere the student
-/// put it on purpose, and the self-test never see it.
+/// itself into /Applications (~/Applications when that isn't writable), opens the copy there, and ejects the DMG it
+/// came from (for a translocated copy, the one its translocation folder mirrors). One already there that's as new or
+/// newer opens instead. A build folder, an app somewhere the student put it on purpose, and the self-test never see it.
 /// </summary>
 public static class MoveToApplications
 {
@@ -35,41 +35,60 @@ public static class MoveToApplications
 
     static string Join(string a, string b) => a.Replace('\\', '/').TrimEnd('/') + "/" + b;
 
-    /// <summary>The whole thing for this run: nothing if the student said "Not now" before (or there's nothing to
-    /// offer), else asks once. True when the copy is moved and will open from its new place, or the copy already in
-    /// Applications is as new or newer and opens instead: the caller quits now. <paramref name="ask"/> shows the one
-    /// sheet (true for Move). <paramref name="spawn"/> starts the little waiter that, once this process is gone, ejects
-    /// the disk image and opens the copy in Applications.</summary>
+    /// <summary>The whole thing for this run: nothing if there's nothing to offer (or the student said "Not now" to this
+    /// version in Downloads or on the Desktop), else asks once. True when the copy is moved and will open from its new
+    /// place, or the copy already in Applications is as new or newer and opens instead: the caller quits now.
+    /// <paramref name="ask"/> shows the one sheet (true for Move). <paramref name="spawn"/> starts the little waiter
+    /// that, once this process is gone, opens the copy in Applications and ejects the disk image.
+    /// <paramref name="otherCopyRunning"/> is <see cref="OtherCopyRunning"/> unless a test says otherwise (the app passes
+    /// the engine's commands to leave out). <paramref name="background"/> is the computer's background library, stopped
+    /// while the bundle it runs from is replaced.</summary>
     public static bool Offer(string baseDir, string home, string userHome, Func<bool> ask, Runner run,
         Action<IReadOnlyList<string>> spawn, int pid, Action<string> log, bool? applicationsWritable = null,
-        Func<bool>? otherCopyRunning = null)
+        Func<bool>? otherCopyRunning = null, IBackgroundLibrary? background = null)
     {
         bool writable = applicationsWritable ?? Machine.Writable("/Applications");
         if (Plan(baseDir, userHome, writable) is not { } plan) return false;
         if (Path.GetFullPath(plan.Source) == Path.GetFullPath(plan.Dest)) return false;
-        // Another copy of the app running (an older one in Applications): swapping the bundle under it and opening the
-        // new one would only hand off to that old copy, so nothing is offered until it's quit.
+        // Another copy of the app open (an older one in Applications, its window or its menu bar copy): swapping the
+        // bundle under it and opening the new one would only hand off to that old copy, so nothing is offered until it's
+        // quit. What AI apps and the computer run from the bundle (MCP, the background library) doesn't count.
         if ((otherCopyRunning ?? (() => OtherCopyRunning(run, pid)))()) return false;
-        string? eject = plan.Volume is { } v && IsDiskImage(v, run) ? v : null;
+        // The disk image to put away: the one it runs from, or for a copy Gatekeeper runs from a translocation folder
+        // (whose path doesn't say), the one that folder mirrors, as `mount` lists it.
+        bool translocated = plan.Source.Replace('\\', '/').Contains("/AppTranslocation/", StringComparison.Ordinal);
+        List<(string From, string To)> mounts = translocated ? Mounts(run) : [];
+        string? volume = !translocated ? plan.Volume : OriginalOf(plan.Source, mounts) is { } original ? MountOf(original, mounts)?.To : null;
+        string? eject = volume is not null && DiskImages(run).Contains(volume) ? volume : null;
         // Never over a copy in Applications that's as new or newer (a disk image or a Downloads copy kept from before would
         // put an older version over one that updated itself): that one opens instead, nothing asked or copied. Not when
         // it's this very copy, run from a translocation folder because an earlier move kept the download's quarantine on
         // it: opening it would only come back here, where moving it again takes the quarantine off.
         if (Apps.PlistString(Path.Combine(plan.Dest, "Contents", "Info.plist"), "CFBundleShortVersionString") is { } installed
             && Updates.Compare(Updates.ParseVersion(installed), Updates.ParseVersion(Apps.PlistString(Path.Combine(plan.Source, "Contents", "Info.plist"), "CFBundleShortVersionString"))) >= 0
-            && !ItselfTranslocated(plan, run))
+            && !ItselfTranslocated(plan, mounts))
         {
             log($"[move] {plan.Dest} is already {installed}: it opens instead of this copy");
             spawn(WaiterCommand(pid, plan.Dest, eject));
             return true;
         }
+        // "Not now" is kept for this version, and only for a copy in Downloads or on the Desktop: one on its disk image or in
+        // a translocation folder can't update itself from there, so it asks every time.
+        bool remembers = plan.Volume is null && !translocated;
+        string version = Apps.PlistString(Path.Combine(plan.Source, "Contents", "Info.plist"), "CFBundleShortVersionString") ?? "";
         string declined = Path.Combine(home, DeclinedFile);
-        if (File.Exists(declined)) return false;
+        if (remembers && Said(declined) == version) return false;
         if (!ask())
         {
-            try { File.WriteAllText(declined, ""); } catch (Exception e) when (e is IOException or UnauthorizedAccessException) { }
+            if (remembers)
+                try { File.WriteAllText(declined, version); } catch (Exception e) when (e is IOException or UnauthorizedAccessException) { }
             return false;
         }
+        // The background library runs from the bundle about to be replaced: it goes first, by its label, so launchd neither
+        // keeps it on a bundle being deleted nor starts it from a half-made one, and it's registered again once the new
+        // bundle is in place (or the old one is back).
+        var paused = background?.All().Where(r => r.Args.Count >= 4 && r.Args[0].StartsWith(plan.Dest.TrimEnd('/') + "/", StringComparison.Ordinal)).ToList() ?? [];
+        foreach (var (h, _) in paused) background!.Stop(h);
         try
         {
             Directory.CreateDirectory(Path.GetDirectoryName(plan.Dest)!);
@@ -94,6 +113,15 @@ public static class MoveToApplications
             log("[move] couldn't move the app: " + e.Message);
             return false;
         }
+        finally
+        {
+            foreach (var (h, args) in paused)
+                try { background!.Register(h, args[0], [.. args.Skip(4)]); }
+                catch (Exception e) when (e is IOException or UnauthorizedAccessException or InvalidOperationException)
+                {
+                    log("[move] couldn't start the background library again: " + e.Message);
+                }
+        }
         log("[move] moved to " + plan.Dest);
         spawn(WaiterCommand(pid, plan.Dest, eject));
         return true;
@@ -101,9 +129,22 @@ public static class MoveToApplications
 
     /// <summary>This copy runs from a translocation folder that mirrors <see cref="MovePlan.Dest"/> itself, or where it
     /// really is can't be told: `mount` lists the folder as a mount of that place.</summary>
-    static bool ItselfTranslocated(MovePlan plan, Runner run) =>
+    static bool ItselfTranslocated(MovePlan plan, List<(string From, string To)> mounts) =>
         plan.Source.Replace('\\', '/').Contains("/AppTranslocation/", StringComparison.Ordinal)
-        && (OriginalOf(plan.Source, Mounts(run)) is not { } original || Firm(original) == Firm(plan.Dest.TrimEnd('/')));
+        && (OriginalOf(plan.Source, mounts) is not { } original || Firm(original) == Firm(plan.Dest.TrimEnd('/')));
+
+    /// <summary>The version "Not now" was said to (an older copy wrote nothing in the file), or null when it wasn't.</summary>
+    static string? Said(string declined)
+    {
+        try
+        {
+            return File.Exists(declined) ? File.ReadAllText(declined).Trim() : null;
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException)
+        {
+            return null;
+        }
+    }
 
     /// <summary>A path without the Data volume's own prefix: /Applications is /System/Volumes/Data/Applications too.</summary>
     static string Firm(string path) => path.StartsWith("/System/Volumes/Data/", StringComparison.Ordinal) ? path["/System/Volumes/Data".Length..] : path;
@@ -128,29 +169,63 @@ public static class MoveToApplications
         MountOf(translocated, mounts) is { } t && t.To.Contains("/AppTranslocation/", StringComparison.Ordinal) && t.From.StartsWith('/')
             ? t.From + translocated[t.To.TrimEnd('/').Length..] : null;
 
-    /// <summary>Any other process running a program from a Syft Notes.app (or an old Study Stash.app) bundle: the app,
-    /// or the library it runs. <paramref name="bundle"/> narrows it to one bundle.</summary>
-    public static bool OtherCopyRunning(Runner run, int pid, string? bundle = null) =>
-        run("/usr/bin/pgrep", ["-f", bundle is null ? "(Syft Notes|Study Stash)\\.app/Contents/MacOS/" : Ere(bundle.TrimEnd('/') + "/Contents/MacOS/")], TimeSpan.FromSeconds(10)) is { ExitCode: 0 } p
-        && p.Stdout.Split('\n', StringSplitOptions.RemoveEmptyEntries)
-            .Any(l => int.TryParse(l.Trim(), out int other) && other != pid);
+    /// <summary>Any other process running the app from a Syft Notes.app (or an old Study Stash.app) bundle: its window,
+    /// its menu bar copy started at login, or another program of the bundle's (an update being put in). The engine's
+    /// own commands (<paramref name="engine"/> knows them: StudyStash.Library.Cli.IsCommand) never count: AI apps start
+    /// `mcp` from the bundle and the computer runs the background library's `helper`, and they run for days (a Mac had
+    /// seventeen, so nothing was ever offered). Without <paramref name="engine"/> every program counts.
+    /// <paramref name="bundle"/> narrows it to one bundle.</summary>
+    public static bool OtherCopyRunning(Runner run, int pid, string? bundle = null, Func<IReadOnlyList<string>, bool>? engine = null)
+    {
+        string where = bundle is null ? "(Syft Notes|Study Stash)\\.app/Contents/MacOS/" : Ere(bundle.TrimEnd('/') + "/Contents/MacOS/");
+        if (run("/usr/bin/pgrep", ["-lf", where], TimeSpan.FromSeconds(10)) is not { ExitCode: 0 } p) return false;
+        // `pgrep -lf`: a process id, then its whole command line (Claude's own wrapper names the bundle's program in its).
+        var program = new System.Text.RegularExpressions.Regex(where + "(?<exe>\\S+)(?<args>.*)");
+        foreach (string line in p.Stdout.Split('\n', StringSplitOptions.RemoveEmptyEntries))
+        {
+            string[] words = line.Trim().Split(' ', 2);
+            if (!int.TryParse(words[0], out int other) || other == pid) continue;
+            if (engine is not null && program.Match(words.Length > 1 ? words[1] : "") is { Success: true } m && m.Groups["exe"].Value == "StudyStash"
+                && engine(m.Groups["args"].Value.Split(' ', StringSplitOptions.RemoveEmptyEntries))) continue;
+            return true;
+        }
+        return false;
+    }
 
     /// <summary>A path as a POSIX extended regular expression (pgrep's) that matches it alone: its special characters
     /// escaped, and nothing else (a space stays a space).</summary>
     internal static string Ere(string text) =>
         string.Concat(text.Select(c => "\\.^$|?*+()[]{}".Contains(c) ? "\\" + c : c.ToString()));
 
-    /// <summary>`hdiutil info` lists only disk images, so a volume it names is one this download made, never a
+    /// <summary>Where each disk image is mounted, from `hdiutil info`: its device lines are the device, its kind and its
+    /// mount point, split by tabs. It lists only disk images, so a volume named there is one a download made, never a
     /// USB stick or another disk.</summary>
-    static bool IsDiskImage(string volume, Runner run) =>
+    internal static List<string> DiskImages(Runner run) =>
         run("/usr/bin/hdiutil", ["info"], TimeSpan.FromSeconds(20)) is { ExitCode: 0 } p
-        && p.Stdout.Split('\n').Any(l => l.TrimEnd().EndsWith(volume, StringComparison.Ordinal));
+            ? [.. p.Stdout.Split('\n').Where(l => l.StartsWith("/dev/", StringComparison.Ordinal)).Select(l => l.Split('\t'))
+                .Where(f => f.Length > 2 && f[2].Trim().Length > 0).Select(f => f[2].Trim())]
+            : [];
 
-    /// <summary>Waits for <paramref name="pid"/> to quit (caffeinate -w blocks until it exits: no polling), ejects <paramref name="volume"/> (when not empty), opens the app.</summary>
+    /// <summary>Waits for <paramref name="pid"/> to quit (caffeinate -w blocks until it exits: no polling) and opens the
+    /// app: a new copy of it, as a program the computer still runs from the old bundle may otherwise be taken for the app.
+    /// Then it puts <paramref name="volume"/> (when not empty) away: asked up to three times while Finder may still have
+    /// its window open or the system its translocation folder (gone within seconds of this copy quitting), with `sync`
+    /// between tries rather than a fixed wait (macos/dmg.sh's way), then made to. It stops as soon as the volume is
+    /// gone.</summary>
     internal static IReadOnlyList<string> WaiterCommand(int pid, string dest, string? volume) =>
     [
         "/bin/sh", "-c",
-        "/usr/bin/caffeinate -w \"$1\"; [ -z \"$3\" ] || /usr/bin/hdiutil detach \"$3\" -quiet; /usr/bin/open \"$2\"",
+        """
+        /usr/bin/caffeinate -w "$1"
+        /usr/bin/open -n "$2"
+        [ -n "$3" ] || exit 0
+        for try in 1 2 3; do
+          [ -d "$3" ] || exit 0
+          /usr/bin/hdiutil detach "$3" -quiet && exit 0
+          sync
+        done
+        exec /usr/bin/hdiutil detach "$3" -quiet -force
+        """,
         "sh", pid.ToString(System.Globalization.CultureInfo.InvariantCulture), dest, volume ?? "",
     ];
 }
