@@ -4,6 +4,7 @@ using Avalonia.Media;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using StudyStash.App.Services;
+using StudyStash.App.ViewModels.Kit;
 
 namespace StudyStash.App.ViewModels;
 
@@ -177,6 +178,9 @@ public sealed partial class OverviewModel : ObservableObject
     /// <summary>An event this close to starting says "In 11 minutes" rather than its day.</summary>
     public static readonly TimeSpan Soon = TimeSpan.FromMinutes(15);
 
+    /// <summary>How far down the page is scrolled: Back and Forward come back to it.</summary>
+    public ScrollPlace Scroll { get; } = new();
+
     public bool IsHome { get; init; }
     /// <summary>Due: the calendar of what's to hand in.</summary>
     public bool IsDuePage { get; init; }
@@ -184,6 +188,9 @@ public sealed partial class OverviewModel : ObservableObject
     public bool IsFolder => !IsHome && !IsDuePage;
     /// <summary>The folder as the library knows it (what its notes are filed under).</summary>
     public string ClassName { get; init; } = "";
+    /// <summary>What the page was built from (<see cref="Sources.Stamp"/> and the page's own choices): read again the
+    /// same, the page stays as it is, where it's scrolled to and what's open in it.</summary>
+    public string Stamp { get; set; } = "";
     /// <summary>The page's title: today's date on Home ("Monday, October 12"), "Due", or the folder's name.</summary>
     public string Title { get; init; } = "";
     /// <summary>A sentence or two under the title, the most pressing thing first.</summary>
@@ -500,6 +507,16 @@ public sealed partial class OverviewModel : ObservableObject
         public Action<string?>? OpenDue { get; init; }
         /// <summary>Starts recording an event (its id) into its folder.</summary>
         public Action<string>? RecordEvent { get; init; }
+
+        /// <summary>Everything a page built from these shows, as one string, the time to the minute ("In 11 minutes"
+        /// moves on): two reads that stamp the same draw the same page.</summary>
+        public string Stamp() => System.Text.Json.JsonSerializer.Serialize(new
+        {
+            Now = TimeZoneInfo.ConvertTime(Now, Zone).ToString("yyyy-MM-dd HH:mm", CultureInfo.InvariantCulture),
+            Zone = Zone.Id,
+            Classes = Classes.Select(c => new { c.Name, Dot = (c.Dot as ISolidColorBrush)?.Color.ToString(), c.Lectures, Group = GroupOf(c.Name) }),
+            Lectures, Due, Canvas, Events, Unsorted, Writing, NotesOff,
+        }, CanvasApi.Json);
     }
 
     /// <summary>An event on a calendar: what, when, and the folder it's clearly for (null for none).</summary>

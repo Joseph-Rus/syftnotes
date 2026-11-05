@@ -68,7 +68,7 @@ Licence: [MIT](https://github.com/wokwi/wokwi-elements/blob/main/LICENSE). Sourc
 
 ## Syft Notes: 25 parts
 
-Licence: [MIT](https://opensource.org/licenses/MIT). Source: https://github.com/Joseph-Rus/study-stash
+Licence: [MIT](https://opensource.org/licenses/MIT). Source: https://github.com/Joseph-Rus/syftnotes
 
 - Syft Notes' own parts, MIT, adapted: Quadcopter drone, side view, Six-axis industrial robot arm, side view, Brushless motor (side), Propeller (side), LiPo battery pack, Electronic speed controller, Camera gimbal, Camera, GPS module, Robot gripper, Servo motor with gearbox, Robot controller cabinet, Teach pendant, 42U server rack (empty), 1U server, 2U server, 48-port network switch, 24-port patch panel, Router, Firewall, Storage array, UPS, Horizontal cable manager, Blanking panel, Vertical PDU
 

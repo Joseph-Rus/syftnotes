@@ -130,9 +130,12 @@ public class AiEnginesTests
     {
         var cfg = Cfg("/lib");
         var s = new AiSettings { Provider = "codex" };
-        var overview = await Engines.StatusAsync(s, cfg, new FakeChecks().Installed("codex").Build());
+        var overview = await Engines.StatusAsync(s, cfg, new FakeChecks().Installed("codex").Ollama(models: [("qwen3:8b", 4.7)]).Build());
         var problem = Assert.Single(overview.Problems);
         Assert.Equal(("not_signed_in", "codex", "Ollama"), (problem.Kind, problem.Engine, problem.FallbackTo));
+        // Ollama was never set up on this computer: there is no fallback to name.
+        overview = await Engines.StatusAsync(s, cfg, new FakeChecks().Installed("codex").Build());
+        Assert.Equal("", Assert.Single(overview.Problems).FallbackTo);
     }
 
     [Fact]

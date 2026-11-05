@@ -210,16 +210,19 @@ public sealed class LectureStore
         }
     }
 
-    /// <summary>Drop the audio of filed lectures older than this many days: the transcript and notes stay.</summary>
+    /// <summary>Drop the audio of filed lectures older than this many days: the transcript and notes stay. Its sound
+    /// is as old as the later of when the lecture started and when this computer last wrote it, so a recording of
+    /// weeks ago that was brought in today (<see cref="LectureFromFile"/>) keeps its sound the full span.</summary>
     public int PruneAudio(int days, DateTimeOffset now)
     {
         if (days <= 0) return 0;
         int n = 0;
         foreach (var l in All())
         {
-            if (l.State != LectureState.Filed || (now - l.StartedAt).TotalDays < days) continue;
             string audio = AudioPath(l.Id);
-            if (!File.Exists(audio)) continue;
+            if (l.State != LectureState.Filed || !File.Exists(audio)) continue;
+            DateTimeOffset written = File.GetLastWriteTimeUtc(audio);
+            if ((now - (written > l.StartedAt ? written : l.StartedAt)).TotalDays < days) continue;
             File.Delete(audio);
             n++;
         }

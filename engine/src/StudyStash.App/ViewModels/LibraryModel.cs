@@ -70,6 +70,8 @@ public sealed partial class NewFolderAsk(string className) : ObservableObject
 public sealed partial class NoteModel : ObservableObject
 {
     public string Id { get; init; } = "";
+    /// <summary>How far down the page is scrolled: Back and Forward come back to it.</summary>
+    public ScrollPlace Scroll { get; } = new();
     /// <summary>The folder it's in ("" or Unsorted for none).</summary>
     public string ClassName { get; init; } = "";
     public IBrush Dot { get; init; } = Brushes.Gray;

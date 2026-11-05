@@ -173,6 +173,8 @@ final class NotebookStore {
     private(set) var notebooks: [Notebook] = []
     /// Goes up each time a page's ink is written, so its picture is drawn again.
     private(set) var inkRevision: [UUID: Int] = [:]
+    /// Notebooks open to write in right now (an editor shows them).
+    @ObservationIgnored var open: Set<UUID> = []
     let folder: URL
 
     init(folder: URL = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0].appending(path: "Notebooks")) {
@@ -209,10 +211,16 @@ final class NotebookStore {
         (try? Data(contentsOf: inkFile(n, page.id))).flatMap { try? PKDrawing(data: $0) } ?? PKDrawing()
     }
 
-    func setDrawing(_ d: PKDrawing, _ n: Notebook, _ page: Notebook.Page) {
+    /// A page's ink written. `redraw: false` leaves its pictures as they are until `redrawPictures` (it's still being
+    /// written in).
+    func setDrawing(_ d: PKDrawing, _ n: Notebook, _ page: Notebook.Page, redraw: Bool = true) {
         try? FileManager.default.createDirectory(at: dir(n), withIntermediateDirectories: true)
         try? d.dataRepresentation().write(to: inkFile(n, page.id), options: .atomic)
-        inkRevision[page.id, default: 0] += 1
+        if redraw { inkRevision[page.id, default: 0] += 1 }
+    }
+
+    func redrawPictures(_ pages: Set<UUID>) {
+        for id in pages { inkRevision[id, default: 0] += 1 }
     }
 
     /// A page's ink copied to another page (a duplicate).
@@ -302,14 +310,21 @@ final class NotebookStore {
     }
 
     /// Save it to the library: the PDF into its class (and lecture), replacing the copy saved before.
+    /// It can be written in while it's on its way: what's marked as saved is the notebook as it is now, saved as of
+    /// when its PDF was made, so a page added or a rename meanwhile is kept, and is still to be sent. One deleted
+    /// meanwhile stays deleted.
     func upload(_ id: UUID, api: APIClient) async throws {
-        guard var n = notebooks.first(where: { $0.id == id }) else { return }
+        guard let n = notebooks.first(where: { $0.id == id }) else { return }
         let name = n.title.replacingOccurrences(of: "/", with: "-") + ".pdf"
+        let made = Date.now
         let added = try await api.upload(files: [(name, "application/pdf", pdfData(n))], class: n.className, lecture: n.lectureID)
         if let old = n.attachmentID, old != added.first?.id { try? await api.deleteAttachment(old) }
-        n.attachmentID = added.first?.id
-        n.savedAt = .now
-        save(n)
+        guard var latest = notebook(id) else { return }
+        latest.attachmentID = added.first?.id
+        // Dates are kept to the second on disk: one changed in the same second its PDF was made still reads as changed
+        // when it's opened again.
+        latest.savedAt = latest.updated > made ? min(made, latest.updated.addingTimeInterval(-1)) : made
+        save(latest)
     }
 
     // MARK: PDFs to write on

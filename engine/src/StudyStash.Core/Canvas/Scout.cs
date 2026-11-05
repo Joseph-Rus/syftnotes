@@ -48,6 +48,19 @@ public sealed class Scout(string home, Func<string, string> classDir, AiJobs ai,
         Finish with up to 8 lines: the recipe in one line, what you downloaded, and what lives outside Canvas.
         """;
 
+    /// <summary>Which classes a sync that just finished should explore: those never explored, and those whose last
+    /// try failed (offline, say) a day or more ago and have no recipe yet, so a failure is tried again without waiting
+    /// for the student to press Explore, but a class that keeps failing doesn't run the AI (and use up the student's
+    /// allowance) on every hourly sync.</summary>
+    public static string[] ToExplore(IEnumerable<string> synced, IReadOnlyDictionary<string, ScoutReport> reports, Func<string, bool> hasRecipe, DateTimeOffset now) =>
+        synced.Where(c => !hasRecipe(c) && !(reports.TryGetValue(c, out var r) && (r.Ok || !TriedLongAgo(r.When, now)))).ToArray();
+
+    static readonly TimeSpan RetryAfter = TimeSpan.FromDays(1);
+
+    /// <summary>A day or more since the last try; a time that can't be read counts as long ago.</summary>
+    static bool TriedLongAgo(string when, DateTimeOffset now) =>
+        !DateTimeOffset.TryParse(when, CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal, out var at) || now - at >= RetryAfter;
+
     /// <summary>Queue classes to explore. Starts working through them unless it already is.</summary>
     public void Queue(params string[] classes)
     {

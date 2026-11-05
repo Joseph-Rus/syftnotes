@@ -3,6 +3,7 @@ using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Interactivity;
 using Avalonia.Threading;
+using StudyStash.App.Controls;
 using StudyStash.App.ViewModels;
 
 namespace StudyStash.App.Views;
@@ -28,17 +29,20 @@ public partial class NotePage : UserControl
         };
         NoteScroll.SizeChanged += (_, _) => PinTabs();
         Fades.Under(Fade, "Surface", 0.55);
-        // Another note opens at its top; a recording's page opens with the caret in its notes.
+        // Another note opens at its top (Back and Forward ask for the place they left it); a recording's page opens
+        // with the caret in its notes.
         string? showing = null;
+        var scrolled = new ScrollKeeper(NoteScroll);
         LibraryModel? model = null;
         void NoteChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
         {
             if (e.PropertyName != nameof(LibraryModel.Note) || model?.Note is not { } note) return;
             string key = note.Id + (note.Live ? "\u0001live" : "");
-            if (key == showing) return;
+            bool another = key != showing;
             showing = key;
-            NoteScroll.Offset = default;
-            if (note.Typing) Dispatcher.UIThread.Post(Typed.FocusEnd, DispatcherPriority.Input);
+            if (another) NoteScroll.Offset = default;
+            scrolled.Follow(note.Scroll);
+            if (another && note.Typing) Dispatcher.UIThread.Post(Typed.FocusEnd, DispatcherPriority.Input);
         }
         DataContextChanged += (_, _) =>
         {

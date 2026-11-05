@@ -106,20 +106,58 @@ public static partial class DocumentText
         {
             return ext switch
             {
-                ".pdf" => Pdf(path, options, ct),
+                ".pdf" or ".pptx" => Joined(Pages(ext, path, options, ct)),
                 ".docx" => Docx(path),
-                ".pptx" => Pptx(path),
                 ".doc" or ".rtf" => Machine.Run("textutil", ["-convert", "txt", "-stdout", path], TimeSpan.FromSeconds(25))?.Stdout,
                 _ when Plain.Contains(ext) => File.ReadAllText(path),
                 _ when Images.Contains(ext) => OneAtATime(() => ImageText(path, DateTime.UtcNow + options.TimeLimit), ct),
                 _ => null,
             };
         }
-        catch (Exception e) when (e is IOException or UnauthorizedAccessException or InvalidDataException or System.Xml.XmlException)
+        catch (Exception e) when (Unreadable(e))
         {
             return null;
         }
     }
+
+    /// <summary>What a file that is damaged, locked or not what its name says throws, which is "no words", not a fault.</summary>
+    static bool Unreadable(Exception e) => e is IOException or UnauthorizedAccessException or InvalidDataException or System.Xml.XmlException;
+
+    /// <summary>A PDF or a PowerPoint (.pptx): the files with pages (<see cref="PagesAsync"/>).</summary>
+    public static bool HasPages(string path) => Path.GetExtension(path).ToLowerInvariant() is ".pdf" or ".pptx";
+
+    /// <summary>
+    /// A PDF's pages or a PowerPoint's slides, each one's words in turn, in the order of the pages or the deck: a page
+    /// with none is "" (so the Nth string is always page N), and a PowerPoint slide's speaker notes come after its words.
+    /// Read the way <see cref="ExtractAsync(string, DocumentTextOptions, CancellationToken)"/> reads, with the same
+    /// limits and text recognition, but nothing is kept; and a PowerPoint's slides past
+    /// <see cref="DocumentTextOptions.MaxPages"/> are left out, as a PDF's pages are. Null when the file isn't there,
+    /// isn't a PDF or .pptx, or doesn't open. <see cref="WordsOf"/> makes the file's words from these.
+    /// </summary>
+    public static async Task<IReadOnlyList<string>?> PagesAsync(string path, DocumentTextOptions options, CancellationToken ct)
+    {
+        if (!HasPages(path) || !File.Exists(path)) return null;
+        string ext = Path.GetExtension(path).ToLowerInvariant();
+        try
+        {
+            var pages = await Task.Run(() => Pages(ext, Path.GetFullPath(path), options, ct), ct);
+            return pages?.Take(options.MaxPages).ToList();
+        }
+        catch (Exception e) when (Unreadable(e))
+        {
+            return null;
+        }
+    }
+
+    /// <summary>The words <see cref="ExtractAsync(string, CancellationToken)"/> gives for a PDF or PowerPoint, made from
+    /// its <paramref name="pages"/> (<see cref="PagesAsync"/>) so a file read as pages needn't be read again for them.</summary>
+    public static string? WordsOf(IReadOnlyList<string>? pages) => Tidy(Joined(pages));
+
+    static List<string>? Pages(string ext, string path, DocumentTextOptions options, CancellationToken ct) =>
+        ext switch { ".pdf" => Pdf(path, options, ct), ".pptx" => Pptx(path), _ => null };
+
+    /// <summary>Pages made one text: the ones with words, a blank line between.</summary>
+    static string? Joined(IEnumerable<string>? pages) => pages is null ? null : string.Join("\n\n", pages.Where(t => t.Length > 0));
 
     /// <summary>The words in a photo or scan, by the computer's own text recognition; null where there's none.</summary>
     static string? ImageText(string path, DateTime until) =>
@@ -163,20 +201,6 @@ public static partial class DocumentText
             if (z.GetEntry(extra) is { } e) parts.Add(Py.Strip(XmlWords(Entry(e), "w:p")));
         return string.Join("\n\n", parts);
     }
-
-    [GeneratedRegex(@"^ppt/(slides/slide|notesSlides/notesSlide)(\d+)\.xml$")]
-    private static partial Regex SlidePart();
-
-    /// <summary>A PowerPoint's slides in order, each with its speaker notes after it.</summary>
-    static string? Pptx(string path)
-    {
-        using var z = ZipFile.OpenRead(path);
-        var parts = z.Entries.Select(e => (Entry: e, Match: SlidePart().Match(e.FullName))).Where(p => p.Match.Success)
-            .OrderBy(p => int.Parse(p.Match.Groups[2].Value, System.Globalization.CultureInfo.InvariantCulture))
-            .ThenBy(p => p.Match.Groups[1].Value.StartsWith("notes", StringComparison.Ordinal) ? 1 : 0)
-            .Select(p => Py.Strip(XmlWords(Entry(p.Entry), "a:p"))).Where(t => t.Length > 0).ToList();
-        return parts.Count == 0 ? null : string.Join("\n\n", parts);
-    }
 }
 
 /// <summary>
@@ -188,7 +212,8 @@ public sealed record DocumentTextOptions
     /// <summary>Where read text is kept, by file path, size and time changed; null keeps nothing.</summary>
     public string? CacheDir { get; init; }
 
-    /// <summary>A PDF's pages past this many aren't read (a 300-page textbook's first chapters are what's asked about).</summary>
+    /// <summary>A PDF's pages past this many aren't read (a 300-page textbook's first chapters are what's asked about),
+    /// and a PowerPoint's slides past it aren't kept as pages.</summary>
     public int MaxPages { get; init; } = 300;
 
     /// <summary>At most this many of a PDF's pages are read as pictures (about a second each on a Mac).</summary>

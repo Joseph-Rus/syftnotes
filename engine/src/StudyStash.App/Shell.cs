@@ -146,7 +146,7 @@ public static partial class Shell
         Run(() => SuggestLighterModelAsync(), "SuggestLighterModel");
         // The program may have moved (Velopack's install, the Mac bundle's new name): what names the old one is put right.
         UiTasks.RunQuietly(() => Task.Run(() => NewPlace.RunHere(host.Home)), "put right what names the app's old place");
-        AppUpdates.Start(host, stop.Token, SayUpdate, () => TypingNotes);
+        AppUpdates.Start(host, stop.Token, SayUpdate, () => TypingNotes, LibraryWindowOpen);
         if (AppUpdates.Current is { } updater)
             updater.FoundChanged += () => Dispatcher.UIThread.Post(() =>
             {
@@ -171,6 +171,7 @@ public static partial class Shell
             splashAtLaunch = SelfTest.Dir is null;
             ShowLibrary();
         }
+        if (host.Settings.SetupDone) AskWhichNotesFolderSoon();
         if (SelfTest.Dir is not null) SelfTest.Run();
     }
 
@@ -1106,7 +1107,8 @@ public static partial class Shell
         quick.Query = "";
         Run(() => SearchAsync(""), "Search");
         var pointer = Floating.Pointer();
-        var (_, scale) = quickWindow.WorkArea(pointer);
+        var (area, scale) = quickWindow.WorkArea(pointer);
+        quick.FitTo(area.Height / scale, Floating.ShadowRoom);
         var size = quickWindow.Measured(scale);
         int room = (int)(Floating.ShadowRoom * scale);
         quickWindow.Put(Placement.QuickPanel(pointer, quickWindow.ScreenList(), size, room));
@@ -1162,6 +1164,17 @@ public static partial class Shell
             UpdateDock();
         };
         return mainWindow = w;
+    }
+
+    /// <summary>The library window is on screen right now (not hidden to the tray, not minimized): an update's restart
+    /// brings it back. Asked from the updater's thread, so it's read on the UI thread's, for 2 seconds at most: a UI
+    /// thread that doesn't answer in time counts as no window (the app comes back quietly) rather than holding the
+    /// update's hand-off.</summary>
+    static bool LibraryWindowOpen()
+    {
+        var answer = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+        Dispatcher.UIThread.Post(() => answer.TrySetResult(mainWindow is { IsVisible: true } w && w.WindowState != WindowState.Minimized));
+        return answer.Task.Wait(TimeSpan.FromSeconds(2)) && answer.Task.Result;
     }
 
     /// <summary>The library window opens where it was left, at the size it was left (or zoomed), if that spot is
@@ -1474,7 +1487,18 @@ public static partial class Shell
             }
         },
         AlreadyHere = () => host.Settings.SetupAi is "claude" or "codex" or "gemini" ? host.Settings.SetupAi : "",
+        Connect = ConnectSignedInAsync,
     };
+
+    /// <summary>An AI the student signed in to here outside the library (setup's own sign-in, or one Get started found):
+    /// Settings' own Connect for it, through the one AI store, so Settings → Your AI and every other screen say it's
+    /// connected with no second Connect.</summary>
+    static async Task ConnectSignedInAsync(string id)
+    {
+        var connect = new AiConnect(host.AiStatus.Library) { Apps = ClaudeSetup.ThisComputer(host.Home), WaitForSignIn = false, SignedInHere = true };
+        var done = await host.AiStatus.ConnectAsync(connect, id);
+        host.Log($"[setup] {AiConnect.Brand(id)}: " + (!done.Ok ? done.Words : done.SignIn == Core.Ai.SignInPhase.Waiting ? "a sign-in is waiting" : "connected"));
+    }
 
     /// <summary>Guided setup's model for this window, reaching the app's own installer, hidden sign-in and pages.
     /// The self-test finds no AI's CLI at all, so it never installs one or reaches an account.</summary>
@@ -1489,12 +1513,8 @@ public static partial class Shell
             Find = SelfTest.Dir is not null ? _ => AgentFound.None : cli => AgentInstall.Find(cli),
             AiApps = aiApps.DesktopStates,
             ConnectAiApp = aiApps.Connect,
-            // An AI got ready here (setup's AI step, a lecture's Get study notes): its apps on this computer get Syft Notes too.
-            ConnectAppsOf = id => Task.Run(() =>
-            {
-                foreach (var app in aiApps.StatesOf(id))
-                    if (app.Installed && !app.Good) aiApps.Connect(app.Id);
-            }),
+            // An AI signed in here (setup's AI step, a lecture's Get study notes): Settings' own Connect for it.
+            Connect = ConnectSignedInAsync,
             Downloading = () => host.Downloading?.Fraction,
             Log = host.Log,
         };

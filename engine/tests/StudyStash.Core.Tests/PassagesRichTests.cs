@@ -133,3 +133,22 @@ public class PassagesRichTests
         Assert.Equal("""{"answer": "fine", "sources": []}""", AiJobs.FirstObject("""{"answer": "fine", "sources": []}"""));
     }
 }
+
+public class SearchHitTimeTests
+{
+    [Fact]
+    public void A_passage_is_listed_at_the_line_that_matched_not_where_its_minute_began()
+    {
+        using var dir = new TempDir();
+        var cfg = new Config(dir["home"], dir["pool"]) { OllamaEnabled = false };
+        Directory.CreateDirectory(cfg.Home);
+        var store = new Store(cfg.DbPath, cfg.PoolDir);
+        store.Save(new Meeting("rec-1")
+        {
+            Title = "Photosynthesis", Date = "2026-09-23T10:02:12-07:00", Owner = "Sam",
+            Transcript = "[00:00] Welcome back, today is photosynthesis.\n[00:12] The light reactions come first, in the thylakoid.\n[00:24] Next is the Calvin cycle, which builds sugar.\n[00:40] It uses the ATP the light reactions made.",
+        }, new Classification("BIO 110", 0.9, "folder", "Photosynthesis", []));
+        var hit = Assert.Single(new LibraryReader(cfg, store).Search("Calvin cycle", null, 6)["passages"]!.AsArray())!;
+        Assert.Equal(24, hit["at"]!.GetValue<double>());
+    }
+}
