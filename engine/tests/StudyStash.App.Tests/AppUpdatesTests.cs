@@ -330,7 +330,7 @@ public class AppUpdatesTests
     {
         // Start-Process refuses an empty -ArgumentList, which would leave the student with no app at all.
         var spawned = new List<IReadOnlyList<string>>();
-        var host = new UpdateHost { System = "Windows", AppDir = @"C:\Apps\Syft Notes", SpawnDetached = spawned.Add };
+        var host = new UpdateHost { System = "Windows", AppDir = @"C:\Apps\Syft Notes", SpawnDetached = a => { spawned.Add(a); return 0; } };
 
         AppUpdates.SpawnWaiter(host, []);
         AppUpdates.SpawnWaiter(host, ["--background"]);

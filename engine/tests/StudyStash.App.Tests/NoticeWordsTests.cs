@@ -135,7 +135,7 @@ public class NoticeWordsTests
             NoticeWords.UpdateDidntTake("0.10.1", "0.10.0"));
         Assert.Null(NoticeWords.UpdateDidntTake("0.10.1", "0.10.1"));
         Assert.Null(NoticeWords.UpdateDidntTake("", "0.10.0"));
-        Assert.Equal("https://github.com/Joseph-Rus/study-stash/releases/tag/v0.10.1", Updates.ReleasePage("0.10.1"));
+        Assert.Equal("https://github.com/Joseph-Rus/syftnotes/releases/tag/v0.10.1", Updates.ReleasePage("0.10.1"));
     }
 
     [Theory]

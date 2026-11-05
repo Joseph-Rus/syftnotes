@@ -14,6 +14,8 @@
 # If Velopack's Setup fails, nothing else happens: the old copy opens again as it was. Settings (~\.study-stash),
 # lectures and Documents are never touched. Everything it does goes to -Log.
 #   powershell -NoProfile -ExecutionPolicy Bypass -File bridge.ps1 -Setup <Setup.exe> -WaitPid <pid> -Log <file>
+# Its first action is to write -StartedFile: the app quits only once it's there. A PowerShell that a policy or an
+# antivirus stops never gets this far, and the app then stays open (Bridge.cs) instead of quitting with nothing to open it.
 # Whatever happens, an app opens at the end: the new copy if it's installed, or else the old one (-OldExe), and a move
 # that fails is written to -FailedFile (-Tag), so the app doesn't try it again for a week (Bridge.cs).
 param(
@@ -25,10 +27,13 @@ param(
   [string]$OldExe = "",
   [string]$FailedFile = "",
   [string]$Tag = "",
+  [string]$StartedFile = "",
   [string]$OpenArgs = "--background",
   [switch]$NoOpen
 )
 $ErrorActionPreference = "Stop"
+# First of all (see the top): the app is waiting for this file before it quits.
+if ($StartedFile) { Set-Content -LiteralPath $StartedFile -Value $PID -ErrorAction SilentlyContinue }
 # Never in a folder the move deletes: Windows keeps a folder something is working in.
 Set-Location -LiteralPath ([IO.Path]::GetTempPath())
 function Say([string]$Line) { Add-Content -LiteralPath $Log -Value ("{0:yyyy-MM-dd HH:mm:ss} [bridge] {1}" -f (Get-Date), $Line) }
@@ -131,6 +136,7 @@ Say "done in $([int]$clock.Elapsed.TotalSeconds) s"
   Finish
   # Velopack's Setup.exe and this script, downloaded for the move, go (this script is already loaded).
   Remove-Item -LiteralPath (Split-Path -Parent $Setup) -Recurse -Force -ErrorAction SilentlyContinue
+  if ($StartedFile) { Remove-Item -LiteralPath $StartedFile -Force -ErrorAction SilentlyContinue }
 }
 if (-not $moved) { exit 1 }
 exit 0

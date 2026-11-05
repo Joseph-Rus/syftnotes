@@ -1,3 +1,5 @@
+using System.ComponentModel;
+using System.Diagnostics;
 using System.Globalization;
 using System.Runtime.InteropServices;
 
@@ -73,6 +75,14 @@ public static class Bridge
 
     /// <summary>Where a failed move is remembered: the release's tag (the move's script writes it too, windows/bridge.ps1).</summary>
     public static string FailedFile(string home) => Path.Combine(home, "bridge-failed.txt");
+
+    /// <summary>What the move's script writes as its first action (windows/bridge.ps1, -StartedFile): the app quits only
+    /// once it's there.</summary>
+    public static string StartedFile(string home) => Path.Combine(home, "bridge-started.txt");
+
+    /// <summary>How long the app waits for <see cref="StartedFile"/> before it takes the move for one that won't start
+    /// (PowerShell stopped by a policy or an antivirus) and stays open.</summary>
+    public static readonly TimeSpan ScriptStartsWithin = TimeSpan.FromSeconds(20);
 
     /// <summary>Why a move failed, as <see cref="FailedFile"/> says after the tag: the AppImage needs FUSE, which this
     /// computer doesn't have yet.</summary>
@@ -173,12 +183,12 @@ public static class Bridge
     /// <paramref name="pid"/> is the app's own process, which the move waits for; <paramref name="relaunchArgs"/> what
     /// the new copy opens with, asked at the moment the move starts.
     public static async Task<bool> ApplyAsync(Release release, string home, UpdateHost host, Func<bool> ready, Action<string> log,
-        int pid, Func<IReadOnlyList<string>> relaunchArgs, string? userHome = null, LinuxMenu? menu = null)
+        int pid, Func<IReadOnlyList<string>> relaunchArgs, string? userHome = null, LinuxMenu? menu = null, TimeSpan? scriptStartsWithin = null)
     {
         if (AssetFor(host) is not { } asset) return false;
         log($"Moving to {release.Tag}, installed the new way...");
         var (ok, retry, why) = host.System == "Windows"
-            ? await WindowsAsync(release, home, host, asset, ready, log, pid, relaunchArgs)
+            ? await WindowsAsync(release, home, host, asset, ready, log, pid, relaunchArgs, scriptStartsWithin ?? ScriptStartsWithin)
             : await LinuxAsync(release, host, asset, ready, log, pid, relaunchArgs, userHome ?? Py.UserHome(), menu ?? new LinuxMenu());
         // Put off for a lecture, or a download that didn't come: the next round tries again. Anything else is
         // remembered, so the move isn't tried again for a week.
@@ -187,7 +197,7 @@ public static class Bridge
     }
 
     static async Task<(bool Ok, bool Retry, string? Why)> WindowsAsync(Release release, string home, UpdateHost host, string asset, Func<bool> ready,
-        Action<string> log, int pid, Func<IReadOnlyList<string>> relaunchArgs)
+        Action<string> log, int pid, Func<IReadOnlyList<string>> relaunchArgs, TimeSpan startsWithin)
     {
         // The Inno install's entry and uninstaller: without them there's nothing to move over from.
         if (!InnoInstalled())
@@ -217,21 +227,61 @@ public static class Bridge
             return (false, true, null);
         }
         string logPath = Path.Combine(home, "logs", "update.log");
+        string started = StartedFile(home);
+        TryDelete(started); // one from an earlier try mustn't pass for this one's
+        int scriptPid;
         try
         {
             // The script stops what still runs from the old folder (the background library) once the app has quit.
-            host.SpawnDetached(["powershell.exe", "-NoProfile", "-ExecutionPolicy", "Bypass", "-WindowStyle", "Hidden", "-File", script,
+            scriptPid = host.SpawnDetached(["powershell.exe", "-NoProfile", "-ExecutionPolicy", "Bypass", "-WindowStyle", "Hidden", "-File", script,
                 "-Setup", setup, "-WaitPid", pid.ToString(CultureInfo.InvariantCulture), "-Log", logPath,
                 "-OldExe", Path.Combine(host.AppDir, "StudyStash.exe"), "-FailedFile", FailedFile(home), "-Tag", release.Tag,
+                "-StartedFile", started,
                 "-OpenArgs", string.Join(' ', relaunchArgs().Select(a => a.Contains(' ') ? $"\"{a}\"" : a))]);
         }
-        catch (Exception e) when (e is System.ComponentModel.Win32Exception or IOException or InvalidOperationException)
+        catch (Exception e) when (e is Win32Exception or IOException or InvalidOperationException)
         {
             log($"Couldn't start the move: {e.Message}");
             return (false, false, null);
         }
+        // PowerShell stopped by a policy or an antivirus never runs the script: nothing would open the app again once it
+        // quit. So it quits only after the script has said it is running.
+        if (!await AppearsAsync(started, startsWithin))
+        {
+            EndPowerShell(scriptPid);
+            log($"The move's script didn't start within {(int)startsWithin.TotalSeconds} s (PowerShell may be stopped on this computer), so Syft Notes stays open on this version.");
+            return (false, false, null);
+        }
         log($"Moving to {release.Tag} once Syft Notes has quit (log: {logPath}).");
         return (true, false, null);
+    }
+
+    /// <summary>Waits for <paramref name="file"/> to exist: looks now, then every 100 ms, until <paramref name="within"/>
+    /// has gone by.</summary>
+    static async Task<bool> AppearsAsync(string file, TimeSpan within)
+    {
+        var clock = Stopwatch.StartNew();
+        while (!File.Exists(file))
+        {
+            if (clock.Elapsed >= within) return false;
+            await Task.Delay(100);
+        }
+        return true;
+    }
+
+    /// <summary>Ends the PowerShell the move's script was given to, so it can't start late and take the app down: only if
+    /// that process id is still a PowerShell (an id is reused once its owner is gone).</summary>
+    static void EndPowerShell(int pid)
+    {
+        if (pid <= 0) return;
+        try
+        {
+            using var p = Process.GetProcessById(pid);
+            if (p.ProcessName.Equals("powershell", StringComparison.OrdinalIgnoreCase)) p.Kill();
+        }
+        catch (Exception e) when (e is ArgumentException or InvalidOperationException or Win32Exception)
+        {
+        }
     }
 
     /// <summary>Inno Setup's uninstall entry for Syft Notes on this account (its AppId).</summary>
