@@ -457,6 +457,7 @@ public sealed partial class LibraryWeb
         MapFiles(app);
         MapInbox(app);
         MapMove(app);
+        MapFolders(app);
         MapSettings(app);
         MapCalendar(app);
         MapPhone(app);
@@ -886,7 +887,7 @@ public sealed partial class LibraryWeb
         string tsNote = ts.Running ? ""
             : "<div class=\"notice\"><div>Tailscale isn't running on this computer, so your laptop can only reach "
               + "it on the same Wi-Fi. Install Tailscale on both and sign in to the same account.</div></div>";
-        const string dl = "https://github.com/Joseph-Rus/study-stash/releases/latest/download";
+        const string dl = "https://github.com/Joseph-Rus/syftnotes/releases/latest/download";
         string invite = $"<div class=\"group-head\">Connect your laptop</div>{tsNote}<div class=\"group\">"
             + $"<div class=\"row\"><span class=\"grow\">Address</span><span class=\"value\">{Ui.Esc(url)}</span></div>"
             + $"<div class=\"row\"><span class=\"grow\">Password</span><span class=\"value\">{Ui.Esc(cfg.PoolPassword.Length > 0 ? cfg.PoolPassword : "none")}</span></div>"
@@ -914,7 +915,7 @@ public sealed partial class LibraryWeb
             + "<p class=\"group-foot\">Set with auto_update in config.toml.</p>"
             + "<div class=\"group-head\">Rewrite every summary</div><div class=\"group\">"
             + "<form class=\"row\" method=\"post\" action=\"/settings/resummarize-all\" data-confirm=\"Rewrite all "
-            + $"{c.Total} summaries with {Ui.Esc(NotesWriter)}? This can take a while.\">"
+            + $"{store.SummaryCount()} summaries with {Ui.Esc(NotesWriter)}? This can take a while.\">"
             + $"<span class=\"grow\">Rewrite all summaries with {Ui.Esc(NotesWriter)}</span>"
             + "<button>Rewrite all</button></form></div>"
             + "<p class=\"group-foot\">Useful after switching models. Lectures stay readable while they are "

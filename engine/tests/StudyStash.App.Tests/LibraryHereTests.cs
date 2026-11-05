@@ -54,10 +54,10 @@ public sealed class LibraryHereTests
         using var host = Host(home.Path);
         // A port this test picked and holds, standing in for a busy 8787: never 8787 itself, which on a student's (or
         // the owner's) computer is their real library.
+        int busy = FreePort();
         using var squatter = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
-        squatter.Bind(new IPEndPoint(IPAddress.Loopback, 0));
+        squatter.Bind(new IPEndPoint(IPAddress.Loopback, busy));
         squatter.Listen();
-        int busy = ((IPEndPoint)squatter.LocalEndPoint!).Port;
         var here = new LibraryHere { Command = [exe], FirstPort = busy, Folder = home["Syft Notes"] };
         try
         {
@@ -134,12 +134,27 @@ public sealed class LibraryHereTests
     }
 
     /// <summary>A port free now, for a library a test makes to start from (never 8787, a real library's).</summary>
+    /// <summary>A port for a test's library, free along with the two after it (a library takes a pair; one test keeps
+    /// the first busy and its library takes the next pair). From 20000-31999, below every system's ephemeral range
+    /// (Linux from 32768, Windows and macOS from 49152): a port the system hands out to connections can be given to
+    /// one between this look and the library's bind, and the library then can't start (rehearsal 41946512485's Windows
+    /// run lost 53155 that way, three times over). Never the same one twice in a run, so tests running at once don't
+    /// pick the same ports.</summary>
     internal static int FreePort()
     {
-        using var probe = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
-        probe.Bind(new IPEndPoint(IPAddress.Loopback, 0));
-        return ((IPEndPoint)probe.LocalEndPoint!).Port;
+        lock (PortGate)
+        {
+            for (int tries = 0; tries < 4_000; tries++)
+            {
+                nextPort = nextPort + 3 >= 32_000 ? 20_000 : nextPort + 3;
+                if (HostInfo.PortFree(nextPort) && HostInfo.PortFree(nextPort + 1) && HostInfo.PortFree(nextPort + 2)) return nextPort;
+            }
+            throw new InvalidOperationException("no free ports for a test's library");
+        }
     }
+    static readonly object PortGate = new();
+    // Where this run starts: another test run on the same computer starts elsewhere, so they don't walk the same ports.
+    static int nextPort = 20_000 + Random.Shared.Next(3_900) * 3;
 
     [Fact]
     public async Task A_library_already_here_keeps_its_folder_port_reach_name_and_password()
@@ -148,12 +163,7 @@ public sealed class LibraryHereTests
         Assert.True(File.Exists(exe), $"build the solution first: no {exe}");
         using var home = new TempHome();
         string notes = home["Lecture notes"];
-        int port;
-        using (var probe = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp))
-        {
-            probe.Bind(new IPEndPoint(IPAddress.Loopback, 0));
-            port = ((IPEndPoint)probe.LocalEndPoint!).Port;
-        }
+        int port = FreePort();
         Configs.Save(new Config(home.Path, notes) { PoolName = "Sam's library", PoolPassword = "kept-password", WebHost = "127.0.0.1", WebPort = port });
         using var host = Host(home.Path);
         var here = new LibraryHere { Command = [exe], FirstPort = FreePort() };

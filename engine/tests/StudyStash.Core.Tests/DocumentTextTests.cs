@@ -265,8 +265,12 @@ public class DocumentTextTests
         Assert.Equal("Two: Big O\nO(n log n)\n\nOne: sorting\n\nSay merge sort is stable\n\nFour: recap", await DocumentText.ExtractAsync(dir["week 3.pptx"], options, default));
         var pages = await DocumentText.PagesAsync(dir["lab.pdf"], options, default);
         Assert.Equal(["Lab 2: Titration", "Burette reads 12.4 mL", "Record the endpoint volume"], pages);
-        Assert.Equal(string.Join("\n\n", pages!), await DocumentText.ExtractAsync(dir["lab.pdf"], options, default));
+        // A file read once as pages has the words reading it for its words alone gives.
+        Assert.Equal(await DocumentText.ExtractAsync(dir["lab.pdf"], options, default), DocumentText.WordsOf(pages));
+        Assert.Equal(await DocumentText.ExtractAsync(dir["week 3.pptx"], options, default), DocumentText.WordsOf(await DocumentText.PagesAsync(dir["week 3.pptx"], options, default)));
+        Assert.Null(DocumentText.WordsOf(["", ""]));
         Assert.Equal(["Lab 2: Titration"], await DocumentText.PagesAsync(dir["lab.pdf"], options with { MaxPages = 1 }, default));
+        Assert.Equal(["Two: Big O\nO(n log n)", "One: sorting\n\nSay merge sort is stable"], await DocumentText.PagesAsync(dir["week 3.pptx"], options with { MaxPages = 2 }, default));
 
         File.WriteAllText(dir["todo.md"], "# Midterm");
         Assert.Null(await DocumentText.PagesAsync(dir["todo.md"], options, default));

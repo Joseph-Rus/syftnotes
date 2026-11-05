@@ -202,6 +202,9 @@ public static class Skin
             MacTokens(dark, dark: true);
             // Apple Symbols: key signs like ↩ as text, never an emoji
             d["TextFont"] = d["DisplayFont"] = d["SerifFont"] = new FontFamily($"{atkinson}, .AppleSystemUIFont, SF Pro Text, Apple Symbols");
+            // A shortcut's keys: Lucida Grande draws ⌥ ⇧ ⌘ ⌃ ↩ before the system font does (it was read as "ᵥ" in a
+            // Mac's dropdown). Only key labels: TextFont's own fallback (Greek, maths in notes) stays as it is.
+            d["KeysFont"] = new FontFamily($"{atkinson}, Lucida Grande, .AppleSystemUIFont");
             d["PopupStrokeWidth"] = new Thickness(1);
         }
         else
@@ -209,7 +212,7 @@ public static class Skin
             WinTokens(light, dark: false);
             WinTokens(dark, dark: true);
             // Segoe UI Variable is Windows 11's; Windows 10 has Segoe UI.
-            d["TextFont"] = d["DisplayFont"] = d["SerifFont"] = new FontFamily($"{atkinson}, Segoe UI Variable Text, Segoe UI");
+            d["TextFont"] = d["DisplayFont"] = d["SerifFont"] = d["KeysFont"] = new FontFamily($"{atkinson}, Segoe UI Variable Text, Segoe UI");
             d["PopupStrokeWidth"] = new Thickness(1);
             d["CaptionButtonWidth"] = 46.0;
         }
@@ -475,7 +478,7 @@ public static class Skin
         foreach (var k in mac ? MacBrushes : WinBrushes) yield return (k, typeof(IBrush));
         foreach (var k in mac ? MacShadows : WinShadows) yield return (k, typeof(BoxShadows));
         if (mac) yield return ("GlassFilter", typeof(GlassFilter));
-        foreach (var k in new[] { "TextFont", "DisplayFont", "SerifFont" }) yield return (k, typeof(FontFamily));
+        foreach (var k in new[] { "TextFont", "DisplayFont", "SerifFont", "KeysFont" }) yield return (k, typeof(FontFamily));
         foreach (var (k, _) in Radii) yield return (k, typeof(CornerRadius));
         foreach (var (k, _) in TypeScale) yield return (k, typeof(double));
         foreach (var (k, _) in Spacing)
