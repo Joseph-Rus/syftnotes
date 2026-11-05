@@ -7,9 +7,10 @@ namespace StudyStash.Core.Filing;
 /// <summary>One file Submit &amp; Organize filed: the run it was part of, when, the class and assignment, where it was
 /// (<see cref="From"/>), where it went (<see cref="To"/>: in the class's folder, or in the Trash, "" when the system
 /// didn't say where), how (<see cref="Moved"/> or <see cref="Trashed"/>), its SHA-256 ("" for a file online only, which
-/// isn't read), and when it was put back (null until it is).</summary>
+/// isn't read), when it was put back (null until it is), and whether the move was still under way (<see cref="Pending"/>:
+/// it was written down before the file moved, and a crash came before it was marked done).</summary>
 public sealed record FiledMove(long Seq, string Run, string At, string ClassName, string Assignment, string From, string To, string Kind, string Hash,
-    string? Undone = null)
+    string? Undone = null, bool Pending = false)
 {
     public const string Moved = "moved", Trashed = "trashed";
 }
@@ -88,8 +89,15 @@ public sealed class SubmitFiler
         string run = Guid.NewGuid().ToString("N")[..12], at = Stamp();
         string folder = FolderFor(work);
         var result = new FilingResult(run, [], []);
-        void Filed(string from, string to, string kind, string hash) =>
-            result.Moves.Add(store.AddFiledMove(new FiledMove(0, run, at, work.Class, work.Assignment.Name, from, to, kind, hash)));
+        // Each move is written down before the file moves and marked done after, so a crash between the two leaves a
+        // pending row that Undo can still follow.
+        FiledMove Log(string from, string to, string kind) =>
+            store.AddFiledMove(new FiledMove(0, run, at, work.Class, work.Assignment.Name, from, to, kind, HashOf(from)));
+        void Done(FiledMove row, string to)
+        {
+            store.FinishFiledMove(row.Seq, to);
+            result.Moves.Add(row with { To = to, Pending = false });
+        }
 
         void Into(string path, string dir)
         {
@@ -98,15 +106,21 @@ public sealed class SubmitFiler
                 result.Left.Add((path, "It isn't in a folder Syft Notes may tidy."));
                 return;
             }
+            FiledMove? row = null;
             try
             {
                 Directory.CreateDirectory(dir);
                 string to = Path.Combine(dir, Attachments.FreeName(dir, Path.GetFileName(path)));
-                Filed(path, to, FiledMove.Moved, Move(path, to));
+                row = Log(path, to, FiledMove.Moved);
+                Move(path, to);
+                Done(row, to);
             }
             catch (Exception e) when (e is IOException or UnauthorizedAccessException)
             {
-                result.Left.Add((path, "Syft Notes couldn't move it (it may be open in another app), so it's where it was."));
+                if (row is not null) store.DropFiledMove(row.Seq);
+                result.Left.Add((path, SubmitMatch.OnlineOnly(path)
+                    ? "It's kept online only, and moving it to another disk would download it, so it's where it was."
+                    : "Syft Notes couldn't move it (it may be open in another app), so it's where it was."));
             }
         }
 
@@ -115,31 +129,53 @@ public sealed class SubmitFiler
         {
             if (clean && SubmitMatch.Inside(m, approved, store.PoolDir))
             {
-                string hash = SubmitMatch.OnlineOnly(m) ? "" : LibraryBringIn.Sha(m) ?? "";
-                if (trash.Send(m) is { } where)
+                var row = Log(m, "", FiledMove.Trashed);
+                string? where;
+                try
                 {
-                    Filed(m, where, FiledMove.Trashed, hash);
+                    where = trash.Send(m);
+                }
+                catch (Exception e) when (e is IOException or UnauthorizedAccessException)
+                {
+                    where = null;
+                }
+                // Gone without the system saying where: it's in the Trash, and Undo says to look there.
+                if (where is not null || !File.Exists(m))
+                {
+                    Done(row, where ?? "");
                     continue;
                 }
+                store.DropFiledMove(row.Seq);
             }
-            // Organize, or Clean where this disk has no Trash: it goes in with the assignment's materials.
+            // Organize, or Clean where the Trash wouldn't keep it: it goes in with the assignment's materials.
             Into(m, Path.Combine(folder, MaterialsFolder));
         }
         if (files is not null && result.Moves.Count > 0) await files.UpdateAsync();
         return result;
     }
 
+    /// <summary>A file's SHA-256 for the log: "" when it's online only (it isn't read) or can't be read.</summary>
+    static string HashOf(string path) => SubmitMatch.OnlineOnly(path) ? "" : LibraryBringIn.Sha(path) ?? "";
+
     /// <summary>
     /// Puts a run's files back where they were, newest first. A file whose place is taken now comes back beside it
     /// under a name of its own (<see cref="UndoOutcome.Beside"/>); one in the Trash comes back from there where the system
-    /// allows (<see cref="UndoOutcome.InTrash"/> where it doesn't). Files already put back are left alone, so Undo can be run
-    /// again after one failed.
+    /// allows (<see cref="UndoOutcome.InTrash"/> where it doesn't). A move a crash cut short (still pending) is followed
+    /// to where the file really is: still where it was, it's left there. Files already put back are left alone, so Undo
+    /// can be run again after one failed.
     /// </summary>
     public List<UndoItem> Undo(string run)
     {
         var done = new List<UndoItem>();
         foreach (var m in store.FiledMoves(run).Where(f => f.Undone is null).OrderByDescending(f => f.Seq))
         {
+            if (m.Pending && File.Exists(m.From))
+            {
+                // It never left (or a copy to another disk stopped before the original went): nothing to put back.
+                store.MarkFiledUndone(m.Seq, Stamp());
+                done.Add(new UndoItem(m.From, m.From, UndoOutcome.Back));
+                continue;
+            }
             string dir = Py.Parent(m.From);
             string back = File.Exists(m.From) ? Path.Combine(dir, Attachments.FreeName(dir, Path.GetFileName(m.From))) : m.From;
             try
@@ -173,18 +209,18 @@ public sealed class SubmitFiler
 
     string Stamp() => Clock().UtcDateTime.ToString("o", CultureInfo.InvariantCulture);
 
-    /// <summary>Moves <paramref name="from"/> to <paramref name="to"/> (never over a file there) and gives its SHA-256
-    /// ("" when it's online only and was renamed without being read). On one disk it's a rename. To another disk it's a
-    /// whole copy, made beside its place and only renamed into it once its size and SHA-256 are the original's; then the
-    /// original goes. If the original can't go, the copy goes instead: never two copies, never half of one.</summary>
-    string Move(string from, string to)
+    /// <summary>Moves <paramref name="from"/> to <paramref name="to"/>, never over a file there. On one disk it's a
+    /// rename. To another disk it's a whole copy, made beside its place and only renamed into it once its size and
+    /// SHA-256 are the original's; then the original goes. If the original can't go, the copy goes instead: never two
+    /// copies, never half of one. A file kept online only isn't copied (that would download it): IOException.</summary>
+    void Move(string from, string to)
     {
         if (SameDisk(from, to))
         {
-            string hash = SubmitMatch.OnlineOnly(from) ? "" : LibraryBringIn.Sha(from) ?? "";
             File.Move(from, to, overwrite: false);
-            return hash;
+            return;
         }
+        if (SubmitMatch.OnlineOnly(from)) throw new IOException("The file is kept online only; copying it would download it.");
         long size = new FileInfo(from).Length;
         string sha = LibraryBringIn.Sha(from) ?? throw new IOException("The file couldn't be read to copy it.");
         Store.PutWhole(to, temp =>
@@ -201,7 +237,6 @@ public sealed class SubmitFiler
             File.Delete(to);
             throw;
         }
-        return sha;
     }
 
     /// <summary>Both paths are on one disk: the same mounted volume (the deepest one holding each), as the system lists

@@ -8,7 +8,7 @@ namespace StudyStash.Core.Filing;
 public interface ITrash
 {
     /// <summary>Sends a file to the Trash. Where it is now in the Trash ("" when the system doesn't say), or null when
-    /// it couldn't go (this disk has no Trash, or the system said no): then nothing happened to it.</summary>
+    /// it couldn't go (this disk has no Trash, or the Trash wouldn't keep it): then nothing happened to it.</summary>
     string? Send(string path);
 
     /// <summary>Puts a file back from the Trash (<paramref name="trashed"/>, where <see cref="Send"/> said it went) at
@@ -18,21 +18,19 @@ public interface ITrash
 }
 
 /// <summary>
-/// The Trash of the computer this runs on. A Mac: NSFileManager's trashItemAtURL, which says where the file went, so
-/// it's put back by moving it from there. Windows: the shell's delete with undo (the Recycle Bin), only on a fixed disk
-/// that has a Recycle Bin, and asking rather than deleting for good should the Recycle Bin refuse it; the Recycle Bin's
-/// copy ($R…, beside the $I… record of where it came from) is found afterwards, and put back by moving it. Anywhere
-/// else (Linux, a network disk), null: Clean puts the file in the assignment's Materials folder instead.
+/// The Trash of the computer this runs on: a Mac's (NSFileManager's trashItemAtURL, which says where the file went, so
+/// it's put back by moving it from there), or Windows' <see cref="RecycleBin"/>. Anywhere else (Linux), null: Clean puts
+/// the file in the assignment's Materials folder instead.
 /// </summary>
 public sealed class SystemTrash : ITrash
 {
+    readonly RecycleBin? bin = OperatingSystem.IsWindows() ? new RecycleBin() : null;
+
     public string? Send(string path)
     {
         try
         {
-            return OperatingSystem.IsMacOS() ? MacSend(Path.GetFullPath(path))
-                : OperatingSystem.IsWindows() ? WinSend(Path.GetFullPath(path))
-                : null;
+            return bin is not null ? bin.Send(path) : OperatingSystem.IsMacOS() ? MacSend(Path.GetFullPath(path)) : null;
         }
         catch (Exception e) when (e is DllNotFoundException or EntryPointNotFoundException or IOException or UnauthorizedAccessException or ArgumentException)
         {
@@ -42,25 +40,11 @@ public sealed class SystemTrash : ITrash
 
     public bool Restore(string trashed, string to)
     {
+        if (bin is not null) return bin.Restore(trashed, to);
         if (trashed.Length == 0 || !File.Exists(trashed)) return false;
         File.Move(trashed, to, overwrite: false);
-        if (OperatingSystem.IsWindows())
-        {
-            // The Recycle Bin's record of where it came from goes too, so the Recycle Bin doesn't list a file that's gone.
-            string info = Path.Combine(Py.Parent(trashed), "$I" + Path.GetFileName(trashed)[2..]);
-            try
-            {
-                File.Delete(info);
-            }
-            catch (Exception e) when (e is IOException or UnauthorizedAccessException)
-            {
-                // The file is back; a record left behind lists it in the Recycle Bin, where it can't be restored again.
-            }
-        }
         return true;
     }
-
-    // --- a Mac ------------------------------------------------------------------------------------------------------
 
     const string ObjC = "/usr/lib/libobjc.A.dylib";
     const string Foundation = "/System/Library/Frameworks/Foundation.framework/Foundation";
@@ -94,8 +78,91 @@ public sealed class SystemTrash : ITrash
             objc_autoreleasePoolPop(pool);
         }
     }
+}
 
-    // --- Windows ----------------------------------------------------------------------------------------------------
+/// <summary>What the Recycle Bin of a file's disk is set to: delete for good rather than keep (Recycle Bin properties'
+/// "Don't move files to the Recycle Bin"), and the most it keeps, in bytes (null when it doesn't say).</summary>
+public sealed record BinRules(bool DeleteForGood, long? MaxBytes);
+
+/// <summary>
+/// Windows' Recycle Bin. A file goes there only when the Recycle Bin of its disk would keep it: a fixed disk with a
+/// Recycle Bin, whose settings (HKCU\…\Explorer\BitBucket\Volume\{volume}) can be read, that isn't set to delete for
+/// good, and that keeps a file this big. Otherwise (or when the settings can't be read) nothing is done, and Clean puts
+/// the file in the assignment's Materials folder. Sent with the shell's delete with undo, asking rather than deleting
+/// for good should the Recycle Bin refuse it after all. The Recycle Bin's copy ($R…, beside the $I… record of where it
+/// came from) is found afterwards, and put back by moving it.
+/// </summary>
+public sealed class RecycleBin : ITrash
+{
+    /// <summary>The Recycle Bin's settings for a file's disk, or null when it has none, or they can't be read. Tests
+    /// give their own.</summary>
+    internal Func<string, BinRules?> Rules { get; init; } = ReadRules;
+
+    /// <summary>Sends a file to the Recycle Bin; false when the shell didn't (tests give their own).</summary>
+    internal Func<string, bool> Delete { get; init; } = ShellDelete;
+
+    /// <summary>Where a file sent is in the Recycle Bin, or null when it can't be found (tests give their own).</summary>
+    internal Func<string, string?> Find { get; init; } = InRecycleBin;
+
+    /// <summary>The Recycle Bin would keep a file of <paramref name="size"/> bytes under <paramref name="rules"/>.</summary>
+    public static bool Keeps(BinRules? rules, long size) => rules is { DeleteForGood: false } && (rules.MaxBytes is not long most || size <= most);
+
+    public string? Send(string path)
+    {
+        string full = Path.GetFullPath(path);
+        if (!Keeps(Rules(full), new FileInfo(full).Length)) return null;
+        if (!Delete(full) || File.Exists(full)) return null;
+        return Find(full) ?? "";
+    }
+
+    public bool Restore(string trashed, string to)
+    {
+        if (trashed.Length == 0 || !File.Exists(trashed)) return false;
+        File.Move(trashed, to, overwrite: false);
+        // The Recycle Bin's record of where it came from goes too, so the Recycle Bin doesn't list a file that's gone.
+        string name = Path.GetFileName(trashed);
+        if (!name.StartsWith("$R", StringComparison.Ordinal)) return true;
+        try
+        {
+            File.Delete(Path.Combine(Py.Parent(trashed), "$I" + name[2..]));
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException)
+        {
+            // The file is back; a record left behind lists it in the Recycle Bin, where it can't be restored again.
+        }
+        return true;
+    }
+
+    [DllImport("kernel32.dll", CharSet = CharSet.Unicode, EntryPoint = "GetVolumeNameForVolumeMountPointW", SetLastError = true)]
+    static extern bool VolumeName(string mountPoint, [Out] char[] name, int length);
+
+    const string BitBucket = @"Software\Microsoft\Windows\CurrentVersion\Explorer\BitBucket\Volume\";
+
+    static BinRules? ReadRules(string path)
+    {
+        if (!OperatingSystem.IsWindows()) return null;
+        try
+        {
+            string? root = Path.GetPathRoot(path);
+            if (string.IsNullOrEmpty(root) || new DriveInfo(root).DriveType != DriveType.Fixed || !Directory.Exists(Path.Combine(root, "$Recycle.Bin")))
+                return null;
+            // "\\?\Volume{guid}\" names the disk; its Recycle Bin settings are under that {guid}.
+            var name = new char[64];
+            if (!VolumeName(root, name, name.Length)) return null;
+            string volume = new string(name).Split('\0')[0];
+            int open = volume.IndexOf('{'), close = volume.IndexOf('}');
+            if (open < 0 || close < open) return null;
+            using var key = Microsoft.Win32.Registry.CurrentUser.OpenSubKey(BitBucket + volume[open..(close + 1)]);
+            if (key is null) return null;
+            return new BinRules(key.GetValue("NukeOnDelete") is int nuke && nuke != 0,
+                key.GetValue("MaxCapacity") is int mb ? mb * 1024L * 1024L : null);
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException or ArgumentException or System.Security.SecurityException
+                                      or DllNotFoundException or EntryPointNotFoundException)
+        {
+            return null;
+        }
+    }
 
     [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
     struct FileOperation
@@ -116,11 +183,9 @@ public sealed class SystemTrash : ITrash
     const uint FoDelete = 3;
     const ushort FofSilent = 0x4, FofNoConfirmation = 0x10, FofAllowUndo = 0x40, FofNoErrorUi = 0x400, FofWantNukeWarning = 0x4000;
 
-    static string? WinSend(string path)
+    static bool ShellDelete(string path)
     {
-        string? root = Path.GetPathRoot(path);
-        if (string.IsNullOrEmpty(root) || new DriveInfo(root).DriveType != DriveType.Fixed || !Directory.Exists(Path.Combine(root, "$Recycle.Bin")))
-            return null;
+        if (!OperatingSystem.IsWindows()) return false;
         var op = new FileOperation
         {
             Window = IntPtr.Zero,
@@ -130,20 +195,21 @@ public sealed class SystemTrash : ITrash
             Aborted = 0,
             NameMappings = IntPtr.Zero,
             Title = null,
-            // Silent, but should the Recycle Bin refuse the file (too big for it), Windows asks before deleting it for good.
+            // Silent; but should the Recycle Bin refuse the file after all, Windows asks before deleting it for good.
             Flags = FofSilent | FofNoConfirmation | FofAllowUndo | FofNoErrorUi | FofWantNukeWarning,
         };
-        if (SHFileOperation(ref op) != 0 || op.Aborted != 0 || File.Exists(path)) return null;
-        return InRecycleBin(root, path) ?? "";
+        return SHFileOperation(ref op) == 0 && op.Aborted == 0;
     }
 
     /// <summary>The Recycle Bin's copy of <paramref name="original"/> (the newest, if it went there more than once):
     /// the $R… file beside the $I… record that names it.</summary>
-    static string? InRecycleBin(string root, string original)
+    static string? InRecycleBin(string original)
     {
+        string? root = Path.GetPathRoot(original);
+        if (string.IsNullOrEmpty(root)) return null;
         string? best = null;
         var bestAt = DateTime.MinValue;
-        IEnumerable<string> bins;
+        List<string> bins;
         try
         {
             bins = Directory.EnumerateDirectories(Path.Combine(root, "$Recycle.Bin")).ToList();

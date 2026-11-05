@@ -228,4 +228,69 @@ public class SubmitOrganizeTests
         var kept = await noTrash.CleanAsync(Work(), null, [draft]);
         Assert.Equal((FiledMove.Moved, Path.Combine(noTrash.FolderFor(Work()), "Materials", "recursion draft.md")), (kept.Moves[0].Kind, kept.Moves[0].To));
     }
+
+    [Fact]
+    public async Task A_recycle_bin_that_wouldnt_keep_a_file_leaves_it_for_the_materials_folder()
+    {
+        using var dir = new TempDir();
+        string documents = dir["Documents"];
+        using var store = new Store(dir["state.db"], dir["Library"]);
+        string draft = Write(Path.Combine(documents, "recursion draft.md"), "first try");
+        string sha = Sha(draft);
+        var asked = new List<string>();
+        string copy = dir["Bin/$RABC123.md"], record = Write(dir["Bin/$IABC123.md"], "where it came from");
+        RecycleBin Bin(BinRules? rules) => new()
+        {
+            Rules = _ => rules,
+            Delete = p =>
+            {
+                asked.Add(p);
+                File.Move(p, copy);
+                return true;
+            },
+            Find = _ => copy,
+        };
+
+        // Set to delete for good, too small for the file, or its settings unreadable: Windows is never asked, and Clean
+        // files the draft with the assignment's materials instead.
+        foreach (var rules in new BinRules?[] { new(DeleteForGood: true, MaxBytes: null), new(DeleteForGood: false, MaxBytes: 4), null })
+        {
+            var filer = new SubmitFiler(store, [documents], Bin(rules));
+            var run = await filer.CleanAsync(Work(), null, [draft]);
+            var kept = Assert.Single(run.Moves);
+            Assert.Equal((FiledMove.Moved, SubmitFiler.MaterialsFolder), (kept.Kind, Path.GetFileName(Path.GetDirectoryName(kept.To))));
+            Assert.Equal(UndoOutcome.Back, Assert.Single(filer.Undo(run.Run)).How);
+        }
+        Assert.Empty(asked);
+
+        // One that keeps it: it goes there, and Undo brings it back and clears the Recycle Bin's record of it.
+        var keeps = new SubmitFiler(store, [documents], Bin(new BinRules(DeleteForGood: false, MaxBytes: 1 << 20)));
+        var trashed = await keeps.CleanAsync(Work(), null, [draft]);
+        Assert.Equal((FiledMove.Trashed, copy), (Assert.Single(trashed.Moves).Kind, trashed.Moves[0].To));
+        Assert.Equal(UndoOutcome.Back, Assert.Single(keeps.Undo(trashed.Run)).How);
+        Assert.Equal(sha, Sha(draft));
+        Assert.False(File.Exists(record));
+    }
+
+    [Fact]
+    public void A_move_a_crash_cut_short_is_still_undone_from_where_the_file_really_is()
+    {
+        using var dir = new TempDir();
+        string documents = dir["Documents"];
+        using var store = new Store(dir["state.db"], dir["Library"]);
+        var filer = new SubmitFiler(store, [documents], new FakeTrash(dir["Trash"]));
+        string folder = filer.FolderFor(Work());
+        string moved = Write(Path.Combine(documents, "lab3.md"), "the report"), stayed = Write(Path.Combine(documents, "draft.md"), "a draft");
+        string movedSha = Sha(moved), stayedSha = Sha(stayed);
+        // Both were written down as pending; then the app stopped: one had moved, the other hadn't yet.
+        foreach (string f in new[] { moved, stayed })
+            store.AddFiledMove(new FiledMove(0, "crash", "2026-10-01T10:05:00Z", "CS 101", "Lab 3: Recursion traces", f,
+                Path.Combine(folder, "Submitted", Path.GetFileName(f)), FiledMove.Moved, Sha(f)));
+        Directory.CreateDirectory(Path.Combine(folder, "Submitted"));
+        File.Move(moved, Path.Combine(folder, "Submitted", "lab3.md"));
+
+        Assert.All(filer.Undo("crash"), u => Assert.Equal(UndoOutcome.Back, u.How));
+        Assert.Equal((movedSha, stayedSha), (Sha(moved), Sha(stayed)));
+        Assert.False(File.Exists(Path.Combine(folder, "Submitted", "lab3.md")));
+    }
 }
