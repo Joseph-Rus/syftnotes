@@ -299,7 +299,7 @@ public sealed class GuidedSetup : ISetupDriver, IGuidedActions
             case ("ai_app", "notnow"):
                 g.Skip("ai_app");
                 Fold(card, "Not now");
-                g.Note("Left your AI app for later", "The student said \"Not now\" to letting their AI app read their lectures. It's in Settings → AI apps.", good: false);
+                g.Note("Left your AI app for later", "The student said \"Not now\" to letting their AI app read their lectures. It's in Settings → Your AI.", good: false);
                 break;
             case ("start_at_login", "on"):
                 try

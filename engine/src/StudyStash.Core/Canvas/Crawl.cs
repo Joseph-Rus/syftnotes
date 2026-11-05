@@ -317,7 +317,8 @@ public sealed partial class Crawl
         string canvasUrl = S(data["base"]);
         long id = Staged(cls).CourseId;
         string api = $"{canvasUrl}/api/v1/courses/{id}";
-        Add($"{api}?include[]=syllabus_body&include[]=term", "json", Tag("course", cls));
+        // total_scores: the student's own enrollment comes back with their grade (nothing when the course hides it).
+        Add($"{api}?include[]=syllabus_body&include[]=term&include[]=total_scores", "json", Tag("course", cls));
         Add($"{api}/pages?per_page=100&sort=title", "json", Tag("pages", cls));
         Add($"{api}/front_page", "json", Tag("front_page", cls));
         // The Files area: folders first (so each file's path is known), then the files themselves (FilesStage).
@@ -1373,6 +1374,16 @@ public sealed partial class Crawl
 
     static string? Opt(JsonNode? v) => S(v) is { Length: > 0 } s ? s : null;
 
+    /// <summary>The student's own grade from the course's <c>enrollments</c> (what <c>include[]=total_scores</c> adds), or
+    /// null when Canvas isn't sharing one: the course hides final grades, or nothing is graded yet. Only the student
+    /// enrollment counts; what's graded so far (<c>computed_current_*</c>), not the final that counts a gap as zero.</summary>
+    static ClassGrade? GradeOf(JsonObject course)
+    {
+        if (Flag(course["hide_final_grades"])) return null;
+        var mine = (course["enrollments"] as JsonArray ?? []).OfType<JsonObject>().FirstOrDefault(e => S(e["type"]) == "student" && D(e["computed_current_score"]) is not null);
+        return mine is null ? null : new ClassGrade { Score = D(mine["computed_current_score"])!.Value, Letter = S(mine["computed_current_grade"]) };
+    }
+
     void Course(string cls, JsonObject c)
     {
         var index = Staged(cls);
@@ -1380,6 +1391,7 @@ public sealed partial class Crawl
         index.Name = S(c["name"]);
         index.Term = S(c["term"]?["name"]);
         index.HtmlUrl = S(c["html_url"]);
+        index.Grade = GradeOf(c);
         if (S(c["syllabus_body"]) is not { Length: > 0 } syllabus) return;
         string root = Rel(cls, CanvasDir(cls));
         var (md, links) = HtmlText.Convert(syllabus, BuildContext(cls, index.CourseId, root));

@@ -190,11 +190,11 @@ error "Chrome isn't signed in to Canvas.", and a file read that Canvas refused s
 
 ## The extension
 
-`extension/` is a Manifest V3 extension (version **1.6**; it has its own version, separate from the app's). The same
+`extension/` is a Manifest V3 extension (version **1.9**; it has its own version, separate from the app's, and the stores serve 1.8 so far). The same
 files run in Chrome 120 or later and the browsers built on it (Edge, Brave, Arc, Opera, Vivaldi), and in Firefox 140 or
 later and the browsers built on it (Zen, LibreWolf, Waterfox). Chrome, Edge, Brave, Arc and Vivaldi add the copy
 published on the Chrome Web Store ([chrome-web-store.md](chrome-web-store.md)), and Firefox's family the one on
-Mozilla's site ([firefox-add-on.md](firefox-add-on.md)), each connected by a pasted code. Opera and Chromium, and a
+Mozilla's site ([firefox-add-on.md](firefox-add-on.md)), each connected by itself from 1.8 and by a pasted code before. Opera and Chromium, and a
 student whose Chrome won't install from the store, load the folder described here. Wherever this page
 says Chrome, any browser of its family does the same. The engine carries it as embedded resources (`extension/<file>` in `StudyStash.Core`), and
 `Extension.Ensure(dir, library, key, canvasUrl)` writes it out as a folder for Chrome's "Load unpacked": the scripts
@@ -215,8 +215,8 @@ for that.
 
 The same files also pack as a **Chrome Web Store** zip (`StudyStash extension-zip OUT.zip`, `Extension.PackForStore`):
 no config files, no `host_permissions`, `optional_host_permissions` for any site instead. A store copy connects by a
-pasted code (`connection_code`, base64url of `config.json`) and asks Chrome for its three sites in that click. Its
-extra status is `no_access` (connected, but Chrome hasn't allowed the sites). Version 1.6 is published (Unlisted), and
+pasted code (`connection_code`, base64url of `config.json`) and asks Chrome for its three sites in that click (from 1.8 it can connect itself instead). Its
+extra status is `no_access` (connected, but Chrome hasn't allowed the sites). Version 1.8 is published (public), and
 the app's Canvas step offers it first: [chrome-web-store.md](chrome-web-store.md). A store copy never reloads itself
 from a folder; its store updates it, so the library never calls it outdated (`CanvasSettings.ExtensionOutdated` is
 only for a copy from before protocol 2, which can't reload itself either).
@@ -473,12 +473,17 @@ land: they fill `CourseIndex`, and every builder here reads straight from it.
 
 - `GET /api/v2/canvas/classes` → one row per class in this library, linked or not: `[{"class","linked",
   "canvas":{"id","code","name","term","url"}|null, "suggested":{"id","name"}|null,"last_sync","counts":
-  {"to_hand_in","done","modules","files","announcements","announcements_new"},"files_hidden","scout":
-  {"state":"done|exploring|waiting|failed|never","files","when","report"}}]`. `suggested` (only when a class isn't
+  {"to_hand_in","done","modules","files","announcements","announcements_new"},"files_hidden","grade":
+  {"score","letter"}|null,"scout":{"state":"done|exploring|waiting|failed|never","files","when","report"}}]`. `suggested` (only when a class isn't
   linked) is `CourseMatch.Suggest`'s best guess from the school's course list: a shared number ("CS 101" ~
   "COMP 101") or a shared word, one a prefix of the other ("CALC" ~ "Calculus"); it's shown, never linked, by
   itself. `announcements_new` is unread-on-Canvas **and** not opened in Syft Notes: `CanvasSeen`
-  (`home/canvas_seen.json`) narrows Canvas's own `read_state` further, per student, per class.
+  (`home/canvas_seen.json`) narrows Canvas's own `read_state` further, per student, per class. `grade` is the
+  student's own overall grade, Canvas's `computed_current_score` and `_grade` (what's graded so far; `letter` is ""
+  when the course has no grading scheme). It comes from the course request that already names the course, which now
+  also asks `include[]=total_scores`: the student enrollment that comes back with it is `CourseIndex.Grade`. It's null
+  when the course hides final grades, when nothing is graded yet, and before a sync that asked; a course whose answer
+  carries none clears the old grade. `/enrollments` is still never requested (`DeniesOtherPeople`).
 - `GET /api/v2/canvas/due` → `{"synced","to_hand_in","next":item|null,"groups":[{"key","label","items":[item]}]}`
   across every class, groups in order **Overdue** (not done, due before now) / **This week** (due before the eighth
   day from now) / **Later** / **No due date** / **Handed in** (submitted, graded, excused, or marked done in Canvas's

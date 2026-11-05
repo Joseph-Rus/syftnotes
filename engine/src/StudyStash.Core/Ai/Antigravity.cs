@@ -11,9 +11,10 @@ namespace StudyStash.Core.Ai;
 /// <para>
 /// Syft Notes runs it with a home of its own (<see cref="Home"/>: agy keeps everything under <c>~/.gemini</c>, and reads
 /// its home from HOME, or USERPROFILE on Windows), so nothing of the student's own agy (their MCP servers, plugins,
-/// skills, hooks, rules, settings) ever runs inside Syft Notes' work, and Syft Notes never writes theirs. The sign-in
-/// is kept in that home too (agy 1.4.5 keeps it there, <c>antigravity-cli/antigravity-oauth-token</c>, which Syft Notes
-/// never reads): a student signs in to Gemini for Syft Notes once, in setup, and its notes and its setup chat use that.
+/// skills, hooks, rules, settings) ever runs inside Syft Notes' work, and Syft Notes never writes theirs. Its sign-in
+/// isn't kept in that home. agy 1.5.0 keeps one sign-in, shared with the student's own agy, in the computer's password
+/// store (the Keychain on a Mac, Credential Manager on Windows), so Syft Notes never clears it without telling the
+/// student.
 /// </para>
 /// <para>
 /// The setup chat runs in that home as an agent of its own (<see cref="SetupAgent"/>): Antigravity's default prompt and
@@ -77,6 +78,39 @@ public static class Antigravity
         windows ? new() { ["HOME"] = home, ["USERPROFILE"] = home } : new() { ["HOME"] = home };
 
     public static Dictionary<string, string> HomeEnv() => HomeEnv(Home(), OperatingSystem.IsWindows());
+
+    /// <summary>
+    /// A folder in Syft Notes' own home for agy with stand-ins, that open nothing, for the programs agy opens the
+    /// browser with (it finds them on its PATH: <c>rundll32</c> on Windows, <c>open</c> on a Mac, <c>xdg-open</c> on
+    /// Linux). It goes first on the sign-in's PATH, so agy never opens the browser itself and Syft Notes opens its page
+    /// (<see cref="AgentSignIn.OpenPage"/>). A browser agy starts takes agy's home as the student's: on Windows (agy
+    /// 1.5.0) Firefox made a brand-new empty profile in this folder, signed in to nothing, with no saved passwords. The
+    /// Windows stand-in is a batch file that ends cmd.exe at once, so the rest of the address, which cmd.exe cuts at
+    /// each &amp;, never runs.
+    /// </summary>
+    public static string OpenersOff()
+    {
+        string dir = Path.Combine(Home(), "openers-off");
+        Directory.CreateDirectory(dir);
+        if (OperatingSystem.IsWindows())
+        {
+            Write(Path.Combine(dir, "rundll32.cmd"), "@exit 0\r\n");
+            return dir;
+        }
+        foreach (string name in new[] { "open", "xdg-open" })
+        {
+            string path = Path.Combine(dir, name);
+            Write(path, "#!/bin/sh\nexit 0\n");
+            File.SetUnixFileMode(path, UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute);
+        }
+        return dir;
+
+        // Only when it isn't there already as it should be (each sign-in asks).
+        static void Write(string path, string text)
+        {
+            if (!File.Exists(path) || File.ReadAllText(path) != text) File.WriteAllText(path, text);
+        }
+    }
 
     public static string SettingsPath(string home) => Path.Combine(home, ".gemini", "antigravity-cli", "settings.json");
     public static string McpConfigPath(string home) => Path.Combine(home, ".gemini", "config", "mcp_config.json");

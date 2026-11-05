@@ -2,8 +2,9 @@
 """Writes macos/dmg-layout.DS_Store: how the Syft Notes disk opens in Finder (one small window, the app on the left,
 the Applications folder on the right, nothing else, no toolbar or sidebar). macos/dmg.sh copies it into the DMG's
 stage folder, so building the DMG needs no Finder scripting. Needs `pip install ds_store`; run again only to change
-the layout:  python3 tools/dmg/make_ds_store.py macos/dmg-layout.DS_Store"""
-import plistlib
+the layout:  python3 tools/dmg/make_ds_store.py macos/dmg-layout.DS_Store
+bwsp and icvp are given as plain dicts: ds_store writes them as property lists itself, so Finder reads a dictionary
+(encoding them here too left Finder a data blob, and the window never opened). tools/dmg/check_ds_store.py checks it."""
 import sys
 
 from ds_store import DSStore
@@ -25,8 +26,8 @@ icvp = {
 }
 with DSStore.open(out, "w+") as d:
     d["."]["vSrn"] = ("long", 1)
-    d["."]["bwsp"] = plistlib.dumps(bwsp, fmt=plistlib.FMT_BINARY)
+    d["."]["bwsp"] = bwsp
     d["."]["icvl"] = ("type", b"icnv")
-    d["."]["icvp"] = plistlib.dumps(icvp, fmt=plistlib.FMT_BINARY)
+    d["."]["icvp"] = icvp
     d["Syft Notes.app"]["Iloc"] = APP_AT
     d["Applications"]["Iloc"] = APPLICATIONS_AT

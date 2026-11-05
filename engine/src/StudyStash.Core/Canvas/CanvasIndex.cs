@@ -23,6 +23,9 @@ public sealed class CourseIndex
     public string Name { get; set; } = "";
     public string Term { get; set; } = "";
     public string HtmlUrl { get; set; } = "";
+    /// <summary>The student's grade in the class, when Canvas shares it (the course's own answer, from the same request
+    /// that names it); null when Canvas hides final grades from this student or hasn't graded anything yet.</summary>
+    public ClassGrade? Grade { get; set; }
     /// <summary>When the sync that wrote this finished (ISO).</summary>
     public string SyncedAt { get; set; } = "";
     /// <summary>How each listing went in that sync: ok | hidden | failed | reading (it never finished).</summary>
@@ -111,6 +114,9 @@ public sealed class CourseIndex
             Name = Either(staged.Name, prev?.Name),
             Term = Either(staged.Term, prev?.Term),
             HtmlUrl = Either(staged.HtmlUrl, prev?.HtmlUrl),
+            // A course that was read (it named itself) says for itself whether it shares a grade, even by saying
+            // nothing: a grade Canvas has stopped sharing doesn't linger. One that wasn't read keeps what was known.
+            Grade = staged.Name.Length > 0 ? staged.Grade : prev?.Grade,
             SyncedAt = at,
             Sections = new(sections),
             ReadAt = new(prev?.ReadAt ?? []),
@@ -175,6 +181,15 @@ public sealed class CourseIndex
         File.Delete(StagedPathIn(home, cls));
         return index;
     }
+}
+
+/// <summary>A class's overall grade as Canvas works it out ("computed_current_*": what's been graded so far).</summary>
+public sealed class ClassGrade
+{
+    /// <summary>The percentage, as Canvas gives it (91.2).</summary>
+    public double Score { get; set; }
+    /// <summary>The letter, when the course has a grading scheme ("A-"); "" when it doesn't.</summary>
+    public string Letter { get; set; } = "";
 }
 
 /// <summary>What a running sync's submissions listing said, by assignment id: each submission, and the assignment it

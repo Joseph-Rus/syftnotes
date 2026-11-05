@@ -51,6 +51,26 @@ public class MathViewTests
         }
     }
 
+    /// <summary>"k-means++" typed as <c>k\text{-means}++</c> draws a hyphen (not a minus with operator gaps) and two plus signs
+    /// close to the word: CSharpMath reads "-" as a minus and gives every "+" an operator's gap.</summary>
+    [AvaloniaTheory]
+    [InlineData(@"k\text{-means}++")]
+    [InlineData(@"\text{k-means++}")]
+    public void K_means_plus_plus_keeps_its_hyphen_and_tight_pluses(string latex)
+    {
+        var atoms = CSharpMath.Atom.LaTeXParser.MathListFromLaTeX(StudyStash.Core.Rich.MathText.Prepare(latex))
+            .Match(l => l.Atoms.ToList(), e => throw new InvalidOperationException(e));
+        Assert.DoesNotContain(atoms, a => a is CSharpMath.Atom.Atoms.BinaryOperator { Nucleus: "\u2212" });
+        Assert.Contains(atoms, a => a is CSharpMath.Atom.Atoms.Ordinary { Nucleus: "\u2010" });
+        // Each plus follows a negative space that takes back the operator's gap on its left.
+        int pluses = 0;
+        for (int i = 0; i < atoms.Count; i++)
+            if (atoms[i].Nucleus == "+") { pluses++; Assert.True(i > 0 && atoms[i - 1] is CSharpMath.Atom.Atoms.Space, $"plus {pluses} keeps its gap"); }
+        Assert.Equal(2, pluses);
+        var window = Show(Mv(latex));
+        window.Close();
+    }
+
     [AvaloniaFact]
     public void Baseline_offset_is_the_ascent()
     {

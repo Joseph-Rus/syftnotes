@@ -52,59 +52,67 @@ public static class MacRename
         return Updates.Compare(VersionOf(to), VersionOf(app)) > 0 ? new RenamePlan(app, to, app, OpenInstead: true) : new RenamePlan(app, to, to);
     }
 
-    /// <summary>Waits for <paramref name="pid"/> to quit (caffeinate -w blocks until it exits), then opens the app at
-    /// <paramref name="app"/> with the arguments this copy had (--background when it was an update's relaunch, so no
-    /// window opens).</summary>
-    internal static IReadOnlyList<string> Reopen(int pid, string app, IReadOnlyList<string> args) =>
+    /// <summary>What a copy that couldn't be renamed is opened again with, so it carries on under its old name instead
+    /// of trying the same rename again.</summary>
+    public const string Failed = "--rename-failed";
+
+    /// <summary>
+    /// The little shell program that does the rename once this copy is gone: it waits for <paramref name="pid"/> to quit
+    /// (caffeinate -w blocks until it exits), then moves <c>From</c> to <c>To</c> (an older copy at <c>To</c> deleted
+    /// first) and opens it with the arguments this copy had (--background after an update's relaunch, so no window). If
+    /// anything is still at <c>To</c> (mv would put the app inside a folder there) or the move fails, it opens the old
+    /// bundle again, with <see cref="Failed"/>. For a newer copy already in place
+    /// (<c>OpenInstead</c>) it deletes this copy and opens that one.
+    /// </summary>
+    internal static IReadOnlyList<string> Script(int pid, RenamePlan plan, IReadOnlyList<string> args) =>
     [
-        "/bin/sh", "-c", "app=\"$1\"; shift; /usr/bin/caffeinate -w \"$0\"; exec /usr/bin/open \"$app\" --args \"$@\"",
-        pid.ToString(System.Globalization.CultureInfo.InvariantCulture), app, .. args,
+        "/bin/sh", "-c",
+        """
+        pid="$1"; from="$2"; to="$3"; old="$4"; newer="$5"; shift 5
+        /usr/bin/caffeinate -w "$pid"
+        if [ "$newer" = 1 ]; then /bin/rm -rf "$from"; exec /usr/bin/open "$to" --args "$@"; fi
+        [ -n "$old" ] && /bin/rm -rf "$old"
+        [ ! -e "$to" ] && /bin/mv "$from" "$to" && exec /usr/bin/open "$to" --args "$@"
+        exec /usr/bin/open "$from" --args "$@" "$0"
+        """,
+        Failed, pid.ToString(System.Globalization.CultureInfo.InvariantCulture), plan.From, plan.To,
+        plan.OpenInstead ? "" : plan.Remove ?? "", plan.OpenInstead ? "1" : "", .. args,
     ];
 
     /// <summary>
-    /// Carry out <paramref name="plan"/>. True when this process should quit now because the app opens from its new
-    /// place (<paramref name="spawn"/> started the waiter that opens it once this process is gone). A copy of the app
-    /// running from the bundle about to go (an older one still open) holds the plan off until it's quit: deleting it
-    /// under that copy would leave it running from nothing. <paramref name="stopBackground"/> stops this copy's own
-    /// background library (the phone answered with the app closed) before its bundle moves; the app starts it again
-    /// from the new place.
+    /// Carry out <paramref name="plan"/>. True when this process should quit now: the rename happens after it has gone.
+    /// This copy runs from the bundle that moves, and a process can't load any more of its code once its bundle has moved
+    /// (starting a program needs System.IO.Pipes; the first start of 0.23.0 crashed on that), so nothing moves or is
+    /// deleted here: <paramref name="spawn"/> starts <see cref="Script"/>, which does it all once this process is gone.
+    /// A copy of the app running from a bundle about to go (an older one still open) holds the plan off until it's quit.
+    /// <paramref name="stopBackground"/> stops this copy's own background library (the phone answered with the app
+    /// closed) before its bundle moves; the app starts it again from the new place. Started with <see cref="Failed"/>,
+    /// it doesn't try again.
     /// </summary>
-    public static bool Run(RenamePlan plan, Func<string, bool> runningFrom, Action stopBackground, Runner run,
+    public static bool Run(RenamePlan plan, Func<string, bool> runningFrom, Action stopBackground,
         Action<IReadOnlyList<string>> spawn, int pid, IReadOnlyList<string> args, Action<string> log)
     {
-        try
+        if (args.Contains(Failed))
         {
-            if (plan.Remove is { } remove && !string.Equals(remove, plan.From, StringComparison.Ordinal) && runningFrom(remove))
-            {
-                log($"[rename] {remove} is still open, so it stays until it's quit");
-                return false;
-            }
-            if (plan.From == plan.To)
-            {
-                Apps.TryDeleteFolder(plan.Remove!);
-                log($"[rename] removed the old {plan.Remove}");
-                return false;
-            }
-            stopBackground();
-            if (plan.OpenInstead)
-            {
-                // The newer copy is already in place: this one goes, and that one opens.
-                Apps.TryDeleteFolder(plan.From);
-                log($"[rename] {plan.To} is newer; removed {plan.From} and opening that one");
-            }
-            else
-            {
-                if (plan.Remove is { } older) Apps.TryDeleteFolder(older);
-                Ready.MoveFolder(plan.From, plan.To, run);
-                log($"[rename] {plan.From} is now {plan.To}");
-            }
-        }
-        catch (Exception e) when (e is IOException or UnauthorizedAccessException)
-        {
-            log("[rename] couldn't rename the app: " + e.Message);
+            log($"[rename] {plan.From} couldn't become {plan.To}, so it keeps its name for now");
             return false;
         }
-        spawn(Reopen(pid, plan.To, args));
+        if (plan.Remove is { } remove && !string.Equals(remove, plan.From, StringComparison.Ordinal) && runningFrom(remove))
+        {
+            log($"[rename] {remove} is still open, so it stays until it's quit");
+            return false;
+        }
+        if (plan.From == plan.To)
+        {
+            // Another bundle (an old Study Stash.app beside this one), never the one this copy runs from.
+            Apps.TryDeleteFolder(plan.Remove!);
+            log($"[rename] removed the old {plan.Remove}");
+            return false;
+        }
+        stopBackground();
+        spawn(Script(pid, plan, args));
+        log(plan.OpenInstead ? $"[rename] {plan.To} is newer: {plan.From} goes once this copy has quit, and that one opens"
+            : $"[rename] {plan.From} becomes {plan.To} once this copy has quit");
         return true;
     }
 }

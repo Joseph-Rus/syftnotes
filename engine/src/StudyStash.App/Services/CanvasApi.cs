@@ -353,7 +353,16 @@ public static class CanvasApi
         public DateTimeOffset? LastSync { get; init; }
         public Counts Counts { get; init; } = new();
         public bool FilesHidden { get; init; }
+        /// <summary>The student's grade in the class when Canvas shares it; null when it doesn't (or from an older library).</summary>
+        public ClassGrade? Grade { get; init; }
         public Scout? Scout { get; init; }
+    }
+
+    public sealed record ClassGrade
+    {
+        public double Score { get; init; }
+        /// <summary>"A-"; "" when the course has no letter scheme.</summary>
+        public string Letter { get; init; } = "";
     }
 
     public sealed record Course
@@ -415,6 +424,8 @@ public static class CanvasApi
         public int ToHandIn { get; init; }
         public Item? Next { get; init; }
         public IReadOnlyList<Group> Groups { get; init; } = [];
+        /// <summary>What the student hid in Syft Notes: in none of the groups, listed apart for "Show hidden".</summary>
+        public IReadOnlyList<Item> Hidden { get; init; } = [];
     }
 
     public sealed record Group
@@ -447,6 +458,8 @@ public static class CanvasApi
         public DateTimeOffset? Submitted { get; init; }
         public DateTimeOffset? GradedAt { get; init; }
         public DateTimeOffset? MarkedDone { get; init; }
+        /// <summary>What the student did about it in Syft Notes alone (never in Canvas): "done", "hidden" or "".</summary>
+        public string Mark { get; init; } = "";
         public string? Url { get; init; }
         public string? Folder { get; init; }
     }
@@ -480,6 +493,7 @@ public static class CanvasApi
         public DateTimeOffset? Submitted { get; init; }
         public DateTimeOffset? GradedAt { get; init; }
         public DateTimeOffset? MarkedDone { get; init; }
+        public string Mark { get; init; } = "";
         public string? Url { get; init; }
         public string? Folder { get; init; }
 
