@@ -1,4 +1,5 @@
 using System.Text.Json.Nodes;
+using StudyStash.App.Platform;
 using StudyStash.App.Services;
 using StudyStash.Core;
 
@@ -13,16 +14,39 @@ public sealed class OlderLibraryTests
     const string Old = "/Applications/Study Stash.app/Contents/MacOS/StudyStash";
 
     [Fact]
-    public void Only_an_older_copy_of_ours_with_nothing_on_the_go_is_replaced()
+    public void Only_an_older_copy_of_ours_for_this_folder_with_nothing_on_the_go_is_replaced()
     {
-        static bool Ours(string p) => p.Contains(".app/", StringComparison.Ordinal);
-        Assert.Equal(OlderVerdict.Replace, OlderLibrary.Judge(Old, Self, Ours, () => false));
-        Assert.Equal(OlderVerdict.Busy, OlderLibrary.Judge(Old, Self, Ours, () => true));
-        // This app's own program (its background library) and someone else's are left as before; so is one whose file
-        // can't be read. Busy isn't even asked then.
-        Assert.Equal(OlderVerdict.Self, OlderLibrary.Judge(Self, Self, Ours, () => throw new InvalidOperationException()));
-        Assert.Equal(OlderVerdict.NotOurs, OlderLibrary.Judge("/usr/local/bin/python3", Self, Ours, () => throw new InvalidOperationException()));
-        Assert.Equal(OlderVerdict.NotOurs, OlderLibrary.Judge(null, Self, Ours, () => throw new InvalidOperationException()));
+        const string home = "/Users/sam/.study-stash";
+        static bool Idle(string _) => false;
+        OurProcess Copy(string? version, string? folder = home, string program = Old, bool ours = true) => new(4242, program, ours, version, folder);
+
+        Assert.Equal(OlderVerdict.Replace, OlderLibrary.Judge(Copy("0.22.1"), Self, "0.23.3", home, Idle));
+        // A lecture on the go in this folder: left alone. Busy is asked of this folder's lectures.
+        Assert.Equal(OlderVerdict.Busy, OlderLibrary.Judge(Copy("0.22.1"), Self, "0.23.3", home, h => h == home));
+        // As new or newer (another path: ~/Applications, a "Keep Both" copy), or a version that can't be read: never.
+        Assert.Equal(OlderVerdict.NotOlder, OlderLibrary.Judge(Copy("0.23.3"), Self, "0.23.3", home, Idle));
+        Assert.Equal(OlderVerdict.NotOlder, OlderLibrary.Judge(Copy("0.24.0"), Self, "0.23.3", home, Idle));
+        Assert.Equal(OlderVerdict.NotOlder, OlderLibrary.Judge(Copy(null), Self, "0.23.3", home, Idle));
+        // Another settings folder's (or one whose folder can't be read), even older: never. Busy isn't asked.
+        Assert.Equal(OlderVerdict.OtherHome, OlderLibrary.Judge(Copy("0.22.1", "/Users/sam/.study-stash-selftest"), Self, "0.23.3", home, _ => throw new InvalidOperationException()));
+        Assert.Equal(OlderVerdict.OtherHome, OlderLibrary.Judge(Copy("0.22.1", null), Self, "0.23.3", home, _ => throw new InvalidOperationException()));
+        // Someone else's program, or one that can't be told: never.
+        Assert.Equal(OlderVerdict.NotOurs, OlderLibrary.Judge(Copy("0.22.1", program: "/usr/local/bin/python3", ours: false), Self, "0.23.3", home, Idle));
+        Assert.Equal(OlderVerdict.NotOurs, OlderLibrary.Judge(null, Self, "0.23.3", home, Idle));
+        // This app's own program (its background library) for this folder: its own to register again, unless busy.
+        Assert.Equal(OlderVerdict.Own, OlderLibrary.Judge(Copy("0.23.3", program: Self), Self, "0.23.3", home, Idle));
+        Assert.Equal(OlderVerdict.Busy, OlderLibrary.Judge(Copy("0.23.3", program: Self), Self, "0.23.3", home, _ => true));
+    }
+
+    [Fact]
+    public void The_folder_a_copy_serves_is_read_from_its_command_line()
+    {
+        const string usual = "/Users/sam/.study-stash";
+        Assert.Equal("/Users/sam/.study-stash", OurProcess.HomeIn("/Applications/Study Stash.app/Contents/MacOS/StudyStash --home /Users/sam/.study-stash helper", usual));
+        Assert.Equal("/Users/sam/My Folder", OurProcess.HomeIn("/Applications/Study Stash.app/Contents/MacOS/StudyStash --home /Users/sam/My Folder serve", usual));
+        Assert.Equal(@"C:\Users\Sam\.study-stash", OurProcess.HomeIn(@"""C:\Apps\StudyStash.exe"" --home ""C:\Users\Sam\.study-stash"" helper --keep-alive", usual));
+        Assert.Equal("/tmp/other", OurProcess.HomeIn("/Applications/Syft Notes.app/Contents/MacOS/StudyStash --home /tmp/other", usual));
+        Assert.Equal(usual, OurProcess.HomeIn("/Applications/Syft Notes.app/Contents/MacOS/StudyStash --background", usual));
     }
 
     [Fact]
@@ -97,6 +121,48 @@ public sealed class OlderLibraryTests
         Assert.Equal(LectureState.Writing, store.Get("rec-20261104-090000-abcdef")!.State);
     }
 
+    [Fact]
+    public async Task A_copy_as_new_or_newer_or_for_another_folder_is_never_touched_and_never_says_restart()
+    {
+        using var home = new TempHome();
+        var cfg = Ready(home);
+        foreach (var holder in new[]
+                 {
+                     new OurProcess(4242, "/Users/sam/Applications/Syft Notes.app/Contents/MacOS/StudyStash", true, Engine.Version, home.Path),
+                     new OurProcess(4242, "/Users/sam/Downloads/Syft Notes.app/Contents/MacOS/StudyStash", true, "99.0.0", home.Path),
+                     new OurProcess(4242, Old, true, "0.22.1", home["elsewhere"]),
+                 })
+        {
+            var asked = new List<string>();
+            var svc = Service(home, cfg, asked, busy: false, free: () => false, holder: holder);
+            await svc.StartAsync();
+            Assert.Empty(asked);
+            Assert.Equal(LibraryServiceState.Elsewhere, svc.State);
+            string? why = await LibraryHere.ProblemAsync(svc, cfg);
+            Assert.Equal(OlderLibrary.OtherCopyWords, why);
+            Assert.DoesNotContain("Restart", why!, StringComparison.OrdinalIgnoreCase);
+        }
+    }
+
+    [Fact]
+    public async Task This_apps_own_background_library_on_another_password_is_registered_again()
+    {
+        // Setup gave the library a new password; the background library still runs with the one it read at login.
+        using var home = new TempHome();
+        var cfg = Ready(home);
+        var asked = new List<string>();
+        var svc = Service(home, cfg, asked, busy: false, free: () => false,
+            holder: new OurProcess(4242, Self, true, Engine.Version, home.Path),
+            background: new BackgroundPlan(NoBackground.Instance, () => true, Self));
+
+        await svc.StartAsync();
+
+        Assert.Equal(["registered again"], asked); // never asked to quit by hand, nothing else started
+        Assert.True(svc.InBackground);
+        Assert.Equal(LibraryServiceState.Elsewhere, svc.State);
+        Assert.Null(svc.Failure);
+    }
+
     static Config Ready(TempHome home)
     {
         var cfg = new Config(home.Path, home["Notes"]) { PoolName = "Ada's library", PoolPassword = "this-copys-password", WebPort = 19787 };
@@ -104,24 +170,27 @@ public sealed class OlderLibraryTests
         return cfg;
     }
 
-    /// <summary>A library service whose port is held by an older copy (process 4242, an old Study Stash.app) that turns
-    /// it away, until <paramref name="free"/>.</summary>
-    static LibraryService Service(TempHome home, Config cfg, List<string> asked, bool busy, Func<bool> free, Action? onQuit = null) =>
-        new(home.Path, cfg, [Self],
+    /// <summary>A library service whose port is held by <paramref name="holder"/> (process 4242; an old Study Stash.app
+    /// for this folder unless said), which turns it away until <paramref name="free"/> (or, with a background library,
+    /// until that's registered again).</summary>
+    static LibraryService Service(TempHome home, Config cfg, List<string> asked, bool busy, Func<bool> free, Action? onQuit = null,
+        OurProcess? holder = null, BackgroundPlan? background = null)
+    {
+        bool registered = false;
+        return new(home.Path, cfg, [Self],
             spawn: info =>
             {
                 asked.Add($"started {info.ArgumentList[0]} {info.ArgumentList[1]}");
                 throw new IOException("no child in this test");
             },
-            waitHealthy: (_, _) => Task.FromResult(false),
+            waitHealthy: (_, _) => Task.FromResult(registered),
             portStatus: _ => Task.FromResult(free() ? "free" : "ours"),
-            health: _ => Task.FromResult<(string, bool)?>(null),
+            health: _ => Task.FromResult<(string, bool)?>(registered ? (Engine.Version, true) : null),
             older: new OlderLibrary
             {
-                Holder = _ => new PortHolder(4242, Old),
-                Ours = p => p == Old,
+                Holder = _ => holder ?? new OurProcess(4242, Old, true, "0.22.1", home.Path),
                 Busy = h => h == home.Path && busy,
-                StopOldRegistration = (_, _) => asked.Add("launchd lets go of the old job"),
+                StopRegistration = (_, _) => asked.Add("launchd lets go of the old job"),
                 AskToQuit = pid =>
                 {
                     asked.Add($"asked process {pid} to quit");
@@ -129,5 +198,29 @@ public sealed class OlderLibraryTests
                     return true;
                 },
             },
-            log: _ => { });
+            log: _ => { })
+        {
+            Background = background is null ? null : background with
+            {
+                System = new Registrations(asked, () => registered = true, background.Program),
+            },
+        };
+    }
+
+    /// <summary>This app's background library, registered for this folder, running this program.</summary>
+    sealed class Registrations(List<string> asked, Action registered, string runs) : IBackgroundLibrary
+    {
+        public bool IsRegistered(string home) => true;
+        public IReadOnlyList<string>? Registered(string home) => [runs, "--home", home, "helper"];
+        public void Register(string home, string program, IReadOnlyList<string>? extra = null)
+        {
+            asked.Add("registered again");
+            registered();
+        }
+        public void Unregister(string home) => asked.Add("unregistered");
+        public List<(string Home, IReadOnlyList<string> Args)> All() => [];
+        public void Stop(string home) => asked.Add("stopped by its label");
+        public void Start(string home) => asked.Add("started by its label");
+        public void Restart(string home) => asked.Add("restarted");
+    }
 }

@@ -1,35 +1,34 @@
-using System.Diagnostics;
 using StudyStash.App.Platform;
 using StudyStash.Core;
 
 namespace StudyStash.App.Services;
 
-/// <summary>The process listening on a port, and the file it really runs: null when that can't be read.</summary>
-public sealed record PortHolder(int Pid, string? Program);
-
-/// <summary>What's done about a library on the port that turns this app away.</summary>
+/// <summary>What's done about one of our processes holding something this copy wants (the library's port).</summary>
 public enum OlderVerdict
 {
-    /// <summary>Not a Syft Notes program, or one that can't be told: left alone, as before.</summary>
+    /// <summary>Not a Syft Notes program, or one that can't be told: never touched.</summary>
     NotOurs,
-    /// <summary>This app's own program (its background library): left alone, as before.</summary>
-    Self,
-    /// <summary>An older copy, but a lecture is being recorded or written down: left alone, looked at again later.</summary>
+    /// <summary>Ours, for another settings folder, or one whose folder can't be read: never touched.</summary>
+    OtherHome,
+    /// <summary>Ours, as new as this copy or newer (or its version can't be read): never touched.</summary>
+    NotOlder,
+    /// <summary>Ours, but a lecture is being recorded or written down in its folder: left alone, looked at again later.</summary>
     Busy,
-    /// <summary>An older copy with nothing on the go: asked to quit, and this app's library starts in its place.</summary>
+    /// <summary>This copy's own program (its background library), for this folder, with nothing on the go.</summary>
+    Own,
+    /// <summary>An older copy, for this folder, with nothing on the go: asked to quit, and this copy takes its place.</summary>
     Replace,
 }
 
 /// <summary>
-/// An older copy of Syft Notes still holding the library's port, with another password or not answering: a Mac's old
-/// background library (a LaunchAgent running an old Study Stash.app), an old copy's library left running, a copy run
-/// from Downloads. It's only ever stopped when its real program (never its arguments, which keep the path it started
-/// from) is in a bundle that says com.study-stash.app, or is StudyStash.exe, and isn't this app's own program; never
-/// while a lecture is being recorded or written down (<see cref="LecturesBusy"/>); and only politely: launchd lets go of
-/// its job, then SIGTERM, which every copy takes as a clean stop. Never a forced end: the library's note files are
-/// written in place, not swapped in whole, so a process ended mid-write could leave half a note. Windows has no polite
-/// way to ask a library it didn't start, so there it's said instead. Everything that touches the computer is swapped in
-/// a test, and does nothing while <see cref="Desktop.SystemChangesOff"/> (tests, the self-test).
+/// An older copy of Syft Notes still holding the library's port and turning this app away: a Mac's old background
+/// library (a LaunchAgent running an old Study Stash.app), an old copy's library left running. Who it is comes from
+/// <see cref="OurProcess"/>; what's done from <see cref="Judge"/>: only a copy of ours, strictly older than this one, for
+/// this settings folder, with no lecture on the go (<see cref="LecturesBusy"/>) is replaced, and only politely: launchd
+/// lets go of its job, then SIGTERM, which every copy takes as a clean stop. Never a forced end: the library's note files
+/// are written in place, not swapped in whole, so a process ended mid-write could leave half a note. Windows has no
+/// polite way to ask a library this app didn't start, so there it's said instead. Everything that touches the computer
+/// is swapped in a test, and does nothing while <see cref="Desktop.SystemChangesOff"/> (tests, the self-test).
 /// </summary>
 public sealed class OlderLibrary
 {
@@ -38,15 +37,14 @@ public sealed class OlderLibrary
 
     public static readonly OlderLibrary ThisComputer = new();
 
-    /// <summary>Who listens on the port.</summary>
-    public Func<int, PortHolder?> Holder { get; init; } = HolderOf;
-    /// <summary>The program is a Syft Notes one.</summary>
-    public Func<string, bool> Ours { get; init; } = IsOurs;
+    /// <summary>Who listens on the port: null when no one process can be told.</summary>
+    public Func<int, OurProcess?> Holder { get; init; } = HolderOf;
     /// <summary>A lecture in this settings folder is being recorded or written down.</summary>
     public Func<string, bool> Busy { get; init; } = home => LecturesBusy(home, DateTime.UtcNow);
-    /// <summary>(home, this app's program): a Mac's background library for this folder that doesn't run this program
-    /// lets go (launchctl bootout), so launchd doesn't start the old one again once it quits.</summary>
-    public Action<string, string> StopOldRegistration { get; init; } = StopRegistration;
+    /// <summary>(home, this app's program): a Mac's background library for this folder that doesn't run
+    /// <c>program</c> (null: whatever it runs) lets go (launchctl bootout, even with no plist left), so launchd doesn't
+    /// start it again once it quits.</summary>
+    public Action<string, string?> StopRegistration { get; init; } = StopRegistered;
     /// <summary>Asks the process to quit (SIGTERM); false where there's no polite way (Windows).</summary>
     public Func<int, bool> AskToQuit { get; init; } = Quit;
 
@@ -56,15 +54,20 @@ public sealed class OlderLibrary
     public const string ClosingWords = "An older copy of Syft Notes is still closing. Your library starts by itself once it has.";
     /// <summary>The words for one this app can't ask to quit (Windows).</summary>
     public const string StillRunningWords = "An older copy of Syft Notes is still running. End it in Task Manager, then open Syft Notes again.";
+    /// <summary>The words for a copy as new as this one or newer, or one set up apart from this one: never touched.</summary>
+    public const string OtherCopyWords = "Another copy of Syft Notes is already running its own library. Quit that copy, then open Syft Notes again.";
 
-    /// <summary>What to do about the program <paramref name="program"/> holding the port, for this app running
-    /// <paramref name="self"/>. <paramref name="busy"/> is only asked about an older copy of ours.</summary>
-    public static OlderVerdict Judge(string? program, string self, Func<string, bool> ours, Func<bool> busy)
+    /// <summary>What to do about <paramref name="holder"/>, for this copy running <paramref name="self"/> at
+    /// <paramref name="version"/> for <paramref name="home"/>. <paramref name="busy"/> is asked only about one of ours
+    /// for this folder, and is asked of this folder's lectures.</summary>
+    public static OlderVerdict Judge(OurProcess? holder, string self, string version, string home, Func<string, bool> busy)
     {
-        if (program is null) return OlderVerdict.NotOurs;
-        if (LibraryService.SameProgram(program, self)) return OlderVerdict.Self;
-        if (!ours(program)) return OlderVerdict.NotOurs;
-        return busy() ? OlderVerdict.Busy : OlderVerdict.Replace;
+        if (holder is not { Ours: true }) return OlderVerdict.NotOurs;
+        if (!holder.Serves(home)) return OlderVerdict.OtherHome;
+        bool own = LibraryService.SameProgram(holder.Program, self);
+        if (!own && !holder.OlderThan(version)) return OlderVerdict.NotOlder;
+        if (busy(home)) return OlderVerdict.Busy;
+        return own ? OlderVerdict.Own : OlderVerdict.Replace;
     }
 
     /// <summary>A lecture is recording or paused; one is being written down right now (its record changed in the last
@@ -88,9 +91,8 @@ public sealed class OlderLibrary
         }
     }
 
-    /// <summary>A Mac: lsof's one listening process; Windows: netstat's. Its program is where its file really is now
-    /// (proc_pidpath on a Mac, through Process.MainModule), never what it was started as.</summary>
-    static PortHolder? HolderOf(int port)
+    /// <summary>A Mac: lsof's one listening process; Windows: netstat's.</summary>
+    static OurProcess? HolderOf(int port)
     {
         if (Desktop.SystemChangesOff) return null;
         List<int> pids;
@@ -109,20 +111,7 @@ public sealed class OlderLibrary
             return null;
         }
         pids = [.. pids.Where(p => p > 0 && p != Environment.ProcessId).Distinct()];
-        if (pids is not [int pid]) return null;
-        try
-        {
-            using var process = Process.GetProcessById(pid);
-            return new PortHolder(pid, process.MainModule?.FileName);
-        }
-        catch (ArgumentException)
-        {
-            return null; // it has just quit
-        }
-        catch (Exception e) when (e is InvalidOperationException or System.ComponentModel.Win32Exception or NotSupportedException)
-        {
-            return new PortHolder(pid, null); // its file can't be read: never taken for ours
-        }
+        return pids is [int pid] ? OurProcess.Of(pid) : null;
     }
 
     /// <summary>The processes netstat -ano says listen on <paramref name="port"/>: a local address ending :port with no
@@ -140,22 +129,11 @@ public sealed class OlderLibrary
         return pids;
     }
 
-    /// <summary>A Mac: the program is inside a bundle that says com.study-stash.app (an old Study Stash.app too).
-    /// Windows: it's StudyStash.exe.</summary>
-    static bool IsOurs(string program)
-    {
-        if (OperatingSystem.IsMacOS())
-            return Apps.EnclosingMacBundle(Path.GetDirectoryName(program) ?? program) is { } bundle
-                   && Apps.PlistString(Path.Combine(bundle, "Contents", "Info.plist"), "CFBundleIdentifier") == "com.study-stash.app";
-        return OperatingSystem.IsWindows() && string.Equals(Path.GetFileName(program), "StudyStash.exe", StringComparison.OrdinalIgnoreCase);
-    }
-
-    static void StopRegistration(string home, string program)
+    static void StopRegistered(string home, string? program)
     {
         if (Desktop.SystemChangesOff || !OperatingSystem.IsMacOS()) return;
         var background = BackgroundLibrary.ThisComputer();
-        if (background.Registered(home) is [var registered, ..] && LibraryService.SameProgram(registered, program)) return;
-        // Even with no plist on disk: launchd keeps a job loaded after its plist was deleted.
+        if (program is not null && background.Registered(home) is [var registered, ..] && LibraryService.SameProgram(registered, program)) return;
         background.Stop(home);
     }
 
