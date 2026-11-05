@@ -220,6 +220,12 @@ public sealed class LibraryService : IDisposable
         }
         var holder = await Task.Run(() => older.Holder(cfg.WebPort));
         var verdict = OlderLibrary.Judge(holder, command[0], Engine.Version, home, older.Busy);
+        // It took this password: unless it's to be replaced now, it's used as it is, with nothing said, as before.
+        if (said is not null && verdict is not (OlderVerdict.Own or OlderVerdict.Replace))
+        {
+            SetState(LibraryServiceState.Elsewhere);
+            return false;
+        }
         if (verdict == OlderVerdict.NotOurs)
         {
             SetState(LibraryServiceState.Elsewhere);
