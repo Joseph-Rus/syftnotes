@@ -484,12 +484,17 @@ public sealed partial class AppHost : IDisposable, IProblemSource
     /// restarts, so such a copy leaves the background library as the copy in Applications set it up.</summary>
     BackgroundPlan? MakeBackgroundPlan()
     {
-        if (MacRename.Passing(Desktop.Program)) return null;
         // The self-test's stand-in for Google Drive goes along, so its phone is answered with the app closed too.
         IReadOnlyList<string>? extra = SelfTest.Dir is not null && StudyStash.Core.TestSwitches.Get("STUDYSTASH_DRIVE_FOLDER") is { Length: > 0 } folder
             ? ["--drive-folder", folder] : null;
-        return new BackgroundPlan(Background, () => BackgroundWanted, Desktop.Program, extra);
+        return MakeBackgroundPlan(Desktop.Program, Background, () => BackgroundWanted, extra);
     }
+
+    /// <summary>The plan for <paramref name="program"/>: none when it runs from its disk image or a translocation folder
+    /// (<see cref="MacRename.Passing"/>), so launchd is never handed a program that's gone once the image is ejected.</summary>
+    internal static BackgroundPlan? MakeBackgroundPlan(string program, IBackgroundLibrary system, Func<bool> wanted,
+        IReadOnlyList<string>? extra = null) =>
+        MacRename.Passing(program) ? null : new BackgroundPlan(system, wanted, program, extra);
 
     /// <summary>The library moves to the background or back, as <see cref="BackgroundWanted"/> now says (Settings →
     /// Phone's switch, Google connected or disconnected, this computer's role changed). With no library of the app's

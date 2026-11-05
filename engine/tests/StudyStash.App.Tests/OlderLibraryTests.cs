@@ -242,6 +242,38 @@ public sealed class OlderLibraryTests
         Assert.Null(svc.Failure);
     }
 
+    [Fact]
+    public async Task A_newer_copy_opened_from_its_disk_image_takes_the_window_but_never_the_library_or_its_login_job()
+    {
+        // Opened straight from the DMG while an older copy of ours, for this folder, sits in the menu bar with nothing on
+        // the go.
+        const string fromImage = "/Volumes/Syft Notes/Syft Notes.app/Contents/MacOS/StudyStash";
+        using var home = new TempHome();
+        var older = new OurProcess(4242, Old, true, V("0.22.1"), home.Path);
+
+        // The window: the older copy is asked to quit, once, and this copy takes the folder (the move into Applications
+        // is offered next).
+        var asked = new List<int>();
+        bool gone = false;
+        var quitting = new OlderLibrary { AskToQuit = pid => { asked.Add(pid); gone = true; return true; }, Busy = _ => false };
+        Assert.True(await Desktop.TakeOverAsync(home.Path, older, fromImage, "0.23.5", quitting, () => gone, _ => { }));
+        Assert.Equal([4242], asked);
+
+        // The login job: no plan from the image (one from Applications has one), so launchd is never handed it.
+        var calls = new List<string>();
+        var system = new Registrations(calls, () => { }, fromImage);
+        Assert.NotNull(AppHost.MakeBackgroundPlan(Self, system, () => true));
+        var plan = AppHost.MakeBackgroundPlan(fromImage, system, () => true);
+        Assert.Null(plan);
+
+        // The library, with that plan: the older one on the port turns this app's password away, and is still never asked
+        // to quit; nothing is registered, started or let go.
+        var svc = Service(home, Ready(home), calls, busy: false, free: () => false, holder: older, background: plan, self: fromImage);
+        await svc.StartAsync();
+        Assert.Empty(calls);
+        Assert.Equal(LibraryServiceState.Elsewhere, svc.State);
+    }
+
     static int[] V(string version) => Updates.ParseVersion(version);
 
     static Config Ready(TempHome home)
