@@ -92,7 +92,7 @@ public sealed class LocalLibrary(LibraryReader reader, Canvas.CanvasSync? canvas
             return NotHere;
         if (home is not null && RealPath(home) is { } h && real.StartsWith(h.TrimEnd(Path.DirectorySeparatorChar) + Path.DirectorySeparatorChar, StringComparison.Ordinal))
             return NotHere;
-        return ClaudeTools.Page(Ai.FileIndex.TextOf(real), offset, "Syft Notes can't read the words in this file (it may be a picture or a scan).");
+        return ClaudeTools.Page(Ai.FileIndex.TextOf(real, home is null ? null : Ai.DocumentTextOptions.For(home)), offset, "Syft Notes can't read the words in this file (it may be a picture or a scan).");
     }
 
     /// <summary>Where a path really is, every link along it followed; null when it can't be followed (a loop, or

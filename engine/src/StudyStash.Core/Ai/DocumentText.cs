@@ -33,10 +33,8 @@ public static partial class DocumentText
     /// <summary>
     /// The text of a PDF, picture, Word document or PowerPoint: its typed text where it has some, text recognition
     /// (handwriting too) where it doesn't. Null when the file isn't there, isn't a kind this reads, or holds no words.
+    /// What it read is kept in <paramref name="options"/>' cache folder, if it has one.
     /// </summary>
-    public static Task<string?> ExtractAsync(string path, CancellationToken ct) => ExtractAsync(path, DocumentTextOptions.Default, ct);
-
-    /// <inheritdoc cref="ExtractAsync(string, CancellationToken)"/>
     public static async Task<string?> ExtractAsync(string path, DocumentTextOptions options, CancellationToken ct)
     {
         if (!CanRead(path) || !File.Exists(path)) return null;
@@ -149,8 +147,9 @@ public static partial class DocumentText
         }
     }
 
-    /// <summary>The words <see cref="ExtractAsync(string, CancellationToken)"/> gives for a PDF or PowerPoint, made from
-    /// its <paramref name="pages"/> (<see cref="PagesAsync"/>) so a file read as pages needn't be read again for them.</summary>
+    /// <summary>The words <see cref="ExtractAsync(string, DocumentTextOptions, CancellationToken)"/> gives for a PDF or
+    /// PowerPoint, made from its <paramref name="pages"/> (<see cref="PagesAsync"/>) so a file read as pages needn't be
+    /// read again for them.</summary>
     public static string? WordsOf(IReadOnlyList<string>? pages) => Tidy(Joined(pages));
 
     static List<string>? Pages(string ext, string path, DocumentTextOptions options, CancellationToken ct) =>
@@ -204,8 +203,9 @@ public static partial class DocumentText
 }
 
 /// <summary>
-/// How <see cref="DocumentText"/> reads. <see cref="Default"/> keeps what it read in the home folder, so reading a
-/// file again (the file search's next pass, an attachment opened twice) costs nothing until the file changes.
+/// How <see cref="DocumentText"/> reads. <see cref="For"/> keeps what it read in a library's own home folder, so reading
+/// a file again (the file search's next pass, an attachment opened twice) costs nothing until the file changes. A
+/// library keeps its readings in its own home, never another's; with no cache folder nothing is kept.
 /// </summary>
 public sealed record DocumentTextOptions
 {
@@ -225,5 +225,6 @@ public sealed record DocumentTextOptions
     /// <summary>Tests: stands in for the computer's text recognition of a PDF's pages.</summary>
     internal DocumentText.PageReaderFn? PageReader { get; init; }
 
-    public static DocumentTextOptions Default => new() { CacheDir = Path.Combine(Configs.DefaultHome, "cache", "text") };
+    /// <summary>Keeps what it reads in <paramref name="home"/>'s <c>cache/text</c> folder.</summary>
+    public static DocumentTextOptions For(string home) => new() { CacheDir = Path.Combine(home, "cache", "text") };
 }
