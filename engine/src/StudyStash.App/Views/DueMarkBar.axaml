@@ -1,0 +1,20 @@
+<!-- "Mark as done" on an assignment's page (both looks), or, once the student did, "Done (marked by you)" with "Undo".
+     It sits in the "Your submission" card; these only change Syft Notes' own Due list: nothing changes in Canvas. -->
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:k="using:StudyStash.App.ViewModels.Kit"
+             xmlns:c="using:StudyStash.App.Controls"
+             x:Class="StudyStash.App.Views.DueMarkBar"
+             x:DataType="k:DueMarkModel">
+  <StackPanel Spacing="8">
+    <WrapPanel ItemSpacing="10" LineSpacing="8">
+      <Button Name="MarkDone" Classes="btn sm" Content="{x:Static k:DueMarkModel.DoneLabel}" Command="{Binding MarkDoneCommand}"
+              IsVisible="{Binding CanMark}" ToolTip.Tip="{x:Static k:DueMarkModel.DoneTip}" VerticalAlignment="Center" />
+      <c:PageText Name="State" Classes="cv-sub-status" Text="{x:Static k:DueMarkModel.DoneState}" IsVisible="{Binding ShowDone}" VerticalAlignment="Center" />
+      <Button Name="UndoIt" Classes="btn sm" Content="{x:Static k:DueMarkModel.UndoLabel}" Command="{Binding UndoItCommand}"
+              IsVisible="{Binding ShowDone}" VerticalAlignment="Center" />
+    </WrapPanel>
+    <TextBlock Name="Say" Classes="cv-sub-detail" Text="{Binding Action.Say}" TextWrapping="Wrap"
+               IsVisible="{Binding Action.Say, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+  </StackPanel>
+</UserControl>
