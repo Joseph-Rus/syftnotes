@@ -71,24 +71,33 @@ static class Program
             Log($"[error] a background task failed: {e.Exception}");
             e.SetObserved();
         };
+        // One copy at a time: a second one asks the first to show itself (or record), then goes. One started at login
+        // has nothing to show, so it just goes.
+        int show = Array.IndexOf(args, "--show"), open = Array.IndexOf(args, "--open");
+        // "--open LINK": Windows opened a studystash: link, for a click on one of the app's notifications.
+        string? word = open >= 0 && open + 1 < args.Length && NoticeLinks.WordFor(args[open + 1]) is { } click ? click
+            : args.Contains("--record") ? "record"
+            : show >= 0 && show + 1 < args.Length ? args[show + 1]
+            : Background ? null : "show";
+        // A Mac copy opened while an older one holds the folder (its menu bar copy, started at login before the update)
+        // takes over from it instead (Desktop.TakeOver: never while a lecture is being recorded or written down there), so
+        // the student sees the version just installed, and the move and the rename below find the old one gone.
+        bool claimed = Desktop.Claim(Home) || word == "show" && Desktop.TakeOver(Home, Log);
         // A Mac copy opened from its DMG or Downloads offers once to move into Applications; moved, it opens there.
         if (MoveSheet.Run(Home, Background)) return 0;
         // The bundle's own name is Syft Notes.app now: one an older copy's updater left as Study Stash.app renames
         // itself, and opens again from there (MacRename.cs).
         if (MoveSheet.Rename(args)) return 0;
-        // One copy at a time: a second one asks the first to show itself (or record), then goes. One started at login
-        // has nothing to show, so it just goes.
-        if (!Desktop.Claim(Home))
+        if (!claimed)
         {
-            int show = Array.IndexOf(args, "--show"), open = Array.IndexOf(args, "--open");
-            // "--open LINK": Windows opened a studystash: link, for a click on one of the app's notifications.
-            string? word = open >= 0 && open + 1 < args.Length && NoticeLinks.WordFor(args[open + 1]) is { } click ? click
-                : args.Contains("--record") ? "record"
-                : show >= 0 && show + 1 < args.Length ? args[show + 1]
-                : Background ? null : "show";
-            Log(word is null ? "[app] Syft Notes is already running for this folder; this copy, started at login, goes"
-                : Desktop.HandOff(Home, word) ? $"[app] Syft Notes is already running for this folder: handed it \"{word}\""
-                : "[app] Syft Notes is already running for this folder but didn't answer in 5 seconds; this copy goes");
+            if (word is null) Log("[app] Syft Notes is already running for this folder; this copy, started at login, goes");
+            else if (Desktop.HandOff(Home, word)) Log($"[app] Syft Notes is already running for this folder: handed it \"{word}\"");
+            else
+            {
+                Log("[app] Syft Notes is already running for this folder but didn't answer in 5 seconds; this copy goes");
+                // Not nothing at all (a Mac): the system's own dialog says so, and what to do.
+                Desktop.SayNotAnswering();
+            }
             return 0;
         }
         Skin.Current = Skin.FromEnvironment();

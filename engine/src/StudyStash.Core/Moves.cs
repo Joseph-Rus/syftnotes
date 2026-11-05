@@ -24,7 +24,8 @@ public static class Moves
 
     /// <summary>True when <paramref name="command"/> is this app's program as it was before it moved, so whatever names
     /// it should name <paramref name="current"/> instead: it's our program by name, it isn't the current one, and it is
-    /// gone, in one of the old places, or in an older copy of the Mac app (<see cref="MacRename.OlderCopy"/>).
+    /// gone, in one of the old places, somewhere a Mac copy only runs for a while (its disk image or a translocation
+    /// folder, <see cref="MacRename.Passing"/>), or in an older copy of the Mac app (<see cref="MacRename.OlderCopy"/>).
     /// <paramref name="exists"/> is File.Exists unless a test says otherwise.</summary>
     public static bool OldProgram(string? command, string current, Func<string, bool>? exists = null)
     {
@@ -33,7 +34,7 @@ public static class Moves
         if (string.Equals(command, current, same)) return false;
         string slashes = command.Replace('\\', '/');
         bool oldPlace = OldPlaces.Any(p => command.Contains(p, StringComparison.OrdinalIgnoreCase) || slashes.Contains(p, StringComparison.OrdinalIgnoreCase));
-        return oldPlace || !(exists ?? File.Exists)(command) || MacRename.OlderCopy(command, current);
+        return oldPlace || MacRename.Passing(command) || !(exists ?? File.Exists)(command) || MacRename.OlderCopy(command, current);
     }
 
     /// <summary>The files that make a folder an Inno Setup install of this app, deleted last so a folder only partly
