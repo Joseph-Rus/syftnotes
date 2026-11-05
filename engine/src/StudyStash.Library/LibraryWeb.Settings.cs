@@ -275,7 +275,7 @@ public sealed partial class LibraryWeb
             && !classes.Any(c => c.Name.Equals(n, StringComparison.OrdinalIgnoreCase)))];
 
     /// <summary>Classes taken off the list, in the app's Settings or on this page: their lectures move to Unsorted, the
-    /// way "Move to" moves one (one that's waiting, being written or couldn't be written changes class only), its Canvas
+    /// way "Move to" moves one (its file goes with it, edits and all; one with no file yet changes class only), its Canvas
     /// course stops syncing (its Canvas files stay), and its folder goes once nothing is left in it. Nothing else is
     /// deleted. A lecture whose file can't be moved (another app has it open) stays, and the rest carry on.</summary>
     void ClassesRemoved(List<string> removed)
