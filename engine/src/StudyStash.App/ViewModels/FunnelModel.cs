@@ -258,8 +258,9 @@ public sealed partial class FunnelModel : ObservableObject, IDisposable
                 if (AddOn is null && Canvas is null)
                 {
                     bool findsItself = await services.AddOnFindsCanvas();
-                    // Left meanwhile ("My school doesn't use Canvas", or Back): nothing to start here now.
-                    if (!OnClasses) break;
+                    // Left meanwhile ("My school doesn't use Canvas", or Back), or started already by a quick Back and
+                    // return: nothing to start here now.
+                    if (!OnClasses || AddOn is not null || Canvas is not null) break;
                     if (findsItself && services.MakeAddOn() is { } addOn)
                     {
                         addOn.OnDone = () =>
