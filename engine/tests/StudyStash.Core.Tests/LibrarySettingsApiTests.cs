@@ -315,9 +315,6 @@ public class LibrarySettingsApiTests
         Assert.Equal(["CS 101"], Configs.Load(cfg.Home).Classes.Select(c => c.Name));
     }
 
-    /// <summary>A class removed in the app's Settings: its lecture moves to Unsorted (note file and all), and so does
-    /// one whose notes couldn't be written; its empty folder goes, the sidebar no longer lists it, and its Canvas course
-    /// is un-ticked. A class whose name was cleared isn't removed: it stays as it was, lectures and all.</summary>
     /// <summary>Removing a class loses nothing: a lecture whose rewrite failed keeps the edits made in its file (moved to
     /// Unsorted, still failed), and one sent for the class after it's gone (recorded meanwhile) is kept and isn't filed
     /// under the removed class.</summary>
@@ -356,6 +353,9 @@ public class LibrarySettingsApiTests
         Assert.Null(Classify.ByRules(late, Configs.Load(cfg.Home).Classes));
     }
 
+    /// <summary>A class removed in the app's Settings: its lecture moves to Unsorted (note file and all), and so does
+    /// one whose notes couldn't be written; its empty folder goes, the sidebar no longer lists it, and its Canvas course
+    /// is un-ticked. A class whose name was cleared isn't removed: it stays as it was, lectures and all.</summary>
     [Fact]
     public async Task Removing_a_class_moves_its_lectures_to_Unsorted_and_stops_its_Canvas_course()
     {
