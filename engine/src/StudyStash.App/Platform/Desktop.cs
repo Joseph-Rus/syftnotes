@@ -351,6 +351,111 @@ public static class Desktop
         }
     }
 
+    /// <summary>How long an older copy asked to quit has before this one hands off to it instead: quitting ends for good
+    /// after 30 s in every copy since 0.20 (Shell.QuitLimit).</summary>
+    static readonly TimeSpan TakeOverWait = TimeSpan.FromSeconds(45);
+
+    /// <summary>
+    /// A Mac: this copy couldn't claim the folder, and the copy holding it (its menu bar copy, started at login before an
+    /// update) is an older Syft Notes than this one, or runs from a bundle that's gone. No word a later copy hands off
+    /// asks an older one to quit, so it's asked the way an update's quit and launchd ask, and every copy takes as its own
+    /// Quit: SIGTERM (its library stops cleanly, its typed notes are kept). This copy claims the folder once it has gone,
+    /// so the student sees the version just installed rather than the old one's window. Never while a lecture is being
+    /// recorded, is paused or is being written down (<see cref="Busy"/>), and never for the same or a newer version, or
+    /// one that can't be told: those are handed off to, as before. The background library is this copy's to start again
+    /// as it starts (LibraryService registers it from this program, and the new one waits for the old one's port). True
+    /// when this copy holds the folder now.
+    /// </summary>
+    public static bool TakeOver(string home, Action<string> log)
+    {
+        if (!OperatingSystem.IsMacOS() || SystemChangesOff || SelfTest.Dir is not null) return false;
+        if (Apps.EnclosingMacBundle(AppContext.BaseDirectory) is not { } mine || BundleVersion(mine) is not { } version) return false;
+        // No holder any more: it quit as this copy looked.
+        if (Holder(home) is not { } holder) return Claim(home);
+        var (pid, program) = holder;
+        // What it really runs: a file that's gone, in the Trash, or not in a bundle of ours counts as older (an update or a
+        // reinstall replaced it while it ran, and the path it started from may hold a newer copy by now).
+        string? theirs = program is null ? null : Apps.EnclosingMacBundle(Path.GetDirectoryName(program) ?? program);
+        bool gone = theirs is null || !Directory.Exists(theirs) || theirs.Replace('\\', '/').Contains("/.Trash", StringComparison.Ordinal)
+                    || Apps.PlistString(Path.Combine(theirs, "Contents", "Info.plist"), "CFBundleIdentifier") != "com.study-stash.app";
+        string? was = gone || theirs is null ? null : BundleVersion(theirs);
+        bool busy = Busy(home);
+        if (!TakesOver(version, was, gone, busy))
+        {
+            if (busy) log($"[app] Syft Notes {was ?? "from a bundle that's gone"} holds this folder and a lecture is being recorded or written down there: it isn't asked to quit");
+            return false;
+        }
+        log($"[app] Syft Notes {was ?? "from a bundle that's gone"} holds this folder (process {pid}): asking it to quit, so {version} runs instead");
+        Services.Native.Kill(pid, Services.Native.SigTerm);
+        if (Services.Kit.Poll.UntilAsync(() => Claim(home), TimeSpan.FromMilliseconds(250), TakeOverWait).GetAwaiter().GetResult())
+        {
+            log($"[app] the older copy quit; {version} takes over");
+            return true;
+        }
+        log($"[app] the older copy didn't quit in {TakeOverWait.TotalSeconds:0} s: handing off to it instead");
+        return false;
+    }
+
+    /// <summary>Whether a copy at <paramref name="mine"/> takes over from the one holding the folder: at
+    /// <paramref name="theirs"/>, or from a file that's <paramref name="gone"/> (deleted or in the Trash while it ran, or
+    /// not in a bundle of ours). Only from an older one, never while <paramref name="busy"/>; a version that can't be
+    /// read is handed off to.</summary>
+    internal static bool TakesOver(string mine, string? theirs, bool gone, bool busy) =>
+        !busy && (gone || theirs is not null && Updates.Compare(Updates.ParseVersion(theirs), Updates.ParseVersion(mine)) < 0);
+
+    /// <summary>A lecture in this folder is being recorded, is paused, or is being written down: the copy holding it
+    /// mustn't be asked to quit. Every copy since 0.20 keeps its lectures there the same way (recordings/rec-*.json and
+    /// their state), so an older one's are read too. True when they can't be read at all, as it can't be told.</summary>
+    internal static bool Busy(string home)
+    {
+        try
+        {
+            return new LectureStore(home).All().Any(l => l.State is LectureState.Recording or LectureState.Paused or LectureState.Transcribing);
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException)
+        {
+            return true;
+        }
+    }
+
+    /// <summary>The process holding <paramref name="home"/>'s app.lock (lsof), and the file it really runs: where that is
+    /// now (proc_pidpath, through Process.MainModule), the Trash once its bundle was put there, and null once it was
+    /// deleted. Never ps or its arguments, which keep the path it started from, where a newer copy may be by now. Null
+    /// when there's no one other process holding it.</summary>
+    static (int Pid, string? Program)? Holder(string home)
+    {
+        if (Machine.Run("/usr/sbin/lsof", ["-t", "--", Path.Combine(home, "app.lock")], TimeSpan.FromSeconds(20)) is not { ExitCode: 0 } open) return null;
+        var pids = open.Stdout.Split('\n', StringSplitOptions.RemoveEmptyEntries).Select(s => int.TryParse(s.Trim(), out int p) ? p : 0)
+            .Where(p => p > 0 && p != Environment.ProcessId).Distinct().ToList();
+        if (pids is not [int pid]) return null;
+        try
+        {
+            using var process = System.Diagnostics.Process.GetProcessById(pid);
+            return (pid, process.MainModule?.FileName);
+        }
+        catch (ArgumentException)
+        {
+            return null; // it has just quit
+        }
+        catch (Exception e) when (e is InvalidOperationException or System.ComponentModel.Win32Exception or NotSupportedException)
+        {
+            return (pid, null); // its file is gone
+        }
+    }
+
+    static string? BundleVersion(string bundle) => Apps.PlistString(Path.Combine(bundle, "Contents", "Info.plist"), "CFBundleShortVersionString");
+
+    /// <summary>A Mac: the copy holding the folder didn't answer, and this one couldn't take over from it, so the student
+    /// isn't left with nothing at all: the system's own dialog (no window of ours needed) says so, and what to do.</summary>
+    public static void SayNotAnswering()
+    {
+        if (!OperatingSystem.IsMacOS() || SelfTest.Dir is not null) return;
+        const string script =
+            "display dialog \"Syft Notes is already open, but it didn't answer. Wait a minute and open it again. If it still doesn't open, restart your Mac.\" " +
+            "with title \"Syft Notes isn't answering\" buttons {\"OK\"} default button \"OK\" with icon note";
+        Machine.Run("/usr/bin/osascript", ["-e", script], TimeSpan.FromMinutes(10));
+    }
+
     /// <summary>The words a later copy can hand off: show the library, record, open the dropdown, the quick panel or
     /// Settings ("settings", or "settings:Library" for one of its pages). A click on one of Windows' notifications
     /// comes the same way, as a word of its own (<see cref="NoticeLinks"/>).</summary>

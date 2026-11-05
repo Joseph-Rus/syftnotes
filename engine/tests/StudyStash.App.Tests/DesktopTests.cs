@@ -79,6 +79,35 @@ public class DesktopTests
         }
     }
 
+    [Fact]
+    public void A_newer_copy_takes_over_only_from_an_older_one_with_no_lecture_on_the_go()
+    {
+        // Older, with nothing being recorded or written down: it's asked to quit, and this copy runs.
+        Assert.True(Desktop.TakesOver("0.23.4", "0.23.2", gone: false, busy: false));
+        Assert.True(Desktop.TakesOver("0.23.4", "0.22.1", gone: false, busy: false));
+        // Its bundle was deleted or put in the Trash while it ran.
+        Assert.True(Desktop.TakesOver("0.23.4", null, gone: true, busy: false));
+        // Recording, paused, or writing a lecture down: never asked to quit; it shows, as before.
+        Assert.False(Desktop.TakesOver("0.23.4", "0.23.2", gone: false, busy: true));
+        Assert.False(Desktop.TakesOver("0.23.4", null, gone: true, busy: true));
+        // The same version, a newer one, or one whose version can't be read: it shows, as before.
+        Assert.False(Desktop.TakesOver("0.23.4", "0.23.4", gone: false, busy: false));
+        Assert.False(Desktop.TakesOver("0.23.2", "0.23.4", gone: false, busy: false));
+        Assert.False(Desktop.TakesOver("0.23.4", null, gone: false, busy: false));
+
+        // Busy is read from the lectures as every copy keeps them, so an older copy's count too.
+        using var home = new TempHome();
+        var lectures = new LectureStore(home.Path);
+        Assert.False(Desktop.Busy(home.Path));
+        lectures.Add(new Lecture { Id = "rec-20261104-090000-abcdef", Started = "2026-11-04T09:00:00-08:00", State = LectureState.Filed });
+        Assert.False(Desktop.Busy(home.Path));
+        foreach (var state in new[] { LectureState.Recording, LectureState.Paused, LectureState.Transcribing })
+        {
+            lectures.Update("rec-20261104-090000-abcdef", l => l.State = state);
+            Assert.True(Desktop.Busy(home.Path));
+        }
+    }
+
     [Theory]
     [InlineData("show", true)]
     [InlineData("settings", true)]

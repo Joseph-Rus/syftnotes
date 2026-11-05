@@ -56,7 +56,9 @@ public class BackgroundLibraryTests
         Assert.Contains($"<key>StandardErrorPath</key><string>{Path.Combine(Path.GetFullPath(home), "logs", "helper.err")}</string>", plist);
         Assert.True(bg.UpToDate(home));
         if (OperatingSystem.IsMacOS()) Assert.Equal(0, Machine.Run("/usr/bin/plutil", ["-lint", bg.PlistPath(home)], TimeSpan.FromSeconds(20))?.ExitCode);
-        Assert.Equal(["launchctl bootstrap gui/501 " + bg.PlistPath(home)], s.Calls);
+        // By its label first, even with no plist yet: launchd keeps a job loaded after its plist was deleted, and a second
+        // bootstrap would fail.
+        Assert.Equal(["launchctl bootout gui/501/com.study-stash.background", "launchctl bootstrap gui/501 " + bg.PlistPath(home)], s.Calls);
         Assert.Equal([program, "--home", Path.GetFullPath(home), "helper"], bg.Registered(home));
 
         // A second folder (the self-test's) gets its own, never the usual one's.
