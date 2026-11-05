@@ -90,6 +90,17 @@ public class AppHostTests
     }
 
     [Fact]
+    public void A_library_is_for_school_unless_it_says_otherwise()
+    {
+        Assert.True(AppHost.ForSchoolIn(null));
+        Assert.True(AppHost.ForSchoolIn(new System.Text.Json.Nodes.JsonObject()));
+        Assert.True(AppHost.ForSchoolIn(new System.Text.Json.Nodes.JsonObject { ["for_school"] = true }));
+        Assert.False(AppHost.ForSchoolIn(new System.Text.Json.Nodes.JsonObject { ["for_school"] = false }));
+        Assert.True(AppHost.ForSchoolIn(new System.Text.Json.Nodes.JsonObject { ["for_school"] = "no" }));
+        Assert.True(AppHost.ForSchoolIn(new System.Text.Json.Nodes.JsonObject { ["for_school"] = null }));
+    }
+
+    [Fact]
     public void The_sound_file_plays_as_fast_as_asked()
     {
         Assert.Equal(1, AppHost.MicSpeed(null));

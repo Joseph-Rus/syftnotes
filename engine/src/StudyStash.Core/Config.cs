@@ -6,7 +6,7 @@ using Tomlyn.Model;
 
 namespace StudyStash.Core;
 
-public sealed class ClassDef(string name, List<string>? aliases = null, string description = "", string group = "")
+public sealed class ClassDef(string name, List<string>? aliases = null, string description = "", string group = "", int color = -1)
 {
     public string Name { get; set; } = name;
     public List<string> Aliases { get; set; } = aliases ?? [];
@@ -14,6 +14,9 @@ public sealed class ClassDef(string name, List<string>? aliases = null, string d
     /// <summary>The sidebar section it sits in: "" for Classes, or a folder of the student's own ("Projects", "Clubs",
     /// "Research"). Lectures, notes, files and Ask work the same in either.</summary>
     public string Group { get; set; } = group;
+    /// <summary>Its colour (which of the app's class colours), kept when other classes come and go: -1 for a class just
+    /// added, until the config is saved (<see cref="Configs.Save"/> gives it the first one no other class has).</summary>
+    public int Color { get; set; } = color;
 }
 
 /// <summary>The library: where lectures are summarized, sorted, and served. Lives in config.toml.</summary>
@@ -205,6 +208,7 @@ public static class Configs
                 $"description = {Toml(c.Description)}",
             ]);
             if (c.Group.Length > 0) lines.Add($"group = {Toml(c.Group)}");
+            if (c.Color >= 0) lines.Add($"color = {Toml(c.Color)}");
         }
         return string.Join("\n", lines) + "\n";
     }
@@ -226,10 +230,23 @@ public static class Configs
 
     public static string Save(Config cfg)
     {
+        GiveColors(cfg.Classes);
         Directory.CreateDirectory(cfg.Home);
         Py.WriteText(cfg.ConfigPath, Dump(cfg));
         Py.OwnerOnly(cfg.ConfigPath);
         return cfg.ConfigPath;
+    }
+
+    /// <summary>A class without a colour yet gets the first one no other class has, once, so a class's colour never
+    /// follows its place in the list.</summary>
+    static void GiveColors(List<ClassDef> classes)
+    {
+        foreach (var c in classes.Where(c => c.Color < 0))
+        {
+            int free = 0;
+            while (classes.Any(o => o.Color == free)) free++;
+            c.Color = free;
+        }
     }
 
     public static string SaveClient(ClientConfig cc)
@@ -277,7 +294,9 @@ public static class Configs
                 if (item is not TomlTable c || !c.TryGetValue("name", out var name))
                     throw new FormatException("config.toml: every [[classes]] needs a name");
                 var aliases = c.TryGetValue("aliases", out var a) && a is TomlArray arr ? arr.Select(x => Str(x!)).ToList() : [];
-                classes.Add(new ClassDef(Str(name), aliases, Str(Get(c, "description", "")), Str(Get(c, "group", ""))));
+                // A class saved before colours were kept has the one its place gave it.
+                int color = c.TryGetValue("color", out var saved) ? Int(saved) : classes.Count;
+                classes.Add(new ClassDef(Str(name), aliases, Str(Get(c, "description", "")), Str(Get(c, "group", "")), color));
             }
         }
         return new Config(home, Py.ExpandUser(Str(Get(data, "pool_dir", DefaultPoolDir))))

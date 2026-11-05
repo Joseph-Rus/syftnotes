@@ -19,6 +19,7 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:s="using:StudyStash.App.Services"
              xmlns:rich="using:StudyStash.Core.Rich"
+             xmlns:canvas="using:StudyStash.Core.Canvas"
              xmlns:app="using:StudyStash.App"
              xmlns:c="using:StudyStash.App.Controls"
              xmlns:v="using:StudyStash.App.Views"
@@ -1126,7 +1127,7 @@
                     <Border Classes="group" Margin="0" Padding="16,12">
                       <Grid ColumnDefinitions="Auto,12,3*,8,2*,8,Auto">
                         <Ellipse Width="8" Height="8" Fill="{DynamicResource Fill2}" VerticalAlignment="Center" />
-                        <Border Grid.Column="2" Classes="field"><TextBox Name="NewLibraryClass" Classes="bare" Text="{Binding Lib.NewClass}" PlaceholderText="A new class" VerticalAlignment="Center" /></Border>
+                        <Border Grid.Column="2" Classes="field"><TextBox Name="NewLibraryClass" Classes="bare" Text="{Binding Lib.NewClass}" PlaceholderText="A new class" MaxLength="{x:Static canvas:CourseNames.MaxLength}" AutomationProperties.Name="New class name" VerticalAlignment="Center" /></Border>
                         <TextBlock Grid.Column="4" Classes="row-sub" Text="Its other names and what it covers come next." VerticalAlignment="Center" TextWrapping="Wrap" />
                         <Button Grid.Column="6" Classes="btn sm" Command="{Binding Lib.AddClassCommand}" VerticalAlignment="Center"><TextBlock Text="Add" /></Button>
                       </Grid>
@@ -1197,8 +1198,8 @@
                       </StackPanel>
                     </Border>
 
-                    <TextBlock Classes="section gap" Text="Local models" />
-                    <Border Classes="group">
+                    <TextBlock Classes="section gap" Text="Local models" IsVisible="{Binding Lib.OllamaChosen}" />
+                    <Border Classes="group" IsVisible="{Binding Lib.OllamaChosen}">
                       <StackPanel>
                         <Border Classes="row">
                           <Grid ColumnDefinitions="*,Auto">
@@ -1237,10 +1238,10 @@
                         </Border>
                       </StackPanel>
                     </Border>
-                    <c:PageText Classes="say" Text="{Binding Lib.OllamaLine}" />
+                    <c:PageText Classes="say" Text="{Binding Lib.OllamaLine}" IsVisible="{Binding Lib.OllamaChosen}" />
 
-                    <TextBlock Classes="section gap" Text="Rewrite every summary" />
-                    <Border Classes="group">
+                    <TextBlock Classes="section gap" Text="Rewrite every summary" IsVisible="{Binding Lib.HasSummaries}" />
+                    <Border Classes="group" IsVisible="{Binding Lib.HasSummaries}">
                       <Border Classes="row">
                         <Grid ColumnDefinitions="*,Auto">
                           <StackPanel Spacing="2" VerticalAlignment="Center">
@@ -1251,7 +1252,7 @@
                         </Grid>
                       </Border>
                     </Border>
-                    <TextBlock Classes="say" Text="Useful after switching models. It can take a while." />
+                    <TextBlock Classes="say" Text="Useful after switching models. It can take a while." IsVisible="{Binding Lib.HasSummaries}" />
 
                     <!-- Listen: Kokoro's voices, downloaded into the library (one press; how far it's got; Remove) -->
                     <StackPanel Name="ListenVoices" IsVisible="{Binding Voices.Available}" Spacing="8">

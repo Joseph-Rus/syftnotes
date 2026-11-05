@@ -123,7 +123,7 @@ public class AiApiTests
         {
             Providers = id => id switch { "codex" => codex, "ollama" => ollama, _ => new ScriptedAi(id) },
             // installed, with a credential hint: "unchecked", not "not_signed_in" — so it's actually tried, not skipped up front
-            Checks = new FakeChecks().Installed("codex").HasEnv("OPENAI_API_KEY", "sk-1").Build(),
+            Checks = new FakeChecks().Installed("codex").HasEnv("OPENAI_API_KEY", "sk-1").Ollama().Build(),
             AskTimeout = TimeSpan.FromMilliseconds(200),
         };
         await using var site = await Site(cfg, store, ai);
@@ -134,6 +134,40 @@ public class AiApiTests
         Assert.True(reply!.FellBack);
         Assert.Equal(("ollama", "codex", "From Ollama."), (reply.Engine, reply.Asked, reply.Answer));
         Assert.Contains("didn't respond in time", reply.Why);
+    }
+
+    [Fact]
+    public async Task Ask_with_no_Ollama_says_what_is_wrong_with_the_AI_in_plain_words_and_never_asks_Ollama()
+    {
+        using var dir = new TempDir();
+        var cfg = Cfg(dir);
+        using var store = new Store(cfg.DbPath, cfg.PoolDir);
+        var gemini = new ScriptedAi("gemini", "Gemini");
+        var ollama = new ScriptedAi("ollama") { Script = [AiEvent.Error("Ollama isn't installed (https://ollama.com/download)")] };
+        var ai = new AiJobs(cfg.Home)
+        {
+            Providers = id => id switch { "gemini" => gemini, "ollama" => ollama, _ => new ScriptedAi(id) },
+            // Gemini is tried for real (a key, so not "not signed in"); Ollama was never set up.
+            Checks = new FakeChecks().Ollama(installed: false).Build() with { HasKey = id => id == "gemini" },
+        };
+        await using var site = await Site(cfg, store, ai);
+        var remote = new AiRemote("http://localhost", "pw", site.Client);
+
+        // No internet; any other failure; and last, one that says it isn't signed in (which the library remembers).
+        (string Raw, string Said)[] cases =
+        [
+            ("fetch failed: getaddrinfo ENOTFOUND generativelanguage.googleapis.com", Engines.CouldntBeReached("Gemini")),
+            ("""{"type":"error","message":"INTERNAL: upstream stream closed"}""", Engines.DidntAnswer("Gemini")),
+            ("""{"type":"error","message":"Not logged in · Please run /login"}""", "Gemini isn't signed in on your library."),
+        ];
+        foreach (var (raw, said) in cases)
+        {
+            gemini.Script = [AiEvent.Error(raw)];
+            var refused = await Assert.ThrowsAsync<LibraryRefusedException>(() =>
+                remote.AskAsync(new AskRequest("What happened?") { Engine = "gemini", Live = "Something happened today." }));
+            Assert.Equal((503, said), (refused.Status, refused.Message));
+        }
+        Assert.Empty(ollama.Prompts);
     }
 
     [Fact]
@@ -148,7 +182,7 @@ public class AiApiTests
         var ai = new AiJobs(cfg.Home)
         {
             Providers = id => id switch { "claude" => claude, "ollama" => ollama, _ => new ScriptedAi(id) },
-            Checks = new FakeChecks().Installed("claude").At(now).Build(),
+            Checks = new FakeChecks().Installed("claude").Ollama().At(now).Build(),
         };
         await using var site = await Site(cfg, store, ai);
         var remote = new AiRemote("http://localhost", "pw", site.Client);
@@ -157,7 +191,7 @@ public class AiApiTests
         Assert.NotNull(reply);
         Assert.True(reply!.FellBack);
         Assert.Equal("Ollama's own answer.", reply.Answer);
-        Assert.Contains("didn't answer", reply.Why);
+        Assert.Equal("Claude hit its usage limit.", reply.Why); // not "rate limit exceeded, resets in 2 hours"
 
         var overview = await remote.EnginesAsync();
         var row = overview!.Engines.Single(e => e.Id == "claude");
@@ -166,7 +200,7 @@ public class AiApiTests
     }
 
     [Fact]
-    public async Task Turning_fallback_off_lets_the_picked_engines_own_error_come_back()
+    public async Task Turning_fallback_off_lets_the_picked_engines_own_failure_come_back_in_plain_words()
     {
         using var dir = new TempDir();
         var cfg = Cfg(dir);
@@ -179,8 +213,32 @@ public class AiApiTests
 
         var refused = await Assert.ThrowsAsync<LibraryRefusedException>(() =>
             remote.AskAsync(new AskRequest("What happened?") { Engine = "claude", Live = "Something happened." }));
-        Assert.Equal(503, refused.Status);
-        Assert.Contains("the model refused to answer", refused.Message);
+        Assert.Equal((503, Engines.DidntAnswer("Claude")), (refused.Status, refused.Message)); // its raw text stays in its record
+    }
+
+    [Fact]
+    public async Task Ollama_failing_an_Ask_says_so_in_plain_words_whether_it_was_picked_or_fell_back_to()
+    {
+        using var dir = new TempDir();
+        var cfg = Cfg(dir);
+        using var store = new Store(cfg.DbPath, cfg.PoolDir);
+        var claude = new ScriptedAi("claude", "Claude") { Script = [AiEvent.Error("INTERNAL: upstream closed")] };
+        var ollama = new ScriptedAi("ollama") { Script = [AiEvent.Error("llama runner process has terminated: exit status 2")] };
+        var ai = new AiJobs(cfg.Home)
+        {
+            Providers = id => id switch { "claude" => claude, "ollama" => ollama, _ => new ScriptedAi(id) },
+            Checks = new FakeChecks().Installed("claude").Ollama().Build(),
+        };
+        await using var site = await Site(cfg, store, ai);
+        var remote = new AiRemote("http://localhost", "pw", site.Client);
+
+        // Asked outright; then after Claude failed too (Ollama is tried next, and fails the same way).
+        foreach (string engine in new[] { "ollama", "claude" })
+        {
+            var refused = await Assert.ThrowsAsync<LibraryRefusedException>(() =>
+                remote.AskAsync(new AskRequest("What happened?") { Engine = engine, Live = "Something happened today." }));
+            Assert.Equal((503, Engines.DidntAnswer("Ollama")), (refused.Status, refused.Message));
+        }
     }
 
     [Fact]

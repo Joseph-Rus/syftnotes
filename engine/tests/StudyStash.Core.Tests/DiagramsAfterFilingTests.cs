@@ -94,7 +94,9 @@ public class DiagramsAfterFilingTests
             Cfg = new Config(Dir["home"], Dir["pool"]) { OllamaEnabled = true, OllamaModel = "qwen3:8b", Classes = [new ClassDef("BIO 210")] };
             new AiSettings { Provider = "claude", Fallback = false }.Save(Cfg.Home); // diagrams: automatic, so Claude designs them
             Store = new Store(Cfg.DbPath, Cfg.PoolDir);
-            Ai = new AiJobs(Cfg.Home) { Providers = _ => Claude, Checks = new FakeChecks().Installed("claude").Build(), Log = Say, DiagramTimeout = TimeSpan.FromSeconds(20) };
+            // The designer's own time limit stays the app's (minutes): a held pass that ran out of time on a slow runner ended
+            // on its own, and what the test does next found no pass running.
+            Ai = new AiJobs(Cfg.Home) { Providers = _ => Claude, Checks = new FakeChecks().Installed("claude").Build(), Log = Say };
             Jobs = Restart();
             Pipeline = new Pipeline(Cfg, Store, (_, _, _) => Task.FromResult("""{"class_name": "BIO 210", "confidence": 0.9, "lecture_title": "Blood pressure", "topics": []}"""),
                 Ai.SummarizeAsync, Say, filed: id => Jobs.AfterFiled(id, Ai.TakeDiagramsFollow(id)));
@@ -246,7 +248,6 @@ public class DiagramsAfterFilingTests
         var local = new AiJobs(rig.Cfg.Home)
         {
             Providers = _ => rig.Claude, Checks = new FakeChecks().Installed("claude").Ollama(models: [("qwen3:30b", 18.6)]).Build(), Log = rig.Say,
-            DiagramTimeout = TimeSpan.FromSeconds(20),
         };
         bool busy = false;
         rig.Jobs = new DiagramJobs(rig.Cfg, rig.Store, local, rig.Say) { NotesBusy = () => busy, YieldCheck = TimeSpan.FromMilliseconds(20) };
