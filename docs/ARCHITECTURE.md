@@ -189,7 +189,8 @@ all words in `Words/`. Each piece has one focused test.
     `IConfirm`; each window `AppWindows.Make` builds has one dialog layer (a DialogHost round its view; `ConfirmLayer.ViewOf(window)` is
     the view inside it), and a question opens over the window the student is in. Safe button focused, Escape and a click outside
     answer no, the veil is the `Scrim` token. Done: the 7 `Confirming*` flags, the library window's stop-and-switch question and
-    the delete-lecture dialog. *Test:* Escape answers false, a yes runs once (`ConfirmTests`); a view model's test gives `FakeConfirm`.
+    the delete-lecture dialog. Something that isn't a yes/no goes on the same layer with `ConfirmLayer.ShowAsync(view)` (the ask for
+    a tip, `Views/SupportAskDialog`). *Test:* Escape answers false, a yes runs once (`ConfirmTests`); a view model's test gives `FakeConfirm`.
 11. **Format** (`Words/Format.cs`). `When(at, now, zone)`, `Ago`, `Clock` (TimedText), `Size(bytes)`,
     `Count(n, noun)`. *First:* `Shell.When`, `Shell.NoteWhen`, the CanvasWords date helpers, `PhoneGoogleModel.Plural`.
     *Test:* one table of cases.
