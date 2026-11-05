@@ -13,6 +13,7 @@ public static partial class Shell
     {
         messages.Register<ToastRequested>(listener, static (_, m) => Toast(m.Title, m.Text, m.Action, m.Run, m.Stay));
         messages.Register<QuitRequested>(listener, static (_, m) => Quit(m.Code));
+        messages.Register<QuitAskingRequested>(listener, static (_, _) => QuitAsking());
         messages.Register<SettingsRequested>(listener, static (_, m) =>
         {
             if (m.Section is null) SettingsFromMenu();

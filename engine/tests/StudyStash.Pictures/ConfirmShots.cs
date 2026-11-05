@@ -14,8 +14,9 @@ namespace StudyStash.App.Pictures;
 
 /// <summary>
 /// The one "Are you sure?" drawn over the full app as a student sees it, light and dark, both looks
-/// (shots/confirm-&lt;question&gt;-&lt;mac|win&gt;-&lt;light|dark&gt;.png): deleting a lecture, and the preview that lists
-/// every class "Use Canvas course names" would rename. Drawn off-screen, never on the student's screen.
+/// (shots/confirm-&lt;question&gt;-&lt;mac|win&gt;-&lt;light|dark&gt;.png): deleting a lecture, the preview that lists every
+/// class "Use Canvas course names" would rename, and Quit while a lecture records. Drawn off-screen, never on the
+/// student's screen.
 /// </summary>
 public class ConfirmShots
 {
@@ -58,6 +59,14 @@ public class ConfirmShots
     {
         var d = new LectureDeletion("lec-recursion", "Recursion and the call stack", "CS 101");
         foreach (var t in Themes) await TakeAsync("delete", skin, t, new ConfirmAsk(d.Ask, d.Warning, "Delete"));
+    }
+
+    [AvaloniaTheory]
+    [InlineData(SkinKind.Mac)]
+    [InlineData(SkinKind.Win)]
+    public async Task Quit_while_recording(SkinKind skin)
+    {
+        foreach (var t in Themes) await TakeAsync("quit-recording", skin, t, QuitWhileRecording.Question);
     }
 
     [AvaloniaTheory]
