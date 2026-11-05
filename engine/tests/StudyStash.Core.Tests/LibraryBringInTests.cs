@@ -417,4 +417,59 @@ public sealed class LibraryBringInTests
         Assert.True(main.Store.Trash("z"));
         foreach (string id in new[] { "y", "w", "v", "h", "g", "n", "n2" }) Assert.True(File.Exists(main.Store.Get(id)!.MdPath));
     }
+
+    /// <summary>A note file as Granola Share 0.2–0.4 wrote it: granola_id, not id.</summary>
+    static string GranolaNote(string library, string cls, string id, string title, string notes)
+    {
+        string path = Path.Combine(library, cls, $"2025-09-15 {title}.md");
+        Directory.CreateDirectory(Path.GetDirectoryName(path)!);
+        File.WriteAllText(path, string.Join("\n", "---", $"title: \"{title}\"", $"lecture_title: \"{title}\"", $"class: \"{cls}\"",
+            "date: \"2025-09-15\"", "source: \"student@example.com\"", $"granola_id: \"{id}\"", "granola_folder: \"\"", "attendees: []",
+            "topics: []", "classified_by: folder (1.00)", "summary_by: \"granola\"", "---", "", $"# {title}", "",
+            $"*2025-09-15*  ·  class: **{cls}**", "", "## Notes", "", notes, ""));
+        return path;
+    }
+
+    /// <summary>A settings folder made afresh (a new laptop through OneDrive or iCloud, a reinstall) on a Study Stash
+    /// folder that already has notes, the oldest from Granola Share: every one is listed where it is, and nothing is
+    /// changed; again, nothing more.</summary>
+    [Fact]
+    public void A_fresh_settings_folder_lists_the_notes_already_in_its_folder()
+    {
+        using var dir = new TempDir();
+        string pool = Path.Combine(dir["home"], "Documents", "Study Stash");
+        using (var before = new Library(dir, "before", pool)) before.File("recent", "Thermodynamics", "Entropy", "Entropy only grows.");
+        GranolaNote(pool, "Thermodynamics", "f0cde2a0-de73", "Heat engines", "Carnot's cycle, from Granola.");
+        var files = Files(pool);
+        using var fresh = new Library(dir, "fresh", pool);
+
+        Assert.Equal(2, LibraryBringIn.ListOwn(fresh.Store, fresh.Cfg));
+
+        Assert.Equal(["Entropy", "Heat engines"], fresh.Store.ListNotes().Select(r => r.LectureTitle ?? "").Order());
+        Assert.Contains("Carnot's cycle, from Granola.", File.ReadAllText(fresh.Store.Get("f0cde2a0-de73")!.MdPath!));
+        Assert.Equal(files, Files(pool));
+        Assert.Equal(0, LibraryBringIn.ListOwn(fresh.Store, fresh.Cfg));
+    }
+
+    /// <summary>One earlier folder (Granola Share's own, in the home folder) and a new, empty one: its notes come in,
+    /// and the earlier folder is never changed.</summary>
+    [Fact]
+    public void One_old_folder_comes_into_an_empty_new_one()
+    {
+        using var dir = new TempDir();
+        string home = dir["home"];
+        string old = Path.Combine(home, LibraryFolders.OldestName), now = Path.Combine(home, "Documents", "Study Stash");
+        GranolaNote(old, "Biology", "a1b2c3", "Cells", "The cell is the unit of life.");
+        GranolaNote(old, "Biology", "d4e5f6", "Genes", "Genes are made of DNA.");
+        var before = Files(old);
+        using var main = new Library(dir, "main", now);
+
+        var did = LibraryBringIn.Apply(main.Store, main.Cfg, old, home);
+
+        Assert.Equal((2, 0, 0), (did.New, did.Here, did.Both));
+        Assert.All(new[] { "a1b2c3", "d4e5f6" }, id => Assert.StartsWith(now, main.Store.Get(id)!.MdPath));
+        Assert.Equal("Biology", main.Store.Get("a1b2c3")!.ClassName);
+        Assert.Equal(before, Files(old));
+        Assert.Equal(0, LibraryBringIn.Apply(main.Store, main.Cfg, old, home).New);
+    }
 }
