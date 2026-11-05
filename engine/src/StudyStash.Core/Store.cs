@@ -941,14 +941,18 @@ public sealed partial class Store : IDisposable
         {
             var row = Get(noteId);
             if (row is null) return null;
-            if (row.Status is Queued or Working)
+            // One that couldn't be written and has no file yet: as one that's waiting, only its class changes.
+            if (row.Status is Queued or Working || row.Status == Failed && string.IsNullOrEmpty(row.MdPath))
             {
-                // The pipeline writes the file when it's done and keeps this choice (see Finish).
+                // The pipeline writes the file when it's done (or tried again) and keeps this choice (see Finish).
                 Exec("UPDATE notes SET class_name=?, classified_by=?, confidence=1.0 WHERE id=?", className, by, noteId);
                 return string.IsNullOrEmpty(row.MdPath) ? null : row.MdPath;
             }
-            return Refile(row, new Classification(className, 1.0, by, row.LectureTitle ?? "", JsonList(row.Topics)), null,
+            string path = Refile(row, new Classification(className, 1.0, by, row.LectureTitle ?? "", JsonList(row.Topics)), null,
                 text => Notes.WithClass(text, row.ClassName ?? "", className));
+            // A rewrite that failed left a file: it moves (edits in it and all), and the lecture still says it failed.
+            if (row.Status == Failed) Exec("UPDATE notes SET status=?, error=? WHERE id=?", Failed, row.Error ?? "", noteId);
+            return path;
         }
     }
 
@@ -1002,6 +1006,27 @@ public sealed partial class Store : IDisposable
             }, text => Notes.WithTitle(text, row.LectureTitle is { Length: > 0 } was ? was : row.Title ?? "", title));
             return Renamed.Done;
         }
+    }
+
+    /// <summary>Deletes a class's folder when no file is left in it, however deep (an empty Attachments or Canvas
+    /// folder doesn't keep it); a folder with any file in it stays, and so does the file.</summary>
+    public void DropEmptyClassFolder(string className)
+    {
+        static void Drop(string dir)
+        {
+            if (!Directory.Exists(dir)) return;
+            foreach (string sub in Directory.EnumerateDirectories(dir)) Drop(sub);
+            try
+            {
+                if (!Directory.EnumerateFileSystemEntries(dir).Any()) Directory.Delete(dir);
+            }
+            catch (Exception e) when (e is IOException or UnauthorizedAccessException)
+            {
+                // Something else has it open: it stays, empty.
+            }
+        }
+        string folder = ClassFolder(className);
+        if (!Py.SamePath(folder, PoolDir)) Drop(folder);
     }
 
     /// <summary>The folder a class's lectures (and its Canvas files) live in, without making it.</summary>

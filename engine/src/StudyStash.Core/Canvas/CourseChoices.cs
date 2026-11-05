@@ -181,7 +181,7 @@ public static partial class CourseChoices
                     continue;
                 }
                 if (cfg.Classes.RemoveAll(c => c.Name == cls) > 0) changedClasses = true;
-                RemoveEmptyFolder(store.ClassFolder(cls));
+                store.DropEmptyClassFolder(cls);
                 outcome.Removed.Add(cls);
             }
         if (changedClasses) Configs.Save(cfg);
@@ -194,6 +194,20 @@ public static partial class CourseChoices
             if (outcome.Added.Count > 0) st.SyncNow = true;
         });
         return outcome;
+    }
+
+    /// <summary>A class taken off the library's list: its Canvas course is un-ticked and stops syncing, as
+    /// <see cref="Apply"/> with keep does it (its Canvas files stay). Only this course: <see cref="Apply"/> would also let
+    /// go of any linked course missing from the last course lookup. Nothing when the class had no course.</summary>
+    public static void Unlink(string home, string cls)
+    {
+        if (!CanvasSettings.Load(home).Courses.ContainsKey(cls)) return;
+        CanvasSettings.Update(home, s =>
+        {
+            if (!s.Courses.Remove(cls, out long id)) return;
+            s.Scouts.Remove(cls);
+            s.Chosen?.Remove(Id(id));
+        });
     }
 
     /// <summary>Why courses can't be dropped with their files right now, or null when they can.</summary>
@@ -219,16 +233,5 @@ public static partial class CourseChoices
         if (all.Any(a => a.ClassName == cls)) Assignments.Save(home, all.Where(a => a.ClassName != cls));
         (crawl ?? new Crawl(home, name => Path.Combine(cfg.PoolDir, Notes.FolderName(name)), () => DateTimeOffset.UtcNow, () => TimeZoneInfo.Local))
             .ForgetClass(cls);
-    }
-
-    static void RemoveEmptyFolder(string folder)
-    {
-        try
-        {
-            if (Directory.Exists(folder) && !Directory.EnumerateFileSystemEntries(folder).Any()) Directory.Delete(folder);
-        }
-        catch (IOException)
-        {
-        }
     }
 }
