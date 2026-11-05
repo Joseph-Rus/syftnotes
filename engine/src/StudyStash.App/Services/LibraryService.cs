@@ -181,10 +181,13 @@ public sealed class LibraryService : IDisposable
 
     /// <summary>
     /// A library already answers on the port. One that takes this app's password is used as it is
-    /// (<see cref="LibraryServiceState.Elsewhere"/>). One that turns it away (another password, or no answer) and runs
-    /// an older copy of Syft Notes is asked to quit (<see cref="OlderLibrary"/>): never while a lecture is being
-    /// recorded or written down, never by force. True once it has gone and the port is free; otherwise this steps
-    /// aside, with <see cref="Failure"/> saying why when it was an older copy, and the app looks again in a minute.
+    /// (<see cref="LibraryServiceState.Elsewhere"/>). One that turns it away (another password, or no answer) is looked
+    /// at (<see cref="OlderLibrary.Judge"/>): an older copy of Syft Notes for this folder is asked to quit; this app's
+    /// own background library is registered again (or, not wanted, let go) so it reads this folder's settings afresh;
+    /// never while a lecture is being recorded or written down, never by force, and never a copy as new as this one or
+    /// newer, or one for another folder. True once the port is this app's to use (free, or its own background library
+    /// registered afresh); otherwise this steps aside, with <see cref="Failure"/> saying why for a copy of ours (never
+    /// "restart"), and the app looks again in a minute.
     /// </summary>
     async Task<bool> ReplaceOlderAsync()
     {
@@ -194,33 +197,53 @@ public sealed class LibraryService : IDisposable
             return false;
         }
         var holder = await Task.Run(() => older.Holder(cfg.WebPort));
-        var verdict = OlderLibrary.Judge(holder?.Program, command[0], older.Ours, () => older.Busy(home));
-        if (verdict is OlderVerdict.NotOurs or OlderVerdict.Self)
+        var verdict = OlderLibrary.Judge(holder, command[0], Engine.Version, home, older.Busy);
+        if (verdict == OlderVerdict.NotOurs)
         {
             SetState(LibraryServiceState.Elsewhere);
             return false;
         }
         olderLookAgain = DateTime.UtcNow + AppUpdates.IdleRecheck;
-        if (verdict == OlderVerdict.Busy)
+        string who = $"Syft Notes {holder!.Version ?? "(version unknown)"} ({holder.Program}, folder {holder.Home ?? "unknown"}) on port {cfg.WebPort}";
+        switch (verdict)
         {
-            log($"[library] an older Syft Notes library ({holder!.Program}) is on port {cfg.WebPort}, but a lecture is being recorded or written down: left running, looked at again in a minute");
-            SetState(LibraryServiceState.Elsewhere, OlderLibrary.BusyWords);
-            return false;
+            case OlderVerdict.OtherHome or OlderVerdict.NotOlder:
+                log($"[library] {who} turns this app away, but isn't an older copy for this folder: left running");
+                SetState(LibraryServiceState.Elsewhere, OlderLibrary.OtherCopyWords);
+                return false;
+            case OlderVerdict.Busy:
+                log($"[library] {who} turns this app away, but a lecture is being recorded or written down: left running, looked at again in a minute");
+                SetState(LibraryServiceState.Elsewhere, OlderLibrary.BusyWords);
+                return false;
+            case OlderVerdict.Own when Background is { } plan && plan.Wanted():
+                // This app's own background library, on settings it read before they changed: registered again (which
+                // boots the old job out first), it starts on this folder's settings as they are now.
+                log($"[library] the background library ({who}) turns this app away: registering it again");
+                try
+                {
+                    await Task.Run(() => plan.System.Register(home, plan.Program, plan.Extra));
+                    olderLookAgain = default;
+                    return true;
+                }
+                catch (Exception e) when (e is IOException or UnauthorizedAccessException or InvalidOperationException or PlatformNotSupportedException or Win32Exception)
+                {
+                    log($"[library] couldn't register the background library again: {e.Message}");
+                }
+                break;
         }
-        await Task.Run(() => older.StopOldRegistration(home, command[0]));
-        if (!older.AskToQuit(holder!.Pid))
-        {
-            log($"[library] an older Syft Notes library ({holder.Program}) is on port {cfg.WebPort}, and this computer has no polite way to ask it to quit: left running");
-            SetState(LibraryServiceState.Elsewhere, OlderLibrary.StillRunningWords);
-            return false;
-        }
+        // An older copy, or this app's own background library that isn't wanted: launchd (or, on Windows, the background
+        // library's own registration) lets go of it, then it's asked to quit.
+        if (verdict == OlderVerdict.Own && Background is { } own) await Task.Run(() => own.System.Stop(home));
+        else await Task.Run(() => older.StopRegistration(home, verdict == OlderVerdict.Own ? null : command[0]));
+        bool asked = older.AskToQuit(holder.Pid);
         if (!await WaitPortFreeAsync())
         {
-            log($"[library] asked an older Syft Notes library ({holder.Program}) on port {cfg.WebPort} to quit; it hasn't yet, looked at again in a minute");
-            SetState(LibraryServiceState.Elsewhere, OlderLibrary.ClosingWords);
+            log(asked ? $"[library] asked {who} to quit; it hasn't yet, looked at again in a minute"
+                : $"[library] {who} turns this app away, and this computer has no polite way to ask it to quit: left running");
+            SetState(LibraryServiceState.Elsewhere, asked ? OlderLibrary.ClosingWords : OlderLibrary.StillRunningWords);
             return false;
         }
-        log($"[library] stopped an older Syft Notes library ({holder.Program}) on port {cfg.WebPort}");
+        log($"[library] stopped {who}");
         olderLookAgain = default;
         return true;
     }
@@ -258,11 +281,19 @@ public sealed class LibraryService : IDisposable
             {
                 await Task.Run(() => bg.Start(home));
             }
-            if (!fresh && await health(cfg) is { } said && (said.Version != Engine.Version || !said.Background))
+            var said = fresh ? null : await health(cfg);
+            if (said is { } was && (was.Version != Engine.Version || !was.Background))
             {
                 // Running an older copy (updated since, by something that didn't restart it): onto this one.
-                log($"[library] the background library runs {said.Version}; starting it again on {Engine.Version}");
+                log($"[library] the background library runs {was.Version}; starting it again on {Engine.Version}");
                 await Task.Run(() => bg.Register(home, plan.Program, plan.Extra));
+            }
+            else if (!fresh && said is null && await portStatus(cfg.WebPort) == "ours")
+            {
+                // Something on the port turns this app away: an older copy, or this app's own background library on
+                // settings that changed since it started (registered again there). Left alone, this steps aside.
+                if (!await ReplaceOlderAsync()) return true;
+                if (await portStatus(cfg.WebPort) == "free") await Task.Run(() => bg.Start(home));
             }
             if (await waitHealthy(cfg, TimeSpan.FromSeconds(30)) && await health(cfg) is { Background: true })
             {
