@@ -4,8 +4,8 @@ namespace StudyStash.Core;
 /// The app's program moved (docs/LIBRARIES.md, phase 5): Windows from Inno Setup's folder to Velopack's, the Mac bundle
 /// from "Study Stash.app" to "Syft Notes.app", Linux from a tarball's folder to an AppImage. What other programs keep
 /// of its path (an AI app's connection, a login item) is put right on the first start from the new place, and only
-/// where it names a program of ours that is gone, or one of the old places: another copy someone runs on purpose (a
-/// build folder) is left alone.
+/// where it names a program of ours that is gone, one of the old places, or (a Mac) an older copy of the app somewhere
+/// else: another copy someone runs on purpose (a build folder, a newer one) is left alone.
 /// </summary>
 public static class Moves
 {
@@ -24,7 +24,8 @@ public static class Moves
 
     /// <summary>True when <paramref name="command"/> is this app's program as it was before it moved, so whatever names
     /// it should name <paramref name="current"/> instead: it's our program by name, it isn't the current one, and it is
-    /// gone, in one of the old places, or somewhere a copy only runs for a while (<see cref="Passing"/>).
+    /// gone, in one of the old places, somewhere a Mac copy only runs for a while (its disk image or a translocation
+    /// folder, <see cref="MacRename.Passing"/>), or in an older copy of the Mac app (<see cref="MacRename.OlderCopy"/>).
     /// <paramref name="exists"/> is File.Exists unless a test says otherwise.</summary>
     public static bool OldProgram(string? command, string current, Func<string, bool>? exists = null)
     {
@@ -33,16 +34,7 @@ public static class Moves
         if (string.Equals(command, current, same)) return false;
         string slashes = command.Replace('\\', '/');
         bool oldPlace = OldPlaces.Any(p => command.Contains(p, StringComparison.OrdinalIgnoreCase) || slashes.Contains(p, StringComparison.OrdinalIgnoreCase));
-        return oldPlace || Passing(command) || !(exists ?? File.Exists)(command);
-    }
-
-    /// <summary>A Mac copy run from somewhere it only stays for a while: its disk image (/Volumes) or the translocation
-    /// folder Gatekeeper runs a download from. What names a program there (a login item, an AI app's connection, the
-    /// background library) stops working once the image is ejected or the Mac restarts.</summary>
-    public static bool Passing(string program)
-    {
-        string path = program.Replace('\\', '/');
-        return path.StartsWith("/Volumes/", StringComparison.Ordinal) || path.Contains("/AppTranslocation/", StringComparison.Ordinal);
+        return oldPlace || MacRename.Passing(command) || !(exists ?? File.Exists)(command) || MacRename.OlderCopy(command, current);
     }
 
     /// <summary>The files that make a folder an Inno Setup install of this app, deleted last so a folder only partly

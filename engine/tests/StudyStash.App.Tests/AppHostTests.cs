@@ -192,8 +192,8 @@ public class AppHostTests
         await Wait.UntilAsync(() => host.Recorder.Current?.State == LectureState.Paused, "the recording to pause", TimeSpan.FromSeconds(15));
         Assert.Equal(LectureState.Paused, host.Recorder.Current?.State);
         Assert.InRange(took.Elapsed.TotalSeconds, 4, 15);
-        lock (said) Assert.Contains(("Recording paused", RecordingWords.CantHear), said);
-        Assert.Equal(RecordingWords.CantHear, host.RecorderProblem);
+        lock (said) Assert.Contains(("Recording paused", RecordingWords.CantHear(true)), said);
+        Assert.Equal(RecordingWords.CantHear(true), host.RecorderProblem);
     }
 
     [Fact]

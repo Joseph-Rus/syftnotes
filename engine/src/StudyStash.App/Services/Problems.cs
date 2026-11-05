@@ -96,11 +96,13 @@ public static class Problems
             yield return new(ProblemKind.Downloading, "Downloading the transcription model",
                 $"{d.Amount}" + (d.Left() is { } left ? $" · {left}" : ""), "");
 
-        if (host.Role != AppRole.Laptop && host.LocalLibraryState is LibraryServiceState.Stopped or LibraryServiceState.Failed or LibraryServiceState.PortTaken)
+        // An older copy of Syft Notes still on the library's port (OlderLibrary) says why, and not "password changed".
+        bool olderCopy = host.Role != AppRole.Laptop && host.LocalLibraryState == LibraryServiceState.Elsewhere && host.LocalLibraryFailure is not null;
+        if (olderCopy || host.Role != AppRole.Laptop && host.LocalLibraryState is LibraryServiceState.Stopped or LibraryServiceState.Failed or LibraryServiceState.PortTaken)
             yield return new(ProblemKind.LibraryStopped, "Your library isn't running",
                 host.LocalLibraryFailure ?? "Start it to keep recording lectures.", "Start it");
 
-        if (host.Library == LibraryState.WrongPassword)
+        if (host.Library == LibraryState.WrongPassword && !olderCopy)
             yield return new(ProblemKind.WrongPassword, "Library password changed", "Type the new one in Settings to keep sending lectures.", "Settings");
 
         if (host.Library == LibraryState.Unreachable)

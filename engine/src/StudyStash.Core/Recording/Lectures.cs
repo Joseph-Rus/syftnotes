@@ -143,6 +143,16 @@ public sealed class LectureStore
     public string AudioPath(string id) => Path.Combine(Dir, id + ".wav");
     string MetaPath(string id) => Path.Combine(Dir, id + ".json");
 
+    /// <summary>When a lecture's record was last saved (UTC): each piece Whisper writes down saves it.</summary>
+    public DateTime ChangedAt(string id) => File.GetLastWriteTimeUtc(MetaPath(id));
+
+    /// <summary>A lecture is on its way to the library, or having its notes written there (Sending or Writing), and its
+    /// sound was last written after <paramref name="since"/> (UTC): restarting the library now could drop the notes it's
+    /// writing. When it stopped is its sound file's last write, which holds for one picked up again days later too.</summary>
+    public bool OnItsWay(DateTime since) =>
+        All().Any(l => l.State is LectureState.Sending or LectureState.Writing
+                       && File.Exists(AudioPath(l.Id)) && File.GetLastWriteTimeUtc(AudioPath(l.Id)) > since);
+
     Dictionary<string, Lecture> Cache()
     {
         if (cache is not null) return cache;

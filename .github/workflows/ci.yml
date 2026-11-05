@@ -187,6 +187,9 @@ jobs:
         with:
           persist-credentials: false
       - run: bash tools/check-connections.sh
+      # macOS reuses the lowest free diskN, so the DMG build must not detach a disk by a number that may be another image's.
+      - name: The Mac disk image build leaves another image alone when ours goes by itself
+        run: sh tools/dmg/test_detach_by_device.sh
       # Finder never opened the DMG's window while this layout held data where it expects dictionaries.
       - name: The Mac disk's Finder layout (macos/dmg-layout.DS_Store) holds dictionaries
         run: |
@@ -624,6 +627,9 @@ jobs:
             exit 1
           fi
           hdiutil detach -quiet "$mnt"
+      # Every DMG from 0.22.0 to 0.23.2 crashed Finder when a student opened it, and nothing here opened one.
+      - name: Finder opens the DMG as a student's download, shows its window, and doesn't crash
+        run: sh tools/dmg/opens-in-finder.sh dist/mac/Syft-Notes.dmg
       - uses: actions/upload-artifact@v7
         if: needs.version.outputs.installers == 'true'
         with:

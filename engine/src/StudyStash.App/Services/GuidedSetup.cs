@@ -304,7 +304,7 @@ public sealed class GuidedSetup : ISetupDriver, IGuidedActions
             case ("start_at_login", "on"):
                 try
                 {
-                    host.LoginItems.StartAtLogin(true, host.Home);
+                    host.ChooseStartAtLogin(true);
                 }
                 catch (Exception e) when (e is InvalidOperationException or IOException or UnauthorizedAccessException or System.Security.SecurityException)
                 {
