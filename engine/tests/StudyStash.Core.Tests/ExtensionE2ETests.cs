@@ -531,8 +531,10 @@ public sealed class ExtensionRig : IAsyncLifetime
         api = new HttpClient { BaseAddress = new Uri($"http://127.0.0.1:{cfg.WebPort}"), Timeout = TimeSpan.FromMinutes(3) };
         api.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", Password);
 
-        // No "Make it": the library made its folder on start, and typing the Canvas address points it there.
-        Assert.True(Extension.Ready(Extension.Folder(Home)), "the library didn't make the extension's folder on start");
+        // The folder is made when a student loads it (the way Add to Chrome makes it), not on start; typing the Canvas
+        // address then points it there.
+        Assert.False(Extension.Ready(Extension.Folder(Home)), "the library made the extension's folder before anyone asked");
+        Extension.EnsureFor(Home, $"http://127.0.0.1:{cfg.WebPort}", CanvasSettings.ExtensionKey(Home), "");
         await PostAsync("/api/v2/canvas", new JsonObject { ["url"] = Canvas.Url }.ToJsonString());
         Folder = Extension.Folder(Home);
         Assert.Equal(Canvas.Url, Extension.Connection(Folder)!.Canvas);
