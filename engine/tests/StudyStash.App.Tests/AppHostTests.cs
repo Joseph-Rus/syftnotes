@@ -297,9 +297,9 @@ public class AppHostTests
         host.StopRecording();
     }
 
-    /// <summary>Told to stop (SIGTERM: launchd, kill) while the quit question shows: the
-    /// app quits as it would anyway (the signal goes straight to Quit, never through the question), the recording is
-    /// saved, and the unanswered question holds nothing up.</summary>
+    /// <summary>Told to stop (SIGTERM: launchd, kill) while the quit question shows: the signal goes straight to Quit
+    /// (Shell.cs), never through the question, and quitting saves the recording. Once it's saved, a Quit while the
+    /// unanswered question still shows goes straight through: nothing is left recording to ask about.</summary>
     [Fact]
     public async Task Told_to_stop_while_the_quit_question_shows_saves_the_recording()
     {
@@ -326,6 +326,9 @@ public class AppHostTests
         // Kept and handed on (to Whisper; with no model here it may stop there), not left recording or thrown away.
         Assert.DoesNotContain(saved.State, new[] { LectureState.Recording, LectureState.Paused });
         Assert.True(Sound.WavSeconds(host.Lectures.AudioPath(lecture.Id)) > Recorder.KeepAtLeastSeconds);
+        var next = guard.MayQuitAsync();
+        Assert.True(next.IsCompleted);
+        Assert.True(await next);
         Assert.False(asking.IsCompleted);
     }
 
