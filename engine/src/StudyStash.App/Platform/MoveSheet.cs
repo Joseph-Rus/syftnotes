@@ -14,8 +14,12 @@ static class MoveSheet
         if (StudyStash.Core.TestSwitches.Get("STUDYSTASH_NO_MOVE") is { Length: > 0 }) return false;
         try
         {
+            // Only a copy of the app open (its window, or its menu bar copy) holds the offer off: never what AI apps and the
+            // computer run from the bundle (MCP, the background library).
             return MoveToApplications.Offer(AppContext.BaseDirectory, home, Py.UserHome(), Ask, Machine.Run,
-                a => Updates.SpawnDetached(a), Environment.ProcessId, Program.Log);
+                a => Updates.SpawnDetached(a), Environment.ProcessId, Program.Log,
+                otherCopyRunning: () => MoveToApplications.OtherCopyRunning(Machine.Run, Environment.ProcessId, engine: StudyStash.Library.Cli.IsCommand),
+                background: BackgroundLibrary.ThisComputer());
         }
         catch (Exception e) when (e is IOException or UnauthorizedAccessException or System.ComponentModel.Win32Exception or InvalidOperationException)
         {
