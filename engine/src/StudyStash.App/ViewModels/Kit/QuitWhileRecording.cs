@@ -1,7 +1,7 @@
 namespace StudyStash.App.ViewModels.Kit;
 
 /// <summary>
-/// The student's own Quit (⌘Q, the app menu's or the Dock's Quit, the menu bar's or the tray's) while a lecture records:
+/// The student's own Quit (⌘Q, the app menu's or the Dock's Quit, the menu bar's or the tray's, Settings' button) while a lecture records:
 /// asked first, as closing the window never stops a recording. One question at a time: Quit pressed again while it
 /// shows neither asks again nor quits round it, but brings the question back to the front (its window may have been
 /// hidden meanwhile, which would leave Quit doing nothing the student can see).

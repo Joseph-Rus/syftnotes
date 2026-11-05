@@ -297,6 +297,38 @@ public class AppHostTests
         host.StopRecording();
     }
 
+    /// <summary>Told to stop (SIGTERM: launchd, kill) while the quit question shows: the
+    /// app quits as it would anyway (the signal goes straight to Quit, never through the question), the recording is
+    /// saved, and the unanswered question holds nothing up.</summary>
+    [Fact]
+    public async Task Told_to_stop_while_the_quit_question_shows_saves_the_recording()
+    {
+        using var home = new TempHome();
+        string wav = Wav(home);
+        // Twenty times real time: past the shortest recording that's kept (Recorder.KeepAtLeastSeconds) in a moment.
+        using var host = Recording(home, new FakeMics(MicAccess.Allowed), () => new FileMicrophone(wav, speed: 20));
+        var start = await host.RecordAsync("CS 101");
+        var lecture = Assert.IsType<Lecture>(start.Lecture);
+        await Wait.UntilAsync(() => host.Recorder.Recent(0) is { } r && r.Start + r.Samples.Length / (double)Sound.Rate > Recorder.KeepAtLeastSeconds + 1,
+            "more than the shortest kept recording", TimeSpan.FromSeconds(15));
+        var never = new TaskCompletionSource<bool>();
+        var guard = new QuitWhileRecording(() => host.Recorder.Current is not null, _ => never.Task, () => { });
+        var asking = guard.MayQuitAsync();
+        Assert.False(asking.IsCompleted);
+
+        // What quitting does to the engine (Shell.Quit → CleanUp → the container's Dispose).
+        var took = Stopwatch.StartNew();
+        host.Dispose();
+        Assert.True(took.Elapsed < TimeSpan.FromSeconds(3.5), $"took {took.Elapsed}");
+
+        Assert.Null(host.Recorder.Current);
+        var saved = host.Lectures.Get(lecture.Id)!;
+        // Kept and handed on (to Whisper; with no model here it may stop there), not left recording or thrown away.
+        Assert.DoesNotContain(saved.State, new[] { LectureState.Recording, LectureState.Paused });
+        Assert.True(Sound.WavSeconds(host.Lectures.AudioPath(lecture.Id)) > Recorder.KeepAtLeastSeconds);
+        Assert.False(asking.IsCompleted);
+    }
+
     [Fact]
     public async Task Not_asked_yet_and_refused_records_nothing_and_says_where_to_allow_it()
     {
