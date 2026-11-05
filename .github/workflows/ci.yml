@@ -187,6 +187,12 @@ jobs:
         with:
           persist-credentials: false
       - run: bash tools/check-connections.sh
+      # Finder never opened the DMG's window while this layout held data where it expects dictionaries.
+      - name: The Mac disk's Finder layout (macos/dmg-layout.DS_Store) holds dictionaries
+        run: |
+          python3 -m venv "$RUNNER_TEMP/ds"
+          "$RUNNER_TEMP/ds/bin/pip" install --quiet ds_store==1.3.1
+          "$RUNNER_TEMP/ds/bin/python" -I tools/dmg/check_ds_store.py macos/dmg-layout.DS_Store
       - name: install.sh, install.ps1, windows/*.ps1 and the Velopack scripts parse
         shell: pwsh
         run: |
@@ -603,8 +609,13 @@ jobs:
             exit 1
           fi
           [ -L "$mnt/Applications" ]
+          # The disk is HFS+ (Finder's saved layout, .DS_Store, is for it; an APFS disk never opened its window) and
+          # holds that layout.
+          diskutil info "$mnt" | grep -q "File System Personality: *HFS+" || { echo "the DMG's disk isn't HFS+"; diskutil info "$mnt"; exit 1; }
+          [ -s "$mnt/.DS_Store" ] || { echo "the DMG has no Finder layout (.DS_Store)"; ls -la "$mnt"; exit 1; }
           # An older copy's updater looks for Study Stash.app on the disk: a hidden link to the app (macos/dmg.sh).
           [ "$(readlink "$mnt/Study Stash.app")" = "Syft Notes.app" ] || { echo "no Study Stash.app link for older updaters"; ls -la "$mnt"; exit 1; }
+          [ -f "$mnt/Study Stash.app/Contents/Info.plist" ] || { echo "the Study Stash.app link doesn't reach the app"; ls -la "$mnt"; exit 1; }
           ls -lO "$mnt" | grep -F "Study Stash.app" | grep -q hidden || { echo "the Study Stash.app link isn't hidden"; ls -lO "$mnt"; exit 1; }
           # Bar the live words' small Whisper (models/live-whisper-*.bin, Intel only), which comes with the app.
           if find "$mnt" \( -iname 'ggml-*.bin' -o -name '*.bin' -size +1M \) ! -name 'live-whisper-*.bin' | grep -q .; then

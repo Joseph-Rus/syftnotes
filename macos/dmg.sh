@@ -52,9 +52,14 @@ stage_dmg() {
   # folder on the right, so the one thing to do is to drag the left one onto the right one. A saved Finder layout
   # (a .DS_Store), so no Finder scripting runs while the DMG is built.
   cp "$HERE/dmg-layout.DS_Store" "$stage/.DS_Store" || true
+  # An empty no_log asks the system not to keep a file-event log on the disk, as other disk images do.
+  mkdir -p "$stage/.fseventsd"
+  : > "$stage/.fseventsd/no_log"
   cp "$app_path/Contents/Resources/AppIcon.icns" "$stage/.VolumeIcon.icns"
   SetFile -c icnC "$stage/.VolumeIcon.icns" 2>/dev/null || true
-  hdi create -volname "$volname" -srcfolder "$stage" -ov -format UDRW "$rw"
+  # HFS+, as other disk images are and as Finder's saved layout expects: hdiutil's own default is APFS, which macOS
+  # logged "Not HFS" for, and the disk's window never opened.
+  hdi create -volname "$volname" -fs HFS+ -srcfolder "$stage" -ov -format UDRW "$rw"
   if hdiutil attach -quiet -nobrowse -mountpoint "$mnt" "$rw"; then
     SetFile -a C "$mnt" 2>/dev/null || true
     # Hidden on the mounted disk itself, so the flag is the disk's own.
