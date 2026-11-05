@@ -235,6 +235,11 @@ public static class Bridge
         string started = StartedFile(home), cancel = CancelFile(home);
         TryDelete(started); // ones from an earlier try mustn't pass for this one's
         TryDelete(cancel);
+        if (File.Exists(started) || File.Exists(cancel))
+        {
+            log("Couldn't clear the last try's notes from the app's folder, so the move doesn't start and Syft Notes stays open on this version.");
+            return (false, false, null);
+        }
         var spawnedAt = DateTime.Now;
         int scriptPid;
         try
