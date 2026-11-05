@@ -486,8 +486,9 @@ public sealed partial class Store : IDisposable
     /// wrote them, its title, topics and class), and <paramref name="why"/> is kept with it for its page to say.
     /// Dropped like <see cref="Finish"/>'s result when the note changed meanwhile. The note file is left exactly as it
     /// is, so edits made in it stay too; only when the lecture itself is no longer the one the file was written from
-    /// (it was sent again with more recorded or typed, or moved to another class while it waited) is the file written
-    /// again, round the notes that were kept.
+    /// (it was sent again with more recorded or typed) is the file written again, round the notes that were kept. A
+    /// lecture moved to another class while it waited has its file moved then (<see cref="SetClass"/>), so it's already
+    /// in its place here.
     /// </summary>
     public string? KeepNotes(NoteRow claimed, Meeting m, string why)
     {
