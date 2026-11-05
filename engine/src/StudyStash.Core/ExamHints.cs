@@ -83,6 +83,9 @@ public static partial class ExamHints
         (double? At, string Text)? open = null;
         foreach (var (at, text) in lines)
         {
+            // A caption with no words (an empty one in an imported transcript, a line of spaces) is no part of a
+            // sentence: skipped, so a sentence on either side of it still joins, and the line kept open always has words.
+            if (string.IsNullOrWhiteSpace(text)) continue;
             if (open is { } o)
             {
                 string t = text.TrimStart();
