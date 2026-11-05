@@ -49,8 +49,8 @@ public class UpdaterTests
     [Fact]
     public async Task The_newest_release_lists_every_installer_and_their_checksums()
     {
-        var github = new FakeOllama((path, _) => path == "/repos/Joseph-Rus/study-stash/releases/latest" ? System.Text.Json.Nodes.JsonNode.Parse("""
-            {"tag_name": "v0.5.0", "html_url": "https://github.com/Joseph-Rus/study-stash/releases/tag/v0.5.0",
+        var github = new FakeOllama((path, _) => path == "/repos/Joseph-Rus/syftnotes/releases/latest" ? System.Text.Json.Nodes.JsonNode.Parse("""
+            {"tag_name": "v0.5.0", "html_url": "https://github.com/Joseph-Rus/syftnotes/releases/tag/v0.5.0",
              "assets": [{"name": "Syft-Notes.dmg", "browser_download_url": "https://dl/study-stash.dmg"},
                         {"name": "Syft-Notes-Setup.exe", "browser_download_url": "https://dl/setup.exe"},
                         {"name": "Syft-Notes-linux-x64.tar.gz", "browser_download_url": "https://dl/linux-x64.tar.gz"},
@@ -68,7 +68,7 @@ public class UpdaterTests
         var rel = await Updates.LatestAsync(github.Client());
         Assert.Equal("v0.5.0", rel!.Tag);
         Assert.Equal([0, 5, 0], rel.Version);
-        Assert.Equal("https://github.com/Joseph-Rus/study-stash/archive/refs/tags/v0.5.0.tar.gz", rel.Url);
+        Assert.Equal("https://github.com/Joseph-Rus/syftnotes/archive/refs/tags/v0.5.0.tar.gz", rel.Url);
         foreach (string name in Updates.Installers) Assert.True(rel.Assets!.ContainsKey(name), name);
         Assert.True(rel.Assets!.ContainsKey(Updates.ChecksumsAsset));
         var none = new FakeOllama((_, _) => (System.Net.HttpStatusCode.NotFound, "{}"));
@@ -306,7 +306,7 @@ public class UpdaterTests
         var host = new UpdateHost
         {
             System = "Darwin", AppDir = oldApp, Http = downloads.Client(), Run = run, Places = places, Background = background,
-            VersionOf = Updates.VersionOf, RelaunchPid = Environment.ProcessId, RelaunchArgs = ["--background"], SpawnDetached = spawned.Add,
+            VersionOf = Updates.VersionOf, RelaunchPid = Environment.ProcessId, RelaunchArgs = ["--background"], SpawnDetached = a => { spawned.Add(a); return 0; },
         };
         var said = new List<string>();
         bool ok = await Updates.ApplyAsync(Rel("v9.9.9", new()
@@ -345,7 +345,7 @@ public class UpdaterTests
         var spawned = new List<IReadOnlyList<string>>();
         var host = new UpdateHost
         {
-            System = "Windows", AppDir = dir["install"], Http = downloads.Client(), SpawnDetached = spawned.Add, TempDir = dir["temp"],
+            System = "Windows", AppDir = dir["install"], Http = downloads.Client(), SpawnDetached = a => { spawned.Add(a); return 0; }, TempDir = dir["temp"],
         };
         Directory.CreateDirectory(host.AppDir);
         var said = new List<string>();
@@ -371,7 +371,7 @@ public class UpdaterTests
         var oldOnly = new List<IReadOnlyList<string>>();
         var older = new UpdateHost
         {
-            System = "Windows", AppDir = dir["install2"], Http = downloads.Client(), SpawnDetached = oldOnly.Add, TempDir = dir["temp2"],
+            System = "Windows", AppDir = dir["install2"], Http = downloads.Client(), SpawnDetached = a => { oldOnly.Add(a); return 0; }, TempDir = dir["temp2"],
         };
         Directory.CreateDirectory(older.AppDir);
         Assert.False(await Updates.ApplyAsync(Rel("v9.9.9", new()

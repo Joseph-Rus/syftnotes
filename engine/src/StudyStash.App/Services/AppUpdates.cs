@@ -465,7 +465,7 @@ public sealed class AppUpdates
         }
         var updates = new AppUpdates
         {
-            Latest = () => Updates.CachedLatestAsync(),
+            Latest = () => Updates.CachedLatestAsync(log: Program.Log),
             LatestNow = () => Updates.LatestAsync(),
             Idle = Idle,
             Enabled = () => (velopack || updateHost.AppDir.Length > 0 || updateHost.CantReplace) && !Desktop.SystemChangesOff,
