@@ -580,7 +580,7 @@ public sealed partial class SettingsModel : ObservableObject, IDisposable
             LibraryServiceState.Running => $"Your library runs on this {device}, on port {host.LocalLibrary.Cfg.WebPort}.",
             LibraryServiceState.Starting => "Starting your library…",
             LibraryServiceState.Elsewhere when host.LibraryInBackground => "It runs in the background, so your phone is answered when Syft Notes is closed.",
-            LibraryServiceState.Elsewhere => $"A library is already running on this {device}.",
+            LibraryServiceState.Elsewhere => host.LocalLibrary.Failure ?? $"A library is already running on this {device}.",
             LibraryServiceState.PortTaken => host.LocalLibrary.Failure ?? "Its port is taken by another program.",
             LibraryServiceState.Failed => $"It stopped: {host.LocalLibrary.Failure}",
             _ => "Stopped.",
@@ -777,7 +777,7 @@ public sealed partial class SettingsModel : ObservableObject, IDisposable
         if (loading || settingLogin) return;
         try
         {
-            host.LoginItems.StartAtLogin(value, host.Home);
+            host.ChooseStartAtLogin(value);
         }
         catch (Exception e) when (e is InvalidOperationException or IOException or UnauthorizedAccessException or System.Security.SecurityException)
         {

@@ -67,6 +67,10 @@ public sealed class AppSettings
     [JsonIgnore]
     public bool LibraryHere => Role != AppRole.Laptop;
     public bool Shortcuts { get; set; } = true;
+    /// <summary>The student's own answer to "Open Syft Notes when you log in" (null: never given on this copy, as on one
+    /// from before it was kept). Windows forgets the login item when the app is uninstalled; a reinstall puts it back
+    /// from this (NewPlace.LoginItemBack).</summary>
+    public bool? StartAtLogin { get; set; }
     /// <summary>Once a day, one anonymous count of this copy (docs/daily-count.md). Off also deletes its code.</summary>
     public bool CountThisCopy { get; set; } = true;
     /// <summary>Shortcuts changed from their defaults, by <see cref="KeyAction"/> name: {"Record": "Control+Shift+R"}.</summary>
@@ -304,7 +308,7 @@ public sealed partial class AppHost : IDisposable, IProblemSource
         KeepModelInUse();
         Lectures = new LectureStore(home);
         Recorder.Recover(Lectures, this.log);
-        Recorder = new Recorder(Lectures, OpenMic, log: this.log);
+        Recorder = new Recorder(Lectures, OpenMic, log: this.log, micAllowed: () => MicAccess() == Audio.MicAccess.Allowed);
         Captions = new LiveCaptioner(() => Recorder.Current, Recorder.Recent, LiveHearer, this.log) { Watched = () => liveWordsWatched };
         // Too slow is judged for each lecture afresh (an app.json from a 0.11 build before it may still say
         // "live_words_too_slow": nothing reads it, and the next save leaves it out).
@@ -480,7 +484,7 @@ public sealed partial class AppHost : IDisposable, IProblemSource
     /// restarts, so such a copy leaves the background library as the copy in Applications set it up.</summary>
     BackgroundPlan? MakeBackgroundPlan()
     {
-        if (Moves.Passing(Desktop.Program)) return null;
+        if (MacRename.Passing(Desktop.Program)) return null;
         // The self-test's stand-in for Google Drive goes along, so its phone is answered with the app closed too.
         IReadOnlyList<string>? extra = SelfTest.Dir is not null && StudyStash.Core.TestSwitches.Get("STUDYSTASH_DRIVE_FOLDER") is { Length: > 0 } folder
             ? ["--drive-folder", folder] : null;
@@ -1024,6 +1028,14 @@ public sealed partial class AppHost : IDisposable, IProblemSource
         bool records = Settings.Role != AppRole.Library;
         return (StatusText(Library, Settings.Role != AppRole.Laptop && LocalLibrary?.State == LibraryServiceState.Running, ModelReady, Downloading, records),
             Library == LibraryState.Connected && (ModelReady || !records));
+    }
+
+    /// <summary>The student's answer to "Open Syft Notes when you log in": the login item changes, and the answer is kept
+    /// (<see cref="AppSettings.StartAtLogin"/>). Throws as <see cref="ILoginItems.StartAtLogin"/> does, keeping nothing.</summary>
+    public void ChooseStartAtLogin(bool on)
+    {
+        LoginItems.StartAtLogin(on, Home);
+        Save(s => s.StartAtLogin = on);
     }
 
     /// <summary>Change the settings and write them to app.json. A full disk (or a folder it can't write) is said, not

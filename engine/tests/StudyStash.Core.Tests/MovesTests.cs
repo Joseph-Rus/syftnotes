@@ -25,6 +25,36 @@ public class MovesTests
     }
 
     [Fact]
+    public void An_older_copy_of_the_Mac_app_kept_elsewhere_counts_as_moved_but_a_newer_equal_or_other_app_does_not()
+    {
+        using var t = new TempDir();
+        // The program inside a fake bundle: Info.plist with an id and a version.
+        string Bundle(string folder, string name, string id, string version)
+        {
+            string contents = Path.Combine(t.Path, folder, name, "Contents");
+            Directory.CreateDirectory(Path.Combine(contents, "MacOS"));
+            File.WriteAllText(Path.Combine(contents, "Info.plist"), $"""
+                <?xml version="1.0" encoding="UTF-8"?>
+                <plist version="1.0"><dict><key>CFBundleIdentifier</key><string>{id}</string>
+                <key>CFBundleShortVersionString</key><string>{version}</string></dict></plist>
+                """);
+            return Path.Combine(contents, "MacOS", "StudyStash");
+        }
+        const string ours = "com.study-stash.app";
+        bool Exists(string _) => true;
+        string now = Bundle("Applications", "Syft Notes.app", ours, "0.23.4");
+        // Older, wherever it sits: ~/Applications, Finder's "Keep Both" copy, Downloads.
+        Assert.True(Moves.OldProgram(Bundle("home/Applications", "Syft Notes.app", ours, "0.23.3"), now, Exists));
+        Assert.True(Moves.OldProgram(Bundle("Applications", "Syft Notes 2.app", ours, "0.9.2"), now, Exists));
+        Assert.True(Moves.OldProgram(Bundle("home/Downloads", "Syft Notes.app", ours, "0.22.0"), now, Exists));
+        // Left alone: newer, equal, another app's, and this one.
+        Assert.False(Moves.OldProgram(Bundle("home/Applications", "Newer.app", ours, "0.24.0"), now, Exists));
+        Assert.False(Moves.OldProgram(Bundle("home/Applications", "Same.app", ours, "0.23.4"), now, Exists));
+        Assert.False(Moves.OldProgram(Bundle("home/Applications", "Other.app", "com.example.other", "0.1.0"), now, Exists));
+        Assert.False(Moves.OldProgram(now, now, Exists));
+    }
+
+    [Fact]
     public void Only_Inno_Setups_own_folder_for_the_app_counts_as_the_old_install()
     {
         string temp = Path.Combine(Path.GetTempPath(), "studystash-moves-" + Guid.NewGuid().ToString("N")[..8]);

@@ -115,8 +115,18 @@ public sealed partial class LibrarySettingsModel : ObservableObject
         ConfidenceChoices = [.. Confidences.Select(c => new SettingChoice(c.ToString(CultureInfo.InvariantCulture), $"{c * 100:0}% sure", PickConfidence))];
     }
 
-    /// <summary>The library is on this computer: its folder can be shown in Finder or Explorer.</summary>
-    public bool IsHere { get; init; }
+    /// <summary>The library is on this computer: its folder can be shown in Finder or Explorer, and its updates are
+    /// this app's, so the line says this app's own version even before (or without) the library answering.</summary>
+    public bool IsHere
+    {
+        get => isHere;
+        init
+        {
+            isHere = value;
+            if (value) UpdateLine = $"Syft Notes {Engine.Version}";
+        }
+    }
+    readonly bool isHere;
     /// <summary>The library's name changed here: the app keeps its own copy in step.</summary>
     public Action<string>? Renamed { get; set; }
     /// <summary>The library's password changed here: the app connects with the new one from now on.</summary>
@@ -431,7 +441,10 @@ public sealed partial class LibrarySettingsModel : ObservableObject
             Version = Str(u?["version"]);
             bool newer = Flag(u?["newer"]);
             CanUpdateNow = newer && Flag(u?["can_update"]);
-            UpdateLine = newer ? $"Version {Str(u?["latest"]).TrimStart('v')} is out. The library has {Version}." : IsHere ? $"Syft Notes {Version}, the newest." : $"Your library has Syft Notes {Version}, the newest.";
+            string latest = Str(u?["latest"]).TrimStart('v');
+            // Here, the version is this app's own; whether there's a newer one is the library's to say.
+            UpdateLine = IsHere ? (newer && latest != Engine.Version ? $"Version {latest} is out. You have {Engine.Version}." : $"Syft Notes {Engine.Version}, the newest.")
+                : newer ? $"Version {latest} is out. The library has {Version}." : $"Your library has Syft Notes {Version}, the newest.";
             AutoUpdate = Flag(u?["auto"]) && (!IsHere || AppAutoUpdate?.Invoke() != false);
 
             var classes = (s["classes"] as JsonArray ?? []).OfType<JsonObject>().Select((c, i) => new LibraryClassRow

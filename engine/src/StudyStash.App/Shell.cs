@@ -145,7 +145,7 @@ public static partial class Shell
         host.Start();
         Run(() => SuggestLighterModelAsync(), "SuggestLighterModel");
         // The program may have moved (Velopack's install, the Mac bundle's new name): what names the old one is put right.
-        UiTasks.RunQuietly(() => Task.Run(() => NewPlace.RunHere(host.Home)), "put right what names the app's old place");
+        UiTasks.RunQuietly(() => Task.Run(() => NewPlace.RunHere(host.Home, host.Settings.StartAtLogin)), "put right what names the app's old place");
         AppUpdates.Start(host, stop.Token, SayUpdate, () => TypingNotes || SettingUp, LibraryWindowOpen);
         if (AppUpdates.Current is { } updater)
             updater.FoundChanged += () => Dispatcher.UIThread.Post(() =>
