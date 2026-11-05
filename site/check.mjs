@@ -6,7 +6,7 @@
 //  - a link, image, script or stylesheet on the site doesn't resolve, or a #fragment names no id on its page;
 //  - a link starts with "/" (the site must also work under <user>.github.io/study-stash/, so links are relative);
 //  - a page loads anything from another site (the privacy policy promises this site loads nothing from others);
-//  - the downloads aren't the release assets (Syft-Notes.dmg, Syft-Notes-Setup.exe and the two Linux AppImages), or
+//  - the downloads aren't the release assets (Syft-Notes.dmg, SyftNotes-win-x64-Setup.exe and the two Linux AppImages), or
 //    the home page doesn't offer them all.
 import { createServer } from "node:http";
 import { readFile, readdir, stat } from "node:fs/promises";
@@ -15,7 +15,7 @@ import { fileURLToPath } from "node:url";
 
 const root = dirname(fileURLToPath(import.meta.url));
 const releases = "https://github.com/Joseph-Rus/study-stash/releases/latest/download/";
-const downloads = [releases + "Syft-Notes.dmg", releases + "Syft-Notes-Setup.exe", releases + "SyftNotes-linux-x64.AppImage",
+const downloads = [releases + "Syft-Notes.dmg", releases + "SyftNotes-win-x64-Setup.exe", releases + "SyftNotes-linux-x64.AppImage",
   releases + "SyftNotes-linux-arm64.AppImage"];
 const types = {
   ".html": "text/html; charset=utf-8", ".css": "text/css", ".js": "text/javascript", ".mjs": "text/javascript",

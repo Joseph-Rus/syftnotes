@@ -814,6 +814,13 @@ public sealed class TranscriptionWorker(LectureStore store, Func<ITranscriber> l
     /// <summary>Why Whisper isn't writing lectures down ("Whisper couldn't start: …"); null while it works.</summary>
     public string? Problem { get; private set; }
 
+    /// <summary>Writing a lecture down (or telling its voices apart) right now: a piece is under way, or the model is
+    /// loaded, as it stays from a lecture's first piece until a few minutes after its last (<see cref="KeepLoaded"/>).
+    /// False while the model is missing or won't load: a lecture left Transcribing then only waits, and a restart
+    /// picks it up where it left off.</summary>
+    public bool Working => stepping || Volatile.Read(ref model) is not null;
+    volatile bool stepping;
+
     /// <summary>Whether to tell a lecture's voices apart once it's all written down (the student turned it on and the
     /// voice model is here). Null: never.</summary>
     public Func<bool>? LabelVoices { get; init; }
@@ -1195,6 +1202,7 @@ public sealed class TranscriptionWorker(LectureStore store, Func<ITranscriber> l
             {
                 stop.ThrowIfCancellationRequested();
                 bool worked;
+                stepping = true;
                 try
                 {
                     worked = await StepAsync(stop);
@@ -1203,6 +1211,10 @@ public sealed class TranscriptionWorker(LectureStore store, Func<ITranscriber> l
                 {
                     log($"[whisper] {e.Message}");
                     worked = false;
+                }
+                finally
+                {
+                    stepping = false;
                 }
                 if (worked) continue;
                 var current = recording();
