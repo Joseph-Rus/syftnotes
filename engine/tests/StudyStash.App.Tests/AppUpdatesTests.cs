@@ -1,4 +1,7 @@
+using System.Threading.Channels;
+using Microsoft.Extensions.Time.Testing;
 using StudyStash.App.Services;
+using StudyStash.Audio;
 using StudyStash.Core;
 
 namespace StudyStash.App.Tests;
@@ -306,6 +309,106 @@ public class AppUpdatesTests
 
         Assert.Equal("waiting until you're done recording", await updates.RoundAsync());
         Assert.False(quit);
+    }
+
+    /// <summary>Task.Delay's clock stops while the computer sleeps: a laptop awake two hours a day would check every
+    /// few days. The rounds go by the wall clock instead, a minute's nap at a time.</summary>
+    [Fact]
+    public async Task A_laptop_that_slept_past_the_hour_checks_on_the_next_minute_awake()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        var clock = new FakeTimeProvider(new DateTimeOffset(2026, 11, 4, 9, 0, 0, TimeSpan.Zero));
+        var naps = Channel.CreateUnbounded<(TimeSpan Wait, TaskCompletionSource Done)>();
+        int rounds = 0;
+        var updates = new AppUpdates
+        {
+            Latest = () => { Interlocked.Increment(ref rounds); return Task.FromResult<Release?>(null); },
+            Idle = () => true, Enabled = () => true, OnDiskVersion = () => Engine.Version,
+            Apply = (_, _, _, _) => Task.FromResult(true), RelaunchAndQuit = () => { }, Log = _ => { }, Home = "unused",
+            FirstCheck = TimeSpan.FromMinutes(2), Clock = clock,
+            // Each nap ends when the test says, whatever it asked for, as a nap does when the computer wakes.
+            Delay = (wait, stop) =>
+            {
+                var done = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+                naps.Writer.TryWrite((wait, done));
+                return done.Task.WaitAsync(stop);
+            },
+        };
+        using var stop = new CancellationTokenSource();
+        var run = updates.RunAsync(stop.Token);
+        async Task<TaskCompletionSource> Nap()
+        {
+            var (wait, done) = await naps.Reader.ReadAsync(ct).AsTask().WaitAsync(TimeSpan.FromSeconds(10), ct);
+            Assert.True(wait <= AppUpdates.Slice, $"a nap of {wait}");
+            return done;
+        }
+
+        // The first round, two minutes after the app starts: a minute's nap is not yet two.
+        (await Nap()).SetResult();
+        var next = await Nap();
+        Assert.Equal(0, rounds);
+        clock.Advance(TimeSpan.FromMinutes(2));
+        next.SetResult();
+        next = await Nap();
+        Assert.Equal(1, rounds);
+        // A minute awake isn't the hour: no round.
+        clock.Advance(TimeSpan.FromMinutes(1));
+        next.SetResult();
+        next = await Nap();
+        Assert.Equal(1, rounds);
+        // Asleep for three hours: the wall clock moved, the nap didn't end. It ends on waking, and the round comes then.
+        clock.Advance(TimeSpan.FromHours(3));
+        next.SetResult();
+        next = await Nap();
+        Assert.Equal(2, rounds);
+
+        stop.Cancel();
+        await run.WaitAsync(TimeSpan.FromSeconds(10), ct);
+    }
+
+    /// <summary>A lecture can be left Transcribing for good when the speech model is missing (a full disk) or won't
+    /// load. An update must not wait on it for ever: the students it happens to are the ones who need the fix, and a
+    /// restart picks the lecture up where it left off. One really being written down is never cut short.</summary>
+    [Fact]
+    public async Task A_lecture_stuck_transcribing_does_not_hold_an_update_off_but_one_being_written_down_does()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        using var home = new TempHome();
+        string wav = home["speech.wav"];
+        using (var w = new WavWriter(wav))
+            w.Write(Enumerable.Range(0, Sound.Rate / 2).Select(i => (float)Math.Sin(i / 10.0) * 0.3f).ToArray());
+        bool broken = true;
+        using var host = new AppHost(home.Path, () => new FileMicrophone(wav),
+            () => broken ? throw new InvalidOperationException("the model file is missing") : new OneLine(), log: _ => { },
+            loginItems: new CountingLoginItems());
+        foreach (var (id, started) in new[] { ("rec-a", "2026-11-04T10:00:00-07:00"), ("rec-b", "2026-11-04T11:00:00-07:00") })
+        {
+            File.Copy(wav, host.Lectures.AudioPath(id));
+            host.Lectures.Add(new Lecture { Id = id, Started = started, State = LectureState.Transcribing, Seconds = 0.5 });
+        }
+        AppUpdates Round() => Updates_(latest: () => Task.FromResult<Release?>(Release()),
+            idleNow: () => AppUpdates.NoLectureInHand(host.Lectures.All(), host.Whisper.Working));
+
+        // The model won't load: both lectures wait, and the update goes ahead.
+        Assert.False(await host.Whisper.StepAsync(ct));
+        Assert.Equal("relaunching", await Round().RoundAsync());
+
+        // The model loads and the first lecture is written down; the second is next: the update waits for it.
+        broken = false;
+        host.Whisper.Wake();
+        Assert.True(await host.Whisper.StepAsync(ct));
+        Assert.Equal(LectureState.Transcribing, host.Lectures.Get("rec-b")!.State);
+        Assert.Equal("waiting until you're done recording", await Round().RoundAsync());
+    }
+
+    sealed class OneLine : ITranscriber
+    {
+        public Task<Transcription> TranscribeAsync(float[] samples, string prompt, string language, CancellationToken stop) =>
+            Task.FromResult(new Transcription([new Spoken(0, 1, "The midterm is on recursion.")], "en"));
+
+        public void Dispose()
+        {
+        }
     }
 
     [Fact]
