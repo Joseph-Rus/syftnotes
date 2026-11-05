@@ -37,7 +37,7 @@ public sealed record UpdateCheck(string Result, Release? Release = null, string?
 
 /// <summary>
 /// The running app checking for a new release on its own (D4): 2 minutes after it starts, then every hour,
-/// installing it once nothing is recording, paused or transcribing, then quitting so the new copy starts in its
+/// installing it once nothing is recording, paused or being written down, then quitting so the new copy starts in its
 /// place. It also notices when a newer copy has already been swapped onto disk by someone else - the CLI's
 /// `studystash update`, or the library page's "Update now" - and relaunches into it once idle, with no download of
 /// its own. With auto_update off it says a new version is out, and installs it when asked (<see cref="NowAsync"/>);
@@ -71,7 +71,7 @@ public sealed class AppUpdates
     /// <summary>What Check now asks: GitHub itself, not what it learned in the last hour (<see cref="Latest"/>, which
     /// the rounds use, if not given).</summary>
     public Func<Task<Release?>>? LatestNow { get; init; }
-    /// <summary>Nothing recording, paused or transcribing right now.</summary>
+    /// <summary>Nothing recording, paused or being written down right now.</summary>
     public required Func<bool> Idle { get; init; }
     /// <summary>Looks for new releases at all: an installed copy (or one that can't replace itself, to say so), and
     /// not the self-test.</summary>
@@ -109,6 +109,12 @@ public sealed class AppUpdates
         double.TryParse(TestSwitches.Get("STUDYSTASH_UPDATE_AFTER"), System.Globalization.CultureInfo.InvariantCulture, out double s) ? s : Updates.FirstCheckAfter);
     /// <summary>How a round waits between checks; a test finishes at once instead of really sleeping.</summary>
     public Func<TimeSpan, CancellationToken, Task> Delay { get; init; } = Task.Delay;
+    /// <summary>The wall clock the rounds go by (<see cref="RunAsync"/>); a test's own moves when it says.</summary>
+    public TimeProvider Clock { get; init; } = TimeProvider.System;
+
+    /// <summary>The longest one nap between rounds lasts: <see cref="Delay"/>'s clock stops while the computer sleeps,
+    /// so the wall clock is looked at again after each.</summary>
+    public static readonly TimeSpan Slice = TimeSpan.FromMinutes(1);
 
     /// <summary>Downloading and installing right now.</summary>
     public bool Installing { get; private set; }
@@ -320,15 +326,23 @@ public sealed class AppUpdates
         return result;
     }
 
-    /// <summary>Rounds forever: the first one 2 minutes after the app starts, then every hour; while a round
-    /// keeps saying to wait for the student, the next one comes a minute later instead.</summary>
+    /// <summary>Rounds forever: the first one <see cref="FirstCheck"/> after the app starts, then every hour; while a
+    /// round keeps saying to wait for the student, the next one comes a minute later instead. The hour is the wall
+    /// clock's: a laptop asleep most of the day still checks on waking, not after an hour awake.</summary>
     public async Task RunAsync(CancellationToken stop)
     {
         try
         {
-            await NapAsync(FirstCheck, stop);
+            TimeSpan wait = FirstCheck;
+            var due = Clock.GetUtcNow() + wait;
             while (!stop.IsCancellationRequested)
             {
+                // A clock set back doesn't put the round off by more than the wait.
+                for (var now = Clock.GetUtcNow(); now < due; now = Clock.GetUtcNow())
+                {
+                    if (due - now > wait) due = now + wait;
+                    if (await NapAsync(due - now < Slice ? due - now : Slice, stop)) break;
+                }
                 string result;
                 try
                 {
@@ -339,7 +353,8 @@ public sealed class AppUpdates
                     Log($"[update] {e.Message}");
                     result = UpToDate;
                 }
-                await NapAsync(result == Waiting ? IdleRecheck : TimeSpan.FromSeconds(Updates.CheckEvery), stop);
+                wait = result == Waiting ? IdleRecheck : TimeSpan.FromSeconds(Updates.CheckEvery);
+                due = Clock.GetUtcNow() + wait;
             }
         }
         catch (OperationCanceledException)
@@ -347,17 +362,19 @@ public sealed class AppUpdates
         }
     }
 
-    /// <summary>The wait between rounds; <see cref="NowAsync"/> cuts it short when it has to wait for a lecture.</summary>
-    async Task NapAsync(TimeSpan wait, CancellationToken stop)
+    /// <summary>One nap between rounds: true when <see cref="NowAsync"/> cut it short to wait for a lecture.</summary>
+    async Task<bool> NapAsync(TimeSpan wait, CancellationToken stop)
     {
         using var nap = CancellationTokenSource.CreateLinkedTokenSource(stop);
         napping = nap;
         try
         {
             await Delay(wait, nap.Token);
+            return false;
         }
         catch (OperationCanceledException) when (!stop.IsCancellationRequested)
         {
+            return true;
         }
         finally
         {
@@ -393,6 +410,14 @@ public sealed class AppUpdates
             host.SpawnDetached(["/bin/sh", "-c", script, pid, Updates.LinuxProgram(host.AppDir), .. args]);
         }
     }
+
+    /// <summary>No lecture recording or paused, and none being written down right now (<paramref name="writingDown"/>:
+    /// <see cref="TranscriptionWorker.Working"/>). A lecture left Transcribing while the model is missing (a full disk)
+    /// or won't load only waits for it, and a restart picks it up where it left off: it never holds an update off, or
+    /// the students who most need a fix would never get it.</summary>
+    internal static bool NoLectureInHand(IEnumerable<Lecture> lectures, bool writingDown) =>
+        !lectures.Any(l => l.State is LectureState.Recording or LectureState.Paused
+                           || (l.State is LectureState.Transcribing && writingDown));
 
     /// <summary>How long after a recording stops an update waits for its notes to be written by the library on this
     /// computer: long enough for a long lecture's, short enough that one stuck on its way never holds updates off.</summary>
@@ -451,7 +476,7 @@ public sealed class AppUpdates
         var updateHost = UpdateHost.ThisComputer();
         IReadOnlyList<string> RelaunchArgs() => RelaunchWith(host.Home, windowOpen?.Invoke() == true);
         bool Idle() => host.Recorder.Current is null
-                       && !host.Lectures.All().Any(l => l.State is LectureState.Recording or LectureState.Paused or LectureState.Transcribing)
+                       && NoLectureInHand(host.Lectures.All(), host.Whisper.Working)
                        && !WritingHere(host)
                        && busy?.Invoke() != true;
         // Velopack installed this copy: only the download and install are Velopack's (VelopackUpdates.cs); when, and what
@@ -492,6 +517,7 @@ public sealed class AppUpdates
             Tell = tell,
             Log = Program.Log,
             Home = host.Home,
+            Clock = host.Clock,
         };
         Current = updates;
         _ = Task.Run(() => updates.RunAsync(stop));
