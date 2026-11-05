@@ -119,15 +119,25 @@ public sealed partial class FunnelModel : ObservableObject, IDisposable
         ? [FunnelStep.Welcome, FunnelStep.Student, FunnelStep.Classes, FunnelStep.Sync, FunnelStep.Ai]
         : [FunnelStep.Welcome, FunnelStep.Student, FunnelStep.Ai];
 
+    /// <summary>Connect your classes was shown this run: it stays counted if the student then says their school has no
+    /// Canvas, so the count never shrinks under a step they've passed ("Step 2 of 4", then "Step 3 of 3").</summary>
+    bool sawClasses;
+
+    /// <summary>The steps the indicator and "Step 2 of 4" count: <see cref="Steps"/>, plus Connect your classes once it's
+    /// been shown.</summary>
+    IReadOnlyList<FunnelStep> Counted => !WithCanvas && sawClasses
+        ? [FunnelStep.Welcome, FunnelStep.Student, FunnelStep.Classes, FunnelStep.Ai]
+        : Steps;
+
     /// <summary>The step indicator's dots, one per step after the welcome.</summary>
     public ObservableCollection<FunnelDot> Indicator { get; } = [];
 
     /// <summary>"Step 2 of 4", counting from after the welcome.</summary>
-    public string StepLabel => $"Step {Steps.ToList().IndexOf(Step)} of {Steps.Count - 1}";
+    public string StepLabel => $"Step {Counted.ToList().IndexOf(Step)} of {Counted.Count - 1}";
 
     void Dots()
     {
-        var steps = Steps.Skip(1).ToList();
+        var steps = Counted.Skip(1).ToList();
         if (Indicator.Select(d => d.Step).SequenceEqual(steps)) { Mark(); return; }
         Indicator.Clear();
         foreach (var s in steps) Indicator.Add(new FunnelDot { Step = s });
@@ -136,10 +146,11 @@ public sealed partial class FunnelModel : ObservableObject, IDisposable
 
     void Mark()
     {
-        int at = Steps.ToList().IndexOf(Step);
+        var counted = Counted.ToList();
+        int at = counted.IndexOf(Step);
         foreach (var d in Indicator)
         {
-            int i = Steps.ToList().IndexOf(d.Step);
+            int i = counted.IndexOf(d.Step);
             d.Current = i == at;
             d.Passed = i < at;
         }
@@ -147,6 +158,7 @@ public sealed partial class FunnelModel : ObservableObject, IDisposable
 
     partial void OnStepChanged(FunnelStep value)
     {
+        if (value == FunnelStep.Classes) sawClasses = true;
         Mark();
         _ = EnterAsync(value);
     }
@@ -257,7 +269,11 @@ public sealed partial class FunnelModel : ObservableObject, IDisposable
             case FunnelStep.Classes:
                 if (AddOn is null && Canvas is null)
                 {
-                    if (await services.AddOnFindsCanvas() && services.MakeAddOn() is { } addOn)
+                    bool findsItself = await services.AddOnFindsCanvas();
+                    // Left meanwhile ("My school doesn't use Canvas", or Back), or started already by a quick Back and
+                    // return: nothing to start here now.
+                    if (!OnClasses || AddOn is not null || Canvas is not null) break;
+                    if (findsItself && services.MakeAddOn() is { } addOn)
                     {
                         addOn.OnDone = () =>
                         {
@@ -297,7 +313,7 @@ public sealed partial class FunnelModel : ObservableObject, IDisposable
                 if (e.PropertyName == nameof(CanvasConnectModel.Current) && canvas.Current >= 3 && OnClasses) Step = FunnelStep.Sync;
             };
             Canvas = canvas;
-            if (canvas.Current >= 3) Step = FunnelStep.Sync;
+            if (canvas.Current >= 3 && OnClasses) Step = FunnelStep.Sync;
         }
     }
 
@@ -308,6 +324,8 @@ public sealed partial class FunnelModel : ObservableObject, IDisposable
         AddOn = null;
         addOn.Dispose();
         await StartTypingAsync();
+        // An add-on from an earlier install is in some browser here: the code's line says to choose Paste a new code.
+        if (addOn.FromBefore) Canvas?.HeardOneFromBefore();
     }
 
     /// <summary>Continue on a step that's done (back on it after Back): the next one.</summary>

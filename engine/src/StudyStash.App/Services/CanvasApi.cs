@@ -424,6 +424,8 @@ public static class CanvasApi
         public int ToHandIn { get; init; }
         public Item? Next { get; init; }
         public IReadOnlyList<Group> Groups { get; init; } = [];
+        /// <summary>What the student hid in Syft Notes: in none of the groups, listed apart for "Show hidden".</summary>
+        public IReadOnlyList<Item> Hidden { get; init; } = [];
     }
 
     public sealed record Group
@@ -456,6 +458,8 @@ public static class CanvasApi
         public DateTimeOffset? Submitted { get; init; }
         public DateTimeOffset? GradedAt { get; init; }
         public DateTimeOffset? MarkedDone { get; init; }
+        /// <summary>What the student did about it in Syft Notes alone (never in Canvas): "done", "hidden" or "".</summary>
+        public string Mark { get; init; } = "";
         public string? Url { get; init; }
         public string? Folder { get; init; }
     }
@@ -489,6 +493,7 @@ public static class CanvasApi
         public DateTimeOffset? Submitted { get; init; }
         public DateTimeOffset? GradedAt { get; init; }
         public DateTimeOffset? MarkedDone { get; init; }
+        public string Mark { get; init; } = "";
         public string? Url { get; init; }
         public string? Folder { get; init; }
 

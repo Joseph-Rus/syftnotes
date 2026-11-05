@@ -36,8 +36,8 @@ public sealed record UpdateNews(UpdateNewsKind Kind, Release Release, string? Wh
 public sealed record UpdateCheck(string Result, Release? Release = null, string? Why = null);
 
 /// <summary>
-/// The running app checking for a new release on its own (D4): 10 minutes after it starts, then every 6 hours,
-/// installing it once nothing is recording, paused or transcribing, then quitting so the new copy starts in its
+/// The running app checking for a new release on its own (D4): 2 minutes after it starts, then every hour,
+/// installing it once nothing is recording, paused or being written down, then quitting so the new copy starts in its
 /// place. It also notices when a newer copy has already been swapped onto disk by someone else - the CLI's
 /// `studystash update`, or the library page's "Update now" - and relaunches into it once idle, with no download of
 /// its own. With auto_update off it says a new version is out, and installs it when asked (<see cref="NowAsync"/>);
@@ -47,7 +47,7 @@ public sealed record UpdateCheck(string Result, Release? Release = null, string?
 public sealed class AppUpdates
 {
     /// <summary>How often the idle-wait loop looks again while an update is ready but the student is mid-lecture,
-    /// instead of waiting the full six hours for the next round.</summary>
+    /// instead of waiting the full hour for the next round.</summary>
     public static readonly TimeSpan IdleRecheck = TimeSpan.FromMinutes(1);
 
     // What a round comes to.
@@ -71,7 +71,7 @@ public sealed class AppUpdates
     /// <summary>What Check now asks: GitHub itself, not what it learned in the last hour (<see cref="Latest"/>, which
     /// the rounds use, if not given).</summary>
     public Func<Task<Release?>>? LatestNow { get; init; }
-    /// <summary>Nothing recording, paused or transcribing right now.</summary>
+    /// <summary>Nothing recording, paused or being written down right now.</summary>
     public required Func<bool> Idle { get; init; }
     /// <summary>Looks for new releases at all: an installed copy (or one that can't replace itself, to say so), and
     /// not the self-test.</summary>
@@ -109,6 +109,12 @@ public sealed class AppUpdates
         double.TryParse(TestSwitches.Get("STUDYSTASH_UPDATE_AFTER"), System.Globalization.CultureInfo.InvariantCulture, out double s) ? s : Updates.FirstCheckAfter);
     /// <summary>How a round waits between checks; a test finishes at once instead of really sleeping.</summary>
     public Func<TimeSpan, CancellationToken, Task> Delay { get; init; } = Task.Delay;
+    /// <summary>The wall clock the rounds go by (<see cref="RunAsync"/>); a test's own moves when it says.</summary>
+    public TimeProvider Clock { get; init; } = TimeProvider.System;
+
+    /// <summary>The longest one nap between rounds lasts: <see cref="Delay"/>'s clock stops while the computer sleeps,
+    /// so the wall clock is looked at again after each.</summary>
+    public static readonly TimeSpan Slice = TimeSpan.FromMinutes(1);
 
     /// <summary>Downloading and installing right now.</summary>
     public bool Installing { get; private set; }
@@ -139,6 +145,10 @@ public sealed class AppUpdates
     readonly SemaphoreSlim oneAtATime = new(1, 1);
     readonly HashSet<string> told = [];
     volatile bool asked;
+    // Update now asks GitHub once per press (fresh), and the rounds that wait for the lecture to end keep that answer
+    // (askedFor) rather than the hour-old cache or a GitHub call a minute.
+    volatile bool fresh;
+    Release? askedFor;
     CancellationTokenSource? napping;
 
     /// <summary>
@@ -177,7 +187,14 @@ public sealed class AppUpdates
         Release? release;
         try
         {
-            release = await Latest();
+            // The student pressed Update now: ask GitHub, not the hour-old answer the background rounds share, or a
+            // release out for less than an hour would be said to be up to date.
+            if (fresh)
+            {
+                fresh = false;
+                release = askedFor = await (LatestNow ?? Latest)();
+            }
+            else release = asked && askedFor is { } pressed ? pressed : await Latest();
         }
         catch (Exception e) when (e is HttpRequestException or TaskCanceledException or System.Text.Json.JsonException)
         {
@@ -250,7 +267,7 @@ public sealed class AppUpdates
         return Relaunching;
     }
 
-    /// <summary>Says <paramref name="news"/> once per version while this copy runs (a round every six hours, or
+    /// <summary>Says <paramref name="news"/> once per version while this copy runs (a round every hour, or
     /// every minute while it waits, never says it again).</summary>
     void Once(UpdateNews news)
     {
@@ -289,10 +306,11 @@ public sealed class AppUpdates
     public async Task<string> NowAsync()
     {
         asked = true;
+        fresh = true;
         string result = await RoundAsync();
         if (result == Waiting)
         {
-            // Look again in a minute, not in six hours.
+            // Look again in a minute, not in an hour.
             try
             {
                 napping?.Cancel();
@@ -308,15 +326,23 @@ public sealed class AppUpdates
         return result;
     }
 
-    /// <summary>Rounds forever: the first one 10 minutes after the app starts, then every 6 hours; while a round
-    /// keeps saying to wait for the student, the next one comes a minute later instead.</summary>
+    /// <summary>Rounds forever: the first one <see cref="FirstCheck"/> after the app starts, then every hour; while a
+    /// round keeps saying to wait for the student, the next one comes a minute later instead. The hour is the wall
+    /// clock's: a laptop asleep most of the day still checks on waking, not after an hour awake.</summary>
     public async Task RunAsync(CancellationToken stop)
     {
         try
         {
-            await NapAsync(FirstCheck, stop);
+            TimeSpan wait = FirstCheck;
+            var due = Clock.GetUtcNow() + wait;
             while (!stop.IsCancellationRequested)
             {
+                // A clock set back doesn't put the round off by more than the wait.
+                for (var now = Clock.GetUtcNow(); now < due; now = Clock.GetUtcNow())
+                {
+                    if (due - now > wait) due = now + wait;
+                    if (await NapAsync(due - now < Slice ? due - now : Slice, stop)) break;
+                }
                 string result;
                 try
                 {
@@ -327,7 +353,8 @@ public sealed class AppUpdates
                     Log($"[update] {e.Message}");
                     result = UpToDate;
                 }
-                await NapAsync(result == Waiting ? IdleRecheck : TimeSpan.FromSeconds(Updates.CheckEvery), stop);
+                wait = result == Waiting ? IdleRecheck : TimeSpan.FromSeconds(Updates.CheckEvery);
+                due = Clock.GetUtcNow() + wait;
             }
         }
         catch (OperationCanceledException)
@@ -335,17 +362,19 @@ public sealed class AppUpdates
         }
     }
 
-    /// <summary>The wait between rounds; <see cref="NowAsync"/> cuts it short when it has to wait for a lecture.</summary>
-    async Task NapAsync(TimeSpan wait, CancellationToken stop)
+    /// <summary>One nap between rounds: true when <see cref="NowAsync"/> cut it short to wait for a lecture.</summary>
+    async Task<bool> NapAsync(TimeSpan wait, CancellationToken stop)
     {
         using var nap = CancellationTokenSource.CreateLinkedTokenSource(stop);
         napping = nap;
         try
         {
             await Delay(wait, nap.Token);
+            return false;
         }
         catch (OperationCanceledException) when (!stop.IsCancellationRequested)
         {
+            return true;
         }
         finally
         {
@@ -358,7 +387,7 @@ public sealed class AppUpdates
     /// on-disk copy, and because relaunching after a fresh install this way (once, from here) avoids racing a
     /// second waiter spawned by <see cref="Updates.ApplyAsync"/> if that were also asked to relaunch. Never after
     /// handing off to Windows' Setup.exe, which opens the app itself once it's done (<see cref="InstallerRelaunches"/>).</summary>
-    static void SpawnWaiter(UpdateHost host, IReadOnlyList<string> args)
+    internal static void SpawnWaiter(UpdateHost host, IReadOnlyList<string> args)
     {
         string pid = Environment.ProcessId.ToString(CultureInfo.InvariantCulture);
         if (host.System == "Darwin")
@@ -369,7 +398,9 @@ public sealed class AppUpdates
         else if (host.System == "Windows")
         {
             string exe = Path.Combine(host.AppDir, "StudyStash.exe");
-            string command = $"Wait-Process -Id {pid} -ErrorAction SilentlyContinue; Start-Process -FilePath '{exe}' -ArgumentList '{string.Join(' ', args)}'";
+            // Start-Process refuses an empty -ArgumentList: with no arguments there is none.
+            string withArgs = args.Count > 0 ? $" -ArgumentList '{string.Join(' ', args)}'" : "";
+            string command = $"Wait-Process -Id {pid} -ErrorAction SilentlyContinue; Start-Process -FilePath '{exe}'{withArgs}";
             host.SpawnDetached(["powershell.exe", "-NoProfile", "-WindowStyle", "Hidden", "-Command", command]);
         }
         else if (host.System == "Linux")
@@ -379,6 +410,14 @@ public sealed class AppUpdates
             host.SpawnDetached(["/bin/sh", "-c", script, pid, Updates.LinuxProgram(host.AppDir), .. args]);
         }
     }
+
+    /// <summary>No lecture recording or paused, and none being written down right now (<paramref name="writingDown"/>:
+    /// <see cref="TranscriptionWorker.Working"/>). A lecture left Transcribing while the model is missing (a full disk)
+    /// or won't load only waits for it, and a restart picks it up where it left off: it never holds an update off, or
+    /// the students who most need a fix would never get it.</summary>
+    internal static bool NoLectureInHand(IEnumerable<Lecture> lectures, bool writingDown) =>
+        !lectures.Any(l => l.State is LectureState.Recording or LectureState.Paused
+                           || (l.State is LectureState.Transcribing && writingDown));
 
     /// <summary>How long after a recording stops an update waits for its notes to be written by the library on this
     /// computer: long enough for a long lecture's, short enough that one stuck on its way never holds updates off.</summary>
@@ -415,19 +454,30 @@ public sealed class AppUpdates
         }
     }
 
+    /// <summary>What the app is opened with once an update has restarted it: with its library window if that was open,
+    /// otherwise quietly (--background, as at login); and its folder when that isn't the usual one.</summary>
+    internal static IReadOnlyList<string> RelaunchWith(string home, bool windowOpen)
+    {
+        List<string> args = windowOpen ? [] : ["--background"];
+        if (!string.Equals(home, Configs.DefaultHome, StringComparison.Ordinal)) args.AddRange(["--home", home]);
+        return args;
+    }
+
     /// <summary>Wires the real pieces to an app that's actually running, and starts checking in the background, off
     /// the UI thread (a Mac install copies and checks a whole app, which would otherwise freeze the menu bar for a
     /// minute). Off for a build folder and the self-test; auto_update is read fresh every round, so turning it off in
     /// Settings (or client.toml) takes effect on the next check.</summary>
     /// <param name="busy">Something the student is in the middle of that a restart would take from under their
-    /// hands (typing in a lecture's notes): an update waits for it, as it waits for a lecture.</param>
-    public static void Start(AppHost host, CancellationToken stop, Action<UpdateNews> tell, Func<bool>? busy = null)
+    /// hands (typing in a lecture's notes, setup open with its answers still in the window): an update, or the move to
+    /// Velopack's install, waits for it, as it waits for a lecture.</param>
+    /// <param name="windowOpen">The library window is open on screen right now: the app comes back with it, instead
+    /// of quietly with only its menu bar icon. Asked at the moment the restart is handed off, from the updater's thread.</param>
+    public static void Start(AppHost host, CancellationToken stop, Action<UpdateNews> tell, Func<bool>? busy = null, Func<bool>? windowOpen = null)
     {
         var updateHost = UpdateHost.ThisComputer();
-        List<string> relaunchArgs = ["--background"];
-        if (!string.Equals(host.Home, Configs.DefaultHome, StringComparison.Ordinal)) relaunchArgs.AddRange(["--home", host.Home]);
+        IReadOnlyList<string> RelaunchArgs() => RelaunchWith(host.Home, windowOpen?.Invoke() == true);
         bool Idle() => host.Recorder.Current is null
-                       && !host.Lectures.All().Any(l => l.State is LectureState.Recording or LectureState.Paused or LectureState.Transcribing)
+                       && NoLectureInHand(host.Lectures.All(), host.Whisper.Working)
                        && !WritingHere(host)
                        && busy?.Invoke() != true;
         // Velopack installed this copy: only the download and install are Velopack's (VelopackUpdates.cs); when, and what
@@ -441,7 +491,7 @@ public sealed class AppUpdates
         }
         var updates = new AppUpdates
         {
-            Latest = () => Updates.CachedLatestAsync(),
+            Latest = () => Updates.CachedLatestAsync(log: Program.Log),
             LatestNow = () => Updates.LatestAsync(),
             Idle = Idle,
             Enabled = () => (velopack || updateHost.AppDir.Length > 0 || updateHost.CantReplace) && !Desktop.SystemChangesOff,
@@ -452,8 +502,8 @@ public sealed class AppUpdates
             // Services running from the old bundle (an old-style library LaunchAgent) restart onto the new one rather
             // than run on from a deleted folder.
             Apply = (release, home, log, restart) =>
-                velopack ? VelopackUpdates.ApplyAsync(release, Idle, StopBackground, relaunchArgs, log)
-                : Bridge.Offers(release, updateHost, home: host.Home) ? Bridge.ApplyAsync(release, home, updateHost, Idle, log, Environment.ProcessId, relaunchArgs)
+                velopack ? VelopackUpdates.ApplyAsync(release, Idle, StopBackground, RelaunchArgs, log)
+                : Bridge.Offers(release, updateHost, home: host.Home) ? Bridge.ApplyAsync(release, home, updateHost, Idle, log, Environment.ProcessId, RelaunchArgs)
                 : Updates.ApplyAsync(release, home, updateHost, log, restart, ready: Idle),
             // Velopack's updater, like Setup.exe, opens the app again itself once it has swapped the new version in.
             InstallerRelaunches = velopack || updateHost.System == "Windows",
@@ -461,13 +511,14 @@ public sealed class AppUpdates
             FailedWhy = () => !velopack && updateHost.System is "Windows" or "Linux" ? Bridge.FailedWhy(host.Home) : null,
             RelaunchAndQuit = () =>
             {
-                SpawnWaiter(updateHost, relaunchArgs);
+                SpawnWaiter(updateHost, RelaunchArgs());
                 Dispatcher.UIThread.Post(static () => WeakReferenceMessenger.Default.Send(new QuitRequested()));
             },
             Quit = () => Dispatcher.UIThread.Post(static () => WeakReferenceMessenger.Default.Send(new QuitRequested())),
             Tell = tell,
             Log = Program.Log,
             Home = host.Home,
+            Clock = host.Clock,
         };
         Current = updates;
         _ = Task.Run(() => updates.RunAsync(stop));

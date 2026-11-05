@@ -23,6 +23,19 @@ public class SummarizeTests
     static readonly Action<string> Quiet = _ => { };
 
     [Fact]
+    public void A_recording_with_no_words_after_half_a_minute_heard_nothing()
+    {
+        Assert.True(Summarize.HeardNothing(120, 0));
+        Assert.False(Summarize.HeardNothing(10, 0));
+        Assert.False(Summarize.HeardNothing(120, 300));
+        Assert.False(Summarize.HeardNothing(null, 0));
+        // Whisper still writing it down (a 40 s recording, 5 s done; or waiting for the model): not known yet.
+        Assert.False(Summarize.HeardNothing(40, 0, writtenDown: 5));
+        Assert.True(Summarize.HeardNothing(40, 0, writtenDown: 40));
+        Assert.StartsWith("Nothing was heard. This lecture ran 2 min, but Syft Notes heard no speech.", Summarize.NothingHeardWords("This lecture", 120));
+    }
+
+    [Fact]
     public void Split_transcript_respects_budget_and_keeps_text()
     {
         string text = Lines(200);
@@ -276,7 +289,7 @@ public class SummarizeTests
         Assert.Equal(["n1"], store.ListNotes().Select(r => r.Id));
         var m = store.Meeting(store.Get("n1")!);
         Assert.Equal(("Sam", "membranes", "osmosis talk"), (m.Owner, m.NotesMarkdown, m.Transcript));
-        Assert.Equal(1, store.RequeueAll());
+        Assert.True(store.Requeue("n1")); // "Try again": this old lecture has no summary for "Rewrite all" to rewrite
         await new Pipeline(cfg, store, log: Quiet).RunPendingAsync();
         var row = store.Get("n1")!;
         Assert.Equal("done", row.Status);

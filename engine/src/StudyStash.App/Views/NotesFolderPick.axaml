@@ -1,0 +1,113 @@
+<!-- "You have Syft Notes folders in two places" (both looks), in three steps. Pick: a row per notes folder found on
+     this computer (where it is, how many lectures and when the last one was, "In use now" on the current one, and Show
+     in Finder or File Explorer), the picked one ringed in ink; Use this one, or Bring in notes from the other. Summary:
+     a line per other folder saying what bringing its notes in will do; Back, and Bring them in. Done: what it did.
+     Setup's white sheet on the window's canvas (SetupStyles): ink and paper, no accent. -->
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:StudyStash.App.ViewModels"
+             xmlns:c="using:StudyStash.App.Controls"
+             x:Class="StudyStash.App.Views.NotesFolderPick"
+             x:DataType="vm:NotesFolderPickModel"
+             Classes="in-setup"
+             Width="580">
+  <UserControl.Styles>
+    <StyleInclude Source="avares://StudyStash/Views/SetupStyles.axaml" />
+  </UserControl.Styles>
+
+  <Border Background="{DynamicResource Canvas}" ClipToBounds="True">
+    <DockPanel>
+      <!-- The title bar: drag the window by it; the system's own buttons sit in it. -->
+      <c:WindowHeader DockPanel.Dock="Top" CanResize="False" Title="Syft Notes" />
+      <Panel Margin="8,0,8,8">
+        <Border Classes="setup-pane" />
+        <Border Classes="setup-clip">
+          <DockPanel>
+            <Grid DockPanel.Dock="Bottom" Classes="setup-foot" RowDefinitions="Auto,Auto,Auto" ColumnDefinitions="Auto,*,Auto">
+              <!-- While it works: how far, on a line of its own, so the buttons never move or get pushed out. -->
+              <Grid Grid.ColumnSpan="3" ColumnDefinitions="Auto,10,*" IsVisible="{Binding Busy}" Margin="0,0,0,10">
+                <c:SyftLoader Kind="HoppingBits" Size="20" VerticalAlignment="Center" />
+                <TextBlock Name="Progress" Grid.Column="2" Classes="choice-about" Text="{Binding Progress}" VerticalAlignment="Center"
+                           TextTrimming="CharacterEllipsis" />
+              </Grid>
+              <!-- What went wrong, the whole width, above the buttons. -->
+              <TextBlock Name="Say" Grid.Row="1" Grid.ColumnSpan="3" Classes="say" Foreground="{DynamicResource Warn}" Text="{Binding Say}"
+                         TextWrapping="Wrap" IsVisible="{Binding Say, Converter={x:Static ObjectConverters.IsNotNull}}" Margin="0,0,0,12" />
+              <!-- Pick: bring the others' notes in (it says what it will do first); Summary: back to the pick. -->
+              <Button Name="BringIn" Grid.Row="2" Classes="text-link" Command="{Binding Look.Command}" IsVisible="{Binding OnPick}" IsEnabled="{Binding !Busy}"
+                      Content="{Binding BringLabel}" VerticalAlignment="Center" />
+              <Button Name="Back" Grid.Row="2" Classes="btn" Command="{Binding Back}" IsVisible="{Binding OnSummary}" IsEnabled="{Binding !Busy}"
+                      Content="{x:Static vm:NotesFolderPickModel.BackLabel}" />
+              <Panel Grid.Row="2" Grid.Column="2">
+                <Button Name="UseFolder" Classes="btn ink" Command="{Binding Use.Command}" IsVisible="{Binding OnPick}" IsEnabled="{Binding !Busy}"
+                        IsDefault="{Binding OnPick}" Content="{x:Static vm:NotesFolderPickModel.UseLabel}" />
+                <Button Name="BringThem" Classes="btn ink" Command="{Binding SummaryAction.Command, FallbackValue={x:Null}}" IsVisible="{Binding OnSummary}"
+                        IsEnabled="{Binding !Busy}" IsDefault="{Binding OnSummary}" Content="{Binding BringButton}" />
+                <Button Name="Finish" Classes="btn ink" Command="{Binding Finish}" IsVisible="{Binding OnDoneStep}"
+                        IsDefault="{Binding OnDoneStep}" Content="{x:Static vm:NotesFolderPickModel.DoneLabel}" />
+              </Panel>
+            </Grid>
+            <ScrollViewer VerticalScrollBarVisibility="Auto">
+              <Panel>
+                <StackPanel Classes="setup-page" Spacing="0" IsVisible="{Binding OnPick}">
+                  <TextBlock Name="Question" Classes="page-title step-title" Text="{Binding Title}" TextWrapping="Wrap" />
+                  <TextBlock Classes="page-lede step-lede" Text="{x:Static vm:NotesFolderPickModel.Lede}" />
+                  <ItemsControl Name="Folders" ItemsSource="{Binding Rows}" Margin="0,20,0,0">
+                    <ItemsControl.ItemsPanel><ItemsPanelTemplate><StackPanel Spacing="10" /></ItemsPanelTemplate></ItemsControl.ItemsPanel>
+                    <ItemsControl.ItemTemplate>
+                      <DataTemplate x:DataType="vm:NotesFolderRow">
+                        <!-- The row picks the folder; Show in Finder sits over its right end, a button of its own. -->
+                        <Grid>
+                          <Button Classes="choice" Classes.on="{Binding IsPicked}" Command="{Binding Pick}"
+                                  AutomationProperties.Name="{Binding Where}" AutomationProperties.HelpText="{Binding Detail}">
+                            <Grid ColumnDefinitions="Auto,14,*,14,Auto">
+                              <Border Classes="radio" Classes.on="{Binding IsPicked}"><Ellipse /></Border>
+                              <StackPanel Grid.Column="2" Spacing="3" VerticalAlignment="Center">
+                                <TextBlock Classes="choice-title" Text="{Binding Where}" TextTrimming="CharacterEllipsis"
+                                           c:Tips.WhenCut="True" ToolTip.Tip="{Binding Path}" />
+                                <StackPanel Orientation="Horizontal" Spacing="8">
+                                  <TextBlock Classes="choice-about" Text="{Binding Detail}" VerticalAlignment="Center" />
+                                  <Border Classes="tag" IsVisible="{Binding InUse}"><TextBlock Text="In use now" /></Border>
+                                </StackPanel>
+                              </StackPanel>
+                              <!-- Room for the link drawn over it. -->
+                              <TextBlock Grid.Column="4" FontSize="{DynamicResource FontCaption}" Opacity="0" IsHitTestVisible="False" VerticalAlignment="Center"
+                                         Text="{x:Static vm:NotesFolderPickModel.RevealLabel}" />
+                            </Grid>
+                          </Button>
+                          <Button Classes="text-link small" HorizontalAlignment="Right" VerticalAlignment="Center" Margin="0,0,14,0"
+                                  Command="{Binding Show}" Content="{x:Static vm:NotesFolderPickModel.RevealLabel}"
+                                  AutomationProperties.HelpText="{Binding Path}" />
+                        </Grid>
+                      </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                  </ItemsControl>
+                </StackPanel>
+
+                <!-- Summary, and Done: a line per other folder. -->
+                <StackPanel Classes="setup-page" Spacing="0" IsVisible="{Binding !OnPick}">
+                  <TextBlock Name="StepTitle" Classes="page-title step-title" Text="{Binding StepTitle}" TextWrapping="Wrap" />
+                  <TextBlock Name="StepLede" Classes="page-lede step-lede" Text="{Binding StepLede}" />
+                  <ItemsControl Name="Plans" ItemsSource="{Binding PlanRows}" Margin="0,20,0,0">
+                    <ItemsControl.ItemsPanel><ItemsPanelTemplate><StackPanel Spacing="10" /></ItemsPanelTemplate></ItemsControl.ItemsPanel>
+                    <ItemsControl.ItemTemplate>
+                      <DataTemplate x:DataType="vm:NotesFolderPlanRow">
+                        <Border Classes="choice-card" Padding="16,12" CornerRadius="{DynamicResource RadiusControl}"
+                                BorderBrush="{DynamicResource Border}" BorderThickness="1">
+                          <StackPanel Spacing="3">
+                            <TextBlock Classes="choice-title" Text="{Binding Where}" TextTrimming="CharacterEllipsis" c:Tips.WhenCut="True" ToolTip.Tip="{Binding Where}" />
+                            <TextBlock Classes="choice-about" Text="{Binding Says}" TextWrapping="Wrap" />
+                          </StackPanel>
+                        </Border>
+                      </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                  </ItemsControl>
+                </StackPanel>
+              </Panel>
+            </ScrollViewer>
+          </DockPanel>
+        </Border>
+      </Panel>
+    </DockPanel>
+  </Border>
+</UserControl>

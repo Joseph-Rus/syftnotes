@@ -93,6 +93,14 @@ public static class FakeAgents
         return Directory.Exists(dir) ? Directory.GetFiles(dir).Length : 0;
     }
 
+    /// <summary>How many times the fake claude's status was asked and said signed out: a file of its own in <c>looks</c>
+    /// for each, written once the answer is settled, for the reason <see cref="Logins"/> gives.</summary>
+    public static int SignedOutLooks(string bin)
+    {
+        string dir = Path.Combine(bin, "looks");
+        return Directory.Exists(dir) ? Directory.GetFiles(dir).Length : 0;
+    }
+
     /// <summary>How many turns the fake has taken: an empty file of its own in <c>turns</c> for each, counted, never read,
     /// for the reason <see cref="Logins"/> gives (a count read from one file failed on Windows with the file in use).</summary>
     public static int Turns(string bin)
@@ -111,7 +119,7 @@ public static class FakeAgents
         fi
         if [ "{{id}}" = claude ] && [ "$1" = auth ] && [ "$2" = status ]; then
           if [ -f "$D/signed-in" ]; then echo '{"loggedIn":true,"authMethod":"claude.ai","subscriptionType":"pro","email":"someone@example.com","orgId":"org-fake"}'; exit 0; fi
-          echo '{"loggedIn":false}'; exit 1
+          mkdir -p "$D/looks" && : > "$D/looks/$$"; echo '{"loggedIn":false}'; exit 1
         fi
         if [ "{{id}}" = codex ] && [ "$1" = login ] && [ "$2" = status ]; then
           if [ -f "$D/signed-in" ]; then echo "Logged in using an API key - sk-proj-***FAKEKEY42"; exit 0; fi
@@ -236,7 +244,7 @@ public static class FakeAgents
         }
         if ($ID -eq 'claude' -and $argv[0] -eq 'auth' -and $argv[1] -eq 'status') {
           if (Test-Path "$D\signed-in") { '{"loggedIn":true,"authMethod":"claude.ai","subscriptionType":"pro","email":"someone@example.com","orgId":"org-fake"}'; exit 0 }
-          '{"loggedIn":false}'; exit 1
+          New-Item -ItemType File -Force -Path "$D\looks\$([guid]::NewGuid())" | Out-Null; '{"loggedIn":false}'; exit 1
         }
         if ($ID -eq 'codex' -and $argv[0] -eq 'login' -and $argv[1] -eq 'status') {
           if (Test-Path "$D\signed-in") { 'Logged in using an API key - sk-proj-***FAKEKEY42'; exit 0 }

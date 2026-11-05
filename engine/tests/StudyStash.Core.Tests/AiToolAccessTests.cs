@@ -70,7 +70,7 @@ public class AiToolAccessTests
         Assert.Equal("ok", await Say(byName["list_lectures"]));
         Assert.Equal("ok", await Say(byName["due_assignments"]));
         Assert.Equal(ToolAccess.Refused("notes"), await Say(byName["get_lecture"]));
-        Assert.Contains("(Settings → AI apps → Study notes)", ToolAccess.Refused("notes"));
+        Assert.Contains("(Settings → Your AI → Advanced settings → Study notes)", ToolAccess.Refused("notes"));
     }
 
     [Fact]

@@ -88,6 +88,20 @@ public class NoticeWordsTests
     }
 
     [Fact]
+    public void A_long_recording_that_heard_nothing_says_so_not_that_it_is_too_short()
+    {
+        // Two minutes with not a line written down: the microphone heard nothing, so the page says to check it.
+        string silent = NoteModel.TooShort(Nouns.Recording, transcript: false, canContinue: false, seconds: 120);
+        Assert.StartsWith("Nothing was heard. This recording ran 2 min, but Syft Notes heard no speech. Check that the right microphone is picked in", silent);
+        Assert.DoesNotContain("too short", silent);
+        // Still being written down (Whisper not done, or waiting for the speech model): nothing is said of what was heard yet.
+        Assert.Contains("too short for notes", NoteModel.TooShort(Nouns.Recording, transcript: false, canContinue: false, seconds: 40, writtenDown: 5));
+        // Ten seconds, or two minutes with a few words, are still just too short.
+        Assert.Contains("too short for notes", NoteModel.TooShort(Nouns.Recording, transcript: false, canContinue: false, seconds: 10));
+        Assert.Contains("too short for notes", NoteModel.TooShort(Nouns.Recording, transcript: true, canContinue: false, seconds: 120));
+    }
+
+    [Fact]
     public void A_recording_stopped_too_soon_to_keep_says_so()
     {
         Assert.Equal(("Recording not kept", "It was under 5 seconds, so there was nothing to write down."), NoticeWords.NotKept(Stopped.TooShort));
@@ -135,7 +149,7 @@ public class NoticeWordsTests
             NoticeWords.UpdateDidntTake("0.10.1", "0.10.0"));
         Assert.Null(NoticeWords.UpdateDidntTake("0.10.1", "0.10.1"));
         Assert.Null(NoticeWords.UpdateDidntTake("", "0.10.0"));
-        Assert.Equal("https://github.com/Joseph-Rus/study-stash/releases/tag/v0.10.1", Updates.ReleasePage("0.10.1"));
+        Assert.Equal("https://github.com/Joseph-Rus/syftnotes/releases/tag/v0.10.1", Updates.ReleasePage("0.10.1"));
     }
 
     [Theory]

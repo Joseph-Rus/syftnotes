@@ -173,6 +173,17 @@ public sealed class CanvasClient(string serverUrl, Func<string> key, HttpClient?
     public Task<CanvasApi.DueResponse?> DueAsync(CancellationToken stop = default) =>
         SendAsync<CanvasApi.DueResponse>(HttpMethod.Get, canvasRoot + "/due", null, stop);
 
+    /// <summary>The student's own mark on a Due item, kept in Syft Notes alone (Canvas is never asked): "done", "hidden", or
+    /// "" to take it back. The Due list as it now stands; null from a library from before marks. An id that isn't a Canvas id
+    /// is refused here (<see cref="CanvasLibraryException"/>), never sent as 0.</summary>
+    public async Task<CanvasApi.DueResponse?> MarkAsync(string cls, string kind, string id, string mark, CancellationToken stop = default)
+    {
+        if (!long.TryParse(id, NumberStyles.None, CultureInfo.InvariantCulture, out long n) || n <= 0)
+            throw new CanvasLibraryException(400, "Syft Notes can't mark that item.");
+        return await SendAsync<CanvasApi.DueResponse>(HttpMethod.Post, canvasRoot + "/mark",
+            new JsonObject { ["class"] = cls, ["kind"] = kind, ["id"] = n, ["mark"] = mark }, stop);
+    }
+
     public Task<CanvasApi.AssignmentsResponse?> AssignmentsAsync(string cls, CancellationToken stop = default) =>
         SendAsync<CanvasApi.AssignmentsResponse>(HttpMethod.Get, $"{canvasRoot}/assignments?class={Q(cls)}", null, stop);
 

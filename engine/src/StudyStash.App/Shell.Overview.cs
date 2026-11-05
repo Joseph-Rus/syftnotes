@@ -69,7 +69,16 @@ public static partial class Shell
         if (turn != pageState.Turn) return;
         if (listed is not { } lectures) { ListFailed(null); return; }
         var sources = OverviewSources(WithLocal([.. lectures.Take(want)], null, homeUnsorted, all: lectures.Count <= want));
+        // Read again and nothing changed (a Canvas sync with no news for it, the window shown again): the page stays
+        // as it is, where it's scrolled to and what's typed in its ask bar.
+        string stamp = $"home|{homeUnsorted}|{want}|{lectures.Count > want}|{sources.Stamp()}";
+        if (library.Overview is { IsHome: true } shown && shown.Stamp == stamp)
+        {
+            Run(() => CountStudyAsync(), "CountStudy");
+            return;
+        }
         var home = OverviewModel.Home(sources, homeUnsorted);
+        home.Stamp = stamp;
         home.CanLoadMore = lectures.Count > want;
         home.OnFilter = unsorted =>
         {
@@ -122,7 +131,17 @@ public static partial class Shell
         var known = host.Classes().FirstOrDefault(c => c.Name == name);
         var facts = new ClassHomeFacts(name, DotFor(name), Math.Max(known.Lectures, lectures.Count), row?.Canvas?.ShortCode is { Length: > 0 } code ? code : null,
             row?.Canvas?.Title is { Length: > 0 } title ? title : null, info is null ? null : S(info["description"]), row?.Counts, host.GroupOf(name));
-        var page = OverviewModel.ForClass(facts, OverviewSources(lectures));
+        var sources = OverviewSources(lectures);
+        // Read again and nothing changed: the page stays as it is.
+        string stamp = $"folder|{name}|{info?.ToJsonString()}|{host.Settings.LibraryHere}|{sources.Stamp()}";
+        if (library.Overview is { IsFolder: true } shown && shown.ClassName == name && shown.Stamp == stamp)
+        {
+            // The page stays, but its Files catch up (a file attached from elsewhere): nothing else reads them again.
+            if (shown.Files is { } kept) Run(() => kept.LoadAsync(), "files.Load");
+            return;
+        }
+        var page = OverviewModel.ForClass(facts, sources);
+        page.Stamp = stamp;
         page.AddLinks(facts, row is null ? null : tab =>
         {
             Remember();
@@ -158,7 +177,16 @@ public static partial class Shell
         // Monday on), and the newest hundred notes reach back well past those.
         var recorded = Events() is null ? [] : (await NotesAsync(lib, null, 100, null)) ?? [];
         if (turn != pageState.Turn) return;
-        var page = OverviewModel.ForDue(OverviewSources(recorded, WithTerm(CanvasLinked ? canvasDue : null, term)), dueOnly);
+        var sources = OverviewSources(recorded, WithTerm(CanvasLinked ? canvasDue : null, term));
+        // Read again and nothing changed (a sync with no news for the calendar): the page stays as it is.
+        string stamp = $"due|{dueOnly}|{sources.Stamp()}";
+        if (library.Overview is { IsDuePage: true } shown && shown.Stamp == stamp)
+        {
+            shown.CanvasStatus = DueStatus();
+            return;
+        }
+        var page = OverviewModel.ForDue(sources, dueOnly);
+        page.Stamp = stamp;
         if (library.Overview is { IsDuePage: true, Calendar: { } before } && page.Calendar is { } now) now.Resume(before);
         if (page.Calendar is { } calendar)
             calendar.PropertyChanged += (_, e) =>
@@ -171,34 +199,44 @@ public static partial class Shell
     }
 
     /// <summary>Each linked class's whole list of assignments, as Canvas has it: the calendar shows what was handed in
-    /// weeks ago and what's due months off, which the Due list (the days round now) leaves out. Kept until Canvas is
-    /// read again.</summary>
-    static List<CanvasApi.AssignmentsResponse>? termAssignments;
+    /// weeks ago and what's due months off, which the Due list (the days round now) leaves out. A class's is kept until
+    /// Canvas brings news of it (null: the library had none to give).</summary>
+    static readonly Dictionary<string, CanvasApi.AssignmentsResponse?> termAssignments = [];
     static string termFor = "";
+
+    /// <summary>Canvas brought news of these classes (null: of any): their term is read again next time it's wanted.</summary>
+    static void ForgetTerm(IReadOnlySet<string>? touched)
+    {
+        if (touched is null) termAssignments.Clear();
+        else foreach (var cls in touched) termAssignments.Remove(cls);
+    }
 
     static async Task<List<CanvasApi.AssignmentsResponse>> TermAsync()
     {
-        if (termAssignments is { } kept && termFor == canvasFor) return kept;
-        if (Canvas().Client is not { } client) return [];
-        string asked = canvasFor;
-        var answers = await Task.WhenAll(canvasClasses.Where(c => c.Linked).Select(async c =>
+        if (termFor != canvasFor)
         {
-            try
-            {
-                return await client.AssignmentsAsync(c.Class) is { } a ? a with { Class = a.Class.Length > 0 ? a.Class : c.Class } : null;
-            }
-            catch (Exception e) when (e is HttpRequestException or TaskCanceledException or CanvasLibraryException or System.Text.Json.JsonException or InvalidOperationException)
-            {
-                return null;
-            }
-        }));
-        var term = answers.OfType<CanvasApi.AssignmentsResponse>().ToList();
-        if (asked == canvasFor)
-        {
-            termAssignments = term;
-            termFor = asked;
+            termAssignments.Clear();
+            termFor = canvasFor;
         }
-        return term;
+        var linked = canvasClasses.Where(c => c.Linked).Select(c => c.Class).ToList();
+        if (Canvas().Client is { } client && linked.Where(c => !termAssignments.ContainsKey(c)).ToList() is { Count: > 0 } missing)
+        {
+            string asked = canvasFor;
+            var answers = await Task.WhenAll(missing.Select(async cls =>
+            {
+                try
+                {
+                    return (cls, Read: true, Term: await client.AssignmentsAsync(cls) is { } a ? a with { Class = a.Class.Length > 0 ? a.Class : cls } : null);
+                }
+                catch (Exception e) when (e is HttpRequestException or TaskCanceledException or CanvasLibraryException or System.Text.Json.JsonException or InvalidOperationException)
+                {
+                    return (cls, Read: false, Term: (CanvasApi.AssignmentsResponse?)null); // asked again next time
+                }
+            }));
+            if (asked == canvasFor)
+                foreach (var (cls, read, term) in answers.Where(a => a.Read)) termAssignments[cls] = term;
+        }
+        return [.. linked.Select(c => termAssignments.GetValueOrDefault(c)).OfType<CanvasApi.AssignmentsResponse>()];
     }
 
     /// <summary>What's due, with the rest of each class's term added: everything handed in, and anything to hand in
@@ -246,13 +284,8 @@ public static partial class Shell
             library.CanvasClass = page;
         }
         library.Overview = null;
-        try
-        {
-            await page.LoadAsync(row);
-        }
-        catch (Exception e) when (e is HttpRequestException or TaskCanceledException or CanvasLibraryException or System.Text.Json.JsonException or InvalidOperationException)
-        {
-        }
+        // While it reads, the list column shows the loader; a list it can't read says so, and the others show.
+        await page.LoadAsync(row);
         if (turn != pageState.Turn) return;
         // A notification's announcement: its own reader, beside the list.
         if (announcementToOpen is { } announcement)
@@ -357,14 +390,8 @@ public static partial class Shell
             };
             page.OnStop = () => StopRecording();
         }
-        // Home's "Buy us a coffee": the Ko-fi page, and the library window's own ask for a tip goes for good (as it
-        // does from the ask itself, which answers here if it's showing).
-        if (page.IsHome)
-            page.OnSupport = () =>
-            {
-                if (library.Support is { } asking) asking.TipCommand.Execute(null);
-                else SupportAsk.Answer(host, SupportAnswer.Tip, url => Dialogs.OpenUrl(url), DateTimeOffset.Now);
-            };
+        // Home's "Buy us a coffee": the Ko-fi page, and the library window's own ask for a tip goes for good.
+        if (page.IsHome) page.OnSupport = () => SupportAsk.Answer(host, SupportAnswer.Tip, url => Dialogs.OpenUrl(url), DateTimeOffset.Now);
         if (library.Overview is { Ask: { } kept } before && before.IsHome == page.IsHome && before.ClassName == page.ClassName && !before.IsDuePage)
         {
             before.Ask = null;

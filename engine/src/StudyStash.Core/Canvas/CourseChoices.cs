@@ -1,4 +1,5 @@
 using System.Globalization;
+using System.Text.Json.Nodes;
 using System.Text.RegularExpressions;
 
 namespace StudyStash.Core.Canvas;
@@ -21,9 +22,13 @@ public static partial class CourseChoices
     /// <summary>Why a course starts unticked, as the picker says it; "" for one that starts ticked.</summary>
     public const string PastTerm = "Past term", LaterTerm = "Later term", NoTerm = "No term", NotAClass = "Not a class";
 
-    // Words in a course's name that mean it isn't a class a student records: practice spaces, worship and assemblies,
-    // orientation and advising, training and resource sites.
-    [GeneratedRegex(@"\b(?:sandbox|chapel|convocation|orientation|advising|advisement|training|resource center|student life|community|playground|practice course|test course)\b", RegexOptions.IgnoreCase)]
+    // Words and phrases in a course's name that mean it isn't a class a student records: practice spaces, worship and
+    // assemblies, advising and student-life sites, and an orientation for new students ("New Student Orientation",
+    // "Orientation 2026"). Only whole words a real class title wouldn't have: "Community Health Nursing", "Athletic
+    // Training" and "Orientation and Mobility" are classes.
+    [GeneratedRegex(@"\b(?:sandbox|chapel|convocation|advising|advisement|student life|resource center|playground|practice course|test course)\b"
+        + @"|\b(?:new|incoming|first[- ]year|freshman|transfer|international|graduate|online|students?|welcome)\s+(?:student\s+)?orientation\b"
+        + @"|^\W*orientation\b(?!\s*(?:(?:and|to|in|of)\b|&))", RegexOptions.IgnoreCase)]
     private static partial Regex NotAClassWords();
 
     [GeneratedRegex(@"\b(Spring|Summer|Fall|Autumn|Winter)\b\D{0,3}((?:19|20)\d{2})\b|\b((?:19|20)\d{2})\D{0,3}\b(Spring|Summer|Fall|Autumn|Winter)\b", RegexOptions.IgnoreCase)]
@@ -35,18 +40,27 @@ public static partial class CourseChoices
     static readonly TimeSpan Ahead = TimeSpan.FromDays(30);
 
     /// <summary>Whether the course starts ticked, and if not, why (<see cref="PastTerm"/>, <see cref="LaterTerm"/>,
-    /// <see cref="NoTerm"/> or <see cref="NotAClass"/>). A course is this term's when its term's (or its own) dates
-    /// say so, or, without dates, when its term's name ("Fall 2026") does; a course in no real term (Canvas's
-    /// "Default Term") or named like a sandbox or chapel isn't.</summary>
+    /// <see cref="NoTerm"/> or <see cref="NotAClass"/>). Canvas's own word comes first: a course the student teaches,
+    /// designs or only observes isn't a class, and one Canvas says is over is last term's. Then a course named like a
+    /// sandbox or chapel isn't a class. Then dates: a course is this term's when its dates say so; without dates, when
+    /// its term's name ("Fall 2026") does, or, in no real term (Canvas's "Default Term"), when the student is enrolled
+    /// in it as a student. A course with none of that (no real term, no dates, nothing about the student) isn't. When in
+    /// doubt a course is ticked: an extra class is easy to untick, a missing one goes unseen.</summary>
     public static (bool Ticked, string Why) Suggest(CourseInfo info, DateTimeOffset now)
     {
-        if (NotAClassWords().IsMatch(info.Name) || NotAClassWords().IsMatch(info.Code)) return (false, NotAClass);
+        var roles = info.Roles.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+        bool student = roles.Contains("student");
+        if (roles.Length > 0 && !student && !roles.Contains("ta")) return (false, NotAClass);
         var (start, end) = Dates(info);
+        // Canvas says it's over: last term's, unless it ended only in the last few days.
+        if (info.Concluded && !(end is { } last && last < now && last + Grace >= now)) return (false, PastTerm);
+        if (NotAClassWords().IsMatch(info.Name) || NotAClassWords().IsMatch(info.Code)) return (false, NotAClass);
         if (end is { } e && e + Grace < now) return (false, PastTerm);
         if (start is { } s && s - Ahead > now) return (false, LaterTerm);
         if (start is not null || end is not null) return (true, "");
         string term = info.Term.Trim();
-        if (term.Length == 0 || term.Equals("Default Term", StringComparison.OrdinalIgnoreCase)) return (false, NoTerm);
+        // No real term: a student enrollment says it's a class; without one, nothing does.
+        if (term.Length == 0 || term.Equals("Default Term", StringComparison.OrdinalIgnoreCase)) return student ? (true, "") : (false, NoTerm);
         if (Season(term) is var (from, to))
         {
             if (to + Grace < now) return (false, PastTerm);
@@ -55,12 +69,33 @@ public static partial class CourseChoices
         return (true, "");
     }
 
-    /// <summary>When the course's term (or else the course itself) starts and ends, where Canvas said.</summary>
+    /// <summary>When the course runs, where Canvas said: its term's dates (or else its own), or its own first when
+    /// the course's dates are the ones Canvas goes by. An end before the start is a typo, so neither counts.</summary>
     static (DateTimeOffset? Start, DateTimeOffset? End) Dates(CourseInfo info)
     {
         static DateTimeOffset? When(string iso) =>
             iso.Length > 0 && DateTimeOffset.TryParse(iso, CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal, out var t) ? t : null;
-        return (When(info.TermStart) ?? When(info.CourseStart), When(info.TermEnd) ?? When(info.CourseEnd));
+        var (termStart, termEnd, ownStart, ownEnd) = (When(info.TermStart), When(info.TermEnd), When(info.CourseStart), When(info.CourseEnd));
+        var (start, end) = info.CourseDates ? (ownStart ?? termStart, ownEnd ?? termEnd) : (termStart ?? ownStart, termEnd ?? ownEnd);
+        return start is { } s && end is { } e && e < s ? (null, null) : (start, end);
+    }
+
+    /// <summary>A course from Canvas's course list (<c>/api/v1/courses</c> with its term and whether it's concluded):
+    /// its name, code and term, the dates that say when it runs, and how the student is in it.</summary>
+    public static CourseInfo Read(JsonObject c)
+    {
+        static string S(JsonNode? v) => v is JsonValue j && j.TryGetValue(out string? s) ? s : "";
+        static bool B(JsonNode? v) => v is JsonValue j && j.TryGetValue(out bool b) && b;
+        // The student's own enrollments in it that are live now, by kind ("student", "teacher"…; older Canvas says
+        // "StudentEnrollment").
+        var roles = (c["enrollments"] as JsonArray ?? []).OfType<JsonObject>()
+            .Where(e => S(e["enrollment_state"]) is "" or "active")
+            .Select(e => S(e["type"]).ToLowerInvariant().Replace("enrollment", "", StringComparison.Ordinal))
+            .Where(r => r.Length > 0).Distinct().Order(StringComparer.Ordinal);
+        return new CourseInfo(S(c["course_code"]), S(c["name"]), S(c["term"]?["name"]),
+            TermStart: S(c["term"]?["start_at"]), TermEnd: S(c["term"]?["end_at"]), CourseStart: S(c["start_at"]), CourseEnd: S(c["end_at"]),
+            Roles: string.Join(' ', roles), Concluded: B(c["concluded"]) || S(c["workflow_state"]) == "completed",
+            CourseDates: B(c["restrict_enrollments_to_course_dates"]));
     }
 
     /// <summary>The months a season names ("Fall 2026" is August to December 2026); null when the term's name has no

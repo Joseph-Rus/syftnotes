@@ -1,5 +1,6 @@
 using Avalonia.Controls;
 using Avalonia.Interactivity;
+using StudyStash.App.Controls;
 using StudyStash.App.ViewModels;
 
 namespace StudyStash.App.Views;
@@ -18,15 +19,21 @@ public partial class Overview : UserControl
         AttachFiles.AcceptDrops(Page, () => (DataContext as OverviewModel)?.Files);
         Fades.Under(Fade, "Surface", 0.55);
         // Another page opens at its top, not wherever the last one was scrolled to; the same one read again (Canvas
-        // synced, a note came in) stays where the student was.
+        // synced, a note came in) stays where the student was. Back and Forward ask for the place they left it.
         string? showing = null;
+        var scrolled = new ScrollKeeper(Page);
         DataContextChanged += (_, _) =>
         {
-            if (DataContext is not OverviewModel m) return;
+            if (DataContext is not OverviewModel m)
+            {
+                scrolled.Follow(null);
+                return;
+            }
             m.Beside = Split.Beside;
             string key = m.IsHome ? m.OnlyUnsorted ? "\u0001unsorted" : "" : m.IsDuePage ? "\u0001due" : m.ClassName;
             if (key != showing) Page.Offset = default;
             showing = key;
+            scrolled.Follow(m.Scroll);
         };
         // Home's notes go on: near the end of what's showing, the next page is asked for.
         Page.ScrollChanged += (_, _) =>

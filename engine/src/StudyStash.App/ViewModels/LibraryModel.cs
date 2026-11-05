@@ -70,6 +70,8 @@ public sealed partial class NewFolderAsk(string className) : ObservableObject
 public sealed partial class NoteModel : ObservableObject
 {
     public string Id { get; init; } = "";
+    /// <summary>How far down the page is scrolled: Back and Forward come back to it.</summary>
+    public ScrollPlace Scroll { get; } = new();
     /// <summary>The folder it's in ("" or Unsorted for none).</summary>
     public string ClassName { get; init; } = "";
     public IBrush Dot { get; init; } = Brushes.Gray;
@@ -99,8 +101,12 @@ public sealed partial class NoteModel : ObservableObject
 
     /// <summary>What the page says of a recording too short to have notes written (<see cref="Summarize.TooShort"/>):
     /// that it is and what notes take, where its words are, and what adds to them. Keep recording is named only where
-    /// the page has the button (<paramref name="canContinue"/>: it was recorded on this computer).</summary>
-    public static string TooShort(string noun, bool transcript, bool canContinue) => Summarize.TooShortWords($"This {noun}")
+    /// the page has the button (<paramref name="canContinue"/>: it was recorded on this computer). One that ran
+    /// <paramref name="seconds"/> long enough for speech and has no words says nothing was heard instead.</summary>
+    public static string TooShort(string noun, bool transcript, bool canContinue, double? seconds = null, double? writtenDown = null) =>
+        Summarize.HeardNothing(seconds, transcript ? 1 : 0, writtenDown)
+            ? Summarize.NothingHeardWords($"This {noun}", seconds!.Value) + (canContinue ? " Keep recording adds to it." : "")
+            : Summarize.TooShortWords($"This {noun}")
         + (transcript ? $" The transcript is in the Transcript tab{(canContinue ? "; Keep recording adds to it." : ".")}" : canContinue ? " Keep recording adds to it." : "");
 
     /// <summary>What the page says where the notes would be while the library writes none (<see cref="Summarize.NotesOn"/>
@@ -507,9 +513,7 @@ public sealed partial class LibraryModel : ObservableObject
         if (newValue is not null)
         {
             newValue.Narrow = Narrow;
-            // The ask for a tip shows on Home, in the page's own flow.
-            newValue.Asking = newValue.IsHome ? Support : null;
-            // So does "Ready when class starts", after a first run.
+            // "Ready when class starts" shows on Home, after a first run.
             newValue.Welcome = newValue.IsHome ? Welcome : null;
             // A page read while the library was still deleting a note lists it: it's shown without it.
             foreach (string id in gone) newValue.Remove(id);
@@ -582,17 +586,14 @@ public sealed partial class LibraryModel : ObservableObject
 
     // --- the ask for a tip ------------------------------------------------------------------------------------------
 
-    /// <summary>The one gentle ask for a tip, on Home (<see cref="SupportAsk"/> says when); null when it isn't asking.</summary>
+    /// <summary>The one gentle ask for a tip, a popup over the window (<see cref="SupportAsk"/> says when); null when it
+    /// isn't asking. Set to null, it closes unanswered.</summary>
     [ObservableProperty] public partial SupportAskModel? Support { get; set; }
-    public bool HasSupport => Support is not null;
     /// <summary>What the student answered: the host saves it, and opens the Ko-fi page for a tip.</summary>
     public Action<SupportAnswer>? OnSupportAnswer { get; set; }
+    bool askedForSupport;
 
-    partial void OnSupportChanged(SupportAskModel? value)
-    {
-        OnPropertyChanged(nameof(HasSupport));
-        if (Overview is { IsHome: true } home) home.Asking = value;
-    }
+    partial void OnSupportChanged(SupportAskModel? oldValue, SupportAskModel? newValue) => oldValue?.PutAway();
 
     /// <summary>Home's "Ready when class starts", after a first run; null once it's put away (or never, for an update).</summary>
     [ObservableProperty] public partial WelcomeCardModel? Welcome { get; set; }
@@ -602,13 +603,18 @@ public sealed partial class LibraryModel : ObservableObject
         if (Overview is { IsHome: true } home) home.Welcome = value;
     }
 
-    /// <summary>Shows the ask (unless it's showing already); <paramref name="last"/> leaves out "Maybe later". Any
-    /// answer puts it away.</summary>
-    public void AskForSupport(bool last) => Support ??= new SupportAskModel(last, answer =>
+    /// <summary>Starts the ask, once a session at most: null if it asked already since the app started.
+    /// <paramref name="last"/> leaves out "Maybe later". Any answer puts it away.</summary>
+    public SupportAskModel? AskForSupport(bool last)
     {
-        Support = null;
-        OnSupportAnswer?.Invoke(answer);
-    });
+        if (askedForSupport) return null;
+        askedForSupport = true;
+        return Support = new SupportAskModel(last, answer =>
+        {
+            Support = null;
+            OnSupportAnswer?.Invoke(answer);
+        });
+    }
 
     /// <summary>The window closes with the ask still showing: that counts as "Maybe later" (or, the last time, as
     /// the end of it), so an ask that's ignored still comes at most twice.</summary>

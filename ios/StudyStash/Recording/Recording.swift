@@ -172,6 +172,7 @@ final class RecordingStore {
     func sendWaiting(api: APIClient) async {
         for r in recordings where r.state == .waiting { await send(r.id, api: api) }
         await PhotoStore.shared.sendWaiting(api: api)
+        await NotebookStore.shared.sendWaiting(api: api)
     }
 }
 

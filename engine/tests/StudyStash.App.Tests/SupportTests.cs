@@ -1,17 +1,20 @@
 using Avalonia;
 using Avalonia.Controls;
+using Avalonia.Headless;
 using Avalonia.Headless.XUnit;
+using Avalonia.Input;
 using Avalonia.Threading;
 using Avalonia.VisualTree;
+using StudyStash.App.Controls;
 using StudyStash.App.Services;
 using StudyStash.App.ViewModels;
 using StudyStash.App.Views;
 
 namespace StudyStash.App.Tests;
 
-/// <summary>"Buy us a coffee": Home's button, and the library window's one gentle ask
-/// for a tip — when it asks, what each answer does, and that the Ko-fi page is only ever caught here, never handed to
-/// a real browser.</summary>
+/// <summary>"Buy us a coffee": Home's button, and the library window's one gentle ask for a tip, a popup over the
+/// window — when it asks, what each answer does, and that the Ko-fi page is only ever caught here, never handed to a
+/// real browser.</summary>
 public class SupportTests
 {
     const string KoFi = "https://ko-fi.com/studystashteam";
@@ -110,78 +113,45 @@ public class SupportTests
         Assert.True(SupportAsk.Due(settings, 5, false, false, Monday));
     }
 
-    // --- the card --------------------------------------------------------------------------------------------------
+    // --- the popup -------------------------------------------------------------------------------------------------
 
     [Theory]
     [InlineData(SupportAnswer.Tip)]
     [InlineData(SupportAnswer.Later)]
     [InlineData(SupportAnswer.Never)]
-    public void Each_button_answers_the_ask_and_puts_the_card_away(SupportAnswer answer)
+    public void Each_button_answers_the_ask_once_and_it_asks_once_a_session(SupportAnswer answer)
     {
         var answers = new List<SupportAnswer>();
         var library = new LibraryModel { OnSupportAnswer = answers.Add };
-        library.AskForSupport(last: false);
-        var card = library.Support!;
-        Assert.True(library.HasSupport);
-        Assert.True(card.CanWait);
-        library.AskForSupport(last: false);
-        Assert.Same(card, library.Support);
+        var ask = library.AskForSupport(last: false)!;
+        Assert.Same(ask, library.Support);
+        Assert.True(ask.CanWait);
+        Assert.Null(library.AskForSupport(last: false)); // once a session at most
 
-        (answer switch
+        var press = answer switch
         {
-            SupportAnswer.Tip => card.TipCommand,
-            SupportAnswer.Later => card.LaterCommand,
-            _ => card.NeverCommand,
-        }).Execute(null);
+            SupportAnswer.Tip => ask.TipCommand,
+            SupportAnswer.Later => ask.LaterCommand,
+            _ => ask.NeverCommand,
+        };
+        press.Execute(null);
+        ask.LaterCommand.Execute(null); // a second press (or Escape after it) answers nothing more
 
         Assert.Equal([answer], answers);
+        Assert.True(ask.Over);
         Assert.Null(library.Support);
-        Assert.False(library.HasSupport);
     }
 
-    [AvaloniaTheory]
-    [InlineData(SkinKind.Mac)]
-    [InlineData(SkinKind.Win)]
-    public void The_card_sits_atop_the_lecture_list_covering_nothing(SkinKind skin)
+    [Fact]
+    public void Put_away_for_a_recording_or_setup_it_closes_with_no_answer()
     {
-        ((App)Application.Current!).UseSkin(skin);
-        try
-        {
-            var library = Demo.Library(askingSupport: true);
-            var answers = new List<SupportAnswer>();
-            library.OnSupportAnswer = answers.Add;
-            Control view = skin == SkinKind.Mac ? new MacLibrary { DataContext = library } : new WinLibrary { DataContext = library };
-            var window = new Window { Width = 1280, Height = 800, Content = view };
-            window.Show();
-            Dispatcher.UIThread.RunJobs();
-            window.UpdateLayout();
-
-            var card = view.GetVisualDescendants().OfType<Control>().Single(c => c.Name == "SupportAsk");
-            Assert.True(card.IsEffectivelyVisible);
-            var texts = Texts(card);
-            Assert.Contains("Enjoying Syft Notes?", texts);
-            Assert.Contains("It's free, and two students build it with Claude.\nA coffee keeps us going.", texts);
-            Assert.Contains("Buy us a coffee", texts);
-            Assert.Contains("Maybe later", texts);
-            Assert.Contains("Don't ask again", texts);
-
-            // In the page's flow on Home: it ends above the first note, so it covers none of them.
-            var firstNote = view.GetVisualDescendants().OfType<Button>().First(b => b.Name == "Row" && b.DataContext is NoteItem);
-            double cardBottom = card.TranslatePoint(new Point(0, card.Bounds.Height), view)!.Value.Y;
-            double noteTop = firstNote.TranslatePoint(new Point(0, 0), view)!.Value.Y;
-            Assert.True(cardBottom <= noteTop, $"the card ends at {cardBottom}, below the first note's top at {noteTop}");
-
-            var tip = card.GetVisualDescendants().OfType<Button>().Single(b => b.Name == "Tip");
-            tip.Command!.Execute(null);
-            Dispatcher.UIThread.RunJobs();
-            Assert.Equal([SupportAnswer.Tip], answers);
-            Assert.False(card.IsEffectivelyVisible);
-            window.Close();
-        }
-        finally
-        {
-            ((App)Application.Current!).UseSkin(SkinKind.Mac);
-        }
+        var answers = new List<SupportAnswer>();
+        var library = new LibraryModel { OnSupportAnswer = answers.Add };
+        var ask = library.AskForSupport(last: false)!;
+        library.Support = null; // what Shell does when a recording starts or setup opens
+        Assert.True(ask.Over);
+        ask.LaterCommand.Execute(null);
+        Assert.Empty(answers); // nothing saved: it may ask another day
     }
 
     [Fact]
@@ -189,7 +159,8 @@ public class SupportTests
     {
         var settings = new AppSettings();
         var answers = new List<SupportAnswer>();
-        var library = new LibraryModel { OnSupportAnswer = a => { answers.Add(a); SupportAsk.Remember(settings, a, Monday); } };
+        LibraryModel Session() => new() { OnSupportAnswer = a => { answers.Add(a); SupportAsk.Remember(settings, a, Monday); } };
+        var library = Session();
         library.WalkAwayFromSupport(); // nothing showing: nothing to answer
         Assert.Empty(answers);
 
@@ -199,26 +170,65 @@ public class SupportTests
         Assert.Null(library.Support);
         Assert.False(settings.SupportAskDone);
 
+        library = Session(); // a month on, the app started again
         library.AskForSupport(last: SupportAsk.IsLast(settings));
         library.WalkAwayFromSupport();
         Assert.True(settings.SupportAskDone);
     }
 
-    [AvaloniaFact]
-    public void The_last_ask_offers_no_later()
+    /// <summary>The ask pops up over the library window on its dialog layer, both looks: the logo, the question, its two
+    /// lines and the three answers, "Maybe later" with the keyboard. Escape is "Maybe later" and closes it. The last
+    /// time it asks, there's no "Maybe later".</summary>
+    [AvaloniaTheory]
+    [InlineData(SkinKind.Mac)]
+    [InlineData(SkinKind.Win)]
+    public async Task It_pops_up_over_the_library_window_and_escape_is_maybe_later(SkinKind skin)
     {
-        var library = Demo.Overview(); // the ask shows on Home
-        library.AskForSupport(last: true);
-        var view = new MacLibrary { DataContext = library };
-        var window = new Window { Width = 1280, Height = 800, Content = view };
-        window.Show();
-        Dispatcher.UIThread.RunJobs();
+        ((App)Application.Current!).UseSkin(skin);
+        var window = new Window { Width = 1280, Height = 800 };
+        try
+        {
+            var library = Demo.Overview();
+            var answers = new List<SupportAnswer>();
+            library.OnSupportAnswer = answers.Add;
+            Control page = skin == SkinKind.Mac ? new MacLibrary { DataContext = library } : new WinLibrary { DataContext = library };
+            window.Content = ConfirmLayer.Wrap(window, page);
+            window.Show();
+            var layer = ConfirmLayer.For(window)!;
 
-        var card = view.GetVisualDescendants().OfType<Control>().Single(c => c.Name == "SupportAsk");
-        Assert.False(library.Support!.CanWait);
-        Assert.DoesNotContain("Maybe later", Texts(card));
-        Assert.Contains("Don't ask again", Texts(card));
-        window.Close();
+            var showing = SupportAskDialog.ShowAsync(layer, library.AskForSupport(last: false)!);
+            SupportAskDialog? dialog = null;
+            await Wait.UntilAsync(() => (dialog = window.GetVisualDescendants().OfType<SupportAskDialog>().FirstOrDefault()) is { IsEffectivelyVisible: true }
+                && dialog.FindControl<Button>("Later")!.IsFocused, "the ask to pop up with Maybe later focused");
+            Assert.True(layer.IsOpen);
+            var popup = dialog!;
+            Assert.Single(popup.GetVisualDescendants().OfType<SyftMark>());
+            var texts = Texts(popup);
+            Assert.Contains("Enjoying Syft Notes?", texts);
+            Assert.Contains("It's free, and two students build it with Claude.\nA coffee keeps us going.", texts);
+            foreach (string words in new[] { "Buy us a coffee", "Maybe later", "Don't ask again" })
+                Assert.Contains(popup.GetVisualDescendants().OfType<Button>(), b => b.IsEffectivelyVisible && Equals(b.Content, words));
+
+            window.KeyPressQwerty(PhysicalKey.Escape, RawInputModifiers.None);
+            await showing;
+            Assert.Equal([SupportAnswer.Later], answers);
+            Assert.False(layer.IsOpen);
+
+            var last = new SupportAskModel(last: true, answers.Add);
+            showing = SupportAskDialog.ShowAsync(layer, last);
+            await Wait.UntilAsync(() => (dialog = window.GetVisualDescendants().OfType<SupportAskDialog>().FirstOrDefault()) is { IsEffectivelyVisible: true }
+                && dialog.FindControl<Button>("Never")!.IsFocused, "the last ask to pop up");
+            Assert.False(dialog!.FindControl<Button>("Later")!.IsVisible);
+            last.NeverCommand.Execute(null);
+            await showing;
+            Assert.Equal([SupportAnswer.Later, SupportAnswer.Never], answers);
+            Assert.False(layer.IsOpen);
+        }
+        finally
+        {
+            window.Close();
+            ((App)Application.Current!).UseSkin(SkinKind.Mac);
+        }
     }
 
     // --- Home ------------------------------------------------------------------------------------------------------
