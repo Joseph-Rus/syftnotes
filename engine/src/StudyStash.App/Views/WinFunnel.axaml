@@ -154,13 +154,14 @@
                             <Button Name="AllowAddOn" Classes="btn sm ink" HorizontalAlignment="Left" Command="{Binding AddOn.AllowCommand, FallbackValue={x:Null}}" Content="Allow" />
                             <Button Name="NotMe" Classes="text-link small" HorizontalAlignment="Left" Command="{Binding AddOn.NotMeCommand, FallbackValue={x:Null}}" Content="That wasn't me" />
                           </StackPanel>
-                          <!-- The add-on is there from before, with an earlier library's key: this library's code, pasted into its button. -->
+                          <!-- An add-on from an earlier install knocked (in a browser the library can't name): this library's code for its button, then the store's steps below. -->
                           <StackPanel Classes="line-body" IsVisible="{Binding AddOn.ShowPaste, FallbackValue=False}">
                             <TextBlock Name="PasteLine" Classes="say" Text="{Binding AddOn.PasteLine, FallbackValue=''}" />
                             <Grid ColumnDefinitions="*,8,Auto">
                               <Border Classes="mono"><SelectableTextBlock Text="{Binding AddOn.ConnectionCode, FallbackValue=''}" MaxHeight="40" /></Border>
                               <Button Grid.Column="2" Classes="btn sm" VerticalAlignment="Center" Command="{Binding AddOn.CopyCodeCommand, FallbackValue={x:Null}}" Content="Copy" />
                             </Grid>
+                            <TextBlock Classes="say" Text="{Binding AddOn.AddItLine, FallbackValue=''}" />
                           </StackPanel>
                           <StackPanel Classes="line-body" IsVisible="{Binding AddOn.ShowStoreSteps, FallbackValue=False}">
                             <TextBlock Classes="say" Text="{Binding AddOn.StoreSteps, FallbackValue=''}" />
