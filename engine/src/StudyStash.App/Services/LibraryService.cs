@@ -52,6 +52,7 @@ public sealed class LibraryService : IDisposable
     readonly Func<Config, TimeSpan, Task<bool>> waitHealthy;
     readonly Func<int, Task<string>> portStatus;
     readonly Func<Config, Task<(string Version, bool Background)?>> health;
+    readonly OlderLibrary older;
     readonly Action<string> log;
     readonly Lock gate = new();
     readonly List<DateTime> recentExits = [];
@@ -59,6 +60,8 @@ public sealed class LibraryService : IDisposable
     Process? proc;
     bool stopping;
     bool disposed;
+    /// <summary>An older copy left on the port (busy, or still closing) isn't looked at again before this.</summary>
+    DateTime olderLookAgain;
 
     /// <summary>The port and password it's running with (or would, once started).</summary>
     public Config Cfg => cfg;
@@ -90,7 +93,7 @@ public sealed class LibraryService : IDisposable
 
     public LibraryService(string home, Config cfg, IReadOnlyList<string>? command = null, Func<ProcessStartInfo, Process>? spawn = null,
         Func<Config, TimeSpan, Task<bool>>? waitHealthy = null, Func<int, Task<string>>? portStatus = null, Action<string>? log = null,
-        Func<Config, Task<(string Version, bool Background)?>>? health = null)
+        Func<Config, Task<(string Version, bool Background)?>>? health = null, OlderLibrary? older = null)
     {
         this.home = home;
         this.cfg = cfg;
@@ -100,6 +103,7 @@ public sealed class LibraryService : IDisposable
         this.portStatus = portStatus ?? (p => HostInfo.PortStatusAsync(p));
         this.log = log ?? Console.WriteLine;
         this.health = health ?? HealthAsync;
+        this.older = older ?? OlderLibrary.ThisComputer;
     }
 
     static readonly HttpClient Http = new() { Timeout = TimeSpan.FromSeconds(5) };
@@ -165,8 +169,60 @@ public sealed class LibraryService : IDisposable
         try { status = await portStatus(cfg.WebPort); }
         catch (Exception e) when (e is HttpRequestException or SocketException) { status = "free"; }
         if (status == "busy") { SetState(LibraryServiceState.PortTaken, $"Port {cfg.WebPort} is taken by another program."); return; }
-        if (status == "ours") { SetState(LibraryServiceState.Elsewhere); return; }
+        if (status == "ours")
+        {
+            if (!await ReplaceOlderAsync()) return;
+            // The port is free now: this app's own library, the background one when that's wanted (registered again
+            // from this program, which boots out the old job first).
+            if (Background is { } again && again.Wanted() && await UseBackgroundAsync(again)) return;
+        }
         await SpawnAsync();
+    }
+
+    /// <summary>
+    /// A library already answers on the port. One that takes this app's password is used as it is
+    /// (<see cref="LibraryServiceState.Elsewhere"/>). One that turns it away (another password, or no answer) and runs
+    /// an older copy of Syft Notes is asked to quit (<see cref="OlderLibrary"/>): never while a lecture is being
+    /// recorded or written down, never by force. True once it has gone and the port is free; otherwise this steps
+    /// aside, with <see cref="Failure"/> saying why when it was an older copy, and the app looks again in a minute.
+    /// </summary>
+    async Task<bool> ReplaceOlderAsync()
+    {
+        if (await health(cfg) is not null)
+        {
+            SetState(LibraryServiceState.Elsewhere);
+            return false;
+        }
+        var holder = await Task.Run(() => older.Holder(cfg.WebPort));
+        var verdict = OlderLibrary.Judge(holder?.Program, command[0], older.Ours, () => older.Busy(home));
+        if (verdict is OlderVerdict.NotOurs or OlderVerdict.Self)
+        {
+            SetState(LibraryServiceState.Elsewhere);
+            return false;
+        }
+        olderLookAgain = DateTime.UtcNow + AppUpdates.IdleRecheck;
+        if (verdict == OlderVerdict.Busy)
+        {
+            log($"[library] an older Syft Notes library ({holder!.Program}) is on port {cfg.WebPort}, but a lecture is being recorded or written down: left running, looked at again in a minute");
+            SetState(LibraryServiceState.Elsewhere, OlderLibrary.BusyWords);
+            return false;
+        }
+        await Task.Run(() => older.StopOldRegistration(home, command[0]));
+        if (!older.AskToQuit(holder!.Pid))
+        {
+            log($"[library] an older Syft Notes library ({holder.Program}) is on port {cfg.WebPort}, and this computer has no polite way to ask it to quit: left running");
+            SetState(LibraryServiceState.Elsewhere, OlderLibrary.StillRunningWords);
+            return false;
+        }
+        if (!await WaitPortFreeAsync())
+        {
+            log($"[library] asked an older Syft Notes library ({holder.Program}) on port {cfg.WebPort} to quit; it hasn't yet, looked at again in a minute");
+            SetState(LibraryServiceState.Elsewhere, OlderLibrary.ClosingWords);
+            return false;
+        }
+        log($"[library] stopped an older Syft Notes library ({holder.Program}) on port {cfg.WebPort}");
+        olderLookAgain = default;
+        return true;
     }
 
     /// <summary>The library we stepped aside for (<see cref="LibraryServiceState.Elsewhere"/>) may have stopped since: a
@@ -174,7 +230,7 @@ public sealed class LibraryService : IDisposable
     /// its place; while another still answers, nothing changes.</summary>
     public async Task TakeOverIfGoneAsync()
     {
-        if (State != LibraryServiceState.Elsewhere) return;
+        if (State != LibraryServiceState.Elsewhere || DateTime.UtcNow < olderLookAgain) return;
         await StartAsync();
     }
 
@@ -235,15 +291,13 @@ public sealed class LibraryService : IDisposable
         return false;
     }
 
-    static bool SameProgram(string a, string b) =>
+    internal static bool SameProgram(string a, string b) =>
         string.Equals(Path.GetFullPath(a), Path.GetFullPath(b), OperatingSystem.IsWindows() ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal);
 
     /// <summary>Up to 15 s for the port to be let go (a background library stopping): a child started sooner couldn't
-    /// listen on it.</summary>
-    async Task WaitPortFreeAsync()
-    {
-        await Poll.UntilAsync(async _ => await portStatus(cfg.WebPort) == "free", TimeSpan.FromMilliseconds(100), TimeSpan.FromSeconds(15));
-    }
+    /// listen on it. False when it's still taken.</summary>
+    Task<bool> WaitPortFreeAsync() =>
+        Poll.UntilAsync(async _ => await portStatus(cfg.WebPort) == "free", TimeSpan.FromMilliseconds(100), TimeSpan.FromSeconds(15));
 
     /// <summary>
     /// Settings → Phone's switch, Google connected or disconnected, or this computer no longer just this computer: the

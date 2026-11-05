@@ -436,6 +436,24 @@ public class LibrarySettingsModelTests
     }
 
     [AvaloniaFact]
+    public async Task Updates_here_say_this_apps_version_even_with_no_library_answering()
+    {
+        // General → Updates was empty when the library on this computer didn't answer: the line came from it alone.
+        var fake = new FakeLibrarySettings { Down = true };
+        var lib = new LibrarySettingsModel(() => fake.Call) { IsHere = true };
+        await lib.Load();
+        Assert.Equal(LibrarySettingsState.Unreachable, lib.State);
+        Assert.Equal($"Syft Notes {Engine.Version}", lib.UpdateLine);
+
+        // Answering, it says whether there's a newer one; the version is still this app's.
+        fake.Down = false;
+        fake.Settings["updates"]!["newer"] = true;
+        fake.Settings["updates"]!["latest"] = "v99.0.0";
+        await lib.Load();
+        Assert.Equal($"Version 99.0.0 is out. You have {Engine.Version}.", lib.UpdateLine);
+    }
+
+    [AvaloniaFact]
     public async Task A_library_that_cant_be_reached_or_is_older_says_so_and_changes_nothing()
     {
         var fake = new FakeLibrarySettings { Down = true };
