@@ -177,7 +177,7 @@
           </WrapPanel>
 
           <!-- The title: typed over to rename it -->
-          <TextBox Name="Title" Classes="bare doc-title" Text="{Binding TitleText}" IsReadOnly="{Binding !CanRename}" Margin="0,10,0,0" MaxWidth="720" HorizontalAlignment="Left"
+          <TextBox Name="Title" Classes="bare doc-title" Text="{Binding TitleText}" IsReadOnly="{Binding !CanRename}" Margin="-8,8,-8,-2" MaxWidth="736" HorizontalAlignment="Left"
                    AutomationProperties.Name="Title" LostFocus="OnTitleLeft" KeyDown="OnTitleKey" />
 
           <!-- Notes | Transcript, and on the right the page's own tools -->
