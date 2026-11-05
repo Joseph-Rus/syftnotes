@@ -245,14 +245,16 @@ public class FunnelTests
         Assert.True(addOn.ShowStoreSteps); // a knock from before Add says nothing about the add-on being added now
         Assert.False(addOn.ShowPaste);
 
-        // Firefox's add-on from an earlier install knocks again with its old key: this library's code, to paste in its button.
+        // An add-on from an earlier install knocks again with its old key, here Chrome's while Firefox is being set up (the
+        // library can't say which): this library's code for its button, Firefox's store steps still under it, no browser named.
         now += TimeSpan.FromSeconds(30);
-        handler.Json(HttpMethod.Get, "/api/v2/canvas/state", """{"state": "no_extension", "url": "https://school.instructure.com", "extension": {"connected": false, "refused_at": "2026-11-02T09:00:20Z"}}""");
+        handler.Json(HttpMethod.Get, "/api/v2/canvas/state", """{"state": "no_extension", "url": "https://school.instructure.com", "extension": {"connected": false, "browser": "Chrome", "refused_at": "2026-11-02T09:00:20Z"}}""");
         await watch.RefreshAsync();
         Assert.True(addOn.ShowPaste);
-        Assert.False(addOn.ShowStoreSteps);
-        Assert.Equal("Connect Firefox again", addOn.AddedLine);
-        Assert.Equal("Firefox already has Syft Notes from before. Click the Syft Notes button in Firefox's toolbar, choose Paste a new code, and paste this:", addOn.PasteLine);
+        Assert.True(addOn.ShowStoreSteps);
+        Assert.Equal("Syft Notes from an earlier install is still in your browser. Click its Syft Notes button in the toolbar, choose Paste a new code, and paste this:", addOn.PasteLine);
+        Assert.Equal("Not in Firefox? Add it:", addOn.AddItLine);
+        Assert.Equal("On the page that just opened in Firefox, click Add to Firefox, then Add.", addOn.StoreSteps);
         Assert.Equal(new ExtensionConnection("https://library.test", "test-key-abc123", "https://school.instructure.com"), Extension.ReadConnectionCode(addOn.ConnectionCode));
         addOn.CopyCodeCommand.Execute(null);
         Assert.Contains(("Copy", addOn.ConnectionCode), log);
@@ -264,15 +266,14 @@ public class FunnelTests
         Assert.False(addOn.ShowPaste);
 
         // A library with no Canvas address yet (a fresh install) has no code to give: the step that asks for the school's,
-        // then its code for the add-on's own button, with nothing to add.
+        // then Add to Firefox as always, its code's line saying to choose Paste a new code in the old add-on's button.
         var fresh = new FakeLibrary()
             .Json(HttpMethod.Post, "/api/v2/canvas/pair", """{"until":"2026-11-02T09:05:00Z"}""")
             .Json(HttpMethod.Post, "/api/v2/canvas", "canvas")
             .Json(HttpMethod.Get, "/api/v2/canvas/classes", "[]")
             .Json(HttpMethod.Get, "/api/v2/canvas/extension", "extension")
             .Json(HttpMethod.Get, "/api/v2/canvas/state", """{"state": "not_set_up", "url": "", "extension": {"connected": false, "refused_at": "2026-11-02T09:00:20Z"}}""");
-        var freshLog = new List<(string What, string Arg)>();
-        var freshContext = CanvasFixtures.Context(fresh, log: freshLog, browsers: [Browsers.Firefox]);
+        var freshContext = CanvasFixtures.Context(fresh, browsers: [Browsers.Firefox]);
         var freshWatch = new CanvasWatch(freshContext);
         var (f, _) = Make(new FunnelServices
         {
@@ -290,14 +291,14 @@ public class FunnelTests
         await freshWatch.RefreshAsync();
         await Wait.UntilAsync(() => f.AsksSchool, "the step that asks for the school's address");
         f.Canvas!.SchoolField = "school.instructure.com";
-        fresh.Json(HttpMethod.Get, "/api/v2/canvas/state", """{"state": "no_extension", "url": "https://school.instructure.com", "extension": {"connected": false, "refused_at": "2026-11-02T09:00:50Z"}}""");
+        fresh.Json(HttpMethod.Get, "/api/v2/canvas/state", """{"state": "no_extension", "url": "https://school.instructure.com", "extension": {"connected": false, "browser": "Chrome", "refused_at": "2026-11-02T09:00:50Z"}}""");
         await f.Canvas.ContinueCommand.ExecuteAsync(null);
-        await Wait.UntilAsync(() => f.Canvas.WaitingForBrowser, "the add-on from before's code");
-        Assert.Equal("In Firefox, click the Syft Notes button (it may be under the puzzle-piece Extensions button).", f.Canvas.StoreStep1);
-        Assert.Equal("Choose Paste a new code, paste this code and click Connect.", f.Canvas.StoreStep2);
+        Assert.True(f.Canvas.ShowAddToBrowser); // Add to Firefox, as always
+        await f.Canvas.AddToBrowserCommand.ExecuteAsync(null);
+        Assert.Equal("On the page that opens in Firefox, click the blue Add to Firefox button, then Add when Firefox asks.", f.Canvas.StoreStep1);
+        Assert.Equal("Click the Syft Notes button (it may be under the puzzle-piece Extensions button), choose Paste a new code if it's there, paste this code and click Connect.", f.Canvas.StoreStep2);
         Assert.True(f.Canvas.ShowCode);
-        Assert.False(f.Canvas.ShowAddOnLink); // nothing to add
-        Assert.Single(freshLog, l => l.What == "OpenAddOn"); // the store's page only from the first Add: nothing opened since
+        Assert.True(f.Canvas.ShowAddOnLink);
         f.Dispose();
     }
 

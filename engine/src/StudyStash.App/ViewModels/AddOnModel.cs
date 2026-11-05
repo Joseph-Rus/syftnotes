@@ -54,7 +54,7 @@ public sealed partial class AddOnModel : ObservableObject, IDisposable
     /// student's own first.</summary>
     public ObservableCollection<BrowserChoice> BrowserChoices { get; } = [];
 
-    [NotifyPropertyChangedFor(nameof(AddLabel), nameof(BrowserName), nameof(StoreSteps), nameof(AllowStep), nameof(AddedLine), nameof(CanvasLine), nameof(CanvasWaitLine), nameof(AskingLine), nameof(PasteLine))]
+    [NotifyPropertyChangedFor(nameof(AddLabel), nameof(BrowserName), nameof(StoreSteps), nameof(AllowStep), nameof(AddedLine), nameof(CanvasLine), nameof(CanvasWaitLine), nameof(AskingLine), nameof(AddItLine))]
     [ObservableProperty]
     public partial Browser Browser { get; set; } = Browsers.Chrome;
 
@@ -95,9 +95,10 @@ public sealed partial class AddOnModel : ObservableObject, IDisposable
 
     /// <summary>The browser has the add-on from before, still connected to an earlier library: its key was turned away
     /// since Add was pressed, and it never finds this library by itself. It takes this library's code instead, pasted
-    /// into its own button (<see cref="ShowPaste"/>). A code needs the Canvas address: without one yet, the step that
-    /// asks for the school's address follows at once (<see cref="OnTypeInstead"/>), in its "I already have it" mode.</summary>
-    [NotifyPropertyChangedFor(nameof(ShowPaste), nameof(ShowStoreSteps), nameof(AddedLine), nameof(ConnectionCode))]
+    /// into its own button (<see cref="ShowPaste"/>). The library doesn't say which browser knocked, so the store's steps
+    /// stay beside it. A code needs the Canvas address: without one yet, the step that asks for the school's address
+    /// follows at once (<see cref="OnTypeInstead"/>).</summary>
+    [NotifyPropertyChangedFor(nameof(ShowPaste), nameof(ConnectionCode))]
     [ObservableProperty]
     public partial bool FromBefore { get; set; }
 
@@ -114,8 +115,8 @@ public sealed partial class AddOnModel : ObservableObject, IDisposable
 
     public bool ShowAdd => !Added && !Connected && !IsAsking;
     /// <summary>What to do in the store, while the add-on isn't asking yet.</summary>
-    public bool ShowStoreSteps => Waiting && !IsAsking && !ShowPaste;
-    /// <summary>The add-on from before takes this library's code, in place of the store's steps.</summary>
+    public bool ShowStoreSteps => Waiting && !IsAsking;
+    /// <summary>The add-on from before takes this library's code, above the store's steps.</summary>
     public bool ShowPaste => Waiting && FromBefore && ConnectionCode.Length > 0;
     /// <summary>Waiting for the add-on to be added and check in.</summary>
     public bool Waiting => Added && !Connected;
@@ -132,10 +133,13 @@ public sealed partial class AddOnModel : ObservableObject, IDisposable
     /// <summary>What comes after the store: the add-on's own page, and the browser's question about reaching Canvas.</summary>
     public string AllowStep => $"A Syft Notes page opens in {BrowserName}: click Allow, then Allow again when {BrowserName} asks.";
 
-    public string AddedLine => Connected ? $"Added to {BrowserName}" : ShowPaste ? $"Connect {BrowserName} again" : Added ? $"Waiting for Syft Notes to be added to {BrowserName}" : $"Add Syft Notes to {BrowserName}";
+    public string AddedLine => Connected ? $"Added to {BrowserName}" : Added ? $"Waiting for Syft Notes to be added to {BrowserName}" : $"Add Syft Notes to {BrowserName}";
 
-    /// <summary>What to do with an add-on from before (<see cref="FromBefore"/>): its own button, then the code.</summary>
-    public string PasteLine => $"{BrowserName} already has Syft Notes from before. Click the Syft Notes button in {BrowserName}'s toolbar, choose Paste a new code, and paste this:";
+    /// <summary>What to do with an add-on from before (<see cref="FromBefore"/>): its own button, then the code. It names
+    /// no browser: the library doesn't say which one knocked.</summary>
+    public string PasteLine => "Syft Notes from an earlier install is still in your browser. Click its Syft Notes button in the toolbar, choose Paste a new code, and paste this:";
+    /// <summary>Under the code: the store's steps for the browser being set up follow, for when the old one is elsewhere.</summary>
+    public string AddItLine => $"Not in {BrowserName}? Add it:";
 
     /// <summary>The code an add-on from a store connects with, as the watch's <see cref="ExtensionKeeper"/> keeps it.</summary>
     public string ConnectionCode => watch.Extension?.ConnectionCode ?? "";

@@ -285,9 +285,15 @@ public sealed partial class CanvasConnectModel : ObservableObject, IDisposable
     /// <summary>The student said the add-on is in their Firefox already: there's no add-on page to open, in the
     /// step's words or its links.</summary>
     bool haveItAlready;
-    /// <summary>The browser setup's add-on step heard the add-on in from before (<see cref="HasItAlready"/>): the
-    /// extension step opens in "I already have it" mode for it.</summary>
-    Browser? hasItIn;
+    /// <summary>Setup's add-on step heard an add-on from an earlier install knock (<see cref="HeardOneFromBefore"/>), in
+    /// a browser it can't name: the code's line says to choose Paste a new code in it, and adding it stays as always.</summary>
+    bool fromBefore;
+    /// <summary>An add-on from an earlier install is in some browser here, with an earlier library's key.</summary>
+    public void HeardOneFromBefore()
+    {
+        fromBefore = true;
+        OnPropertyChanged(nameof(StoreStep2));
+    }
     /// <summary>Nothing here can take the extension: the step links to where Chrome is got.</summary>
     public bool ShowGetBrowser => ShowAdvice && advice!.NoneHere;
     public bool WaitingForBrowser => AddedToBrowser && !BrowserConnected;
@@ -309,7 +315,8 @@ public sealed partial class CanvasConnectModel : ObservableObject, IDisposable
         : Browser == Browsers.Edge ? "On the page that opens in Edge, click Get extension. If Edge asks to allow extensions from other stores, click Allow. Then click Add extension."
         : $"On the page that opens in {BrowserName}, click the blue {Browser.StoreButton} button, then Add extension when {BrowserName} asks.";
     public string StoreStep2 => haveItAlready
-        ? "Choose Paste a new code, paste this code and click Connect."
+        ? "Paste this code and click Connect."
+        : fromBefore ? "Click the Syft Notes button (it may be under the puzzle-piece Extensions button), choose Paste a new code if it's there, paste this code and click Connect."
         : "Click the Syft Notes button (it may be under the puzzle-piece Extensions button), paste this code and click Connect.";
     public string StoreStep3 => $"Click Allow when {BrowserName} asks.";
     /// <summary>The code a store's copy is connected with (<see cref="Extension.ConnectionCode"/>: the library as this
@@ -471,7 +478,6 @@ public sealed partial class CanvasConnectModel : ObservableObject, IDisposable
         BrowserError = null;
         OfferBrowsers();
         hurry ??= watch.Hurry();
-        if (hasItIn is { } browser) UiTasks.Run(() => HaveItInAsync(browser), "canvas: the add-on from before");
     }
 
     /// <summary>Reads which browsers the extension can go in here, and takes the one to use (the student's own
@@ -507,7 +513,6 @@ public sealed partial class CanvasConnectModel : ObservableObject, IDisposable
         if (browser == Browser) return;
         pickedHere = true;
         haveItAlready = false;
-        hasItIn = null;
         LoadFolder = false;
         AddedToBrowser = false;
         BrowserError = null;
@@ -531,21 +536,9 @@ public sealed partial class CanvasConnectModel : ObservableObject, IDisposable
     /// been pressed, but with nothing to add: the code to paste into the add-on's own button, and the wait for it to
     /// connect. It's the browser Syft Notes opens Canvas in from here.</summary>
     [RelayCommand]
-    Task HaveIt() => advice?.Usual is { Family: BrowserFamily.Firefox } usual ? HaveItInAsync(usual) : Task.CompletedTask;
-
-    /// <summary>Setup's add-on step heard the add-on in <paramref name="browser"/> from before, with an earlier library's
-    /// key: once the school's address is in, the extension step is that browser's "I already have it" one (the code for
-    /// its own button, nothing to add).</summary>
-    public void HasItAlready(Browser browser)
+    async Task HaveIt()
     {
-        hasItIn = browser;
-        if (Current == 2) UiTasks.Run(() => HaveItInAsync(browser), "canvas: the add-on from before");
-    }
-
-    /// <summary>"I already have it" in <paramref name="usual"/>.</summary>
-    async Task HaveItInAsync(Browser usual)
-    {
-        if (context.Client is not { } client) return;
+        if (advice?.Usual is not { Family: BrowserFamily.Firefox } usual || context.Client is not { } client) return;
         AddingToBrowser = true;
         BrowserError = null;
         try

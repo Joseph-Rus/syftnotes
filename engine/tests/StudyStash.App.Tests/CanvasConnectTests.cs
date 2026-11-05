@@ -406,7 +406,7 @@ public class CanvasConnectTests
             StudyStash.Core.Canvas.Extension.ReadConnectionCode(m.ConnectionCode));
         Assert.Equal("Syft Notes reads Canvas through your own sign-in in Firefox Developer Edition. To connect the add-on you have there:", m.BrowserHelp);
         Assert.Equal("In Firefox Developer Edition, click the Syft Notes button (it may be under the puzzle-piece Extensions button).", m.StoreStep1);
-        Assert.Equal("Choose Paste a new code, paste this code and click Connect.", m.StoreStep2);
+        Assert.Equal("Paste this code and click Connect.", m.StoreStep2);
         Assert.True(m.WaitingForBrowser);
         Assert.Equal("Waiting for Firefox Developer Edition…", m.WaitingLabel);
         Assert.False(m.ShowAdvice);
