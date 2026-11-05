@@ -92,13 +92,14 @@ public static class NewPlace
 
     /// <summary>The real thing, once the app has started: only for a copy that's installed (Velopack's, or a Mac
     /// bundle), never while the self-test or a test runs.</summary>
-    public static void RunHere(string home)
+    public static void RunHere(string home, bool? startAtLogin)
     {
         if (Desktop.SystemChangesOff || SelfTest.Dir is not null) return;
         bool installed = VelopackUpdates.Installed || OperatingSystem.IsMacOS() && Apps.MacBundleOf() is not null;
         if (!installed) return;
         // First, so the old copy is gone by the time the AI apps' connections name this one.
         if (OperatingSystem.IsWindows()) OldInnoCopy(home);
+        if (OperatingSystem.IsWindows()) LoginItemBack(startAtLogin, home);
         try
         {
             foreach (string line in Run(ClaudeSetup.ThisComputer(home), home, Desktop.Program, () => Desktop.LoginProgram(home),
@@ -115,6 +116,27 @@ public static class NewPlace
             Program.Log("[moved] couldn't put everything right for the new place: " + e.Message);
         }
     }
+
+    /// <summary>Where Windows keeps Task Manager's Startup tab switch for each Run entry.</summary>
+    const string StartupApprovedKey = @"Software\Microsoft\Windows\CurrentVersion\Explorer\StartupApproved\Run";
+
+    /// <summary>Whether the login item goes back: the student said yes to "Open Syft Notes when you log in"
+    /// (<paramref name="chosen"/>), Windows has no Run entry for it any more (an uninstall takes it, and a reinstall
+    /// doesn't write it), and Task Manager's Startup tab hasn't been told to keep it off (<paramref name="approved"/>,
+    /// its StartupApproved value: an odd first byte is "Disabled").</summary>
+    internal static bool PutLoginItemBack(bool? chosen, bool present, byte[]? approved) =>
+        chosen == true && !present && !(approved is { Length: > 0 } && (approved[0] & 1) == 1);
+
+    /// <summary>The login item the student chose, back after a reinstall (<see cref="PutLoginItemBack"/>).</summary>
+    [SupportedOSPlatform("windows")]
+    static void LoginItemBack(bool? chosen, string home) => Step("put start at login back", () =>
+    {
+        var (_, value) = Desktop.LoginName(home);
+        using var approvedKey = Registry.CurrentUser.OpenSubKey(StartupApprovedKey);
+        if (!PutLoginItemBack(chosen, Desktop.StartsAtLogin(home), approvedKey?.GetValue(value) as byte[])) return;
+        Desktop.StartAtLogin(true, home);
+        Program.Log("[moved] start at login is back, as the student had it (an uninstall took it)");
+    });
 
     /// <summary>What the Inno Setup copy left: its install (<see cref="ClearOldInno"/>), and the studystash: link (a
     /// click on a notification) it registered, which now opens this copy and so goes with Velopack's uninstall, as

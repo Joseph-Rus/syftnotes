@@ -8,6 +8,18 @@ namespace StudyStash.App.Tests;
 /// another copy that's still there is left alone. Every file is in the test's own folder.</summary>
 public class NewPlaceTests
 {
+    /// <summary>An uninstall takes the Run entry with it and a reinstall doesn't write it: the login item goes back only
+    /// when the student said yes, it's missing, and Task Manager's Startup tab doesn't have it switched off.</summary>
+    [Theory]
+    [InlineData(true, false, null, true)]                          // said yes, gone: back
+    [InlineData(true, false, new byte[] { 2, 0, 0, 0 }, true)]     // Task Manager says Enabled
+    [InlineData(true, false, new byte[] { 3, 0, 0, 0 }, false)]    // Task Manager says Disabled: left off
+    [InlineData(true, true, null, false)]                          // still there: nothing to do
+    [InlineData(false, false, null, false)]                        // said no
+    [InlineData(null, false, null, false)]                         // never asked on this copy
+    public void Start_at_login_goes_back_only_as_the_student_left_it(bool? chosen, bool present, byte[]? approved, bool back) =>
+        Assert.Equal(back, NewPlace.PutLoginItemBack(chosen, present, approved));
+
     [Fact]
     public void Connections_and_start_at_login_naming_the_old_program_follow_it_and_others_stay()
     {
