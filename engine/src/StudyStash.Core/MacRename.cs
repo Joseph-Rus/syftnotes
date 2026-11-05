@@ -29,6 +29,15 @@ public static class MacRename
     static int[] VersionOf(string bundle) =>
         Updates.ParseVersion(Apps.PlistString(Path.Combine(bundle, "Contents", "Info.plist"), "CFBundleShortVersionString"));
 
+    /// <summary>True when <paramref name="program"/> sits in another bundle of ours (the same CFBundleIdentifier) with a
+    /// lower version than the bundle <paramref name="current"/> runs from: an older copy kept beside this one (in
+    /// ~/Applications, a Finder "Keep Both" copy, one left in Downloads). This bundle itself, a newer or equal copy and
+    /// someone else's app are never older.</summary>
+    internal static bool OlderCopy(string program, string current) =>
+        Apps.EnclosingMacBundle(program) is { } theirs && Apps.EnclosingMacBundle(current) is { } mine
+        && !string.Equals(theirs, mine, StringComparison.OrdinalIgnoreCase)
+        && Ours(theirs) && Updates.Compare(VersionOf(theirs), VersionOf(mine)) < 0;
+
     /// <summary>What to do for the copy that runs from <paramref name="baseDir"/>, or null for nothing: not inside a
     /// bundle of ours, still on its disk image or in Gatekeeper's translocation folder (moving into Applications comes
     /// first, MoveToApplications.cs), or in a folder this account can't change.</summary>
