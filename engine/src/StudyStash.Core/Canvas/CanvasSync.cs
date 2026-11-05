@@ -407,6 +407,24 @@ public sealed partial class CanvasSync
         return result;
     }
 
+    /// <summary>A Canvas file's bytes, read through the extension like any other read and kept in memory only (nothing
+    /// is saved): how Submit &amp; Organize checks that a file on this computer is the one handed in. Null when it isn't a
+    /// Canvas address, or Canvas or the browser didn't give it.</summary>
+    public async Task<byte[]?> BytesAsync(string url, CancellationToken ct = default)
+    {
+        if (CanvasUrl(url) is not string full || DeniesOtherPeople(full)) return null;
+        var r = await Agents.FetchAsync(full, "bytes", null, ct);
+        if (r.Error.Length > 0 || r.Status >= 400 || r.B64.Length == 0 || Crawl.Classify(r) == CanvasAnswer.SignedOut) return null;
+        try
+        {
+            return Convert.FromBase64String(r.B64);
+        }
+        catch (FormatException)
+        {
+            return null;
+        }
+    }
+
     /// <summary>"CS 101/Canvas/files/slides.pdf" → the file in that class's folder, or null when the class isn't one
     /// of this library's or the path leaves its folder.</summary>
     public string? SavePath(string saveTo)
