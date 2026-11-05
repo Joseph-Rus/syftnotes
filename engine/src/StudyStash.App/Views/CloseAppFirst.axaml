@@ -1,0 +1,20 @@
+<!-- An AI's desktop app (Claude, ChatGPT) is open when setup connects it (both looks): it keeps its settings in memory
+     and writes them back whole, so it's closed first. One button, Close Claude: Syft Notes closes it, connects, opens it
+     again and carries on by itself. If it won't close, how to quit it, and the button turns to Connect. Shown on guided
+     setup's sign-in screen and in the Get-ready window (the first run's AI step). -->
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:StudyStash.App.ViewModels"
+             xmlns:c="using:StudyStash.App.Controls"
+             x:Class="StudyStash.App.Views.CloseAppFirst"
+             x:DataType="vm:GuidedSetupModel">
+  <Border Name="CloseBox" Classes="problem" Margin="0,18,0,0" IsVisible="{Binding HasCloseApp}">
+    <Grid ColumnDefinitions="Auto,10,*,10,Auto">
+      <c:Icon Glyph="info" Size="18" VerticalAlignment="Center" />
+      <TextBlock Name="CloseSay" Grid.Column="2" Classes="say" Text="{Binding CloseSay}" TextWrapping="Wrap" VerticalAlignment="Center" />
+      <Button Name="CloseButton" Grid.Column="4" Classes="btn sm ink" VerticalAlignment="Center" Command="{Binding CloseAndConnectCommand}"
+              Content="{Binding CloseButton}" IsVisible="{Binding !ClosingApp}" />
+      <c:SyftLoader Grid.Column="4" Kind="HoppingBits" Size="20" VerticalAlignment="Center" IsVisible="{Binding ClosingApp}" />
+    </Grid>
+  </Border>
+</UserControl>

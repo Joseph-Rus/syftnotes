@@ -52,6 +52,11 @@ public sealed class GuidedServices
     /// app's AI store), run in the background: its apps here get Syft Notes, and the library checks it, so every screen
     /// says it's connected with no second Connect. Null: nothing is connected (a test).</summary>
     public Func<string, Task>? Connect { get; init; }
+    /// <summary>The AI's desktop app that is open and whose settings Connect has to change ("Claude"), so it's closed
+    /// first (<see cref="ClaudeSetup.OpenToChange"/>); "" for none.</summary>
+    public Func<string, string> AppToClose { get; init; } = _ => "";
+    /// <summary>That Connect with the app closed first and opened again after, saying each step ("Closing Claude…").</summary>
+    public Func<string, Action<string>, Task<ConnectOutcome>>? CloseAndConnect { get; init; }
 
     public AgentInstall MakeInstaller(AgentCliInfo cli) =>
         Installer?.Invoke(cli) ?? new AgentInstall(cli, Windows, Path.Combine(Home, "logs", "setup-install.log"));
@@ -571,6 +576,7 @@ public sealed partial class GuidedSetupModel : ObservableObject, IDisposable
     {
         if (id is not ("claude" or "codex" or "gemini")) return;
         StopWork();
+        CloseApp = "";
         forNotes = id;
         Picked = id;
         Notify(nameof(ForNotes), nameof(ByHandLabel), nameof(StepLabel), nameof(PlanNote), nameof(ReadyTitle), nameof(InstallLede));
@@ -586,17 +592,80 @@ public sealed partial class GuidedSetupModel : ObservableObject, IDisposable
     }
 
     /// <summary>Back to the by-hand step that asked, the AI ready (or the student gave up on it: <paramref name="ready"/>
-    /// false, and nothing is picked).</summary>
-    void BackToNotes(bool ready = true)
+    /// false, and nothing is picked). Its desktop app open, it waits on this screen for Close Claude first.</summary>
+    void BackToNotes(bool ready = true, bool connected = false)
     {
         string id = forNotes;
+        if (ready && !connected && services.AppToClose(id) is { Length: > 0 } app)
+        {
+            CloseFailed = false;
+            CloseSay = AiConnect.CloseFirstWords(app);
+            CloseApp = app;
+            return;
+        }
+        CloseApp = "";
         forNotes = "";
         Notify(nameof(ForNotes), nameof(ByHandLabel));
         Screen = GuidedScreen.Manual;
         if (!ready) return;
         // Connected all the way, by Settings' own Connect, in the background: the store turns every screen Connected.
-        if (services.Connect is { } connect) UiTasks.Run(() => connect(id), $"setup: connect {id}");
+        if (!connected && services.Connect is { } connect) UiTasks.Run(() => connect(id), $"setup: connect {id}");
         ReadyForNotes?.Invoke(id);
+    }
+
+    /// <summary>The AI's desktop app that has to be closed before it's connected ("Claude"), while this screen waits
+    /// for the student to press Close; "" otherwise.</summary>
+    [NotifyPropertyChangedFor(nameof(HasCloseApp), nameof(CloseButton))]
+    [ObservableProperty]
+    public partial string CloseApp { get; set; } = "";
+    public bool HasCloseApp => CloseApp.Length > 0;
+    /// <summary>"Close Claude first", then where it's got to, or how to quit it when it wouldn't close.</summary>
+    [ObservableProperty] public partial string CloseSay { get; set; } = "";
+    /// <summary>It wouldn't close: the button is Connect, for once the student has quit it.</summary>
+    [NotifyPropertyChangedFor(nameof(CloseButton))]
+    [ObservableProperty]
+    public partial bool CloseFailed { get; set; }
+    [ObservableProperty] public partial bool ClosingApp { get; set; }
+    public string CloseButton => CloseFailed ? "Connect" : AiConnect.CloseButtonWords(CloseApp);
+
+    /// <summary>Close Claude (or Connect, once it's quit by hand): closes the app, connects it, opens it again, and
+    /// carries on as if it had never been open.</summary>
+    [RelayCommand]
+    async Task CloseAndConnect()
+    {
+        if (ClosingApp || !HasCloseApp) return;
+        string id = forNotes;
+        string app = services.AppToClose(id);
+        if (app.Length == 0 || services.CloseAndConnect is not { } run)
+        {
+            // Quit by hand meanwhile: on as usual.
+            BackToNotes();
+            return;
+        }
+        ClosingApp = true;
+        CloseSay = AiConnect.ClosingWords(app);
+        var ui = SynchronizationContext.Current;
+        ConnectOutcome done;
+        try
+        {
+            // Said on this thread (Connect's steps are), it shows at once and in order; from another, it's posted here.
+            done = await run(id, words =>
+            {
+                if (ui is null || SynchronizationContext.Current == ui) CloseSay = words;
+                else services.Post(() => CloseSay = words);
+            });
+        }
+        finally
+        {
+            ClosingApp = false;
+        }
+        if (done.CouldntClose)
+        {
+            CloseSay = done.Words;
+            CloseFailed = true;
+            return;
+        }
+        BackToNotes(connected: true);
     }
 
     void ByHandAt(string item)
