@@ -67,6 +67,10 @@ public sealed class AppSettings
     [JsonIgnore]
     public bool LibraryHere => Role != AppRole.Laptop;
     public bool Shortcuts { get; set; } = true;
+    /// <summary>The student's own answer to "Open Syft Notes when you log in" (null: never given on this copy, as on one
+    /// from before it was kept). Windows forgets the login item when the app is uninstalled; a reinstall puts it back
+    /// from this (NewPlace.LoginItemBack).</summary>
+    public bool? StartAtLogin { get; set; }
     /// <summary>Once a day, one anonymous count of this copy (docs/daily-count.md). Off also deletes its code.</summary>
     public bool CountThisCopy { get; set; } = true;
     /// <summary>Shortcuts changed from their defaults, by <see cref="KeyAction"/> name: {"Record": "Control+Shift+R"}.</summary>
@@ -1020,6 +1024,14 @@ public sealed partial class AppHost : IDisposable, IProblemSource
         bool records = Settings.Role != AppRole.Library;
         return (StatusText(Library, Settings.Role != AppRole.Laptop && LocalLibrary?.State == LibraryServiceState.Running, ModelReady, Downloading, records),
             Library == LibraryState.Connected && (ModelReady || !records));
+    }
+
+    /// <summary>The student's answer to "Open Syft Notes when you log in": the login item changes, and the answer is kept
+    /// (<see cref="AppSettings.StartAtLogin"/>). Throws as <see cref="ILoginItems.StartAtLogin"/> does, keeping nothing.</summary>
+    public void ChooseStartAtLogin(bool on)
+    {
+        LoginItems.StartAtLogin(on, Home);
+        Save(s => s.StartAtLogin = on);
     }
 
     /// <summary>Change the settings and write them to app.json. A full disk (or a folder it can't write) is said, not
