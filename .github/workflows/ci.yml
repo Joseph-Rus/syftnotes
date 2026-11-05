@@ -1143,9 +1143,11 @@ jobs:
 
   # Linux: one self-contained folder per processor, each packed as its one download, Syft-Notes-linux-<x64|arm64>.tar.gz
   # (linux/build.sh), with the install.sh that puts it in ~/.local/share/syft-notes. Each is built and proved on its own
-  # processor (ubuntu-24.04 and ubuntu-24.04-arm), under Xvfb: self-tested as just this computer and as a laptop, then
-  # installed for an account of its own, run from there, and uninstalled. A merge throws the tarballs away; a release
-  # keeps them for publishing.
+  # processor (ubuntu-24.04 and ubuntu-24.04-arm), under Xvfb. What ships is a student's copy, with no self-test, demo
+  # libraries or test switches in it (linux/build.sh stops if they are, and the installed copy is checked); the
+  # self-tests run a copy of the same code built with them (--test-helpers), which is never shipped: as just this
+  # computer and as a laptop, the second from where install.sh puts it. The student's tarball is installed first, run
+  # from there, and uninstalled. A merge throws the tarballs away; a release keeps the student's for publishing.
   linux-app:
     name: Linux app (${{ matrix.rid }}, self-test, tarball)
     needs: [version]
@@ -1186,7 +1188,13 @@ jobs:
         run: |
           sudo apt-get update -qq
           sudo apt-get install -y -qq --no-install-recommends xvfb xauth libx11-6 libice6 libsm6 libfontconfig1 fonts-dejavu-core fonts-noto-core libpulse0
-      - name: Build ${{ matrix.rid }} and Syft-Notes-${{ matrix.rid }}.tar.gz
+      # No secret: this copy is never shipped.
+      - name: Build the copy the self-tests run (${{ matrix.rid }}, with the test helpers; never shipped)
+        env:
+          STUDYSTASH_LINUX_RIDS: ${{ matrix.rid }}
+          STUDYSTASH_SKIP_WEB: "1"
+        run: sh linux/build.sh --test-helpers dist/linux-test
+      - name: Build ${{ matrix.rid }} and Syft-Notes-${{ matrix.rid }}.tar.gz - the student's copy, with no test helpers
         env:
           STUDYSTASH_LINUX_RIDS: ${{ matrix.rid }}
           # The laptop's Google sign-in secret, built into the app as on the Mac.
@@ -1230,7 +1238,7 @@ jobs:
             export XDG_RUNTIME_DIR="/run/user/$(id -u)" DBUS_SESSION_BUS_ADDRESS="unix:path=/run/user/$(id -u)/bus"
           fi
           out="$RUNNER_TEMP/selftest/one-computer"
-          sh linux/selftest.sh "dist/linux/$RID/syft-notes" "$out"
+          sh linux/selftest.sh "dist/linux-test/$RID/syft-notes" "$out"
           grep -q "just this computer" "$out/selftest.txt" || { echo "the self-test didn't run Just this computer"; exit 1; }
           grep -q "notes written on this computer by its own library" "$out/selftest.txt" || { echo "the notes weren't written by this computer's own library"; exit 1; }
           grep -q "^background library registered" "$out/selftest.txt" || { echo "the self-test didn't turn on answering with the app closed"; exit 1; }
@@ -1240,11 +1248,11 @@ jobs:
           # is gone once the self-test took it away.
           # pidwait blocks until every process whose command line matches has gone (no polling), timeout bounds it; the
           # [S] keeps the pattern from matching timeout's and pidwait's own command lines.
-          app_processes="dist/linux/$RID/syft-notes/[S]tudyStash"
+          app_processes="dist/linux-test/$RID/syft-notes/[S]tudyStash"
           command -v pidwait > /dev/null || { echo "::error::this runner has no pidwait (procps)"; exit 1; }
           timeout 20 pidwait -f "$app_processes" || true
           if pgrep -fa "$app_processes"; then echo "the app's library was still running 20 s after the app quit"; exit 1; fi
-      - name: install.sh puts Syft Notes on an account of its own (the app, its menu entry, its icon, syft-notes on the PATH), the installed copy self-tests as a laptop, and uninstall.sh takes it off again
+      - name: install.sh puts Syft Notes on an account of its own (the app, its menu entry, its icon, syft-notes on the PATH, no self-test in it), the copy with the test helpers installed over it self-tests as a laptop, and uninstall.sh takes it off again
         timeout-minutes: 12
         env:
           RID: ${{ matrix.rid }}
@@ -1257,8 +1265,12 @@ jobs:
           [ "$("$HOME/.local/bin/syft-notes" version)" = "$V" ] || { echo "syft-notes on the PATH isn't $V"; exit 1; }
           grep -q "^Exec=\"$app/StudyStash\" %u$" "$HOME/.local/share/applications/syft-notes.desktop" || { echo "the menu entry doesn't start the installed app"; cat "$HOME/.local/share/applications/syft-notes.desktop"; exit 1; }
           [ -s "$HOME/.local/share/icons/hicolor/256x256/apps/syft-notes.png" ] || { echo "no icon"; exit 1; }
-          # Installing again over it (as a second download does) replaces it in place.
-          STUDYSTASH_NO_OPEN=1 sh "$RUNNER_TEMP/syft-notes/install.sh"
+          [ "$(perl -0777 -ne 'print /s\0e\0l\0f\0t\0e\0s\0t\0\.\0t\0x\0t/ ? "self-test" : "clean"' "$app/StudyStash.dll")" = clean ] || { echo "the installed copy has the self-test in it"; exit 1; }
+          # Installing again over it (as a second download does) replaces it in place: with the copy that has the test
+          # helpers, which is the one self-tested from where it is installed.
+          mkdir "$RUNNER_TEMP/test"
+          tar -xzf "dist/linux-test/Syft-Notes-$RID.tar.gz" -C "$RUNNER_TEMP/test"
+          STUDYSTASH_NO_OPEN=1 sh "$RUNNER_TEMP/test/syft-notes/install.sh"
           [ ! -e "$app.old" ] || { echo "an old copy was left beside the new one"; exit 1; }
           out="$RUNNER_TEMP/selftest/laptop"
           sh linux/selftest.sh "$app" "$out"
