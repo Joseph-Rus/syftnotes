@@ -33,7 +33,7 @@ public static class Checksums
 /// <summary>New releases on GitHub, and finding the right installer by name (D2); installing one is Updater.cs.</summary>
 public static partial class Updates
 {
-    public const string RepoSlug = "Joseph-Rus/study-stash";
+    public const string RepoSlug = "Joseph-Rus/syftnotes";
     public const string LatestApi = $"https://api.github.com/repos/{RepoSlug}/releases/latest";
 
     // One download per system: the same app whatever the computer is for (setup asks, and Settings can change it).
@@ -160,9 +160,12 @@ public static partial class Updates
     static DateTime cachedAt = DateTime.MinValue;
     static Release? cached;
 
-    /// <summary>For the web pages: at most one GitHub call an hour, and never an exception.</summary>
-    public static async Task<Release?> CachedLatestAsync(double maxAgeSeconds = 3600)
+    /// <summary>For the web pages: at most one GitHub call an hour, and never an exception. A check that fails (GitHub
+    /// turning the address away after 60 calls an hour, no network) is said once in <paramref name="log"/> (the console
+    /// when none is given) and not asked again for the hour, so the answer stays what it was.</summary>
+    public static async Task<Release?> CachedLatestAsync(double maxAgeSeconds = 3600, Action<string>? log = null)
     {
+        log ??= Console.WriteLine;
         await CacheGate.WaitAsync();
         try
         {
@@ -174,6 +177,7 @@ public static partial class Updates
                 }
                 catch (Exception e) when (e is HttpRequestException or TaskCanceledException or JsonException)
                 {
+                    log($"[update] check failed: {e.Message}");
                 }
                 cachedAt = DateTime.UtcNow;
             }

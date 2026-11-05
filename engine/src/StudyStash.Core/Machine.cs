@@ -44,9 +44,8 @@ public static partial class Machine
             }
             // Once it has stopped, all it printed is in the pipe. The pipe's end can still be held off by something it
             // started that took its output along (on Windows a child inherits it, and git's background helpers live on
-            // after the command): what it printed is taken without waiting for them. Before, this waited out the whole
-            // timeout and then lost what was printed, so `git rev-parse` after a commit came back empty.
-            return new ProcResult(p.ExitCode, stdout.Take(OutputSettles));
+            // after the command): what it printed is taken once the pipe holds nothing more, without waiting for them.
+            return new ProcResult(p.ExitCode, stdout.Take(timeout));
         }
         catch (Exception e) when (e is System.ComponentModel.Win32Exception or InvalidOperationException or IOException)
         {
@@ -54,38 +53,140 @@ public static partial class Machine
         }
     }
 
-    /// <summary>How long a stopped command's output may still take to end by itself before what it printed is taken as
-    /// it is (it normally ends at once).</summary>
-    static readonly TimeSpan OutputSettles = TimeSpan.FromSeconds(2);
+    /// <summary>Done when <paramref name="p"/> itself has ended. <see cref="Process.WaitForExitAsync"/> also waits for its
+    /// redirected output to end, which something it started can hold open long after it has gone (on Windows a child
+    /// inherits it, and git's background helpers live on).</summary>
+    public static async Task ExitedAsync(Process p, CancellationToken stop)
+    {
+        var ended = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        p.EnableRaisingEvents = true;
+        p.Exited += (_, _) => ended.TrySetResult();
+        if (p.HasExited) ended.TrySetResult();
+        await ended.Task.WaitAsync(stop);
+    }
 
-    /// <summary>A command's output, read as it comes, so what's been printed can be had before the pipe has ended.</summary>
+    /// <summary>A command's output, read as it comes on a thread of its own, so what's been printed can be had before the
+    /// pipe has ended. It only ever reads what is already in the pipe (never a read that waits for more), so it can be
+    /// asked at any moment whether anything is left, on Windows too, where asking waits behind a read in flight.</summary>
     sealed class OutputSoFar
     {
-        readonly System.Text.StringBuilder text = new();
-        readonly Task reading;
+        readonly Stream from;
+        readonly System.Text.Encoding encoding;
+        readonly MemoryStream got = new();
+        readonly object gate = new();
+        bool stopped, ended;
 
-        public OutputSoFar(StreamReader from) => reading = Task.Run(async () =>
+        public OutputSoFar(StreamReader reader)
         {
-            var buffer = new char[4096];
-            int n;
-            while ((n = await from.ReadAsync(buffer)) > 0)
-                lock (text) text.Append(buffer, 0, n);
-        });
+            from = reader.BaseStream;
+            encoding = reader.CurrentEncoding;
+            new Thread(Read) { IsBackground = true, Name = "command output" }.Start();
+        }
 
-        /// <summary>All of it once the pipe has ended, or, after <paramref name="settle"/>, what has come so far.</summary>
-        public string Take(TimeSpan settle)
+        void Read()
         {
+            var buffer = new byte[4096];
+            bool read = false;
             try
             {
-                reading.Wait(settle);
+                while (true)
+                {
+                    int waiting = Waiting(from);
+                    // Right after a read, a command printing a lot fills the pipe again in moments (Windows' holds only
+                    // about 4 KB): it's looked at again at once for a little while, not after a whole wait.
+                    for (var spin = new SpinWait(); waiting == 0 && read && spin.Count < 200; spin.SpinOnce(sleep1Threshold: -1))
+                        waiting = Waiting(from);
+                    read = waiting > 0;
+                    if (waiting > 0)
+                    {
+                        // There already, so this doesn't wait; asked for a whole buffer so none of it stays in the stream's own.
+                        int n = from.Read(buffer, 0, buffer.Length);
+                        if (n <= 0) return;
+                        lock (gate) got.Write(buffer, 0, n);
+                        continue;
+                    }
+                    if (waiting < 0) return; // the pipe has ended
+                    lock (gate)
+                    {
+                        // The command has stopped: all it printed was in the pipe before that, and the pipe is empty
+                        // (looked at again after the stop was seen, so the last of it isn't missed).
+                        if (stopped && Waiting(from) == 0) return;
+                        if (!stopped) Monitor.Wait(gate, TimeSpan.FromMilliseconds(20)); // or until it stops
+                    }
+                }
             }
-            catch (AggregateException)
+            catch (Exception e) when (e is IOException or ObjectDisposedException)
             {
                 // The pipe broke: what came before it is still what it printed.
             }
-            lock (text) return text.ToString();
+            finally
+            {
+                lock (gate)
+                {
+                    ended = true;
+                    Monitor.PulseAll(gate);
+                }
+            }
+        }
+
+        /// <summary>All it printed, once the command has stopped: what's in the pipe then, read to its end, without waiting
+        /// for whatever the command started that still holds the pipe. <paramref name="atMost"/> only bounds a reader that
+        /// never gets to run.</summary>
+        public string Take(TimeSpan atMost)
+        {
+            var until = DateTime.UtcNow + atMost;
+            byte[] bytes;
+            lock (gate)
+            {
+                stopped = true;
+                Monitor.PulseAll(gate);
+                while (!ended && until - DateTime.UtcNow is var left && left > TimeSpan.Zero) Monitor.Wait(gate, left);
+                bytes = got.ToArray();
+            }
+            // Read as the command's own reader would have (a byte-order mark at its start isn't text).
+            using var text = new StreamReader(new MemoryStream(bytes), encoding);
+            return text.ReadToEnd();
         }
     }
+
+    /// <summary>How many bytes are in a pipe to be read right now, without waiting: 0 for none yet, -1 once it has ended
+    /// (or broken).</summary>
+    static int Waiting(Stream pipe)
+    {
+        System.Runtime.InteropServices.SafeHandle? handle = pipe switch
+        {
+            FileStream f => f.SafeFileHandle,
+            System.IO.Pipes.PipeStream p => p.SafePipeHandle,
+            _ => null,
+        };
+        if (handle is null || handle.IsInvalid || handle.IsClosed) return -1;
+        if (OperatingSystem.IsWindows())
+            return PeekNamedPipe(handle, IntPtr.Zero, 0, IntPtr.Zero, out uint available, IntPtr.Zero) ? (int)Math.Min(available, int.MaxValue) : -1;
+        var fd = new PollFd { Fd = (int)handle.DangerousGetHandle(), Events = PollIn };
+        int ready;
+        do ready = poll(ref fd, 1, 0);
+        while (ready < 0 && System.Runtime.InteropServices.Marshal.GetLastPInvokeError() == 4); // EINTR: ask again
+        if (ready < 0) return -1;
+        if (ready == 0) return 0;
+        if ((fd.Revents & PollIn) != 0) return 4096; // something to read (a read of it returns what's there, or 0 at its end)
+        return (fd.Revents & (PollHup | PollErr | PollNval)) != 0 ? -1 : 0;
+    }
+
+    const short PollIn = 0x1, PollErr = 0x8, PollHup = 0x10, PollNval = 0x20;
+
+    [System.Runtime.InteropServices.StructLayout(System.Runtime.InteropServices.LayoutKind.Sequential)]
+    struct PollFd
+    {
+        public int Fd;
+        public short Events;
+        public short Revents;
+    }
+
+    [System.Runtime.InteropServices.DllImport("libc", SetLastError = true)]
+    static extern int poll(ref PollFd fds, nuint count, int timeoutMs);
+
+    [System.Runtime.InteropServices.DllImport("kernel32.dll", SetLastError = true)]
+    static extern bool PeekNamedPipe(System.Runtime.InteropServices.SafeHandle pipe, IntPtr buffer, uint size, IntPtr read, out uint available, IntPtr left);
 
     /// <summary>Starts a program and leaves it running: not waited for, and what it prints isn't read (a browser, which
     /// outlives this call and Syft Notes). Each argument reaches it whole, whatever is in it: no shell reads them.

@@ -1,7 +1,9 @@
+using System.IO.Compression;
 using System.Net;
 using System.Net.Http.Headers;
 using System.Text;
 using System.Text.Json.Nodes;
+using StudyStash.Core.Ai;
 using StudyStash.Library;
 
 namespace StudyStash.Core.Tests;
@@ -63,10 +65,10 @@ public class AttachmentsApiTests
         return await Json(r);
     }
 
-    static async Task Read(Store store, string id)
-    {
-        for (int i = 0; i < 200 && store.GetAttachment(id)?.State == Attachment.Reading; i++) await Task.Delay(20);
-    }
+    /// <summary>Waits for the library to finish reading an attachment: the real reader's first picture on a cold start
+    /// (Vision loading) can take longer than a few seconds.</summary>
+    static async Task Read(Store store, string id) =>
+        Assert.True(await Waiting.UntilAsync(() => store.GetAttachment(id)?.State != Attachment.Reading, 30), "the attachment was still being read after 30 seconds");
 
     [Fact]
     public async Task A_file_attached_to_a_lecture_is_kept_in_its_class_folder_and_listed()
@@ -394,6 +396,23 @@ public class AttachmentsApiTests
     }
 
     [Fact]
+    public async Task What_the_library_reads_is_kept_in_its_own_home()
+    {
+        using var dir = new TempDir();
+        var (cfg, store) = Library(dir);
+        using var owned = store;
+        // No ReadDocument override: the library's own reader, which keeps what it reads beside the library's config.
+        await using var site = await Site(cfg, store, new LibraryWebOptions
+        {
+            ListModels = _ => Task.FromResult<List<(string, double)>?>([]),
+            Latest = _ => Task.FromResult<Release?>(null),
+        });
+        var body = await Upload(site, Form([("notes.txt", Encoding.UTF8.GetBytes("Osmosis moves water."))], lecture: "n1"));
+        await Read(store, body["attachments"]![0]!["id"]!.GetValue<string>());
+        Assert.Single(Directory.GetFiles(Path.Combine(cfg.Home, "cache", "text")));
+    }
+
+    [Fact]
     public async Task A_reader_that_fails_leaves_the_attachment_without_words_not_stuck()
     {
         using var dir = new TempDir();
@@ -463,5 +482,99 @@ public class AttachmentsApiTests
         await using var site = await Site(cfg, store);
         await Read(store, "a1");
         Assert.Equal("Mitosis.", store.GetAttachment("a1")!.Text);
+    }
+
+    /// <summary>A PowerPoint with these slides, each line of one a paragraph.</summary>
+    static byte[] Pptx(params string[] slides)
+    {
+        var bytes = new MemoryStream();
+        using (var zip = new ZipArchive(bytes, ZipArchiveMode.Create, leaveOpen: true))
+            for (int i = 0; i < slides.Length; i++)
+            {
+                using var w = new StreamWriter(zip.CreateEntry($"ppt/slides/slide{i + 1}.xml").Open());
+                w.Write("<p:sld>" + string.Concat(slides[i].Split('\n').Select(l => $"<a:p><a:t>{WebUtility.HtmlEncode(l)}</a:t></a:p>")) + "</p:sld>");
+            }
+        return bytes.ToArray();
+    }
+
+    [Fact]
+    public async Task A_decks_slides_are_listed_with_when_each_was_taught()
+    {
+        using var dir = new TempDir();
+        var (cfg, store) = Library(dir);
+        using var owned = store;
+        // Three minutes each on reefs, kelp and tides, then reminders; the deck's last slide was never spoken about.
+        string[] topics = ["Coral reefs\npolyps, zooxanthellae, bleaching", "Kelp forests\nholdfast, stipe, urchins, otters", "Tides\nlunar gravity, spring, neap"];
+        var said = topics.SelectMany((topic, t) => Enumerable.Range(0, 18).Select(i =>
+        {
+            var words = topic.Split([' ', ',', '\n'], StringSplitOptions.RemoveEmptyEntries);
+            return $"[{TimedText.Clock(t * 180 + i * 10)}] {words[2 * i % words.Length]} with {words[(2 * i + 1) % words.Length]} matters";
+        })).Concat(Enumerable.Range(0, 60).Select(i => $"[{TimedText.Clock(540 + i * 10)}] reminders about the field trip and the lab report"));
+        store.Save(new Meeting("n2") { Title = "Oceans", Date = "2026-09-02", Transcript = string.Join('\n', said) },
+            new Classification("BIO 110", 1, "folder"), "## Summary\nOceans.", "qwen3");
+        string[] deck = [.. topics, "Deep sea vents\nchemosynthesis, tubeworms, hydrothermal"];
+        File.WriteAllBytes(Path.Combine(store.AttachmentsDir("BIO 110"), "Oceans.pptx"), Pptx(deck));
+        const string PptxType = "application/vnd.openxmlformats-officedocument.presentationml.presentation";
+        // A deck attached before pages were kept: its words are read, its pages aren't yet.
+        store.AddAttachment(new Attachment("old", "Oceans.pptx", "Oceans.pptx", "BIO 110", "n2", 100, PptxType, "2026-09-02T00:00:00Z", "words", Attachment.Read));
+        // And one on a lecture with no timed transcript (n1's is plain text), its pages already kept.
+        store.AddAttachment(new Attachment("plain", "Cells.pptx", "Oceans.pptx", "BIO 110", "n1", 100, PptxType, "2026-09-01T00:00:00Z", "words", Attachment.Read));
+        store.SetAttachmentPages("plain", ["Cells", "Membranes\nlipids"]);
+        // No stand-in for reading words: decks are read for real, once.
+        await using var site = await Site(cfg, store, new LibraryWebOptions
+        {
+            ListModels = _ => Task.FromResult<List<(string, double)>?>([]), Latest = _ => Task.FromResult<Release?>(null),
+        });
+
+        async Task<JsonObject> Listed(string lecture) =>
+            (JsonObject)Assert.Single((JsonArray)(await Json(await site.Client.SendAsync(Req(HttpMethod.Get, $"/api/v2/attachments?lecture={lecture}"))))["attachments"]!)!;
+
+        // Asked for first, the old deck has no times yet and its pages are read in the background, then kept.
+        var first = await Listed("n2");
+        Assert.True(first.ContainsKey("slides"));
+        Assert.Null(first["slides"]);
+        for (var until = DateTime.UtcNow.AddSeconds(10); store.AttachmentPages("old") is null && DateTime.UtcNow < until;) await Task.Delay(20);
+        Assert.Equal(deck, store.AttachmentPages("old"));
+
+        var slides = ((JsonArray)(await Listed("n2"))["slides"]!).Select(s => (JsonObject)s!).ToList();
+        Assert.Equal([1, 2, 3, 4], slides.Select(s => s["n"]!.GetValue<int>()));
+        Assert.Equal(["Coral reefs", "Kelp forests", "Tides", "Deep sea vents"], slides.Select(s => s["title"]!.GetValue<string>()));
+        var at = slides.Select(s => s["at"]?.GetValue<double>()).ToList();
+        Assert.InRange(at[0]!.Value, 0, 179);
+        Assert.InRange(at[1]!.Value, 180, 359);
+        Assert.InRange(at[2]!.Value, 360, 539);
+        Assert.Null(at[3]);
+
+        var plain = ((JsonArray)(await Listed("n1"))["slides"]!).Select(s => (JsonObject)s!).ToList();
+        Assert.Equal(["Cells", "Membranes"], plain.Select(s => s["title"]!.GetValue<string>()));
+        Assert.All(plain, s => Assert.Null(s["at"]));
+
+        // A deck attached now is read once: its pages are kept, and its words are those pages joined, as reading it for
+        // its words alone gives them.
+        var sent = await Upload(site, Form([("Oceans.pptx", Pptx(deck))], lecture: "n2"));
+        string sentId = sent["attachments"]![0]!["id"]!.GetValue<string>();
+        await Read(store, sentId);
+        Assert.Equal(deck, store.AttachmentPages(sentId));
+        Assert.Equal(await DocumentText.ExtractAsync(store.AttachmentPath(store.GetAttachment(sentId)!), new DocumentTextOptions(), default), store.GetAttachment(sentId)!.Text);
+        Assert.StartsWith("Coral reefs\npolyps", store.GetAttachment(sentId)!.Text);
+
+        // A deck whose file isn't there when it's read (its lecture was being filed under another class: its file is in
+        // CS 101, its row still says BIO 110) keeps no pages, not an empty list, so it gets them when listed again.
+        store.Save(new Meeting("n3") { Title = "Rivers", Date = "2026-09-03", Transcript = "Rivers carry silt down to their deltas." },
+            new Classification("BIO 110", 1, "folder"), "## Summary\nRivers.", "qwen3");
+        string[] rivers = ["Rivers\nsource, mouth", "Deltas\nsilt, distributary"];
+        File.WriteAllBytes(Path.Combine(store.AttachmentsDir("CS 101"), "Rivers.pptx"), Pptx(rivers));
+        store.AddAttachment(new Attachment("moved", "Rivers.pptx", "Rivers.pptx", "BIO 110", "n3", 100, PptxType, "2026-09-03T00:00:00Z", "words", Attachment.Read));
+        Assert.Null((await Listed("n3"))["slides"]);
+        store.SetClass("n3", "CS 101");
+        for (var until = DateTime.UtcNow.AddSeconds(10); ; await Task.Delay(20))
+        {
+            var kept = store.AttachmentPages("moved");
+            Assert.True(kept is null || kept.Count > 0, "a file that wasn't there must not be kept as a deck with no pages");
+            if (kept is not null || DateTime.UtcNow > until) break;
+            await Listed("n3");
+        }
+        Assert.Equal(rivers, store.AttachmentPages("moved"));
+        Assert.Equal(["Rivers", "Deltas"], ((JsonArray)(await Listed("n3"))["slides"]!).Select(s => s!["title"]!.GetValue<string>()));
     }
 }

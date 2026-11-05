@@ -474,8 +474,32 @@ public sealed class LibraryServiceTests
         finally { try { Directory.Delete(home, true); } catch (IOException) { } }
     }
 
-    sealed class Recording(List<string> calls, List<string> registered) : IBackgroundLibrary
+    [Fact]
+    public async Task A_background_library_an_older_copy_registered_differently_is_registered_again()
     {
+        // A Mac's LaunchAgent from before it had its error file: same program, same version, written again.
+        string home = TempHome();
+        try
+        {
+            var cfg = ReadyConfig(home);
+            var calls = new List<string>();
+            var registered = new List<string> { "/Apps/Syft Notes.app/Contents/MacOS/StudyStash", "--home", home, "helper" };
+            var svc = new LibraryService(home, cfg, ["/nowhere/studystash"], spawn: _ => throw new InvalidOperationException("no child here"),
+                waitHealthy: (_, _) => Task.FromResult(true), portStatus: _ => Task.FromResult("ours"),
+                health: _ => Task.FromResult<(string, bool)?>((Engine.Version, true)))
+            {
+                Background = new BackgroundPlan(new Recording(calls, registered, upToDate: false), () => true, registered[0]),
+            };
+            await svc.StartAsync();
+            Assert.Equal(["register"], calls);
+            Assert.True(svc.InBackground);
+        }
+        finally { try { Directory.Delete(home, true); } catch (IOException) { } }
+    }
+
+    sealed class Recording(List<string> calls, List<string> registered, bool upToDate = true) : IBackgroundLibrary
+    {
+        public bool UpToDate(string home) => upToDate;
         public bool IsRegistered(string home) => true;
         public IReadOnlyList<string>? Registered(string home) => registered;
         public List<(string Home, IReadOnlyList<string> Args)> All() => [(registered[2], registered)];

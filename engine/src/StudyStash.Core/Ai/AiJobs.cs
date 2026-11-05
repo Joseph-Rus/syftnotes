@@ -30,22 +30,33 @@ public sealed class AiJobs(string home, Func<string>? ollamaHost = null)
     public AiSignIns SignIns => signIns ??= new AiSignIns(Checks, MarkSignedIn) { Every = SignInEvery, Patience = SignInPatience };
 
     /// <summary>An AI's own status command said the student signed in: it's ready now, with no check to press, and the
-    /// notes it couldn't write while it was signed out are written (<see cref="SignedInAgain"/>). A usage limit is left
-    /// alone: signing in doesn't end one.</summary>
+    /// notes it couldn't write while it was signed out are written (<see cref="SignedInAgain"/>). The AI the student just
+    /// signed in to, when it's a new one, is the one they want: it writes their notes and answers their questions from
+    /// now on, whatever was chosen before, so nobody has to go to Settings to pick it. Signing back in to an AI already
+    /// used for something (a sign-in that had run out) is a repair: every pick, and its model, stays as it was. A student
+    /// who chose the free AI on this computer for anything keeps it: signing in to a cloud AI never sends their
+    /// transcripts there by itself. A usage limit is left alone: signing in doesn't end one.</summary>
     public void MarkSignedIn(string id)
     {
         var s = Settings;
         bool back = Engines.LooksLikeAuth(s.Tests.GetValueOrDefault(id, ""));
         s.Tests[id] = "works";
-        // The first AI a student gets working, with none chosen yet, is the one that writes their notes (and answers).
-        bool first = !s.Picked("notes") && id != "ollama";
-        if (first) s.Provider = id;
+        bool Uses(string job, string ai) => s.Picked(job) && s.For(job).Provider == ai;
+        // The jobs a sign-in hands over (sorting stays where it was): none may be one the student set to the free AI.
+        string[] moved = ["notes", "ask", "agent"];
+        bool chosen = id != "ollama" && !AiSettings.Jobs.Any(job => Uses(job, id)) && !moved.Any(job => Uses(job, "ollama"));
+        if (chosen)
+        {
+            s.Provider = id;
+            // As Settings' own pick does (/api/v2/ai/defaults): the notes, Ask, and the chat that answers with Ask.
+            foreach (string job in moved) s.ByJob[job] = new AiChoice(id);
+        }
         s.Save(home);
-        if (first) NotesAiChosen?.Invoke();
+        if (chosen) NotesAiChosen?.Invoke();
         if (back) SignedInAgain?.Invoke(id);
     }
 
-    /// <summary>An AI was chosen to write the notes where none was before: the library writes the notes it kept waiting.</summary>
+    /// <summary>An AI was just chosen to write the notes (signed in to): the library writes the notes it kept waiting.</summary>
     public event Action? NotesAiChosen;
 
     /// <summary>The library's start: an ai.json from before "nobody chosen yet" whose Ollama was only the old default
@@ -132,6 +143,9 @@ public sealed class AiJobs(string home, Func<string>? ollamaHost = null)
     {
         var settings = Settings;
         var choice = settings.For(job);
+        // No AI chosen and no Ollama here: say so in Ask's words, not Ollama's "isn't installed" with its download link.
+        if (!settings.Picked(job) && Providers is null && !Checks.OllamaInstalled())
+            throw new InvalidOperationException("This needs an AI: choose one in Settings → Your AI.");
         var provider = Provider(choice.Provider);
         // Only the notes take the speed Settings sets for Claude Code: sorting and answers stay as set up.
         var how = job == "notes" ? AiSpeed.ForNotes(choice.Provider, choice.Model, settings.Speed) : new AiSpeed.How(choice.Model, "", false);
@@ -564,16 +578,21 @@ public sealed class AiJobs(string home, Func<string>? ollamaHost = null)
         return ollamaSorts ? null : notes;
     }
 
+    /// <summary>The AI that the last sort went to ("gemini", "ollama"…): what a lecture's <c>classified_by</c> names.</summary>
+    public string SortedWith { get; private set; } = "ollama";
+
     /// <summary>Sorting into classes.</summary>
     public async Task<string> SortAsync(Config cfg, string prompt, JsonObject schema)
     {
         var settings = Settings;
         if (await SortFollowsNotesAsync(settings, cfg, Checks) is { } follows)
         {
+            SortedWith = follows;
             string text = await AnswerWithAsync(follows, settings.For("notes").Model, prompt
                 + "\n\nAnswer with only a JSON object that fits this JSON schema, and nothing else:\n" + schema.ToJsonString(), CancellationToken.None);
             return FirstObject(text) ?? throw new InvalidDataException("the answer wasn't JSON");
         }
+        SortedWith = settings.For("sort").Provider;
         if (settings.Local("sort") && Providers is null) return await Classify.OllamaChatAsync(cfg, prompt, schema);
         return await JsonAnswerAsync("sort", prompt, schema); // another engine's pick, or a test's fake Ollama
     }
@@ -847,6 +866,16 @@ public sealed class AiJobs(string home, Func<string>? ollamaHost = null)
     static string AskModel(string engine, AiSettings settings, Config cfg) =>
         engine == "ollama" ? cfg.EffectiveSummaryModel : settings.Models.GetValueOrDefault(engine, "");
 
+    /// <summary>What a student is told when <paramref name="engine"/> failed an Ask, wherever it shows (the error, the line under
+    /// a half answer, the "came from Ollama" note): the plain sentences of the setup chats, never its raw text.</summary>
+    string AskFailure(string engine, Exception ex)
+    {
+        string name = Engines.Name(engine);
+        if (ex is OperationCanceledException or TimeoutException) return $"{name} didn't respond in time.";
+        return SetupChat.Classify(ex.Message) == ChatProblem.Offline ? Engines.CouldntBeReached(name)
+            : Engines.KnownUnusableWhy(engine, Settings, Checks) ?? Engines.DidntAnswer(name);
+    }
+
     /// <summary>
     /// Answer a question with a chosen engine (the request's, or ai.json's "ask" pick): when it's known unusable
     /// (not installed, not signed in, hit its limit) and <see cref="AiSettings.Fallback"/> is on and Ollama is installed,
@@ -902,6 +931,13 @@ public sealed class AiJobs(string home, Func<string>? ollamaHost = null)
             return answer;
         }
 
+        // A run that failed, said in plain words (see AskFailure): its raw text stays in the AI's record and as the inner exception.
+        InvalidOperationException Failed(string who, Exception ex)
+        {
+            Record(who, false, ex is OperationCanceledException ? "timed out" : ex.Message);
+            return new InvalidOperationException(AskFailure(who, ex), ex);
+        }
+
         JsonObject result;
         using var cts = CancellationTokenSource.CreateLinkedTokenSource(ct);
         cts.CancelAfter(AskTimeout);
@@ -917,32 +953,29 @@ public sealed class AiJobs(string home, Func<string>? ollamaHost = null)
         }
         catch (Exception ex) when (ex is InvalidOperationException or HttpRequestException or TimeoutException && shown.Length > 0)
         {
-            Record(engine, false, ex.Message);
-            throw new InvalidOperationException($"{Engines.Name(engine)} stopped partway through: {ex.Message}", ex);
+            throw Failed(engine, ex); // what it wrote stays on screen above this
         }
         catch (Exception ex) when (ex is InvalidOperationException or InvalidDataException or HttpRequestException or TimeoutException or OperationCanceledException)
         {
             if (ex is OperationCanceledException && ct.IsCancellationRequested) throw; // the caller gave up; not ours to paper over
-            bool timedOut = ex is OperationCanceledException;
-            Record(engine, false, timedOut ? "timed out" : ex.Message);
-            if (engine == "ollama") throw;
-            why = timedOut ? $"{Engines.Name(engine)} didn't respond in time." : $"{Engines.Name(engine)} didn't answer: {ex.Message}";
-            if (!CanFallBack(settings))
-            {
-                string name = Engines.Name(engine);
-                if (timedOut) throw new InvalidOperationException(why, ex);
-                // Fallback switched off: the AI's own error comes back as it is. Otherwise Ollama just isn't here, and the
-                // student is told what's wrong with the AI in plain words (its raw text stays in its record and as the inner
-                // exception), not that an Ollama they never set up isn't installed.
-                if (!settings.Fallback) throw;
-                throw new InvalidOperationException(SetupChat.Classify(ex.Message) == ChatProblem.Offline ? Engines.CouldntBeReached(name)
-                    : Engines.KnownUnusableWhy(engine, Settings, Checks) ?? Engines.DidntAnswer(name), ex);
-            }
+            var failed = Failed(engine, ex);
+            // Ollama has nothing to fall back to, nor has an AI when fallback is off or Ollama isn't here: the student is
+            // told what's wrong in plain words.
+            if (engine == "ollama" || !CanFallBack(settings)) throw failed;
+            why = failed.Message;
             fellBack = true;
             engine = "ollama";
             using var cts2 = CancellationTokenSource.CreateLinkedTokenSource(ct);
             cts2.CancelAfter(AskTimeout);
-            result = await RunAsync(engine, cts2);
+            try
+            {
+                result = await RunAsync(engine, cts2);
+            }
+            catch (Exception ex2) when (ex2 is InvalidOperationException or InvalidDataException or HttpRequestException or TimeoutException
+                || (ex2 is OperationCanceledException && !ct.IsCancellationRequested))
+            {
+                throw Failed(engine, ex2); // the first AI failed and Ollama did too
+            }
         }
 
         var sources = (result["sources"] as JsonArray ?? []).Select(s => new AskSource(

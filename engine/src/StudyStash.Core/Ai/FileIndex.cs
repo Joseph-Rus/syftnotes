@@ -41,7 +41,7 @@ public sealed partial class FileIndex
     public FileIndex(string home, Func<IReadOnlyList<(string Name, string Path, bool Private)>> roots, Func<IReadOnlyCollection<string>> lectures)
     {
         dbPath = System.IO.Path.Combine(home, "files.db");
-        documents = new DocumentTextOptions { CacheDir = System.IO.Path.Combine(home, "cache", "text") };
+        documents = DocumentTextOptions.For(home);
         this.roots = roots;
         this.lectures = lectures;
         using var db = Open();
@@ -99,7 +99,8 @@ public sealed partial class FileIndex
     }
 
     /// <summary>The words in a file, or "" when it can't be read. PDFs, pictures, Word and PowerPoint are read by
-    /// <see cref="DocumentText"/> (handwriting too), and what it read is kept in <paramref name="documents"/>'s cache.</summary>
+    /// <see cref="DocumentText"/> (handwriting too), and what it read is kept in <paramref name="documents"/>'s cache
+    /// (null: nothing is kept).</summary>
     public static string TextOf(string path, DocumentTextOptions? documents = null)
     {
         string ext = System.IO.Path.GetExtension(path).ToLowerInvariant();
@@ -111,7 +112,7 @@ public sealed partial class FileIndex
                 return Py.Head(string.Join("\n\n", (JsonNode.Parse(File.ReadAllText(path))?["cells"] as JsonArray ?? [])
                     .Select(c => string.Concat((c?["source"] as JsonArray ?? []).Select(x => x?.GetValue<string>() ?? "")))), MaxText);
             if (DocumentText.CanRead(path))
-                return Py.Head(DocumentText.ExtractAsync(path, documents ?? DocumentTextOptions.Default, CancellationToken.None).GetAwaiter().GetResult() ?? "", MaxText);
+                return Py.Head(DocumentText.ExtractAsync(path, documents ?? new DocumentTextOptions(), CancellationToken.None).GetAwaiter().GetResult() ?? "", MaxText);
         }
         catch (Exception e) when (e is IOException or UnauthorizedAccessException or System.Text.Json.JsonException
                                       or InvalidOperationException or FormatException)

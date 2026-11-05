@@ -59,6 +59,30 @@ public class FunnelTests
     // --- the way through -----------------------------------------------------------------------------------------------
 
     [AvaloniaFact]
+    public async Task No_Canvas_while_the_classes_step_is_still_starting_stays_on_the_AI()
+    {
+        var finds = new TaskCompletionSource<bool>();
+        int started = 0;
+        var (f, _) = Make(new FunnelServices
+        {
+            MakeReady = () => Ready(),
+            AddOnFindsCanvas = () => finds.Task,
+            MakeAddOn = () => { started++; return null; },
+            MakeCanvas = () => { started++; return Task.FromResult<CanvasConnectModel?>(null); },
+        });
+        await f.GetStartedCommand.ExecuteAsync(null);
+        await f.IAmAStudentCommand.ExecuteAsync(null);
+        Assert.True(f.OnClasses);
+
+        // "My school doesn't use Canvas" before the step has asked the store: when the answer comes, nothing starts.
+        f.NoCanvasCommand.Execute(null);
+        finds.SetResult(true);
+        Avalonia.Threading.Dispatcher.UIThread.RunJobs();
+        Assert.True(f.OnAi);
+        Assert.Equal(0, started);
+    }
+
+    [AvaloniaFact]
     public async Task Get_started_makes_the_library_then_asks_if_they_are_a_student()
     {
         var (f, setup) = Make();
@@ -99,6 +123,22 @@ public class FunnelTests
         f.SkipCommand.Execute(null);
         f.LaterCommand.Execute(null);
         Assert.Equal(new FunnelEnd(Student: true, Canvas: false, Ai: ""), end);
+    }
+
+    [AvaloniaFact]
+    public async Task No_Canvas_from_the_classes_step_keeps_counting_up()
+    {
+        var (f, _) = Make(new FunnelServices { MakeReady = () => Ready() });
+        await f.GetStartedCommand.ExecuteAsync(null);
+        await f.IAmAStudentCommand.ExecuteAsync(null);
+        Assert.Equal("Step 2 of 4", f.StepLabel);
+
+        // "My school doesn't use Canvas" on Connect your classes: on to the AI as step 3, never "Step 2 of 2".
+        f.NoCanvasCommand.Execute(null);
+        Assert.True(f.OnAi);
+        Assert.Equal("Step 3 of 3", f.StepLabel);
+        Assert.Equal([FunnelStep.Student, FunnelStep.Classes, FunnelStep.Ai], f.Indicator.Select(d => d.Step));
+        Assert.True(f.Indicator[1].Passed);
     }
 
     [AvaloniaFact]
@@ -224,6 +264,81 @@ public class FunnelTests
         handler.Json(HttpMethod.Get, "/api/v2/canvas/state", """{"state": "not_set_up", "url": "", "extension": {"connected": true, "version": "1.6", "browser": "Chrome", "last_seen": "2999-01-01T00:00:00Z"}}""");
         await watch.RefreshAsync();
         Assert.False(f.FindsItself);
+        f.Dispose();
+    }
+
+    [AvaloniaFact]
+    public async Task An_add_on_from_before_with_an_old_key_gets_this_library_s_code_to_paste_once_it_knocks_after_Add()
+    {
+        using var home = new TempHome();
+        var now = DateTimeOffset.Parse("2026-11-02T09:00:00Z");
+        var log = new List<(string What, string Arg)>();
+        var handler = new FakeLibrary()
+            .Json(HttpMethod.Post, "/api/v2/canvas/pair", """{"until":"2026-11-02T09:05:00Z"}""")
+            .Json(HttpMethod.Get, "/api/v2/canvas/extension", "extension")
+            .Json(HttpMethod.Get, "/api/v2/canvas/state", """{"state": "no_extension", "url": "https://school.instructure.com", "extension": {"connected": false, "refused_at": "2026-11-02T08:59:40Z"}}""");
+        var context = CanvasFixtures.Context(handler, log: log, browsers: [Browsers.Firefox]);
+        var watch = new CanvasWatch(context) { Extension = new ExtensionKeeper(home.Path, () => context.Client) };
+        using var addOn = new AddOnModel(context, watch, () => now);
+        await addOn.AddCommand.ExecuteAsync(null);
+        await watch.RefreshAsync();
+        Assert.True(addOn.ShowStoreSteps); // a knock from before Add says nothing about the add-on being added now
+        Assert.False(addOn.ShowPaste);
+
+        // An add-on from an earlier install knocks again with its old key, here Chrome's while Firefox is being set up (the
+        // library can't say which): this library's code for its button, Firefox's store steps still under it, no browser named.
+        now += TimeSpan.FromSeconds(30);
+        handler.Json(HttpMethod.Get, "/api/v2/canvas/state", """{"state": "no_extension", "url": "https://school.instructure.com", "extension": {"connected": false, "browser": "Chrome", "refused_at": "2026-11-02T09:00:20Z"}}""");
+        await watch.RefreshAsync();
+        Assert.True(addOn.ShowPaste);
+        Assert.True(addOn.ShowStoreSteps);
+        Assert.Equal("Syft Notes from an earlier install is still in your browser. Click its Syft Notes button in the toolbar, choose Paste a new code, and paste this:", addOn.PasteLine);
+        Assert.Equal("Not in Firefox? Add it:", addOn.AddItLine);
+        Assert.Equal("On the page that just opened in Firefox, click Add to Firefox, then Add.", addOn.StoreSteps);
+        Assert.Equal(new ExtensionConnection("https://library.test", "test-key-abc123", "https://school.instructure.com"), Extension.ReadConnectionCode(addOn.ConnectionCode));
+        addOn.CopyCodeCommand.Execute(null);
+        Assert.Contains(("Copy", addOn.ConnectionCode), log);
+
+        // Pasted: it checks in with this library's key, and the step is done as always.
+        handler.Json(HttpMethod.Get, "/api/v2/canvas/state", """{"state": "connected", "url": "https://school.instructure.com", "extension": {"connected": true, "browser": "Firefox"}}""");
+        await watch.RefreshAsync();
+        Assert.True(addOn.IsDone);
+        Assert.False(addOn.ShowPaste);
+
+        // A library with no Canvas address yet (a fresh install) has no code to give: the step that asks for the school's,
+        // then Add to Firefox as always, its code's line saying to choose Paste a new code in the old add-on's button.
+        var fresh = new FakeLibrary()
+            .Json(HttpMethod.Post, "/api/v2/canvas/pair", """{"until":"2026-11-02T09:05:00Z"}""")
+            .Json(HttpMethod.Post, "/api/v2/canvas", "canvas")
+            .Json(HttpMethod.Get, "/api/v2/canvas/classes", "[]")
+            .Json(HttpMethod.Get, "/api/v2/canvas/extension", "extension")
+            .Json(HttpMethod.Get, "/api/v2/canvas/state", """{"state": "not_set_up", "url": "", "extension": {"connected": false, "refused_at": "2026-11-02T09:00:20Z"}}""");
+        var freshContext = CanvasFixtures.Context(fresh, browsers: [Browsers.Firefox]);
+        var freshWatch = new CanvasWatch(freshContext);
+        var (f, _) = Make(new FunnelServices
+        {
+            MakeAddOn = () => new AddOnModel(freshContext, freshWatch, () => DateTimeOffset.Parse("2026-11-02T09:00:00Z")),
+            MakeCanvas = async () =>
+            {
+                var c = new CanvasConnectModel(freshContext, freshWatch, forSetup: true);
+                await c.StartAsync(CanvasFixtures.Load<CanvasApi.State>("state-not-set-up"), []);
+                return c;
+            },
+        });
+        await f.GetStartedCommand.ExecuteAsync(null);
+        await f.IAmAStudentCommand.ExecuteAsync(null);
+        await f.AddOn!.AddCommand.ExecuteAsync(null);
+        await freshWatch.RefreshAsync();
+        await Wait.UntilAsync(() => f.AsksSchool, "the step that asks for the school's address");
+        f.Canvas!.SchoolField = "school.instructure.com";
+        fresh.Json(HttpMethod.Get, "/api/v2/canvas/state", """{"state": "no_extension", "url": "https://school.instructure.com", "extension": {"connected": false, "browser": "Chrome", "refused_at": "2026-11-02T09:00:50Z"}}""");
+        await f.Canvas.ContinueCommand.ExecuteAsync(null);
+        Assert.True(f.Canvas.ShowAddToBrowser); // Add to Firefox, as always
+        await f.Canvas.AddToBrowserCommand.ExecuteAsync(null);
+        Assert.Equal("On the page that opens in Firefox, click the blue Add to Firefox button, then Add when Firefox asks.", f.Canvas.StoreStep1);
+        Assert.Equal("Click the Syft Notes button (it may be under the puzzle-piece Extensions button), choose Paste a new code if it's there, paste this code and click Connect.", f.Canvas.StoreStep2);
+        Assert.True(f.Canvas.ShowCode);
+        Assert.True(f.Canvas.ShowAddOnLink);
         f.Dispose();
     }
 

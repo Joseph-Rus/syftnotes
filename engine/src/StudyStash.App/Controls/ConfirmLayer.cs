@@ -13,7 +13,8 @@ namespace StudyStash.App.Controls;
 
 /// <summary>
 /// A window's dialog layer: DialogHost.Avalonia's host wrapped round the window's view (<c>AppWindows.Make</c> does it
-/// for every window it makes), so <see cref="Confirm"/> can put a question over that window. It dims the view behind
+/// for every window it makes), so <see cref="Confirm"/> can put a question over that window (and the library window its
+/// ask for a tip, <see cref="SupportAskDialog"/>). It dims the view behind
 /// and keeps the keyboard in the question. Styled by <c>DialogHost.confirm</c> in Styles.axaml.
 /// </summary>
 public sealed class ConfirmLayer
@@ -59,12 +60,26 @@ public sealed class ConfirmLayer
     public static ConfirmLayer? Pick() =>
         layers.Where(l => l.window.IsVisible).OrderByDescending(l => l.window.IsActive).ThenByDescending(l => l.lastActive).FirstOrDefault();
 
+    /// <summary>Something shows over this window now (a question, the ask for a tip): nothing else may open over it.</summary>
+    public bool IsOpen => Host.IsOpen;
+
     /// <summary>Asks over this window, which comes to the front first if it isn't there (the library open behind another
     /// app: the question must not appear where the student isn't looking). The keyboard goes back to where it was afterwards.</summary>
     public async Task<bool> AskAsync(ConfirmAsk ask)
     {
-        if (Host.IsOpen) return false;
-        if (!window.IsActive)
+        var dialog = new ConfirmDialog(ask);
+        dialog.Answered += yes => Close(yes);
+        return await ShowAsync(dialog) is true;
+    }
+
+    /// <summary>Shows <paramref name="dialog"/> over this window (as <see cref="AskAsync"/> does) until <see cref="Close"/>
+    /// or a click outside closes it: what it was closed with, false for a click outside. Null at once if something shows
+    /// over the window already. <paramref name="raise"/> false leaves the window where it is, for what can wait until
+    /// the student comes back to it.</summary>
+    public async Task<object?> ShowAsync(Control dialog, bool raise = true)
+    {
+        if (Host.IsOpen) return null;
+        if (raise && !window.IsActive)
         {
             AppWindows.Raise(window);
             // The app itself comes forward too (a Mac); not in a test, which never takes the student's screen.
@@ -73,10 +88,11 @@ public sealed class ConfirmLayer
         // A window that has only just been shown is ready for the question a moment later.
         if (!Host.IsLoaded) await Dispatcher.UIThread.InvokeAsync(() => { }, DispatcherPriority.Loaded);
         var before = TopLevel.GetTopLevel(Host)?.FocusManager?.GetFocusedElement();
-        var dialog = new ConfirmDialog(ask);
-        dialog.Answered += yes => Host.CurrentSession?.Close(yes);
-        bool said = await DialogHost.Show(dialog, Host) is true;
+        var said = await DialogHost.Show(dialog, Host);
         if (before is Control c && c.IsEffectivelyVisible) Dispatcher.UIThread.Post(() => c.Focus());
         return said;
     }
+
+    /// <summary>Closes what shows over this window with <paramref name="answer"/>.</summary>
+    public void Close(object? answer) => Host.CurrentSession?.Close(answer);
 }

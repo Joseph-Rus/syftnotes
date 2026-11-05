@@ -7,9 +7,9 @@ public class MoveToApplicationsTests
         <plist version="1.0"><dict><key>CFBundleIdentifier</key><string>com.study-stash.app</string></dict></plist>
         """;
 
-    static string Make(string root, string sub, string plist = Plist)
+    static string Make(string root, string sub, string plist = Plist, string name = "Study Stash.app")
     {
-        string contents = Path.Combine(root, sub, "Study Stash.app", "Contents");
+        string contents = Path.Combine(root, sub, name, "Contents");
         string tree = Path.Combine(contents, "MacOS", "arm64");
         Directory.CreateDirectory(tree);
         File.WriteAllText(Path.Combine(contents, "Info.plist"), plist);
@@ -57,18 +57,28 @@ public class MoveToApplicationsTests
     }
 
     [Fact]
-    public void Not_now_is_remembered_and_nothing_is_asked_twice()
+    public void Not_now_is_remembered_for_that_version_and_never_for_a_copy_gatekeeper_moved()
     {
         using var t = new TempDir();
         string home = Path.Combine(t.Path, "home");
         Directory.CreateDirectory(home);
-        string baseDir = Make(home, "Downloads");
         int asked = 0;
-        bool Go() => MoveToApplications.Offer(baseDir, home, home, () => { asked++; return false; },
-            (_, _, _) => null, _ => throw new InvalidOperationException("nothing starts"), 1, _ => { }, applicationsWritable: true, otherCopyRunning: () => false);
-        Assert.False(Go());
-        Assert.False(Go());
+        // applications=false so the destination is under the temp home, never the real /Applications
+        bool Go(string baseDir) => MoveToApplications.Offer(baseDir, home, home, () => { asked++; return false; },
+            (_, _, _) => null, _ => throw new InvalidOperationException("nothing starts"), 1, _ => { }, applicationsWritable: false, otherCopyRunning: () => false);
+        string downloads = Make(home, "Downloads", Versioned("0.23.2"));
+        Assert.False(Go(downloads));
+        Assert.False(Go(downloads));
         Assert.Equal(1, asked);
+        // A newer download asks again.
+        File.WriteAllText(Path.Combine(home, "Downloads", "Study Stash.app", "Contents", "Info.plist"), Versioned("0.23.4"));
+        Assert.False(Go(downloads));
+        Assert.Equal(2, asked);
+        // One Gatekeeper runs from a translocation folder can't update itself from there, so it asks every time.
+        string moved = Make(t.Path, "x/AppTranslocation/ABC/d", Versioned("0.23.4"));
+        Assert.False(Go(moved));
+        Assert.False(Go(moved));
+        Assert.Equal(4, asked);
     }
 
     [Fact]
@@ -93,20 +103,135 @@ public class MoveToApplicationsTests
         Directory.CreateDirectory(home);
         string baseDir = Make(home, "Downloads");
         IReadOnlyList<string>? spawned = null;
-        // a stand-in for ditto: copies the folder
+        var ran = new List<string>();
+        // a stand-in for ditto (copies the folder) and xattr
         ProcResult? Run(string exe, IReadOnlyList<string> args, TimeSpan _)
         {
-            if (exe == "ditto") CopyDir(args[0], args[1]);
+            if (exe == "ditto") CopyDir(args[^2], args[^1]);
+            ran.Add(string.Join(' ', [exe, .. args]));
             return new ProcResult(0, "");
         }
         bool went = MoveToApplications.Offer(baseDir, home, home, () => true, Run, a => spawned = a, 4242, _ => { }, applicationsWritable: false, otherCopyRunning: () => false);
         Assert.True(went);
         string dest = Path.Combine(home, "Applications", "Syft Notes.app");
         Assert.True(File.Exists(Path.Combine(dest, "Contents", "Info.plist")));
+        // Copied without the download's quarantine, which would have Gatekeeper run it from a translocation folder too.
+        string source = Path.Combine(home, "Downloads", "Study Stash.app");
+        Assert.Equal([$"ditto --noqtn {source} {dest}.new", $"/usr/bin/xattr -dr com.apple.quarantine {dest}.new"], ran.ToArray());
         Assert.Equal(["sh", "4242", dest, ""], spawned!.Skip(3).ToArray());
         Assert.Contains("/usr/bin/caffeinate -w", spawned![2]);
         Assert.DoesNotContain("sleep", spawned[2]);
     }
+
+    [Fact]
+    public void One_in_Applications_as_new_or_newer_opens_instead_unless_its_this_copy_translocated()
+    {
+        if (OperatingSystem.IsWindows()) return; // a Mac's paths and mounts (Linux runs it the same way)
+        using var t = new TempDir();
+        string home = Path.Combine(t.Path, "home");
+        string dest = Path.Combine(home, "Applications", "Syft Notes.app");
+        Directory.CreateDirectory(Path.Combine(dest, "Contents"));
+        File.WriteAllText(Path.Combine(dest, "Contents", "Info.plist"), Versioned("0.23.4"));
+        string mount = "/dev/disk3s1s1 on / (apfs, sealed, local, read-only, journaled)\n";
+        IReadOnlyList<string>? spawned = null;
+        var ran = new List<string>();
+        ProcResult? Run(string exe, IReadOnlyList<string> args, TimeSpan _)
+        {
+            if (exe == "ditto") CopyDir(args[^2], args[^1]);
+            ran.Add(exe);
+            return new ProcResult(0, exe == "/sbin/mount" ? mount : "");
+        }
+        bool Go(string baseDir) => MoveToApplications.Offer(baseDir, home, home, () => true, Run, a => spawned = a, 4242, _ => { },
+            applicationsWritable: false, otherCopyRunning: () => false);
+
+        // An older copy kept in Downloads, or the same version on the Desktop: the one in Applications opens, and nothing
+        // is asked or copied (an older one would go over a copy that updated itself).
+        Assert.True(Go(Make(home, "Downloads", Versioned("0.23.2"))));
+        Assert.Equal(["sh", "4242", dest, ""], spawned!.Skip(3).ToArray());
+        Assert.True(Go(Make(home, "Desktop", Versioned("0.23.4"))));
+        Assert.DoesNotContain("ditto", ran);
+
+        // That copy itself, run from a translocation folder (an earlier move kept the download's quarantine on it): opening
+        // it would only come back here, so it moves again, which takes the quarantine off. `mount` lists the translocation
+        // folder as a mount of the bundle, which shows inside it as d/<its name>, as macOS 26 prints it.
+        string self = Make(t.Path, "x/AppTranslocation/ABC/d", Versioned("0.23.4"), "Syft Notes.app");
+        mount += $"{dest} on {Path.Combine(t.Path, "x", "AppTranslocation", "ABC")} (nullfs, local, nodev, nosuid, read-only, nobrowse, mounted by student)\n";
+        Assert.True(Go(self));
+        Assert.Contains("ditto", ran);
+        Assert.Contains("/usr/bin/xattr", ran);
+        Assert.Equal(["sh", "4242", dest, ""], spawned!.Skip(3).ToArray());
+
+        // An older copy run from a translocation folder `mount` says nothing about: the newer one in Applications still
+        // opens, since only this very copy is ever the same version.
+        ran.Clear();
+        File.WriteAllText(Path.Combine(dest, "Contents", "Info.plist"), Versioned("0.23.5"));
+        Assert.True(Go(Make(t.Path, "y/AppTranslocation/DEF/d", Versioned("0.23.4"))));
+        Assert.DoesNotContain("ditto", ran);
+    }
+
+    /// <summary>The background library, as the move sees it: one registration, and what's asked of it, in order with the
+    /// move's own commands.</summary>
+    sealed class Background(string home, string program, List<string> asked) : IBackgroundLibrary
+    {
+        public bool IsRegistered(string h) => h == home;
+        public IReadOnlyList<string>? Registered(string h) => h == home ? new[] { program, "--home", home, "helper" } : null;
+        public void Register(string h, string p, IReadOnlyList<string>? extra = null) => asked.Add($"register {p}");
+        public void Unregister(string h) => asked.Add("unregister");
+        public List<(string Home, IReadOnlyList<string> Args)> All() => [(home, new[] { program, "--home", home, "helper" })];
+        public void Stop(string h) => asked.Add("stop");
+        public void Start(string h) => asked.Add("start");
+        public void Restart(string h) => asked.Add("restart");
+    }
+
+    [Fact]
+    public void A_translocated_copy_puts_away_the_disk_image_its_folder_mirrors_and_the_background_library_comes_back()
+    {
+        if (OperatingSystem.IsWindows()) return; // a Mac's paths and mounts (Linux runs it the same way)
+        using var t = new TempDir();
+        string home = Path.Combine(t.Path, "home");
+        Directory.CreateDirectory(home);
+        // Gatekeeper ran it from a translocation folder, whose path doesn't say where it came from: `mount` says what the
+        // folder mirrors, and so which disk image to eject (not an older Syft Notes' mounted beside it). As macOS 26 prints
+        // it, the folder is a mount of the bundle on the image, which shows inside it as d/<its name>.
+        string baseDir = Make(t.Path, "x/AppTranslocation/ABC/d", Versioned("0.23.4"), "Syft Notes.app");
+        string volumes = Path.Combine(t.Path, "Volumes");
+        Make(volumes, "Syft Notes", Versioned("0.23.4"), "Syft Notes.app");
+        string mount = "/dev/disk3s1s1 on / (apfs, sealed, local, read-only, journaled)\n"
+                       + $"/dev/disk5s1 on {volumes}/Syft Notes 1 (hfs, local, nodev, nosuid, read-only, noowners, quarantine, mounted by student)\n"
+                       + $"/dev/disk6s1 on {volumes}/Syft Notes (hfs, local, nodev, nosuid, read-only, noowners, quarantine, mounted by student)\n"
+                       + $"{volumes}/Syft Notes/Syft Notes.app on {t.Path}/x/AppTranslocation/ABC (nullfs, local, nodev, nosuid, read-only, nobrowse, mounted by student)\n";
+        string info = $"/dev/disk5\tGUID_partition_scheme\t\n/dev/disk5s1\tApple_HFS\t{volumes}/Syft Notes 1\n"
+                      + $"/dev/disk6\tGUID_partition_scheme\t\n/dev/disk6s1\tApple_HFS\t{volumes}/Syft Notes\n";
+        // An older copy is in Applications, and the background library runs from it.
+        string dest = Path.Combine(home, "Applications", "Syft Notes.app");
+        Directory.CreateDirectory(Path.Combine(dest, "Contents"));
+        File.WriteAllText(Path.Combine(dest, "Contents", "Info.plist"), Versioned("0.23.2"));
+        IReadOnlyList<string>? spawned = null;
+        var ran = new List<string>();
+        // a stand-in for ditto (copies the folder), xattr, mount and hdiutil
+        ProcResult? Run(string exe, IReadOnlyList<string> args, TimeSpan _)
+        {
+            if (exe == "ditto") CopyDir(args[^2], args[^1]);
+            ran.Add(exe);
+            return new ProcResult(0, exe == "/sbin/mount" ? mount : exe == "/usr/bin/hdiutil" ? info : "");
+        }
+        string program = Path.Combine(dest, "Contents", "MacOS", "StudyStash");
+        bool went = MoveToApplications.Offer(baseDir, home, home, () => true, Run, a => spawned = a, 4242, _ => { },
+            applicationsWritable: false, otherCopyRunning: () => false, background: new Background(home, program, ran));
+        Assert.True(went);
+        Assert.Equal("0.23.4", Apps.PlistString(Path.Combine(dest, "Contents", "Info.plist"), "CFBundleShortVersionString"));
+        // It goes by its label before the bundle under it is replaced, and comes back on the new one.
+        Assert.Equal(["stop", "ditto", "/usr/bin/xattr", $"register {program}"], ran.Where(r => r is "stop" or "ditto" or "/usr/bin/xattr" || r.StartsWith("register")).ToArray());
+        Assert.Equal(["sh", "4242", dest, $"{volumes}/Syft Notes"], spawned!.Skip(3).ToArray());
+        // Opened as a new copy, then the disk image is asked to go a few times (Finder may still have its window open),
+        // and made to last.
+        Assert.Contains("/usr/bin/open -n \"$2\"", spawned![2]);
+        Assert.Contains("-force", spawned![2]);
+        Assert.DoesNotContain("sleep", spawned![2]);
+    }
+
+    static string Versioned(string version) =>
+        Plist.Replace("</dict>", $"<key>CFBundleShortVersionString</key><string>{version}</string></dict>");
 
     static void CopyDir(string from, string to)
     {
@@ -131,11 +256,22 @@ public class MoveToApplicationsTests
     }
 
     [Fact]
-    public void Another_copy_is_any_process_but_this_one_in_the_list()
+    public void Only_a_copy_of_the_app_holds_the_move_off_never_what_AI_apps_and_the_computer_run_from_it()
     {
-        ProcResult? Pgrep(string pids) => new ProcResult(0, pids);
-        Assert.False(MoveToApplications.OtherCopyRunning((_, _, _) => Pgrep("4242\n"), 4242));
-        Assert.True(MoveToApplications.OtherCopyRunning((_, _, _) => Pgrep("4242\n999\n"), 4242));
-        Assert.False(MoveToApplications.OtherCopyRunning((_, _, _) => new ProcResult(1, ""), 4242));
+        // `pgrep -lf` as a Mac printed it: AI apps' MCP servers from the old bundle and the new (one through Claude's own
+        // wrapper) and the background library, then the menu bar copy started at login.
+        const string engines = "501 /Applications/Study Stash.app/Contents/MacOS/StudyStash mcp --client claude-code\n"
+            + "502 /Applications/Claude.app/Contents/Helpers/disclaimer --pgroup -- /Applications/Study Stash.app/Contents/MacOS/StudyStash mcp --client claude-desktop\n"
+            + "503 /Applications/Syft Notes.app/Contents/MacOS/StudyStash --home /Users/student/.study-stash helper\n"
+            + "504 /Applications/Syft Notes.app/Contents/MacOS/StudyStash mcp --client chatgpt\n";
+        const string menuBar = "505 /Applications/Syft Notes.app/Contents/MacOS/StudyStash --background\n";
+        bool Running(string pgrep, int pid = 4242) =>
+            MoveToApplications.OtherCopyRunning((_, _, _) => new ProcResult(0, pgrep), pid, engine: StudyStash.Library.Cli.IsCommand);
+        Assert.False(Running(engines));
+        Assert.True(Running(engines + menuBar));
+        Assert.False(Running(menuBar, pid: 505)); // this very copy
+        // Without the engine's commands to leave out, every program counts (the bundle's rename still waits for them).
+        Assert.True(MoveToApplications.OtherCopyRunning((_, _, _) => new ProcResult(0, engines), 4242));
+        Assert.False(MoveToApplications.OtherCopyRunning((_, _, _) => new ProcResult(1, ""), 4242, engine: StudyStash.Library.Cli.IsCommand));
     }
 }

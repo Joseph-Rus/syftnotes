@@ -34,8 +34,8 @@ public sealed class UpdateHost
     /// <summary>What running this exact program with `version` prints, or null when it doesn't run here.</summary>
     public Func<string, string?> VersionOf { get; init; } = _ => throw Off("Running the new app");
     /// <summary>Start a program detached from this one, so it outlives it: Windows' Setup.exe, or the Mac relaunch
-    /// waiter below.</summary>
-    public Action<IReadOnlyList<string>> SpawnDetached { get; init; } = _ => throw Off("Starting the installer");
+    /// waiter below. Its process id (0 when there's none to name), for ending it if it must not run after all.</summary>
+    public Func<IReadOnlyList<string>, int> SpawnDetached { get; init; } = _ => throw Off("Starting the installer");
     /// <summary>A pid to wait for before reopening the app after a Mac swap; 0 means don't.</summary>
     public int RelaunchPid { get; init; }
     public IReadOnlyList<string> RelaunchArgs { get; init; } = [];
@@ -95,8 +95,8 @@ public sealed class UpdateHost
 /// </summary>
 public static partial class Updates
 {
-    public const double FirstCheckAfter = 10 * 60;
-    public const double CheckEvery = 6 * 3600;
+    public const double FirstCheckAfter = 2 * 60;
+    public const double CheckEvery = 3600;
     public const double LockStaleAfter = 20 * 60;
 
     /// <summary>The version on disk right now: another process (the CLI, the library page's Update now) may have
@@ -131,14 +131,15 @@ public static partial class Updates
         return p is { ExitCode: 0 } ? Py.Strip(p.Stdout) : null;
     }
 
-    /// <summary>Start a program with no console and no wait, so it outlives this one.</summary>
-    public static void SpawnDetached(IReadOnlyList<string> args)
+    /// <summary>Start a program with no console and no wait, so it outlives this one; its process id.</summary>
+    public static int SpawnDetached(IReadOnlyList<string> args)
     {
         // In the temp folder, not this copy's own: a program left running in a folder keeps Windows from deleting it
         // (the move to Velopack's install uninstalls the folder this copy runs from).
         var psi = new ProcessStartInfo(args[0]) { UseShellExecute = false, CreateNoWindow = true, WorkingDirectory = Path.GetTempPath() };
         foreach (string a in args.Skip(1)) psi.ArgumentList.Add(a);
-        using var _ = Process.Start(psi);
+        using var p = Process.Start(psi);
+        return p?.Id ?? 0;
     }
 
     /// <summary>Whether <paramref name="file"/> is the release's <paramref name="asset"/>, by its SHA256SUMS.txt.</summary>

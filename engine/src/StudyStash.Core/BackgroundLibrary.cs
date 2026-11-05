@@ -90,6 +90,10 @@ public sealed class BackgroundLibrary : IBackgroundLibrary
     public string UnitPath(string home) => Path.Combine(Systemd, UnitName(home) + ".service");
     public string AutostartPath(string home) => Path.Combine(Autostart, UnitName(home) + ".desktop");
 
+    /// <summary>Where a Mac's launchd puts what the background library prints before its log is open, the runtime's own
+    /// report of a crash included: nothing else would say why it stopped as it started.</summary>
+    public static string ErrorsPath(string home) => Path.Combine(Path.GetFullPath(home), "logs", "helper.err");
+
     /// <summary>Where the background library writes its own process id (and, kept alive by itself, its library's).</summary>
     public static string PidPath(string home) => Path.Combine(home, "background.pid");
 
@@ -104,7 +108,7 @@ public sealed class BackgroundLibrary : IBackgroundLibrary
 
     /// <summary>The LaunchAgent. No RunAtLoad: KeepAlive's PathState starts it at login and after a crash, but only
     /// while its program is there, so once the app is in the Trash launchd quietly leaves it be.</summary>
-    public static string Plist(string label, IReadOnlyList<string> args, string userHome)
+    public static string Plist(string label, IReadOnlyList<string> args, string userHome, string errors)
     {
         string items = string.Concat(args.Select(a => $"\n        <string>{Xml(a)}</string>"));
         return $"""
@@ -125,6 +129,7 @@ public sealed class BackgroundLibrary : IBackgroundLibrary
                 </dict>
                 <key>ThrottleInterval</key><integer>10</integer>
                 <key>ProcessType</key><string>Standard</string>
+                <key>StandardErrorPath</key><string>{Xml(errors)}</string>
                 <key>EnvironmentVariables</key>
                 <dict>
                     <key>PATH</key><string>/usr/local/bin:/opt/homebrew/bin:/usr/bin:/bin:/usr/sbin:/sbin:{Xml(userHome)}/.local/bin</string>
@@ -211,6 +216,22 @@ public sealed class BackgroundLibrary : IBackgroundLibrary
         "Windows" => RunKey.Get(RunValue(home)) is not null,
         _ => LinuxWay(home) is not null,
     };
+
+    /// <summary>Whether the registration is the one this version writes. A Mac's LaunchAgent an older copy wrote (one
+    /// without <see cref="ErrorsPath"/>) isn't: the app registers it again.</summary>
+    public bool UpToDate(string home)
+    {
+        if (System != "Darwin") return true;
+        try
+        {
+            string text = File.ReadAllText(PlistPath(home)).ReplaceLineEndings("\n");
+            return text == Plist(Label(home), PlistArgs(text), Py.UserHome(), ErrorsPath(home));
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException)
+        {
+            return true;
+        }
+    }
 
     /// <summary>What the registration runs: its program and arguments, or null when there's none.</summary>
     public IReadOnlyList<string>? Registered(string home)
@@ -346,7 +367,7 @@ public sealed class BackgroundLibrary : IBackgroundLibrary
         {
             var args = Command(program, home, keepAlive: false, extra);
             Directory.CreateDirectory(LaunchAgents);
-            Py.WriteText(PlistPath(home), Plist(Label(home), args, Py.UserHome()));
+            Py.WriteText(PlistPath(home), Plist(Label(home), args, Py.UserHome(), ErrorsPath(home)));
             Run("launchctl", ["bootstrap", Target, PlistPath(home)], Quick);
         }
         else if (System == "Windows")
@@ -528,6 +549,8 @@ public interface IBackgroundLibrary
     bool IsRegistered(string home);
     /// <summary>The program and arguments the registration runs, or null when there's none.</summary>
     IReadOnlyList<string>? Registered(string home);
+    /// <summary>False when an older copy wrote the registration, and this version writes it differently.</summary>
+    bool UpToDate(string home) => true;
     void Register(string home, string program, IReadOnlyList<string>? extra = null);
     void Unregister(string home);
     /// <summary>Every one registered on this computer, by its folder, with what it runs.</summary>

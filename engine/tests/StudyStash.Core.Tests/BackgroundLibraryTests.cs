@@ -52,6 +52,9 @@ public class BackgroundLibraryTests
         // RunAtLoad, which would try once at every login even with the app gone.
         Assert.Contains("<key>PathState</key>\n        <dict>\n            <key>/Applications/Syft Notes.app/Contents/MacOS/StudyStash</key><true/>", plist);
         Assert.DoesNotContain("RunAtLoad", plist);
+        // A crash before its log is open still leaves words: launchd puts them in the logs folder.
+        Assert.Contains($"<key>StandardErrorPath</key><string>{Path.Combine(Path.GetFullPath(home), "logs", "helper.err")}</string>", plist);
+        Assert.True(bg.UpToDate(home));
         if (OperatingSystem.IsMacOS()) Assert.Equal(0, Machine.Run("/usr/bin/plutil", ["-lint", bg.PlistPath(home)], TimeSpan.FromSeconds(20))?.ExitCode);
         Assert.Equal(["launchctl bootstrap gui/501 " + bg.PlistPath(home)], s.Calls);
         Assert.Equal([program, "--home", Path.GetFullPath(home), "helper"], bg.Registered(home));
@@ -61,6 +64,10 @@ public class BackgroundLibraryTests
         var all = Assert.Single(bg.All());
         Assert.Equal(Path.GetFullPath(home), all.Home);
         Assert.Equal([program, "--home", Path.GetFullPath(home), "helper"], all.Args);
+
+        // One an older copy wrote, without the error file, isn't up to date: the app registers it again.
+        File.WriteAllText(bg.PlistPath(home), string.Join('\n', plist.Split('\n').Where(l => !l.Contains("StandardErrorPath"))));
+        Assert.False(bg.UpToDate(home));
 
         s.Calls.Clear();
         bg.Unregister(home);

@@ -30,7 +30,7 @@
         <li><a href="../phone/">Phone app</a></li>
         <li class="hide-sm"><a href="./" aria-current="page">Privacy</a></li>
         <li class="hide-sm"><a href="../support/">Support</a></li>
-        <li><a class="gh" href="https://github.com/Joseph-Rus/study-stash" aria-label="Syft Notes on GitHub"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 .3a12 12 0 0 0-3.8 23.4c.6.1.8-.3.8-.6v-2c-3.3.7-4-1.6-4-1.6-.6-1.4-1.4-1.8-1.4-1.8-1-.7.1-.7.1-.7 1.2.1 1.8 1.2 1.8 1.2 1.1 1.8 2.8 1.3 3.5 1 .1-.8.4-1.3.8-1.6-2.7-.3-5.5-1.3-5.5-5.9 0-1.3.5-2.4 1.2-3.2-.1-.3-.5-1.5.1-3.2 0 0 1-.3 3.3 1.2a11.5 11.5 0 0 1 6 0c2.3-1.5 3.3-1.2 3.3-1.2.6 1.7.2 2.9.1 3.2.8.8 1.2 1.9 1.2 3.2 0 4.6-2.8 5.6-5.5 5.9.4.4.8 1.1.8 2.2v3.3c0 .3.2.7.8.6A12 12 0 0 0 12 .3"/></svg></a></li>
+        <li><a class="gh" href="https://github.com/Joseph-Rus/syftnotes" aria-label="Syft Notes on GitHub"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 .3a12 12 0 0 0-3.8 23.4c.6.1.8-.3.8-.6v-2c-3.3.7-4-1.6-4-1.6-.6-1.4-1.4-1.8-1.4-1.8-1-.7.1-.7.1-.7 1.2.1 1.8 1.2 1.8 1.2 1.1 1.8 2.8 1.3 3.5 1 .1-.8.4-1.3.8-1.6-2.7-.3-5.5-1.3-5.5-5.9 0-1.3.5-2.4 1.2-3.2-.1-.3-.5-1.5.1-3.2 0 0 1-.3 3.3 1.2a11.5 11.5 0 0 1 6 0c2.3-1.5 3.3-1.2 3.3-1.2.6 1.7.2 2.9.1 3.2.8.8 1.2 1.9 1.2 3.2 0 4.6-2.8 5.6-5.5 5.9.4.4.8 1.1.8 2.2v3.3c0 .3.2.7.8.6A12 12 0 0 0 12 .3"/></svg></a></li>
       </ul>
     </nav>
   </div>
@@ -73,7 +73,7 @@
           computer. With Claude, ChatGPT or Gemini, your transcripts go to that company under your own account.</li>
       </ul>
       <p>Syft Notes is free, open-source software under the MIT licence. Everything on this page can be checked in its
-        <a href="https://github.com/Joseph-Rus/study-stash">source code</a>.</p>
+        <a href="https://github.com/Joseph-Rus/syftnotes">source code</a>.</p>
 
       <h2 id="stays">What stays on your computers</h2>
       <p>Syft Notes keeps its data in two folders, unless you choose other places. Your notes are in
@@ -224,12 +224,12 @@
           and passages a question needs) straight to that company's API, with your key. The key is kept in a file in
           <code>.study-stash</code> on your library's computer and is sent only to that company's API.</li>
         <li><strong>Claude, ChatGPT and other AI apps</strong> can read your library only if you set that up in
-          <strong>Settings → Your library → AI apps</strong>, and only read. The apps on your computer (the Claude
-          and ChatGPT apps, Claude Code, Gemini CLI) read it through that computer once you choose
-          <strong>Connect</strong>, with no address on the internet. claude.ai and chatgpt.com in a browser, and the
-          Claude phone app, run on Anthropic's and OpenAI's servers, so they need your library to have an address on
-          the internet: that's off unless you turn it on, and it's protected by signing in with your library
-          password.</li>
+          <strong>Settings → Your library → Your AI</strong>, and only read. The apps on your computer (the
+          Claude and ChatGPT apps, Claude Code, Gemini CLI) read it through that computer once you choose
+          <strong>Connect</strong> on their AI's card there, with no address on the internet. claude.ai and chatgpt.com
+          in a browser, and the Claude phone app, run on Anthropic's and OpenAI's servers, so they need your library
+          to have an address on the internet: that's off unless you turn it on, and it's protected by signing in with
+          your library password.</li>
       </ul>
       <p>Without an engine, lectures are still transcribed and filed.</p>
 
@@ -238,7 +238,7 @@
         engine you choose), Syft Notes contacts:</p>
       <ul>
         <li><strong>GitHub</strong>, to check for and download updates from Syft Notes' own
-          <a href="https://github.com/Joseph-Rus/study-stash/releases">releases</a>. Each download is checked
+          <a href="https://github.com/Joseph-Rus/syftnotes/releases">releases</a>. Each download is checked
           against the release's checksums. You can turn automatic updates off.</li>
         <li><strong>Hugging Face</strong>, to download the transcription model you pick (a Whisper model or NVIDIA
           Parakeet; Cactus Whistle comes with the app) and, if you turn on <strong>Tell speakers apart</strong>, the
@@ -253,9 +253,9 @@
           your school's address. It sends no information about you, and what comes back is one version number.</li>
         <li><strong>Syft Notes' daily count</strong>, kept in Google's Firestore in Syft Notes' own project: once a
           day, the computer app sends one record with a random code made for this copy of the app (not linked to you,
-          your accounts or your computer's name), the day, the app's version and whether it's a Mac or a PC. That's
-          all it holds, and nothing outside the project can read it. It tells us how many copies are in use. Turn it
-          off in <strong>Settings → General → Count this copy</strong>. The iPhone and iPad app sends no count at
+          your accounts or your computer's name), the day, the app's version and whether it's a Mac, Windows or Linux.
+          That's all it holds, and nothing outside the project can read it. It tells us how many copies are in use.
+          Turn it off in <strong>Settings → General → Count this copy</strong>. The iPhone and iPad app sends no count at
           all.</li>
       </ul>
       <p>None of these requests include your notes, recordings, calendar or Canvas data, and none identify you beyond
@@ -283,13 +283,13 @@
 
       <h2 id="changes">Changes</h2>
       <p>If this policy changes, the new version is posted here with a new date, and every earlier version stays in
-        the <a href="https://github.com/Joseph-Rus/study-stash/commits/main/site/privacy/index.html">site's history on
+        the <a href="https://github.com/Joseph-Rus/syftnotes/commits/main/site/privacy/index.html">site's history on
         GitHub</a>. If Syft Notes ever needs to read something new, it will ask you first.</p>
 
       <h2 id="contact">Contact</h2>
       <p>Questions about privacy: email <a href="mailto:support@syftnotes.com">support@syftnotes.com</a>, or open an issue on
-        <a href="https://github.com/Joseph-Rus/study-stash/issues">GitHub</a>. To report a security problem privately,
-        use the repository's <a href="https://github.com/Joseph-Rus/study-stash/security/advisories/new">Report a
+        <a href="https://github.com/Joseph-Rus/syftnotes/issues">GitHub</a>. To report a security problem privately,
+        use the repository's <a href="https://github.com/Joseph-Rus/syftnotes/security/advisories/new">Report a
         vulnerability</a> form. See <a href="../support/">Support</a> for more.</p>
     </div>
   </div>
@@ -306,7 +306,7 @@
       <li><a href="./">Privacy</a></li>
       <li><a href="../terms/">Terms</a></li>
       <li><a href="../support/">Support</a></li>
-      <li><a href="https://github.com/Joseph-Rus/study-stash">GitHub</a></li>
+      <li><a href="https://github.com/Joseph-Rus/syftnotes">GitHub</a></li>
     </ul>
   </div>
 </footer>

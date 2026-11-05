@@ -144,4 +144,27 @@ public class AppCalendarTests
         }
         finally { host.StopRecording(); }
     }
+
+    /// <summary>Keep recording a lecture the library sorter left in Unsorted and the student then moved to CS 101: while
+    /// it records, it's in CS 101 (what the sidebar's chip, the pill and its page read), not Unsorted from before.</summary>
+    [Fact]
+    public async Task Keeping_a_lecture_going_records_it_in_its_folder_in_the_library()
+    {
+        using var home = new TempHome();
+        using var host = Host(home);
+        var done = new Lecture
+        {
+            Id = "rec-20260923-100212-abc123", Started = DateTimeOffset.Now.AddDays(-1).ToString("o"), State = LectureState.Filed,
+            FiledClass = Configs.Unsorted, FiledTitle = "Recursion",
+        };
+        host.Lectures.Add(done);
+
+        var start = await host.ContinueAsync(done.Id, "Recursion", "CS 101");
+        try
+        {
+            Assert.Equal("CS 101", start.Lecture!.ClassName);
+            Assert.Equal("CS 101", host.Recorder.Current!.ClassName);
+        }
+        finally { host.StopRecording(); }
+    }
 }

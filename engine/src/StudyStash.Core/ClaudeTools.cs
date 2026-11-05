@@ -92,7 +92,7 @@ public sealed class LocalLibrary(LibraryReader reader, Canvas.CanvasSync? canvas
             return NotHere;
         if (home is not null && RealPath(home) is { } h && real.StartsWith(h.TrimEnd(Path.DirectorySeparatorChar) + Path.DirectorySeparatorChar, StringComparison.Ordinal))
             return NotHere;
-        return ClaudeTools.Page(Ai.FileIndex.TextOf(real), offset, "Syft Notes can't read the words in this file (it may be a picture or a scan).");
+        return ClaudeTools.Page(Ai.FileIndex.TextOf(real, home is null ? null : Ai.DocumentTextOptions.For(home)), offset, "Syft Notes can't read the words in this file (it may be a picture or a scan).");
     }
 
     /// <summary>Where a path really is, every link along it followed; null when it can't be followed (a loop, or
@@ -151,7 +151,7 @@ public sealed class LocalLibrary(LibraryReader reader, Canvas.CanvasSync? canvas
                     id = matches[0].Id;
                 }
                 if (id is null) return CanvasErr("Give an assignment id or words of its name.");
-                var found = Canvas.CanvasView.Assignment(index, id.Value, canvas.Clock(), canvas.Crawl.AssignmentFolder(cls, id.Value));
+                var found = Canvas.CanvasView.Assignment(index, id.Value, canvas.Clock(), canvas.Crawl.AssignmentFolder(cls, id.Value), Canvas.DueMarks.Load(home ?? ""));
                 return found is null ? CanvasErr($"No assignment {id} in {cls}.") : found;
             }
             case "modules":
@@ -167,7 +167,7 @@ public sealed class LocalLibrary(LibraryReader reader, Canvas.CanvasSync? canvas
                 return result;
             }
             default: // "assignments": what's still due, everywhere or in one class
-                var all = Canvas.Assignments.Load(home ?? "");
+                var all = Canvas.Assignments.Shown(home ?? "");
                 var list = Canvas.Assignments.Upcoming(all, DateTime.Now, body?["days"] is JsonValue d && d.TryGetValue(out int n) ? n : 14, cls);
                 return new JsonArray(list.Select(a => (JsonNode)new JsonObject
                 {
@@ -228,6 +228,16 @@ public sealed class RemoteLibrary(string serverUrl, Func<string> key, HttpClient
     }
 
     static string Q(string? s) => Uri.EscapeDataString(s ?? "");
+
+    /// <summary>Starts a bring-in job in the library (<see cref="LibraryBringIn.Route"/>: kind, into, from, refile), or
+    /// gets the one already running there. Null from a library older than this.</summary>
+    public async Task<BringInStatus?> StartFolderJobAsync(JsonObject ask, CancellationToken stop = default) =>
+        BringInStatus.FromJson(await SendAsync(HttpMethod.Post, "/folders/job", ask, stop) as JsonObject);
+
+    /// <summary>The bring-in job running in the library, or the last one; null when it has had none since it started
+    /// (or is older than this).</summary>
+    public async Task<BringInStatus?> FolderJobAsync(CancellationToken stop = default) =>
+        BringInStatus.FromJson(await SendAsync(HttpMethod.Get, "/folders/job", stop: stop) as JsonObject);
 
     /// <summary>The library's name and classes. A library from before /api/v2 (the Python engine) answers 404.</summary>
     public async Task<JsonObject> OverviewAsync() =>
@@ -834,6 +844,9 @@ public static class ClaudeTools
         if (pts.Length > 0) sb.Append("Points: ").Append(pts).Append('\n');
         sb.Append("Status: ").Append(S(a["label"]));
         if (S(a["score_text"]) is { Length: > 0 } score) sb.Append(" · ").Append(score);
+        // What the student marked in Syft Notes (never sent to Canvas), as the app shows it.
+        if (S(a["mark"]) is "done") sb.Append(" · marked done in Syft Notes");
+        else if (S(a["mark"]) is "hidden") sb.Append(" · hidden in Syft Notes");
         sb.Append('\n');
         if (a["submission"] is JsonObject subm && S(subm["submitted_at"]) is { Length: > 0 } submittedAt)
             sb.Append("Submitted: ").Append(Canvas.CanvasMarkdown.When(submittedAt, TimeZoneInfo.Local)).Append('\n');
