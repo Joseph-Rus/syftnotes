@@ -59,6 +59,9 @@ public sealed partial class LibraryWeb
                 return;
             }
             var reading = store.UnreadAttachments().Select(a => a.Id).ToHashSet();
+            // Asked for no other folder: only this folder's own note files state.db doesn't list (a settings folder made
+            // afresh on a folder that has notes).
+            if (from.Count + refile.Count == 0) job.Add(new BringInCount(cfg.PoolDir, LibraryBringIn.ListOwn(store, cfg), 0, 0, 0, 0, 0));
             foreach (var (asked, bring) in from.Select(f => (f, true)).Concat(refile.Select(f => (f, false))))
             {
                 // A folder asked for that this library can't use is said, never passed over: the switch isn't finished.

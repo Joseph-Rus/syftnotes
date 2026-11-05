@@ -62,4 +62,19 @@ public sealed class LibraryFoldersTests
         places.Add(third);
         Assert.True(LibraryFolders.ShouldAsk(LibraryFolders.Find(school, places), answered, school));
     }
+
+    /// <summary>A library folder the student renamed is found too; a named one with no notes isn't.</summary>
+    [Fact]
+    public void A_renamed_folder_is_found()
+    {
+        using var tmp = new TempDir();
+        string home = tmp["home"], docs = Path.Combine(home, "Documents");
+        string renamed = Path.Combine(docs, "Study Stash old"), syft = Path.Combine(docs, "Syft Notes");
+        foreach (string library in new[] { renamed, syft }) Note(library, "Biology", "2026-09-28 Cells.md");
+        Directory.CreateDirectory(Path.Combine(docs, "Study Stash empty", "Biology"));
+
+        var found = LibraryFolders.Find(null, LibraryFolders.Places(null, docs, home, "Darwin", _ => null));
+
+        Assert.Equal(new[] { renamed, syft }.Select(LibraryFolders.Real).Order(), found.Select(f => f.Path).Order());
+    }
 }

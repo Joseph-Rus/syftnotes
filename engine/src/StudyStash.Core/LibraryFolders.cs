@@ -69,8 +69,10 @@ public static partial class LibraryFolders
     /// <summary>
     /// Where a library folder may be on a computer: the one in use; Documents (wherever the system keeps it now) under
     /// each name a library folder has had; on Windows also the profile's own Documents, OneDrive's (a personal one
-    /// and every "OneDrive - School"), and the OneDrive folders Windows names; on a Mac ~/Documents and each OneDrive
-    /// in ~/Library/CloudStorage; and the first versions' folder in the home folder. Only lists them: whether each is
+    /// and every "OneDrive - School"), and the OneDrive folders Windows names; on a Mac ~/Documents and each OneDrive in
+    /// ~/Library/CloudStorage (never iCloud Drive's folder: looking there can make macOS ask the student for access); a
+    /// folder named after Study Stash or Syft Notes in any of them (renamed); and the first versions' folder in the home
+    /// folder. Only lists them: whether each is
     /// there, and holds a library, is <see cref="Find(string?, IEnumerable{string})"/>'s look.
     /// </summary>
     public static List<string> Places(string? inUse, string documents, string userHome, string system, Func<string, string?> env)
@@ -91,7 +93,9 @@ public static partial class LibraryFolders
         }
         var places = new List<string>();
         if (inUse is { Length: > 0 }) places.Add(inUse);
-        places.AddRange(docs.Select(d => Path.Combine(d, Name)));
+        // Study Stash, and one a student renamed ("Study Stash 2", "Syft Notes"): each counts only if it holds a library.
+        foreach (string d in docs)
+            places.AddRange([Path.Combine(d, Name), .. Children(d, Name + "*"), .. Children(d, "Syft Notes*")]);
         places.Add(Path.Combine(userHome, OldestName));
         return places;
     }

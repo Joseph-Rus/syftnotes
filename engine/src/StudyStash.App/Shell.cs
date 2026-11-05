@@ -1362,6 +1362,8 @@ public static partial class Shell
                 Setup.Finish(model, host);
                 w.Close();
                 ShowLibrary();
+                // A Study Stash folder that already has notes (a new laptop through OneDrive or iCloud, a reinstall) shows them.
+                AskWhichNotesFolderSoon();
                 // The first run ends by saying where the S. lives (or that a full menu bar hides it).
                 if (!again) DispatcherTimer.RunOnce(SayWhereTheIconIs, TimeSpan.FromSeconds(1));
             };
@@ -1470,6 +1472,7 @@ public static partial class Shell
                     + (end.Ai.Length > 0 ? $"{Core.Ai.Engines.Name(end.Ai)} writes the notes" : "no AI yet (Later)"));
                 w.Close();
                 ShowLibrary();
+                AskWhichNotesFolderSoon();
                 // Home's "Ready when class starts", and the classes Canvas brought in, show at once.
                 RequestRefresh();
             };

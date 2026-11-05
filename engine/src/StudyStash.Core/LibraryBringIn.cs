@@ -68,6 +68,23 @@ public static class LibraryBringIn
     public static BringInCount Refile(Store store, Config cfg, string from, string userHome, Action<int, int>? progress = null) =>
         new Run(store, cfg, store.PoolDir, from, userHome, Mode.Refile, progress).Go();
 
+    /// <summary>Lists the note files in this library's own folder that state.db doesn't (a settings folder made afresh
+    /// on a folder that has notes: a new laptop through OneDrive or iCloud, a reinstall), where they are. Only files no
+    /// row points at are read, so it's quick when there's nothing new. How many it listed.</summary>
+    public static int ListOwn(Store store, Config cfg)
+    {
+        var listed = new HashSet<string>(store.NoteFiles().Select(p => Path.GetFullPath(p)), LibraryFolders.Comparer);
+        var gone = store.DeletedIds();
+        int n = 0;
+        foreach (string file in NoteFiles(store.PoolDir).Where(f => !listed.Contains(Path.GetFullPath(f))))
+            if (Read(file) is { } note && store.Get(note.Id) is null && !gone.Contains(note.Id))
+            {
+                Enlist(store, cfg, note, note.Text, note.Path, apply: true);
+                n++;
+            }
+        return n;
+    }
+
     enum Mode { Plan, Apply, Refile }
 
     sealed class Run(Store store, Config cfg, string into, string from, string userHome, Mode mode, Action<int, int>? progress)
@@ -485,7 +502,9 @@ public static class LibraryBringIn
             return null;
         }
         var front = Front(text.Replace("\r\n", "\n"));
-        if (!front.TryGetValue("id", out var idNode) || Py.AsString(idNode) is not { Length: > 0 and <= 200 } id) return null;
+        // Granola Share 0.2–0.4 wrote granola_id (its meeting's id, which the lecture kept) where later versions write id.
+        var idNode = front.GetValueOrDefault("id") ?? front.GetValueOrDefault("granola_id");
+        if (Py.AsString(idNode) is not { Length: > 0 and <= 200 } id) return null;
         string folderName = Path.GetFileName(Py.Parent(path));
         return new NoteFile(path, text, id, front, Py.AsString(front.GetValueOrDefault("class")) is { Length: > 0 } c ? c : folderName);
     }
@@ -547,9 +566,9 @@ public static class LibraryBringIn
             var m = new Meeting(Id)
             {
                 Title = Title.Length > 0 ? Title : System.IO.Path.GetFileNameWithoutExtension(Path),
-                Date = S("date"), Owner = S("source"), Folder = S("folder"),
+                Date = S("date"), Owner = S("source"), Folder = S("folder").Length > 0 ? S("folder") : S("granola_folder"),
                 Attendees = (Fields.GetValueOrDefault("attendees") as JsonArray ?? []).Select(Py.AsString).OfType<string>().ToList(),
-                NotesMarkdown = Notes.Section(Plain, "Notes"),
+                NotesMarkdown = Notes.Section(Plain, "Notes") is { Length: > 0 } notes ? notes : Notes.Section(Plain, "Granola's notes"),
                 PrivateNotes = Notes.Section(Plain, "Private notes"),
                 Transcript = Notes.Section(Plain, "Transcript"),
             };
@@ -586,6 +605,9 @@ public static class LibraryBringIn
                     break;
                 }
             }
+            // A file from before the id line (granola_id only) gets one, so the copy reads as itself.
+            if (!Fields.ContainsKey("id") && lines.Length > 0 && lines[0].TrimEnd('\r') == "---")
+                lines = [lines[0], $"id: {PyJson.Dumps(id)}{(lines[0].EndsWith('\r') ? "\r" : "")}", .. lines[1..]];
             var fields = new Dictionary<string, JsonNode?>(Fields) { ["id"] = id, ["title"] = title, ["lecture_title"] = lecture };
             return new NoteFile(Path, string.Join("\n", lines), id, fields, Class);
         }
