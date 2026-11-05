@@ -52,6 +52,8 @@ public sealed class LibraryService : IDisposable
     readonly Func<Config, TimeSpan, Task<bool>> waitHealthy;
     readonly Func<int, Task<string>> portStatus;
     readonly Func<Config, Task<(string Version, bool Background)?>> health;
+    readonly OlderLibrary older;
+    readonly Func<Config, Task<bool>> refuses;
     readonly Action<string> log;
     readonly Lock gate = new();
     readonly List<DateTime> recentExits = [];
@@ -59,6 +61,8 @@ public sealed class LibraryService : IDisposable
     Process? proc;
     bool stopping;
     bool disposed;
+    /// <summary>An older copy left on the port (busy, or still closing) isn't looked at again before this.</summary>
+    DateTime olderLookAgain;
 
     /// <summary>The port and password it's running with (or would, once started).</summary>
     public Config Cfg => cfg;
@@ -90,7 +94,8 @@ public sealed class LibraryService : IDisposable
 
     public LibraryService(string home, Config cfg, IReadOnlyList<string>? command = null, Func<ProcessStartInfo, Process>? spawn = null,
         Func<Config, TimeSpan, Task<bool>>? waitHealthy = null, Func<int, Task<string>>? portStatus = null, Action<string>? log = null,
-        Func<Config, Task<(string Version, bool Background)?>>? health = null)
+        Func<Config, Task<(string Version, bool Background)?>>? health = null, OlderLibrary? older = null,
+        Func<Config, Task<bool>>? refuses = null)
     {
         this.home = home;
         this.cfg = cfg;
@@ -100,6 +105,8 @@ public sealed class LibraryService : IDisposable
         this.portStatus = portStatus ?? (p => HostInfo.PortStatusAsync(p));
         this.log = log ?? Console.WriteLine;
         this.health = health ?? HealthAsync;
+        this.older = older ?? OlderLibrary.ThisComputer;
+        this.refuses = refuses ?? RefusesAsync;
     }
 
     static readonly HttpClient Http = new() { Timeout = TimeSpan.FromSeconds(5) };
@@ -119,6 +126,23 @@ public sealed class LibraryService : IDisposable
         catch (Exception e) when (e is HttpRequestException or TaskCanceledException or System.Text.Json.JsonException or InvalidOperationException)
         {
             return null;
+        }
+    }
+
+    /// <summary>The library on the port says no to this password (401 or 403). A library that doesn't answer in time
+    /// (busy with a long job: its health check waits for the store) hasn't refused anything: false.</summary>
+    static async Task<bool> RefusesAsync(Config cfg)
+    {
+        try
+        {
+            using var request = new HttpRequestMessage(HttpMethod.Get, $"http://127.0.0.1:{cfg.WebPort}/api/health");
+            request.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", cfg.PoolPassword);
+            using var r = await Http.SendAsync(request);
+            return r.StatusCode is System.Net.HttpStatusCode.Unauthorized or System.Net.HttpStatusCode.Forbidden;
+        }
+        catch (Exception e) when (e is HttpRequestException or TaskCanceledException)
+        {
+            return false;
         }
     }
 
@@ -165,8 +189,100 @@ public sealed class LibraryService : IDisposable
         try { status = await portStatus(cfg.WebPort); }
         catch (Exception e) when (e is HttpRequestException or SocketException) { status = "free"; }
         if (status == "busy") { SetState(LibraryServiceState.PortTaken, $"Port {cfg.WebPort} is taken by another program."); return; }
-        if (status == "ours") { SetState(LibraryServiceState.Elsewhere); return; }
+        if (status == "ours")
+        {
+            if (!await ReplaceOlderAsync()) return;
+            // The port is free now: this app's own library, the background one when that's wanted (registered again
+            // from this program, which boots out the old job first).
+            if (Background is { } again && again.Wanted() && await UseBackgroundAsync(again)) return;
+        }
         await SpawnAsync();
+    }
+
+    /// <summary>
+    /// A library already answers on the port. One that takes this app's password is used as it is
+    /// (<see cref="LibraryServiceState.Elsewhere"/>). One that turns it away (another password, or no answer) is looked
+    /// at (<see cref="OlderLibrary.Judge"/>): an older copy of Syft Notes for this folder is asked to quit; this app's
+    /// own background library is registered again (or, not wanted, let go) so it reads this folder's settings afresh;
+    /// never while a lecture is being recorded or written down, never by force, and never a copy as new as this one or
+    /// newer, or one for another folder. True once the port is this app's to use (free, or its own background library
+    /// registered afresh); otherwise this steps aside, with <see cref="Failure"/> saying why for a copy of ours (never
+    /// "restart"), and the app looks again in a minute.
+    /// </summary>
+    async Task<bool> ReplaceOlderAsync()
+    {
+        // Taking this password, it's used as it is, unless it says it's an older version than this app.
+        var said = await health(cfg);
+        if (said is { } took && Updates.Compare(Updates.ParseVersion(took.Version), Updates.ParseVersion(Engine.Version)) >= 0)
+        {
+            SetState(LibraryServiceState.Elsewhere);
+            return false;
+        }
+        var holder = await Task.Run(() => older.Holder(cfg.WebPort));
+        var verdict = OlderLibrary.Judge(holder, command[0], Engine.Version, home, older.Busy);
+        // It took this password: unless it's to be replaced now, it's used as it is, with nothing said, as before.
+        if (said is not null && verdict is not (OlderVerdict.Own or OlderVerdict.Replace))
+        {
+            SetState(LibraryServiceState.Elsewhere);
+            return false;
+        }
+        if (verdict == OlderVerdict.NotOurs)
+        {
+            SetState(LibraryServiceState.Elsewhere);
+            return false;
+        }
+        olderLookAgain = DateTime.UtcNow + AppUpdates.IdleRecheck;
+        string who = $"Syft Notes {(holder!.Version is { } v ? string.Join('.', v) : "(version unknown)")} ({holder.Program}, folder {holder.Home ?? "unknown"}) on port {cfg.WebPort}";
+        // No answer in time isn't a refusal: a library busy with a long job (a class renamed, the notes indexed again)
+        // is never stopped for being slow. Only a clear no (401/403), or an older version said, goes on.
+        if (said is null && !await refuses(cfg))
+        {
+            log($"[library] {who} didn't answer in time: left running, looked at again in a minute");
+            SetState(LibraryServiceState.Elsewhere, OlderLibrary.SlowWords);
+            return false;
+        }
+        switch (verdict)
+        {
+            case OlderVerdict.OtherHome or OlderVerdict.NotOlder or OlderVerdict.Passing:
+                log($"[library] {who} turns this app away, but isn't an older copy for this folder: left running");
+                SetState(LibraryServiceState.Elsewhere, OlderLibrary.OtherCopyWords);
+                return false;
+            case OlderVerdict.Busy:
+                log($"[library] {who} turns this app away, but a lecture is being recorded or written down: left running, looked at again in a minute");
+                SetState(LibraryServiceState.Elsewhere, OlderLibrary.BusyWords);
+                return false;
+            case OlderVerdict.Own when Background is { } plan && plan.Wanted():
+                // This app's own background library, on settings it read before they changed: registered again (which
+                // boots the old job out first), it starts on this folder's settings as they are now.
+                log($"[library] the background library ({who}) turns this app away: registering it again");
+                try
+                {
+                    await Task.Run(() => plan.System.Register(home, plan.Program, plan.Extra));
+                    olderLookAgain = default;
+                    return true;
+                }
+                catch (Exception e) when (e is IOException or UnauthorizedAccessException or InvalidOperationException or PlatformNotSupportedException or Win32Exception)
+                {
+                    log($"[library] couldn't register the background library again: {e.Message}");
+                }
+                break;
+        }
+        // An older copy, or this app's own background library that isn't wanted: launchd (or, on Windows, the background
+        // library's own registration) lets go of it, then it's asked to quit.
+        if (verdict == OlderVerdict.Own && Background is { } own) await Task.Run(() => own.System.Stop(home));
+        else await Task.Run(() => older.StopRegistration(home, verdict == OlderVerdict.Own ? null : command[0]));
+        // Once per process: asked on an earlier look, it's only looked at again (a second SIGTERM means "stop now").
+        bool asked = older.AskOnce(holder.Pid, out bool before);
+        if (!(before ? await portStatus(cfg.WebPort) == "free" : await WaitPortFreeAsync()))
+        {
+            log(asked ? $"[library] asked {who} to quit; it hasn't yet, looked at again in a minute"
+                : $"[library] {who} turns this app away, and this computer has no polite way to ask it to quit: left running");
+            SetState(LibraryServiceState.Elsewhere, asked ? OlderLibrary.ClosingWords : OlderLibrary.StillRunningWords);
+            return false;
+        }
+        log($"[library] stopped {who}");
+        olderLookAgain = default;
+        return true;
     }
 
     /// <summary>The library we stepped aside for (<see cref="LibraryServiceState.Elsewhere"/>) may have stopped since: a
@@ -174,7 +290,7 @@ public sealed class LibraryService : IDisposable
     /// its place; while another still answers, nothing changes.</summary>
     public async Task TakeOverIfGoneAsync()
     {
-        if (State != LibraryServiceState.Elsewhere) return;
+        if (State != LibraryServiceState.Elsewhere || DateTime.UtcNow < olderLookAgain) return;
         await StartAsync();
     }
 
@@ -202,11 +318,19 @@ public sealed class LibraryService : IDisposable
             {
                 await Task.Run(() => bg.Start(home));
             }
-            if (!fresh && await health(cfg) is { } said && (said.Version != Engine.Version || !said.Background))
+            var said = fresh ? null : await health(cfg);
+            if (said is { } was && (was.Version != Engine.Version || !was.Background))
             {
                 // Running an older copy (updated since, by something that didn't restart it): onto this one.
-                log($"[library] the background library runs {said.Version}; starting it again on {Engine.Version}");
+                log($"[library] the background library runs {was.Version}; starting it again on {Engine.Version}");
                 await Task.Run(() => bg.Register(home, plan.Program, plan.Extra));
+            }
+            else if (!fresh && said is null && await portStatus(cfg.WebPort) == "ours")
+            {
+                // Something on the port turns this app away: an older copy, or this app's own background library on
+                // settings that changed since it started (registered again there). Left alone, this steps aside.
+                if (!await ReplaceOlderAsync()) return true;
+                if (await portStatus(cfg.WebPort) == "free") await Task.Run(() => bg.Start(home));
             }
             if (await waitHealthy(cfg, TimeSpan.FromSeconds(30)) && await health(cfg) is { Background: true })
             {
@@ -235,15 +359,13 @@ public sealed class LibraryService : IDisposable
         return false;
     }
 
-    static bool SameProgram(string a, string b) =>
+    internal static bool SameProgram(string a, string b) =>
         string.Equals(Path.GetFullPath(a), Path.GetFullPath(b), OperatingSystem.IsWindows() ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal);
 
     /// <summary>Up to 15 s for the port to be let go (a background library stopping): a child started sooner couldn't
-    /// listen on it.</summary>
-    async Task WaitPortFreeAsync()
-    {
-        await Poll.UntilAsync(async _ => await portStatus(cfg.WebPort) == "free", TimeSpan.FromMilliseconds(100), TimeSpan.FromSeconds(15));
-    }
+    /// listen on it. False when it's still taken.</summary>
+    Task<bool> WaitPortFreeAsync() =>
+        Poll.UntilAsync(async _ => await portStatus(cfg.WebPort) == "free", TimeSpan.FromMilliseconds(100), TimeSpan.FromSeconds(15));
 
     /// <summary>
     /// Settings → Phone's switch, Google connected or disconnected, or this computer no longer just this computer: the

@@ -83,13 +83,16 @@ public sealed class LibraryHere
 
     /// <summary>Why the library just started can't be used, in the student's words, or null when it's up and answers
     /// this app. One that stepped aside for a library already on the port (<see cref="LibraryServiceState.Elsewhere"/>)
-    /// is asked with the password too: "ready" is never said over a library that turns the app away.</summary>
-    static async Task<string?> ProblemAsync(LibraryService svc, Config cfg)
+    /// is asked with the password too: "ready" is never said over a library that turns the app away. An older copy of
+    /// Syft Notes on the port was asked to quit as the library started (<see cref="OlderLibrary"/>); one still there
+    /// says why in <see cref="LibraryService.Failure"/>, never "restart".</summary>
+    internal static async Task<string?> ProblemAsync(LibraryService svc, Config cfg)
     {
         string device = Machine.Device;
         if (svc.State == LibraryServiceState.Running) return null;
         if (svc.State != LibraryServiceState.Elsewhere)
             return "The library didn't start." + (svc.Failure is { Length: > 0 } f ? $" {f.TrimEnd('.')}." : "") + " Its log is in the logs folder.";
+        if (svc.Failure is { Length: > 0 } older) return older;
         try
         {
             await LibraryApi.CheckServerAsync($"http://127.0.0.1:{cfg.WebPort}", cfg.PoolPassword);

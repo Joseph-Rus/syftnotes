@@ -17,7 +17,7 @@ public static class Apps
 
     /// <summary>The &lt;string&gt; that follows &lt;key&gt;key&lt;/key&gt; in a plist, or null: no such key, the value
     /// isn't a string, or the file isn't a plist at all (a garbled Info.plist should never throw, only answer null).</summary>
-    internal static string? PlistString(string path, string key)
+    public static string? PlistString(string path, string key)
     {
         try
         {
@@ -34,7 +34,7 @@ public static class Apps
 
     /// <summary>Walking up from a folder inside the bundle (e.g. Contents/MacOS/arm64) to "Study Stash.app" itself, or
     /// null short of the root (a build folder isn't inside one).</summary>
-    internal static string? EnclosingMacBundle(string baseDir)
+    public static string? EnclosingMacBundle(string baseDir)
     {
         for (var dir = new DirectoryInfo(baseDir); dir is not null; dir = dir.Parent)
             if (dir.Name.EndsWith(".app", StringComparison.OrdinalIgnoreCase)) return dir.FullName;
