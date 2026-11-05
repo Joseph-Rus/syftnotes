@@ -318,6 +318,44 @@ public class LibrarySettingsApiTests
     /// <summary>A class removed in the app's Settings: its lecture moves to Unsorted (note file and all), and so does
     /// one whose notes couldn't be written; its empty folder goes, the sidebar no longer lists it, and its Canvas course
     /// is un-ticked. A class whose name was cleared isn't removed: it stays as it was, lectures and all.</summary>
+    /// <summary>Removing a class loses nothing: a lecture whose rewrite failed keeps the edits made in its file (moved to
+    /// Unsorted, still failed), and one sent for the class after it's gone (recorded meanwhile) is kept and isn't filed
+    /// under the removed class.</summary>
+    [Fact]
+    public async Task Removing_a_class_keeps_a_failed_lecture_s_edited_file_and_a_lecture_sent_for_it_later()
+    {
+        using var dir = new TempDir();
+        var (cfg, store) = Library(dir);
+        using var _s = store;
+        string first = store.Save(new Meeting("m4") { Title = "Enzymes", Date = "2026-09-04", Transcript = "Today." },
+            new Classification("BIO 110", 0.9, "folder"), summaryMd: "## Summary\nEnzymes.");
+        // A rewrite was asked for and threw: the lecture failed, its file still in BIO 110, edited there since.
+        store.Requeue("m4");
+        store.ClaimNext();
+        store.MarkFailed("m4", "The notes engine stopped.");
+        File.AppendAllText(first, "\nMy own note about enzymes.\n");
+        await using var site = await Site(cfg, store);
+
+        await Json(await site.Client.SendAsync(Req(HttpMethod.Post, "/api/v2/settings", new
+        {
+            classes = new object[] { new { name = "CS 101", was = "CS 101" } },
+            known = new[] { "CS 101", "BIO 110" },
+        })));
+
+        var failed = store.Get("m4")!;
+        Assert.Equal((Configs.Unsorted, Store.Failed, "The notes engine stopped."), (failed.ClassName, failed.Status, failed.Error));
+        Assert.Equal(Configs.Unsorted, Path.GetFileName(Path.GetDirectoryName(failed.MdPath)));
+        Assert.Contains("My own note about enzymes.", File.ReadAllText(failed.MdPath!));
+        Assert.False(File.Exists(first));
+
+        // Recorded for BIO 110 on the laptop while it was being removed, and sent after: it's kept, and the class it was
+        // recorded for no longer files it (the AI sorts it, or it waits in Unsorted).
+        var late = new Meeting("m5") { Title = "Photosynthesis", Date = "2026-09-05", Transcript = "Light reactions.", Folder = "BIO 110" };
+        store.Enqueue(late);
+        Assert.Equal(("Photosynthesis", 1L), (store.Get("m5")!.Title, store.Get("m5")!.HasTranscript));
+        Assert.Null(Classify.ByRules(late, Configs.Load(cfg.Home).Classes));
+    }
+
     [Fact]
     public async Task Removing_a_class_moves_its_lectures_to_Unsorted_and_stops_its_Canvas_course()
     {
