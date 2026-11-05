@@ -102,6 +102,8 @@ static class Program
         }
         Skin.Current = Skin.FromEnvironment();
         Log($"[app] Syft Notes {Engine.Version} starting ({Home})");
+        // A Mac with its screen asleep: Avalonia can't start drawing and would end the app (MacDisplay.cs).
+        MacDisplay.WaitUntilAwake(Log);
         int code = BuildAvaloniaApp().StartWithClassicDesktopLifetime(args);
         Log($"[app] quit ({code})");
         return code;
