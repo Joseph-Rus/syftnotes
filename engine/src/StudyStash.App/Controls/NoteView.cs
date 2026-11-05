@@ -716,8 +716,12 @@ public sealed partial class NoteView : StackPanel
             {
                 if (await source(id) is { } path && File.Exists(path))
                 {
-                    using var stream = File.OpenRead(path);
-                    picture.Source = Avalonia.Media.Imaging.Bitmap.DecodeToWidth(stream, 1400);
+                    // A phone photo is megapixels: decoded on a worker thread so the page keeps scrolling.
+                    picture.Source = await Task.Run(() =>
+                    {
+                        using var stream = File.OpenRead(path);
+                        return Avalonia.Media.Imaging.Bitmap.DecodeToWidth(stream, 1400);
+                    });
                     picture.IsVisible = true;
                 }
             }

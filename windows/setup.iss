@@ -44,6 +44,9 @@ SolidCompression=yes
 WizardStyle=modern
 CloseApplications=force
 RestartApplications=no
+; One Setup at a time: a second double-click while this one runs says so and ends, rather than both writing the same
+; files ("MoveFile failed; code 183").
+SetupMutex=SyftNotesSetup
 #ifdef SignInstaller
 ; windows\sign-release.ps1 passes /DSignInstaller and the sign tool's command: Setup.exe, the uninstaller and any
 ; temporary copy of it that Setup makes are all signed (docs/signing.md).
@@ -97,10 +100,35 @@ Type: filesandordirs; Name: "{app}"
 [Code]
 var
   UpdateFinished: Boolean;
+  HandedToVelopack: Boolean;
 
 function Relaunch: Boolean;
 begin
   Result := ExpandConstant('{param:relaunch|0}') = '1';
+end;
+
+// Velopack's install of Syft Notes (docs/LIBRARIES.md, phase 5): once it's on this account, it's the copy that updates
+// itself, and this Setup never puts a second one beside it in Programs\Study Stash (two Syft Notes in Apps, the Start
+// menu pointed at the old one). It opens that copy instead, and ends without installing. An Inno install updating
+// itself (/relaunch=1) where there's no Velopack copy installs over itself as before.
+function VelopackCopy: String;
+begin
+  Result := ExpandConstant('{localappdata}\SyftNotes\current\StudyStash.exe');
+end;
+
+function InitializeSetup: Boolean;
+var
+  ResultCode: Integer;
+  Args: String;
+begin
+  Result := True;
+  if not FileExists(VelopackCopy) then Exit;
+  Result := False;
+  HandedToVelopack := True;
+  Log('Syft Notes is installed the new way (' + VelopackCopy + '): opening it instead of installing a second copy');
+  if Relaunch then Args := '--background' else Args := '';
+  if not Exec(VelopackCopy, Args, '', SW_SHOWNORMAL, ewNoWait, ResultCode) then
+    Log('Couldn''t open it: ' + SysErrorMessage(ResultCode));
 end;
 
 // Every process of this account running this install's StudyStash.exe (the app, and the library it runs), counted;
@@ -287,7 +315,7 @@ var
   ResultCode: Integer;
   Exe: String;
 begin
-  if (not Relaunch) or UpdateFinished then Exit;
+  if HandedToVelopack or (not Relaunch) or UpdateFinished then Exit;
   try
     Exe := ExpandConstant('{app}\StudyStash.exe');
     if FileExists(Exe) then

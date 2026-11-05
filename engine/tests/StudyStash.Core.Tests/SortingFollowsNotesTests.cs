@@ -114,6 +114,41 @@ public class SortingFollowsNotesTests
         new AiSettings { Provider = "gemini", ByJob = { ["ask"] = new AiChoice("ollama") } }.Save(cfg.Home);
         now = await Settings();
         Assert.Equal((true, "qwen3:8b"), (now["ollama"]!["chosen"]!.GetValue<bool>(), now["ollama"]!["sort_model"]!.GetValue<string>()));
+
+        // "Rewrite all" queues the lectures it counts: l1 has a summary, l2 (filed with none) is not rewritten.
+        using var rewrite = new HttpRequestMessage(HttpMethod.Post, "/api/v2/settings/rewrite-all") { Content = JsonContent.Create(new { }) };
+        rewrite.Headers.Authorization = new("Bearer", "pw");
+        var queued = JsonNode.Parse(await (await site.Client.SendAsync(rewrite)).Content.ReadAsStringAsync())!["queued"]!.GetValue<int>();
+        Assert.Equal((1, "queued", "done"), (queued, store.Get("l1")!.Status, store.Get("l2")!.Status));
+    }
+
+    [Theory]
+    [InlineData("/api/v2/settings", """{"sort_engine": "ollama"}""")]
+    [InlineData("/api/v2/ai/defaults", """{"ask": "ollama"}""")]
+    public async Task Picking_Ollama_for_sorting_or_Ask_makes_the_model_on_this_computer_the_librarys_own(string route, string body)
+    {
+        using var dir = new TempDir();
+        var cfg = Cfg(dir);
+        cfg.OllamaModel = Config.DefaultOllamaModel; // nobody chose a free model: the built-in one is 24 GB and isn't here
+        Directory.CreateDirectory(cfg.Home);
+        using var store = new Store(cfg.DbPath, cfg.PoolDir);
+        var ai = new AiJobs(cfg.Home) { Checks = new FakeChecks().Ollama(models: [("qwen3:1.7b", 1.4)]).Build() with { RamGb = () => 8 } };
+        await using var site = await TestSite.StartAsync(b => LibraryWeb.Build(b, cfg, store, new Pipeline(cfg, store, log: _ => { }), new LibraryWebOptions
+        {
+            ListModels = _ => Task.FromResult<List<(string, double)>?>([("qwen3:1.7b", 1.4)]), Tailscale = () => new TailscaleInfo(),
+            Latest = _ => Task.FromResult<Release?>(null), Ai = ai,
+        }));
+
+        using var post = new HttpRequestMessage(HttpMethod.Post, route) { Content = new StringContent(body, System.Text.Encoding.UTF8, "application/json") };
+        post.Headers.Authorization = new("Bearer", "pw");
+        Assert.True((await site.Client.SendAsync(post)).IsSuccessStatusCode);
+
+        // What sorting (cfg.OllamaModel) and Ask (the notes model) ask Ollama for is the model Settings names.
+        using var get = new HttpRequestMessage(HttpMethod.Get, "/api/v2/settings");
+        get.Headers.Authorization = new("Bearer", "pw");
+        var shown = JsonNode.Parse(await (await site.Client.SendAsync(get)).Content.ReadAsStringAsync())!["ollama"]!["sort_model"]!.GetValue<string>();
+        Assert.Equal(("qwen3:1.7b", "qwen3:1.7b", "qwen3:1.7b"), (cfg.OllamaModel, cfg.EffectiveSummaryModel, shown));
+        Assert.Equal("qwen3:1.7b", Configs.Load(cfg.Home).OllamaModel); // and it is saved, not only held while running
     }
 
     [Fact]

@@ -5,7 +5,8 @@ in `chrome://extensions`, see [canvas.md](canvas.md#the-extension)). That needs 
 student who isn't technical, and Chrome turns an unpacked extension off if Developer mode is switched off later. A copy
 from the Chrome Web Store has neither problem: the student clicks **Add to Chrome**, and Chrome keeps it up to date.
 
-Version 1.6 is published, Unlisted (anyone with the link can install it, nobody finds it by searching):
+Version 1.8 is published, and public (1.6 first went up Unlisted, found only by its link). The repo's copy is now 1.9,
+which the store doesn't serve yet:
 [Syft Notes for Canvas](https://chromewebstore.google.com/detail/study-stash-for-canvas/dfhoenhdjjbnopbepgkgjdgdnfmecjjd),
 item ID `dfhoenhdjjbnopbepgkgjdgdnfmecjjd`. `Extension.ChromeStorePublishedAt` names that page, so from the Syft Notes
 after 0.16.13 the Canvas step offers the store first in Chrome, Edge, Brave, Arc and Vivaldi, and keeps the folder for
@@ -71,7 +72,7 @@ too; Microsoft's page now says Get extension.
   folder. The library calls an extension outdated only when it can't bring itself up to date (from before protocol 2),
   so a store copy of any version is never told to reload, and every version gets work.
 
-## The published copy is the repo's 1.6
+## The published 1.6 was the repo's 1.6
 
 Checked 2026-10-14. The package from
 `https://clients2.google.com/service/update2/crx?response=redirect&prodversion=130.0&acceptformat=crx2,crx3&x=id%3Ddfhoenhdjjbnopbepgkgjdgdnfmecjjd%26uc`
@@ -94,7 +95,8 @@ and no `key`.
   those sites later, when it is connected. Nothing is granted at install. Everything else is shared with the unpacked
   folder: name **Syft Notes for Canvas**, short name **Syft Notes**, the description (132 characters at most),
   `minimum_chrome_version` 120, `permissions` `["alarms", "storage"]` and icons at 16, 32, 48 and 128 px.
-- **Connecting by code.** A store copy has no folder for Syft Notes to write, so the student pastes a code instead:
+- **Connecting by code.** A store copy has no folder for Syft Notes to write, so the student pastes a code instead (before
+  1.8, and still when the app asks for the school's address; 1.8 can [connect itself](#finding-canvas-by-itself-18)):
   - The code is `config.json`'s text (`{app, key, canvas, files, protocol}`) in base64url (`Extension.ConnectionCode`).
     The library gives it for Chrome on the library computer as `connection_code` in `GET /api/v2/canvas/extension`
     (library address `http://127.0.0.1:<port>`). The laptop app makes its own, with the library address the laptop
@@ -156,13 +158,12 @@ needs the extension's ID ([above](#the-extensions-id)), so the folder keeps its 
 
 ### 3. The listing
 
-- **Visibility: Unlisted.** Only people with the link can find it. That is enough for Syft Notes, whose app hands out
-  the link, and it keeps the extension out of search results where people without a library would install it.
-  (Private is only for named testers or a Google Workspace domain.)
+- **Visibility: Public**, since 1.8. It went up Unlisted, which was enough while the Syft Notes app was the only thing
+  handing out the link. (Private is only for named testers or a Google Workspace domain.)
 - **Name and summary** come from the manifest: "Syft Notes for Canvas" and its description.
 - **Detailed description**, plain text: what it does (copies your Canvas courses, meaning assignments, your
   submissions and feedback, modules, files and announcements, into your own Syft Notes library), that it only reads
-  and uses your own sign-in, that it does nothing until you paste a code from Syft Notes, and that nothing goes
+  and uses your own sign-in, that it does nothing until you connect it to Syft Notes, and that nothing goes
   anywhere except your library.
 - **Category**: Education. **Language**: English.
 - **Icon**: 128 × 128 (`extension/icon-128.png`: the app icon tile at 96 px inside Chrome's 16-px margin; every size is
@@ -203,7 +204,7 @@ Fix it, bump the version and resubmit.
 
 ## Updates
 
-1. Change the files in `extension/` and raise `"version"` in `extension/manifest.json` (1.6 → 1.7; `1.10` comes after
+1. Change the files in `extension/` and raise `"version"` in `extension/manifest.json` (1.9 → 1.10: `1.10` comes after
    `1.9`). **Every change to a shipped file needs a new version**: the store refuses an upload that isn't higher than
    the published one, and unpacked copies only reload themselves when the version (or their sites) changes
    ([canvas.md](canvas.md#versions-updates-and-reload)). The extension's version is its own and never follows the

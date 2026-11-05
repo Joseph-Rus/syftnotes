@@ -33,20 +33,23 @@ public sealed class AiJobs(string home, Func<string>? ollamaHost = null)
     /// notes it couldn't write while it was signed out are written (<see cref="SignedInAgain"/>). The AI the student just
     /// signed in to, when it's a new one, is the one they want: it writes their notes and answers their questions from
     /// now on, whatever was chosen before, so nobody has to go to Settings to pick it. Signing back in to an AI already
-    /// used for something (a sign-in that had run out) is a repair: every pick, and its model, stays as it was. A usage
-    /// limit is left alone: signing in doesn't end one.</summary>
+    /// used for something (a sign-in that had run out) is a repair: every pick, and its model, stays as it was. A student
+    /// who chose the free AI on this computer for anything keeps it: signing in to a cloud AI never sends their
+    /// transcripts there by itself. A usage limit is left alone: signing in doesn't end one.</summary>
     public void MarkSignedIn(string id)
     {
         var s = Settings;
         bool back = Engines.LooksLikeAuth(s.Tests.GetValueOrDefault(id, ""));
         s.Tests[id] = "works";
-        bool inUse = AiSettings.Jobs.Any(job => s.Picked(job) && s.For(job).Provider == id);
-        bool chosen = id != "ollama" && !inUse;
+        bool Uses(string job, string ai) => s.Picked(job) && s.For(job).Provider == ai;
+        // The jobs a sign-in hands over (sorting stays where it was): none may be one the student set to the free AI.
+        string[] moved = ["notes", "ask", "agent"];
+        bool chosen = id != "ollama" && !AiSettings.Jobs.Any(job => Uses(job, id)) && !moved.Any(job => Uses(job, "ollama"));
         if (chosen)
         {
             s.Provider = id;
             // As Settings' own pick does (/api/v2/ai/defaults): the notes, Ask, and the chat that answers with Ask.
-            foreach (string job in new[] { "notes", "ask", "agent" }) s.ByJob[job] = new AiChoice(id);
+            foreach (string job in moved) s.ByJob[job] = new AiChoice(id);
         }
         s.Save(home);
         if (chosen) NotesAiChosen?.Invoke();
@@ -928,6 +931,13 @@ public sealed class AiJobs(string home, Func<string>? ollamaHost = null)
             return answer;
         }
 
+        // A run that failed, said in plain words (see AskFailure): its raw text stays in the AI's record and as the inner exception.
+        InvalidOperationException Failed(string who, Exception ex)
+        {
+            Record(who, false, ex is OperationCanceledException ? "timed out" : ex.Message);
+            return new InvalidOperationException(AskFailure(who, ex), ex);
+        }
+
         JsonObject result;
         using var cts = CancellationTokenSource.CreateLinkedTokenSource(ct);
         cts.CancelAfter(AskTimeout);
@@ -943,24 +953,29 @@ public sealed class AiJobs(string home, Func<string>? ollamaHost = null)
         }
         catch (Exception ex) when (ex is InvalidOperationException or HttpRequestException or TimeoutException && shown.Length > 0)
         {
-            Record(engine, false, ex.Message);
-            throw new InvalidOperationException(AskFailure(engine, ex), ex); // what it wrote stays on screen above this
+            throw Failed(engine, ex); // what it wrote stays on screen above this
         }
         catch (Exception ex) when (ex is InvalidOperationException or InvalidDataException or HttpRequestException or TimeoutException or OperationCanceledException)
         {
             if (ex is OperationCanceledException && ct.IsCancellationRequested) throw; // the caller gave up; not ours to paper over
-            bool timedOut = ex is OperationCanceledException;
-            Record(engine, false, timedOut ? "timed out" : ex.Message);
-            if (engine == "ollama") throw;
-            why = AskFailure(engine, ex);
-            // Nothing to fall back to (switched off, or Ollama isn't here): the student is told what's wrong with the AI in
-            // plain words, and its raw text stays in its record and as the inner exception.
-            if (!CanFallBack(settings)) throw new InvalidOperationException(why, ex);
+            var failed = Failed(engine, ex);
+            // Ollama has nothing to fall back to, nor has an AI when fallback is off or Ollama isn't here: the student is
+            // told what's wrong in plain words.
+            if (engine == "ollama" || !CanFallBack(settings)) throw failed;
+            why = failed.Message;
             fellBack = true;
             engine = "ollama";
             using var cts2 = CancellationTokenSource.CreateLinkedTokenSource(ct);
             cts2.CancelAfter(AskTimeout);
-            result = await RunAsync(engine, cts2);
+            try
+            {
+                result = await RunAsync(engine, cts2);
+            }
+            catch (Exception ex2) when (ex2 is InvalidOperationException or InvalidDataException or HttpRequestException or TimeoutException
+                || (ex2 is OperationCanceledException && !ct.IsCancellationRequested))
+            {
+                throw Failed(engine, ex2); // the first AI failed and Ollama did too
+            }
         }
 
         var sources = (result["sources"] as JsonArray ?? []).Select(s => new AskSource(
