@@ -30,7 +30,7 @@ public class NewPlaceTests
         File.WriteAllText(other, "");
         var setup = new ClaudeSetup
         {
-            Program = now, Home = home["study-stash"], UserHome = home["user"], Find = _ => null, AppInstalled = _ => false, ReopenApp = null,
+            Program = now, Home = home["study-stash"], UserHome = home["user"], Find = _ => null, AppInstalled = _ => false, QuitApp = null, OpenApp = null,
             Running = _ => false, Probe = null,
             DesktopConfig = home["user/Claude/claude_desktop_config.json"], ClaudeCodeConfig = home["user/.claude.json"],
             CodexConfig = home["user/.codex/config.toml"], GeminiConfig = home["user/.gemini/settings.json"],

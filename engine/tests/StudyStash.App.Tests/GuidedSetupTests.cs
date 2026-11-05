@@ -75,6 +75,9 @@ public sealed class GuidedSetupTests
         public List<string> Connected { get; } = [];
         /// <summary>The AIs whose apps were connected as they got ready.</summary>
         public List<string> AppsOf { get; } = [];
+        /// <summary>The AI's desktop app that's open ("Claude"), and the Connects that closed it first.</summary>
+        public string AppOpen { get; set; } = "";
+        public List<string> ClosedFirst { get; } = [];
 
         public Rig(string cli = "claude", bool installed = false, bool signedIn = false, AppRole? role = null, bool again = false, Action<AppSettings>? saved = null,
             Func<IAudioSource>? mic = null, TempHome? home = null)
@@ -121,6 +124,14 @@ public sealed class GuidedSetupTests
                 {
                     AppsOf.Add(id);
                     return Task.CompletedTask;
+                },
+                AppToClose = _ => AppOpen,
+                CloseAndConnect = (id, say) =>
+                {
+                    say(AiConnect.ClosingWords(AppOpen));
+                    ClosedFirst.Add(id);
+                    AppOpen = "";
+                    return Task.FromResult(new ConnectOutcome(true, "Claude is connected."));
                 },
             };
             Guided = new GuidedSetupModel(Setup, services, () => Host.Settings, Host.Save);
@@ -468,6 +479,18 @@ public sealed class GuidedSetupTests
         ready = null;
         await g.GetReadyForNotesAsync("claude");
         Assert.Equal((GuidedScreen.Manual, "claude"), (g.Screen, ready));
+
+        // The Claude app is open: nothing is written while it is (it would write its own copy back over it). It waits
+        // here on one button, Close Claude, which closes it, connects, opens it again, and carries on by itself.
+        (ready, rig.AppOpen) = (null, "Claude");
+        rig.AppsOf.Clear();
+        await g.GetReadyForNotesAsync("claude");
+        Assert.Equal((GuidedScreen.SignIn, "Close Claude first", "Close Claude", (string?)null), (g.Screen, g.CloseSay, g.CloseButton, ready));
+        Assert.Empty(rig.AppsOf);
+        await g.CloseAndConnectCommand.ExecuteAsync(null);
+        Assert.Equal((GuidedScreen.Manual, "claude", false), (g.Screen, ready, g.HasCloseApp));
+        Assert.Equal(["claude"], rig.ClosedFirst);
+        Assert.Empty(rig.AppsOf); // connected by Close Claude, not once more in the background
     }
 
     [AvaloniaFact]

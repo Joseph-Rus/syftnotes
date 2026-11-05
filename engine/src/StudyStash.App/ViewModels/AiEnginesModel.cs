@@ -76,7 +76,7 @@ public sealed partial class AiEngineRow : ObservableObject
     /// again."); "" when there's nothing.</summary>
     public string Next { get; init; } = "";
     public bool HasNext => Next.Length > 0;
-    /// <summary>A Mac can quit the app and open it again for the student: the card offers to.</summary>
+    /// <summary>Syft Notes can close the app and open it again for the student: the card offers to.</summary>
     public bool CanReopen { get; init; }
     public string ReopenWords { get; init; } = "";
     public IAsyncRelayCommand ReopenCommand { get; internal set; } = null!;
@@ -622,7 +622,7 @@ public sealed partial class AiEnginesModel : ObservableObject, IDisposable
         var said = outcomes.GetValueOrDefault(e.Id);
         bool connected = e.Installed && status.State is AiEngineState.Ready or AiEngineState.Limited;
         string next = connected && broken is null ? NextFor(mine) : "";
-        var reopen = next.Length > 0 ? mine.FirstOrDefault(a => a is { Good: true, Running: true, Loaded: false, CanReopen: true }) : null;
+        var reopen = next.Length > 0 ? mine.FirstOrDefault(a => a is { NeedsReopen: true, CanReopen: true }) : null;
 
         string state, about, action = "", link = "";
         bool good = false, warn = false, primary = false, options = false;
@@ -644,7 +644,10 @@ public sealed partial class AiEnginesModel : ObservableObject, IDisposable
                 : status.State == AiEngineState.Failed ? $"{name} didn't work last time. Fix checks it and signs you in if it needs to."
                 : broken is not null ? $"{broken.Words} isn't reading your lectures yet. Fix connects it."
                 : AiWords.ConnectAbout(e.Id);
-            action = SignInPhase.TryAgain(signIn) || SignInPhase.TryAgain(said?.SignIn) ? "Try again"
+            // Its desktop app is open: Close Claude, which carries on by itself; Connect once the student has quit it.
+            action = said?.CloseFirst is { Length: > 0 } app ? AiConnect.CloseButtonWords(app)
+                : said?.CouldntClose == true ? "Connect"
+                : SignInPhase.TryAgain(signIn) || SignInPhase.TryAgain(said?.SignIn) ? "Try again"
                 : signIn == SignInPhase.Region ? "" : "Fix";
             if (signIn == SignInPhase.Stuck || said?.SignIn == SignInPhase.Stuck || installStopped.Contains(e.Id)) link = "Get help";
         }
@@ -715,7 +718,7 @@ public sealed partial class AiEnginesModel : ObservableObject, IDisposable
     /// <summary>The one thing left: an app of this AI that is open and hasn't loaded Syft Notes since it was added has to
     /// be quit and opened again (it reads its settings only when it starts).</summary>
     string NextFor(List<AiAppState> mine) =>
-        mine.FirstOrDefault(a => a is { Good: true, Running: true, Loaded: false } && ClaudeSetup.DesktopApp(a.Id) is not null) is { } app
+        mine.FirstOrDefault(a => a.NeedsReopen && ClaudeSetup.DesktopApp(a.Id) is not null) is { } app
             ? AiConnect.QuitWords(ClaudeSetup.DesktopApp(app.Id)!.Value.Name, appsOnWindows ?? AiApps?.Windows ?? OperatingSystem.IsWindows())
             : "";
 
@@ -774,10 +777,10 @@ public sealed partial class AiEnginesModel : ObservableObject, IDisposable
 
     async Task RunRowActionAsync(AiEngineRow row)
     {
-        // Claude, ChatGPT and Gemini: one Connect, whatever is needed.
+        // Claude, ChatGPT and Gemini: one Connect, whatever is needed (closing its desktop app first, once asked to).
         if (row.Id != "ollama")
         {
-            await ConnectAsync(row.Id);
+            await ConnectAsync(row.Id, close: outcomes.GetValueOrDefault(row.Id)?.CloseFirst.Length > 0);
             return;
         }
         Busy = true;
@@ -804,7 +807,7 @@ public sealed partial class AiEnginesModel : ObservableObject, IDisposable
     /// Safe to press again: it puts right whatever is wrong. On a library on another computer, an AI not installed there
     /// opens its site, as before.
     /// </summary>
-    public async Task<ConnectOutcome> ConnectAsync(string id)
+    public async Task<ConnectOutcome> ConnectAsync(string id, bool close = false)
     {
         if (!Here && last?.Engines.FirstOrDefault(e => e.Id == id) is { Installed: false } away)
         {
@@ -828,7 +831,7 @@ public sealed partial class AiEnginesModel : ObservableObject, IDisposable
                 if (!settingUp.ContainsKey(id)) return;
                 settingUp[id] = step.Words;
                 Redraw();
-            })));
+            }), close: close));
         }
         finally
         {
@@ -844,7 +847,7 @@ public sealed partial class AiEnginesModel : ObservableObject, IDisposable
         return outcome;
     }
 
-    /// <summary>Quits an app and opens it again (a Mac), so it loads Syft Notes; then looks until it has.</summary>
+    /// <summary>Closes an app and opens it again, so it loads Syft Notes; then looks until it has.</summary>
     async Task ReopenAsync(string appId)
     {
         if (AiApps is not { } setup) return;

@@ -77,10 +77,13 @@
                 </Grid>
                 <!-- What's connected ("Writes your notes · Claude app · Claude Code"), where Connect has got to, or what's wrong -->
                 <TextBlock Classes="ai-row-sub" Text="{Binding About}" TextWrapping="Wrap" Margin="36,0,0,0" />
-                <!-- The one thing left for the student: an app to quit and open again (from the tray, on Windows) -->
-                <Grid ColumnDefinitions="Auto,8,*" Margin="36,0,0,0" IsVisible="{Binding HasNext}">
+                <!-- The one thing left for the student: an app to quit and open again, and a button that does it -->
+                <Grid ColumnDefinitions="Auto,8,*,Auto" Margin="36,0,0,0" IsVisible="{Binding HasNext}">
                   <c:Icon Glyph="info" Size="16" VerticalAlignment="Top" Margin="0,1,0,0" />
                   <TextBlock Grid.Column="2" Classes="ai-row-sub ai-next" Text="{Binding Next}" TextWrapping="Wrap" VerticalAlignment="Center" />
+                  <Button Grid.Column="3" Classes="ai-pillbtn" Command="{Binding ReopenCommand}" IsVisible="{Binding CanReopen}" Margin="12,0,0,0" VerticalAlignment="Center">
+                    <Border Classes="ai-pill primary"><TextBlock Text="{Binding ReopenWords}" /></Border>
+                  </Button>
                 </Grid>
                 <!-- What else to try (Open the page again, or Get help) -->
                 <Button Classes="ai-textbtn" Name="SignInLink" Command="{Binding LinkCommand}" IsVisible="{Binding HasLink}" HorizontalAlignment="Left" Margin="36,0,0,0">
