@@ -4,7 +4,7 @@ using Microsoft.Data.Sqlite;
 
 namespace StudyStash.Core;
 
-/// <summary>Which class a note belongs in, and who decided: folder | rules | ollama | none | human.</summary>
+/// <summary>Which class a note belongs in, and who decided: folder | rules | an AI's id (ollama, claude, codex, gemini) | none | human.</summary>
 public sealed class Classification(string className, double confidence, string by, string lectureTitle = "",
     List<string>? topics = null)
 {
@@ -172,6 +172,7 @@ public sealed partial class Store : IDisposable
 
     // A note is in the library once it has a file, even while it is being written again.
     const string Filed = "md_path IS NOT NULL AND class_name IS NOT NULL";
+    const string HasSummary = Filed + " AND COALESCE(summary_md, '') <> ''";
 
     const string Schema = """
 
@@ -196,6 +197,8 @@ public sealed partial class Store : IDisposable
         CREATE TABLE IF NOT EXISTS sync_state (key TEXT PRIMARY KEY, value TEXT);
         CREATE TABLE IF NOT EXISTS trash (id TEXT PRIMARY KEY, row_json TEXT, md_text TEXT, deleted_at TEXT);
         CREATE TABLE IF NOT EXISTS gone (id TEXT PRIMARY KEY, gone_at TEXT);
+        CREATE TABLE IF NOT EXISTS deleted (id TEXT PRIMARY KEY, deleted_at TEXT);
+        INSERT OR IGNORE INTO deleted(id, deleted_at) SELECT id, gone_at FROM gone;
 
         """;
 
@@ -434,17 +437,21 @@ public sealed partial class Store : IDisposable
         }
     }
 
-    /// <summary>Every lecture filed with no notes (notes were off, or nothing wrote them), queued to have them written:
-    /// a first AI was just chosen on a lecture's page. How many.</summary>
+    /// <summary>Every lecture with no notes (filed without them because notes were off or nothing wrote them, or one that
+    /// failed), queued to have them written: an AI was just chosen on a lecture's or Home's "get notes" card. How many.</summary>
     public int RequeueMissing()
     {
         lock (gate)
-            return Exec("UPDATE notes SET status=?, updated_at=? WHERE status=? AND COALESCE(summary_md, '')=''", Queued, Now(), Done);
+            return Exec("UPDATE notes SET status=?, updated_at=? WHERE status IN (?, ?) AND COALESCE(summary_md, '')=''", Queued, Now(), Done, Failed);
     }
 
+    /// <summary>"Rewrite every summary": the lectures that have one (<see cref="SummaryCount"/> counts the same), queued to
+    /// be written again; one that failed to rewrite is tried again. A lecture with no summary is not: it is written by
+    /// <see cref="RequeueMissing"/> (choosing an AI on a "get notes" card), or tried again from the library web page's
+    /// "Try again" on a failed one. How many.</summary>
     public int RequeueAll()
     {
-        lock (gate) return Exec("UPDATE notes SET status=?, updated_at=? WHERE status IN (?, ?)", Queued, Now(), Done, Failed);
+        lock (gate) return Exec($"UPDATE notes SET status=?, updated_at=? WHERE status IN (?, ?) AND {HasSummary}", Queued, Now(), Done, Failed);
     }
 
     public void MarkFailed(string noteId, string error)
@@ -577,6 +584,16 @@ public sealed partial class Store : IDisposable
         }
     }
 
+    /// <summary>How many filed lectures have a summary written for them (what "Rewrite all" would rewrite).</summary>
+    public int SummaryCount()
+    {
+        lock (gate)
+        {
+            using var cmd = Command($"SELECT COUNT(*) FROM notes WHERE {HasSummary}");
+            return Convert.ToInt32(cmd.ExecuteScalar(), System.Globalization.CultureInfo.InvariantCulture);
+        }
+    }
+
     /// <summary>Every lecture's note file, as the index has it.</summary>
     public List<string> NoteFiles()
     {
@@ -607,6 +624,33 @@ public sealed partial class Store : IDisposable
         }
     }
 
+    /// <summary>Writes lecture <paramref name="id"/>'s note file afresh from its row (its notes, title and class; its
+    /// transcript too when the row has the lecture whole) at <paramref name="want"/>, or "name (2).md" beside a file that's
+    /// there, and points the row at it: for a lecture whose file is gone. Where it went.</summary>
+    public string WriteFromRow(string id, string want)
+    {
+        lock (gate)
+        {
+            var row = Get(id) ?? throw new InvalidOperationException("no such lecture");
+            var m = Meeting(row with { MdPath = null });
+            var c = new Classification(string.IsNullOrEmpty(row.ClassName) ? Configs.Unsorted : row.ClassName, row.Confidence ?? 0,
+                row.ClassifiedBy ?? "", row.LectureTitle ?? "", JsonList(row.Topics));
+            string text = Notes.Render(m, c, row.SummaryMd ?? "", row.SummaryModel ?? "");
+            string path = FreeBeside(Py.NormPath(want));
+            Directory.CreateDirectory(Py.Parent(path));
+            ReplaceFile(path, OperatingSystem.IsWindows() ? text.Replace("\n", "\r\n") : text);
+            Exec("UPDATE notes SET md_path=? WHERE id=?", path, id);
+            return path;
+        }
+    }
+
+    /// <summary>A lecture's note file is now <paramref name="path"/> (a copy of it, brought into this library's folder
+    /// from another, <see cref="LibraryBringIn"/>): only where the row looks for it changes. False for no such lecture.</summary>
+    public bool PointAt(string noteId, string path)
+    {
+        lock (gate) return Exec("UPDATE notes SET md_path=? WHERE id=?", Py.NormPath(path), noteId) > 0;
+    }
+
     public string ClassDir(string? className)
     {
         lock (gate)
@@ -621,24 +665,45 @@ public sealed partial class Store : IDisposable
     {
         string name = $"{Notes.DatePrefix(m.Date)} {Notes.Slugify(m.Title)}";
         string path = Path.Combine(ClassDir(className), name + ".md");
-        if (File.Exists(path))
-        {
-            using var cmd = Command("SELECT id FROM notes WHERE md_path=?", path);
-            if (cmd.ExecuteScalar() is string other && other != m.Id)
-                path = Path.Combine(ClassDir(className), $"{name} [{Py.Tail(m.Id, 6)}].md");
-        }
+        // A file already there that isn't this lecture's own (another lecture's, or one the student keeps in the folder)
+        // is never written over: this one takes a name of its own.
+        if (File.Exists(path) && !OwnFile(path, m.Id))
+            path = Path.Combine(ClassDir(className), $"{name} [{Py.Tail(m.Id, 6)}].md");
         return path;
     }
 
+    /// <summary>Whether the note file at <paramref name="path"/> is this lecture's own: the one it's filed at, or one the
+    /// library wrote for it (its front matter names it) that wasn't recorded yet. A file that can't be read isn't.</summary>
+    bool OwnFile(string path, string id)
+    {
+        using (var cmd = Command("SELECT md_path FROM notes WHERE id=?", id))
+            if (cmd.ExecuteScalar() is string filed && Py.SamePath(filed, path)) return true;
+        try
+        {
+            string want = $"id: {PyJson.Dumps(id)}";
+            foreach (string line in File.ReadLines(path).Take(16))
+                if (line == want) return true;
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException)
+        {
+        }
+        return false;
+    }
+
     /// <summary>Write the Markdown file and mark the note done. New notes are a version (<see cref="NotesVersions"/>)
-    /// made by <paramref name="versionKind"/>: the library writing them, unless said otherwise.</summary>
+    /// made by <paramref name="versionKind"/>: the library writing them, unless said otherwise. <paramref name="at"/>
+    /// files it at that path instead of the one its class, day and title give (another library folder's lecture
+    /// brought in).</summary>
     public string Save(Meeting m, Classification c, string summaryMd = "", string summaryModel = "", string error = "",
-        string versionKind = NotesChangeKind.Written)
+        string versionKind = NotesChangeKind.Written, string? fileText = null, string? at = null)
     {
         lock (gate)
         {
-            string path = TargetPath(m, c.ClassName);
-            Py.WriteText(path, Notes.Render(m, c, summaryMd, summaryModel));
+            string path = at is null ? TargetPath(m, c.ClassName) : Py.NormPath(at);
+            // The file's own text (one moved with edits of its own) is written as it is; otherwise the library's. Either way
+            // before the old file goes, so a write that fails leaves that one where it was.
+            if (fileText is null) Py.WriteText(path, Notes.Render(m, c, summaryMd, summaryModel));
+            else if (!File.Exists(path) || File.ReadAllText(path, new System.Text.UTF8Encoding(false)) != fileText) ReplaceFile(path, fileText);
             string now = Now();
             string? oldPath = null, firstSeen = null;
             (string Markdown, string Model, string At) before = ("", "", "");
@@ -882,13 +947,35 @@ public sealed partial class Store : IDisposable
                 Exec("UPDATE notes SET class_name=?, classified_by=?, confidence=1.0 WHERE id=?", className, by, noteId);
                 return string.IsNullOrEmpty(row.MdPath) ? null : row.MdPath;
             }
-            string? old = string.IsNullOrEmpty(row.MdPath) ? null : row.MdPath;
-            var m = Meeting(row);
-            var c = new Classification(className, 1.0, by, row.LectureTitle ?? "", JsonList(row.Topics));
-            string newPath = Save(m, c, row.SummaryMd ?? "", row.SummaryModel ?? "", row.Error ?? "");
-            DropEmptyDir(old, newPath);
-            return newPath;
+            return Refile(row, new Classification(className, 1.0, by, row.LectureTitle ?? "", JsonList(row.Topics)), null,
+                text => Notes.WithClass(text, row.ClassName ?? "", className));
         }
+    }
+
+    /// <summary>A filed lecture's note file written again where it belongs now that its class or title changed
+    /// (<paramref name="c"/>; <paramref name="change"/> changes the lecture itself). What was written in the file itself
+    /// (in another app, or by an AI working in the folder) and not taken in yet goes with it: its summary taken in first
+    /// (the older one kept as a version), and the file's own text moved, changed by <paramref name="sameInFile"/> to say
+    /// the same. A file that can't be read throws, and nothing moves. Where the file is now.</summary>
+    string Refile(NoteRow row, Classification c, Action<Meeting>? change, Func<string, string> sameInFile)
+    {
+        string? old = string.IsNullOrEmpty(row.MdPath) ? null : row.MdPath;
+        var m = Meeting(row);
+        string summary = row.SummaryMd ?? "", model = row.SummaryModel ?? "";
+        string? edited = null;
+        bool crlf = false;
+        if (old is not null)
+        {
+            var was = new Classification(row.ClassName ?? "", row.Confidence ?? 1, row.ClassifiedBy ?? "", row.LectureTitle ?? "", JsonList(row.Topics));
+            edited = EditedFile(old, m, was, summary, model, out crlf);
+            if (edited is not null && TakeInSummary(row, m, summary, model, edited) is { } theirs) summary = theirs;
+        }
+        change?.Invoke(m);
+        // The file's own text is written in the library's place before the old file goes, so a write that fails loses nothing.
+        string? moved = edited is null ? null : sameInFile(edited);
+        string path = Save(m, c, summary, model, row.Error ?? "", fileText: moved is not null && crlf ? moved.Replace("\n", "\r\n") : moved);
+        DropEmptyDir(old, path);
+        return path;
     }
 
     /// <summary>What became of renaming a lecture.</summary>
@@ -906,14 +993,13 @@ public sealed partial class Store : IDisposable
             var row = Get(noteId);
             if (row is null) return Renamed.Gone;
             if (row.Status is Queued or Working) return Renamed.Busy;
-            string? old = string.IsNullOrEmpty(row.MdPath) ? null : row.MdPath;
-            var m = Meeting(row);
-            m.Title = title;
-            m.Raw[Core.Meeting.TitleBy] = Core.Meeting.ByHand;
             var c = new Classification(string.IsNullOrEmpty(row.ClassName) ? Configs.Unsorted : row.ClassName, row.Confidence ?? 0,
                 row.ClassifiedBy ?? "", title, JsonList(row.Topics));
-            string path = Save(m, c, row.SummaryMd ?? "", row.SummaryModel ?? "", row.Error ?? "");
-            DropEmptyDir(old, path);
+            Refile(row, c, m =>
+            {
+                m.Title = title;
+                m.Raw[Core.Meeting.TitleBy] = Core.Meeting.ByHand;
+            }, text => Notes.WithTitle(text, row.LectureTitle is { Length: > 0 } was ? was : row.Title ?? "", title));
             return Renamed.Done;
         }
     }
@@ -1007,7 +1093,11 @@ public sealed partial class Store : IDisposable
             if (path is not null && File.Exists(path)) File.Delete(path);
             Exec("DELETE FROM notes WHERE id=?", noteId);
             Unindex(noteId);
-            if (forGood) ForgetNotesVersions(noteId);
+            if (forGood)
+            {
+                ForgetNotesVersions(noteId);
+                Exec("INSERT OR IGNORE INTO deleted(id, deleted_at) VALUES(?,?)", noteId, Now());
+            }
             DropEmptyDir(path, null);
             return true;
         }
@@ -1060,8 +1150,16 @@ public sealed partial class Store : IDisposable
             var back = Get(noteId);
             if (back is not null && !string.IsNullOrEmpty(back.MdPath) && text is not null)
             {
-                Directory.CreateDirectory(Py.Parent(back.MdPath));
-                Py.WriteText(back.MdPath, text);
+                // Another lecture's file there since (one of the same class, day and title, or the folder in use's own
+                // after a switch of folders): this one comes back beside it, "name (2).md", never over it.
+                string path = FreeBeside(back.MdPath, p => Py.ReadText(p) == text.Replace("\r\n", "\n"));
+                if (path != back.MdPath)
+                {
+                    Exec("UPDATE notes SET md_path=? WHERE id=?", path, noteId);
+                    back = Get(noteId)!;
+                }
+                Directory.CreateDirectory(Py.Parent(back.MdPath!));
+                Py.WriteText(back.MdPath!, text);
                 var m = Meeting(back);
                 Index(noteId, string.IsNullOrEmpty(back.SummaryMd) ? m.NotesMarkdown : back.SummaryMd, m.Transcript, back.UpdatedAt ?? "");
             }
@@ -1084,6 +1182,7 @@ public sealed partial class Store : IDisposable
             foreach (string id in ids)
             {
                 Exec("INSERT INTO gone(id, gone_at) VALUES(?,?) ON CONFLICT(id) DO UPDATE SET gone_at=excluded.gone_at", id, now);
+                Exec("INSERT OR IGNORE INTO deleted(id, deleted_at) VALUES(?,?)", id, now);
                 Exec("DELETE FROM trash WHERE id=?", id);
                 DetachAttachments(id);
                 ForgetNotesVersions(id);
@@ -1117,6 +1216,71 @@ public sealed partial class Store : IDisposable
             using var r = cmd.ExecuteReader();
             while (r.Read()) ids.Add(r.GetString(0));
             return ids;
+        }
+    }
+
+    /// <summary>Every lecture the student deleted: in the trash now, or deleted for good at any time since this was kept
+    /// (unlike <see cref="Gone"/>, which forgets after a month). Bringing in another folder's notes never brings one back.</summary>
+    public HashSet<string> DeletedIds()
+    {
+        lock (gate)
+        {
+            var ids = new HashSet<string>();
+            using var cmd = Command("SELECT id FROM trash UNION SELECT id FROM gone UNION SELECT id FROM deleted");
+            using var r = cmd.ExecuteReader();
+            while (r.Read()) ids.Add(r.GetString(0));
+            return ids;
+        }
+    }
+
+    /// <summary>Each lecture in the trash whose file was at a path <paramref name="map"/> knows (one in a library folder
+    /// no longer in use) will be restored to where <paramref name="map"/> says instead. How many. (A map that only looks
+    /// sees every trashed lecture's path, and changes nothing.)</summary>
+    public int RepointTrash(Func<string, string?> map)
+    {
+        lock (gate)
+        {
+            var moved = new List<(string Id, string Row)>();
+            using (var cmd = Command("SELECT id, row_json FROM trash"))
+            using (var r = cmd.ExecuteReader())
+                while (r.Read())
+                {
+                    if (r.IsDBNull(1) || JsonNode.Parse(r.GetString(1)) is not JsonObject row) continue;
+                    if (Py.AsString(row["md_path"]) is not { Length: > 0 } path || map(path) is not { } to) continue;
+                    row["md_path"] = Py.NormPath(to);
+                    moved.Add((r.GetString(0), row.ToJsonString()));
+                }
+            foreach (var (id, row) in moved) Exec("UPDATE trash SET row_json=? WHERE id=?", row, id);
+            return moved.Count;
+        }
+    }
+
+    /// <summary><paramref name="want"/>, or the first of "name (2).ext", "name (3).ext"… beside it, that has no file
+    /// (nor is in <paramref name="reserved"/>, which it joins), or whose file <paramref name="reuse"/> accepts.</summary>
+    public static string FreeBeside(string want, Func<string, bool>? reuse = null, ISet<string>? reserved = null)
+    {
+        string path = want;
+        for (int i = 2; File.Exists(path) && reuse?.Invoke(path) != true || reserved?.Contains(path) == true; i++)
+            path = Path.Combine(Py.Parent(want), $"{Path.GetFileNameWithoutExtension(want)} ({i}){Path.GetExtension(want)}");
+        reserved?.Add(path);
+        return path;
+    }
+
+    /// <summary>Makes <paramref name="path"/> whole or not at all: <paramref name="write"/> fills a hidden file beside
+    /// it, which is then renamed into place (over what's there only with <paramref name="overwrite"/>).</summary>
+    public static void PutWhole(string path, Action<string> write, bool overwrite)
+    {
+        string dir = Py.Parent(path);
+        Directory.CreateDirectory(dir);
+        string temp = Path.Combine(dir, $".{Path.GetFileName(path)}.{Guid.NewGuid():N}.part");
+        try
+        {
+            write(temp);
+            File.Move(temp, path, overwrite);
+        }
+        finally
+        {
+            if (File.Exists(temp)) File.Delete(temp);
         }
     }
 

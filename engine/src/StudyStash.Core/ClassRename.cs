@@ -100,7 +100,7 @@ public static class ClassRename
         var aliases = def.Aliases.Append(from).Append(st.Code)
             .Where(a => a.Length > 0 && !a.Equals(to, StringComparison.OrdinalIgnoreCase))
             .Distinct(StringComparer.OrdinalIgnoreCase).ToList();
-        cfg.Classes[cfg.Classes.IndexOf(def)] = new ClassDef(to, aliases, def.Description);
+        cfg.Classes[cfg.Classes.IndexOf(def)] = new ClassDef(to, aliases, def.Description, color: def.Color);
         Configs.Save(cfg);
 
         CanvasSettings.Update(home, s =>
@@ -121,6 +121,7 @@ public static class ClassRename
         var all = Assignments.Load(home);
         if (all.Any(a => a.ClassName == from)) Assignments.Save(home, all.Select(a => a.ClassName == from ? a with { ClassName = to } : a));
         CanvasSeen.Rename(home, from, to);
+        DueMarks.Rename(home, from, to);
         CanvasNotifications.Rename(home, from, to);
         (crawl ?? new Crawl(home, name => Path.Combine(cfg.PoolDir, Notes.FolderName(name)), () => DateTimeOffset.UtcNow, () => TimeZoneInfo.Local))
             .RenameClass(from, to);

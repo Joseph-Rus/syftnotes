@@ -98,7 +98,7 @@ public sealed class GuidedSetupTests
             foreach (var m in WhisperModels.All) Models.Hold.Add(m.File);
             Host = new AppHost(Home.Path, mic ?? (() => throw new InvalidOperationException("no microphone in this test")), log: _ => { }, loginItems: Login,
                 models: new ModelSetting(null, Mirror: "https://mirror.example/models"), http: new HttpClient(Models));
-            Setup = Services.Setup.Make(Host, role, here: new LibraryHere { Command = [BuiltEngine()], Folder = Home["Syft Notes"] });
+            Setup = Services.Setup.Make(Host, role, here: new LibraryHere { Command = [BuiltEngine()], FirstPort = LibraryHereTests.FreePort(), Folder = Home["Syft Notes"] });
             Setup.Again = again;
             var services = new GuidedServices
             {
@@ -589,6 +589,32 @@ public sealed class GuidedSetupTests
         Assert.Equal("codex", notes.KeyFor);
         Assert.True(notes.Engines.Single(r => r.Id == "codex").ShowKeyLink);
         Assert.False(notes.Engines.Single(r => r.Id == "claude").ShowKeyLink); // ready: no link
+    }
+
+    /// <summary>Claude signed in on a plan other apps can't use: "Check again" signs in again, for another account (or
+    /// the same one, upgraded), instead of checking the same account again. The old one is never signed out (Claude
+    /// Code's sign-in is the student's own), so the wait holds until the new sign-in has finished.</summary>
+    [AvaloniaFact]
+    public async Task Check_again_on_a_plan_problem_signs_in_again_for_another_account()
+    {
+        await using var rig = new Rig(cli: "claude", installed: true, signedIn: true);
+        FakeAgents.Replay(rig.Bin, [Init(), Done("Claude Code requires a Pro or Max subscription. Upgrade at claude.com/pricing", error: true)], 1);
+        await rig.OpenAsync();
+        var g = rig.Guided;
+        g.PickCommand.Execute("claude");
+        await g.ContinueCommand.ExecuteAsync(null);
+        await Until(() => g.HasPlanProblem, "the plan check's answer");
+        Assert.Equal(ChatProblem.Plan, g.PlanProblem);
+        Assert.Equal(0, FakeAgents.Logins(rig.Bin)); // signed in already: no sign-in ran
+
+        string signedIn = Path.Combine(rig.Bin, "signed-in");
+        var before = new DateTime(2020, 1, 1, 0, 0, 0, DateTimeKind.Utc);
+        File.SetLastWriteTimeUtc(signedIn, before);
+        await g.CheckAgainCommand.ExecuteAsync(null).WaitAsync(TimeSpan.FromSeconds(60));
+        Assert.Equal(1, FakeAgents.Logins(rig.Bin));
+        Assert.True(File.GetLastWriteTimeUtc(signedIn) > before); // the new sign-in finished before the check
+        Assert.True(g.AiReady);
+        Assert.False(g.HasPlanProblem);
     }
 
     [AvaloniaFact]

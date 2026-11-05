@@ -157,8 +157,8 @@ public static partial class Shell
         host.Start();
         Run(() => SuggestLighterModelAsync(), "SuggestLighterModel");
         // The program may have moved (Velopack's install, the Mac bundle's new name): what names the old one is put right.
-        UiTasks.RunQuietly(() => Task.Run(() => NewPlace.RunHere(host.Home)), "put right what names the app's old place");
-        AppUpdates.Start(host, stop.Token, SayUpdate, () => TypingNotes);
+        UiTasks.RunQuietly(() => Task.Run(() => NewPlace.RunHere(host.Home, host.Settings.StartAtLogin)), "put right what names the app's old place");
+        AppUpdates.Start(host, stop.Token, SayUpdate, () => TypingNotes || SettingUp, LibraryWindowOpen);
         if (AppUpdates.Current is { } updater)
             updater.FoundChanged += () => Dispatcher.UIThread.Post(() =>
             {
@@ -183,6 +183,7 @@ public static partial class Shell
             splashAtLaunch = SelfTest.Dir is null;
             ShowLibrary();
         }
+        if (host.Settings.SetupDone) AskWhichNotesFolderSoon();
         if (SelfTest.Dir is not null) SelfTest.Run();
     }
 
@@ -1142,7 +1143,8 @@ public static partial class Shell
         quick.Query = "";
         Run(() => SearchAsync(""), "Search");
         var pointer = Floating.Pointer();
-        var (_, scale) = quickWindow.WorkArea(pointer);
+        var (area, scale) = quickWindow.WorkArea(pointer);
+        quick.FitTo(area.Height / scale, Floating.ShadowRoom);
         var size = quickWindow.Measured(scale);
         int room = (int)(Floating.ShadowRoom * scale);
         quickWindow.Put(Placement.QuickPanel(pointer, quickWindow.ScreenList(), size, room));
@@ -1198,6 +1200,17 @@ public static partial class Shell
             UpdateDock();
         };
         return mainWindow = w;
+    }
+
+    /// <summary>The library window is on screen right now (not hidden to the tray, not minimized): an update's restart
+    /// brings it back. Asked from the updater's thread, so it's read on the UI thread's, for 2 seconds at most: a UI
+    /// thread that doesn't answer in time counts as no window (the app comes back quietly) rather than holding the
+    /// update's hand-off.</summary>
+    static bool LibraryWindowOpen()
+    {
+        var answer = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+        Dispatcher.UIThread.Post(() => answer.TrySetResult(mainWindow is { IsVisible: true } w && w.WindowState != WindowState.Minimized));
+        return answer.Task.Wait(TimeSpan.FromSeconds(2)) && answer.Task.Result;
     }
 
     /// <summary>The library window opens where it was left, at the size it was left (or zoomed), if that spot is
@@ -1299,6 +1312,12 @@ public static partial class Shell
     }
 
     public static void ShowSetup() => ShowSetup(false);
+
+    /// <summary>Setup's window (guided setup, setup by hand or the first run's funnel) is open: its answers are only in
+    /// the window, so an update (or the move to Velopack's install) waits for it as it waits for a lecture, instead of
+    /// restarting the app to the welcome page. Not "setup unfinished": a student who never finishes it must still get
+    /// updates. Asked from the updater's thread: a field, nothing of the window itself.</summary>
+    static bool SettingUp => setupWindow is not null;
 
     /// <summary>
     /// Setup's window: guided setup (pick an AI, install it, sign in, then the chat), or setup by hand when

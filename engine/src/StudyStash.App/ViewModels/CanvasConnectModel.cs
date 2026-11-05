@@ -285,6 +285,15 @@ public sealed partial class CanvasConnectModel : ObservableObject, IDisposable
     /// <summary>The student said the add-on is in their Firefox already: there's no add-on page to open, in the
     /// step's words or its links.</summary>
     bool haveItAlready;
+    /// <summary>Setup's add-on step heard an add-on from an earlier install knock (<see cref="HeardOneFromBefore"/>), in
+    /// a browser it can't name: the code's line says to choose Paste a new code in it, and adding it stays as always.</summary>
+    bool fromBefore;
+    /// <summary>An add-on from an earlier install is in some browser here, with an earlier library's key.</summary>
+    public void HeardOneFromBefore()
+    {
+        fromBefore = true;
+        OnPropertyChanged(nameof(StoreStep2));
+    }
     /// <summary>Nothing here can take the extension: the step links to where Chrome is got.</summary>
     public bool ShowGetBrowser => ShowAdvice && advice!.NoneHere;
     public bool WaitingForBrowser => AddedToBrowser && !BrowserConnected;
@@ -307,6 +316,7 @@ public sealed partial class CanvasConnectModel : ObservableObject, IDisposable
         : $"On the page that opens in {BrowserName}, click the blue {Browser.StoreButton} button, then Add extension when {BrowserName} asks.";
     public string StoreStep2 => haveItAlready
         ? "Paste this code and click Connect."
+        : fromBefore ? "Click the Syft Notes button (it may be under the puzzle-piece Extensions button), choose Paste a new code if it's there, paste this code and click Connect."
         : "Click the Syft Notes button (it may be under the puzzle-piece Extensions button), paste this code and click Connect.";
     public string StoreStep3 => $"Click Allow when {BrowserName} asks.";
     /// <summary>The code a store's copy is connected with (<see cref="Extension.ConnectionCode"/>: the library as this

@@ -131,7 +131,7 @@ public sealed record SetupChecks(double? Ram, double? Disk, TailscaleInfo Tailsc
 public sealed partial class LibrarySetup
 {
     public const int SetupPort = 8764;
-    public const string Releases = "https://github.com/Joseph-Rus/study-stash/releases/latest/download";
+    public const string Releases = "https://github.com/Joseph-Rus/syftnotes/releases/latest/download";
 
     public string Home { get; }
     public SetupHost Host { get; }

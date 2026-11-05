@@ -27,14 +27,14 @@ public sealed partial class Store
         CREATE INDEX IF NOT EXISTS attachments_class ON attachments(class_name);
         """);
 
-    /// <summary>The photo columns, added to a library made before whiteboard photos.</summary>
+    /// <summary>The photo columns (and a deck's pages), added to a library made before them.</summary>
     void MigrateAttachments()
     {
         var cols = new HashSet<string>();
         using (var cmd = Command("PRAGMA table_info(attachments)"))
         using (var r = cmd.ExecuteReader())
             while (r.Read()) cols.Add(r.GetString(r.GetOrdinal("name")));
-        foreach (string c in new[] { "taken", "kind" })
+        foreach (string c in new[] { "taken", "kind", "pages" })
             if (!cols.Contains(c)) Exec($"ALTER TABLE attachments ADD COLUMN {c} TEXT");
     }
 
@@ -181,6 +181,35 @@ public sealed partial class Store
         }
     }
 
+    /// <summary>At most this much of a slide's words is kept: its title and points, not a page of small print.</summary>
+    public const int MaxPageChars = 2_000;
+
+    /// <summary>A deck's pages, one string per slide in the deck's order (<see cref="Ai.DocumentText.PagesAsync"/>),
+    /// each cut to <see cref="MaxPageChars"/>; none when it had none to read. False when it's been removed meanwhile.</summary>
+    public bool SetAttachmentPages(string id, IReadOnlyList<string> pages)
+    {
+        string json = System.Text.Json.JsonSerializer.Serialize(pages.Select(p => Py.Head(p, MaxPageChars)).ToList());
+        lock (gate) return Exec("UPDATE attachments SET pages=? WHERE id=?", json, id) > 0;
+    }
+
+    /// <summary>A deck's pages as <see cref="SetAttachmentPages"/> kept them; null when they haven't been read yet.</summary>
+    public List<string>? AttachmentPages(string id)
+    {
+        lock (gate)
+        {
+            using var cmd = Command("SELECT pages FROM attachments WHERE id=?", id);
+            if (cmd.ExecuteScalar() is not string json) return null;
+            try
+            {
+                return System.Text.Json.JsonSerializer.Deserialize<List<string>>(json);
+            }
+            catch (System.Text.Json.JsonException)
+            {
+                return null; // read again
+            }
+        }
+    }
+
     /// <summary>These attachments' words went into their lecture's notes.</summary>
     public void MarkAttachmentsUsed(IEnumerable<string> ids)
     {
@@ -206,6 +235,13 @@ public sealed partial class Store
     public List<Attachment> PhotosOf(string noteId) =>
         [.. ListAttachments(noteId: noteId).Where(a => a.IsPhoto && a.Type.StartsWith("image/", StringComparison.Ordinal)).OrderBy(a => a.Taken, StringComparer.Ordinal)];
 
+    /// <summary>The attachment's file in its class's Attachments folder is now <paramref name="file"/> (a copy brought
+    /// in beside a different file of its old name).</summary>
+    public void SetAttachmentFile(string id, string file)
+    {
+        lock (gate) Exec("UPDATE attachments SET file=? WHERE id=?", file, id);
+    }
+
     /// <summary>Removes an attachment: its file and its row. False when there's no such attachment.</summary>
     public bool RemoveAttachment(string id)
     {
@@ -222,6 +258,8 @@ public sealed partial class Store
             {
             }
             Exec("DELETE FROM attachments WHERE id=?", id);
+            // One brought in from another library folder (LibraryBringIn) stays removed when that folder is brought in again.
+            if (id.StartsWith("folder-", StringComparison.Ordinal)) Exec("INSERT OR IGNORE INTO deleted(id, deleted_at) VALUES(?,?)", id, Now());
             return true;
         }
     }

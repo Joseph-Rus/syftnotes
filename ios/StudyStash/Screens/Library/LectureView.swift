@@ -50,12 +50,20 @@ struct LectureView: View {
     @State private var player = TranscriptPlayer()
     /// The notebook beside the notes (iPad, or a wide window).
     @State private var inkBeside = false
+    /// The notes' column's width, which the notebook beside it halves.
+    @State private var columnWidth: CGFloat = .infinity
     @State private var store = NotebookStore.shared
     @State private var recordings = RecordingStore.shared
     @State private var recorder = Recorder.shared
 
     private var compact: Bool { sizeClass != .regular }
-    private var margin: CGFloat { compact ? Space.pageCompact : Space.pageRegular }
+    /// The notebook shows beside the notes only where there's room: a window narrowed to a phone's width (Split View,
+    /// Stage Manager) puts it away until it's wide again, rather than squeezing both.
+    private var beside: Bool { inkBeside && !compact }
+    /// The notes' column as narrow as a phone's: on a phone, or halved by the notebook in a narrow window (an iPad
+    /// mini's), where the iPad's margins and Only my notes in the tab strip didn't fit.
+    private var narrow: Bool { compact || (beside && columnWidth < 512) }
+    private var margin: CGFloat { narrow ? Space.pageCompact : Space.pageRegular }
     /// The notes' column: the desktop's 704 (68 characters at 16).
     private let column: CGFloat = 704
 
@@ -74,6 +82,9 @@ struct LectureView: View {
                 }
                 .scrollDismissesKeyboard(.interactively)
                 .accessibilityIdentifier("page.lecture")
+                // Ask and Study under the notes, not across the notebook beside them.
+                .safeAreaInset(edge: .bottom, spacing: 0) { bottomBar(l) }
+                .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { columnWidth = $0 }
                 .task(id: l == nil) { await openAtMoment(l, proxy, at: moment) }
                 .task(id: jump) { if let jump { await openAtMoment(l, proxy, at: jump.at) } }
                 #if DEBUG
@@ -85,7 +96,7 @@ struct LectureView: View {
                 }
                 #endif
             }
-            if inkBeside, let l {
+            if beside, let l {
                 Rectangle().fill(.line).frame(width: 1).ignoresSafeArea()
                 HandwritingView(className: filed(l), lecture: (l.id, title(l)), embedded: true)
                     .frame(maxWidth: .infinity)
@@ -103,7 +114,6 @@ struct LectureView: View {
         .onDisappear { showing = false }
         .recordsInto(l.flatMap(filed))
         .toolbar { toolbar(l) }
-        .safeAreaInset(edge: .bottom, spacing: 0) { bottomBar(l) }
         .sheet(isPresented: $picking) {
             if let l { FolderPickerSheet(current: folder(l)) { cls in Task { await move(l, to: cls) } } }
         }
@@ -344,7 +354,7 @@ struct LectureView: View {
         }), tabs: [(.notes, "Notes"), (.transcript, "Transcript")])
         .overlay(alignment: .trailing) {
             HStack(spacing: 14) {
-                if !compact, pane == .notes, someMine(l) { onlyMineToggle }
+                if !narrow, pane == .notes, someMine(l) { onlyMineToggle }
                 Button { attach(l) } label: { Label("Attach", icon: "attach_file") }
                     .buttonStyle(.pill(small: true))
                     .accessibilityHint("Add your notes, slides, photos or a handout to this \(noun(l))")
@@ -418,12 +428,12 @@ struct LectureView: View {
     private func someMine(_ l: Lecture) -> Bool { hasMine(l) && !allMine(l) }
 
     /// "What you wrote" in ink and "Added from the recording" in grey; with nothing of theirs, "Written from the
-    /// recording". On a phone, Only my notes sits at its end.
+    /// recording". In a phone-wide column, Only my notes sits at its end.
     @ViewBuilder private func legend(_ l: Lecture) -> some View {
         let mine = hasMine(l), all = allMine(l)
         let yours = LegendItem(text: "What you wrote", mine: true)
         let added = LegendItem(text: mine ? "Added from the recording" : "Written from the recording", mine: false)
-        if mine && !all && compact {
+        if mine && !all && narrow {
             HStack(alignment: .top, spacing: 12) {
                 VStack(alignment: .leading, spacing: 6) { yours; added }
                 Spacer(minLength: 8)
@@ -569,7 +579,7 @@ struct LectureView: View {
             if player.started { playerPill }
             if let l {
                 HStack(spacing: 10) {
-                    AskBarButton(placeholder: "Ask about this \(noun(l))", scope: compact ? nil : "This \(noun(l))") { asking = true }
+                    AskBarButton(placeholder: "Ask about this \(noun(l))", scope: narrow ? nil : "This \(noun(l))") { asking = true }
                         .accessibilityLabel("Ask about this \(noun(l))")
                     Button { studying = true } label: { Label("Study", icon: "flashcards") }
                         .buttonStyle(StudyButtonStyle())

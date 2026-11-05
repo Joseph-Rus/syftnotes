@@ -62,6 +62,16 @@ public static class Cli
         }
     });
 
+    /// <summary>An error that stopped the background library, as one line of its log: its type and words (and those of
+    /// the error under it, a port in use under a failed start), then where it was thrown, its top frames.</summary>
+    internal static string CrashLine(Exception e)
+    {
+        var inner = e.GetBaseException();
+        string what = $"{e.GetType().FullName}: {e.Message}" + (inner != e ? $" (from {inner.GetType().FullName}: {inner.Message})" : "");
+        var frames = (e.StackTrace ?? "").Split('\n').Select(l => l.Trim()).Where(l => l.StartsWith("at ", StringComparison.Ordinal)).Take(4);
+        return string.Join(" | ", [what.ReplaceLineEndings(" "), .. frames]);
+    }
+
     /// <summary>True when these arguments name a command (options may come first: <c>--home DIR run</c>).</summary>
     public static bool IsCommand(IReadOnlyList<string> args)
     {
@@ -197,7 +207,7 @@ public static class Cli
             Pipeline? writer = null; // the pipeline, below: the diagrams wait while it writes notes
             var diagrams = new DiagramJobs(cfg, store, ai) { NotesBusy = () => writer?.Writing == true };
             var pipeline = writer = new Pipeline(cfg, store, ai.SortAsync, ai.SummarizeAsync, notesModel: () => ai.Describe("notes", cfg), notesFast: ai.NotesInFastMode,
-                filed: id => diagrams.AfterFiled(id, ai.TakeDiagramsFollow(id)), limitUntil: ai.LimitUntil);
+                filed: id => diagrams.AfterFiled(id, ai.TakeDiagramsFollow(id)), limitUntil: ai.LimitUntil, sortedWith: () => ai.SortedWith);
             // An AI that needed signing in again answers once more: the lectures it couldn't write notes for meanwhile
             // get them now, without the student asking for each.
             ai.NotesAiChosen += () =>
@@ -255,13 +265,13 @@ public static class Cli
             var indexing = fileIndex.RunAsync(Console.WriteLine, stop.Token);
             // Canvas, through the Chrome extension: one queue for the sync and for AIs' reads.
             var canvas = new StudyStash.Core.Canvas.CanvasSync(home, c => store.ClassDir(c)) { KnownClass = c => cfg.ClassNames().Contains(c) };
-            // After a sync, an AI explores each class it hasn't explored yet (Settings can ask again).
+            // After a sync, an AI explores each class it hasn't explored yet, and tries again where it failed (Settings can ask again).
             var scout = new StudyStash.Core.Canvas.Scout(home, c => store.ClassDir(c), ai);
             canvas.Synced += classes =>
             {
-                var s = StudyStash.Core.Canvas.CanvasSettings.Load(home);
                 if (ai.AgentReady().Ok)
-                    scout.Queue(classes.Where(c => !s.Scouts.ContainsKey(c) && !File.Exists(Path.Combine(store.ClassDir(c), "Canvas", "canvas-recipe.md"))).ToArray());
+                    scout.Queue(StudyStash.Core.Canvas.Scout.ToExplore(classes, StudyStash.Core.Canvas.CanvasSettings.Load(home).Scouts,
+                        c => File.Exists(Path.Combine(store.ClassDir(c), "Canvas", "canvas-recipe.md")), DateTimeOffset.Now));
             };
             // The phone over Google Drive (docs/phone-google.md): its link runs here, in the library, so the phone is
             // answered whenever the library runs, the app open or not. It starts once the app has connected an account.
@@ -330,7 +340,27 @@ public static class Cli
                 BackgroundLibrary.WritePids(home, Environment.ProcessId);
             }
             Console.WriteLine($"[background] Syft Notes {Engine.Version} answers the phone with the app closed (process {Environment.ProcessId})");
-            return await Library(updates: false, background: true);
+            try
+            {
+                // An update's hand-off: the library before this one may hold the port a few seconds more (a Mac's launchd
+                // starts this one the moment the new app is in place). Still taken after that, another copy answers: this
+                // one steps aside, and the computer tries it again later (launchd after its ThrottleInterval, whatever
+                // the exit code; systemd's Restart=on-failure only after a non-zero one, so it's 1).
+                var cfg = Configs.Load(home);
+                if (File.Exists(cfg.ConfigPath) && !await HostInfo.WaitPortFreeAsync(cfg.WebPort, TimeSpan.FromSeconds(15), stop.Token))
+                    return Print($"[background] port {cfg.WebPort} is still in use: another copy is answering; this one steps aside", 1);
+                return await Library(updates: false, background: true);
+            }
+            catch (OperationCanceledException) when (stop.IsCancellationRequested)
+            {
+                return 0;
+            }
+            catch (Exception e)
+            {
+                // Nothing else would say why: under launchd the runtime's own crash report goes nowhere.
+                Console.WriteLine($"[background] stopped by an error: {CrashLine(e)}");
+                return 1;
+            }
         }
 
         // The library as a child that's started again whenever it stops (a growing pause if it keeps failing as it
@@ -391,7 +421,9 @@ public static class Cli
                     BackgroundLibrary.WritePids(home, Environment.ProcessId, p.Id);
                     try
                     {
-                        await p.WaitForExitAsync(stop.Token);
+                        // Its own end, not its output's: something it started (git's background helpers) can hold the
+                        // output open after it has gone, and the library was never started again (Windows).
+                        await Machine.ExitedAsync(p, stop.Token);
                     }
                     catch (OperationCanceledException)
                     {

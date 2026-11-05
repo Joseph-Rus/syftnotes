@@ -72,11 +72,41 @@ public static partial class ExamHints
     /// <summary>The flagged moments of timed lines.</summary>
     public static List<ExamHint> Find(IEnumerable<Spoken> lines) => Find(lines.Select(l => ((double?)l.Start, l.Text)));
 
+    // A caption that stops on a comma, or whose next one carries on in lower case, is one sentence in two lines.
+    [GeneratedRegex(@"[.!?][""')\]]*$")]
+    private static partial Regex Ends();
+
+    /// <summary>The lines with a sentence cut across captions put back together, at the moment its first part was said
+    /// (never past about 60 words, for a transcript with no punctuation to go by).</summary>
+    static IEnumerable<(double? At, string Text)> Whole(IEnumerable<(double? At, string Text)> lines)
+    {
+        (double? At, string Text)? open = null;
+        foreach (var (at, text) in lines)
+        {
+            // A caption with no words (an empty one in an imported transcript, a line of spaces) is no part of a
+            // sentence: skipped, so a sentence on either side of it still joins, and the line kept open always has words.
+            if (string.IsNullOrWhiteSpace(text)) continue;
+            if (open is { } o)
+            {
+                string t = text.TrimStart();
+                bool carriesOn = !Ends().IsMatch(o.Text.TrimEnd()) && t.Length > 0 && (",;:".Contains(o.Text.TrimEnd()[^1]) || char.IsLower(t[0]));
+                if (carriesOn && o.Text.Count(char.IsWhiteSpace) < 60)
+                {
+                    open = (o.At, o.Text.TrimEnd() + " " + t);
+                    continue;
+                }
+                yield return o;
+            }
+            open = (at, text);
+        }
+        if (open is { } last) yield return last;
+    }
+
     static List<ExamHint> Find(IEnumerable<(double? At, string Text)> lines)
     {
         var found = new List<ExamHint>();
         string before = "";
-        foreach (var (at, text) in lines)
+        foreach (var (at, text) in Whole(lines))
             foreach (string raw in SentenceBreak().Split(text))
             {
                 string sentence = Regex.Replace(raw, @"\s+", " ").Trim();

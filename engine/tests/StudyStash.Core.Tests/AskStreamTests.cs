@@ -146,7 +146,8 @@ public class AskStreamTests
 
         var asking = remote.AskAsync(Question(), soFar => { if (soFar.Length > 0) started.TrySetResult(); }, CancellationToken.None);
         await started.Task.WaitAsync(TimeSpan.FromSeconds(30));
-        await Task.Delay(ai.AskTimeout * 2); // Claude's silence after its first words: longer than the limit, on purpose
+        // Claude's silence after its first words, twice the limit on purpose: it is never stopped in all that time (the wait ends at once if it is).
+        await Assert.ThrowsAsync<TimeoutException>(() => claude.StoppedWhileHeld.Task.WaitAsync(ai.AskTimeout * 2));
         gate.SetResult(true);
         var reply = await asking;
 
@@ -175,7 +176,7 @@ public class AskStreamTests
 
         Assert.Equal("Cells have membranes", soFar); // not thrown away for Ollama's answer from scratch
         Assert.Equal(503, stopped.Status);
-        Assert.Equal("Claude stopped partway through: rate limit exceeded", stopped.Message);
+        Assert.Equal("Claude hit its usage limit.", stopped.Message); // not "rate limit exceeded"
         Assert.False(ollama.Finished);
     }
 

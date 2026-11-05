@@ -7,7 +7,7 @@ using StudyStash.Core;
 namespace StudyStash.App.Tests;
 
 /// <summary>Making this computer the library, end to end: a real child on a free port, client.toml pointed at it, and
-/// nothing installed.</summary>
+/// nothing installed. Every library made here starts from a port the test picked, never 8787 (a real library's).</summary>
 public sealed class LibraryHereTests
 {
     static string BuiltEngine()
@@ -28,7 +28,7 @@ public sealed class LibraryHereTests
         using var home = new TempHome();
         using var host = Host(home.Path);
         // Its notes in this test's own folder: with none given a new library keeps them in the real Documents\Study Stash.
-        var here = new LibraryHere { Command = [exe], Folder = home["Syft Notes"] };
+        var here = new LibraryHere { Command = [exe], FirstPort = FreePort(), Folder = home["Syft Notes"] };
         try
         {
             string said = await here.CreateAsync(host, "Ada's library", "at-least-4", "Ada");
@@ -46,21 +46,24 @@ public sealed class LibraryHereTests
     }
 
     [Fact]
-    public async Task A_busy_8787_gets_the_next_free_pair()
+    public async Task A_busy_first_port_gets_the_next_free_pair()
     {
         string exe = BuiltEngine();
         Assert.True(File.Exists(exe), $"build the solution first: no {exe}");
         using var home = new TempHome();
         using var host = Host(home.Path);
-        var here = new LibraryHere { Command = [exe], Folder = home["Syft Notes"] };
+        // A port this test picked and holds, standing in for a busy 8787: never 8787 itself, which on a student's (or
+        // the owner's) computer is their real library.
+        int busy = FreePort();
         using var squatter = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
-        squatter.Bind(new IPEndPoint(IPAddress.Loopback, 8787));
+        squatter.Bind(new IPEndPoint(IPAddress.Loopback, busy));
         squatter.Listen();
+        var here = new LibraryHere { Command = [exe], FirstPort = busy, Folder = home["Syft Notes"] };
         try
         {
             await here.CreateAsync(host, "Ada's library", "at-least-4", "Ada");
             var cfg = Configs.Load(home.Path);
-            Assert.NotEqual(8787, cfg.WebPort);
+            Assert.True(cfg.WebPort > busy, $"the library took {cfg.WebPort}, not a free pair after the busy {busy}");
             var cc = Configs.LoadClient(home.Path);
             Assert.Equal($"http://127.0.0.1:{cfg.WebPort}", cc.ServerUrl);
         }
@@ -74,7 +77,7 @@ public sealed class LibraryHereTests
         Assert.True(File.Exists(exe), $"build the solution first: no {exe}");
         using var home = new TempHome();
         using var host = Host(home.Path);
-        var here = new LibraryHere { Command = [exe], Folder = home["Syft Notes"] };
+        var here = new LibraryHere { Command = [exe], FirstPort = FreePort(), Folder = home["Syft Notes"] };
         try
         {
             await here.CreateAsync(host, "Ada's library", "at-least-4", "Ada");
@@ -118,7 +121,7 @@ public sealed class LibraryHereTests
         // What a setup from before the rule left behind: the app could never reach this library, however often it tried.
         Configs.Save(new Config(home.Path, home["Notes"]) { PoolName = "Sam's library", PoolPassword = "pässword", WebHost = "127.0.0.1", WebPort = FreePort() });
         using var host = Host(home.Path);
-        var here = new LibraryHere { Command = [exe] };
+        var here = new LibraryHere { Command = [exe], FirstPort = FreePort() };
         try
         {
             await here.CreateAsync(host, null, null, "Sam");
@@ -130,12 +133,28 @@ public sealed class LibraryHereTests
         finally { if (host.LocalLibrary is { } svc) await svc.StopAsync(); }
     }
 
-    static int FreePort()
+    /// <summary>A port free now, for a library a test makes to start from (never 8787, a real library's).</summary>
+    /// <summary>A port for a test's library, free along with the two after it (a library takes a pair; one test keeps
+    /// the first busy and its library takes the next pair). From 20000-31999, below every system's ephemeral range
+    /// (Linux from 32768, Windows and macOS from 49152): a port the system hands out to connections can be given to
+    /// one between this look and the library's bind, and the library then can't start (rehearsal 41946512485's Windows
+    /// run lost 53155 that way, three times over). Never the same one twice in a run, so tests running at once don't
+    /// pick the same ports.</summary>
+    internal static int FreePort()
     {
-        using var probe = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
-        probe.Bind(new IPEndPoint(IPAddress.Loopback, 0));
-        return ((IPEndPoint)probe.LocalEndPoint!).Port;
+        lock (PortGate)
+        {
+            for (int tries = 0; tries < 4_000; tries++)
+            {
+                nextPort = nextPort + 3 >= 32_000 ? 20_000 : nextPort + 3;
+                if (HostInfo.PortFree(nextPort) && HostInfo.PortFree(nextPort + 1) && HostInfo.PortFree(nextPort + 2)) return nextPort;
+            }
+            throw new InvalidOperationException("no free ports for a test's library");
+        }
     }
+    static readonly object PortGate = new();
+    // Where this run starts: another test run on the same computer starts elsewhere, so they don't walk the same ports.
+    static int nextPort = 20_000 + Random.Shared.Next(3_900) * 3;
 
     [Fact]
     public async Task A_library_already_here_keeps_its_folder_port_reach_name_and_password()
@@ -144,15 +163,10 @@ public sealed class LibraryHereTests
         Assert.True(File.Exists(exe), $"build the solution first: no {exe}");
         using var home = new TempHome();
         string notes = home["Lecture notes"];
-        int port;
-        using (var probe = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp))
-        {
-            probe.Bind(new IPEndPoint(IPAddress.Loopback, 0));
-            port = ((IPEndPoint)probe.LocalEndPoint!).Port;
-        }
+        int port = FreePort();
         Configs.Save(new Config(home.Path, notes) { PoolName = "Sam's library", PoolPassword = "kept-password", WebHost = "127.0.0.1", WebPort = port });
         using var host = Host(home.Path);
-        var here = new LibraryHere { Command = [exe] };
+        var here = new LibraryHere { Command = [exe], FirstPort = FreePort() };
         try
         {
             // What Settings' "make this the library" asks for: nothing new.
@@ -185,7 +199,7 @@ public sealed class LibraryHereTests
         Assert.True(File.Exists(exe), $"build the solution first: no {exe}");
         using var home = new TempHome();
         using var host = Host(home.Path);
-        var m = Setup.Make(host, AppRole.Both, here: new LibraryHere { Command = [exe], Folder = home["Syft Notes"] });
+        var m = Setup.Make(host, AppRole.Both, here: new LibraryHere { Command = [exe], FirstPort = FreePort(), Folder = home["Syft Notes"] });
         m.Go(SetupStep.Welcome); // past How it works
         try
         {

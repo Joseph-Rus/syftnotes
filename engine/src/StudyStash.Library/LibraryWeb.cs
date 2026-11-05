@@ -277,7 +277,7 @@ public sealed partial class LibraryWeb
             Admin = role == "admin", Current = current, Password = cfg.PoolPassword.Length > 0, Back = back, Nonce = options.Nonce(),
             Chat = ChatOn,
             Inbox = ChatOn ? (Directory.Exists(Path.Combine(cfg.PoolDir, "Inbox")) ? Directory.EnumerateFiles(Path.Combine(cfg.PoolDir, "Inbox"), "*.md").Count() : 0) : null,
-            Due = CanvasOn ? StudyStash.Core.Canvas.Assignments.Upcoming(StudyStash.Core.Canvas.Assignments.Load(cfg.Home), DateTime.Now, 7).Count : null,
+            Due = CanvasOn ? StudyStash.Core.Canvas.Assignments.Upcoming(StudyStash.Core.Canvas.Assignments.Shown(cfg.Home), DateTime.Now, 7).Count : null,
         };
     }
 
@@ -457,6 +457,7 @@ public sealed partial class LibraryWeb
         MapFiles(app);
         MapInbox(app);
         MapMove(app);
+        MapFolders(app);
         MapSettings(app);
         MapCalendar(app);
         MapPhone(app);
@@ -617,9 +618,11 @@ public sealed partial class LibraryWeb
             : r.HasTranscript is > 0 ? "No study notes yet" : "No transcript, so no study notes"));
         if (!string.IsNullOrEmpty(r.ClassifiedBy))
         {
-            string sure = r.ClassifiedBy == "ollama"
+            // An AI sorted it when it isn't one of the others: "ollama" is the AI of before the library named which (Engines.Name for the rest).
+            bool byAi = !SortedBy.ContainsKey(r.ClassifiedBy) || r.ClassifiedBy == "ollama";
+            string sure = byAi
                 ? $", {Math.Round((r.Confidence ?? 0) * 100, MidpointRounding.ToEven).ToString(CultureInfo.InvariantCulture)}% sure" : "";
-            about.Add(("Sorted by", "Sorted by " + Ui.Esc(SortedBy.GetValueOrDefault(r.ClassifiedBy, r.ClassifiedBy) + sure)));
+            about.Add(("Sorted by", "Sorted by " + Ui.Esc((SortedBy.GetValueOrDefault(r.ClassifiedBy) ?? Engines.Name(r.ClassifiedBy)) + sure)));
         }
         string aboutHtml = string.Concat(about.Select(a => $"<div><dt>{Ui.Esc(a.Item1)}</dt><dd>{a.Item2}</dd></div>"));
 
@@ -884,7 +887,7 @@ public sealed partial class LibraryWeb
         string tsNote = ts.Running ? ""
             : "<div class=\"notice\"><div>Tailscale isn't running on this computer, so your laptop can only reach "
               + "it on the same Wi-Fi. Install Tailscale on both and sign in to the same account.</div></div>";
-        const string dl = "https://github.com/Joseph-Rus/study-stash/releases/latest/download";
+        const string dl = "https://github.com/Joseph-Rus/syftnotes/releases/latest/download";
         string invite = $"<div class=\"group-head\">Connect your laptop</div>{tsNote}<div class=\"group\">"
             + $"<div class=\"row\"><span class=\"grow\">Address</span><span class=\"value\">{Ui.Esc(url)}</span></div>"
             + $"<div class=\"row\"><span class=\"grow\">Password</span><span class=\"value\">{Ui.Esc(cfg.PoolPassword.Length > 0 ? cfg.PoolPassword : "none")}</span></div>"
@@ -912,7 +915,7 @@ public sealed partial class LibraryWeb
             + "<p class=\"group-foot\">Set with auto_update in config.toml.</p>"
             + "<div class=\"group-head\">Rewrite every summary</div><div class=\"group\">"
             + "<form class=\"row\" method=\"post\" action=\"/settings/resummarize-all\" data-confirm=\"Rewrite all "
-            + $"{c.Total} summaries with {Ui.Esc(NotesWriter)}? This can take a while.\">"
+            + $"{store.SummaryCount()} summaries with {Ui.Esc(NotesWriter)}? This can take a while.\">"
             + $"<span class=\"grow\">Rewrite all summaries with {Ui.Esc(NotesWriter)}</span>"
             + "<button>Rewrite all</button></form></div>"
             + "<p class=\"group-foot\">Useful after switching models. Lectures stay readable while they are "
@@ -942,9 +945,9 @@ public sealed partial class LibraryWeb
             if ((was.Length > 0 ? was : name) is { Length: > 0 } showed) shown.Add(showed);
             if (name.Length == 0 || name == Configs.Unsorted || seen.Contains(name) || f.Get($"class_remove_{i}") == "1") continue;
             var aliases = f.Get($"class_aliases_{i}").Split(',').Select(Py.Strip).Where(a => a.Length > 0).ToList();
-            // The page doesn't show a class's sidebar folder ("Clubs"), so it keeps the one it had.
-            string group = cfg.Classes.FirstOrDefault(c => c.Name == name || (was.Length > 0 && c.Name == was))?.Group ?? "";
-            classes.Add(new ClassDef(name, aliases, Py.Strip(f.Get($"class_desc_{i}")), group));
+            // The page doesn't show a class's sidebar folder ("Clubs") or its colour, so it keeps the ones it had.
+            var had = cfg.Classes.FirstOrDefault(c => c.Name == name || (was.Length > 0 && c.Name == was));
+            classes.Add(new ClassDef(name, aliases, Py.Strip(f.Get($"class_desc_{i}")), had?.Group ?? "", had?.Color ?? -1));
             seen.Add(name);
             if (was.Length > 0 && was != name && cfg.Classes.Any(c => c.Name == was)) renames.Add(new ClassRenameStep(was, name, 0, ""));
         }

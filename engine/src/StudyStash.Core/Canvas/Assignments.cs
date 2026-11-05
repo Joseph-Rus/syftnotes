@@ -1,6 +1,7 @@
 using System.Globalization;
 using System.Text.Json;
 using System.Text.Json.Nodes;
+using System.Text.Json.Serialization;
 
 namespace StudyStash.Core.Canvas;
 
@@ -15,13 +16,16 @@ namespace StudyStash.Core.Canvas;
 /// <param name="Comments">How many comments others (the grader) left; null in a list saved before it was counted.</param>
 /// <param name="MarkedDone">Marked done in Canvas's planner.</param>
 /// <param name="MarkedDoneAt">When it was marked done, Canvas's UTC ISO; "" when it wasn't.</param>
+/// <param name="Mark">What the student did about it in Syft Notes (never in Canvas): "done", "hidden" or "". Put on by
+/// <see cref="DueMarks.Apply"/>, never saved with the list.</param>
+/// <param name="MarkAt">When they did, UTC ISO; "" when they haven't.</param>
 public sealed record Assignment(string ClassName, long Id, string Name, string Due, double? Points, string Status,
     double? Score, string Submitted, string Url, bool Late = false, bool Missing = false, bool Excused = false, string Grade = "",
     string GradedAt = "", string GradingType = "", string Kind = "assignment", string DueAt = "", int? Comments = null,
-    bool MarkedDone = false, string MarkedDoneAt = "")
+    bool MarkedDone = false, string MarkedDoneAt = "", [property: JsonIgnore] string Mark = "", [property: JsonIgnore] string MarkAt = "")
 {
-    /// <summary>Handed in, doesn't need anything more, or the student ticked it off themselves.</summary>
-    public bool Done => Status is "graded" or "submitted" or "excused" or "late" or "closed" || MarkedDone;
+    /// <summary>Handed in, doesn't need anything more, or the student ticked it off themselves (in Canvas's planner, or here).</summary>
+    public bool Done => Status is "graded" or "submitted" or "excused" or "late" or "closed" || MarkedDone || Mark == DueMarks.Done;
 }
 
 /// <summary>Something that changed on Canvas between two syncs, in the design's words ("Graded: CS 101 · Problem set 4
@@ -152,14 +156,14 @@ public static class Assignments
 
     /// <summary>What changed between two syncs, in words: new assignments, moved due dates, new marks, new comments
     /// from the grader, work gone missing, and assignments Canvas no longer lists. <paramref name="now"/> is the
-    /// wall clock the due dates are in.</summary>
+    /// wall clock the due dates are in. A row the student hid (<see cref="DueMarks.Apply"/> put its mark on) says nothing.</summary>
     public static List<CanvasChange> Diff(IReadOnlyList<Assignment> before, IReadOnlyList<Assignment> after, DateTime now)
     {
         var old = before.GroupBy(a => (a.ClassName, a.Id)).ToDictionary(g => g.Key, g => g.First());
         var said = new List<CanvasChange>();
         void Say(string kind, Assignment a, string word, string what) =>
             said.Add(new CanvasChange(kind, a.ClassName, a.Name, $"{word}: {a.ClassName} · {a.Name}{(what.Length > 0 ? " · " + what : "")}", a.Id));
-        foreach (var a in after)
+        foreach (var a in after.Where(a => a.Mark != DueMarks.Hidden))
         {
             if (!old.TryGetValue((a.ClassName, a.Id), out var o))
             {
@@ -175,7 +179,7 @@ public static class Assignments
             if (a.Status == "missing" && o.Status != "missing") Say("missing", a, "Missing", a.Due.Length > 0 ? "was due " + Short(a.Due, now) : "");
         }
         var listed = after.Select(a => (a.ClassName, a.Id)).ToHashSet();
-        foreach (var o in before.Where(o => !listed.Contains((o.ClassName, o.Id)))) Say("removed", o, "Removed", "");
+        foreach (var o in before.Where(o => o.Mark != DueMarks.Hidden && !listed.Contains((o.ClassName, o.Id)))) Say("removed", o, "Removed", "");
         return said;
     }
 
@@ -183,6 +187,8 @@ public static class Assignments
 
     public static string PathIn(string home) => Path.Combine(home, "canvas_assignments.json");
 
+    /// <summary>What the last sync saved, as Canvas said it, for what writes the list back (the sync, a class renamed or
+    /// forgotten). Anything that shows it uses <see cref="Shown"/>.</summary>
     public static List<Assignment> Load(string home)
     {
         try
@@ -195,10 +201,31 @@ public static class Assignments
         }
     }
 
+    /// <summary>The saved list with the student's own marks on it (<see cref="DueMarks"/>; a hidden one stays, as <c>Mark</c>
+    /// "hidden"), for the classes still linked to a Canvas course. Un-ticking a course leaves its rows in the file until the
+    /// next sync; they are gone from here at once, so every list drops them together.</summary>
+    public static List<Assignment> Marked(string home)
+    {
+        var linked = CanvasSettings.Load(home).Courses.Keys.ToHashSet();
+        return DueMarks.Apply(Load(home).Where(a => linked.Contains(a.ClassName)), DueMarks.Load(home));
+    }
+
+    /// <summary>The list as the student sees it: <see cref="Marked"/> with what they hid left out. Every list the app, Ask,
+    /// notifications and Claude's tools show comes from here.</summary>
+    public static List<Assignment> Shown(string home) => [.. Marked(home).Where(a => a.Mark != DueMarks.Hidden)];
+
     public static void Save(string home, IEnumerable<Assignment> items)
     {
         SharedFile.Write(PathIn(home), JsonSerializer.Serialize(items.ToList(), Options));
     }
+
+    /// <summary>Still to hand in at <paramref name="now"/> (wall-clock, like <see cref="Assignment.Due"/>): not done, and not
+    /// work that takes nothing to hand in once its time has gone (an in-class quiz that already happened). That goes with
+    /// what's behind you and keeps its "Nothing to hand in" label; one still to come stays where it is. The class list, the
+    /// Due groups and their count all ask this, so they agree. (Decided when the list is read, not when it's synced: a quiz
+    /// held at 10:00 stops being "to hand in" at 10:00, not at the next sync.)</summary>
+    public static bool ToHandIn(Assignment a, DateTime now) =>
+        !a.Done && !(a.Status == "no submission" && a.Due.Length > 0 && DateTime.Parse(a.Due, CultureInfo.InvariantCulture) < now);
 
     /// <summary>What's still to do, soonest first: open, past due or missing, due within <paramref name="days"/> (or
     /// overdue), plus anything with no due date that's open.</summary>

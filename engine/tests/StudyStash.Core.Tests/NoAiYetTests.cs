@@ -125,17 +125,48 @@ public class NoAiYetTests
     }
 
     [Fact]
-    public void The_first_AI_signed_in_becomes_the_writer_when_none_was_chosen_and_a_later_one_changes_nothing()
+    public void The_AI_a_student_signs_in_to_writes_the_notes_and_answers_from_then_on()
     {
         using var dir = new TempDir();
         var cfg = Library(dir);
         var ai = new AiJobs(cfg.Home);
         int chosen = 0;
         ai.NotesAiChosen += () => chosen++;
+        (string, string, int) Now() => (AiSettings.Load(cfg.Home).For("notes").Provider, AiSettings.Load(cfg.Home).For("ask").Provider, chosen);
+
+        // None chosen yet: the one signed in to.
         ai.MarkSignedIn("gemini");
-        Assert.Equal(("gemini", true, 1), (AiSettings.Load(cfg.Home).Provider, AiSettings.Load(cfg.Home).NotesChosen, chosen));
+        Assert.Equal(("gemini", "gemini", 1), Now());
+        // Signed in to another later (Settings, an AI card, Connect): that one, for the notes and Ask, with no picking.
         ai.MarkSignedIn("claude");
-        Assert.Equal(("gemini", 1), (AiSettings.Load(cfg.Home).Provider, chosen));
+        Assert.Equal(("claude", "claude", 2), Now());
+        // Signing back in to the one already used changes nothing.
+        ai.MarkSignedIn("claude");
+        Assert.Equal(("claude", "claude", 2), Now());
+
+        // Split picks (notes on Gemini with its own model, Ask on Claude), and Claude's sign-in runs out: signing back in
+        // to Claude is a repair, and every pick stays as it was.
+        var split = AiSettings.Load(cfg.Home);
+        split.ByJob["notes"] = new AiChoice("gemini", "gemini-3.8-pro");
+        split.Save(cfg.Home);
+        ai.MarkSignedIn("claude");
+        Assert.Equal(("gemini", "claude", 2), Now());
+        Assert.Equal("gemini-3.8-pro", AiSettings.Load(cfg.Home).For("notes").Model);
+
+        // Notes chosen on the free AI on this computer: signing in to a new cloud AI never takes them over.
+        var local = AiSettings.Load(cfg.Home);
+        local.ByJob["notes"] = new AiChoice("ollama");
+        local.Save(cfg.Home);
+        ai.MarkSignedIn("codex");
+        Assert.Equal(("ollama", "claude", 2), Now());
+
+        // Only sorting set to the free AI: a new sign-in still writes the notes and answers, and sorting stays on it.
+        var sortOnly = new AiSettings { Provider = "claude" };
+        sortOnly.ByJob["sort"] = new AiChoice("ollama");
+        sortOnly.Save(cfg.Home);
+        ai.MarkSignedIn("gemini");
+        Assert.Equal(("gemini", "gemini", 3), Now());
+        Assert.Equal("ollama", AiSettings.Load(cfg.Home).For("sort").Provider);
     }
 
     [Fact]
