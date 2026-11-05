@@ -14,6 +14,11 @@ public sealed record ToastRequested(string Title, string Text, string? Action = 
 /// <summary>Quit Syft Notes, with an exit code.</summary>
 public sealed record QuitRequested(int Code = 0);
 
+/// <summary>The student's own Quit from a screen (Settings → General's Quit Syft Notes): asked first while a lecture
+/// records, as ⌘Q and the menus' Quit are. <see cref="QuitRequested"/> stays the app's own quit (an update restarting
+/// it, the self-test), which never asks.</summary>
+public sealed record QuitAskingRequested;
+
 /// <summary>Settings, open at <see cref="Section"/> ("AI", "Canvas"…). With no section it's Settings as the app menu
 /// and ⌘, open it: the dropdown and the quick panel make way, and before setup's done, setup comes forward instead.</summary>
 public sealed record SettingsRequested(string? Section = null);

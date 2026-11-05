@@ -31,8 +31,9 @@ public sealed class CanvasWatch(CanvasContext context, TimeProvider? clock = nul
     /// <summary>Told about anything that went wrong while asking (for the log); the watch carries on regardless.</summary>
     public Action<Exception>? OnError { get; init; }
 
-    /// <summary>Keeps this computer's Chrome extension folder current on every refresh (on start, and whenever the
-    /// library's Canvas address or key changes), and says whether Chrome is connected. Null: leave the folder alone.</summary>
+    /// <summary>Keeps this computer's Chrome extension folder, when it has one, current on every refresh (on start, and
+    /// whenever the library's Canvas address or key changes), and says whether Chrome is connected. Null: leave the
+    /// folder alone.</summary>
     public ExtensionKeeper? Extension { get; init; }
 
     /// <summary>3 seconds while a screen waits for Chrome (<see cref="Hurry"/>); 5 while syncing or the extension hasn't

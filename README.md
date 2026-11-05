@@ -641,10 +641,12 @@ at), then connects the extension with a code:
 - **Opera and Chromium**, or if your school's Chrome won't add it from the store (**Can't add it
   from the store? Load it from a folder instead**): Syft Notes opens that browser's extensions page
   and shows the extension's folder. Turn on **Developer mode**, click **Load unpacked**, and pick
-  that folder, or drag the folder onto the Extensions page. On a Mac the folder is **Syft Notes →
-  Chrome extension** in your home folder (`~/Study Stash/Chrome extension`), where the browser's
-  window can see it; on Windows it's `chrome-extension` in `%USERPROFILE%\.study-stash`. There's no
-  code to paste. Then sign in to Canvas and click **Find my courses**.
+  that folder, or drag the folder onto the Extensions page. Syft Notes makes the folder only when
+  you do this. On a Mac the folder is **Syft Notes → Chrome extension** in your home folder
+  (`~/Syft Notes/Chrome extension`, or `~/Study Stash/Chrome extension` if an earlier version made
+  it), where the browser's window can see it; on Windows it's `chrome-extension` in
+  `%USERPROFILE%\.study-stash`. There's no code to paste. Then sign in to Canvas and click **Find my
+  courses**.
 
 Canvas then syncs about once an hour while that browser is open (it can stay minimized): what's due,
 assignments with rubrics, your submissions and feedback, modules, files, pages and announcements,
@@ -749,8 +751,10 @@ the `STUDYSTASH_HOME` environment variable). If you connect Granola, its sign-in
 `granola-tokens.json`. The notes themselves are plain Markdown files in a folder per class, by
 default in **Documents/Study Stash** on the library's computer (**Settings → Library → Notes folder**
 shows where), which you can open, back up or sync however you like. On a Mac and on Linux the browser
-extension's folder (for Opera, or a browser that can't add it from a store) is `~/Study Stash/Chrome
-extension`, because a browser's Load unpacked window doesn't show folders whose names start with a dot.
+extension's folder (for Opera, or a browser that can't add it from a store, and made only when you
+load it) is `~/Syft Notes/Chrome extension` (an earlier version's `~/Study Stash/Chrome extension`
+stays where it is), because a browser's Load unpacked window doesn't show folders whose names start
+with a dot.
 
 ## Updates
 

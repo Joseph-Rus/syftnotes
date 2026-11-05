@@ -390,14 +390,8 @@ public static partial class Shell
             };
             page.OnStop = () => StopRecording();
         }
-        // Home's "Buy us a coffee": the Ko-fi page, and the library window's own ask for a tip goes for good (as it
-        // does from the ask itself, which answers here if it's showing).
-        if (page.IsHome)
-            page.OnSupport = () =>
-            {
-                if (library.Support is { } asking) asking.TipCommand.Execute(null);
-                else SupportAsk.Answer(host, SupportAnswer.Tip, url => Dialogs.OpenUrl(url), DateTimeOffset.Now);
-            };
+        // Home's "Buy us a coffee": the Ko-fi page, and the library window's own ask for a tip goes for good.
+        if (page.IsHome) page.OnSupport = () => SupportAsk.Answer(host, SupportAnswer.Tip, url => Dialogs.OpenUrl(url), DateTimeOffset.Now);
         if (library.Overview is { Ask: { } kept } before && before.IsHome == page.IsHome && before.ClassName == page.ClassName && !before.IsDuePage)
         {
             before.Ask = null;

@@ -118,9 +118,10 @@ home/
   crawl.json                          the sync's queue, its sections, the manifest of saved files
   canvas_assignments.json             every assignment and where you stand, for the Due list
   canvas_key                          the extension's own key
-  chrome-extension/                   the extension's folder, for Chrome's "Load unpacked" (brought up to date when the library starts);
-                                      on a Mac, only one an older Syft Notes wrote (see below)
-~/Study Stash/Chrome extension/       on a Mac, the extension's folder (Chrome's picker hides the dot-folder home)
+  chrome-extension/                   the extension's folder, for Chrome's "Load unpacked", only once a student has asked for it
+                                      (brought up to date when the library starts); on a Mac, only one an older Syft Notes wrote
+~/Syft Notes/Chrome extension/        on a Mac, the extension's folder once a student asks for it (Chrome's picker hides the
+                                      dot-folder home); an older one at ~/Study Stash/Chrome extension stays where it is
 ```
 
 ### Target (after T8) — reached
@@ -199,17 +200,22 @@ student whose Chrome won't install from the store, load the folder described her
 says Chrome, any browser of its family does the same. The engine carries it as embedded resources (`extension/<file>` in `StudyStash.Core`), and
 `Extension.Ensure(dir, library, key, canvasUrl)` writes it out as a folder for Chrome's "Load unpacked": the scripts
 (`background.js`, `connection.js`, the popup, the icons that `tools/syft/make_art.swift` draws), a manifest,
-and `config.json` + `config.js`. The library keeps its own folder (`Extension.Folder(home)`) ready by itself: on start, and whenever the Canvas address changes.
+and `config.json` + `config.js`. **The folder is made only when a student takes that route** (Add to Opera or Chromium,
+"Load it from a folder instead", or the library page's Make the folder): no Canvas, a browser's store, or a student who
+isn't one never gets a folder. Once there is one, the library keeps it (`Extension.Folder(home)`) up to date by itself:
+on start, and whenever the Canvas address changes (`Extension.KeepFor`, which makes none).
 
 **Where the folder is.** `Extension.Folder(home)` is `<home>/chrome-extension` on Windows and Linux. On a Mac the home
 is `~/.study-stash`, and Chrome's "Load unpacked" window hides dot-folders (and `~/Library`), so the folder is
-`~/Study Stash/Chrome extension` instead: shown by that window without any shortcut, never synced to iCloud (not in
+`~/Syft Notes/Chrome extension` instead: shown by that window without any shortcut, never synced to iCloud (not in
 Desktop or Documents), and only this person's (the folder and the `Syft Notes` folder Syft Notes makes for it are
 `0700`; `config.json` and `config.js` are `0600`). Another hidden home in the same account gets its own
 `Chrome extension (<8 hex>)`; a home outside the person's home folder, or one Chrome already shows, keeps
-`<home>/chrome-extension`. **Migration:** a Chrome that loaded `<home>/chrome-extension` before keeps loading it from
-there, so `Extension.EnsureFor` writes both whenever that old folder exists (same library, key and Canvas), and the
-connected copy never breaks. The student can also drag the folder onto Chrome's Extensions page (Developer mode on)
+`<home>/chrome-extension`. **Migration:** a folder an earlier Syft Notes made as `~/Study Stash/Chrome extension` is
+kept where it is (`Extension.Folder` returns it while it has a manifest, so no second folder appears and the Chrome
+loading it never breaks), and a Chrome that loaded `<home>/chrome-extension` before keeps loading it from there, so
+`Extension.EnsureFor` and `Extension.KeepFor` write the folder that is there and that old one too whenever it exists
+(same library, key and Canvas). The student can also drag the folder onto Chrome's Extensions page (Developer mode on)
 instead of using Load unpacked; on a Mac and on Windows, Add to Chrome shows the folder selected in Finder/Explorer
 for that.
 
@@ -352,24 +358,28 @@ What protocol 2 (1.3) does, answer by answer (all kept in 1.4):
 
 ### Setting it up, and the folder's life
 
-There is no "Make it" step anywhere: each computer's folder is written and kept by Syft Notes itself.
+The folder is made when a student loads it and kept by Syft Notes after that; a store copy never has one.
 
-1. **The library** makes its folder (`Extension.Folder(home)`, and keeps an old `<home>/chrome-extension` current) when it starts (`EnsureHere`, even before there's a Canvas address:
-   then its manifest has no Canvas host and every job is refused), and writes it again when the Canvas address is
-   saved (Settings, `POST /api/v2/canvas {"url"}`, Find my courses with an address typed); every start also brings
-   it up to a new engine version. Its config points at `http://127.0.0.1:<port>`.
-2. **The laptop app** keeps its folder (`ExtensionKeeper.LocalFolder`, the same rule) with `ExtensionKeeper.KeepAsync`: it asks the library
-   (`GET /api/v2/canvas/extension`) and, once the library has a Canvas address, writes the folder pointing at the
-   library as the laptop reaches it (`CanvasClient.ServerUrl`), the key and the Canvas address. It writes again when
-   any of those or the extension version changes, and never when nothing did. When the app and the library share a
-   computer and a folder, it only reports the library's own.
-3. **The student** installs the Chrome Web Store copy and pastes the code (`connection_code`,
+1. **The student asks.** Add to Opera or Chromium, or "Load it from a folder instead", uses the folder that is there,
+   or makes it: `CanvasContext`'s `PrepareExtension` (`Extension.EnsureFor`) writes it from the app, pointing at the
+   library as this computer reaches it. The library's page has a Make the folder button for the same
+   (`POST /settings/canvas/extension`).
+2. **The library** brings its folder up to date (`Extension.Folder(home)`, and an old `<home>/chrome-extension`) when it
+   starts (`EnsureHere`, which makes none) and when the Canvas address is saved (Settings,
+   `POST /api/v2/canvas {"url"}`, Find my courses with an address typed); every start also brings it up to a new engine
+   version. Its config points at `http://127.0.0.1:<port>`. Without a folder, nothing happens.
+3. **The laptop app** keeps a folder it has (`ExtensionKeeper.LocalFolder`, the same rule) with `ExtensionKeeper.KeepAsync`:
+   it asks the library (`GET /api/v2/canvas/extension`) and, once the library has a Canvas address, writes the folder
+   pointing at the library as the laptop reaches it (`CanvasClient.ServerUrl`), the key and the Canvas address. It writes
+   again when any of those or the extension version changes, and never when nothing did. When the app and the library
+   share a computer and a folder, it only reports the library's own.
+4. **The student** installs the Chrome Web Store copy and pastes the code (`connection_code`,
    `ExtensionKeeper.ConnectionCode`), which the Canvas step offers first in Chrome, Edge, Brave, Arc and Vivaldi; or
    (Opera, Chromium, a Chrome that won't install from the store) loads the folder once (chrome://extensions, Developer
    mode, Load unpacked, or drags the folder onto that page). The screens
    can show "Add to Chrome" until `connected` (a check-in within 90 s for protocol 3), then which Chrome it is
    (`seen_where`).
-4. **After that, nothing by hand.** A folder rewritten with new host permissions or a new version reloads the running
+5. **After that, nothing by hand.** A folder rewritten with new host permissions or a new version reloads the running
    copy by itself (the library also nudges the waiting request, so it happens at once); a new key or library address
    in config.json is read on the next round without a reload. Chrome only has to keep running with Developer mode on
    (Chrome turns off an unpacked extension that reloads itself once Developer mode is off: the store copy avoids that).

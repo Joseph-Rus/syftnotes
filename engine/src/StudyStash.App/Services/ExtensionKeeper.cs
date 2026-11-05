@@ -5,20 +5,21 @@ using StudyStash.Core.Canvas;
 namespace StudyStash.App.Services;
 
 /// <summary>
-/// Keeps the Chrome extension's folder on this computer ready by itself, so the student never has to make it: once
-/// the app is paired with a library that has a Canvas address, the folder points at that library (as this computer
-/// reaches it) and that Canvas, and it's written again when either changes or Syft Notes updates. Also says what
-/// the library last heard from Chrome, so a screen can show "Add to Chrome" and then "Connected". Nothing here
-/// touches the UI thread.
+/// Keeps the Chrome extension's folder on this computer up to date by itself, so the student never has to redo it:
+/// once the app is paired with a library that has a Canvas address, a folder that's there points at that library (as
+/// this computer reaches it) and that Canvas, and it's written again when either changes or Syft Notes updates. It
+/// makes none: the folder is made when the student loads it into a browser (<c>CanvasActions.PrepareExtension</c>),
+/// never for one who uses a browser's store. Also says what the library last heard from Chrome, so a screen can
+/// show "Add to Chrome" and then "Connected". Nothing here touches the UI thread.
 /// </summary>
 public sealed class ExtensionKeeper(string home, Func<CanvasClient?> client, Action<string>? log = null)
 {
-    /// <summary>What the folder was last written for (the library's address, the key, the Canvas address and this
+    /// <summary>What the folder was last kept for (the library's address, the key, the Canvas address and this
     /// engine's extension version, hashed so the key isn't kept here): the same again means nothing to do.</summary>
     string keptFor = "";
 
-    /// <summary>The folder Chrome loads the extension from on this computer ("Load unpacked"). The one an older
-    /// Syft Notes wrote inside the home is kept up to date alongside it, for a Chrome that loaded that one.</summary>
+    /// <summary>The folder Chrome loads the extension from on this computer ("Load unpacked"), when there is one. The
+    /// one an older Syft Notes wrote inside the home is kept up to date alongside it, for a Chrome that loaded that one.</summary>
     public string LocalFolder { get; init; } = Extension.Folder(home);
 
     /// <summary>The folder is there, complete, and points at the paired library and its Canvas.</summary>
@@ -41,9 +42,9 @@ public sealed class ExtensionKeeper(string home, Func<CanvasClient?> client, Act
     public event Action? Changed;
 
     /// <summary>
-    /// Asks the library about its extension and brings the folder up to date when what it points at has changed.
-    /// Does nothing without a library (or a library too old to say). Never throws for a library that didn't answer
-    /// or a folder that couldn't be written: the next call tries again. True when the folder was written.
+    /// Asks the library about its extension and, when there's a folder here, brings it up to date when what it points
+    /// at has changed. Does nothing without a library (or a library too old to say). Never throws for a library that
+    /// didn't answer or a folder that couldn't be written: the next call tries again. True when a folder was written.
     /// </summary>
     public async Task<bool> KeepAsync(CancellationToken stop = default)
     {
@@ -72,7 +73,7 @@ public sealed class ExtensionKeeper(string home, Func<CanvasClient?> client, Act
             {
                 try
                 {
-                    wrote = Extension.EnsureFor(home, folder, c.ServerUrl, info.Key, info.Canvas).Changed;
+                    wrote = Extension.KeepFor(home, folder, c.ServerUrl, info.Key, info.Canvas).Changed;
                     keptFor = wanted;
                     if (wrote) log?.Invoke($"[canvas] the Chrome extension's folder on this computer is ready (version {Extension.Version()}): {folder}");
                 }

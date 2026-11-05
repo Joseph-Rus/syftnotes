@@ -1207,6 +1207,22 @@
     <Setter Property="AcceptsReturn" Value="False" />
     <Setter Property="VerticalContentAlignment" Value="Top" />
     <Setter Property="PlaceholderForeground" Value="{DynamicResource InkSubtle}" />
+    <!-- Room for the wash and the ring round the words; the view pulls it back by as much, so at rest the words line up
+         with the line above. -->
+    <Setter Property="Padding" Value="8,2" />
+  </Style>
+  <!-- A plain heading at rest; one that can be renamed says so: the pointer over it washes it as a hovered row is, and
+       with the caret in it it's ringed in ink, as a text field is (the ring drawn inside, so the words don't move). -->
+  <Style Selector="TextBox.doc-title /template/ Border#PART_BorderElement">
+    <Setter Property="CornerRadius" Value="{DynamicResource RadiusControl}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource Ink}" />
+  </Style>
+  <Style Selector="TextBox.doc-title[IsReadOnly=False]:pointerover /template/ Border#PART_BorderElement">
+    <Setter Property="Background" Value="{DynamicResource Hover}" />
+  </Style>
+  <Style Selector="TextBox.doc-title[IsReadOnly=False]:focus /template/ Border#PART_BorderElement">
+    <Setter Property="Background" Value="Transparent" />
+    <Setter Property="BorderThickness" Value="1.5" />
   </Style>
   <Style Selector="Button.tab">
     <Setter Property="Theme" Value="{StaticResource Surface}" />
