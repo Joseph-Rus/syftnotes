@@ -427,14 +427,8 @@ public sealed class AppUpdates
     /// computer, or being written there: an update restarts that library, which would drop the notes it's writing
     /// (11:48 one day: a lecture's notes waited two hours behind an update that started two seconds after it was sent).
     /// When it stopped is its sound file's last write, which holds for one picked up again days later too.</summary>
-    internal static bool WritingHere(AppHost host)
-    {
-        if (host.LocalLibrary is null) return false;
-        var since = DateTime.UtcNow - WritingWait;
-        return host.Lectures.All().Any(l => l.State is LectureState.Sending or LectureState.Writing
-                                            && File.Exists(host.Lectures.AudioPath(l.Id))
-                                            && File.GetLastWriteTimeUtc(host.Lectures.AudioPath(l.Id)) > since);
-    }
+    internal static bool WritingHere(AppHost host) =>
+        host.LocalLibrary is not null && host.Lectures.OnItsWay(DateTime.UtcNow - WritingWait);
 
     /// <summary>auto_update, read fresh each round: client.toml's, and config.toml's too when the library is on this
     /// computer (Settings → Your library → Update automatically writes that one). Either off is off; a file that

@@ -12,6 +12,9 @@ public enum OlderVerdict
     OtherHome,
     /// <summary>Ours, as new as this copy or newer (or its version can't be read): never touched.</summary>
     NotOlder,
+    /// <summary>This copy runs from its disk image or a translocation folder (<see cref="MacRename.Passing"/>): it never
+    /// touches what the installed copy runs.</summary>
+    Passing,
     /// <summary>Ours, but a lecture is being recorded or written down in its folder: left alone, looked at again later.</summary>
     Busy,
     /// <summary>This copy's own program (its background library), for this folder, with nothing on the go.</summary>
@@ -48,13 +51,32 @@ public sealed class OlderLibrary
     /// <summary>Asks the process to quit (SIGTERM); false where there's no polite way (Windows).</summary>
     public Func<int, bool> AskToQuit { get; init; } = Quit;
 
+    /// <summary>The processes already asked: a second SIGTERM means "stop now", with no clean-up, so it's never sent.</summary>
+    readonly HashSet<int> asked = [];
+    readonly Lock gate = new();
+
+    /// <summary>Asks <paramref name="pid"/> to quit, once: true when it has been asked (<paramref name="before"/>: on an
+    /// earlier look, so nothing is sent now), false where there's no polite way.</summary>
+    public bool AskOnce(int pid, out bool before)
+    {
+        lock (gate) before = asked.Contains(pid);
+        if (before) return true;
+        if (!AskToQuit(pid)) return false;
+        lock (gate) asked.Add(pid);
+        return true;
+    }
+
     /// <summary>The words for a library left alone because a lecture is on the go there.</summary>
     public const string BusyWords = "An older copy of Syft Notes is still busy with a lecture (recording it or writing it down). Your library starts by itself once it's done.";
     /// <summary>The words for one asked to quit that hasn't yet.</summary>
     public const string ClosingWords = "An older copy of Syft Notes is still closing. Your library starts by itself once it has.";
     /// <summary>The words for one this app can't ask to quit (Windows).</summary>
     public const string StillRunningWords = "An older copy of Syft Notes is still running. End it in Task Manager, then open Syft Notes again.";
-    /// <summary>The words for a copy as new as this one or newer, or one set up apart from this one: never touched.</summary>
+    /// <summary>The words for a library of ours that didn't answer in time (busy with a long job, a class renamed or the
+    /// notes indexed again): never taken for a refusal.</summary>
+    public const string SlowWords = "Your library is busy and didn't answer just now. Syft Notes tries again in a minute.";
+    /// <summary>The words for a copy as new as this one or newer, or one set up apart from this one (or this copy runs
+    /// from its disk image): never touched.</summary>
     public const string OtherCopyWords = "Another copy of Syft Notes is already running its own library. Quit that copy, then open Syft Notes again.";
 
     /// <summary>What to do about <paramref name="holder"/>, for this copy running <paramref name="self"/> at
@@ -64,6 +86,7 @@ public sealed class OlderLibrary
     {
         if (holder is not { Ours: true }) return OlderVerdict.NotOurs;
         if (!holder.Serves(home)) return OlderVerdict.OtherHome;
+        if (MacRename.Passing(self)) return OlderVerdict.Passing;
         bool own = LibraryService.SameProgram(holder.Program, self);
         if (!own && !holder.OlderThan(version)) return OlderVerdict.NotOlder;
         if (busy(home)) return OlderVerdict.Busy;
@@ -71,9 +94,9 @@ public sealed class OlderLibrary
     }
 
     /// <summary>A lecture is recording or paused; one is being written down right now (its record changed in the last
-    /// few minutes: one left Transcribing with no model to write it never holds this off); or one the library has is
-    /// having its notes written, sent within <see cref="AppUpdates.WritingWait"/>. One still waiting to be sent doesn't
-    /// count: it's here, and goes to the new library. True when the lectures can't be read, as it can't be told.</summary>
+    /// few minutes: one left Transcribing with no model to write it never holds this off); or one is on its way to the
+    /// library or having its notes written there (<see cref="LectureStore.OnItsWay"/>, as an update waits for it). True
+    /// when the lectures can't be read, as it can't be told.</summary>
     public static bool LecturesBusy(string home, DateTime now)
     {
         try
@@ -81,9 +104,7 @@ public sealed class OlderLibrary
             var store = new LectureStore(home);
             var all = store.All();
             bool writingDown = all.Any(l => l.State == LectureState.Transcribing && now - store.ChangedAt(l.Id) < WritingDownNow);
-            return !AppUpdates.NoLectureInHand(all, writingDown)
-                   || all.Any(l => l.State == LectureState.Writing && File.Exists(store.AudioPath(l.Id))
-                                   && now - File.GetLastWriteTimeUtc(store.AudioPath(l.Id)) < AppUpdates.WritingWait);
+            return !AppUpdates.NoLectureInHand(all, writingDown) || store.OnItsWay(now - AppUpdates.WritingWait);
         }
         catch (Exception e) when (e is IOException or UnauthorizedAccessException)
         {

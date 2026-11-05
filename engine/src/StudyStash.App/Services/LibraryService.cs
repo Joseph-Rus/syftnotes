@@ -53,6 +53,7 @@ public sealed class LibraryService : IDisposable
     readonly Func<int, Task<string>> portStatus;
     readonly Func<Config, Task<(string Version, bool Background)?>> health;
     readonly OlderLibrary older;
+    readonly Func<Config, Task<bool>> refuses;
     readonly Action<string> log;
     readonly Lock gate = new();
     readonly List<DateTime> recentExits = [];
@@ -93,7 +94,8 @@ public sealed class LibraryService : IDisposable
 
     public LibraryService(string home, Config cfg, IReadOnlyList<string>? command = null, Func<ProcessStartInfo, Process>? spawn = null,
         Func<Config, TimeSpan, Task<bool>>? waitHealthy = null, Func<int, Task<string>>? portStatus = null, Action<string>? log = null,
-        Func<Config, Task<(string Version, bool Background)?>>? health = null, OlderLibrary? older = null)
+        Func<Config, Task<(string Version, bool Background)?>>? health = null, OlderLibrary? older = null,
+        Func<Config, Task<bool>>? refuses = null)
     {
         this.home = home;
         this.cfg = cfg;
@@ -104,6 +106,7 @@ public sealed class LibraryService : IDisposable
         this.log = log ?? Console.WriteLine;
         this.health = health ?? HealthAsync;
         this.older = older ?? OlderLibrary.ThisComputer;
+        this.refuses = refuses ?? RefusesAsync;
     }
 
     static readonly HttpClient Http = new() { Timeout = TimeSpan.FromSeconds(5) };
@@ -123,6 +126,23 @@ public sealed class LibraryService : IDisposable
         catch (Exception e) when (e is HttpRequestException or TaskCanceledException or System.Text.Json.JsonException or InvalidOperationException)
         {
             return null;
+        }
+    }
+
+    /// <summary>The library on the port says no to this password (401 or 403). A library that doesn't answer in time
+    /// (busy with a long job: its health check waits for the store) hasn't refused anything: false.</summary>
+    static async Task<bool> RefusesAsync(Config cfg)
+    {
+        try
+        {
+            using var request = new HttpRequestMessage(HttpMethod.Get, $"http://127.0.0.1:{cfg.WebPort}/api/health");
+            request.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", cfg.PoolPassword);
+            using var r = await Http.SendAsync(request);
+            return r.StatusCode is System.Net.HttpStatusCode.Unauthorized or System.Net.HttpStatusCode.Forbidden;
+        }
+        catch (Exception e) when (e is HttpRequestException or TaskCanceledException)
+        {
+            return false;
         }
     }
 
@@ -191,7 +211,9 @@ public sealed class LibraryService : IDisposable
     /// </summary>
     async Task<bool> ReplaceOlderAsync()
     {
-        if (await health(cfg) is not null)
+        // Taking this password, it's used as it is, unless it says it's an older version than this app.
+        var said = await health(cfg);
+        if (said is { } took && Updates.Compare(Updates.ParseVersion(took.Version), Updates.ParseVersion(Engine.Version)) >= 0)
         {
             SetState(LibraryServiceState.Elsewhere);
             return false;
@@ -204,10 +226,18 @@ public sealed class LibraryService : IDisposable
             return false;
         }
         olderLookAgain = DateTime.UtcNow + AppUpdates.IdleRecheck;
-        string who = $"Syft Notes {holder!.Version ?? "(version unknown)"} ({holder.Program}, folder {holder.Home ?? "unknown"}) on port {cfg.WebPort}";
+        string who = $"Syft Notes {(holder!.Version is { } v ? string.Join('.', v) : "(version unknown)")} ({holder.Program}, folder {holder.Home ?? "unknown"}) on port {cfg.WebPort}";
+        // No answer in time isn't a refusal: a library busy with a long job (a class renamed, the notes indexed again)
+        // is never stopped for being slow. Only a clear no (401/403), or an older version said, goes on.
+        if (said is null && !await refuses(cfg))
+        {
+            log($"[library] {who} didn't answer in time: left running, looked at again in a minute");
+            SetState(LibraryServiceState.Elsewhere, OlderLibrary.SlowWords);
+            return false;
+        }
         switch (verdict)
         {
-            case OlderVerdict.OtherHome or OlderVerdict.NotOlder:
+            case OlderVerdict.OtherHome or OlderVerdict.NotOlder or OlderVerdict.Passing:
                 log($"[library] {who} turns this app away, but isn't an older copy for this folder: left running");
                 SetState(LibraryServiceState.Elsewhere, OlderLibrary.OtherCopyWords);
                 return false;
@@ -235,8 +265,9 @@ public sealed class LibraryService : IDisposable
         // library's own registration) lets go of it, then it's asked to quit.
         if (verdict == OlderVerdict.Own && Background is { } own) await Task.Run(() => own.System.Stop(home));
         else await Task.Run(() => older.StopRegistration(home, verdict == OlderVerdict.Own ? null : command[0]));
-        bool asked = older.AskToQuit(holder.Pid);
-        if (!await WaitPortFreeAsync())
+        // Once per process: asked on an earlier look, it's only looked at again (a second SIGTERM means "stop now").
+        bool asked = older.AskOnce(holder.Pid, out bool before);
+        if (!(before ? await portStatus(cfg.WebPort) == "free" : await WaitPortFreeAsync()))
         {
             log(asked ? $"[library] asked {who} to quit; it hasn't yet, looked at again in a minute"
                 : $"[library] {who} turns this app away, and this computer has no polite way to ask it to quit: left running");

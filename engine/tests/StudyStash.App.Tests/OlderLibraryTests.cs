@@ -18,7 +18,8 @@ public sealed class OlderLibraryTests
     {
         const string home = "/Users/sam/.study-stash";
         static bool Idle(string _) => false;
-        OurProcess Copy(string? version, string? folder = home, string program = Old, bool ours = true) => new(4242, program, ours, version, folder);
+        OurProcess Copy(string? version, string? folder = home, string program = Old, bool ours = true) =>
+            new(4242, program, ours, version is null ? null : V(version), folder);
 
         Assert.Equal(OlderVerdict.Replace, OlderLibrary.Judge(Copy("0.22.1"), Self, "0.23.3", home, Idle));
         // A lecture on the go in this folder: left alone. Busy is asked of this folder's lectures.
@@ -36,6 +37,28 @@ public sealed class OlderLibraryTests
         // This app's own program (its background library) for this folder: its own to register again, unless busy.
         Assert.Equal(OlderVerdict.Own, OlderLibrary.Judge(Copy("0.23.3", program: Self), Self, "0.23.3", home, Idle));
         Assert.Equal(OlderVerdict.Busy, OlderLibrary.Judge(Copy("0.23.3", program: Self), Self, "0.23.3", home, _ => true));
+        // This copy runs from its disk image or a translocation folder: never the installed copy's library.
+        Assert.Equal(OlderVerdict.Passing, OlderLibrary.Judge(Copy("0.22.1"), "/Volumes/Syft Notes/Syft Notes.app/Contents/MacOS/StudyStash", "0.23.3", home, Idle));
+        Assert.Equal(OlderVerdict.Passing, OlderLibrary.Judge(Copy("0.22.1"), "/private/var/folders/x/T/AppTranslocation/A1/d/Syft Notes.app/Contents/MacOS/StudyStash", "0.23.3", home, Idle));
+    }
+
+    [Fact]
+    public void A_process_is_asked_to_quit_once_never_twice()
+    {
+        // A second SIGTERM means "stop now", with no clean-up.
+        var sent = new List<int>();
+        var older = new OlderLibrary { AskToQuit = pid => { sent.Add(pid); return true; } };
+        Assert.True(older.AskOnce(4242, out bool before));
+        Assert.False(before);
+        Assert.True(older.AskOnce(4242, out before));
+        Assert.True(before);
+        Assert.True(older.AskOnce(4343, out before));
+        Assert.Equal([4242, 4343], sent);
+        // No polite way (Windows): nothing sent, and it's tried again next time.
+        var windows = new OlderLibrary { AskToQuit = _ => false };
+        Assert.False(windows.AskOnce(4242, out _));
+        Assert.False(windows.AskOnce(4242, out before));
+        Assert.False(before);
     }
 
     [Fact]
@@ -50,7 +73,7 @@ public sealed class OlderLibraryTests
     }
 
     [Fact]
-    public void Busy_is_a_lecture_recording_or_being_written_down_now_never_one_waiting_to_be_sent()
+    public void Busy_is_a_lecture_recording_or_being_written_down_or_on_its_way_to_the_library_now()
     {
         using var home = new TempHome();
         var store = new LectureStore(home.Path);
@@ -66,13 +89,16 @@ public sealed class OlderLibraryTests
         // Left Transcribing long ago (no model to write it down with): it never holds the library off.
         Assert.False(OlderLibrary.LecturesBusy(home.Path, now.AddHours(1)));
 
-        // Recorded while the library was down, waiting to be sent: here, not in the old library, so not busy.
+        // On its way to the library, or its notes being written there, recorded lately: busy, as an update waits for it.
         File.WriteAllBytes(store.AudioPath("rec-1"), [0]);
-        store.Update("rec-1", l => l.State = LectureState.Sending);
+        foreach (var state in new[] { LectureState.Sending, LectureState.Writing })
+        {
+            store.Update("rec-1", l => l.State = state);
+            Assert.True(OlderLibrary.LecturesBusy(home.Path, now), state.ToString());
+        }
+        // Recorded long ago and still waiting (the library has turned the app away for a while): not busy.
+        File.SetLastWriteTimeUtc(store.AudioPath("rec-1"), now.AddHours(-2));
         Assert.False(OlderLibrary.LecturesBusy(home.Path, now));
-        // Sent, and its notes being written there right now: busy.
-        store.Update("rec-1", l => l.State = LectureState.Writing);
-        Assert.True(OlderLibrary.LecturesBusy(home.Path, now));
     }
 
     [Fact]
@@ -128,9 +154,9 @@ public sealed class OlderLibraryTests
         var cfg = Ready(home);
         foreach (var holder in new[]
                  {
-                     new OurProcess(4242, "/Users/sam/Applications/Syft Notes.app/Contents/MacOS/StudyStash", true, Engine.Version, home.Path),
-                     new OurProcess(4242, "/Users/sam/Downloads/Syft Notes.app/Contents/MacOS/StudyStash", true, "99.0.0", home.Path),
-                     new OurProcess(4242, Old, true, "0.22.1", home["elsewhere"]),
+                     new OurProcess(4242, "/Users/sam/Applications/Syft Notes.app/Contents/MacOS/StudyStash", true, V(Engine.Version), home.Path),
+                     new OurProcess(4242, "/Users/sam/Downloads/Syft Notes.app/Contents/MacOS/StudyStash", true, V("99.0.0"), home.Path),
+                     new OurProcess(4242, Old, true, V("0.22.1"), home["elsewhere"]),
                  })
         {
             var asked = new List<string>();
@@ -152,7 +178,7 @@ public sealed class OlderLibraryTests
         var cfg = Ready(home);
         var asked = new List<string>();
         var svc = Service(home, cfg, asked, busy: false, free: () => false,
-            holder: new OurProcess(4242, Self, true, Engine.Version, home.Path),
+            holder: new OurProcess(4242, Self, true, V(Engine.Version), home.Path),
             background: new BackgroundPlan(NoBackground.Instance, () => true, Self));
 
         await svc.StartAsync();
@@ -162,6 +188,45 @@ public sealed class OlderLibraryTests
         Assert.Equal(LibraryServiceState.Elsewhere, svc.State);
         Assert.Null(svc.Failure);
     }
+
+    [Fact]
+    public async Task A_library_that_doesnt_answer_in_time_is_left_alone_and_looked_at_again_later()
+    {
+        // A library busy with a long job (a class renamed) misses the 5 s health check: that's no refusal.
+        using var home = new TempHome();
+        var cfg = Ready(home);
+        var asked = new List<string>();
+        bool says401 = false, quit = false;
+        int looks = 0;
+        var svc = Service(home, cfg, asked, busy: false, free: () => quit, onQuit: () => quit = true, refuses: () => says401, lookedUp: () => looks++);
+
+        await svc.StartAsync();
+        Assert.Empty(asked);
+        Assert.Equal(OlderLibrary.SlowWords, svc.Failure);
+        Assert.DoesNotContain("Restart", (await LibraryHere.ProblemAsync(svc, cfg))!, StringComparison.OrdinalIgnoreCase);
+        // The library watch's next look, ten seconds on, leaves it be: a minute goes by first.
+        await svc.TakeOverIfGoneAsync();
+        Assert.Equal(1, looks);
+
+        // Looked at again and saying no to this password (401): an older copy, so it's replaced.
+        says401 = true;
+        await svc.StartAsync();
+        Assert.Equal(["launchd lets go of the old job", "asked process 4242 to quit", "started --home " + home.Path], asked);
+    }
+
+    [Fact]
+    public async Task A_copy_run_from_its_disk_image_never_touches_the_installed_copys_library()
+    {
+        using var home = new TempHome();
+        var cfg = Ready(home);
+        var asked = new List<string>();
+        var svc = Service(home, cfg, asked, busy: false, free: () => false, self: "/Volumes/Syft Notes/Syft Notes.app/Contents/MacOS/StudyStash");
+        await svc.StartAsync();
+        Assert.Empty(asked);
+        Assert.Equal(OlderLibrary.OtherCopyWords, svc.Failure);
+    }
+
+    static int[] V(string version) => Updates.ParseVersion(version);
 
     static Config Ready(TempHome home)
     {
@@ -174,10 +239,10 @@ public sealed class OlderLibraryTests
     /// for this folder unless said), which turns it away until <paramref name="free"/> (or, with a background library,
     /// until that's registered again).</summary>
     static LibraryService Service(TempHome home, Config cfg, List<string> asked, bool busy, Func<bool> free, Action? onQuit = null,
-        OurProcess? holder = null, BackgroundPlan? background = null)
+        OurProcess? holder = null, BackgroundPlan? background = null, string self = Self, Func<bool>? refuses = null, Action? lookedUp = null)
     {
         bool registered = false;
-        return new(home.Path, cfg, [Self],
+        return new(home.Path, cfg, [self],
             spawn: info =>
             {
                 asked.Add($"started {info.ArgumentList[0]} {info.ArgumentList[1]}");
@@ -188,7 +253,11 @@ public sealed class OlderLibraryTests
             health: _ => Task.FromResult<(string, bool)?>(registered ? (Engine.Version, true) : null),
             older: new OlderLibrary
             {
-                Holder = _ => holder ?? new OurProcess(4242, Old, true, "0.22.1", home.Path),
+                Holder = _ =>
+                {
+                    lookedUp?.Invoke();
+                    return holder ?? new OurProcess(4242, Old, true, V("0.22.1"), home.Path);
+                },
                 Busy = h => h == home.Path && busy,
                 StopRegistration = (_, _) => asked.Add("launchd lets go of the old job"),
                 AskToQuit = pid =>
@@ -198,7 +267,9 @@ public sealed class OlderLibraryTests
                     return true;
                 },
             },
-            log: _ => { })
+            log: _ => { },
+            // A clear no (401) unless the test says it didn't answer in time.
+            refuses: _ => Task.FromResult(refuses?.Invoke() ?? true))
         {
             Background = background is null ? null : background with
             {
