@@ -8,6 +8,18 @@ namespace StudyStash.App.Tests;
 /// another copy that's still there is left alone. Every file is in the test's own folder.</summary>
 public class NewPlaceTests
 {
+    /// <summary>An uninstall takes the Run entry with it and a reinstall doesn't write it: the login item goes back only
+    /// when the student said yes, it's missing, and Task Manager's Startup tab doesn't have it switched off.</summary>
+    [Theory]
+    [InlineData(true, false, null, true)]                          // said yes, gone: back
+    [InlineData(true, false, new byte[] { 2, 0, 0, 0 }, true)]     // Task Manager says Enabled
+    [InlineData(true, false, new byte[] { 3, 0, 0, 0 }, false)]    // Task Manager says Disabled: left off
+    [InlineData(true, true, null, false)]                          // still there: nothing to do
+    [InlineData(false, false, null, false)]                        // said no
+    [InlineData(null, false, null, false)]                         // never asked on this copy
+    public void Start_at_login_goes_back_only_as_the_student_left_it(bool? chosen, bool present, byte[]? approved, bool back) =>
+        Assert.Equal(back, NewPlace.PutLoginItemBack(chosen, present, approved));
+
     [Fact]
     public void Connections_and_start_at_login_naming_the_old_program_follow_it_and_others_stay()
     {
@@ -45,5 +57,44 @@ public class NewPlaceTests
         Assert.Equal(3, done.Count);
         // A second start finds nothing left to do.
         Assert.Empty(NewPlace.Run(setup, home["study-stash"], now, () => now, () => throw new InvalidOperationException("nothing to do")));
+    }
+
+    [Fact]
+    public void The_old_install_left_behind_goes_with_its_entry_and_shortcuts_and_nothing_else_does()
+    {
+        using var home = new TempHome();
+        string old = Path.Combine(home.Path, "Local", "Programs", "Study Stash");
+        string running = Path.Combine(home.Path, "Local", "SyftNotes", "current");
+        string menu = home["Start Menu"];
+        string studyStash = home["study-stash"];
+        foreach (string dir in (string[])[Path.Combine(old, "runtimes", "win-x64"), running, menu, studyStash]) Directory.CreateDirectory(dir);
+        foreach (string file in (string[])["StudyStash.exe", "unins000.exe", "unins000.dat", "Avalonia.dll", Path.Combine("runtimes", "win-x64", "libSkiaSharp.dll")])
+            File.WriteAllText(Path.Combine(old, file), "");
+        // A .lnk keeps its target's path as UTF-16 (VelopackHooks.LinkNames reads it so).
+        static void Link(string lnk, string target) => File.WriteAllBytes(lnk, System.Text.Encoding.Unicode.GetBytes("\0L" + target + "\0"));
+        Link(Path.Combine(menu, "Old Syft Notes.lnk"), Path.Combine(old, "StudyStash.exe"));
+        Link(Path.Combine(menu, "Syft Notes.lnk"), Path.Combine(running, "StudyStash.exe"));
+        Link(Path.Combine(menu, "Study Stash 2.lnk"), Path.Combine(home.Path, "Local", "Programs", "Study Stash 2", "StudyStash.exe"));
+        File.WriteAllText(Path.Combine(studyStash, "bridge-failed.txt"), "v0.23.0");
+        int forgot = 0;
+
+        // Its program running (or its uninstaller, hung): nothing is touched, and the next start tries again.
+        using (new FileStream(Path.Combine(old, "unins000.exe"), FileMode.Open, FileAccess.Read, FileShare.None))
+            if (OperatingSystem.IsWindows())
+            {
+                Assert.Contains("still there", NewPlace.ClearOldInstall(old, running, studyStash, [menu], () => forgot++));
+                Assert.True(File.Exists(Path.Combine(old, "Avalonia.dll")));
+            }
+
+        Assert.Equal($"removed the old install in {old}", NewPlace.ClearOldInstall(old, running, studyStash, [menu], () => forgot++));
+        Assert.False(Directory.Exists(old));
+        Assert.Equal(1, forgot);
+        Assert.Equal(["Study Stash 2.lnk", "Syft Notes.lnk"], Directory.GetFiles(menu).Select(Path.GetFileName).Order());
+        Assert.False(File.Exists(Path.Combine(studyStash, "bridge-failed.txt")));
+        // An entry naming the running copy's own folder, or a folder that isn't Inno's: left alone.
+        Assert.Null(NewPlace.ClearOldInstall(running, running, studyStash, [menu], () => forgot++));
+        Assert.Null(NewPlace.ClearOldInstall(home.Path, running, studyStash, [menu], () => forgot++));
+        Assert.True(Directory.Exists(running));
+        Assert.Equal(1, forgot);
     }
 }

@@ -65,7 +65,13 @@
             </StackPanel>
           </Border>
         </StackPanel>
-        <c:BySkin Mac="{x:Type v:MacCanvasClass}" Win="{x:Type v:WinCanvasClass}" DataContext="{Binding CanvasClass}" />
+        <!-- A list that couldn't be read says so above the ones that could; until anything is read, the loader. -->
+        <c:PageText DockPanel.Dock="Top" Margin="22,0,16,10" DataContext="{Binding CanvasClass}" x:DataType="vm:CanvasClassModel" IsVisible="{Binding HasProblem}"
+                    Text="{Binding Problem}" FontSize="{DynamicResource FontCaption}" Foreground="{DynamicResource Warn}" TextWrapping="Wrap" />
+        <Panel DataContext="{Binding CanvasClass}" x:DataType="vm:CanvasClassModel">
+          <c:SyftLoader Name="CanvasListsLoading" Kind="HoppingBits" Size="22" Margin="22,8,0,0" HorizontalAlignment="Left" VerticalAlignment="Top" IsVisible="{Binding Loading}" />
+          <c:BySkin Mac="{x:Type v:MacCanvasClass}" Win="{x:Type v:WinCanvasClass}" IsVisible="{Binding !Loading}" />
+        </Panel>
       </DockPanel>
 
       <!-- Home, Due, or a folder's page: the whole pane -->

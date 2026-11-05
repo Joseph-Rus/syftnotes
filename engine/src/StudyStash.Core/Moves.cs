@@ -4,8 +4,8 @@ namespace StudyStash.Core;
 /// The app's program moved (docs/LIBRARIES.md, phase 5): Windows from Inno Setup's folder to Velopack's, the Mac bundle
 /// from "Study Stash.app" to "Syft Notes.app", Linux from a tarball's folder to an AppImage. What other programs keep
 /// of its path (an AI app's connection, a login item) is put right on the first start from the new place, and only
-/// where it names a program of ours that is gone, or one of the old places: another copy someone runs on purpose (a
-/// build folder) is left alone.
+/// where it names a program of ours that is gone, one of the old places, or (a Mac) an older copy of the app somewhere
+/// else: another copy someone runs on purpose (a build folder, a newer one) is left alone.
 /// </summary>
 public static class Moves
 {
@@ -24,7 +24,8 @@ public static class Moves
 
     /// <summary>True when <paramref name="command"/> is this app's program as it was before it moved, so whatever names
     /// it should name <paramref name="current"/> instead: it's our program by name, it isn't the current one, and it is
-    /// gone or in one of the old places. <paramref name="exists"/> is File.Exists unless a test says otherwise.</summary>
+    /// gone, in one of the old places, or in an older copy of the Mac app (<see cref="MacRename.OlderCopy"/>).
+    /// <paramref name="exists"/> is File.Exists unless a test says otherwise.</summary>
     public static bool OldProgram(string? command, string current, Func<string, bool>? exists = null)
     {
         if (string.IsNullOrWhiteSpace(command) || !NamedLikeOurs(command)) return false;
@@ -32,7 +33,127 @@ public static class Moves
         if (string.Equals(command, current, same)) return false;
         string slashes = command.Replace('\\', '/');
         bool oldPlace = OldPlaces.Any(p => command.Contains(p, StringComparison.OrdinalIgnoreCase) || slashes.Contains(p, StringComparison.OrdinalIgnoreCase));
-        return oldPlace || !(exists ?? File.Exists)(command);
+        return oldPlace || !(exists ?? File.Exists)(command) || MacRename.OlderCopy(command, current);
+    }
+
+    /// <summary>The files that make a folder an Inno Setup install of this app, deleted last so a folder only partly
+    /// deleted is still known as one the next time.</summary>
+    static readonly string[] InnoMarks = ["unins000.exe", "StudyStash.exe", "unins000.dat"];
+
+    /// <summary>True when <paramref name="folder"/> (an Inno Setup entry's InstallLocation) is the old Windows install
+    /// of this app, safe to delete: Inno Setup's own place for it (a "Study Stash" folder in "Programs", setup.iss), not
+    /// a drive's root, not inside the running copy's folder <paramref name="running"/> or holding it, and either gone
+    /// already or holding the app's program and Inno's uninstall data.</summary>
+    public static bool OldInstallFolder(string? folder, string running)
+    {
+        if (string.IsNullOrWhiteSpace(folder) || !Path.IsPathFullyQualified(folder)) return false;
+        string full = Path.TrimEndingDirectorySeparator(Path.GetFullPath(folder));
+        if (Path.GetDirectoryName(full) is not { Length: > 0 } parent) return false; // a drive's root
+        if (!Path.GetFileName(full).Equals("Study Stash", StringComparison.OrdinalIgnoreCase)
+            || !Path.GetFileName(parent).Equals("Programs", StringComparison.OrdinalIgnoreCase)) return false;
+        string mine = Path.TrimEndingDirectorySeparator(Path.GetFullPath(running)) + Path.DirectorySeparatorChar;
+        string theirs = full + Path.DirectorySeparatorChar;
+        if (mine.StartsWith(theirs, StringComparison.OrdinalIgnoreCase) || theirs.StartsWith(mine, StringComparison.OrdinalIgnoreCase)) return false;
+        return !Directory.Exists(full)
+            || File.Exists(Path.Combine(full, "StudyStash.exe")) && File.Exists(Path.Combine(full, "unins000.dat"));
+    }
+
+    /// <summary>Deletes the old install's folder (<see cref="OldInstallFolder"/> says it is one), without its
+    /// uninstaller: null once it's gone, or the first file that couldn't go. Nothing is touched while its program or
+    /// uninstaller is running (neither is ever stopped); a file that's held open is skipped, and Inno's own files go
+    /// last, one at a time, so a folder only partly deleted is found and tried again on the next start. A link inside
+    /// it (a junction, a symbolic link) goes as a link: what it points at is never touched, and a folder that is a link
+    /// itself is left alone (<see cref="IsLink"/>).</summary>
+    public static string? DeleteOldInstall(string folder)
+    {
+        if (!Directory.Exists(folder)) return null;
+        if (IsLink(folder)) return folder;
+        string[] marks = InnoMarks.Select(m => Path.Combine(folder, m)).ToArray();
+        if (marks.FirstOrDefault(InUse) is { } running) return running;
+        // Never through a link: its target isn't the install.
+        var walk = new EnumerationOptions { RecurseSubdirectories = true, AttributesToSkip = FileAttributes.ReparsePoint };
+        var here = new EnumerationOptions { AttributesToSkip = 0 };
+        string? held = null;
+        string[] dirs = [folder, .. Directory.EnumerateDirectories(folder, "*", walk)];
+        foreach (string link in dirs.SelectMany(d => Directory.EnumerateFileSystemEntries(d, "*", here)).Where(IsLink).ToList())
+            if (!TryUnlink(link)) held ??= link;
+        foreach (string file in Directory.EnumerateFiles(folder, "*", walk).ToList())
+            if (!marks.Contains(file, StringComparer.OrdinalIgnoreCase) && !TryDelete(file)) held ??= file;
+        if (held is not null) return held;
+        foreach (string mark in marks)
+            if (File.Exists(mark) && !TryDelete(mark)) return mark;
+        try
+        {
+            Directory.Delete(folder, recursive: true); // only empty folders are left
+            return null;
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException)
+        {
+            return folder;
+        }
+    }
+
+    /// <summary>Whether <paramref name="path"/> is a link (a junction or a symbolic link) rather than a real file or
+    /// folder; one that can't be read counts as a link, so it's left alone.</summary>
+    public static bool IsLink(string path)
+    {
+        try
+        {
+            return File.GetAttributes(path).HasFlag(FileAttributes.ReparsePoint);
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException)
+        {
+            return true;
+        }
+    }
+
+    static bool TryDelete(string file)
+    {
+        try
+        {
+            File.SetAttributes(file, FileAttributes.Normal);
+            File.Delete(file);
+            return true;
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException)
+        {
+            return false;
+        }
+    }
+
+    /// <summary>Removes a link itself, never what it points at (a folder's link is removed as an empty folder).</summary>
+    static bool TryUnlink(string link)
+    {
+        try
+        {
+            if (new FileInfo(link).Attributes.HasFlag(FileAttributes.Directory)) Directory.Delete(link, recursive: false);
+            else File.Delete(link);
+            return true;
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException)
+        {
+            return false;
+        }
+    }
+
+    /// <summary>Whether a program is running from <paramref name="file"/>: Windows lets a running program be read,
+    /// even with no sharing, but never written.</summary>
+    static bool InUse(string file)
+    {
+        if (!File.Exists(file)) return false;
+        try
+        {
+            using var _ = new FileStream(file, FileMode.Open, FileAccess.ReadWrite, FileShare.None);
+            return false;
+        }
+        catch (IOException)
+        {
+            return true;
+        }
+        catch (UnauthorizedAccessException)
+        {
+            return false; // read-only, or not this account's to write: the delete finds out
+        }
     }
 
     /// <summary>The program a Windows Run value starts: its first word, or the quoted path it starts with.</summary>

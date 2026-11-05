@@ -383,7 +383,7 @@ public class RecordingTests
         public FakeMic Mic => Mics[^1];
         public LectureState? State => Recorder.Current?.State;
 
-        public Watched(LectureStore store, Func<FakeMic>? mic = null, Func<string, bool, IWavSink>? openFile = null, Func<string, long?>? freeBytes = null)
+        public Watched(LectureStore store, Func<FakeMic>? mic = null, Func<string, bool, IWavSink>? openFile = null, Func<string, long?>? freeBytes = null, bool micAllowed = false)
         {
             Recorder = new Recorder(store, () =>
             {
@@ -393,7 +393,7 @@ public class RecordingTests
             }, () => Tuesday, line =>
             {
                 lock (Log) Log.Add(line);
-            }, openFile, freeBytes);
+            }, openFile, freeBytes, () => micAllowed);
             Recorder.Problem += why =>
             {
                 lock (Said) Said.Add(why);
@@ -482,6 +482,24 @@ public class RecordingTests
     }
 
     [Fact]
+    public void Only_zeros_with_the_microphone_allowed_sends_the_student_to_the_Sound_settings()
+    {
+        using var dir = new TempDir();
+        using var w = new Watched(new LectureStore(dir.Path), micAllowed: true);
+        w.Recorder.Start("CS 101");
+        for (int s = 0; s <= 5; s++)
+        {
+            w.Mic.Zeros(1);
+            w.Recorder.Check(Now0.AddSeconds(s));
+        }
+        Assert.Equal(LectureState.Paused, w.State);
+        string said = Assert.Single(w.Said);
+        Assert.Equal(RecordingWords.CantHear(true), said);
+        Assert.DoesNotContain("Privacy", said);
+        Assert.Contains(Machine.Linux ? "Sound settings" : OperatingSystem.IsWindows() ? "System → Sound → Input" : "Sound → Input", said);
+    }
+
+    [Fact]
     public void Only_zeros_at_the_start_says_the_microphone_isnt_allowed()
     {
         Assert.Equal("Syft Notes can't hear the microphone. Allow it in System Settings → Privacy & Security → Microphone.", RecordingWords.CantHearMac);
@@ -498,7 +516,7 @@ public class RecordingTests
         w.Mic.Zeros(1);
         rec.Check(Now0.AddSeconds(5));
         Assert.Equal(LectureState.Paused, w.State);
-        Assert.Equal([RecordingWords.CantHear], w.Said);
+        Assert.Equal([RecordingWords.CantHear(false)], w.Said);
         if (OperatingSystem.IsMacOS()) Assert.Equal(RecordingWords.CantHearMac, w.Said[0]);
 
         // Allowed now: Resume, and the room is heard. A quiet room later on (a pause in the lecture) is only quiet.
@@ -705,31 +723,19 @@ public class RecordingTests
         using (var wav = new WavWriter(path)) wav.Write(Enumerable.Range(0, Sound.Rate).Select(i => (float)Math.Sin(i / 9.0) * 0.4f).ToArray());
         var sound = Sound.ReadWav(path);
 
-        double Play(int speed, int samples, out List<float> got)
-        {
-            var heard = new List<float>();
-            using var mic = new FileMicrophone(path, speed);
-            Assert.Equal(speed, mic.Speed);
-            mic.Samples += b =>
-            {
-                lock (heard) heard.AddRange(b);
-            };
-            var took = Stopwatch.StartNew();
-            mic.Start();
-            Assert.True(SpinWait.SpinUntil(() =>
-            {
-                lock (heard) return heard.Count >= samples;
-            }, 10000));
-            double seconds = took.Elapsed.TotalSeconds;
-            mic.Stop();
-            lock (heard) got = [.. heard];
-            return seconds;
-        }
-
-        // Four seconds of sound at 4×: the file's sound, in order, round again. (How long it takes isn't asserted: a
-        // busy CI machine made that fail for no reason.)
-        Play(4, 4 * Sound.Rate, out var fastSound);
-        for (int i = 0; i < 4 * Sound.Rate; i++) Assert.Equal(sound[i % sound.Length], fastSound[i]);
+        // Its own clock, stepped here: a busy CI machine's thread pool once ran the real 100 ms beat late for 10 s.
+        var clock = new Microsoft.Extensions.Time.Testing.FakeTimeProvider();
+        var heard = new List<float>();
+        using var mic = new FileMicrophone(path, 4, clock);
+        Assert.Equal(4, mic.Speed);
+        mic.Samples += heard.AddRange;
+        mic.Start();
+        // Four seconds of sound at 4× is ten beats, 100 ms apart: one second.
+        for (int beat = 0; beat < 10; beat++) clock.Advance(TimeSpan.FromMilliseconds(100));
+        mic.Stop();
+        // The file's sound, in order, round again, and nothing more.
+        Assert.Equal(4 * Sound.Rate, heard.Count);
+        for (int i = 0; i < heard.Count; i++) Assert.Equal(sound[i % sound.Length], heard[i]);
         Assert.Equal(1, new FileMicrophone(path, 0).Speed);
     }
 

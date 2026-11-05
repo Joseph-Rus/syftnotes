@@ -101,7 +101,7 @@
                   </StackPanel>
                   <Button Grid.Column="2" Classes="sk-keys" Classes.listening="{Binding Listening}" Command="{Binding ChangeCommand}"
                           VerticalAlignment="Center" ToolTip.Tip="Click, then press the keys you want">
-                    <TextBlock Text="{Binding Keys}" FontSize="13" FontWeight="Medium" />
+                    <TextBlock Text="{Binding Keys}" FontFamily="{DynamicResource KeysFont}" FontSize="13" FontWeight="Medium" />
                   </Button>
                   <Button Grid.Column="4" Classes="sk-link" Command="{Binding ResetCommand}" IsVisible="{Binding Changed}" VerticalAlignment="Center">
                     <TextBlock Text="Reset" FontSize="{DynamicResource FontCaption}" />

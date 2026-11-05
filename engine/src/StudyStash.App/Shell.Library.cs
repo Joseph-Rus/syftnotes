@@ -5,6 +5,7 @@ using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Input.Platform;
 using Avalonia.Media;
+using StudyStash.App.Controls;
 using StudyStash.App.Controls.Rich;
 using StudyStash.App.Services;
 using StudyStash.App.ViewModels;
@@ -55,11 +56,8 @@ public static partial class Shell
         await host.CheckLibraryAsync();
         if (quitting || host.Library != LibraryState.Connected) return;
         library.ShowCounts(host.Classes().Select(c => (c.Name, c.Lectures)), host.Overview?["unsorted"]?.GetValue<int>() ?? 0);
-        library.ForSchool = ForSchool;
+        library.ForSchool = host.ForSchool;
     }
-
-    /// <summary>What the library is for says school, or says nothing (a library from before it was asked).</summary>
-    static bool ForSchool => host.Overview?["for_school"] is not System.Text.Json.Nodes.JsonValue v || !v.TryGetValue(out bool school) || school;
 
     static bool libraryReloadWhole;
 
@@ -154,7 +152,7 @@ public static partial class Shell
         UpdateDueItem();
         UpdateNextDue();
         int unsorted = host.Overview?["unsorted"]?.GetValue<int>() ?? 0;
-        library.ForSchool = ForSchool;
+        library.ForSchool = host.ForSchool;
         library.UnsortedCount = unsorted;
         if (host.Library != LibraryState.Connected || host.OlderLibrary)
         {
@@ -174,9 +172,9 @@ public static partial class Shell
             return;
         }
         library.Empty = null;
-        AskForSupportIfDue(host.Classes().Sum(c => c.Lectures) + unsorted);
         Run(() => HearNotesWriterAsync(), "HearNotesWriter");
         await ReshowAsync();
+        AskForSupportIfDue(host.Classes().Sum(c => c.Lectures) + unsorted);
     }
 
     /// <summary>The page the window is on, read again: a note filed, a class linked, the library back. No step in
@@ -195,14 +193,16 @@ public static partial class Shell
         }
     }
 
-    /// <summary>The library window asks for a tip atop the lecture list when <see cref="SupportAsk.Due"/> says it's
-    /// time (the library holds a few lectures, nothing is recording, setup isn't open), and puts the ask away when not.</summary>
+    /// <summary>The library window asks for a tip in a popup over itself when <see cref="SupportAsk.Due"/> says it's
+    /// time (the library holds a few lectures, nothing is recording, setup isn't open), once a session at most, and
+    /// only while the window shows, nothing else is over it and no note is being edited.</summary>
     static void AskForSupportIfDue(int lectures)
     {
+        if (mainWindow is not { IsVisible: true } w || ConfirmLayer.For(w) is not { IsOpen: false } layer || library.Notes is { Editing: true }) return;
         bool due = SupportAsk.Due(host.Settings, lectures, recording: host.Recorder.Current is not null,
             settingUp: setupWindow?.IsVisible == true, DateTimeOffset.Now);
-        if (due) library.AskForSupport(last: SupportAsk.IsLast(host.Settings));
-        else library.Support = null;
+        if (due && library.AskForSupport(last: SupportAsk.IsLast(host.Settings)) is { } ask)
+            Run(() => SupportAskDialog.ShowAsync(layer, ask), "AskForSupport");
     }
 
     /// <summary>A note's page: a lecture, a meeting or a recording, filling the pane. One that's being recorded shows
@@ -271,7 +271,7 @@ public static partial class Shell
         bool heard = S(l["transcript"]).Trim().Length > 0;
         string? why = S(l["no_notes"]) switch
         {
-            Summarize.NoNotesShort => NoteModel.TooShort(noun, heard, keepRecording is not null),
+            Summarize.NoNotesShort => NoteModel.TooShort(noun, heard, keepRecording is not null, l["seconds"] is JsonValue ran && ran.TryGetValue(out double ranFor) ? ranFor : null),
             Summarize.NoNotesOff => NoteModel.NotesAreOff(noun, heard),
             _ => null,
         };
@@ -436,7 +436,7 @@ public static partial class Shell
                 // The library writes no notes, or it's too short for them as far as its length tells already: none
                 // are promised for it.
                 _ when NotesOff => NoteModel.NotesAreOff(noun, l.Segments.Count > 0),
-                _ when WillHaveNotes(l) == false => NoteModel.TooShort(noun, l.Segments.Count > 0, keepRecording is not null),
+                _ when WillHaveNotes(l) == false => NoteModel.TooShort(noun, l.Segments.Count > 0, keepRecording is not null, l.Seconds, l.TranscribedSeconds),
                 // Recorded before the model arrived: it waits for it (the download's on Home and in the menu bar).
                 LectureState.Transcribing when l.WaitsForModel && !host.ModelReady => host.Downloading is { } d
                     ? $"This {noun} is written down as soon as speech-to-text is ready on this computer ({Math.Clamp((int)Math.Round(d.Fraction * 100), 0, 99)}% downloaded)."
@@ -904,7 +904,7 @@ public static partial class Shell
                     rows.Add(new QuickRow { Kind = QuickKind.Header, Title = "Passages from notes", First = rows.Count == 0 });
                     foreach (var p in passages)
                     {
-                        string where = p["at"] is JsonValue v && v.TryGetValue(out double at) ? TimedText.Clock(at) : S(p["section"]) is { Length: > 0 } sec ? sec : "Transcript";
+                        string where = p["at"] is JsonValue v && v.TryGetValue(out double at) ? TimedText.Clock(at) : S(p["section"]) is { Length: > 0 } sec ? PlainMath.Inline(sec) : "Transcript";
                         rows.Add(new QuickRow
                         {
                             Kind = QuickKind.Passage, Title = "…" + Excerpt(S(p["text"]), query) + "…", Sub = $"{S(p["title"])} · {where}", Dot = DotFor(S(p["class"])),
@@ -981,9 +981,10 @@ public static partial class Shell
     }
 
     /// <summary>A passage of notes as it reads, not as it's written: no Markdown's **, `, # or list markers, no
-    /// link addresses, one line.</summary>
+    /// link addresses, no raw LaTeX, one line.</summary>
     internal static string PlainPassage(string text)
     {
+        text = PlainMath.Inline(text);
         text = System.Text.RegularExpressions.Regex.Replace(text, @"!?\[([^\]]*)\]\([^)]*\)", "$1");
         text = System.Text.RegularExpressions.Regex.Replace(text, @"(?m)^\s*(#{1,6}\s+|[-*+]\s+|\d+\.\s+|>\s?)", "");
         text = System.Text.RegularExpressions.Regex.Replace(text, @"(\*\*|__|\*|`|~~)", "");

@@ -1,6 +1,6 @@
 import XCTest
 
-/// Writing by hand: a new notebook from Attach, its paper chosen, then changed, and a page added, with real taps on
+/// Writing by hand: a new notebook from Attach, its paper chosen, then changed, and pages added, with real taps on
 /// the demo library. The same on an iPhone (Paper and Add a page are in the bar's More) and an iPad (in the bar).
 @MainActor
 final class NotebookTests: XCTestCase {
@@ -52,6 +52,7 @@ final class NotebookTests: XCTestCase {
         let undo = app.buttons["notebook.undo"], redo = app.buttons["notebook.redo"]
         expect(undo, "Undo")
         XCTAssertFalse(undo.isEnabled, "nothing to undo yet")
+        choosePen(app)
         let desk = page(app, "notebook")
         desk.coordinate(withNormalizedOffset: CGVector(dx: 0.3, dy: 0.42))
             .press(forDuration: 0.1, thenDragTo: desk.coordinate(withNormalizedOffset: CGVector(dx: 0.7, dy: 0.47)))
@@ -61,11 +62,25 @@ final class NotebookTests: XCTestCase {
         redo.tap()
         XCTAssertTrue(waitUntil { undo.isEnabled }, "done again")
 
+        // A page added at the end: the line can still be undone (and is done again, so the notebook isn't empty).
+        if app.buttons["notebook.addPage"].exists {
+            app.buttons["notebook.addPage"].tap()
+        } else {
+            tap(app.buttons["notebook.more"], "the bar's More")
+            tap(app.buttons["Add a page after this one"], "More's Add a page after this one")
+        }
+        expect(text(app, containing: "page 3 of 3"), "page 3 of 3 under the title")
+        XCTAssertTrue(undo.isEnabled, "the line can still be undone after a page is added")
+        undo.tap()
+        XCTAssertTrue(waitUntil { !undo.isEnabled && redo.isEnabled }, "the line undone after a page was added")
+        redo.tap()
+        XCTAssertTrue(waitUntil { undo.isEnabled }, "done again")
+
         // The pages, each on Cornell notes.
         XCTAssertFalse(app.keyboards.firstMatch.exists, "no keyboard over the notebook")
         tap(app.buttons["notebook.pages"], "Pages")
         expect(element(app, "Page 1, Cornell notes"), "page 1 on Cornell notes in the pages")
-        expect(element(app, "Page 2, Cornell notes, showing"), "page 2, showing, on Cornell notes")
+        expect(element(app, "Page 3, Cornell notes, showing"), "page 3, showing, on Cornell notes")
         // A phone's pages are a sheet of their own: closed first.
         if app.navigationBars["Pages"].exists {
             app.navigationBars["Pages"].buttons["Done"].tap()
@@ -76,6 +91,94 @@ final class NotebookTests: XCTestCase {
         tap(app.buttons["Done"].firstMatch, "the notebook's Done")
         expect(page(app, "home"), "Home again", timeout: 12)
         expect(app.buttons["Calculus II notes, \(Self.today), in Calculus II"], "the notebook on Home's shelf, in Calculus II")
+    }
+
+    /// Apple's pens stay while a menu is open over the page (the lasso's), so a selection can be recoloured.
+    func testPensStayOverTheLassosMenu() {
+        let app = XCUIApplication()
+        app.launchArguments = ["-demo", "-quiet", "-show", "notebook"]
+        app.launch()
+        let desk = page(app, "notebook")
+        expect(desk, "the sample notebook")
+        tap(app.buttons["Lasso"], "the pens' lasso")
+        desk.coordinate(withNormalizedOffset: CGVector(dx: 0.12, dy: 0.12))
+            .press(forDuration: 0.05, thenDragTo: desk.coordinate(withNormalizedOffset: CGVector(dx: 0.9, dy: 0.14)))
+        desk.coordinate(withNormalizedOffset: CGVector(dx: 0.9, dy: 0.14))
+            .press(forDuration: 0.05, thenDragTo: desk.coordinate(withNormalizedOffset: CGVector(dx: 0.88, dy: 0.3)))
+        // A tap on the page opens its menu (tapped again if the first only ends the lasso).
+        for _ in 0..<3 where !app.menuItems.firstMatch.waitForExistence(timeout: 2) {
+            desk.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.2)).tap()
+        }
+        expect(app.menuItems.firstMatch, "the menu over the page")
+        XCTAssertTrue(app.buttons["Lasso"].exists, "the pens still there with the menu open")
+        XCTAssertFalse(app.keyboards.firstMatch.exists, "no keyboard with the menu")
+        choosePen(app)
+    }
+
+    /// Apple's pens remember their tool from one launch to the next: a test that writes picks the Pen first (one that
+    /// left the lasso chosen made the next run's line a lasso).
+    private func choosePen(_ app: XCUIApplication) {
+        let pen = app.buttons["Pen"]
+        guard pen.waitForExistence(timeout: 3) else { return }
+        if !pen.isSelected { pen.tap() }
+        XCTAssertTrue(pen.isSelected, "the Pen chosen")
+    }
+
+    /// An iPad's Write alongside: the notebook beside the lecture's notes, with Ask and Study under the notes rather than
+    /// across it. When the window narrows to a phone's width (Stage Manager, a window made small) the notebook steps
+    /// aside, and what was written in it is saved first: Home's shelf has it in the lecture's class.
+    func testIPadNotebookBesideStepsAsideSavedWhenTheWindowNarrows() throws {
+        try XCTSkipUnless(UIDevice.current.userInterfaceIdiom == .pad, "Write alongside is an iPad's")
+        let app = XCUIApplication()
+        app.launchArguments = ["-demo", "-quiet", "-fresh-notebooks", "-tab-bar", "-open", "lecture:demo-calc-ibp", "-ink", "1"]
+        app.launch()
+        fillScreen(app)
+        addTeardownBlock { @MainActor in self.fillScreen(app) }
+
+        let paper = page(app, "newNotebook")
+        expect(paper, "a new notebook beside the notes")
+        for name in ["Ask about this lecture", "Study"] {
+            expect(app.buttons[name], name)
+            XCTAssertLessThanOrEqual(app.buttons[name].frame.maxX, paper.frame.minX, "\(name) under the notes, clear of the notebook")
+        }
+        tap(app.buttons["notebook.create"], "Create notebook")
+        let desk = page(app, "notebook")
+        expect(desk, "the notebook beside the notes")
+        choosePen(app)
+        // A line written with a finger (the row over it has Undo, but unlabelled, so the shelf below is the proof).
+        desk.coordinate(withNormalizedOffset: CGVector(dx: 0.3, dy: 0.42))
+            .press(forDuration: 0.1, thenDragTo: desk.coordinate(withNormalizedOffset: CGVector(dx: 0.7, dy: 0.47)))
+
+        // The window's corner dragged in: as narrow as a window goes, a phone's width.
+        let window = app.windows.firstMatch.frame
+        let origin = app.windows.firstMatch.coordinate(withNormalizedOffset: .zero)
+        origin.withOffset(CGVector(dx: window.maxX - 6, dy: window.maxY - 6))
+            .press(forDuration: 0.6, thenDragTo: origin.withOffset(CGVector(dx: window.minX + 100, dy: window.maxY * 0.85)))
+        XCTAssertTrue(waitUntil { app.windows.firstMatch.frame.width < 500 }, "the window narrowed")
+        XCTAssertTrue(desk.waitForNonExistence(timeout: 5), "the notebook steps aside in a phone-wide window")
+        expect(page(app, "lecture"), "the notes, the whole window")
+
+        // Saved as it went: on Home's shelf, in the lecture's class.
+        fillScreen(app)
+        tap(app.navigationBars.buttons["BackButton"], "Back")
+        expect(page(app, "home"), "Home")
+        expect(app.buttons["Notes, Integration by Parts and the LIATE Rule, in Calculus II"], "the notebook saved, on Home's shelf", timeout: 15)
+    }
+
+    /// The window made the whole screen again, with its own controls (Zoom held, then Fill), when it isn't.
+    private func fillScreen(_ app: XCUIApplication) {
+        let springboard = XCUIApplication(bundleIdentifier: "com.apple.springboard")
+        let screen = springboard.frame.width
+        guard app.windows.firstMatch.frame.width < screen else { return }
+        let controls = springboard.buttons["window-controls:app.studystash.ios"]
+        guard controls.waitForExistence(timeout: 5) else { return }
+        controls.tap()
+        let zoom = springboard.buttons["Zoom-button"]
+        guard zoom.waitForExistence(timeout: 3) else { return }
+        zoom.press(forDuration: 1.2)
+        let fill = springboard.buttons["Fill"]
+        if fill.waitForExistence(timeout: 3) { fill.tap() }
+        _ = waitUntil { app.windows.firstMatch.frame.width >= screen }
     }
 
     private func waitUntil(_ timeout: Double = 5, _ ok: () -> Bool) -> Bool {

@@ -85,4 +85,23 @@ public class ExamHintsTests
         Assert.Equal("Recursion traces will be on it, the stack diagrams from last week.", hint.Said);
         Assert.Empty(ExamHints.Find("[18:05] Okay, the stack. The plates will be on it, one by one."));
     }
+
+    [Fact]
+    public void A_sentence_cut_across_two_captions_is_one_flag()
+    {
+        var hint = Assert.Single(ExamHints.Find("[10:00] For the exam next Friday,\n[10:03] you need to know the difference between mitosis and meiosis.\n[10:09] Now, on to the next slide."));
+        Assert.Equal("For the exam next Friday, you need to know the difference between mitosis and meiosis.", hint.Said);
+        Assert.Equal("10:00", hint.Moment);
+    }
+
+    [Fact]
+    public void A_caption_with_no_words_between_the_two_parts_neither_breaks_the_sentence_nor_the_page()
+    {
+        var hint = Assert.Single(ExamHints.Find("[10:00] For the exam next Friday,\n[10:02] \n[10:03] you need to know mitosis."));
+        Assert.Equal("For the exam next Friday, you need to know mitosis.", hint.Said);
+        Assert.Equal("10:00", hint.Moment);
+        // Untimed with a line of spaces, and the same with Windows line endings: read, never thrown on.
+        Assert.NotEmpty(ExamHints.Find("For the exam next Friday,\n   \nyou need to know mitosis."));
+        Assert.NotEmpty(ExamHints.Find("[10:00] For the exam next Friday,\r\n\r\n[10:03] you need to know mitosis.\r\n"));
+    }
 }

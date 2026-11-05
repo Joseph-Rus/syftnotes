@@ -659,6 +659,7 @@
     <Setter Property="VerticalAlignment" Value="Center" />
   </Style>
   <Style Selector="Border.kbd > TextBlock, TextBlock.kbd">
+    <Setter Property="FontFamily" Value="{DynamicResource KeysFont}" />
     <Setter Property="FontSize" Value="12.5" />
     <Setter Property="FontWeight" Value="Medium" />
     <Setter Property="Foreground" Value="{DynamicResource InkSubtle}" />

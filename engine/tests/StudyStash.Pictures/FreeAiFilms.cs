@@ -402,7 +402,7 @@ public class FreeAiFilms
 
     /// <summary>Stills of each piece in both looks, light and dark, and in colour themes with a pale accent and a dark
     /// one: the offer over a lecture with no notes, a long lecture's parts, the paste box over notes it would replace,
-    /// the notes' ⋯ menu, and Settings → AI apps' switch.</summary>
+    /// the notes' ⋯ menu, and Settings → Your AI → Advanced settings' switch.</summary>
     [AvaloniaFact]
     public void Free_AI_in_every_look_and_theme()
     {

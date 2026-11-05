@@ -12,10 +12,10 @@ namespace StudyStash.Core.Ai;
 /// </summary>
 public static class ToolAccess
 {
-    /// <summary>What every tool says while Settings → AI apps has reading switched off.</summary>
-    public const string Off = "Reading is switched off for AI apps in Syft Notes. The student can turn it on in Syft Notes → Settings → AI apps.";
+    /// <summary>What every tool says while Settings → Your AI → Advanced settings has reading switched off.</summary>
+    public const string Off = "Reading is switched off for AI apps in Syft Notes. The student can turn it on in Syft Notes → Settings → Your AI → Advanced settings.";
 
-    /// <summary>Each scope as its toggle is named in Settings → AI apps, and what it lets tools read.</summary>
+    /// <summary>Each scope as its toggle is named in Settings → Your AI → Advanced settings, and what it lets tools read.</summary>
     static readonly Dictionary<string, (string Toggle, string What)> Toggles = new()
     {
         ["lectures"] = ("Lectures and transcripts", "lectures and transcripts"),
@@ -23,15 +23,15 @@ public static class ToolAccess
         ["canvas"] = ("Canvas assignments and files", "Canvas"),
     };
 
-    /// <summary>The switch in Settings → AI apps that lets AI apps save the notes they write (save_notes).</summary>
+    /// <summary>The switch in Settings → Your AI → Advanced settings that lets AI apps save the notes they write (save_notes).</summary>
     public const string SaveToggle = "Save notes they write";
 
     /// <summary>What a tool says when the toggle its scope needs is off, naming that toggle.</summary>
     public static string Refused(string scope) => scope == "save"
-        ? $"Syft Notes' settings don't let AI apps save notes right now (Settings → AI apps → {SaveToggle}). Nothing was saved: the student can switch it on, or copy these notes into Syft Notes with Paste notes."
+        ? $"Syft Notes' settings don't let AI apps save notes right now (Settings → Your AI → Advanced settings → {SaveToggle}). Nothing was saved: the student can switch it on, or copy these notes into Syft Notes with Paste notes."
         : Toggles.TryGetValue(scope, out var t)
-        ? $"Syft Notes' settings don't let AI tools read {t.What} right now (Settings → AI apps → {t.Toggle})."
-        : "Syft Notes' settings don't let AI tools read that right now (Settings → AI apps).";
+        ? $"Syft Notes' settings don't let AI tools read {t.What} right now (Settings → Your AI → Advanced settings → {t.Toggle})."
+        : "Syft Notes' settings don't let AI tools read that right now (Settings → Your AI → Advanced settings).";
 
     /// <summary>The scope a tool needs, or null only for list_classes (just the class names and counts). Every other
     /// tool is named here on purpose: a test fails when a new tool isn't. save_notes is the one that writes: "save".</summary>
