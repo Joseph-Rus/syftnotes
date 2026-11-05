@@ -7,9 +7,9 @@ public class MoveToApplicationsTests
         <plist version="1.0"><dict><key>CFBundleIdentifier</key><string>com.study-stash.app</string></dict></plist>
         """;
 
-    static string Make(string root, string sub, string plist = Plist)
+    static string Make(string root, string sub, string plist = Plist, string name = "Study Stash.app")
     {
-        string contents = Path.Combine(root, sub, "Study Stash.app", "Contents");
+        string contents = Path.Combine(root, sub, name, "Contents");
         string tree = Path.Combine(contents, "MacOS", "arm64");
         Directory.CreateDirectory(tree);
         File.WriteAllText(Path.Combine(contents, "Info.plist"), plist);
@@ -143,13 +143,21 @@ public class MoveToApplicationsTests
         Assert.DoesNotContain("ditto", ran);
 
         // That copy itself, run from a translocation folder (an earlier move kept the download's quarantine on it): opening
-        // it would only come back here, so it moves again, which takes the quarantine off.
-        string self = Make(t.Path, "x/AppTranslocation/ABC/d", Versioned("0.23.4"));
-        mount += $"{dest} on {Path.Combine(t.Path, "x", "AppTranslocation", "ABC", "d", "Study Stash.app")} (nullfs, local, nodev, nosuid, read-only, nobrowse, mounted by student)\n";
+        // it would only come back here, so it moves again, which takes the quarantine off. `mount` lists the translocation
+        // folder as a mount of the bundle, which shows inside it as d/<its name>, as macOS 26 prints it.
+        string self = Make(t.Path, "x/AppTranslocation/ABC/d", Versioned("0.23.4"), "Syft Notes.app");
+        mount += $"{dest} on {Path.Combine(t.Path, "x", "AppTranslocation", "ABC")} (nullfs, local, nodev, nosuid, read-only, nobrowse, mounted by student)\n";
         Assert.True(Go(self));
         Assert.Contains("ditto", ran);
         Assert.Contains("/usr/bin/xattr", ran);
         Assert.Equal(["sh", "4242", dest, ""], spawned!.Skip(3).ToArray());
+
+        // An older copy run from a translocation folder `mount` says nothing about: the newer one in Applications still
+        // opens, since only this very copy is ever the same version.
+        ran.Clear();
+        File.WriteAllText(Path.Combine(dest, "Contents", "Info.plist"), Versioned("0.23.5"));
+        Assert.True(Go(Make(t.Path, "y/AppTranslocation/DEF/d", Versioned("0.23.4"))));
+        Assert.DoesNotContain("ditto", ran);
     }
 
     static string Versioned(string version) =>

@@ -54,10 +54,12 @@ public static class MoveToApplications
         // Never over a copy in Applications that's as new or newer (a disk image or a Downloads copy kept from before would
         // put an older version over one that updated itself): that one opens instead, nothing asked or copied. Not when
         // it's this very copy, run from a translocation folder because an earlier move kept the download's quarantine on
-        // it: opening it would only come back here, where moving it again takes the quarantine off.
-        if (Apps.PlistString(Path.Combine(plan.Dest, "Contents", "Info.plist"), "CFBundleShortVersionString") is { } installed
-            && Updates.Compare(Updates.ParseVersion(installed), Updates.ParseVersion(Apps.PlistString(Path.Combine(plan.Source, "Contents", "Info.plist"), "CFBundleShortVersionString"))) >= 0
-            && !ItselfTranslocated(plan, run))
+        // it: opening it would only come back here, where moving it again takes the quarantine off. This very copy is
+        // always the same version, so a newer one opens whatever `mount` says.
+        string? installed = Apps.PlistString(Path.Combine(plan.Dest, "Contents", "Info.plist"), "CFBundleShortVersionString");
+        int order = installed is null ? -1 : Updates.Compare(Updates.ParseVersion(installed),
+            Updates.ParseVersion(Apps.PlistString(Path.Combine(plan.Source, "Contents", "Info.plist"), "CFBundleShortVersionString")));
+        if (order > 0 || (order == 0 && !ItselfTranslocated(plan, run)))
         {
             log($"[move] {plan.Dest} is already {installed}: it opens instead of this copy");
             spawn(WaiterCommand(pid, plan.Dest, eject));
@@ -122,11 +124,25 @@ public static class MoveToApplications
         mounts.Where(m => path == m.To || path.StartsWith(m.To.TrimEnd('/') + "/", StringComparison.Ordinal))
             .OrderByDescending(m => m.To.Length).Select(m => ((string From, string To)?)m).FirstOrDefault();
 
-    /// <summary>Where a copy Gatekeeper runs from a translocation folder really is: the place that folder is a mount of
-    /// (with the rest of the path below it), or null when `mount` doesn't say.</summary>
-    internal static string? OriginalOf(string translocated, List<(string From, string To)> mounts) =>
-        MountOf(translocated, mounts) is { } t && t.To.Contains("/AppTranslocation/", StringComparison.Ordinal) && t.From.StartsWith('/')
-            ? t.From + translocated[t.To.TrimEnd('/').Length..] : null;
+    /// <summary>Where a copy Gatekeeper runs from a translocation folder really is, or null when `mount` doesn't say or
+    /// what it says isn't there. macOS lists the folder (…/AppTranslocation/&lt;id&gt;) as a mount of the bundle itself,
+    /// which shows inside it as d/&lt;the bundle's name&gt;: "/Applications/X.app on …/AppTranslocation/&lt;id&gt;" for a
+    /// copy that runs from …/AppTranslocation/&lt;id&gt;/d/X.app.</summary>
+    internal static string? OriginalOf(string translocated, List<(string From, string To)> mounts)
+    {
+        // /var is /private/var: `mount` names the folder one way, the path a copy runs from may say the other.
+        static string Canon(string p) => p.StartsWith("/private/var/", StringComparison.Ordinal) ? p["/private".Length..] : p;
+        string path = Canon(translocated.Replace('\\', '/'));
+        if (MountOf(path, [.. mounts.Select(m => (m.From, Canon(m.To)))]) is not { } t
+            || !t.To.Contains("/AppTranslocation/", StringComparison.Ordinal) || !t.From.StartsWith('/'))
+            return null;
+        string from = t.From.TrimEnd('/'), root = t.To.TrimEnd('/'), mirror = root + "/d/" + Path.GetFileName(from);
+        string? original = Under(path, mirror) ? from + path[mirror.Length..]
+            : Under(path, root) ? from + path[root.Length..] : null;
+        return original is not null && Directory.Exists(original) ? original : null;
+    }
+
+    static bool Under(string path, string folder) => path == folder || path.StartsWith(folder + "/", StringComparison.Ordinal);
 
     /// <summary>Any other process running a program from a Syft Notes.app (or an old Study Stash.app) bundle: the app,
     /// or the library it runs. <paramref name="bundle"/> narrows it to one bundle.</summary>
