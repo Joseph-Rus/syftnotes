@@ -7,9 +7,9 @@ public class MoveToApplicationsTests
         <plist version="1.0"><dict><key>CFBundleIdentifier</key><string>com.study-stash.app</string></dict></plist>
         """;
 
-    static string Make(string root, string sub, string plist = Plist)
+    static string Make(string root, string sub, string plist = Plist, string name = "Study Stash.app")
     {
-        string contents = Path.Combine(root, sub, "Study Stash.app", "Contents");
+        string contents = Path.Combine(root, sub, name, "Contents");
         string tree = Path.Combine(contents, "MacOS", "arm64");
         Directory.CreateDirectory(tree);
         File.WriteAllText(Path.Combine(contents, "Info.plist"), plist);
@@ -152,13 +152,21 @@ public class MoveToApplicationsTests
         Assert.DoesNotContain("ditto", ran);
 
         // That copy itself, run from a translocation folder (an earlier move kept the download's quarantine on it): opening
-        // it would only come back here, so it moves again, which takes the quarantine off.
-        string self = Make(t.Path, "x/AppTranslocation/ABC/d", Versioned("0.23.4"));
-        mount += $"{dest} on {Path.Combine(t.Path, "x", "AppTranslocation", "ABC", "d", "Study Stash.app")} (nullfs, local, nodev, nosuid, read-only, nobrowse, mounted by student)\n";
+        // it would only come back here, so it moves again, which takes the quarantine off. `mount` lists the translocation
+        // folder as a mount of the bundle, which shows inside it as d/<its name>, as macOS 26 prints it.
+        string self = Make(t.Path, "x/AppTranslocation/ABC/d", Versioned("0.23.4"), "Syft Notes.app");
+        mount += $"{dest} on {Path.Combine(t.Path, "x", "AppTranslocation", "ABC")} (nullfs, local, nodev, nosuid, read-only, nobrowse, mounted by student)\n";
         Assert.True(Go(self));
         Assert.Contains("ditto", ran);
         Assert.Contains("/usr/bin/xattr", ran);
         Assert.Equal(["sh", "4242", dest, ""], spawned!.Skip(3).ToArray());
+
+        // An older copy run from a translocation folder `mount` says nothing about: the newer one in Applications still
+        // opens, since only this very copy is ever the same version.
+        ran.Clear();
+        File.WriteAllText(Path.Combine(dest, "Contents", "Info.plist"), Versioned("0.23.5"));
+        Assert.True(Go(Make(t.Path, "y/AppTranslocation/DEF/d", Versioned("0.23.4"))));
+        Assert.DoesNotContain("ditto", ran);
     }
 
     /// <summary>The background library, as the move sees it: one registration, and what's asked of it, in order with the
@@ -183,13 +191,15 @@ public class MoveToApplicationsTests
         string home = Path.Combine(t.Path, "home");
         Directory.CreateDirectory(home);
         // Gatekeeper ran it from a translocation folder, whose path doesn't say where it came from: `mount` says what the
-        // folder mirrors, and so which disk image to eject (not an older Syft Notes' mounted beside it).
-        string baseDir = Make(t.Path, "x/AppTranslocation/ABC/d", Versioned("0.23.4"));
+        // folder mirrors, and so which disk image to eject (not an older Syft Notes' mounted beside it). As macOS 26 prints
+        // it, the folder is a mount of the bundle on the image, which shows inside it as d/<its name>.
+        string baseDir = Make(t.Path, "x/AppTranslocation/ABC/d", Versioned("0.23.4"), "Syft Notes.app");
         string volumes = Path.Combine(t.Path, "Volumes");
+        Make(volumes, "Syft Notes", Versioned("0.23.4"), "Syft Notes.app");
         string mount = "/dev/disk3s1s1 on / (apfs, sealed, local, read-only, journaled)\n"
                        + $"/dev/disk5s1 on {volumes}/Syft Notes 1 (hfs, local, nodev, nosuid, read-only, noowners, quarantine, mounted by student)\n"
                        + $"/dev/disk6s1 on {volumes}/Syft Notes (hfs, local, nodev, nosuid, read-only, noowners, quarantine, mounted by student)\n"
-                       + $"{volumes}/Syft Notes on {t.Path}/x/AppTranslocation/ABC/d (nullfs, local, nodev, nosuid, read-only, nobrowse, mounted by student)\n";
+                       + $"{volumes}/Syft Notes/Syft Notes.app on {t.Path}/x/AppTranslocation/ABC (nullfs, local, nodev, nosuid, read-only, nobrowse, mounted by student)\n";
         string info = $"/dev/disk5\tGUID_partition_scheme\t\n/dev/disk5s1\tApple_HFS\t{volumes}/Syft Notes 1\n"
                       + $"/dev/disk6\tGUID_partition_scheme\t\n/dev/disk6s1\tApple_HFS\t{volumes}/Syft Notes\n";
         // An older copy is in Applications, and the background library runs from it.
