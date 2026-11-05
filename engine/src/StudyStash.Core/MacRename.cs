@@ -36,7 +36,7 @@ public static class MacRename
     /// the installed copy set up.</summary>
     public static bool Passing(string path)
     {
-        path = path.Replace('\', '/');
+        path = path.Replace('\\', '/');
         return path.Contains("/AppTranslocation/", StringComparison.Ordinal) || path.StartsWith("/Volumes/", StringComparison.Ordinal);
     }
 
