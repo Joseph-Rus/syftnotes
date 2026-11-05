@@ -51,9 +51,18 @@ public static class RecordingWords
     public const string MicStopped = "The microphone stopped. Plug it back in, then press Resume.";
     public const string CantHearMac = "Syft Notes can't hear the microphone. Allow it in System Settings → Privacy & Security → Microphone.";
     public const string CantHearWindows = "Windows isn't letting Syft Notes use the microphone. Turn on Settings → Privacy & security → Microphone → Let desktop apps access your microphone.";
-    public const string CantHearLinux = "Syft Notes can't hear the microphone. Check it's picked and not muted in your system's Sound settings, under Input.";
-    public const string MutedMac = "Syft Notes can't hear the microphone. In System Settings → Sound → Input, check that the right microphone is picked and its input level is up.";
-    public const string MutedWindows = "Syft Notes can't hear the microphone. In Settings → System → Sound → Input, check that it isn't muted and its input volume is up.";
+    public const string CantHearLinux = $"Syft Notes can't hear the microphone. Check it's picked and not muted in {SoundInputLinux}.";
+    public const string MutedMac = $"Syft Notes can't hear the microphone. In {SoundInputMac}, check that the right microphone is picked and its input level is up.";
+    public const string MutedWindows = $"Syft Notes can't hear the microphone. In {SoundInputWindows}, check that it isn't muted and its input volume is up.";
+
+    /// <summary>Where the system picks the microphone and sets its level, in each system's own words: one place, so
+    /// every message sends the student to the same spot.</summary>
+    public const string SoundInputMac = "System Settings → Sound → Input";
+    public const string SoundInputWindows = "Settings → System → Sound → Input";
+    public const string SoundInputLinux = "your system's Sound settings, under Input";
+
+    /// <summary>This computer's <see cref="SoundInputMac"/>, <see cref="SoundInputWindows"/> or <see cref="SoundInputLinux"/>.</summary>
+    public static string SoundInput => Machine.Linux ? SoundInputLinux : OperatingSystem.IsWindows() ? SoundInputWindows : SoundInputMac;
     public const string CouldntRead = "The recording couldn't be read";
 
     /// <summary>A microphone that gives only silence. With the system's permission known to be given
