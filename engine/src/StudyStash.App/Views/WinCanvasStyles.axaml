@@ -279,7 +279,7 @@
     <Setter Property="Foreground" Value="{DynamicResource Fg2}" />
   </Style>
   <Style Selector="TextBlock.cv-tile-value">
-    <Setter Property="FontSize" Value="15" />
+    <Setter Property="FontSize" Value="{DynamicResource FontBody}" />
     <Setter Property="FontWeight" Value="SemiBold" />
   </Style>
   <Style Selector="TextBlock.cv-h3">

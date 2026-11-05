@@ -26,7 +26,9 @@ public sealed partial class LibraryWeb
         {
             var body = await Http.JsonBodyAsync(ctx.Request);
             if (body is null) return Http.Detail(422, "send the settings to change as a JSON object");
-            return ChangeSettings(body) is { } refused ? refused : Http.Json(await SettingsJsonAsync());
+            if (ChangeSettings(body) is { } refused) return refused;
+            if (Text(body["sort_engine"]) == "ollama") await ChooseFreeModelAsync();
+            return Http.Json(await SettingsJsonAsync());
         })));
         // A class's own folders: link one on this computer (a project's repo, say) or let it go. The folder stays where
         // it is; it's listed on the class's home, searched, and read by the AI like the folders in Settings.
@@ -169,11 +171,11 @@ public sealed partial class LibraryWeb
             ["name"] = cfg.PoolName,
             ["has_password"] = cfg.PoolPassword.Length > 0,
             ["notes_folder"] = cfg.PoolDir,
-            ["lectures"] = counts.Values.Sum(),
+            ["lectures"] = store.SummaryCount(), // the lectures with a summary: what "Rewrite all" rewrites
             ["classes"] = new JsonArray(cfg.Classes.Select(c => (JsonNode?)new JsonObject
             {
                 ["name"] = c.Name, ["aliases"] = new JsonArray(c.Aliases.Select(a => (JsonNode?)a).ToArray()), ["description"] = c.Description,
-                ["group"] = c.Group,
+                ["group"] = c.Group, ["color"] = c.Color,
                 ["folder"] = store.ClassDir(c.Name), ["lectures"] = counts.GetValueOrDefault(c.Name, 0),
             }).ToArray()),
             ["course_names"] = CourseNamesJson(),
@@ -187,8 +189,9 @@ public sealed partial class LibraryWeb
                 ["answering"] = models is not null,
                 ["models"] = new JsonArray((models ?? []).Select(m => (JsonNode?)new JsonObject { ["name"] = m.Name, ["size"] = Ollama.SizeLabel(m.SizeGb) }).ToArray()),
                 ["summary_model"] = cfg.SummaryModel,
-                ["sort_model"] = cfg.OllamaModel,
-                ["recommended"] = Ollama.RecommendedModel(options.RamGb()),
+                // Nobody chose one: the model this computer can run (the same rule setup follows), not the built-in one for a big computer.
+                ["sort_model"] = Engines.FreeModelChosen(cfg) ? cfg.OllamaModel : Engines.FreeModel(cfg, Jobs.Checks),
+                ["chosen"] = picked.OllamaChosen,
             },
             // Which AI sorts lectures into classes (the web page's "Sorts lectures"): its own, or "" for the library's main one.
             ["sorting"] = new JsonObject
@@ -283,13 +286,15 @@ public sealed partial class LibraryWeb
             {
                 string cls = Text(item["name"]) ?? "";
                 if (cls.Length == 0) continue;
-                if (cls.Length > 60) return Http.Detail(400, $"“{cls[..20]}…” is too long for a class name (up to 60 characters).");
+                if (cls.Length > StudyStash.Core.Canvas.CourseNames.MaxLength) return Http.Detail(400, $"“{cls[..20]}…” is too long for a class name (up to {StudyStash.Core.Canvas.CourseNames.MaxLength} characters).");
                 if (cls.Equals(Configs.Unsorted, StringComparison.OrdinalIgnoreCase)) return Http.Detail(400, $"“{Configs.Unsorted}” is taken: lectures wait there to be filed.");
                 if (!seen.Add(cls)) return Http.Detail(400, $"There are two classes called {cls}.");
                 var aliases = (item["aliases"] as JsonArray)?.Select(Text).OfType<string>().Where(a => a.Length > 0).Distinct().ToList() ?? [];
                 // A class's sidebar folder: as sent, else what it had (under this name, or the one it's renamed from).
-                string group = Text(item["group"]) ?? cfg.Classes.FirstOrDefault(c => c.Name == cls || c.Name == Text(item["was"]))?.Group ?? "";
-                classes.Add(new ClassDef(cls, aliases, Text(item["description"]) ?? "", group.Trim()));
+                // Its colour is always the one it had.
+                var had = cfg.Classes.FirstOrDefault(c => c.Name == cls || c.Name == Text(item["was"]));
+                string group = Text(item["group"]) ?? had?.Group ?? "";
+                classes.Add(new ClassDef(cls, aliases, Text(item["description"]) ?? "", group.Trim(), had?.Color ?? -1));
                 if (Text(item["was"]) is { Length: > 0 } was && was != cls && cfg.Classes.Any(c => c.Name == was)) renames.Add(new ClassRenameStep(was, cls, 0, ""));
             }
             // "known": the classes the app's Settings had when it opened. One it never had (added from somewhere else

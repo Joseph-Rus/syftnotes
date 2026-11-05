@@ -138,14 +138,14 @@ public class AskStreamingTests
         lib.OnAskStream = (_, soFar, _) =>
         {
             soFar("Half an answer");
-            throw new LibraryRefusedException(503, "Claude Code stopped partway through: rate limit exceeded");
+            throw new LibraryRefusedException(503, "Claude hit its usage limit.");
         };
         model.Question = "q";
 
         await model.AskCommand.ExecuteAsync(null);
 
         Assert.Equal("Half an answer", model.Turns[0].Answer);
-        Assert.Equal("Claude Code stopped partway through: rate limit exceeded", model.Turns[0].Failed);
+        Assert.Equal("Claude hit its usage limit.", model.Turns[0].Failed);
     }
 
     [AvaloniaFact]

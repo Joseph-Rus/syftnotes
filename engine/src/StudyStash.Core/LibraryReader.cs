@@ -19,7 +19,7 @@ public sealed partial class LibraryReader(Config cfg, Store store)
     /// <summary>What the laptop says it is recording (see <see cref="RecordingNow"/>).</summary>
     public RecordingNow Recording { get; init; } = new();
 
-    /// <summary>The library's name, its classes (in the order they were added: their dot colors follow it), and how
+    /// <summary>The library's name, its classes (in the order they were added, each with the colour it keeps), and how
     /// much is waiting.</summary>
     public JsonObject Overview()
     {
@@ -27,13 +27,14 @@ public sealed partial class LibraryReader(Config cfg, Store store)
         var counts = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
         foreach (var (cls, n) in Store.ClassesSummary()) counts[cls] = counts.GetValueOrDefault(cls) + n;
         var classes = new JsonArray();
-        int index = 0;
+        int index = 0, next = Cfg.Classes.Select(c => c.Color + 1).Append(Cfg.Classes.Count).Max();
         var canvas = Canvas.CanvasSettings.Load(Cfg.Home);
         var linked = Ai.Folders.Load(Cfg.Home);
         foreach (var c in Cfg.Classes)
+        {
             classes.Add(new JsonObject
             {
-                ["name"] = c.Name, ["lectures"] = counts.GetValueOrDefault(c.Name), ["color"] = index++, ["description"] = c.Description,
+                ["name"] = c.Name, ["lectures"] = counts.GetValueOrDefault(c.Name), ["color"] = c.Color >= 0 ? c.Color : index, ["description"] = c.Description,
                 // The sidebar section it's in: "" for Classes, else one of the student's own folders ("Projects").
                 ["group"] = c.Group,
                 // Folders on the library's computer that go with it (a project's repo, say), not part of the library.
@@ -46,9 +47,11 @@ public sealed partial class LibraryReader(Config cfg, Store store)
                 // Its other names (one it had before a rename, say), so a laptop's lectures filed under an old name can follow it.
                 ["aliases"] = new JsonArray(c.Aliases.Select(a => (JsonNode?)a).ToArray()),
             });
+            index++;
+        }
         // Lectures filed under a class since removed from the config still show, after the rest.
         foreach (var (name, n) in counts.Where(kv => !kv.Key.Equals(Configs.Unsorted, StringComparison.OrdinalIgnoreCase) && Cfg.Classes.All(c => !c.Name.Equals(kv.Key, StringComparison.OrdinalIgnoreCase))))
-            classes.Add(new JsonObject { ["name"] = name, ["lectures"] = n, ["color"] = index++ });
+            classes.Add(new JsonObject { ["name"] = name, ["lectures"] = n, ["color"] = next++ });
         var status = Store.StatusCounts();
         return new JsonObject
         {
@@ -200,14 +203,31 @@ public sealed partial class LibraryReader(Config cfg, Store store)
         foreach (var r in Store.Search(query, 50).Where(r => className is null || r.ClassName == className).Take(limit)) lectures.Add(Summary(r));
         var passages = (JsonArray)result["passages"]!;
         if (Passages.AllWords(query) is string match)
-            foreach (var hit in Store.SearchPassages(match, className, limit: limit * 2).Take(limit * 2)) passages.Add(PassageJson(hit.Note, hit.Passage));
+            foreach (var hit in Store.SearchPassages(match, className, limit: limit * 2).Take(limit * 2)) passages.Add(PassageJson(hit.Note, hit.Passage, HitAt(hit.Note, hit.Passage, query)));
         var classes = (JsonArray)result["classes"]!;
         foreach (var c in ((JsonArray)Overview()["classes"]!).OfType<JsonObject>())
             if (c["name"]!.GetValue<string>().Contains(query, StringComparison.OrdinalIgnoreCase)) classes.Add(c.DeepClone());
         return result;
     }
 
-    static JsonObject PassageJson(NoteRow note, Passage p) => new()
+    /// <summary>When the words were said: a transcript passage spans about a minute, so its start can be a line or
+    /// three before the hit. This is the start of the first line of it that holds the most of the query's words (the
+    /// passage's own start when none does, or when it isn't a timed transcript's).</summary>
+    double? HitAt(NoteRow note, Passage p, string query)
+    {
+        if (p.Start is not double start || p.Kind != Passage.TranscriptKind) return p.Start;
+        var words = Passages.Words(query);
+        if (words.Count == 0) return start;
+        var best = TimedText.Parse(Store.Meeting(note).Transcript)
+            .Where(l => l.Start >= start && l.Start < start + 120 && p.Text.Contains(l.Text, StringComparison.Ordinal))
+            .Select(l => (Line: l, Held: words.Count(w => l.Text.Contains(w, StringComparison.OrdinalIgnoreCase))))
+            .Where(x => x.Held > 0)
+            .OrderByDescending(x => x.Held)
+            .FirstOrDefault();
+        return best.Line?.Start ?? start;
+    }
+
+    static JsonObject PassageJson(NoteRow note, Passage p, double? at) => new()
     {
         ["id"] = note.Id,
         ["title"] = !string.IsNullOrEmpty(note.LectureTitle) ? note.LectureTitle : note.Title,
@@ -215,7 +235,7 @@ public sealed partial class LibraryReader(Config cfg, Store store)
         ["date"] = note.Date,
         ["kind"] = p.Kind,
         ["section"] = p.Section,
-        ["at"] = p.Start,
+        ["at"] = at,
         ["text"] = p.Text,
     };
 

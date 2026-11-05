@@ -36,7 +36,7 @@
         <c:PageText Classes="cv-detail-title" c:Typography.Extra="-0.6" Text="{Binding Title}" TextWrapping="Wrap" Margin="0,0,0,8" />
 
         <Border Classes="cv-tiles">
-          <Grid ColumnDefinitions="*,1,*,1,*">
+          <Grid ColumnDefinitions="Auto,1,*,1,*">
             <StackPanel Grid.Column="0" Spacing="2" Margin="16,12">
               <c:PageText Classes="cv-tile-label" Text="Due" />
               <c:PageText Classes="cv-tile-value" CopyJoin=": " Text="{Binding DueValue}" />

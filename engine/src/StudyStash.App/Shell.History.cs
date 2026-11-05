@@ -12,9 +12,10 @@ public static partial class Shell
 {
     /// <summary>What the window showed: an overview (Home, Due and the class its calendar was for, or a folder's
     /// page), a note, an assignment on a page of its own, or a class's Canvas lists (the list it was on, and the
-    /// assignment or page open beside it).</summary>
+    /// assignment or page open beside it). <c>Scroll</c> is how far down an overview or a note's notes was scrolled,
+    /// when it was left (kept to be gone back to, not part of which place it is).</summary>
     sealed record Place(string? Overview = null, string? DueOnly = null, string? Lecture = null, (string Class, string Id)? Assignment = null,
-        string? Canvas = null, ClassTab Tab = ClassTab.Assignments, CanvasReaderModel? Reader = null, bool Study = false);
+        string? Canvas = null, ClassTab Tab = ClassTab.Assignments, CanvasReaderModel? Reader = null, bool Study = false, double Scroll = 0);
 
     const int HistoryLimit = 50;
     static readonly List<Place> backPlaces = [], forwardPlaces = [];
@@ -32,13 +33,22 @@ public static partial class Shell
         return new Place(Overview: "");
     }
 
+    /// <summary>How far down <paramref name="here"/> is scrolled (an overview, or a note's notes; a note's transcript
+    /// isn't what Back brings the note's page back to).</summary>
+    static double Scrolled(Place here) => here switch
+    {
+        { Overview: not null } => library.Overview?.Scroll.Y ?? 0,
+        { Lecture: not null } => library.Note is { ShowTranscript: false } note ? note.Scroll.Y : 0,
+        _ => 0,
+    };
+
     /// <summary>The student is about to leave this place for another: it's kept for Back, and Forward starts over.</summary>
     static void Remember()
     {
         if (restoring) return;
         var here = Here();
-        if (backPlaces.Count > 0 && backPlaces[^1] == here) return;
-        backPlaces.Add(here);
+        if (backPlaces.Count > 0 && backPlaces[^1] with { Scroll = 0 } == here) return;
+        backPlaces.Add(here with { Scroll = Scrolled(here) });
         if (backPlaces.Count > HistoryLimit) backPlaces.RemoveAt(0);
         forwardPlaces.Clear();
         UpdateHistory();
@@ -52,7 +62,8 @@ public static partial class Shell
         if (from.Count == 0) return;
         var place = from[^1];
         from.RemoveAt(from.Count - 1);
-        to.Add(Here());
+        var here = Here();
+        to.Add(here with { Scroll = Scrolled(here) });
         UpdateHistory();
         Run(() => BackToAsync(place), "BackTo");
     }
@@ -96,7 +107,10 @@ public static partial class Shell
         if (place.Overview is { } over)
         {
             if (over == DueHome) dueOnly = place.DueOnly;
+            var was = library.Overview;
             await ShowOverviewAsync(over);
+            // The page that opened (not one that couldn't, or that was left for another meanwhile) is scrolled to where it was left.
+            if (place.Scroll > 0 && pageState.Overview == over && library.Overview is { } page && page != was) page.Scroll.PutBack(place.Scroll);
         }
         else if (place.Canvas is { } cls)
         {
@@ -117,7 +131,12 @@ public static partial class Shell
             }
         }
         else if (place.Assignment is { } assignment) await ShowAssignmentPageAsync(assignment.Class, assignment.Id);
-        else if (place.Lecture is { } id) await ShowLectureAsync(id);
+        else if (place.Lecture is { } id)
+        {
+            var was = library.Note;
+            await ShowLectureAsync(id);
+            if (place.Scroll > 0 && pageState.Lecture == id && library.Note is { } note && note != was) note.Scroll.PutBack(place.Scroll);
+        }
         else await ShowHomeAsync();
     }
 

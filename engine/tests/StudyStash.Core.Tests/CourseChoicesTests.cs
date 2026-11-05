@@ -41,6 +41,36 @@ public class CourseChoicesTests
         Assert.Equal((true, ""), CourseChoices.Suggest(new CourseInfo("CS 101", "Intro", "Default Term", CourseStart: "2026-08-20T00:00:00Z"), Now));
     }
 
+    // Courses as Canvas's course list gives them: a real class must never be left out, and a chapel, orientation,
+    // sandbox or a course the student teaches must not come in.
+    const string AsStudent = """, "enrollments": [{"type": "student", "enrollment_state": "active"}]""";
+    const string ThisFall = """, "term": {"name": "Fall 2026", "start_at": "2026-08-20T00:00:00Z", "end_at": "2026-12-15T00:00:00Z"}""";
+
+    [Theory]
+    [InlineData("""{"name": "Community Health Nursing", "course_code": "NURS 340" """ + ThisFall + AsStudent + "}", true, "")]
+    [InlineData("""{"name": "Athletic Training Clinical I", "course_code": "AT 210" """ + ThisFall + AsStudent + "}", true, "")]
+    [InlineData("""{"name": "Statics", "course_code": "MECH 2010", "term": {"name": "Default Term"}""" + AsStudent + "}", true, "")]
+    [InlineData("""{"name": "Statics", "course_code": "MECH 2010", "term": {"name": "Default Term"}, "enrollments": [{"type": "StudentEnrollment"}]}""", true, "")]
+    [InlineData("""{"name": "Orientation & Mobility", "course_code": "SPED 455" """ + ThisFall + AsStudent + "}", true, "")]
+    [InlineData("""{"name": "Marine Biology", "course_code": "BIO 250", "concluded": true, "term": {"name": "Summer 2026", "start_at": "2026-06-01T00:00:00Z", "end_at": "2026-09-24T17:00:00Z"}""" + AsStudent + "}", true, "")]
+    [InlineData("""{"name": "Orientation and Mobility", "course_code": "SPED 455" """ + ThisFall + AsStudent + "}", true, "")]
+    [InlineData("""{"name": "Fluids Lab", "course_code": "ME 330", "restrict_enrollments_to_course_dates": true, "start_at": "2026-09-01T00:00:00Z", "end_at": "2026-12-01T00:00:00Z", "term": {"name": "Spring 2026", "start_at": "2026-01-10T00:00:00Z", "end_at": "2026-05-10T00:00:00Z"}""" + AsStudent + "}", true, "")]
+    [InlineData("""{"name": "Genetics", "course_code": "BIO 300", "start_at": "2026-08-20T00:00:00Z", "end_at": "2016-12-15T00:00:00Z", "term": {"name": "Default Term"}""" + AsStudent + "}", true, "")]
+    [InlineData("""{"name": "Physics I", "course_code": "PHYS 101", "term": {"name": "Fall 2025"}""" + AsStudent + "}", false, CourseChoices.PastTerm)]
+    [InlineData("""{"name": "Student Success Seminar", "course_code": "FYE 101" """ + ThisFall + AsStudent + "}", true, "")]
+    [InlineData("""{"name": "Chapel", "course_code": "CHPL 100" """ + ThisFall + AsStudent + "}", false, CourseChoices.NotAClass)]
+    [InlineData("""{"name": "New Student Orientation", "course_code": "NSO" """ + ThisFall + AsStudent + "}", false, CourseChoices.NotAClass)]
+    [InlineData("""{"name": "Sandbox - Practice", "course_code": "SBX-1", "term": {"name": "Default Term"}, "enrollments": [{"type": "teacher", "enrollment_state": "active"}]}""", false, CourseChoices.NotAClass)]
+    [InlineData("""{"name": "Physics I", "course_code": "PHYS 101" """ + ThisFall + """, "enrollments": [{"type": "teacher", "enrollment_state": "active"}]}""", false, CourseChoices.NotAClass)]
+    [InlineData("""{"name": "World History", "course_code": "HIST 101", "concluded": true, "term": {"name": "Spring 2026"}""" + AsStudent + "}", false, CourseChoices.PastTerm)]
+    [InlineData("""{"name": "World History", "course_code": "HIST 101", "workflow_state": "completed", "term": {"name": "Default Term"}""" + AsStudent + "}", false, CourseChoices.PastTerm)]
+    [InlineData("""{"name": "Statics", "course_code": "MECH 2010", "term": {"name": "Default Term"}}""", false, CourseChoices.NoTerm)]
+    public void Canvas_s_own_fields_decide_which_courses_are_classes(string course, bool ticked, string why)
+    {
+        var info = CourseChoices.Read((JsonObject)JsonNode.Parse(course)!);
+        Assert.Equal((ticked, why), CourseChoices.Suggest(info, Now));
+    }
+
     static (Config Cfg, Store Store) Library(TempDir dir)
     {
         var cfg = new Config(dir["home"], dir["pool"]) { PoolPassword = Password, OllamaEnabled = false, Classes = [new ClassDef("Lab Notes")] };

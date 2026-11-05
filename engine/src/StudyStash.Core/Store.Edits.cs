@@ -54,6 +54,57 @@ public static partial class Notes
         return string.Join("\n", lines);
     }
 
+    /// <summary>A note file moved from <paramref name="from"/> to <paramref name="to"/>: its front matter's <c>class:</c>
+    /// and the class under its title (as <see cref="Render"/> writes them, and only while they still say the old class) say
+    /// the new one, every other line as it is.</summary>
+    public static string WithClass(string text, string from, string to) => Lines(text, lines =>
+    {
+        int end = FrontMatterEnd(lines);
+        for (int i = 1; i < end; i++)
+            if (lines[i] == $"class: {PyJson.Dumps(from)}") { lines[i] = $"class: {PyJson.Dumps(to)}"; break; }
+        string was = $"class: **{from}**";
+        for (int i = end + 1; i < lines.Length; i++)
+        {
+            if (lines[i].Trim().Length == 0 || lines[i].StartsWith("# ", StringComparison.Ordinal)) continue;
+            // The line under the title: "*date*  ·  class: **…**" (a student's own line further down is never touched).
+            if (lines[i].StartsWith('*') && lines[i].IndexOf(was, StringComparison.Ordinal) is var at and >= 0)
+                lines[i] = lines[i][..at] + $"class: **{to}**" + lines[i][(at + was.Length)..];
+            break;
+        }
+    });
+
+    /// <summary>Where a note file's front matter ends (its closing <c>---</c>); -1 with none.</summary>
+    static int FrontMatterEnd(string[] lines) => lines.Length > 0 && lines[0] == "---" ? Array.IndexOf(lines, "---", 1) : -1;
+
+    /// <summary>A note file's text changed line by line by <paramref name="change"/>, an invisible byte-order mark at its
+    /// start kept out of the way and put back.</summary>
+    static string Lines(string text, Action<string[]> change)
+    {
+        bool bom = text.StartsWith('\uFEFF');
+        var lines = (bom ? text[1..] : text).Split('\n');
+        change(lines);
+        return (bom ? "\uFEFF" : "") + string.Join("\n", lines);
+    }
+
+    /// <summary>A note file for a lecture renamed from <paramref name="from"/> to <paramref name="to"/>: its front matter's
+    /// <c>title:</c> and <c>lecture_title:</c> and the heading at its top (as <see cref="Render"/> writes them, and only while
+    /// the heading still says the old title) say the new one, every other line as it is.</summary>
+    public static string WithTitle(string text, string from, string to) => Lines(text, lines =>
+    {
+        int end = FrontMatterEnd(lines);
+        for (int i = 1; i < end; i++)
+        {
+            if (lines[i].StartsWith("title: ", StringComparison.Ordinal)) lines[i] = $"title: {PyJson.Dumps(to)}";
+            else if (lines[i].StartsWith("lecture_title: ", StringComparison.Ordinal)) lines[i] = $"lecture_title: {PyJson.Dumps(to)}";
+        }
+        for (int i = end + 1; i < lines.Length; i++)
+        {
+            if (lines[i].Trim().Length == 0) continue;
+            if (lines[i] == "# " + from) lines[i] = "# " + to; // a heading the student changed stays theirs
+            break;
+        }
+    });
+
     /// <summary>A note file whose summary says who wrote it as <paramref name="writer"/> ("_Written by … from the
     /// transcript._" under it, as <see cref="Render"/> writes it; with no writer, no such line), every other line as it
     /// is. As it is, for a file with no summary.</summary>
@@ -80,6 +131,38 @@ public static partial class Notes
 
 public sealed partial class Store
 {
+    /// <summary>The note file's own text when it holds edits the library didn't write (in another app, or by an AI working
+    /// in the folder); null when it's as the library wrote it, or isn't there. <paramref name="crlf"/>: the line endings to
+    /// write it back with. Throws when it can't be read.</summary>
+    string? EditedFile(string path, Meeting m, Classification c, string current, string model, out bool crlf)
+    {
+        crlf = OperatingSystem.IsWindows(); // as filing writes it (Py.WriteText)
+        if (!File.Exists(path)) return null;
+        byte[] bytes = File.ReadAllBytes(path);
+        string text = new UTF8Encoding(false).GetString(bytes).Replace("\r\n", "\n").Replace('\r', '\n');
+        // (A file from before a too-short recording's file said so has the older words where its notes would be:
+        // nobody has touched that one either.)
+        string written = Notes.Render(m, c, current, model);
+        // (And a file from before notes that never came back left nothing there has that line under Notes.)
+        if (text == written || text.Replace($"\n## Notes\n\n{Notes.NoNotesReturned}\n", "") == written
+            || text == written.Replace(Notes.TooShortForNotes, Notes.NoNotesReturned))
+            return null;
+        crlf = bytes.AsSpan().IndexOf("\r\n"u8) >= 0; // its own line endings stay
+        return text;
+    }
+
+    /// <summary>A summary edited in the note file itself, taken in as the lecture's notes, the library's older copy kept
+    /// as a version. The notes taken in; null when the file's summary says nothing new.</summary>
+    string? TakeInSummary(NoteRow row, Meeting m, string current, string model, string edited)
+    {
+        if (Notes.SummaryInFile(edited) is not { Length: > 0 } theirs || Notes.SameWords(theirs, current)) return null;
+        string seen = Now();
+        Exec("UPDATE notes SET summary_md=?, updated_at=? WHERE id=?", theirs, seen, row.Id);
+        Index(row.Id, theirs, m.Transcript, seen);
+        RecordVersion(row.Id, (current, model, row.UpdatedAt ?? ""), theirs, model, NotesChangeKind.File);
+        return theirs;
+    }
+
     /// <summary>
     /// A lecture's notes as the student edited them, saved as its notes in one step under the store's lock: search and
     /// Ask read them at once, and who wrote them, the lecture's class and everything else about it stay as they were.
@@ -117,23 +200,11 @@ public sealed partial class Store
             var c = new Classification(row.ClassName ?? "", row.Confidence ?? 1, row.ClassifiedBy ?? "", row.LectureTitle ?? "", JsonList(row.Topics));
             string model = row.SummaryModel ?? "";
             string path = row.MdPath;
-            bool crlf = OperatingSystem.IsWindows(); // as filing writes it (Py.WriteText)
-            string? edited = null; // the note file's text, when it has edits of its own
+            bool crlf;
+            string? edited; // the note file's text, when it has edits of its own
             try
             {
-                if (File.Exists(path))
-                {
-                    byte[] bytes = File.ReadAllBytes(path);
-                    string text = new UTF8Encoding(false).GetString(bytes).Replace("\r\n", "\n").Replace('\r', '\n');
-                    // (A file from before a too-short recording's file said so has the older words where its notes
-                    // would be: nobody has touched that one either.)
-                    string written = Notes.Render(m, c, current, model);
-                    if (text != written && text != written.Replace(Notes.TooShortForNotes, Notes.NoNotesReturned))
-                    {
-                        edited = text;
-                        crlf = bytes.AsSpan().IndexOf("\r\n"u8) >= 0; // its own line endings stay
-                    }
-                }
+                edited = EditedFile(path, m, c, current, model, out crlf);
             }
             catch (Exception e) when (e is IOException or UnauthorizedAccessException)
             {
@@ -144,12 +215,8 @@ public sealed partial class Store
             // first, the library's older copy kept as a version. An edit that says what it started from then stops, so
             // the student sees them and chooses; anything else (an AI app's save, a paste, a version put back) goes on,
             // and they're the notes it replaces: kept as a version, never saved over unseen.
-            if (edited is not null && Notes.SummaryInFile(edited) is { Length: > 0 } theirs && !Notes.SameWords(theirs, current))
+            if (edited is not null && TakeInSummary(row, m, current, model, edited) is { } theirs)
             {
-                string seen = Now();
-                Exec("UPDATE notes SET summary_md=?, updated_at=? WHERE id=?", theirs, seen, noteId);
-                Index(noteId, theirs, m.Transcript, seen);
-                RecordVersion(noteId, (current, model, row.UpdatedAt ?? ""), theirs, model, NotesChangeKind.File);
                 if (basedOn is not null) return NotesEdited.Changed;
                 current = theirs;
             }
