@@ -64,8 +64,9 @@ public class MoveToApplicationsTests
         Directory.CreateDirectory(home);
         string baseDir = Make(home, "Downloads");
         int asked = 0;
+        // applications=false so the destination is under the temp home, never the real /Applications
         bool Go() => MoveToApplications.Offer(baseDir, home, home, () => { asked++; return false; },
-            (_, _, _) => null, _ => throw new InvalidOperationException("nothing starts"), 1, _ => { }, applicationsWritable: true, otherCopyRunning: () => false);
+            (_, _, _) => null, _ => throw new InvalidOperationException("nothing starts"), 1, _ => { }, applicationsWritable: false, otherCopyRunning: () => false);
         Assert.False(Go());
         Assert.False(Go());
         Assert.Equal(1, asked);
@@ -93,20 +94,66 @@ public class MoveToApplicationsTests
         Directory.CreateDirectory(home);
         string baseDir = Make(home, "Downloads");
         IReadOnlyList<string>? spawned = null;
-        // a stand-in for ditto: copies the folder
+        var ran = new List<string>();
+        // a stand-in for ditto (copies the folder) and xattr
         ProcResult? Run(string exe, IReadOnlyList<string> args, TimeSpan _)
         {
-            if (exe == "ditto") CopyDir(args[0], args[1]);
+            if (exe == "ditto") CopyDir(args[^2], args[^1]);
+            ran.Add(string.Join(' ', [exe, .. args]));
             return new ProcResult(0, "");
         }
         bool went = MoveToApplications.Offer(baseDir, home, home, () => true, Run, a => spawned = a, 4242, _ => { }, applicationsWritable: false, otherCopyRunning: () => false);
         Assert.True(went);
         string dest = Path.Combine(home, "Applications", "Syft Notes.app");
         Assert.True(File.Exists(Path.Combine(dest, "Contents", "Info.plist")));
+        // Copied without the download's quarantine, which would have Gatekeeper run it from a translocation folder too.
+        string source = Path.Combine(home, "Downloads", "Study Stash.app");
+        Assert.Equal([$"ditto --noqtn {source} {dest}.new", $"/usr/bin/xattr -dr com.apple.quarantine {dest}.new"], ran.ToArray());
         Assert.Equal(["sh", "4242", dest, ""], spawned!.Skip(3).ToArray());
         Assert.Contains("/usr/bin/caffeinate -w", spawned![2]);
         Assert.DoesNotContain("sleep", spawned[2]);
     }
+
+    [Fact]
+    public void One_in_Applications_as_new_or_newer_opens_instead_unless_its_this_copy_translocated()
+    {
+        if (OperatingSystem.IsWindows()) return; // a Mac's paths and mounts (Linux runs it the same way)
+        using var t = new TempDir();
+        string home = Path.Combine(t.Path, "home");
+        string dest = Path.Combine(home, "Applications", "Syft Notes.app");
+        Directory.CreateDirectory(Path.Combine(dest, "Contents"));
+        File.WriteAllText(Path.Combine(dest, "Contents", "Info.plist"), Versioned("0.23.4"));
+        string mount = "/dev/disk3s1s1 on / (apfs, sealed, local, read-only, journaled)\n";
+        IReadOnlyList<string>? spawned = null;
+        var ran = new List<string>();
+        ProcResult? Run(string exe, IReadOnlyList<string> args, TimeSpan _)
+        {
+            if (exe == "ditto") CopyDir(args[^2], args[^1]);
+            ran.Add(exe);
+            return new ProcResult(0, exe == "/sbin/mount" ? mount : "");
+        }
+        bool Go(string baseDir) => MoveToApplications.Offer(baseDir, home, home, () => true, Run, a => spawned = a, 4242, _ => { },
+            applicationsWritable: false, otherCopyRunning: () => false);
+
+        // An older copy kept in Downloads, or the same version on the Desktop: the one in Applications opens, and nothing
+        // is asked or copied (an older one would go over a copy that updated itself).
+        Assert.True(Go(Make(home, "Downloads", Versioned("0.23.2"))));
+        Assert.Equal(["sh", "4242", dest, ""], spawned!.Skip(3).ToArray());
+        Assert.True(Go(Make(home, "Desktop", Versioned("0.23.4"))));
+        Assert.DoesNotContain("ditto", ran);
+
+        // That copy itself, run from a translocation folder (an earlier move kept the download's quarantine on it): opening
+        // it would only come back here, so it moves again, which takes the quarantine off.
+        string self = Make(t.Path, "x/AppTranslocation/ABC/d", Versioned("0.23.4"));
+        mount += $"{dest} on {Path.Combine(t.Path, "x", "AppTranslocation", "ABC", "d", "Study Stash.app")} (nullfs, local, nodev, nosuid, read-only, nobrowse, mounted by student)\n";
+        Assert.True(Go(self));
+        Assert.Contains("ditto", ran);
+        Assert.Contains("/usr/bin/xattr", ran);
+        Assert.Equal(["sh", "4242", dest, ""], spawned!.Skip(3).ToArray());
+    }
+
+    static string Versioned(string version) =>
+        Plist.Replace("</dict>", $"<key>CFBundleShortVersionString</key><string>{version}</string></dict>");
 
     static void CopyDir(string from, string to)
     {
