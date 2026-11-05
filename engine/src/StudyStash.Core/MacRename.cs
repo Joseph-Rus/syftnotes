@@ -23,11 +23,22 @@ public static class MacRename
     public const string OldName = "Study Stash.app";
     const string BundleId = "com.study-stash.app";
 
-    static bool Ours(string bundle) =>
+    /// <summary>The bundle is there and says com.study-stash.app (a Study Stash.app of before too).</summary>
+    public static bool Ours(string bundle) =>
         Directory.Exists(bundle) && Apps.PlistString(Path.Combine(bundle, "Contents", "Info.plist"), "CFBundleIdentifier") == BundleId;
 
-    static int[] VersionOf(string bundle) =>
+    /// <summary>The bundle's version, [0] when it can't be read.</summary>
+    public static int[] VersionOf(string bundle) =>
         Updates.ParseVersion(Apps.PlistString(Path.Combine(bundle, "Contents", "Info.plist"), "CFBundleShortVersionString"));
+
+    /// <summary>A copy that runs from somewhere it only stays for a while: its disk image (/Volumes) or Gatekeeper's
+    /// translocation folder. Moving into Applications comes first (MoveToApplications.cs); until then it changes nothing
+    /// the installed copy set up.</summary>
+    public static bool Passing(string path)
+    {
+        path = path.Replace('\', '/');
+        return path.Contains("/AppTranslocation/", StringComparison.Ordinal) || path.StartsWith("/Volumes/", StringComparison.Ordinal);
+    }
 
     /// <summary>True when <paramref name="program"/> sits in another bundle of ours (the same CFBundleIdentifier) with a
     /// lower version than the bundle <paramref name="current"/> runs from: an older copy kept beside this one (in
@@ -45,8 +56,7 @@ public static class MacRename
     {
         writable ??= Machine.Writable;
         if (Apps.EnclosingMacBundle(baseDir) is not { } app || !Ours(app)) return null;
-        string path = app.Replace('\\', '/');
-        if (path.Contains("/AppTranslocation/", StringComparison.Ordinal) || path.StartsWith("/Volumes/", StringComparison.Ordinal)) return null;
+        if (Passing(app)) return null;
         if (Path.GetDirectoryName(app) is not { } parent || !writable(parent)) return null;
         string to = Path.Combine(parent, Name);
         if (string.Equals(Path.GetFileName(app), Name, StringComparison.Ordinal))
