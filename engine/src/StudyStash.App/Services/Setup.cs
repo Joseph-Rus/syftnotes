@@ -250,7 +250,7 @@ public static class Setup
         {
             try
             {
-                host.LoginItems.StartAtLogin(true, host.Home);
+                host.ChooseStartAtLogin(true);
             }
             catch (Exception e) when (e is InvalidOperationException or IOException or UnauthorizedAccessException or System.Security.SecurityException)
             {
