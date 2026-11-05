@@ -160,6 +160,35 @@ public class AppUpdatesTests
         Assert.True(quit);
     }
 
+    /// <summary>A first run's setup keeps its answers only in its window: the speech model finishing its download was
+    /// when the move to Velopack's install quit the app, and it came back on the welcome page. Shell counts setup's
+    /// window being open as busy, so a new version and the move both wait for it, like for a lecture. Closing it,
+    /// finished or not, lifts the wait: a student who never finishes setup still gets every update.</summary>
+    [Theory]
+    [InlineData(false)] // a newer version
+    [InlineData(true)] // the move to Velopack's install, at the version the copy already runs
+    public async Task Setup_being_open_holds_an_update_and_the_move_until_it_is_done(bool move)
+    {
+        bool settingUp = true, left = false; // settingUp: setup's window is open
+        int applied = 0;
+        var release = Release(move ? Engine.Version : "9.9.9");
+        var updates = Updates_(
+            onDisk: Engine.Version, idleNow: () => !settingUp,
+            latest: () => Task.FromResult<Release?>(release),
+            moves: r => move && r == release,
+            apply: (_, _, _, _) => { applied++; return Task.FromResult(true); },
+            relaunchAndQuit: () => left = true, quit: () => left = true);
+
+        Assert.Equal(AppUpdates.Waiting, await updates.RoundAsync());
+        Assert.Equal(AppUpdates.Waiting, await updates.RoundAsync()); // a minute later (IdleRecheck): still setting up
+        Assert.Equal(0, applied);
+        Assert.False(left);
+        settingUp = false; // the window closed (setup done or not)
+        Assert.Equal(move ? AppUpdates.HandedOff : AppUpdates.Relaunching, await updates.RoundAsync());
+        Assert.Equal(1, applied);
+        Assert.True(left);
+    }
+
     [Fact]
     public async Task A_failed_install_says_so_once_and_does_not_quit()
     {
