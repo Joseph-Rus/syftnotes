@@ -309,6 +309,31 @@ public class StoreClassifyTests
     }
 
     [Fact]
+    public void Moving_a_lecture_waiting_for_its_rewrite_keeps_the_edits_in_its_file_when_the_rewrite_writes_nothing()
+    {
+        using var dir = new TempDir();
+        using var store = new Store(dir["state.db"], dir["pool"]);
+        var m = new Meeting("q1") { Title = "Cells", Date = "2026-09-02", Transcript = "Today." };
+        string first = store.Save(m, new Classification("CS 101", 0.9, "rules"), summaryMd: "## Summary\nCells.");
+        File.AppendAllText(first, "\nMy own line.\n");
+
+        // A rewrite was asked for, and the student moves the lecture while it waits: the file moves now, edit and all.
+        store.Requeue("q1");
+        string? moved = store.SetClass("q1", "Bio 110");
+        Assert.Equal("Bio 110", Path.GetFileName(Path.GetDirectoryName(moved)));
+        Assert.False(File.Exists(first));
+        Assert.Contains("My own line.", Py.ReadText(moved!));
+        Assert.Equal(Store.Queued, store.Get("q1")!.Status);
+
+        // The rewrite then writes nothing (its engine failed): the moved file, edit and all, stays.
+        var claimed = store.ClaimNext()!;
+        store.KeepNotes(claimed, m, "The notes engine stopped.");
+        var row = store.Get("q1")!;
+        Assert.Equal("Bio 110", row.ClassName);
+        Assert.Contains("My own line.", Py.ReadText(row.MdPath!));
+    }
+
+    [Fact]
     public void The_json_columns_are_what_python_writes()
     {
         using var dir = new TempDir();
