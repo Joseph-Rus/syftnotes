@@ -104,6 +104,9 @@ public static class NewPlace
         if (Desktop.SystemChangesOff || SelfTest.Dir is not null) return;
         bool installed = VelopackUpdates.Installed || OperatingSystem.IsMacOS() && Apps.MacBundleOf() is not null;
         if (!installed) return;
+        // A Mac copy run from its disk image or a translocation folder isn't where the app lives: what it wrote there would
+        // break again at eject or restart, so it leaves everything as the copy in Applications set it up.
+        if (Moves.Passing(Desktop.Program)) return;
         // First, so the old copy is gone by the time the AI apps' connections name this one.
         if (OperatingSystem.IsWindows()) OldInnoCopy(home);
         try
