@@ -335,7 +335,7 @@ public class LibrarySettingsModelTests
     public async Task Classes_are_added_edited_and_removed_and_a_row_being_typed_in_stays()
     {
         var fake = new FakeLibrarySettings();
-        var (model, host, home) = Open(fake);
+        var (model, host, home) = Open(fake, confirm: new FakeConfirm());
         using var _h = home;
         using var _host = host;
         using var _m = model;
@@ -360,11 +360,39 @@ public class LibrarySettingsModelTests
         Assert.Equal(["CS 101", "BIO 110", "MATH 221", "PHYS 150"], fake.Settings["classes"]!.AsArray().Select(c => c!["name"]!.GetValue<string>()));
     }
 
+    /// <summary>The × asks first, saying where its lectures go; "Cancel" leaves the class and sends nothing.</summary>
+    [AvaloniaFact]
+    public async Task Removing_a_class_asks_first_and_cancel_keeps_it()
+    {
+        var fake = new FakeLibrarySettings();
+        var confirm = new FakeConfirm(answer: false);
+        var (model, host, home) = Open(fake, confirm: confirm);
+        using var _h = home;
+        using var _host = host;
+        using var _m = model;
+        model.Section = "Classes";
+        var lib = model.Lib;
+        int calls = fake.Calls.Count;
+
+        await lib.RemoveClassCommand.ExecuteAsync(lib.Classes.Single(c => c.Name == "BIO 110"));
+        var asked = Assert.Single(confirm.Asked);
+        Assert.Equal("Remove BIO 110?", asked.Title);
+        Assert.Equal("Its 14 lectures move to Unsorted. Nothing is deleted.", asked.Text);
+        Assert.Equal("Remove", asked.Yes);
+        Assert.Equal(calls, fake.Calls.Count);
+        Assert.Contains(lib.Classes, c => c.Name == "BIO 110");
+
+        confirm.Answer = true;
+        await lib.RemoveClassCommand.ExecuteAsync(lib.Classes.Single(c => c.Name == "BIO 110"));
+        Assert.DoesNotContain(lib.Classes, c => c.Name == "BIO 110");
+        Assert.DoesNotContain("BIO 110", fake.Settings["classes"]!.AsArray().Select(c => c!["name"]!.GetValue<string>()));
+    }
+
     [AvaloniaFact]
     public async Task The_app_hears_when_the_classes_change_and_not_when_the_library_says_no()
     {
         var fake = new FakeLibrarySettings();
-        var (model, host, home) = Open(fake);
+        var (model, host, home) = Open(fake, confirm: new FakeConfirm());
         using var _h = home;
         using var _host = host;
         using var _m = model;
