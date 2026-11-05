@@ -89,6 +89,8 @@ public class BridgeTests
         Assert.False(ok);
         Assert.Single(spawned);
         Assert.Equal("v9.9.9", File.ReadAllText(Bridge.FailedFile(t["home"])));
+        // And a script PowerShell lets run late is told to leave the open app alone (bridge.ps1 ends at once on this note).
+        Assert.Equal("v9.9.9", File.ReadAllText(Bridge.CancelFile(t["home"])));
         Assert.Contains("didn't start", said[^1]);
     }
 
@@ -101,6 +103,7 @@ public class BridgeTests
         Assert.True(ok);
         Assert.Equal(Bridge.StartedFile(t["home"]), spawned.Single()[spawned.Single().ToList().IndexOf("-StartedFile") + 1]);
         Assert.False(File.Exists(Bridge.FailedFile(t["home"])));
+        Assert.False(File.Exists(Bridge.CancelFile(t["home"])));
         Assert.StartsWith("Moving to v9.9.9 once Syft Notes has quit", said[^1]);
     }
 
@@ -113,5 +116,9 @@ public class BridgeTests
         Assert.Contains("--silent", text);
         Assert.Contains(@"User Pinned\TaskBar", text);
         Assert.Contains("[string]$StartedFile", text);
+        // A script that runs late, after the app gave up, looks for the cancel note right after saying it started.
+        int wrote = text.IndexOf("Set-Content -LiteralPath $StartedFile", StringComparison.Ordinal);
+        int checks = text.IndexOf("Test-Path -LiteralPath $CancelFile", StringComparison.Ordinal);
+        Assert.True(wrote >= 0 && checks > wrote);
     }
 }
