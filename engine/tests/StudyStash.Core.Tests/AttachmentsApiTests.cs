@@ -65,10 +65,10 @@ public class AttachmentsApiTests
         return await Json(r);
     }
 
-    static async Task Read(Store store, string id)
-    {
-        for (int i = 0; i < 200 && store.GetAttachment(id)?.State == Attachment.Reading; i++) await Task.Delay(20);
-    }
+    /// <summary>Waits for the library to finish reading an attachment: the real reader's first picture on a cold start
+    /// (Vision loading) can take longer than a few seconds.</summary>
+    static async Task Read(Store store, string id) =>
+        Assert.True(await Waiting.UntilAsync(() => store.GetAttachment(id)?.State != Attachment.Reading, 30), "the attachment was still being read after 30 seconds");
 
     [Fact]
     public async Task A_file_attached_to_a_lecture_is_kept_in_its_class_folder_and_listed()
@@ -393,6 +393,23 @@ public class AttachmentsApiTests
         await Read(store, id);
         var list = await Json(await site.Client.SendAsync(Req(HttpMethod.Get, "/api/v2/attachments?lecture=n1")));
         Assert.True(list["attachments"]![0]!["hasText"]!.GetValue<bool>());
+    }
+
+    [Fact]
+    public async Task What_the_library_reads_is_kept_in_its_own_home()
+    {
+        using var dir = new TempDir();
+        var (cfg, store) = Library(dir);
+        using var owned = store;
+        // No ReadDocument override: the library's own reader, which keeps what it reads beside the library's config.
+        await using var site = await Site(cfg, store, new LibraryWebOptions
+        {
+            ListModels = _ => Task.FromResult<List<(string, double)>?>([]),
+            Latest = _ => Task.FromResult<Release?>(null),
+        });
+        var body = await Upload(site, Form([("notes.txt", Encoding.UTF8.GetBytes("Osmosis moves water."))], lecture: "n1"));
+        await Read(store, body["attachments"]![0]!["id"]!.GetValue<string>());
+        Assert.Single(Directory.GetFiles(Path.Combine(cfg.Home, "cache", "text")));
     }
 
     [Fact]
