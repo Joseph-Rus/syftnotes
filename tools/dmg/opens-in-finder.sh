@@ -20,6 +20,12 @@ finder_windows() {
       .map(w => w.kCGWindowName || "?").join("\n")'
 }
 
+# Finder crash or hang reports written since the DMG was opened.
+finder_reports() {
+  find "$HOME/Library/Logs/DiagnosticReports" /Library/Logs/DiagnosticReports -maxdepth 1 \
+    \( -name 'Finder*.ips' -o -name 'Finder*.hang' -o -name 'Finder*.spin' \) -newer "$work/marker" 2>/dev/null
+}
+
 finder=$(pgrep -x Finder) || { echo "Finder isn't running here, so the DMG can't be opened as a student does" >&2; exit 1; }
 windows_before=$(finder_windows | grep -c .)
 ls /Volumes > "$work/volumes-before"
@@ -42,12 +48,21 @@ while [ "$waited" -lt 60 ] && [ "$(pgrep -x Finder)" = "$finder" ]; do
   sleep 1
 done
 
+# Once the window shows, up to 5 s more in which Finder must stay the same Finder with no report: a Finder that crashes
+# a moment after drawing the window fails too. Either sign ends the watch at once.
+if [ -n "$window" ]; then
+  watched=0
+  while [ "$watched" -lt 10 ] && [ "$(pgrep -x Finder)" = "$finder" ] && [ -z "$(finder_reports)" ]; do
+    watched=$((watched + 1))
+    sleep 0.5
+  done
+fi
+
 failed=0
 fail() { echo "::error::$*"; failed=1; }
 now=$(pgrep -x Finder)
 [ "$now" = "$finder" ] || fail "Finder crashed or quit while the DMG opened (it was pid $finder, now ${now:-not running})"
-reports=$(find "$HOME/Library/Logs/DiagnosticReports" /Library/Logs/DiagnosticReports -maxdepth 1 \
-  \( -name 'Finder*.ips' -o -name 'Finder*.hang' -o -name 'Finder*.spin' \) -newer "$work/marker" 2>/dev/null)
+reports=$(finder_reports)
 [ -z "$reports" ] || fail "Finder left a crash or hang report: $reports"
 if log show --start "$since" --predicate 'process == "Finder"' --style compact 2>/dev/null | grep -F "unrecognized selector"; then
   fail "Finder's log says \"unrecognized selector\" since the DMG was opened"
@@ -55,5 +70,5 @@ fi
 [ -n "$vol" ] || fail "the DMG didn't mount in 60 s"
 [ -n "$vol" ] && [ -z "$window" ] && fail "Finder showed no window for $vol in 60 s; its windows: $(finder_windows | tr '\n' ',')"
 [ -z "$vol" ] || hdiutil detach -quiet "$vol" || hdiutil detach -quiet -force "$vol"
-[ "$failed" = 0 ] && echo "Finder opened $(basename "$1") (quarantined, as downloaded) at $vol, showed its window after ${waited} s, and didn't crash"
+[ "$failed" = 0 ] && echo "Finder opened $(basename "$1") (quarantined, as downloaded) at $vol, showed its window after ${waited} s, and didn't crash in the 5 s after"
 exit "$failed"
