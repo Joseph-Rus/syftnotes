@@ -263,18 +263,42 @@ public class FunnelTests
         Assert.True(addOn.IsDone);
         Assert.False(addOn.ShowPaste);
 
-        // A library with no Canvas address yet (a fresh install) has no code to give: the step that asks for the school's.
+        // A library with no Canvas address yet (a fresh install) has no code to give: the step that asks for the school's,
+        // then its code for the add-on's own button, with nothing to add.
         var fresh = new FakeLibrary()
             .Json(HttpMethod.Post, "/api/v2/canvas/pair", """{"until":"2026-11-02T09:05:00Z"}""")
+            .Json(HttpMethod.Post, "/api/v2/canvas", "canvas")
+            .Json(HttpMethod.Get, "/api/v2/canvas/classes", "[]")
+            .Json(HttpMethod.Get, "/api/v2/canvas/extension", "extension")
             .Json(HttpMethod.Get, "/api/v2/canvas/state", """{"state": "not_set_up", "url": "", "extension": {"connected": false, "refused_at": "2026-11-02T09:00:20Z"}}""");
-        var freshContext = CanvasFixtures.Context(fresh, browsers: [Browsers.Firefox]);
+        var freshLog = new List<(string What, string Arg)>();
+        var freshContext = CanvasFixtures.Context(fresh, log: freshLog, browsers: [Browsers.Firefox]);
         var freshWatch = new CanvasWatch(freshContext);
-        using var freshAddOn = new AddOnModel(freshContext, freshWatch, () => DateTimeOffset.Parse("2026-11-02T09:00:00Z"));
-        bool typing = false;
-        freshAddOn.OnTypeInstead = () => typing = true;
-        await freshAddOn.AddCommand.ExecuteAsync(null);
+        var (f, _) = Make(new FunnelServices
+        {
+            MakeAddOn = () => new AddOnModel(freshContext, freshWatch, () => DateTimeOffset.Parse("2026-11-02T09:00:00Z")),
+            MakeCanvas = async () =>
+            {
+                var c = new CanvasConnectModel(freshContext, freshWatch, forSetup: true);
+                await c.StartAsync(CanvasFixtures.Load<CanvasApi.State>("state-not-set-up"), []);
+                return c;
+            },
+        });
+        await f.GetStartedCommand.ExecuteAsync(null);
+        await f.IAmAStudentCommand.ExecuteAsync(null);
+        await f.AddOn!.AddCommand.ExecuteAsync(null);
         await freshWatch.RefreshAsync();
-        Assert.True(typing);
+        await Wait.UntilAsync(() => f.AsksSchool, "the step that asks for the school's address");
+        f.Canvas!.SchoolField = "school.instructure.com";
+        fresh.Json(HttpMethod.Get, "/api/v2/canvas/state", """{"state": "no_extension", "url": "https://school.instructure.com", "extension": {"connected": false, "refused_at": "2026-11-02T09:00:50Z"}}""");
+        await f.Canvas.ContinueCommand.ExecuteAsync(null);
+        await Wait.UntilAsync(() => f.Canvas.WaitingForBrowser, "the add-on from before's code");
+        Assert.Equal("In Firefox, click the Syft Notes button (it may be under the puzzle-piece Extensions button).", f.Canvas.StoreStep1);
+        Assert.Equal("Choose Paste a new code, paste this code and click Connect.", f.Canvas.StoreStep2);
+        Assert.True(f.Canvas.ShowCode);
+        Assert.False(f.Canvas.ShowAddOnLink); // nothing to add
+        Assert.Single(freshLog, l => l.What == "OpenAddOn"); // the store's page only from the first Add: nothing opened since
+        f.Dispose();
     }
 
     [AvaloniaFact]

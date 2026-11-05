@@ -95,8 +95,8 @@ public sealed partial class AddOnModel : ObservableObject, IDisposable
 
     /// <summary>The browser has the add-on from before, still connected to an earlier library: its key was turned away
     /// since Add was pressed, and it never finds this library by itself. It takes this library's code instead, pasted
-    /// into its own button. Only while there's a code to give (a code needs the Canvas address); without one, the step
-    /// that asks for the school's address follows at once (<see cref="OnTypeInstead"/>).</summary>
+    /// into its own button (<see cref="ShowPaste"/>). A code needs the Canvas address: without one yet, the step that
+    /// asks for the school's address follows at once (<see cref="OnTypeInstead"/>), in its "I already have it" mode.</summary>
     [NotifyPropertyChangedFor(nameof(ShowPaste), nameof(ShowStoreSteps), nameof(AddedLine), nameof(ConnectionCode))]
     [ObservableProperty]
     public partial bool FromBefore { get; set; }
@@ -114,9 +114,9 @@ public sealed partial class AddOnModel : ObservableObject, IDisposable
 
     public bool ShowAdd => !Added && !Connected && !IsAsking;
     /// <summary>What to do in the store, while the add-on isn't asking yet.</summary>
-    public bool ShowStoreSteps => Waiting && !IsAsking && !FromBefore;
+    public bool ShowStoreSteps => Waiting && !IsAsking && !ShowPaste;
     /// <summary>The add-on from before takes this library's code, in place of the store's steps.</summary>
-    public bool ShowPaste => Waiting && FromBefore;
+    public bool ShowPaste => Waiting && FromBefore && ConnectionCode.Length > 0;
     /// <summary>Waiting for the add-on to be added and check in.</summary>
     public bool Waiting => Added && !Connected;
     public bool Found => CanvasUrl.Length > 0;
@@ -132,7 +132,7 @@ public sealed partial class AddOnModel : ObservableObject, IDisposable
     /// <summary>What comes after the store: the add-on's own page, and the browser's question about reaching Canvas.</summary>
     public string AllowStep => $"A Syft Notes page opens in {BrowserName}: click Allow, then Allow again when {BrowserName} asks.";
 
-    public string AddedLine => Connected ? $"Added to {BrowserName}" : FromBefore ? $"Connect {BrowserName} again" : Added ? $"Waiting for Syft Notes to be added to {BrowserName}" : $"Add Syft Notes to {BrowserName}";
+    public string AddedLine => Connected ? $"Added to {BrowserName}" : ShowPaste ? $"Connect {BrowserName} again" : Added ? $"Waiting for Syft Notes to be added to {BrowserName}" : $"Add Syft Notes to {BrowserName}";
 
     /// <summary>What to do with an add-on from before (<see cref="FromBefore"/>): its own button, then the code.</summary>
     public string PasteLine => $"{BrowserName} already has Syft Notes from before. Click the Syft Notes button in {BrowserName}'s toolbar, choose Paste a new code, and paste this:";
@@ -181,14 +181,13 @@ public sealed partial class AddOnModel : ObservableObject, IDisposable
         if (s.Extension?.Connected == true) Connected = true;
         if (s.Url.Length > 0) CanvasUrl = s.Url;
         // An add-on from before knocked with an earlier library's key since Add was pressed (it knocks every 30 s).
-        bool fromBefore = Added && !Connected && addedAt is { } pressed && s.Extension?.RefusedAt >= pressed;
-        if (fromBefore && ConnectionCode.Length == 0 && !told)
+        FromBefore = Added && !Connected && addedAt is { } pressed && s.Extension?.RefusedAt >= pressed;
+        if (FromBefore && ConnectionCode.Length == 0 && !told)
         {
             told = true;
             OnTypeInstead?.Invoke();
             return;
         }
-        FromBefore = fromBefore && ConnectionCode.Length > 0;
         // An add-on that says its version and it's older than 1.8 can't find Canvas: the typing way, at once.
         // Only a check-in after the store's page opened counts: a version the library kept from an earlier install says
         // nothing about the add-on being added now.
