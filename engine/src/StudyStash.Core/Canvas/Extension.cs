@@ -7,9 +7,10 @@ namespace StudyStash.Core.Canvas;
 /// The browser extension that reads Canvas with the person's own sign-in and hands it to the library. Its files are
 /// inside the engine; <see cref="Ensure"/> writes them out as a folder Chrome, or any browser built on it (Edge,
 /// Brave, Arc, Opera, Vivaldi), loads ("Load unpacked"), with a config.json (and config.js, for a copy from before
-/// 1.4) that says where the library is and holds the extension's key. The library keeps its own folder ready by
-/// itself: on start, and whenever the Canvas address changes. When Syft Notes updates, the folder is brought up to
-/// date, and the extension reloads itself from it the next time it checks in. Firefox, and the browsers built on it
+/// 1.4) that says where the library is and holds the extension's key. The folder is made only when a student takes
+/// that route (<see cref="EnsureFor(string, string, string, string)"/>); once there is one, the library keeps it
+/// current by itself (<see cref="KeepFor"/>): on start, and whenever the Canvas address changes. When Syft Notes
+/// updates, the folder is brought up to date, and the extension reloads itself from it the next time it checks in. Firefox, and the browsers built on it
 /// (Zen, LibreWolf, Waterfox), keep only an add-on Mozilla has signed, so theirs is packed instead
 /// (<see cref="PackForFirefox"/>) and connected by pasting a code (<see cref="ConnectionCode"/>), like a copy from the
 /// Chrome Web Store (<see cref="PackForStore"/>).
@@ -65,12 +66,14 @@ public static class Extension
 
     /// <summary>
     /// Where Chrome loads it from. On a Mac, Chrome's Load unpacked window hides dot-folders and ~/Library, and the
-    /// home (~/.study-stash) is one, so the folder there is <c>~/Study Stash/Chrome extension</c>: a folder the window
+    /// home (~/.study-stash) is one, so the folder there is <c>~/Syft Notes/Chrome extension</c>: a folder the window
     /// shows at once, never synced to iCloud (not Desktop or Documents), and only this person's (it holds what
-    /// connects to the library). A second hidden home in the same account gets its own ("Chrome extension (1a2b3c4d)"),
-    /// so the two never write over each other. Linux's Load unpacked window (GTK's) hides dot-folders too, so it has the
-    /// same folder (<paramref name="mac"/> is true for it). On Windows, and for a home outside <paramref name="userHome"/> (a
-    /// test's, or one the student put somewhere Chrome shows), it's the home's own chrome-extension, as it always was.
+    /// connects to the library). One an earlier Syft Notes made as <c>~/Study Stash/Chrome extension</c> stays where it
+    /// is, since a Chrome may be loading it from there. A second hidden home in the same account gets its own
+    /// ("Chrome extension (1a2b3c4d)"), so the two never write over each other. Linux's Load unpacked window (GTK's)
+    /// hides dot-folders too, so it has the same folder (<paramref name="mac"/> is true for it). On Windows, and for a
+    /// home outside <paramref name="userHome"/> (a test's, or one the student put somewhere Chrome shows), it's the
+    /// home's own chrome-extension, as it always was. Only a path: nothing is made here (<see cref="EnsureFor(string, string, string, string)"/>).
     /// </summary>
     public static string Folder(string home, string userHome, bool mac)
     {
@@ -84,7 +87,8 @@ public static class Extension
         if (!hidden) return inHome;
         string name = relative == ".study-stash" ? "Chrome extension"
             : $"Chrome extension ({Convert.ToHexStringLower(System.Security.Cryptography.SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(full)))[..8]})";
-        return Path.Combine(user, "Study Stash", name);
+        string earlier = Path.Combine(user, "Study Stash", name);
+        return Made(earlier) ? earlier : Path.Combine(user, "Syft Notes", name);
     }
 
     /// <summary>The folder inside the home, where Syft Notes wrote it before it had a folder of its own on a Mac. A
@@ -93,22 +97,38 @@ public static class Extension
     public static string InHome(string home) => Path.Combine(home, "chrome-extension");
 
     /// <summary>
-    /// <see cref="Ensure"/> for a home: its folder (<see cref="Folder(string)"/>), and the one an older Syft Notes
-    /// wrote inside the home when that's another folder and it's there (a Chrome may have loaded it and still be
-    /// connected through it: it gets the same update, so it never breaks). The result is the home's own folder.
+    /// <see cref="Ensure"/> for a home, made because the student asked for it (Add to Opera, or "Load it from a
+    /// folder instead"): its folder (<see cref="Folder(string)"/>), and the one an older Syft Notes wrote inside the
+    /// home when that's another folder and it's there (a Chrome may have loaded it and still be connected through
+    /// it: it gets the same update, so it never breaks). The result is the home's own folder.
     /// </summary>
     public static EnsureResult EnsureFor(string home, string library, string key, string canvasUrl) =>
         EnsureFor(home, Folder(home), library, key, canvasUrl);
 
     /// <summary><see cref="EnsureFor(string, string, string, string)"/> with the home's folder given (tests).</summary>
-    public static EnsureResult EnsureFor(string home, string folder, string library, string key, string canvasUrl)
+    public static EnsureResult EnsureFor(string home, string folder, string library, string key, string canvasUrl) =>
+        Write(home, folder, library, key, canvasUrl, make: true);
+
+    /// <summary>
+    /// <see cref="EnsureFor(string, string, string, string, string)"/> for the folders that are already there, and no
+    /// other: the home's own (<paramref name="folder"/>) and the one inside the home, brought up to date for a Chrome
+    /// that loads them. A student who never loads the folder (no Canvas, or a browser's store) never gets one.
+    /// </summary>
+    public static EnsureResult KeepFor(string home, string folder, string library, string key, string canvasUrl) =>
+        Write(home, folder, library, key, canvasUrl, make: false);
+
+    static EnsureResult Write(string home, string folder, string library, string key, string canvasUrl, bool make)
     {
-        // The folder that holds it (~/Study Stash on a Mac), when Syft Notes makes it, is only this person's too.
-        if (!OperatingSystem.IsWindows() && Path.GetDirectoryName(Path.GetFullPath(folder)) is { } parent && !Directory.Exists(parent))
-            Directory.CreateDirectory(parent, OwnerOnlyFolder);
-        var result = Ensure(folder, library, key, canvasUrl);
+        var result = new EnsureResult(false, folder);
+        if (make || Made(folder))
+        {
+            // The folder that holds it (~/Syft Notes on a Mac), when Syft Notes makes it, is only this person's too.
+            if (!OperatingSystem.IsWindows() && Path.GetDirectoryName(Path.GetFullPath(folder)) is { } parent && !Directory.Exists(parent))
+                Directory.CreateDirectory(parent, OwnerOnlyFolder);
+            result = Ensure(folder, library, key, canvasUrl);
+        }
         string old = InHome(home);
-        if (!SamePath(old, folder) && File.Exists(Path.Combine(old, "manifest.json")))
+        if (!SamePath(old, folder) && Made(old))
         {
             try
             {
@@ -121,6 +141,9 @@ public static class Extension
         }
         return result;
     }
+
+    /// <summary>Whether Syft Notes has made a folder here (it has a manifest).</summary>
+    static bool Made(string dir) => File.Exists(Path.Combine(dir, "manifest.json"));
 
     static bool SamePath(string a, string b) =>
         string.Equals(Path.GetFullPath(a).TrimEnd(Path.DirectorySeparatorChar), Path.GetFullPath(b).TrimEnd(Path.DirectorySeparatorChar),

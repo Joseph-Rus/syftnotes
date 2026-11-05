@@ -5,8 +5,8 @@ using StudyStash.Core.Canvas;
 
 namespace StudyStash.App.Tests;
 
-/// <summary>The laptop's extension folder where Chrome's picker shows it, with the old one inside the home still kept
-/// up to date for a Chrome that loaded it; and the Chrome step saying which folder to pick, or to drag it.</summary>
+/// <summary>The old extension folder inside the home still kept up to date for a Chrome that loaded it, without a second
+/// folder made where Chrome's picker shows it; and the Chrome step saying which folder to pick, or to drag it.</summary>
 public class ExtensionFolderMoveTests
 {
     const string Library = """
@@ -17,7 +17,7 @@ public class ExtensionFolderMoveTests
     static string Key(string folder) => JsonNode.Parse(File.ReadAllText(Path.Combine(folder, "config.json")))!["key"]!.GetValue<string>();
 
     [Fact]
-    public async Task The_new_folder_is_written_and_a_connected_Chrome_s_old_folder_follows_it()
+    public async Task A_connected_Chrome_s_old_folder_follows_the_new_key_and_no_second_folder_is_made()
     {
         using var home = new TempHome();
         using var visible = new TempHome();
@@ -30,10 +30,9 @@ public class ExtensionFolderMoveTests
         };
 
         Assert.True(await keeper.KeepAsync(TestContext.Current.CancellationToken));
-        Assert.True(keeper.FolderReady);
-        Assert.True(Extension.Ready(keeper.LocalFolder));
-        Assert.Equal("key-after", Key(keeper.LocalFolder));
         Assert.Equal("key-after", Key(old));
+        Assert.False(Directory.Exists(keeper.LocalFolder)); // only a Chrome that loads a folder gets one
+        Assert.False(keeper.FolderReady);
     }
 
     [Fact]
