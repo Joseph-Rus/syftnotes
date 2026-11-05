@@ -102,6 +102,22 @@ public class FunnelTests
     }
 
     [AvaloniaFact]
+    public async Task No_Canvas_from_the_classes_step_keeps_counting_up()
+    {
+        var (f, _) = Make(new FunnelServices { MakeReady = () => Ready() });
+        await f.GetStartedCommand.ExecuteAsync(null);
+        await f.IAmAStudentCommand.ExecuteAsync(null);
+        Assert.Equal("Step 2 of 4", f.StepLabel);
+
+        // "My school doesn't use Canvas" on Connect your classes: on to the AI as step 3, never "Step 2 of 2".
+        f.NoCanvasCommand.Execute(null);
+        Assert.True(f.OnAi);
+        Assert.Equal("Step 3 of 3", f.StepLabel);
+        Assert.Equal([FunnelStep.Student, FunnelStep.Classes, FunnelStep.Ai], f.Indicator.Select(d => d.Step));
+        Assert.True(f.Indicator[1].Passed);
+    }
+
+    [AvaloniaFact]
     public async Task A_student_s_classes_with_nothing_typed_the_add_on_finds_canvas_then_the_sync_follows()
     {
         var log = new List<(string What, string Arg)>();
