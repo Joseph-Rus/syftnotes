@@ -40,6 +40,8 @@ public sealed class OlderLibraryTests
         // This copy runs from its disk image or a translocation folder: never the installed copy's library.
         Assert.Equal(OlderVerdict.Passing, OlderLibrary.Judge(Copy("0.22.1"), "/Volumes/Syft Notes/Syft Notes.app/Contents/MacOS/StudyStash", "0.23.3", home, Idle));
         Assert.Equal(OlderVerdict.Passing, OlderLibrary.Judge(Copy("0.22.1"), "/private/var/folders/x/T/AppTranslocation/A1/d/Syft Notes.app/Contents/MacOS/StudyStash", "0.23.3", home, Idle));
+        // The app itself, about to offer the move into Applications, isn't held off by where it runs.
+        Assert.Equal(OlderVerdict.Replace, OlderLibrary.Judge(Copy("0.22.1"), "/Volumes/Syft Notes/Syft Notes.app/Contents/MacOS/StudyStash", "0.23.3", home, Idle, installing: true));
     }
 
     [Fact]

@@ -385,9 +385,9 @@ public static class Desktop
     /// version just installed rather than the old one's window. Who holds it is read as for the library's port
     /// (<see cref="OurProcess.Of"/>), and the same rule decides (<see cref="Services.OlderLibrary.Judge"/>): only an older
     /// copy of ours, for this folder, with no lecture on the go (<see cref="Services.OlderLibrary.LecturesBusy"/>), is
-    /// asked, and only once (<see cref="Services.OlderLibrary.AskOnce"/>). One that can't be told, as new as this one or
-    /// newer, another folder's, busy, or this copy run from its disk image or a translocation folder: handed off to, as
-    /// before. A copy that isn't in a bundle (a build folder) never asks. The background library is this copy's to start
+    /// asked, and only once (<see cref="Services.OlderLibrary.AskOnce"/>), from Applications or from the disk image (the
+    /// move into Applications follows). One that can't be told, as new as this one or newer, another folder's, or busy:
+    /// handed off to, as before. A copy that isn't in a bundle (a build folder) never asks. The background library is this copy's to start
     /// again as it starts (LibraryService). True when this copy holds the folder now.
     /// </summary>
     public static bool TakeOver(string home, Action<string> log)
@@ -408,7 +408,9 @@ public static class Desktop
         // looked); otherwise it's handed off to, as before.
         if (holder is null) return claim();
         string who = $"Syft Notes {(holder.Version is { } v ? string.Join('.', v) : "(version unknown)")} ({holder.Program}, process {holder.Pid})";
-        var verdict = Services.OlderLibrary.Judge(holder, self, version, home, older.Busy);
+        // A copy opened from its disk image takes over too: the move into Applications follows (MoveSheet), and it never
+        // registers anything from the image.
+        var verdict = Services.OlderLibrary.Judge(holder, self, version, home, older.Busy, installing: true);
         if (verdict != Services.OlderVerdict.Replace)
         {
             log($"[app] {who} holds this folder and isn't asked to quit ({verdict}): handing off to it");

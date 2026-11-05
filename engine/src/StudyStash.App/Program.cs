@@ -80,9 +80,8 @@ static class Program
             : show >= 0 && show + 1 < args.Length ? args[show + 1]
             : Background ? null : "show";
         // A Mac copy opened while an older one holds the folder (its menu bar copy, started at login before the update)
-        // takes over from it instead (Desktop.TakeOver: never while a lecture is being recorded or written down there, and
-        // never from this copy's disk image or a translocation folder), so the student sees the version just installed,
-        // and the move and the rename below find the old one gone.
+        // takes over from it instead (Desktop.TakeOver: never while a lecture is being recorded or written down there), so
+        // the student sees the version just installed, and the move and the rename below find the old one gone.
         bool claimed = Desktop.Claim(Home) || word == "show" && Desktop.TakeOver(Home, Log);
         // A Mac copy opened from its DMG or Downloads offers once to move into Applications; moved, it opens there.
         if (MoveSheet.Run(Home, Background)) return 0;

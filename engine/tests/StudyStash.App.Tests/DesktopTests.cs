@@ -111,6 +111,13 @@ public class DesktopTests
         Assert.True(older.AskOnce(4242, out bool before));
         Assert.True(before);
 
+        // Opened from its disk image (or a translocation folder) too: the move into Applications comes next, so the old
+        // copy can't hold it off and get its own window shown instead.
+        bool gone = false;
+        var fromImage = new OlderLibrary { AskToQuit = _ => gone = true, Busy = _ => false };
+        Assert.True(await Desktop.TakeOverAsync(Home, Holder("0.22.1"), "/Volumes/Syft Notes/Syft Notes.app/Contents/MacOS/StudyStash",
+            "0.23.4", fromImage, () => gone, _ => { }));
+
         // One that never lets go: asked once, and handed off to when the wait is up.
         var clock = new FakeTimeProvider();
         var stuck = new OlderLibrary { AskToQuit = pid => { asked.Add(pid); return true; }, Busy = _ => false };
@@ -133,7 +140,6 @@ public class DesktopTests
                      (Holder("0.22.1") with { Home = "/Users/sam/.study-stash-selftest" }, Self, false), // another folder's
                      (Holder("0.22.1") with { Ours = false }, Self, false), // not a Syft Notes program
                      (Holder("0.23.4", program: Self), Self, false), // this very program
-                     (Holder("0.22.1"), "/Volumes/Syft Notes/Syft Notes.app/Contents/MacOS/StudyStash", false), // this copy runs from its disk image
                  })
         {
             var asked = new List<int>();
