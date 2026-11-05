@@ -47,8 +47,9 @@ dmg_free() {
 # two release rehearsals stopped here, after the app was built and signed, with nothing in the log, because it runs
 # quietly. So the first try is quiet, and a try after a failure says everything it does. Between tries `sync` returns
 # once the disk has taken every write still pending (what a busy volume or image is usually still doing), and then the
-# wait is on what the next try needs, $hdi_image (set by the caller) as the image: a detach waits for it to be no longer
-# attached, a convert makes any disk still holding it let go.
+# wait is on what the next try needs, $hdi_image (set by the caller) as the image: a detach is done as soon as the image
+# is no longer attached (it waits up to 10 s for that, else tries again), a convert makes any disk still holding the
+# image let go.
 hdi() {
   hdi_verb=$1
   shift
@@ -67,7 +68,9 @@ hdi() {
     hdi_try=$((hdi_try + 1))
     sync
     case $hdi_verb in
-      detach) dmg_free "$hdi_image" 10 || true ;;
+      # Once our image is free there is nothing left to detach, and a detach by number is never tried again: macOS
+      # reuses the lowest free diskN, so that number may by now be another image's.
+      detach) if dmg_free "$hdi_image" 10; then return 0; fi ;;
       convert) dmg_free "$hdi_image" 30 force || true ;;
     esac
   done
@@ -108,10 +111,11 @@ stage_dmg() {
     SetFile -a C "$mnt" 2>/dev/null || true
     # Hidden on the mounted disk itself, so the flag is the disk's own.
     chflags -h hidden "$mnt/Study Stash.app"
-    # A volume something is still looking at won't let go: asked three times, then made to.
-    hdi detach "${dev:-$mnt}" || hdiutil detach -force "${dev:-$mnt}" || echo "the disk is still attached; letting go of it below" >&2
+    # A volume something is still looking at won't let go: asked three times, then made to, below.
+    hdi detach "${dev:-$mnt}" || echo "the disk is still attached; letting go of it below" >&2
   fi
-  # Nothing may still have the image open when it's converted, however the disk went.
+  # Nothing may still have the image open when it's converted, however the disk went. This forces only the disks that
+  # hold this image (never a disk by its number, which another image may have taken by now).
   dmg_free "$rw" 30 force || true
   rm -f "$dmg"
   hdi convert "$rw" -format UDZO -ov -o "$dmg"
