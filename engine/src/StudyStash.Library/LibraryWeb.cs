@@ -887,7 +887,7 @@ public sealed partial class LibraryWeb
         string tsNote = ts.Running ? ""
             : "<div class=\"notice\"><div>Tailscale isn't running on this computer, so your laptop can only reach "
               + "it on the same Wi-Fi. Install Tailscale on both and sign in to the same account.</div></div>";
-        const string dl = "https://github.com/Joseph-Rus/study-stash/releases/latest/download";
+        const string dl = "https://github.com/Joseph-Rus/syftnotes/releases/latest/download";
         string invite = $"<div class=\"group-head\">Connect your laptop</div>{tsNote}<div class=\"group\">"
             + $"<div class=\"row\"><span class=\"grow\">Address</span><span class=\"value\">{Ui.Esc(url)}</span></div>"
             + $"<div class=\"row\"><span class=\"grow\">Password</span><span class=\"value\">{Ui.Esc(cfg.PoolPassword.Length > 0 ? cfg.PoolPassword : "none")}</span></div>"

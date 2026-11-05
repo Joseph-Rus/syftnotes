@@ -17,7 +17,7 @@ static class MoveSheet
             // Only a copy of the app open (its window, or its menu bar copy) holds the offer off: never what AI apps and the
             // computer run from the bundle (MCP, the background library).
             return MoveToApplications.Offer(AppContext.BaseDirectory, home, Py.UserHome(), Ask, Machine.Run,
-                Updates.SpawnDetached, Environment.ProcessId, Program.Log,
+                a => Updates.SpawnDetached(a), Environment.ProcessId, Program.Log,
                 otherCopyRunning: () => MoveToApplications.OtherCopyRunning(Machine.Run, Environment.ProcessId, engine: StudyStash.Library.Cli.IsCommand),
                 background: BackgroundLibrary.ThisComputer());
         }
@@ -45,7 +45,7 @@ static class MoveSheet
                     foreach (var (home, run) in background.All())
                         if (run.Count > 0 && run[0].StartsWith(plan.From.TrimEnd('/') + "/", StringComparison.Ordinal)) background.Stop(home);
                 },
-                Updates.SpawnDetached, Environment.ProcessId, args, Program.Log);
+                a => Updates.SpawnDetached(a), Environment.ProcessId, args, Program.Log);
         }
         catch (Exception e) when (e is IOException or UnauthorizedAccessException or System.ComponentModel.Win32Exception or InvalidOperationException)
         {
