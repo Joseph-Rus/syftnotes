@@ -1,7 +1,9 @@
 using System.Collections.Concurrent;
 using System.IO.Pipes;
 using System.Xml;
+using Microsoft.Extensions.Time.Testing;
 using StudyStash.App.Platform;
+using StudyStash.App.Services;
 using StudyStash.Core;
 
 namespace StudyStash.App.Tests;
@@ -79,32 +81,67 @@ public class DesktopTests
         }
     }
 
-    [Fact]
-    public void A_newer_copy_takes_over_only_from_an_older_one_with_no_lecture_on_the_go()
-    {
-        // Older, with nothing being recorded or written down: it's asked to quit, and this copy runs.
-        Assert.True(Desktop.TakesOver("0.23.4", "0.23.2", gone: false, busy: false));
-        Assert.True(Desktop.TakesOver("0.23.4", "0.22.1", gone: false, busy: false));
-        // Its bundle was deleted or put in the Trash while it ran.
-        Assert.True(Desktop.TakesOver("0.23.4", null, gone: true, busy: false));
-        // Recording, paused, or writing a lecture down: never asked to quit; it shows, as before.
-        Assert.False(Desktop.TakesOver("0.23.4", "0.23.2", gone: false, busy: true));
-        Assert.False(Desktop.TakesOver("0.23.4", null, gone: true, busy: true));
-        // The same version, a newer one, or one whose version can't be read: it shows, as before.
-        Assert.False(Desktop.TakesOver("0.23.4", "0.23.4", gone: false, busy: false));
-        Assert.False(Desktop.TakesOver("0.23.2", "0.23.4", gone: false, busy: false));
-        Assert.False(Desktop.TakesOver("0.23.4", null, gone: false, busy: false));
+    // The app.lock holder, as Desktop.TakeOver is handed it: what decides is OlderLibrary.Judge (OlderLibraryTests), so
+    // these only check what TakeOver does with each answer. Nothing real is asked or signalled.
+    const string Home = "/Users/sam/.study-stash";
+    const string Self = "/Applications/Syft Notes.app/Contents/MacOS/StudyStash";
 
-        // Busy is read from the lectures as every copy keeps them, so an older copy's count too.
-        using var home = new TempHome();
-        var lectures = new LectureStore(home.Path);
-        Assert.False(Desktop.Busy(home.Path));
-        lectures.Add(new Lecture { Id = "rec-20261104-090000-abcdef", Started = "2026-11-04T09:00:00-08:00", State = LectureState.Filed });
-        Assert.False(Desktop.Busy(home.Path));
-        foreach (var state in new[] { LectureState.Recording, LectureState.Paused, LectureState.Transcribing })
+    static OurProcess Holder(string version, string program = "/Applications/Study Stash.app/Contents/MacOS/StudyStash") =>
+        new(4242, program, true, Updates.ParseVersion(version), Home);
+
+    [Fact]
+    public async Task A_folder_holder_that_cant_be_told_is_handed_off_to_and_never_asked_to_quit()
+    {
+        var asked = new List<int>();
+        var older = new OlderLibrary { AskToQuit = pid => { asked.Add(pid); return true; }, Busy = _ => false };
+        Assert.False(await Desktop.TakeOverAsync(Home, null, Self, "0.23.4", older, claim: () => false, log: _ => { }));
+        Assert.Empty(asked);
+    }
+
+    [Fact]
+    public async Task An_older_copy_for_this_folder_is_asked_to_quit_once_and_this_copy_waits_for_the_folder()
+    {
+        var asked = new List<int>();
+        bool quit = false;
+        var older = new OlderLibrary { AskToQuit = pid => { asked.Add(pid); quit = true; return true; }, Busy = _ => false };
+        // Asked, then the folder is claimed once it has gone: this copy runs.
+        Assert.True(await Desktop.TakeOverAsync(Home, Holder("0.22.1"), Self, "0.23.4", older, () => quit, _ => { }));
+        Assert.Equal([4242], asked);
+        // Asked through the one SIGTERM per process the library's port uses too: never sent again from here.
+        Assert.True(older.AskOnce(4242, out bool before));
+        Assert.True(before);
+
+        // One that never lets go: asked once, and handed off to when the wait is up.
+        var clock = new FakeTimeProvider();
+        var stuck = new OlderLibrary { AskToQuit = pid => { asked.Add(pid); return true; }, Busy = _ => false };
+        asked.Clear();
+        var waiting = Desktop.TakeOverAsync(Home, Holder("0.22.1"), Self, "0.23.4", stuck, () => false, _ => { }, clock);
+        Assert.False(waiting.IsCompleted);
+        clock.Advance(Desktop.TakeOverWait);
+        Assert.False(await waiting.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken));
+        Assert.Equal([4242], asked);
+    }
+
+    [Fact]
+    public async Task Any_other_holder_is_handed_off_to_and_never_asked_to_quit()
+    {
+        foreach (var (holder, self, busy) in new (OurProcess, string, bool)[]
+                 {
+                     (Holder("0.23.4"), Self, false), // as new as this copy
+                     (Holder("0.24.0"), Self, false), // newer
+                     (Holder("0.22.1"), Self, true), // a lecture being recorded or written down there
+                     (Holder("0.22.1") with { Home = "/Users/sam/.study-stash-selftest" }, Self, false), // another folder's
+                     (Holder("0.22.1") with { Ours = false }, Self, false), // not a Syft Notes program
+                     (Holder("0.23.4", program: Self), Self, false), // this very program
+                     (Holder("0.22.1"), "/Volumes/Syft Notes/Syft Notes.app/Contents/MacOS/StudyStash", false), // this copy runs from its disk image
+                 })
         {
-            lectures.Update("rec-20261104-090000-abcdef", l => l.State = state);
-            Assert.True(Desktop.Busy(home.Path));
+            var asked = new List<int>();
+            int claims = 0;
+            var older = new OlderLibrary { AskToQuit = pid => { asked.Add(pid); return true; }, Busy = _ => busy };
+            Assert.False(await Desktop.TakeOverAsync(Home, holder, self, "0.23.4", older, () => { claims++; return true; }, _ => { }));
+            Assert.Empty(asked);
+            Assert.Equal(0, claims);
         }
     }
 
