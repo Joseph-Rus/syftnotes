@@ -146,7 +146,7 @@ public static partial class Shell
         Run(() => SuggestLighterModelAsync(), "SuggestLighterModel");
         // The program may have moved (Velopack's install, the Mac bundle's new name): what names the old one is put right.
         UiTasks.RunQuietly(() => Task.Run(() => NewPlace.RunHere(host.Home)), "put right what names the app's old place");
-        AppUpdates.Start(host, stop.Token, SayUpdate, () => TypingNotes, LibraryWindowOpen);
+        AppUpdates.Start(host, stop.Token, SayUpdate, () => TypingNotes || SettingUp, LibraryWindowOpen);
         if (AppUpdates.Current is { } updater)
             updater.FoundChanged += () => Dispatcher.UIThread.Post(() =>
             {
@@ -1276,6 +1276,12 @@ public static partial class Shell
     }
 
     public static void ShowSetup() => ShowSetup(false);
+
+    /// <summary>Setup's window (guided setup, setup by hand or the first run's funnel) is open: its answers are only in
+    /// the window, so an update (or the move to Velopack's install) waits for it as it waits for a lecture, instead of
+    /// restarting the app to the welcome page. Not "setup unfinished": a student who never finishes it must still get
+    /// updates. Asked from the updater's thread: a field, nothing of the window itself.</summary>
+    static bool SettingUp => setupWindow is not null;
 
     /// <summary>
     /// Setup's window: guided setup (pick an AI, install it, sign in, then the chat), or setup by hand when
