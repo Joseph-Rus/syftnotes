@@ -1,3 +1,5 @@
+using System.ComponentModel;
+using System.Diagnostics;
 using System.Globalization;
 using System.Runtime.InteropServices;
 
@@ -11,7 +13,8 @@ namespace StudyStash.Core;
 /// <list type="bullet">
 /// <item>Windows (an Inno Setup install): Velopack's Setup.exe for this processor is downloaded and checked, then
 /// windows/bridge.ps1 takes over once the app has quit: Setup.exe --silent, the Run entries and shortcuts (taskbar pins
-/// too) pointed at the new program, the Inno uninstaller, the Start-menu entry put back, the app opened again.</item>
+/// too) pointed at the new program, the app opened again; the new copy then deletes the old folder and its Apps-list
+/// entry itself (the app's NewPlace), without the Inno uninstaller.</item>
 /// <item>Linux (the tarball's folder): the AppImage is downloaded and checked, put in ~/Applications and tried once
 /// (it needs FUSE, which some systems don't have); if it runs, it goes in the applications menu and on the PATH in the
 /// old copy's place, the old folder goes, and the AppImage opens.</item>
@@ -72,6 +75,19 @@ public static class Bridge
 
     /// <summary>Where a failed move is remembered: the release's tag (the move's script writes it too, windows/bridge.ps1).</summary>
     public static string FailedFile(string home) => Path.Combine(home, "bridge-failed.txt");
+
+    /// <summary>What the move's script writes as its first action (windows/bridge.ps1, -StartedFile): the app quits only
+    /// once it's there.</summary>
+    public static string StartedFile(string home) => Path.Combine(home, "bridge-started.txt");
+
+    /// <summary>What the app writes when it gives up on a script that hasn't started: a script that PowerShell lets run
+    /// late, when this copy is still open, sees it right after writing <see cref="StartedFile"/> and ends at once
+    /// (windows/bridge.ps1, -CancelFile), instead of waiting for the app and ending it.</summary>
+    public static string CancelFile(string home) => Path.Combine(home, "bridge-cancel.txt");
+
+    /// <summary>How long the app waits for <see cref="StartedFile"/> before it takes the move for one that won't start
+    /// (PowerShell stopped by a policy or an antivirus) and stays open.</summary>
+    public static readonly TimeSpan ScriptStartsWithin = TimeSpan.FromSeconds(20);
 
     /// <summary>Why a move failed, as <see cref="FailedFile"/> says after the tag: the AppImage needs FUSE, which this
     /// computer doesn't have yet.</summary>
@@ -170,14 +186,14 @@ public static class Bridge
     /// <summary>Moves this copy over to Velopack's install of <paramref name="release"/>. True once it's under way:
     /// the caller quits, and what does the move opens the app again. False leaves this copy as it is.</summary>
     /// <paramref name="pid"/> is the app's own process, which the move waits for; <paramref name="relaunchArgs"/> what
-    /// the new copy opens with.
+    /// the new copy opens with, asked at the moment the move starts.
     public static async Task<bool> ApplyAsync(Release release, string home, UpdateHost host, Func<bool> ready, Action<string> log,
-        int pid, IReadOnlyList<string> relaunchArgs, string? userHome = null, LinuxMenu? menu = null)
+        int pid, Func<IReadOnlyList<string>> relaunchArgs, string? userHome = null, LinuxMenu? menu = null, TimeSpan? scriptStartsWithin = null)
     {
         if (AssetFor(host) is not { } asset) return false;
         log($"Moving to {release.Tag}, installed the new way...");
         var (ok, retry, why) = host.System == "Windows"
-            ? await WindowsAsync(release, home, host, asset, ready, log, pid, relaunchArgs)
+            ? await WindowsAsync(release, home, host, asset, ready, log, pid, relaunchArgs, scriptStartsWithin ?? ScriptStartsWithin)
             : await LinuxAsync(release, host, asset, ready, log, pid, relaunchArgs, userHome ?? Py.UserHome(), menu ?? new LinuxMenu());
         // Put off for a lecture, or a download that didn't come: the next round tries again. Anything else is
         // remembered, so the move isn't tried again for a week.
@@ -186,9 +202,9 @@ public static class Bridge
     }
 
     static async Task<(bool Ok, bool Retry, string? Why)> WindowsAsync(Release release, string home, UpdateHost host, string asset, Func<bool> ready,
-        Action<string> log, int pid, IReadOnlyList<string> relaunchArgs)
+        Action<string> log, int pid, Func<IReadOnlyList<string>> relaunchArgs, TimeSpan startsWithin)
     {
-        // The Inno uninstaller the move runs, and its entry: without them there's nothing to move over from.
+        // The Inno install's entry and uninstaller: without them there's nothing to move over from.
         if (!InnoInstalled())
         {
             log("This copy's Setup entry is missing, so it can't move to the new installer here.");
@@ -209,28 +225,85 @@ public static class Bridge
             log($"Couldn't get the move ready: {e.Message}");
             return (false, false, null);
         }
-        // The last moment to put it off: once the script starts, the old copy is uninstalled.
+        // The last moment to put it off: once the script starts, the old copy is replaced.
         if (!ready())
         {
             log(Updates.PutOff);
             return (false, true, null);
         }
         string logPath = Path.Combine(home, "logs", "update.log");
+        string started = StartedFile(home), cancel = CancelFile(home);
+        TryDelete(started); // ones from an earlier try mustn't pass for this one's
+        TryDelete(cancel);
+        if (File.Exists(started) || File.Exists(cancel))
+        {
+            log("Couldn't clear the last try's notes from the app's folder, so the move doesn't start and Syft Notes stays open on this version.");
+            return (false, false, null);
+        }
+        var spawnedAt = DateTime.Now;
+        int scriptPid;
         try
         {
             // The script stops what still runs from the old folder (the background library) once the app has quit.
-            host.SpawnDetached(["powershell.exe", "-NoProfile", "-ExecutionPolicy", "Bypass", "-WindowStyle", "Hidden", "-File", script,
+            scriptPid = host.SpawnDetached(["powershell.exe", "-NoProfile", "-ExecutionPolicy", "Bypass", "-WindowStyle", "Hidden", "-File", script,
                 "-Setup", setup, "-WaitPid", pid.ToString(CultureInfo.InvariantCulture), "-Log", logPath,
                 "-OldExe", Path.Combine(host.AppDir, "StudyStash.exe"), "-FailedFile", FailedFile(home), "-Tag", release.Tag,
-                "-OpenArgs", string.Join(' ', relaunchArgs.Select(a => a.Contains(' ') ? $"\"{a}\"" : a))]);
+                "-StartedFile", started, "-CancelFile", cancel,
+                "-OpenArgs", string.Join(' ', relaunchArgs().Select(a => a.Contains(' ') ? $"\"{a}\"" : a))]);
         }
-        catch (Exception e) when (e is System.ComponentModel.Win32Exception or IOException or InvalidOperationException)
+        catch (Exception e) when (e is Win32Exception or IOException or InvalidOperationException)
         {
             log($"Couldn't start the move: {e.Message}");
             return (false, false, null);
         }
+        // PowerShell stopped by a policy or an antivirus never runs the script: nothing would open the app again once it
+        // quit. So it quits only after the script has said it is running.
+        if (!await AppearsAsync(started, startsWithin))
+        {
+            // The cancel note first: if the PowerShell can't be ended and an antivirus lets it run later, its script sees
+            // this and leaves the open app alone.
+            try
+            {
+                File.WriteAllText(cancel, release.Tag);
+            }
+            catch (Exception e) when (e is IOException or UnauthorizedAccessException)
+            {
+            }
+            EndPowerShell(scriptPid, spawnedAt);
+            log($"The move's script didn't start within {(int)startsWithin.TotalSeconds} s (PowerShell may be stopped on this computer), so Syft Notes stays open on this version.");
+            return (false, false, null);
+        }
         log($"Moving to {release.Tag} once Syft Notes has quit (log: {logPath}).");
         return (true, false, null);
+    }
+
+    /// <summary>Waits for <paramref name="file"/> to exist: looks now, then every 100 ms, until <paramref name="within"/>
+    /// has gone by.</summary>
+    static async Task<bool> AppearsAsync(string file, TimeSpan within)
+    {
+        var clock = Stopwatch.StartNew();
+        while (!File.Exists(file))
+        {
+            if (clock.Elapsed >= within) return false;
+            await Task.Delay(100);
+        }
+        return true;
+    }
+
+    /// <summary>Ends the PowerShell the move's script was given to, so it can't start late and take the app down. Only the
+    /// process this started: the same id, still a PowerShell, started no earlier than <paramref name="spawnedAt"/> (an id
+    /// is reused once its owner is gone); any other is left alone.</summary>
+    static void EndPowerShell(int pid, DateTime spawnedAt)
+    {
+        if (pid <= 0) return;
+        try
+        {
+            using var p = Process.GetProcessById(pid);
+            if (p.ProcessName.Equals("powershell", StringComparison.OrdinalIgnoreCase) && p.StartTime >= spawnedAt - TimeSpan.FromSeconds(1)) p.Kill();
+        }
+        catch (Exception e) when (e is ArgumentException or InvalidOperationException or Win32Exception)
+        {
+        }
     }
 
     /// <summary>Inno Setup's uninstall entry for Syft Notes on this account (its AppId).</summary>
@@ -244,7 +317,7 @@ public static class Bridge
     }
 
     static async Task<(bool Ok, bool Retry, string? Why)> LinuxAsync(Release release, UpdateHost host, string asset, Func<bool> ready, Action<string> log,
-        int pid, IReadOnlyList<string> relaunchArgs, string userHome, LinuxMenu menu)
+        int pid, Func<IReadOnlyList<string>> relaunchArgs, string userHome, LinuxMenu menu)
     {
         string place = AppImagePlace(userHome);
         string fresh = place + ".new";
@@ -297,7 +370,7 @@ public static class Bridge
         Updates.StopBackground(Updates.LinuxProgram(host.AppDir), host);
         log($"Installed {release.Tag} as {place}.");
         const string script = "exe=\"$1\"; old=\"$2\"; shift 2; tail --pid=\"$0\" -f /dev/null; rm -rf -- \"$old\"; exec \"$exe\" \"$@\"";
-        host.SpawnDetached(["/bin/sh", "-c", script, pid.ToString(CultureInfo.InvariantCulture), place, host.AppDir, .. relaunchArgs]);
+        host.SpawnDetached(["/bin/sh", "-c", script, pid.ToString(CultureInfo.InvariantCulture), place, host.AppDir, .. relaunchArgs()]);
         return (true, false, null);
     }
 

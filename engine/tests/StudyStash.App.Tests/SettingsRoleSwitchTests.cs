@@ -106,7 +106,7 @@ public sealed class SettingsRoleSwitchTests
         // to bring over (RoleSwitchTests covers that, with an old library on another host to bring lectures from).
         new AppSettings { SetupDone = true, Role = AppRole.Laptop }.Save(home["laptop"]);
         using var host = new AppHost(home["laptop"], log: _ => { });
-        using var model = SettingsModel.Make(host, confirm: new FakeConfirm()).WithLibraryHere(() => new LibraryHere { Command = [exe], Folder = home["new-pool"] });
+        using var model = SettingsModel.Make(host, confirm: new FakeConfirm()).WithLibraryHere(() => new LibraryHere { Command = [exe], FirstPort = LibraryHereTests.FreePort(), Folder = home["new-pool"] });
         model.DisplayName = "Ada";
         try
         {
@@ -137,13 +137,13 @@ public sealed class SettingsRoleSwitchTests
         // existing one and keeps its notes: the child process opens the same database once it starts.
         // A port of its own: the default (8787) may be a real library's on this computer, and this one keeps whatever
         // port its config says, so the hand-off would reach that library instead.
-        var cfg = new Config(home.Path, home["here-pool"]) { PoolName = "Ada's library", PoolPassword = "here-pw", WebPort = FreePort() };
+        var cfg = new Config(home.Path, home["here-pool"]) { PoolName = "Ada's library", PoolPassword = "here-pw", WebPort = LibraryHereTests.FreePort() };
         Directory.CreateDirectory(cfg.Home);
         Directory.CreateDirectory(cfg.PoolDir);
         Configs.Save(cfg);
         using (var seed = new Store(cfg.DbPath, cfg.PoolDir)) FileLecture(seed, "b1");
 
-        var here = new LibraryHere { Command = [exe] };
+        var here = new LibraryHere { Command = [exe], FirstPort = LibraryHereTests.FreePort() };
         string done = await here.CreateAsync(host, null, null, "Ada");
         Assert.Contains("ready", done, StringComparison.Ordinal);
 
@@ -165,10 +165,4 @@ public sealed class SettingsRoleSwitchTests
         }
     }
 
-    static int FreePort()
-    {
-        for (int port = 18_787; port < 19_787; port += 2)
-            if (StudyStash.Core.HostInfo.PortFree(port) && StudyStash.Core.HostInfo.PortFree(port + 1)) return port;
-        throw new InvalidOperationException("no free ports");
-    }
 }

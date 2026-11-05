@@ -566,6 +566,37 @@ public class OverviewTests
         Assert.Equal("Record", m.RecordWords);
     }
 
+    [AvaloniaTheory]
+    [InlineData(SkinKind.Mac)]
+    [InlineData(SkinKind.Win)]
+    public void A_screen_reader_hears_the_stop_square_only_while_it_records(SkinKind skin)
+    {
+        // Ready to record, the stop square inside Record is only its red dot: Windows' UI Automation read it as an
+        // enabled "Stop recording" button inside "Start recording".
+        var m = OverviewModel.Home(Sources());
+        m.OnRecord = () => { };
+        var view = new Overview { DataContext = m };
+        var w = Host(view, skin, 1100, 800);
+        try
+        {
+            var stop = view.FindControl<Button>("StopRecording")!;
+            static bool Heard(Control c) => Avalonia.Automation.Peers.ControlAutomationPeer.CreatePeerForElement(c).IsControlElement();
+            Assert.False(Heard(stop));
+            var recorder = new RecorderModel { Elapsed = "00:05" };
+            m.Recorder = recorder;
+            m.Recording = true;
+            Dispatcher.UIThread.RunJobs();
+            Assert.True(Heard(stop));
+            recorder.IsPaused = true;
+            Dispatcher.UIThread.RunJobs();
+            Assert.True(Heard(stop));
+        }
+        finally
+        {
+            w.Close();
+        }
+    }
+
     [Fact]
     public void Pages_left_while_it_records_let_the_recorder_go()
     {
@@ -656,33 +687,6 @@ public class OverviewTests
             Assert.True(In(ask, view).Left >= In(page, view).Left && In(ask, view).Right <= In(page, view).Right, $"{skin}: Ask runs off the page");
             Assert.True(In(ask, view).Bottom <= In(page, view).Bottom, $"{skin}: Ask hangs under the page");
             Assert.Equal("Ask anything about your notes", ask.GetVisualDescendants().OfType<TextBox>().Single().PlaceholderText);
-        }
-        finally
-        {
-            w.Close();
-            ((App)Application.Current!).UseSkin(SkinKind.Mac);
-        }
-    }
-
-    [AvaloniaTheory]
-    [InlineData(SkinKind.Mac)]
-    [InlineData(SkinKind.Win)]
-    public void Homes_ask_for_a_tip_shows_whole_with_its_buttons_over_what_comes_next(SkinKind skin)
-    {
-        var m = Demo.Semester();
-        m.AskForSupport(last: false);
-        var view = Library(skin, m);
-        var w = Host(view, skin, 1280, 860);
-        try
-        {
-            var page = view.GetVisualDescendants().OfType<Overview>().Single();
-            var card = Named<Control>(page, "SupportAsk");
-            Assert.True(card.IsEffectivelyVisible);
-            // The card holds all of itself. It was cut off under its first line, its three buttons left under the
-            // heading below: its box was named as the Ask bar's is, and took the bar's fixed height.
-            foreach (string name in new[] { "Tip", "Later", "Never" })
-                Assert.True(In(Named<Button>(card, name), view).Bottom <= In(card, view).Bottom + 0.5, $"{skin}: {name} is inside the card");
-            Assert.True(In(Named<StackPanel>(page, "UpNext"), view).Top >= In(card, view).Bottom, $"{skin}: Up next starts under the card");
         }
         finally
         {

@@ -52,10 +52,17 @@ public static class RecordingWords
     public const string CantHearMac = "Syft Notes can't hear the microphone. Allow it in System Settings → Privacy & Security → Microphone.";
     public const string CantHearWindows = "Windows isn't letting Syft Notes use the microphone. Turn on Settings → Privacy & security → Microphone → Let desktop apps access your microphone.";
     public const string CantHearLinux = "Syft Notes can't hear the microphone. Check it's picked and not muted in your system's Sound settings, under Input.";
+    public const string MutedMac = "Syft Notes can't hear the microphone. In System Settings → Sound → Input, check that the right microphone is picked and its input level is up.";
+    public const string MutedWindows = "Syft Notes can't hear the microphone. In Settings → System → Sound → Input, check that it isn't muted and its input volume is up.";
     public const string CouldntRead = "The recording couldn't be read";
 
-    /// <summary>A microphone that gives only silence: the system isn't letting Syft Notes hear it.</summary>
-    public static string CantHear => Machine.Linux ? CantHearLinux : OperatingSystem.IsWindows() ? CantHearWindows : CantHearMac;
+    /// <summary>A microphone that gives only silence. With the system's permission known to be given
+    /// (<paramref name="micAllowed"/>) it's muted or turned right down, so the words send the student to the Sound
+    /// settings; otherwise it's the system not letting Syft Notes hear.</summary>
+    public static string CantHear(bool micAllowed) =>
+        Machine.Linux ? CantHearLinux
+        : !micAllowed ? (OperatingSystem.IsWindows() ? CantHearWindows : CantHearMac)
+        : OperatingSystem.IsWindows() ? MutedWindows : MutedMac;
 
     public static string CouldntSave(string why) => $"Recording paused: the recording couldn't be saved ({why.TrimEnd('.')}).";
 }
@@ -110,10 +117,12 @@ public sealed class Recorder : IDisposable
     long buffersSeen, buffersAtStart;
     DateTime? watchedSince, lastBufferAt, lastCheckAt, failedAt;
     bool reopened;
+    readonly Func<bool> micAllowed;
 
     public Recorder(LectureStore store, Func<IAudioSource> openSource, Func<DateTimeOffset>? clock = null, Action<string>? log = null,
-        Func<string, bool, IWavSink>? openFile = null, Func<string, long?>? freeBytes = null)
+        Func<string, bool, IWavSink>? openFile = null, Func<string, long?>? freeBytes = null, Func<bool>? micAllowed = null)
     {
+        this.micAllowed = micAllowed ?? (() => false);
         this.store = store;
         this.openSource = openSource;
         this.clock = clock ?? (() => DateTimeOffset.Now);
@@ -571,8 +580,8 @@ public sealed class Recorder : IDisposable
             }
             else if (!heard && n > buffersAtStart && now - watchedSince >= SilentFor)
             {
-                log($"[recorder] {l.Id}: only silence from the microphone: it isn't allowed");
-                problem = RecordingWords.CantHear;
+                log($"[recorder] {l.Id}: only silence from the microphone: is it allowed, or muted?");
+                problem = RecordingWords.CantHear(micAllowed());
             }
             if (problem is not null)
             {
@@ -813,6 +822,13 @@ public sealed class TranscriptionWorker(LectureStore store, Func<ITranscriber> l
 
     /// <summary>Why Whisper isn't writing lectures down ("Whisper couldn't start: …"); null while it works.</summary>
     public string? Problem { get; private set; }
+
+    /// <summary>Writing a lecture down (or telling its voices apart) right now: a piece is under way, or the model is
+    /// loaded, as it stays from a lecture's first piece until a few minutes after its last (<see cref="KeepLoaded"/>).
+    /// False while the model is missing or won't load: a lecture left Transcribing then only waits, and a restart
+    /// picks it up where it left off.</summary>
+    public bool Working => stepping || Volatile.Read(ref model) is not null;
+    volatile bool stepping;
 
     /// <summary>Whether to tell a lecture's voices apart once it's all written down (the student turned it on and the
     /// voice model is here). Null: never.</summary>
@@ -1195,6 +1211,7 @@ public sealed class TranscriptionWorker(LectureStore store, Func<ITranscriber> l
             {
                 stop.ThrowIfCancellationRequested();
                 bool worked;
+                stepping = true;
                 try
                 {
                     worked = await StepAsync(stop);
@@ -1203,6 +1220,10 @@ public sealed class TranscriptionWorker(LectureStore store, Func<ITranscriber> l
                 {
                     log($"[whisper] {e.Message}");
                     worked = false;
+                }
+                finally
+                {
+                    stepping = false;
                 }
                 if (worked) continue;
                 var current = recording();

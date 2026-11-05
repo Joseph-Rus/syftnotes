@@ -64,6 +64,17 @@ public sealed partial class QuickModel : ObservableObject
 
     public ObservableCollection<QuickRow> Rows { get; } = [];
 
+    /// <summary>The most the results (or the answer) may take before they scroll inside the panel, so the panel
+    /// never reaches past the bottom of the screen; the window sets it from its display each time it opens.</summary>
+    [ObservableProperty] public partial double ResultsMaxHeight { get; set; } = 420;
+
+    /// <summary>What the panel needs besides its results: the query, the chips or footer, spacing and padding.</summary>
+    const double OtherParts = 240;
+
+    /// <summary>The room for results on a display <paramref name="workHeight"/> tall (in DIPs): the panel sits a fifth
+    /// down, with <paramref name="shadow"/> of shadow room above and below it.</summary>
+    public void FitTo(double workHeight, double shadow) => ResultsMaxHeight = Math.Max(160, workHeight * 0.8 - OtherParts - shadow);
+
     public bool HasNote => !string.IsNullOrEmpty(Note);
     public bool Searching => !Answering;
     /// <summary>The Return key's sign, asked for as text: on its own a Mac draws ↩ as a blue emoji keycap.</summary>

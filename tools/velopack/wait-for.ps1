@@ -9,7 +9,11 @@ if (-not $Gone -and -not $Pattern) { throw "wait-for.ps1: give -Pattern or -Gone
 
 function Done {
   if ($Gone) { return -not (Test-Path -LiteralPath $Path) }
-  return (Test-Path -LiteralPath $Path) -and [bool](Select-String -LiteralPath $Path -Pattern $Pattern -Quiet)
+  if (-not (Test-Path -LiteralPath $Path)) { return $false }
+  # Something may be writing the file this very moment (PowerShell's Add-Content holds it alone): not yet, and the
+  # change that write makes wakes this again.
+  try { return [bool](Select-String -LiteralPath $Path -Pattern $Pattern -Quiet -ErrorAction Stop) }
+  catch { if ($_.Exception -is [IO.IOException] -or $_.Exception.InnerException -is [IO.IOException]) { return $false }; throw }
 }
 
 # Watch the nearest folder that exists (the file, or the folder being removed, may not be there yet or any more).

@@ -1,0 +1,30 @@
+<!-- The library window's one gentle ask for a tip (Services/SupportAsk.cs says when), a small popup over the window on
+     its dialog layer (Controls/ConfirmLayer.cs): the logo, the question, two lines, and the answers. "Buy us a coffee" is
+     the ink button, "Maybe later" the plain one under it (it has the keyboard, so Return and Space change nothing for
+     good), and "Don't ask again" a quiet link. Escape and a click outside count as "Maybe later". Drawn from the Syft
+     tokens, the same on both systems. -->
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:c="using:StudyStash.App.Controls"
+             xmlns:vm="using:StudyStash.App.ViewModels"
+             xmlns:s="using:StudyStash.App.Services"
+             x:Class="StudyStash.App.Views.SupportAskDialog"
+             x:DataType="vm:SupportAskModel"
+             Width="360" Focusable="False"
+             AutomationProperties.Name="{x:Static s:SupportAsk.Title}">
+  <StackPanel Margin="{DynamicResource Inset6}" Spacing="{DynamicResource Space2}">
+    <c:SyftMark Size="44" HorizontalAlignment="Center" Margin="0,0,0,8" />
+    <TextBlock Name="Question" Text="{x:Static s:SupportAsk.Title}" FontSize="{DynamicResource FontSubtitle}" FontWeight="SemiBold"
+               TextAlignment="Center" TextWrapping="Wrap" />
+    <TextBlock Text="{x:Static s:SupportAsk.Text}" FontSize="{DynamicResource FontBody}" Foreground="{DynamicResource TextMuted}"
+               TextAlignment="Center" TextWrapping="Wrap" />
+    <StackPanel Spacing="{DynamicResource Space2}" Margin="0,12,0,0">
+      <Button Name="Tip" Classes="btn sm ink" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center"
+              Content="{x:Static s:SupportAsk.Button}" Command="{Binding TipCommand}" AutomationProperties.Name="{x:Static s:SupportAsk.Button}" />
+      <Button Name="Later" Classes="btn sm" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" IsVisible="{Binding CanWait}"
+              Content="{x:Static s:SupportAsk.LaterButton}" Command="{Binding LaterCommand}" AutomationProperties.Name="{x:Static s:SupportAsk.LaterButton}" />
+      <Button Name="Never" Classes="text-link" HorizontalAlignment="Center" Margin="0,4,0,0"
+              Content="{x:Static s:SupportAsk.NeverButton}" Command="{Binding NeverCommand}" AutomationProperties.Name="{x:Static s:SupportAsk.NeverButton}" />
+    </StackPanel>
+  </StackPanel>
+</UserControl>
