@@ -143,6 +143,9 @@ public sealed class LectureStore
     public string AudioPath(string id) => Path.Combine(Dir, id + ".wav");
     string MetaPath(string id) => Path.Combine(Dir, id + ".json");
 
+    /// <summary>When a lecture's record was last saved (UTC): each piece Whisper writes down saves it.</summary>
+    public DateTime ChangedAt(string id) => File.GetLastWriteTimeUtc(MetaPath(id));
+
     Dictionary<string, Lecture> Cache()
     {
         if (cache is not null) return cache;
