@@ -191,7 +191,7 @@ public class AiApiTests
         Assert.NotNull(reply);
         Assert.True(reply!.FellBack);
         Assert.Equal("Ollama's own answer.", reply.Answer);
-        Assert.Contains("didn't answer", reply.Why);
+        Assert.Equal("Claude hit its usage limit.", reply.Why); // not "rate limit exceeded, resets in 2 hours"
 
         var overview = await remote.EnginesAsync();
         var row = overview!.Engines.Single(e => e.Id == "claude");
@@ -200,7 +200,7 @@ public class AiApiTests
     }
 
     [Fact]
-    public async Task Turning_fallback_off_lets_the_picked_engines_own_error_come_back()
+    public async Task Turning_fallback_off_lets_the_picked_engines_own_failure_come_back_in_plain_words()
     {
         using var dir = new TempDir();
         var cfg = Cfg(dir);
@@ -213,8 +213,32 @@ public class AiApiTests
 
         var refused = await Assert.ThrowsAsync<LibraryRefusedException>(() =>
             remote.AskAsync(new AskRequest("What happened?") { Engine = "claude", Live = "Something happened." }));
-        Assert.Equal(503, refused.Status);
-        Assert.Contains("the model refused to answer", refused.Message);
+        Assert.Equal((503, Engines.DidntAnswer("Claude")), (refused.Status, refused.Message)); // its raw text stays in its record
+    }
+
+    [Fact]
+    public async Task Ollama_failing_an_Ask_says_so_in_plain_words_whether_it_was_picked_or_fell_back_to()
+    {
+        using var dir = new TempDir();
+        var cfg = Cfg(dir);
+        using var store = new Store(cfg.DbPath, cfg.PoolDir);
+        var claude = new ScriptedAi("claude", "Claude") { Script = [AiEvent.Error("INTERNAL: upstream closed")] };
+        var ollama = new ScriptedAi("ollama") { Script = [AiEvent.Error("llama runner process has terminated: exit status 2")] };
+        var ai = new AiJobs(cfg.Home)
+        {
+            Providers = id => id switch { "claude" => claude, "ollama" => ollama, _ => new ScriptedAi(id) },
+            Checks = new FakeChecks().Installed("claude").Ollama().Build(),
+        };
+        await using var site = await Site(cfg, store, ai);
+        var remote = new AiRemote("http://localhost", "pw", site.Client);
+
+        // Asked outright; then after Claude failed too (Ollama is tried next, and fails the same way).
+        foreach (string engine in new[] { "ollama", "claude" })
+        {
+            var refused = await Assert.ThrowsAsync<LibraryRefusedException>(() =>
+                remote.AskAsync(new AskRequest("What happened?") { Engine = engine, Live = "Something happened today." }));
+            Assert.Equal((503, Engines.DidntAnswer("Ollama")), (refused.Status, refused.Message));
+        }
     }
 
     [Fact]

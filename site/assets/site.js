@@ -22,7 +22,7 @@
   var next = document.querySelector("[data-next]");
   var then = {
     mac: "Downloading. When it's done, open Syft-Notes.dmg and drag Syft Notes onto Applications, then open it.",
-    windows: "Downloading. When it's done, open Syft-Notes-Setup.exe: it installs and opens Syft Notes by itself. If Windows says it protected your PC, click More info, then Run anyway.",
+    windows: "Downloading. When it's done, open SyftNotes-win-x64-Setup.exe: it installs and opens Syft Notes by itself. If Windows says it protected your PC, click More info, then Run anyway.",
     linux: "Downloading. When it's done, unpack it and run sh syft-notes/install.sh: Syft Notes is then in your applications menu."
   };
   if (hero) {
@@ -41,7 +41,7 @@
       }
     }
   }
-  document.querySelectorAll("a[href$='Syft-Notes.dmg'], a[href$='Syft-Notes-Setup.exe'], a[href$='.tar.gz'], [data-os='linux']").forEach(function (a) {
+  document.querySelectorAll("a[href$='Syft-Notes.dmg'], a[href$='SyftNotes-win-x64-Setup.exe'], a[href$='.tar.gz'], [data-os='linux']").forEach(function (a) {
     a.addEventListener("click", function () {
       if (!next) return;
       var href = a.getAttribute("href") || "";

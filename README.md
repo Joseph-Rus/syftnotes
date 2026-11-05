@@ -18,7 +18,7 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/Joseph-Rus/study-stash/releases/latest"><img src="https://img.shields.io/github/v/release/Joseph-Rus/study-stash?label=release" alt="Latest release"></a>
+  <a href="https://github.com/Joseph-Rus/syftnotes/releases/latest"><img src="https://img.shields.io/github/v/release/Joseph-Rus/syftnotes?label=release" alt="Latest release"></a>
   <img src="https://img.shields.io/badge/macOS%2015%2B%20%C2%B7%20Windows%2010%2F11%20%C2%B7%20Linux-555" alt="macOS 15 or later, Windows 10 or 11, Linux">
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue" alt="MIT licence"></a>
 </p>
@@ -261,7 +261,7 @@ your laptop                                  your library (this laptop, or a com
 
 ## Install
 
-One download for every computer, on the [latest release](https://github.com/Joseph-Rus/study-stash/releases/latest):
+One download for every computer, on the [latest release](https://github.com/Joseph-Rus/syftnotes/releases/latest):
 
 | Mac | Windows | Linux |
 |---|---|---|
@@ -293,71 +293,52 @@ Or install from a terminal:
 
 ```bash
 # Mac or Linux (Terminal)
-curl -fsSL https://raw.githubusercontent.com/Joseph-Rus/study-stash/main/install.sh | sh
+curl -fsSL https://raw.githubusercontent.com/Joseph-Rus/syftnotes/main/install.sh | sh
 ```
 ```powershell
 # Windows (PowerShell)
-irm https://raw.githubusercontent.com/Joseph-Rus/study-stash/main/install.ps1 | iex
+irm https://raw.githubusercontent.com/Joseph-Rus/syftnotes/main/install.ps1 | iex
 ```
 
 Then open **Syft Notes**. See [Setting up](#setting-up).
 
 ## Setting up
 
-The first time Syft Notes opens, it says how it works, then asks which AI you have. An AI sets
-Syft Notes up with you, writes your notes and answers your questions:
+The first time Syft Notes opens, setup is one screen at a time, with **Back** on every one:
 
-- **Claude**: you have a paid Claude plan, Pro or Max. (Syft Notes talks to it through Claude Code,
-  Anthropic's own helper for apps.)
-- **ChatGPT**: you have a paid ChatGPT plan, Plus or higher. (Through Codex, OpenAI's.)
-- **Gemini**: you connect it on the notes step, with an API key or Google's Antigravity app.
-- **I don't have a paid plan**: that's fine. Syft Notes still records and transcribes. A free AI on
-  your computer (Ollama) or an API key is there too, marked Advanced.
+1. **Get started.** One button. It makes your library on this computer, asks for the microphone and
+   starts downloading a speech model that keeps up on your computer (there's nothing to choose). A
+   tick box opens Syft Notes when you log in, so your library runs whenever you're logged in.
+2. **Are you a student?** **Yes** brings your classes in from Canvas. **No** (lectures, talks or
+   meetings) goes straight to your AI, and you add your folders on Home. If your school doesn't use
+   Canvas, say so there and add your classes on Home too.
+3. **Connect your classes.** Add Syft Notes to your browser and sign in to Canvas the way you usually
+   do: there's nothing to type ([the steps](#canvas-assignments-due-dates-and-files)).
+4. **Bringing in your classes.** The first sync, a line for each part: your classes, assignments and
+   due dates, files and pages. It takes a few minutes, and the files keep coming in while your
+   browser is open. **Skip for now** carries on without waiting.
+5. **Connect your AI.** An AI writes your notes and answers your questions. Pick the one you pay for:
+   **Claude**, **ChatGPT** or **Gemini**. With no plan, **Continue with Google** uses Gemini, free
+   with your Google account. If an AI is already signed in on your computer, the screen offers
+   **Continue** with it first. Otherwise, if the maker's own helper for the AI isn't on your
+   computer yet, press **Download and set up** (Syft Notes runs the maker's own installer, for your
+   account only, no admin password; nothing is downloaded until you press it), then **Open sign-in
+   page** to sign in on the maker's own page. Syft Notes never sees your password or your sign-in. Gemini's page ends on a
+   code: copy it and paste it into the box Syft Notes shows. A tiny test message then checks your
+   plan includes it (if not, setup says so), and you're on Home.
 
-**If you already have the ChatGPT app or the Claude app on a Mac, there's nothing to install.** The
-ChatGPT app carries Codex inside it, signed in with the app, and the Claude app keeps its own Claude
-Code once its Code tab has been opened. Syft Notes finds those copies: the one you have starts
-picked, and **Continue** goes straight to the chat.
+**Skip** on the last screen asks once more, and **Later** goes to Home, which keeps a **Continue with
+Google** button until you connect an AI. Without one, Syft Notes still records your lectures and
+writes down what's said. The AI uses a little of your plan to write your notes and answer your
+questions (you can switch to a free local model in **Settings → Your AI** any time).
 
-Otherwise: pick the one you pay for, press **Download and set up** (Syft Notes runs its maker's own
-installer, for your account only, no admin password; nothing is downloaded until you press it), then
-**Open sign-in page** to sign in on Claude's or ChatGPT's own page. Syft Notes never sees your
-password or your sign-in. A tiny test message then checks your plan includes it. If the account is
-on a plan other apps can't use (a free one), setup says so, and you can carry on and add an API key
-on the notes step.
-
-After that your AI walks you through the rest in a chat, with a checklist beside it: one computer or
-two, the microphone, the transcription model, your classes, Canvas, letting your ChatGPT or Claude
-app read your lectures (one **Connect**, if you have the app), and starting at login. It can
-only use Syft Notes' own setup tools (no commands, files or web), and anything that changes your
-computer happens only when you press the button in its card. Close the window part-way and the chat
-picks up where it left off. The chat uses a little of your plan, and your AI then writes your
-notes and answers your questions (you can switch to a free local model in Settings any time).
-
-Choosing Gemini or **I don't have a paid plan**, or pressing **Set up by hand**, goes to setup by
-hand: a few plain steps. It asks **Where your lectures are kept**, with **Just this Mac** (or **Just this PC**) chosen, which is what
-most students want: check the microphone, choose who writes the notes, what you'll use Syft Notes
-for, Canvas, your classes, and starting at login (recommended, so your library runs whenever you're
-logged in). There's no step for the speech model: Syft Notes picks one that keeps up on your
-computer and downloads it while you finish.
-
-The notes step lists **Free AI on this Mac** (marked **Advanced**), **Claude** and **ChatGPT**, each
-with one button, **Set it up**, and **Gemini**. Claude, ChatGPT and Gemini can each use an API key
-pasted there instead. **No AI for now** records and transcribes, and notes can be switched on later
-in Settings. With no paid plan the step starts on the free AI if it's already on your computer with
-a model, and on **No AI for now** otherwise. The free AI's **Set it up** downloads Ollama with a
-model sized for your computer, installs and starts it, and shows how far along it is, with nothing to
-do in a browser or a terminal; you can carry on with setup while it downloads. Setup tries the AI you
-pick once before saving it, so a signed-out one is caught right there. **Set up by hand** is on
-every screen too, and **Settings → General → Run setup** runs either again.
-
-Under **Advanced**, for a laptop you take to class and a computer at home that stays on:
-
-- **My computer at home:** a password for your library, who writes the notes, what it's for,
-  Canvas, your classes, and starting at login. It ends by showing the address and password to
-  connect a laptop.
-- **My laptop for class:** find your library (or type its address and password), check the
-  microphone, what it's for, Canvas, and your classes.
+**Settings → General → Run setup** runs setup again with what's set up already kept: your AI walks
+you through the rest in a chat with a checklist beside it. **Set up by hand** (there too, and on a
+laptop already connected to a library on another computer) is a few plain steps instead: where your
+lectures are kept (**Just this Mac** or **Just this PC**, which is what most students want; under
+**Advanced**, **My computer at home** for a library that stays on, or **My laptop for class** to
+connect to one), the microphone, who writes the notes, what you'll use Syft Notes for, Canvas, your
+classes, and starting at login.
 
 Changed your mind, or your plans changed? Switch any time in **Settings → Connection → This
 computer**: a laptop can also become your library (bringing over whatever it was connected to
@@ -449,6 +430,7 @@ key needs a personal Google account (school accounts may not get the free tier),
 18 or over. Google's free tier may use what you send to improve its products, and people may read
 it; to keep lectures private, use the free AI on your computer. Or install
 [Antigravity](https://antigravity.google), run `agy` once and sign in with your Google account.
+Google's sign-in page ends on a code: in setup, paste it into the box Syft Notes shows.
 
 **API keys for Claude and ChatGPT.** On setup's notes step or in **Settings → Your AI**, Claude can
 run on a key from the [Anthropic Console](https://console.anthropic.com/settings/keys) and ChatGPT on
@@ -630,33 +612,39 @@ your classes' module files and pages, announcements, quizzes and discussions.
 Syft Notes reads Canvas through your browser with your own sign-in (no Canvas password or token),
 and only reads; nothing on Canvas changes. It works in Chrome and the browsers built on it (Edge,
 Brave, Arc, Opera, Vivaldi), and in Firefox and the browsers built on it (Zen, LibreWolf,
-Waterfox). On your library's computer:
+Waterfox). In setup's Canvas step, on your library's computer, there is nothing to type:
 
-1. **Settings → Canvas** (or the Canvas step in setup): type your school's Canvas address.
-2. Click **Add to Chrome** (the button names your own browser: Add to Edge, Add to Firefox; if the
-   browser you usually use can't run the extension, like Safari, Syft Notes says so and uses
-   another one on your computer, or points you to Chrome when there's none).
-   - **Chrome, Edge, Brave, Arc and Vivaldi:** it opens
-     [Syft Notes for Canvas](https://chromewebstore.google.com/detail/study-stash-for-canvas/dfhoenhdjjbnopbepgkgjdgdnfmecjjd)
-     on the Chrome Web Store. Click the blue **Add to Chrome** button (Add to Brave in Brave),
-     then **Add extension**. In Edge the button says **Get extension**, and the first time Edge
-     asks to allow extensions from other stores: click **Allow**. Then click the extension's
-     **Syft Notes** button (it may be under the puzzle-piece Extensions button), paste the code
-     Syft Notes shows, click **Connect**, then **Allow**.
-   - **Opera and Chromium**, or if your school's Chrome won't add it from the store (**Can't add
-     it from the store? Load it from a folder instead**): it opens that browser's extensions page
-     and shows the extension's folder. Turn on **Developer mode**, click **Load unpacked**, and
-     pick that folder, or drag the folder onto the Extensions page. On a Mac the folder is
-     **Syft Notes → Chrome extension** in your home folder (`~/Study Stash/Chrome extension`),
-     where the browser's window can see it; on Windows it's `chrome-extension` in
-     `%USERPROFILE%\.study-stash`.
-   - **Firefox and its family:** it opens
-     [Syft Notes for Canvas](https://addons.mozilla.org/firefox/addon/study-stash-for-canvas/)
-     on Mozilla's add-ons site. Click the blue **Add to Firefox** button, then **Add**. Click the
-     add-on's **Syft Notes** button (it may be under the puzzle-piece Extensions button), paste
-     the code Syft Notes shows, click **Connect**, then **Allow**. It needs Firefox 140 or later.
-3. Sign in to Canvas in that browser, then click **Find my courses** and match each class to its
-   course.
+1. Click **Add Syft Notes to Chrome** (the button names your own browser: Edge, Firefox and so on; if
+   the browser you usually use can't run the extension, like Safari, Syft Notes says so and uses
+   another one on your computer, or points you to Chrome when there's none). It opens Syft Notes
+   for Canvas in your browser's own store:
+   - **Chrome, Edge, Brave, Arc and Vivaldi:** the
+     [Chrome Web Store](https://chromewebstore.google.com/detail/study-stash-for-canvas/dfhoenhdjjbnopbepgkgjdgdnfmecjjd).
+     Click the blue **Add to Chrome** button (Add to Brave in Brave), then **Add extension**. In
+     Edge the button says **Get extension**, and the first time Edge asks to allow extensions from
+     other stores: click **Allow**.
+   - **Firefox and its family:** [Mozilla's add-ons site](https://addons.mozilla.org/firefox/addon/study-stash-for-canvas/).
+     Click the blue **Add to Firefox** button, then **Add**. It needs Firefox 140 or later.
+2. Syft Notes says your browser is asking to connect: press **Allow**. A Syft Notes page in the
+   browser then asks to read Canvas: click **Allow**, then **Allow** again when the browser asks.
+3. Sign in to Canvas in that browser, the way you usually do. Syft Notes finds your school's Canvas
+   by itself and brings in your classes.
+
+If the store's add-on is an older one, or you add Canvas later from **Settings → Canvas**
+(**Set up**), Syft Notes asks for your school's Canvas address first (the address you open Canvas
+at), then connects the extension with a code:
+
+- **Chrome, Edge, Brave, Arc, Vivaldi and Firefox:** add it from the store as above, then click the
+  extension's **Syft Notes** button (it may be under the puzzle-piece Extensions button), paste the
+  code Syft Notes shows, click **Connect**, then **Allow**. Sign in to Canvas in that browser, then
+  click **Find my courses** and match each class to its course.
+- **Opera and Chromium**, or if your school's Chrome won't add it from the store (**Can't add it
+  from the store? Load it from a folder instead**): Syft Notes opens that browser's extensions page
+  and shows the extension's folder. Turn on **Developer mode**, click **Load unpacked**, and pick
+  that folder, or drag the folder onto the Extensions page. On a Mac the folder is **Syft Notes →
+  Chrome extension** in your home folder (`~/Study Stash/Chrome extension`), where the browser's
+  window can see it; on Windows it's `chrome-extension` in `%USERPROFILE%\.study-stash`. There's no
+  code to paste. Then sign in to Canvas and click **Find my courses**.
 
 Canvas then syncs about once an hour while that browser is open (it can stay minimized): what's due,
 assignments with rubrics, your submissions and feedback, modules, files, pages and announcements,
@@ -683,8 +671,8 @@ pays for the app's development and updates itself.
 ## Granola
 
 If you also record lectures in [Granola](https://granola.ai), Syft Notes can bring them over. In
-**Settings → Granola**, press **Connect** and sign in on Granola's own page in your browser. Study
-Stash never sees your password. From then on it looks at your Granola every few minutes. When there's
+**Settings → Granola**, press **Connect** and sign in on Granola's own page in your browser. Syft
+Notes never sees your password. From then on it looks at your Granola every few minutes. When there's
 a lecture it doesn't have, a notification offers it with a **Transfer** button, and the Granola page
 lists every one that's waiting, each with **Transfer** and **Leave it**.
 
@@ -704,14 +692,15 @@ on. Syft Notes isn't affiliated with Granola.
 ## Connect Claude, ChatGPT and Gemini to your library (MCP)
 
 Your library speaks [MCP](https://modelcontextprotocol.io), so AI apps can read your lectures, notes
-and Canvas work. Set it up in **Settings → AI apps**.
+and Canvas work. Set it up in **Settings → Your AI**; what AI apps may read is under **Advanced
+settings** there.
 
 - **AI apps on this computer** (Claude Desktop, Claude Code, ChatGPT, Gemini CLI): choose **Connect**
-  next to the app. Syft Notes adds itself to that app's own settings file, keeping everything else
-  in it (and a copy of it as it was, `….study-stash-backup`). The app has to be quit and opened
-  again to load it: on a Mac the row has a **Reopen** button that does that for you. The row then
+  on their AI's card. Syft Notes adds itself to that app's own settings file, keeping everything else
+  in it (and a copy of it as it was, `….syft-notes-backup`). The app has to be quit and opened
+  again to load it: on a Mac the card has a **Reopen** button that does that for you. The card then
   turns to **Connected** by itself (ChatGPT's, once you start a chat in Codex).
-  **Disconnect** takes only Syft Notes back out. The **ChatGPT** row is the ChatGPT desktop app
+  **Disconnect** takes only Syft Notes back out. The **ChatGPT** card covers the ChatGPT desktop app
   (the one with Codex built in) and Codex in the terminal or your editor: they share one settings
   file. The app starts Syft Notes itself and reads your library through this computer, so this
   works on a computer on its own: no Tailscale, no internet address, and no password goes into the
@@ -719,7 +708,7 @@ and Canvas work. Set it up in **Settings → AI apps**.
 - **Notes from an AI app.** An app on this computer can also save notes you ask it to write: with
   no paid AI, connect the free Claude app and ask it to "write notes for my last lecture", and they
   appear on the lecture's page. Notes they replace are kept, so you can put them back from History.
-  **Save notes they write**, on the same page, switches this off.
+  **Save notes they write**, under **Advanced settings**, switches this off.
 - **claude.ai and chatgpt.com in a browser, and the Claude phone app**: these run on Anthropic's
   and OpenAI's servers, so they need an internet address. Turn on **Let Claude and ChatGPT reach
   your library from the internet** (it uses a
@@ -765,8 +754,8 @@ extension`, because a browser's Load unpacked window doesn't show folders whose 
 
 ## Updates
 
-Installed copies update themselves: they check for a new release a few minutes after starting and
-every 6 hours, and install it when nothing is recording or being transcribed and you aren't typing
+Installed copies update themselves: they check for a new release a couple of minutes after starting and
+then every hour, and install it when nothing is recording or being transcribed and you aren't typing
 in a lecture's notes. To update right away, use **Update now** in **Settings → General → Updates**,
 or from the menu bar on a Mac. A laptop whose library is another computer has that library's own
 **Update now** and **Update automatically** under **Settings → Library**. Updates come through

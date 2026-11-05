@@ -175,6 +175,7 @@ public sealed partial class AttachmentsModel(IAttachmentLibrary library, string?
             OnPropertyChanged(nameof(HasPhotos));
         }
         OnPropertyChanged(nameof(HasItems));
+        OnPropertyChanged(nameof(HeaderText));
         OnPropertyChanged(nameof(ShowHeader));
     }
 
@@ -201,8 +202,12 @@ public sealed partial class AttachmentsModel(IAttachmentLibrary library, string?
         if (await PhotoFileAsync(item.Id) is not { } path) return;
         try
         {
-            using var stream = File.OpenRead(path);
-            var bitmap = Avalonia.Media.Imaging.Bitmap.DecodeToHeight(stream, 200);
+            // A phone photo is megapixels: decoded on a worker thread, then handed to the screen.
+            var bitmap = await Task.Run(() =>
+            {
+                using var stream = File.OpenRead(path);
+                return Avalonia.Media.Imaging.Bitmap.DecodeToHeight(stream, 200);
+            });
             Avalonia.Threading.Dispatcher.UIThread.Post(() => item.Thumb = bitmap);
         }
         catch (Exception e) when (e is IOException or UnauthorizedAccessException or ArgumentException or NotSupportedException)
@@ -299,6 +304,7 @@ public sealed partial class AttachmentsModel(IAttachmentLibrary library, string?
     {
         Items.Remove(item);
         OnPropertyChanged(nameof(HasItems));
+        OnPropertyChanged(nameof(HeaderText));
         OnPropertyChanged(nameof(ShowHeader));
         try
         {

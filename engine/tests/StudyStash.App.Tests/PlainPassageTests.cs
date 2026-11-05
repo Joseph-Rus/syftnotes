@@ -6,6 +6,7 @@ public class PlainPassageTests
     [InlineData("**Gradient Descent Process**", "Gradient Descent Process")]
     [InlineData("- Updating parameters using `gradient descent`:", "Updating parameters using gradient descent:")]
     [InlineData("## Key points\nThe [slides](files/week2.pdf) say so", "Key points The slides say so")]
+    [InlineData("What is the best value for $k$? Use **$O(n^2)$** time.", "What is the best value for k? Use O(n²) time.")]
     [InlineData("a snake_case name stays", "a snake_case name stays")]
     public void A_search_passage_reads_without_its_Markdown(string text, string expected) =>
         Assert.Equal(expected, Shell.PlainPassage(text));

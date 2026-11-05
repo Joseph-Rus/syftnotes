@@ -202,7 +202,7 @@ public sealed partial class SettingsModel : ObservableObject, IDisposable
     [ObservableProperty] public partial string KeepAudio { get; set; } = "30";
     [ObservableProperty] public partial bool Shortcuts { get; set; }
     [ObservableProperty] public partial bool CountThisCopy { get; set; } = true;
-    public string CountThisCopySub => "Once a day, send one anonymous count (a random code for this copy, the version and Mac or Windows) so we know how many people use Syft Notes.";
+    public string CountThisCopySub => "Once a day, send one anonymous count (a random code for this copy, the version and Mac, Windows or Linux) so we know how many people use Syft Notes.";
     /// <summary>Which shortcut (if either) another app already has, once the toggle's had a moment to try them.</summary>
     [ObservableProperty] public partial string? ShortcutsSay { get; set; }
     public bool CanRecordComputerAudio => host.CanRecordComputerAudio;
@@ -351,7 +351,7 @@ public sealed partial class SettingsModel : ObservableObject, IDisposable
         this.confirm = confirm;
         bool records = host.Settings.Role != AppRole.Library;
         // Not for school (what the library is for says so): Folders, and no Canvas.
-        bool school = host.Overview?["for_school"] is not System.Text.Json.Nodes.JsonValue fs || !fs.TryGetValue(out bool sc) || sc;
+        bool school = host.ForSchool;
         string device = Machine.Device;
         ComputerNavTitle = host.Settings.Role == AppRole.Laptop ? "This laptop" : $"This {device}";
         NavItem Nav(string id, string glyph, string label) => new() { Id = id, Glyph = glyph, Label = label };
@@ -777,7 +777,7 @@ public sealed partial class SettingsModel : ObservableObject, IDisposable
         if (loading || settingLogin) return;
         try
         {
-            host.LoginItems.StartAtLogin(value, host.Home);
+            host.ChooseStartAtLogin(value);
         }
         catch (Exception e) when (e is InvalidOperationException or IOException or UnauthorizedAccessException or System.Security.SecurityException)
         {

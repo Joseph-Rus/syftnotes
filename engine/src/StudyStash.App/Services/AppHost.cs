@@ -67,6 +67,10 @@ public sealed class AppSettings
     [JsonIgnore]
     public bool LibraryHere => Role != AppRole.Laptop;
     public bool Shortcuts { get; set; } = true;
+    /// <summary>The student's own answer to "Open Syft Notes when you log in" (null: never given on this copy, as on one
+    /// from before it was kept). Windows forgets the login item when the app is uninstalled; a reinstall puts it back
+    /// from this (NewPlace.LoginItemBack).</summary>
+    public bool? StartAtLogin { get; set; }
     /// <summary>Once a day, one anonymous count of this copy (docs/daily-count.md). Off also deletes its code.</summary>
     public bool CountThisCopy { get; set; } = true;
     /// <summary>Shortcuts changed from their defaults, by <see cref="KeyAction"/> name: {"Record": "Control+Shift+R"}.</summary>
@@ -119,6 +123,11 @@ public sealed class AppSettings
     /// first ("To hear when it's ready, allow Syft Notes' notifications when your Mac asks."): set by Get started on a
     /// Mac, cleared once asked. An update never sets it (they were asked long ago).</summary>
     public bool AskNotificationsAtStop { get; set; }
+    /// <summary>The notes folders the student was shown when they last answered "Which notes folder should Syft Notes
+    /// use?" (<see cref="LibraryFolderPick"/>); null until they answer. It's asked again only for a folder not in it.</summary>
+    public List<string>? NotesFoldersSeen { get; set; }
+    /// <summary>The notes folder they picked then.</summary>
+    public string NotesFolderChosen { get; set; } = "";
 
     public static string PathIn(string home) => System.IO.Path.Combine(home, "app.json");
 
@@ -218,6 +227,9 @@ public sealed partial class AppHost : IDisposable, IProblemSource
     public bool OlderLibrary { get; private set; }
     /// <summary>The library's name, classes (in order: their colors) and the rest of /api/v2/library.</summary>
     public JsonObject? Overview { get; private set; }
+    /// <summary>What the library is for says school, or says nothing (a library from before it was asked).</summary>
+    public bool ForSchool => ForSchoolIn(Overview);
+    internal static bool ForSchoolIn(JsonObject? overview) => overview?["for_school"] is not JsonValue v || !v.TryGetValue(out bool school) || school;
     public DownloadProgress? Downloading { get; private set; }
     /// <summary>The model <see cref="Downloading"/> is about.</summary>
     public WhisperModel? DownloadingModel { get; private set; }
@@ -296,7 +308,7 @@ public sealed partial class AppHost : IDisposable, IProblemSource
         KeepModelInUse();
         Lectures = new LectureStore(home);
         Recorder.Recover(Lectures, this.log);
-        Recorder = new Recorder(Lectures, OpenMic, log: this.log);
+        Recorder = new Recorder(Lectures, OpenMic, log: this.log, micAllowed: () => MicAccess() == Audio.MicAccess.Allowed);
         Captions = new LiveCaptioner(() => Recorder.Current, Recorder.Recent, LiveHearer, this.log) { Watched = () => liveWordsWatched };
         // Too slow is judged for each lecture afresh (an app.json from a 0.11 build before it may still say
         // "live_words_too_slow": nothing reads it, and the next save leaves it out).
@@ -1014,6 +1026,14 @@ public sealed partial class AppHost : IDisposable, IProblemSource
             Library == LibraryState.Connected && (ModelReady || !records));
     }
 
+    /// <summary>The student's answer to "Open Syft Notes when you log in": the login item changes, and the answer is kept
+    /// (<see cref="AppSettings.StartAtLogin"/>). Throws as <see cref="ILoginItems.StartAtLogin"/> does, keeping nothing.</summary>
+    public void ChooseStartAtLogin(bool on)
+    {
+        LoginItems.StartAtLogin(on, Home);
+        Save(s => s.StartAtLogin = on);
+    }
+
     /// <summary>Change the settings and write them to app.json. A full disk (or a folder it can't write) is said, not
     /// thrown: the change still holds until the app quits.</summary>
     public void Save(Action<AppSettings> change)
@@ -1058,18 +1078,23 @@ public sealed partial class AppHost : IDisposable, IProblemSource
 
     /// <summary>Keep recording a lecture that stopped (minutes or days ago): what's recorded now is added to the end of
     /// its transcript, and its notes are written again. The microphone is asked for as Record asks.
-    /// <paramref name="title"/> is what the library calls the note now, when the app has just read it.</summary>
-    public Task<RecordStart> ContinueAsync(string id, string? title = null) => MicThenAsync(() => ContinueRecording(id, title));
+    /// <paramref name="title"/> and <paramref name="className"/> are what the library calls the note now and the folder
+    /// it's in ("" for none), when the app has just read them.</summary>
+    public Task<RecordStart> ContinueAsync(string id, string? title = null, string? className = null) =>
+        MicThenAsync(() => ContinueRecording(id, title, className));
 
-    public Lecture ContinueRecording(string id, string? title = null)
+    public Lecture ContinueRecording(string id, string? title = null, string? className = null)
     {
         if (!ModelReady) throw new InvalidOperationException("Download the transcription model first (Settings → Recording).");
-        // The note may have been renamed in the library since it was filed: its name there is the one its page goes by
-        // while it records again. A title typed on the recording the first time gives way to it too, or it would go
-        // back to the library as the student's newest and replace the one they chose since.
-        if (title is { Length: > 0 })
+        // The note may have been renamed or moved in the library since it was filed: its name and folder there are the
+        // ones its page, the sidebar and the pill go by while it records again (not Unsorted, from before it was moved).
+        // A title typed on the recording the first time gives way to it too, or it would go back to the library as the
+        // student's newest and replace the one they chose since.
+        if (title is { Length: > 0 } || className is not null)
             Lectures.Update(id, x =>
             {
+                if (className is not null) x.ClassName = x.FiledClass = className;
+                if (title is not { Length: > 0 }) return;
                 x.FiledTitle = title;
                 if (x.TitleTyped) x.Title = title;
             });

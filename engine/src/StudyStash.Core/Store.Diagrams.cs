@@ -133,7 +133,7 @@ public sealed partial class Store
 
     /// <summary>A file's new text, in one step: written to a hidden file beside it, then moved over it, so nothing ever
     /// reads it half-written (and a crash leaves the old one whole).</summary>
-    static void ReplaceFile(string path, string text)
+    internal static void ReplaceFile(string path, string text)
     {
         string temp = Path.Combine(Py.Parent(path), "." + Path.GetFileName(path) + ".diagrams");
         try

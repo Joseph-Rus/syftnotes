@@ -1,4 +1,6 @@
 using System.Runtime.InteropServices;
+using System.Security.Cryptography;
+using System.Text;
 
 namespace StudyStash.Core.Tests;
 
@@ -43,6 +45,68 @@ public class BridgeTests
         Assert.Equal("", Bridge.FailedWhy(t.Path));
     }
 
+    /// <summary>A Windows move with a fake PowerShell: <paramref name="runs"/> is whether its script gets as far as writing
+    /// the started file. (On a Windows machine the move looks for Inno Setup's real registry entry, so these return early there.)</summary>
+    static async Task<(bool Ok, List<string> Said, List<IReadOnlyList<string>> Spawned)> WindowsMove(TempDir t, bool runs)
+    {
+        string asset = Bridge.AssetFor(new UpdateHost { System = "Windows", AppDir = t["install"] })!;
+        byte[] setup = [1, 2, 3];
+        var downloads = new FakeDownloads(new()
+        {
+            ["https://dl/setup.exe"] = setup,
+            ["https://dl/sums.txt"] = Encoding.UTF8.GetBytes($"{Convert.ToHexStringLower(SHA256.HashData(setup))}  {asset}\n"),
+        });
+        var spawned = new List<IReadOnlyList<string>>();
+        var host = new UpdateHost
+        {
+            System = "Windows", AppDir = t["install"], TempDir = t["temp"], Http = downloads.Client(),
+            SpawnDetached = args =>
+            {
+                spawned.Add(args);
+                if (runs) File.WriteAllText(args[args.ToList().IndexOf("-StartedFile") + 1], "1234");
+                return 0;
+            },
+        };
+        Directory.CreateDirectory(t["home"]);
+        var said = new List<string>();
+        var release = new Release("v9.9.9", Updates.ParseVersion("9.9.9"), "", "", new Dictionary<string, string>
+        {
+            [asset] = "https://dl/setup.exe", [Updates.ChecksumsAsset] = "https://dl/sums.txt",
+        });
+        // Zero: the file is there when the app looks, or it isn't, with nothing to wait for.
+        bool ok = await Bridge.ApplyAsync(release, t["home"], host, () => true, said.Add, Environment.ProcessId, () => ["--background"],
+            scriptStartsWithin: TimeSpan.Zero);
+        return (ok, said, spawned);
+    }
+
+    [Fact]
+    public async Task A_move_whose_script_never_starts_leaves_the_app_open_and_is_remembered()
+    {
+        if (OperatingSystem.IsWindows()) return;
+        using var t = new TempDir();
+        var (ok, said, spawned) = await WindowsMove(t, runs: false);
+        // False is "don't quit": the app stays as it is, and doesn't try the move again for a week.
+        Assert.False(ok);
+        Assert.Single(spawned);
+        Assert.Equal("v9.9.9", File.ReadAllText(Bridge.FailedFile(t["home"])));
+        // And a script PowerShell lets run late is told to leave the open app alone (bridge.ps1 ends at once on this note).
+        Assert.Equal("v9.9.9", File.ReadAllText(Bridge.CancelFile(t["home"])));
+        Assert.Contains("didn't start", said[^1]);
+    }
+
+    [Fact]
+    public async Task A_move_whose_script_has_started_goes_ahead()
+    {
+        if (OperatingSystem.IsWindows()) return;
+        using var t = new TempDir();
+        var (ok, said, spawned) = await WindowsMove(t, runs: true);
+        Assert.True(ok);
+        Assert.Equal(Bridge.StartedFile(t["home"]), spawned.Single()[spawned.Single().ToList().IndexOf("-StartedFile") + 1]);
+        Assert.False(File.Exists(Bridge.FailedFile(t["home"])));
+        Assert.False(File.Exists(Bridge.CancelFile(t["home"])));
+        Assert.StartsWith("Moving to v9.9.9 once Syft Notes has quit", said[^1]);
+    }
+
     [Fact]
     public void The_Windows_move_script_is_in_the_app()
     {
@@ -51,5 +115,10 @@ public class BridgeTests
         string text = new StreamReader(s!).ReadToEnd();
         Assert.Contains("--silent", text);
         Assert.Contains(@"User Pinned\TaskBar", text);
+        Assert.Contains("[string]$StartedFile", text);
+        // A script that runs late, after the app gave up, looks for the cancel note right after saying it started.
+        int wrote = text.IndexOf("Set-Content -LiteralPath $StartedFile", StringComparison.Ordinal);
+        int checks = text.IndexOf("Test-Path -LiteralPath $CancelFile", StringComparison.Ordinal);
+        Assert.True(wrote >= 0 && checks > wrote);
     }
 }

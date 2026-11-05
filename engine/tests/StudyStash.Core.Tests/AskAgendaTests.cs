@@ -49,7 +49,11 @@ public class AskAgendaTests
         var now = new DateTimeOffset(2026, 10, 30, 16, 0, 0, TimeSpan.Zero); // Friday, 9:00 AM daylight time (UTC-7)
         var cfg = new Config(dir.Path, dir["pool"]) { Classes = [new ClassDef("CS 101")] };
         using var store = new Store(cfg.DbPath, cfg.PoolDir);
-        CanvasSettings.Update(dir.Path, s => s.Url = "https://canvas.example.edu");
+        CanvasSettings.Update(dir.Path, s =>
+        {
+            s.Url = "https://canvas.example.edu";
+            s.Courses["CS 101"] = 4201; // its rows count only while the class is linked to a Canvas course
+        });
         const string dueAt = "2026-11-04T18:15:00Z"; // Wednesday 10:15 AM standard time (UTC-8)
         Assignments.Save(dir.Path, [new Assignment("CS 101", 1, "Future of CS essay", Assignments.Local(dueAt, zone), 10, "open", null, "", "", DueAt: dueAt)]);
         var sync = new CanvasSync(dir.Path, c => FakeCanvas.ClassDir(dir, c), _ => { }) { Clock = () => now, Zone = zone };
