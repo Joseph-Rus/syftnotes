@@ -69,9 +69,10 @@ public static partial class LibraryFolders
     /// <summary>
     /// Where a library folder may be on a computer: the one in use; Documents (wherever the system keeps it now) under
     /// each name a library folder has had; on Windows also the profile's own Documents, OneDrive's (a personal one
-    /// and every "OneDrive - School"), and the OneDrive folders Windows names; on a Mac ~/Documents, each OneDrive in
-    /// ~/Library/CloudStorage and what iCloud Drive left of Documents; a folder named after Study Stash or Syft Notes in
-    /// any of them (renamed); and the first versions' folder in the home folder. Only lists them: whether each is
+    /// and every "OneDrive - School"), and the OneDrive folders Windows names; on a Mac ~/Documents and each OneDrive in
+    /// ~/Library/CloudStorage (never iCloud Drive's folder: looking there can make macOS ask the student for access); a
+    /// folder named after Study Stash or Syft Notes in any of them (renamed); and the first versions' folder in the home
+    /// folder. Only lists them: whether each is
     /// there, and holds a library, is <see cref="Find(string?, IEnumerable{string})"/>'s look.
     /// </summary>
     public static List<string> Places(string? inUse, string documents, string userHome, string system, Func<string, string?> env)
@@ -89,8 +90,6 @@ public static partial class LibraryFolders
         else if (system == "Darwin")
         {
             docs.AddRange(Children(Path.Combine(userHome, "Library", "CloudStorage"), "OneDrive*").Select(d => Path.Combine(d, "Documents")));
-            // What iCloud Drive's "Desktop & Documents" left behind when it was turned off.
-            docs.Add(Path.Combine(userHome, "Library", "Mobile Documents", "com~apple~CloudDocs", "Documents"));
         }
         var places = new List<string>();
         if (inUse is { Length: > 0 }) places.Add(inUse);
