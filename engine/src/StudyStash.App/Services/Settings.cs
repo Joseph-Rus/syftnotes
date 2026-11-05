@@ -777,7 +777,7 @@ public sealed partial class SettingsModel : ObservableObject, IDisposable
         if (loading || settingLogin) return;
         try
         {
-            host.LoginItems.StartAtLogin(value, host.Home);
+            host.ChooseStartAtLogin(value);
         }
         catch (Exception e) when (e is InvalidOperationException or IOException or UnauthorizedAccessException or System.Security.SecurityException)
         {
