@@ -47,4 +47,43 @@ public sealed class LibraryFolderPickTests
         Assert.True(LibraryFolderPick.IsInUse(Configs.Load(home.Path).PoolDir, inUse));
         Assert.Null(host.Settings.NotesFoldersSeen);
     }
+
+    /// <summary>What happens at start: two folders with notes still ask; one earlier folder (the one in use empty) is
+    /// brought in without a question, until it's been done; only the folder in use lists its own notes.</summary>
+    [Fact]
+    public void One_earlier_folder_is_brought_in_and_two_still_ask()
+    {
+        using var home = new TempHome();
+        string inUse = home["Documents/Study Stash"], older = home["OneDrive/Documents/Study Stash"];
+        Directory.CreateDirectory(Path.Combine(older, "Biology"));
+        File.WriteAllText(Path.Combine(older, "Biology", "2026-10-02 Cell division.md"), "# Notes\n");
+        var cfg = Configs.Load(home.Path);
+        cfg.PoolDir = inUse;
+        Configs.Save(cfg);
+        using var host = new AppHost(home.Path, log: _ => { }, loginItems: new CountingLoginItems());
+        host.Save(s => (s.Role, s.SetupDone) = (AppRole.Both, true));
+        List<LibraryFolder> Find(string? used) => LibraryFolders.Find(used, [inUse, older]);
+
+        var (step, found) = LibraryFolderPick.Look(host, Find);
+        Assert.Equal(LibraryFolderPick.AtStart.BringIn, step);
+        Assert.True(LibraryFolders.Comparer.Equals(LibraryFolders.Real(older), Assert.Single(found).Path));
+        Assert.Equal("Brought in 2 lectures from your earlier Syft Notes folder.", LibraryFolderPick.StartWords(step, [new(older, 2, 0, 0, 0, 1, 0)]));
+        Assert.Null(LibraryFolderPick.StartWords(step, [new(older, 0, 2, 0, 0, 0, 0)]));
+
+        // Done once (remembered with both folders): from then on, only the folder in use's own notes.
+        host.Save(s =>
+        {
+            s.NotesFoldersSeen = [.. found.Select(f => f.Path), inUse];
+            s.NotesFolderChosen = inUse;
+        });
+        Directory.CreateDirectory(Path.Combine(inUse, "Biology"));
+        File.WriteAllText(Path.Combine(inUse, "Biology", "2026-10-02 Cell division.md"), "# Notes\n");
+        Assert.Equal(LibraryFolderPick.AtStart.ListOwn, LibraryFolderPick.Look(host, Find).Step);
+
+        // A third folder with notes turns up: two or more to choose from, so the question comes back.
+        string school = home["OneDrive - Example University/Documents/Study Stash"];
+        Directory.CreateDirectory(Path.Combine(school, "Biology"));
+        File.WriteAllText(Path.Combine(school, "Biology", "2026-11-01 Genes.md"), "# Notes\n");
+        Assert.Equal(LibraryFolderPick.AtStart.Ask, LibraryFolderPick.Look(host, used => LibraryFolders.Find(used, [inUse, older, school])).Step);
+    }
 }
