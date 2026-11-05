@@ -35,7 +35,8 @@ for RID in $RIDS; do
   if [ -n "${STUDYSTASH_VELOPACK_BASE:-}" ]; then
     cp "$STUDYSTASH_VELOPACK_BASE/$RID/"*.nupkg "$STUDYSTASH_VELOPACK_BASE/$RID/releases.$RID.json" "$FEED/"
   else
-    vpk download github --repoUrl https://github.com/Joseph-Rus/syftnotes --channel "$RID" --outputDir "$FEED" \
+    # With the run's token, so a shared runner's 60-an-hour limit never costs the delta (macos/velopack-pack.sh).
+    vpk download github --repoUrl https://github.com/Joseph-Rus/syftnotes --channel "$RID" --outputDir "$FEED" ${GH_TOKEN:+--token "$GH_TOKEN"} \
       || echo "velopack-pack.sh: no earlier release on the $RID channel, so no delta this time"
   fi
   vpk pack --packId SyftNotes --packVersion "$VERSION" --packDir "$PACK" --mainExe StudyStash --runtime "$RID" \

@@ -531,6 +531,8 @@ jobs:
         env:
           # Set the repository variable STUDYSTASH_LIBRARY_VALIDATION to "off" to keep disable-library-validation (docs/signing.md).
           STUDYSTASH_LIBRARY_VALIDATION: ${{ vars.STUDYSTASH_LIBRARY_VALIDATION }}
+          # vpk reads the last release's feed with it, for the delta (macos/velopack-pack.sh).
+          GH_TOKEN: ${{ github.token }}
         run: |
           STUDYSTASH_NOTARY_KEY='' STUDYSTASH_NOTARY_KEY_ID='' STUDYSTASH_NOTARY_ISSUER_ID='' sh macos/sign-release.sh dist/mac-test
           sh macos/sign-release.sh dist/mac
@@ -858,10 +860,13 @@ jobs:
           WINDOWS_SIGNING_PROFILE: ${{ secrets.WINDOWS_SIGNING_PROFILE }}
           WINDOWS_CERT_PFX_BASE64: ${{ secrets.WINDOWS_CERT_PFX_BASE64 }}
           WINDOWS_CERT_PASSWORD: ${{ secrets.WINDOWS_CERT_PASSWORD }}
+          GH_TOKEN: ${{ github.token }}
         run: .\windows\velopack-pack.ps1 -Out dist\windows
       - name: Velopack's Setup.exe and update packages (the rehearsal's certificate, or unsigned as Setup.exe is)
         if: needs.version.outputs.installers == 'true' && needs.version.outputs.win_signing != 'real'
         shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: .\windows\velopack-pack.ps1 -Out dist\windows
       - name: The signature is the one this run was told to make
         if: needs.version.outputs.win_signing != 'off'
@@ -1298,6 +1303,7 @@ jobs:
         if: needs.version.outputs.installers == 'true'
         env:
           STUDYSTASH_LINUX_RIDS: ${{ matrix.rid }}
+          GH_TOKEN: ${{ github.token }}
         run: sh linux/velopack-pack.sh dist/linux
       - uses: actions/upload-artifact@v7
         if: needs.version.outputs.installers == 'true'

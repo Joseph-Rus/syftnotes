@@ -48,7 +48,9 @@ foreach ($Rid in $Rids) {
   if ($env:STUDYSTASH_VELOPACK_BASE) {
     Copy-Item (Join-Path $env:STUDYSTASH_VELOPACK_BASE "$Rid\*.nupkg"), (Join-Path $env:STUDYSTASH_VELOPACK_BASE "$Rid\releases.$Rid.json") $Feed
   } else {
-    vpk download github --repoUrl https://github.com/Joseph-Rus/syftnotes --channel $Rid --outputDir $Feed
+    # With the run's token, so a shared runner's 60-an-hour limit never costs the delta (macos/velopack-pack.sh).
+    $token = if ($env:GH_TOKEN) { @("--token", $env:GH_TOKEN) } else { @() }
+    vpk download github --repoUrl https://github.com/Joseph-Rus/syftnotes --channel $Rid --outputDir $Feed @token
     if ($LASTEXITCODE -ne 0) { Write-Host "no earlier release on the $Rid channel, so no delta this time" }
   }
   vpk pack --packId SyftNotes --packVersion $Version --packDir $Pack --mainExe StudyStash.exe --runtime $Rid --channel $Rid `

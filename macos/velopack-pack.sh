@@ -27,7 +27,9 @@ mkdir -p "$FEED"
 if [ -n "${STUDYSTASH_VELOPACK_BASE:-}" ]; then
   cp "$STUDYSTASH_VELOPACK_BASE/osx/"*.nupkg "$STUDYSTASH_VELOPACK_BASE/osx/releases.osx.json" "$FEED/"
 else
-  vpk download github --repoUrl https://github.com/Joseph-Rus/syftnotes --channel osx --outputDir "$FEED" \
+  # With the run's token: unsigned, GitHub allows 60 calls an hour per address, which shared runners use up
+  # (0.23.4 shipped with no Mac delta because of a 403 here).
+  vpk download github --repoUrl https://github.com/Joseph-Rus/syftnotes --channel osx --outputDir "$FEED" ${GH_TOKEN:+--token "$GH_TOKEN"} \
     || echo "velopack-pack.sh: no earlier release on the osx channel, so no delta this time"
 fi
 
