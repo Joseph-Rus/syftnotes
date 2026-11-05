@@ -31,6 +31,12 @@ public sealed partial class Store
             );
             CREATE INDEX IF NOT EXISTS filed_moves_run ON filed_moves(run, seq);
             """);
+        // A table made before moves were written down ahead of time gets the column (its rows were all done).
+        var cols = new HashSet<string>();
+        using (var cmd = Command("PRAGMA table_info(filed_moves)"))
+        using (var r = cmd.ExecuteReader())
+            while (r.Read()) cols.Add(r.GetString(r.GetOrdinal("name")));
+        if (!cols.Contains("status")) Exec("ALTER TABLE filed_moves ADD COLUMN status TEXT DEFAULT 'done'");
         filedTable = true;
     }
 

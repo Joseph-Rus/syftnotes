@@ -87,7 +87,7 @@ public sealed record BinRules(bool DeleteForGood, long? MaxBytes);
 /// <summary>
 /// Windows' Recycle Bin. A file goes there only when the Recycle Bin of its disk would keep it: a fixed disk with a
 /// Recycle Bin, whose settings (HKCU\…\Explorer\BitBucket\Volume\{volume}) can be read, that isn't set to delete for
-/// good, and that keeps a file this big. Otherwise (or when the settings can't be read) nothing is done, and Clean puts
+/// good (by the student, or by a school's policy, NoRecycleFiles), and that keeps a file this big. Otherwise (or when the settings can't be read) nothing is done, and Clean puts
 /// the file in the assignment's Materials folder. Sent with the shell's delete with undo, asking rather than deleting
 /// for good should the Recycle Bin refuse it after all. The Recycle Bin's copy ($R…, beside the $I… record of where it
 /// came from) is found afterwards, and put back by moving it.
@@ -97,6 +97,10 @@ public sealed class RecycleBin : ITrash
     /// <summary>The Recycle Bin's settings for a file's disk, or null when it has none, or they can't be read. Tests
     /// give their own.</summary>
     internal Func<string, BinRules?> Rules { get; init; } = ReadRules;
+
+    /// <summary>A policy (a school's, on a laptop it manages) switches the Recycle Bin off: files are deleted for good.
+    /// Tests give their own.</summary>
+    internal Func<bool> SwitchedOff { get; init; } = PolicySaysNo;
 
     /// <summary>Sends a file to the Recycle Bin; false when the shell didn't (tests give their own).</summary>
     internal Func<string, bool> Delete { get; init; } = ShellDelete;
@@ -110,7 +114,9 @@ public sealed class RecycleBin : ITrash
     public string? Send(string path)
     {
         string full = Path.GetFullPath(path);
-        if (!Keeps(Rules(full), new FileInfo(full).Length)) return null;
+        var rules = Rules(full);
+        if (rules is not null && SwitchedOff()) rules = rules with { DeleteForGood = true };
+        if (!Keeps(rules, new FileInfo(full).Length)) return null;
         if (!Delete(full) || File.Exists(full)) return null;
         return Find(full) ?? "";
     }
@@ -137,6 +143,27 @@ public sealed class RecycleBin : ITrash
     static extern bool VolumeName(string mountPoint, [Out] char[] name, int length);
 
     const string BitBucket = @"Software\Microsoft\Windows\CurrentVersion\Explorer\BitBucket\Volume\";
+
+    const string Policies = @"Software\Microsoft\Windows\CurrentVersion\Policies\Explorer";
+
+    /// <summary>NoRecycleFiles is 1 for this person or for the whole computer; not knowing counts as switched off.</summary>
+    static bool PolicySaysNo()
+    {
+        if (!OperatingSystem.IsWindows()) return true;
+        try
+        {
+            foreach (var hive in new[] { Microsoft.Win32.Registry.CurrentUser, Microsoft.Win32.Registry.LocalMachine })
+            {
+                using var key = hive.OpenSubKey(Policies);
+                if (key?.GetValue("NoRecycleFiles") is int off && off != 0) return true;
+            }
+            return false;
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException or System.Security.SecurityException)
+        {
+            return true;
+        }
+    }
 
     static BinRules? ReadRules(string path)
     {

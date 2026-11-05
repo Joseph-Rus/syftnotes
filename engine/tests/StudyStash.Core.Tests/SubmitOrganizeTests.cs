@@ -239,9 +239,10 @@ public class SubmitOrganizeTests
         string sha = Sha(draft);
         var asked = new List<string>();
         string copy = dir["Bin/$RABC123.md"], record = Write(dir["Bin/$IABC123.md"], "where it came from");
-        RecycleBin Bin(BinRules? rules) => new()
+        RecycleBin Bin(BinRules? rules, bool policyOff = false) => new()
         {
             Rules = _ => rules,
+            SwitchedOff = () => policyOff,
             Delete = p =>
             {
                 asked.Add(p);
@@ -251,11 +252,13 @@ public class SubmitOrganizeTests
             Find = _ => copy,
         };
 
-        // Set to delete for good, too small for the file, or its settings unreadable: Windows is never asked, and Clean
-        // files the draft with the assignment's materials instead.
-        foreach (var rules in new BinRules?[] { new(DeleteForGood: true, MaxBytes: null), new(DeleteForGood: false, MaxBytes: 4), null })
+        // Set to delete for good, switched off by a school's policy, too small for the file, or its settings unreadable:
+        // Windows is never asked, and Clean files the draft with the assignment's materials instead.
+        var roomy = new BinRules(DeleteForGood: false, MaxBytes: 1 << 20);
+        foreach (var bin in new[] { Bin(new BinRules(DeleteForGood: true, MaxBytes: null)), Bin(roomy, policyOff: true),
+                     Bin(new BinRules(DeleteForGood: false, MaxBytes: 4)), Bin(null) })
         {
-            var filer = new SubmitFiler(store, [documents], Bin(rules));
+            var filer = new SubmitFiler(store, [documents], bin);
             var run = await filer.CleanAsync(Work(), null, [draft]);
             var kept = Assert.Single(run.Moves);
             Assert.Equal((FiledMove.Moved, SubmitFiler.MaterialsFolder), (kept.Kind, Path.GetFileName(Path.GetDirectoryName(kept.To))));
@@ -264,7 +267,7 @@ public class SubmitOrganizeTests
         Assert.Empty(asked);
 
         // One that keeps it: it goes there, and Undo brings it back and clears the Recycle Bin's record of it.
-        var keeps = new SubmitFiler(store, [documents], Bin(new BinRules(DeleteForGood: false, MaxBytes: 1 << 20)));
+        var keeps = new SubmitFiler(store, [documents], Bin(roomy));
         var trashed = await keeps.CleanAsync(Work(), null, [draft]);
         Assert.Equal((FiledMove.Trashed, copy), (Assert.Single(trashed.Moves).Kind, trashed.Moves[0].To));
         Assert.Equal(UndoOutcome.Back, Assert.Single(keeps.Undo(trashed.Run)).How);
