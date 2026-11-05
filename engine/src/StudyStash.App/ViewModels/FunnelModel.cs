@@ -257,7 +257,10 @@ public sealed partial class FunnelModel : ObservableObject, IDisposable
             case FunnelStep.Classes:
                 if (AddOn is null && Canvas is null)
                 {
-                    if (await services.AddOnFindsCanvas() && services.MakeAddOn() is { } addOn)
+                    bool findsItself = await services.AddOnFindsCanvas();
+                    // Left meanwhile ("My school doesn't use Canvas", or Back): nothing to start here now.
+                    if (!OnClasses) break;
+                    if (findsItself && services.MakeAddOn() is { } addOn)
                     {
                         addOn.OnDone = () =>
                         {
@@ -297,7 +300,7 @@ public sealed partial class FunnelModel : ObservableObject, IDisposable
                 if (e.PropertyName == nameof(CanvasConnectModel.Current) && canvas.Current >= 3 && OnClasses) Step = FunnelStep.Sync;
             };
             Canvas = canvas;
-            if (canvas.Current >= 3) Step = FunnelStep.Sync;
+            if (canvas.Current >= 3 && OnClasses) Step = FunnelStep.Sync;
         }
     }
 

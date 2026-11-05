@@ -102,6 +102,30 @@ public class FunnelTests
     }
 
     [AvaloniaFact]
+    public async Task No_Canvas_while_the_classes_step_is_still_starting_stays_on_the_AI()
+    {
+        var finds = new TaskCompletionSource<bool>();
+        int started = 0;
+        var (f, _) = Make(new FunnelServices
+        {
+            MakeReady = () => Ready(),
+            AddOnFindsCanvas = () => finds.Task,
+            MakeAddOn = () => { started++; return null; },
+            MakeCanvas = () => { started++; return Task.FromResult<CanvasConnectModel?>(null); },
+        });
+        await f.GetStartedCommand.ExecuteAsync(null);
+        await f.IAmAStudentCommand.ExecuteAsync(null);
+        Assert.True(f.OnClasses);
+
+        // "My school doesn't use Canvas" before the step has asked the store: when the answer comes, nothing starts.
+        f.NoCanvasCommand.Execute(null);
+        finds.SetResult(true);
+        Avalonia.Threading.Dispatcher.UIThread.RunJobs();
+        Assert.True(f.OnAi);
+        Assert.Equal(0, started);
+    }
+
+    [AvaloniaFact]
     public async Task A_student_s_classes_with_nothing_typed_the_add_on_finds_canvas_then_the_sync_follows()
     {
         var log = new List<(string What, string Arg)>();
