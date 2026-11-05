@@ -59,6 +59,30 @@ public class FunnelTests
     // --- the way through -----------------------------------------------------------------------------------------------
 
     [AvaloniaFact]
+    public async Task No_Canvas_while_the_classes_step_is_still_starting_stays_on_the_AI()
+    {
+        var finds = new TaskCompletionSource<bool>();
+        int started = 0;
+        var (f, _) = Make(new FunnelServices
+        {
+            MakeReady = () => Ready(),
+            AddOnFindsCanvas = () => finds.Task,
+            MakeAddOn = () => { started++; return null; },
+            MakeCanvas = () => { started++; return Task.FromResult<CanvasConnectModel?>(null); },
+        });
+        await f.GetStartedCommand.ExecuteAsync(null);
+        await f.IAmAStudentCommand.ExecuteAsync(null);
+        Assert.True(f.OnClasses);
+
+        // "My school doesn't use Canvas" before the step has asked the store: when the answer comes, nothing starts.
+        f.NoCanvasCommand.Execute(null);
+        finds.SetResult(true);
+        Avalonia.Threading.Dispatcher.UIThread.RunJobs();
+        Assert.True(f.OnAi);
+        Assert.Equal(0, started);
+    }
+
+    [AvaloniaFact]
     public async Task Get_started_makes_the_library_then_asks_if_they_are_a_student()
     {
         var (f, setup) = Make();
@@ -99,6 +123,22 @@ public class FunnelTests
         f.SkipCommand.Execute(null);
         f.LaterCommand.Execute(null);
         Assert.Equal(new FunnelEnd(Student: true, Canvas: false, Ai: ""), end);
+    }
+
+    [AvaloniaFact]
+    public async Task No_Canvas_from_the_classes_step_keeps_counting_up()
+    {
+        var (f, _) = Make(new FunnelServices { MakeReady = () => Ready() });
+        await f.GetStartedCommand.ExecuteAsync(null);
+        await f.IAmAStudentCommand.ExecuteAsync(null);
+        Assert.Equal("Step 2 of 4", f.StepLabel);
+
+        // "My school doesn't use Canvas" on Connect your classes: on to the AI as step 3, never "Step 2 of 2".
+        f.NoCanvasCommand.Execute(null);
+        Assert.True(f.OnAi);
+        Assert.Equal("Step 3 of 3", f.StepLabel);
+        Assert.Equal([FunnelStep.Student, FunnelStep.Classes, FunnelStep.Ai], f.Indicator.Select(d => d.Step));
+        Assert.True(f.Indicator[1].Passed);
     }
 
     [AvaloniaFact]
