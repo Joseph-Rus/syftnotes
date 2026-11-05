@@ -443,7 +443,8 @@ public sealed class AppUpdates
     /// minute). Off for a build folder and the self-test; auto_update is read fresh every round, so turning it off in
     /// Settings (or client.toml) takes effect on the next check.</summary>
     /// <param name="busy">Something the student is in the middle of that a restart would take from under their
-    /// hands (typing in a lecture's notes): an update waits for it, as it waits for a lecture.</param>
+    /// hands (typing in a lecture's notes, setup open with its answers still in the window): an update, or the move to
+    /// Velopack's install, waits for it, as it waits for a lecture.</param>
     /// <param name="windowOpen">The library window is open on screen right now: the app comes back with it, instead
     /// of quietly with only its menu bar icon. Asked at the moment the restart is handed off, from the updater's thread.</param>
     public static void Start(AppHost host, CancellationToken stop, Action<UpdateNews> tell, Func<bool>? busy = null, Func<bool>? windowOpen = null)
