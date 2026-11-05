@@ -191,7 +191,8 @@ public sealed class LibraryService : IDisposable
         {
             bool fresh = false;
             var registered = bg.Registered(home);
-            if (registered is not { Count: > 0 } || !SameProgram(registered[0], plan.Program))
+            // Written again, too, when an older copy wrote it differently (a Mac's, before it had its error file).
+            if (registered is not { Count: > 0 } || !SameProgram(registered[0], plan.Program) || !bg.UpToDate(home))
             {
                 log("[library] registering the background library, so the phone is answered with the app closed");
                 await Task.Run(() => bg.Register(home, plan.Program, plan.Extra));
