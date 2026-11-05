@@ -81,12 +81,15 @@ public sealed class OlderLibrary
 
     /// <summary>What to do about <paramref name="holder"/>, for this copy running <paramref name="self"/> at
     /// <paramref name="version"/> for <paramref name="home"/>. <paramref name="busy"/> is asked only about one of ours
-    /// for this folder, and is asked of this folder's lectures.</summary>
-    public static OlderVerdict Judge(OurProcess? holder, string self, string version, string home, Func<string, bool> busy)
+    /// for this folder, and is asked of this folder's lectures. <paramref name="installing"/>: the app itself asks, about
+    /// the copy holding its folder, right before it offers the move into Applications (Desktop.TakeOver), so running from
+    /// its disk image doesn't hold it off there; it never registers anything from the image (MakeBackgroundPlan).</summary>
+    public static OlderVerdict Judge(OurProcess? holder, string self, string version, string home, Func<string, bool> busy,
+        bool installing = false)
     {
         if (holder is not { Ours: true }) return OlderVerdict.NotOurs;
         if (!holder.Serves(home)) return OlderVerdict.OtherHome;
-        if (MacRename.Passing(self)) return OlderVerdict.Passing;
+        if (!installing && MacRename.Passing(self)) return OlderVerdict.Passing;
         bool own = LibraryService.SameProgram(holder.Program, self);
         if (!own && !holder.OlderThan(version)) return OlderVerdict.NotOlder;
         if (busy(home)) return OlderVerdict.Busy;

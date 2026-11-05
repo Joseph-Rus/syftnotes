@@ -373,6 +373,81 @@ public static class Desktop
         }
     }
 
+    /// <summary>How long an older copy asked to quit has before this one hands off to it instead: quitting ends for good
+    /// after 30 s in every copy since 0.20 (Shell.QuitLimit).</summary>
+    internal static readonly TimeSpan TakeOverWait = TimeSpan.FromSeconds(45);
+
+    /// <summary>
+    /// A Mac: this copy couldn't claim the folder, and the copy holding it (its menu bar copy, started at login before an
+    /// update) may be an older Syft Notes than this one. No word a later copy hands off asks an older one to quit, so
+    /// it's asked the way an update's quit and launchd ask, and every copy takes as its own Quit: SIGTERM (its library
+    /// stops cleanly, its typed notes are kept). This copy claims the folder once it has gone, so the student sees the
+    /// version just installed rather than the old one's window. Who holds it is read as for the library's port
+    /// (<see cref="OurProcess.Of"/>), and the same rule decides (<see cref="Services.OlderLibrary.Judge"/>): only an older
+    /// copy of ours, for this folder, with no lecture on the go (<see cref="Services.OlderLibrary.LecturesBusy"/>), is
+    /// asked, and only once (<see cref="Services.OlderLibrary.AskOnce"/>), from Applications or from the disk image (the
+    /// move into Applications follows). One that can't be told, as new as this one or newer, another folder's, or busy:
+    /// handed off to, as before. A copy that isn't in a bundle (a build folder) never asks. The background library is this copy's to start
+    /// again as it starts (LibraryService). True when this copy holds the folder now.
+    /// </summary>
+    public static bool TakeOver(string home, Action<string> log)
+    {
+        if (!OperatingSystem.IsMacOS() || SystemChangesOff || SelfTest.Dir is not null) return false;
+        if (Apps.EnclosingMacBundle(AppContext.BaseDirectory) is null) return false;
+        return TakeOverAsync(home, LockHolder(home), Program, Engine.Version, Services.OlderLibrary.ThisComputer, () => Claim(home), log)
+            .GetAwaiter().GetResult();
+    }
+
+    /// <summary><see cref="TakeOver(string, Action{string})"/> once the folder's holder is looked up
+    /// (<paramref name="holder"/>, null when it can't be told), with the asking (<paramref name="older"/>), the claim and
+    /// the clock swapped in a test.</summary>
+    internal static async Task<bool> TakeOverAsync(string home, OurProcess? holder, string self, string version,
+        Services.OlderLibrary older, Func<bool> claim, Action<string> log, TimeProvider? clock = null)
+    {
+        // Can't be told: never asked. The folder is this copy's only if it's free by now (the holder quit as this copy
+        // looked); otherwise it's handed off to, as before.
+        if (holder is null) return claim();
+        string who = $"Syft Notes {(holder.Version is { } v ? string.Join('.', v) : "(version unknown)")} ({holder.Program}, process {holder.Pid})";
+        // A copy opened from its disk image takes over too: the move into Applications follows (MoveSheet), and it never
+        // registers anything from the image.
+        var verdict = Services.OlderLibrary.Judge(holder, self, version, home, older.Busy, installing: true);
+        if (verdict != Services.OlderVerdict.Replace)
+        {
+            log($"[app] {who} holds this folder and isn't asked to quit ({verdict}): handing off to it");
+            return false;
+        }
+        log($"[app] {who} holds this folder: asking it to quit, so {version} runs instead");
+        if (!older.AskOnce(holder.Pid, out _)) return false;
+        if (await Services.Kit.Poll.UntilAsync(claim, TimeSpan.FromMilliseconds(250), TakeOverWait, clock: clock))
+        {
+            log($"[app] the older copy quit; {version} takes over");
+            return true;
+        }
+        log($"[app] the older copy didn't quit in {TakeOverWait.TotalSeconds:0} s: handing off to it instead");
+        return false;
+    }
+
+    /// <summary>The process holding <paramref name="home"/>'s app.lock (lsof), as <see cref="OurProcess.Of"/> tells it:
+    /// null when there's no one other process holding it, or it can't be told.</summary>
+    static OurProcess? LockHolder(string home)
+    {
+        if (Machine.Run("/usr/sbin/lsof", ["-t", "--", Path.Combine(home, "app.lock")], TimeSpan.FromSeconds(20)) is not { ExitCode: 0 } open) return null;
+        var pids = open.Stdout.Split('\n', StringSplitOptions.RemoveEmptyEntries).Select(s => int.TryParse(s.Trim(), out int p) ? p : 0)
+            .Where(p => p > 0 && p != Environment.ProcessId).Distinct().ToList();
+        return pids is [int pid] ? OurProcess.Of(pid) : null;
+    }
+
+    /// <summary>A Mac: the copy holding the folder didn't answer, and this one couldn't take over from it, so the student
+    /// isn't left with nothing at all: the system's own dialog (no window of ours needed) says so, and what to do.</summary>
+    public static void SayNotAnswering()
+    {
+        if (!OperatingSystem.IsMacOS() || SelfTest.Dir is not null) return;
+        const string script =
+            "display dialog \"Syft Notes is already open, but it didn't answer. Wait a minute and open it again. If it still doesn't open, restart your Mac.\" " +
+            "with title \"Syft Notes isn't answering\" buttons {\"OK\"} default button \"OK\" with icon note";
+        Machine.Run("/usr/bin/osascript", ["-e", script], TimeSpan.FromMinutes(10));
+    }
+
     /// <summary>The words a later copy can hand off: show the library, record, open the dropdown, the quick panel or
     /// Settings ("settings", or "settings:Library" for one of its pages). A click on one of Windows' notifications
     /// comes the same way, as a word of its own (<see cref="NoticeLinks"/>).</summary>

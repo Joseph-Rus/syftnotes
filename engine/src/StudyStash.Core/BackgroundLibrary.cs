@@ -358,17 +358,22 @@ public sealed class BackgroundLibrary : IBackgroundLibrary
     bool UserSystemd() => Ok("systemctl", "--user", "show-environment");
 
     /// <summary>Registers the background library for <paramref name="home"/> and starts it now, replacing a
-    /// registration of an older copy (the one already running is stopped first, so two never fight over the port).</summary>
+    /// registration of an older copy (the one already running is stopped first, so two never fight over the port). A
+    /// Mac's job goes by its label first even with no plist on disk: launchd keeps a job loaded after its plist was
+    /// deleted, and a second bootstrap then fails. One launchd won't take throws, so the caller says so (and the app
+    /// runs its own library); one loaded meanwhile (two registrations at once, as the app starts) is taken.</summary>
     public void Register(string home, string program, IReadOnlyList<string>? extra = null)
     {
-        if (IsRegistered(home)) Unregister(home);
+        if (IsRegistered(home) || System == "Darwin") Unregister(home);
         Directory.CreateDirectory(Path.Combine(home, "logs"));
         if (System == "Darwin")
         {
             var args = Command(program, home, keepAlive: false, extra);
             Directory.CreateDirectory(LaunchAgents);
             Py.WriteText(PlistPath(home), Plist(Label(home), args, Py.UserHome(), ErrorsPath(home)));
-            Run("launchctl", ["bootstrap", Target, PlistPath(home)], Quick);
+            var boot = Run("launchctl", ["bootstrap", Target, PlistPath(home)], Quick);
+            if (boot is not { ExitCode: 0 } && !Ok("launchctl", "print", $"{Target}/{Label(home)}"))
+                throw new InvalidOperationException($"launchd didn't take the background library (launchctl bootstrap ended {(boot is null ? "without running" : boot.ExitCode.ToString(global::System.Globalization.CultureInfo.InvariantCulture))})");
         }
         else if (System == "Windows")
         {
