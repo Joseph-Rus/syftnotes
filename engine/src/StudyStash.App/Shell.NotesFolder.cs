@@ -23,8 +23,17 @@ public static partial class Shell
         if (SelfTest.Dir is not null) return;
         Run(async () =>
         {
-            var found = await Task.Run(() => LibraryFolderPick.ToAsk(host));
-            if (found is not null) Dispatcher.UIThread.Post(() => AskWhichNotesFolder(found));
+            var (step, found) = await Task.Run(() => LibraryFolderPick.Look(host));
+            if (step == LibraryFolderPick.AtStart.Ask) Dispatcher.UIThread.Post(() => AskWhichNotesFolder(found));
+            if (step is not (LibraryFolderPick.AtStart.BringIn or LibraryFolderPick.AtStart.ListOwn)) return;
+            // One earlier folder, or notes in this one the library doesn't list yet: brought in without a question.
+            var done = await LibraryFolderPick.AtStartAsync(host, step, found);
+            if (done.Ok && LibraryFolderPick.StartWords(step, done.Value!) is { } words)
+                Dispatcher.UIThread.Post(() =>
+                {
+                    RequestLibraryReload(whole: true);
+                    Toast("Syft Notes", words, null, null);
+                });
         }, "LibraryFolderPick");
     }
 

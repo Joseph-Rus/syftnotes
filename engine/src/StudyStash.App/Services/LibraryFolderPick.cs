@@ -18,12 +18,74 @@ public static class LibraryFolderPick
     /// <summary>The folders to ask about, or null when there's nothing to ask: not the one-laptop setup, setup not
     /// done, no library here, fewer than two library folders, or ones the student has answered for. Looks at the disk:
     /// call it off the UI thread.</summary>
-    public static IReadOnlyList<LibraryFolder>? ToAsk(AppHost host, Func<string?, List<LibraryFolder>>? find = null)
+    public static IReadOnlyList<LibraryFolder>? ToAsk(AppHost host, Func<string?, List<LibraryFolder>>? find = null) =>
+        Look(host, find) is (AtStart.Ask, var found) ? found : null;
+
+    /// <summary>What to do about library folders when the app starts or setup ends.</summary>
+    public enum AtStart
     {
-        if (host.Settings.Role != AppRole.Both || !host.Settings.SetupDone) return null;
-        if (LibraryHere.Existing(host.Home) is not { } cfg) return null;
+        /// <summary>Not the one-laptop setup, setup not done, or no library here.</summary>
+        Nothing,
+        /// <summary>Two or more folders hold notes, and the student hasn't answered for them: ask which.</summary>
+        Ask,
+        /// <summary>One folder holds notes and it isn't the one in use (an earlier install's, or Documents moved): it's
+        /// brought in without a question, once.</summary>
+        BringIn,
+        /// <summary>Otherwise: the folder in use's own note files that state.db doesn't list are listed (quick when
+        /// there are none).</summary>
+        ListOwn,
+    }
+
+    /// <summary>What to do (<see cref="AtStart"/>), with the library folders found. Looks at the disk: call it off the UI
+    /// thread.</summary>
+    public static (AtStart Step, IReadOnlyList<LibraryFolder> Found) Look(AppHost host, Func<string?, List<LibraryFolder>>? find = null)
+    {
+        if (host.Settings.Role != AppRole.Both || !host.Settings.SetupDone) return (AtStart.Nothing, Array.Empty<LibraryFolder>());
+        if (LibraryHere.Existing(host.Home) is not { } cfg) return (AtStart.Nothing, Array.Empty<LibraryFolder>());
         var found = (find ?? LibraryFolders.Find)(cfg.PoolDir);
-        return LibraryFolders.ShouldAsk(found, host.Settings.NotesFoldersSeen, host.Settings.NotesFolderChosen) ? found : null;
+        if (found.Count >= 2)
+            return (LibraryFolders.ShouldAsk(found, host.Settings.NotesFoldersSeen, host.Settings.NotesFolderChosen) ? AtStart.Ask : AtStart.ListOwn, found);
+        if (found is [{ InUse: false } old] && host.Settings.NotesFoldersSeen?.Contains(old.Path, LibraryFolders.Comparer) != true)
+            return (AtStart.BringIn, found);
+        return (AtStart.ListOwn, found);
+    }
+
+    /// <summary>
+    /// <see cref="AtStart.BringIn"/> or <see cref="AtStart.ListOwn"/>, once the library answers (it starts with the
+    /// app): the library brings the one other folder's notes in (copied; that folder is only read), or lists its own
+    /// folder's unlisted note files. A bring-in that worked is remembered with both folders, so it's done once and the
+    /// question doesn't come up for them later. What it did, or why it couldn't.
+    /// </summary>
+    public static async Task<Outcome<List<BringInCount>>> AtStartAsync(AppHost host, AtStart step, IReadOnlyList<LibraryFolder> found,
+        CancellationToken ct = default)
+    {
+        if (!await Poll.UntilAsync(() => host.LocalLibrary?.State is LibraryServiceState.Running or LibraryServiceState.Elsewhere,
+                TimeSpan.FromSeconds(1), TimeSpan.FromMinutes(2), ct))
+            return Outcome<List<BringInCount>>.Failed(Failure.Offline);
+        IEnumerable<string> from = step == AtStart.BringIn ? found.Select(f => f.Path) : Array.Empty<string>();
+        var done = await RunJobAsync(host, new JsonObject { ["kind"] = BringInJob.Bring, ["from"] = Paths(from), ["refile"] = Paths([]) }, null, ct);
+        if (!done.Ok)
+        {
+            host.Log($"[library] couldn't look for notes at start: {done.Failure!.Kind}");
+            return done;
+        }
+        host.Log($"[library] at start ({step}): {string.Join("; ", done.Value!.Select(d => $"{d.New} new, {d.Both} both, {d.Files} files"))}");
+        if (step == AtStart.BringIn && LibraryHere.Existing(host.Home) is { } cfg)
+            host.Save(s =>
+            {
+                s.NotesFoldersSeen = [.. found.Select(f => f.Path), cfg.PoolDir];
+                s.NotesFolderChosen = cfg.PoolDir;
+            });
+        return done;
+    }
+
+    /// <summary>What a start's bring-in says on a notice, or null when nothing came in. The words wait for the owner's OK.</summary>
+    public static string? StartWords(AtStart step, IReadOnlyList<BringInCount> done)
+    {
+        int n = done.Sum(d => d.New + d.Both);
+        if (n == 0) return null;
+        string lectures = n == 1 ? "1 lecture" : $"{n} lectures";
+        return step == AtStart.BringIn ? $"Brought in {lectures} from your earlier Syft Notes folder." : $"Found {lectures} in your Syft Notes folder.";
     }
 
     /// <summary>

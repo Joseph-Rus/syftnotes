@@ -62,4 +62,22 @@ public sealed class LibraryFoldersTests
         places.Add(third);
         Assert.True(LibraryFolders.ShouldAsk(LibraryFolders.Find(school, places), answered, school));
     }
+
+    /// <summary>On a Mac: what iCloud Drive left of Documents, and a library folder the student renamed, are found too.</summary>
+    [Fact]
+    public void A_renamed_folder_and_iCloud_s_leftover_are_found()
+    {
+        using var tmp = new TempDir();
+        string home = tmp["home"], docs = Path.Combine(home, "Documents");
+        string renamed = Path.Combine(docs, "Study Stash old"), syft = Path.Combine(docs, "Syft Notes");
+        string icloud = Path.Combine(home, "Library", "Mobile Documents", "com~apple~CloudDocs", "Documents", "Study Stash");
+        foreach (string library in new[] { renamed, syft, icloud }) Note(library, "Biology", "2026-09-28 Cells.md");
+        // A folder with the name but no notes isn't a library.
+        Directory.CreateDirectory(Path.Combine(docs, "Study Stash empty", "Biology"));
+
+        var found = LibraryFolders.Find(null, LibraryFolders.Places(null, docs, home, "Darwin", _ => null));
+
+        Assert.Equal(3, found.Count);
+        Assert.Equal(new[] { renamed, syft, icloud }.Select(LibraryFolders.Real).Order(), found.Select(f => f.Path).Order());
+    }
 }
