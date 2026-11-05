@@ -44,9 +44,9 @@ public sealed record MicTrouble(MicTroubleKind Kind, string Title, string Detail
 
     /// <summary>No microphone plugged in or picked.</summary>
     public static MicTrouble NoDevice(bool windows) => windows
-        ? new(MicTroubleKind.NoDevice, "No microphone found", "Plug one in, or pick one in Settings → System → Sound → Input.",
+        ? new(MicTroubleKind.NoDevice, "No microphone found", $"Plug one in, or pick one in {RecordingWords.SoundInputWindows}.",
             "Open Sound settings", WindowsSoundUrl)
-        : new(MicTroubleKind.NoDevice, "No microphone found", "Plug one in, or pick one in System Settings → Sound → Input.",
+        : new(MicTroubleKind.NoDevice, "No microphone found", $"Plug one in, or pick one in {RecordingWords.SoundInputMac}.",
             "Open Sound settings", MacSoundUrl);
 
     public static MicTrouble NoDevice() => Machine.Linux ? Linux.NoDevice() : NoDevice(OperatingSystem.IsWindows());
@@ -101,7 +101,7 @@ public sealed record MicTrouble(MicTroubleKind Kind, string Title, string Detail
             "Your system isn't letting Syft Notes record. If it was installed as a Flatpak or Snap, allow it the microphone in that app's permissions.", "", "");
 
         public static MicTrouble NoDevice() => new(MicTroubleKind.NoDevice, "No microphone found",
-            "Plug one in, or pick one in your system's Sound settings, under Input.", "", "");
+            $"Plug one in, or pick one in {RecordingWords.SoundInputLinux}.", "", "");
 
         public static MicTrouble InUse() => new(MicTroubleKind.InUse, "Another app is using the microphone",
             "Close the app that's using it, then press Record.", "", "");
