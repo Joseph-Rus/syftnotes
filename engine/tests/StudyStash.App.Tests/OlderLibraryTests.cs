@@ -226,6 +226,20 @@ public sealed class OlderLibraryTests
         Assert.Equal(OlderLibrary.OtherCopyWords, svc.Failure);
     }
 
+    [Fact]
+    public async Task An_older_library_that_takes_the_password_is_used_quietly_while_a_lecture_is_on_its_way()
+    {
+        // As before: it works, so nothing is said and nothing is stopped, even with a lecture from the last half hour.
+        using var home = new TempHome();
+        var cfg = Ready(home);
+        var asked = new List<string>();
+        var svc = Service(home, cfg, asked, busy: true, free: () => false, takesPasswordAs: "0.22.1");
+        await svc.StartAsync();
+        Assert.Empty(asked);
+        Assert.Equal(LibraryServiceState.Elsewhere, svc.State);
+        Assert.Null(svc.Failure);
+    }
+
     static int[] V(string version) => Updates.ParseVersion(version);
 
     static Config Ready(TempHome home)
@@ -239,7 +253,8 @@ public sealed class OlderLibraryTests
     /// for this folder unless said), which turns it away until <paramref name="free"/> (or, with a background library,
     /// until that's registered again).</summary>
     static LibraryService Service(TempHome home, Config cfg, List<string> asked, bool busy, Func<bool> free, Action? onQuit = null,
-        OurProcess? holder = null, BackgroundPlan? background = null, string self = Self, Func<bool>? refuses = null, Action? lookedUp = null)
+        OurProcess? holder = null, BackgroundPlan? background = null, string self = Self, Func<bool>? refuses = null, Action? lookedUp = null,
+        string? takesPasswordAs = null)
     {
         bool registered = false;
         return new(home.Path, cfg, [self],
@@ -250,7 +265,8 @@ public sealed class OlderLibraryTests
             },
             waitHealthy: (_, _) => Task.FromResult(registered),
             portStatus: _ => Task.FromResult(free() ? "free" : "ours"),
-            health: _ => Task.FromResult<(string, bool)?>(registered ? (Engine.Version, true) : null),
+            health: _ => Task.FromResult<(string, bool)?>(registered ? (Engine.Version, true)
+                : takesPasswordAs is { } version ? (version, false) : null),
             older: new OlderLibrary
             {
                 Holder = _ =>
