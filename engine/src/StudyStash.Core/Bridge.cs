@@ -80,6 +80,11 @@ public static class Bridge
     /// once it's there.</summary>
     public static string StartedFile(string home) => Path.Combine(home, "bridge-started.txt");
 
+    /// <summary>What the app writes when it gives up on a script that hasn't started: a script that PowerShell lets run
+    /// late, when this copy is still open, sees it right after writing <see cref="StartedFile"/> and ends at once
+    /// (windows/bridge.ps1, -CancelFile), instead of waiting for the app and ending it.</summary>
+    public static string CancelFile(string home) => Path.Combine(home, "bridge-cancel.txt");
+
     /// <summary>How long the app waits for <see cref="StartedFile"/> before it takes the move for one that won't start
     /// (PowerShell stopped by a policy or an antivirus) and stays open.</summary>
     public static readonly TimeSpan ScriptStartsWithin = TimeSpan.FromSeconds(20);
@@ -227,8 +232,10 @@ public static class Bridge
             return (false, true, null);
         }
         string logPath = Path.Combine(home, "logs", "update.log");
-        string started = StartedFile(home);
-        TryDelete(started); // one from an earlier try mustn't pass for this one's
+        string started = StartedFile(home), cancel = CancelFile(home);
+        TryDelete(started); // ones from an earlier try mustn't pass for this one's
+        TryDelete(cancel);
+        var spawnedAt = DateTime.Now;
         int scriptPid;
         try
         {
@@ -236,7 +243,7 @@ public static class Bridge
             scriptPid = host.SpawnDetached(["powershell.exe", "-NoProfile", "-ExecutionPolicy", "Bypass", "-WindowStyle", "Hidden", "-File", script,
                 "-Setup", setup, "-WaitPid", pid.ToString(CultureInfo.InvariantCulture), "-Log", logPath,
                 "-OldExe", Path.Combine(host.AppDir, "StudyStash.exe"), "-FailedFile", FailedFile(home), "-Tag", release.Tag,
-                "-StartedFile", started,
+                "-StartedFile", started, "-CancelFile", cancel,
                 "-OpenArgs", string.Join(' ', relaunchArgs().Select(a => a.Contains(' ') ? $"\"{a}\"" : a))]);
         }
         catch (Exception e) when (e is Win32Exception or IOException or InvalidOperationException)
@@ -248,7 +255,16 @@ public static class Bridge
         // quit. So it quits only after the script has said it is running.
         if (!await AppearsAsync(started, startsWithin))
         {
-            EndPowerShell(scriptPid);
+            // The cancel note first: if the PowerShell can't be ended and an antivirus lets it run later, its script sees
+            // this and leaves the open app alone.
+            try
+            {
+                File.WriteAllText(cancel, release.Tag);
+            }
+            catch (Exception e) when (e is IOException or UnauthorizedAccessException)
+            {
+            }
+            EndPowerShell(scriptPid, spawnedAt);
             log($"The move's script didn't start within {(int)startsWithin.TotalSeconds} s (PowerShell may be stopped on this computer), so Syft Notes stays open on this version.");
             return (false, false, null);
         }
@@ -269,15 +285,16 @@ public static class Bridge
         return true;
     }
 
-    /// <summary>Ends the PowerShell the move's script was given to, so it can't start late and take the app down: only if
-    /// that process id is still a PowerShell (an id is reused once its owner is gone).</summary>
-    static void EndPowerShell(int pid)
+    /// <summary>Ends the PowerShell the move's script was given to, so it can't start late and take the app down. Only the
+    /// process this started: the same id, still a PowerShell, started no earlier than <paramref name="spawnedAt"/> (an id
+    /// is reused once its owner is gone); any other is left alone.</summary>
+    static void EndPowerShell(int pid, DateTime spawnedAt)
     {
         if (pid <= 0) return;
         try
         {
             using var p = Process.GetProcessById(pid);
-            if (p.ProcessName.Equals("powershell", StringComparison.OrdinalIgnoreCase)) p.Kill();
+            if (p.ProcessName.Equals("powershell", StringComparison.OrdinalIgnoreCase) && p.StartTime >= spawnedAt - TimeSpan.FromSeconds(1)) p.Kill();
         }
         catch (Exception e) when (e is ArgumentException or InvalidOperationException or Win32Exception)
         {
