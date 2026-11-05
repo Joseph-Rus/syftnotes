@@ -7,7 +7,7 @@ than letters) is read by the computer's own text recognition. Nothing is install
 computer.
 
 ```
-FileIndex.TextOf / Attachments  ──▶  DocumentText.ExtractAsync(path, ct)
+FileIndex.TextOf / Attachments  ──▶  DocumentText.ExtractAsync(path, options, ct)
                                           │
                         ┌─────────────────┼─────────────────────┐
                         ▼                 ▼                     ▼
@@ -75,7 +75,8 @@ Runtime APIs a plain .NET program can't reach directly).
 
 ## The cache
 
-What's read from a file is kept under `home/cache/text`, keyed by the file's full path (hashed), and checked
+What's read from a file is kept under `home/cache/text` (`DocumentTextOptions.For(home)`: the home of the library that
+read it, never the default one), keyed by the file's full path (hashed), and checked
 against a stamp of how it was read plus the file's size and last-write time. Reading the same file again — the
 file search's next pass, an attachment opened twice — costs nothing until the file actually changes. A file with
 no words at all is remembered as having none, so it isn't retried every time. Two readers of the same file at once
