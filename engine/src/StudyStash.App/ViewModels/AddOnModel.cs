@@ -54,7 +54,7 @@ public sealed partial class AddOnModel : ObservableObject, IDisposable
     /// student's own first.</summary>
     public ObservableCollection<BrowserChoice> BrowserChoices { get; } = [];
 
-    [NotifyPropertyChangedFor(nameof(AddLabel), nameof(BrowserName), nameof(StoreSteps), nameof(AllowStep), nameof(AddedLine), nameof(CanvasLine), nameof(CanvasWaitLine), nameof(AskingLine))]
+    [NotifyPropertyChangedFor(nameof(AddLabel), nameof(BrowserName), nameof(StoreSteps), nameof(AllowStep), nameof(AddedLine), nameof(CanvasLine), nameof(CanvasWaitLine), nameof(AskingLine), nameof(PasteLine))]
     [ObservableProperty]
     public partial Browser Browser { get; set; } = Browsers.Chrome;
 
@@ -69,7 +69,7 @@ public sealed partial class AddOnModel : ObservableObject, IDisposable
     public bool HasAdvice => Advice.Length > 0 && !Added;
 
     /// <summary>Add was pressed: the store's page is open in the browser.</summary>
-    [NotifyPropertyChangedFor(nameof(HasAdvice), nameof(ShowAdd), nameof(Waiting), nameof(AddedLine), nameof(ShowStoreSteps))]
+    [NotifyPropertyChangedFor(nameof(HasAdvice), nameof(ShowAdd), nameof(Waiting), nameof(AddedLine), nameof(ShowStoreSteps), nameof(ShowPaste))]
     [ObservableProperty]
     public partial bool Added { get; set; }
 
@@ -89,9 +89,17 @@ public sealed partial class AddOnModel : ObservableObject, IDisposable
 
     /// <summary>The add-on checked in with the library.</summary>
     [NotifyPropertyChangedFor(nameof(ShowAdd), nameof(Waiting), nameof(AddedLine), nameof(CanSwitchBrowser), nameof(LookingForCanvas), nameof(CanvasLine),
-        nameof(CanvasWaitLine), nameof(IsDone), nameof(IsAsking), nameof(ShowStoreSteps))]
+        nameof(CanvasWaitLine), nameof(IsDone), nameof(IsAsking), nameof(ShowStoreSteps), nameof(ShowPaste))]
     [ObservableProperty]
     public partial bool Connected { get; set; }
+
+    /// <summary>The browser has the add-on from before, still connected to an earlier library: its key was turned away
+    /// since Add was pressed, and it never finds this library by itself. It takes this library's code instead, pasted
+    /// into its own button. Only while there's a code to give (a code needs the Canvas address); without one, the step
+    /// that asks for the school's address follows at once (<see cref="OnTypeInstead"/>).</summary>
+    [NotifyPropertyChangedFor(nameof(ShowPaste), nameof(ShowStoreSteps), nameof(AddedLine), nameof(ConnectionCode))]
+    [ObservableProperty]
+    public partial bool FromBefore { get; set; }
 
     /// <summary>The student's Canvas, as the add-on found it ("https://school.instructure.com"); "" until then.</summary>
     [NotifyPropertyChangedFor(nameof(Found), nameof(LookingForCanvas), nameof(CanvasLine), nameof(CanvasWaitLine), nameof(IsDone))]
@@ -106,7 +114,9 @@ public sealed partial class AddOnModel : ObservableObject, IDisposable
 
     public bool ShowAdd => !Added && !Connected && !IsAsking;
     /// <summary>What to do in the store, while the add-on isn't asking yet.</summary>
-    public bool ShowStoreSteps => Waiting && !IsAsking;
+    public bool ShowStoreSteps => Waiting && !IsAsking && !FromBefore;
+    /// <summary>The add-on from before takes this library's code, in place of the store's steps.</summary>
+    public bool ShowPaste => Waiting && FromBefore;
     /// <summary>Waiting for the add-on to be added and check in.</summary>
     public bool Waiting => Added && !Connected;
     public bool Found => CanvasUrl.Length > 0;
@@ -122,7 +132,13 @@ public sealed partial class AddOnModel : ObservableObject, IDisposable
     /// <summary>What comes after the store: the add-on's own page, and the browser's question about reaching Canvas.</summary>
     public string AllowStep => $"A Syft Notes page opens in {BrowserName}: click Allow, then Allow again when {BrowserName} asks.";
 
-    public string AddedLine => Connected ? $"Added to {BrowserName}" : Added ? $"Waiting for Syft Notes to be added to {BrowserName}" : $"Add Syft Notes to {BrowserName}";
+    public string AddedLine => Connected ? $"Added to {BrowserName}" : FromBefore ? $"Connect {BrowserName} again" : Added ? $"Waiting for Syft Notes to be added to {BrowserName}" : $"Add Syft Notes to {BrowserName}";
+
+    /// <summary>What to do with an add-on from before (<see cref="FromBefore"/>): its own button, then the code.</summary>
+    public string PasteLine => $"{BrowserName} already has Syft Notes from before. Click the Syft Notes button in {BrowserName}'s toolbar, choose Paste a new code, and paste this:";
+
+    /// <summary>The code an add-on from a store connects with, as the watch's <see cref="ExtensionKeeper"/> keeps it.</summary>
+    public string ConnectionCode => watch.Extension?.ConnectionCode ?? "";
 
     /// <summary>The second line: the student's Canvas, found by itself.</summary>
     public string CanvasLine => Found ? $"Found your Canvas: {School}" : "Sign in to Canvas";
@@ -164,6 +180,15 @@ public sealed partial class AddOnModel : ObservableObject, IDisposable
         Asking = s.Extension?.Asking ?? "";
         if (s.Extension?.Connected == true) Connected = true;
         if (s.Url.Length > 0) CanvasUrl = s.Url;
+        // An add-on from before knocked with an earlier library's key since Add was pressed (it knocks every 30 s).
+        bool fromBefore = Added && !Connected && addedAt is { } pressed && s.Extension?.RefusedAt >= pressed;
+        if (fromBefore && ConnectionCode.Length == 0 && !told)
+        {
+            told = true;
+            OnTypeInstead?.Invoke();
+            return;
+        }
+        FromBefore = fromBefore && ConnectionCode.Length > 0;
         // An add-on that says its version and it's older than 1.8 can't find Canvas: the typing way, at once.
         // Only a check-in after the store's page opened counts: a version the library kept from an earlier install says
         // nothing about the add-on being added now.
@@ -246,6 +271,10 @@ public sealed partial class AddOnModel : ObservableObject, IDisposable
         told = true;
         OnTypeInstead?.Invoke();
     }
+
+    /// <summary>Copy, beside the code for an add-on from before.</summary>
+    [RelayCommand]
+    void CopyCode() => context.Actions.Copy(ConnectionCode);
 
     /// <summary>"Open the page again", for a student who closed it.</summary>
     [RelayCommand]
