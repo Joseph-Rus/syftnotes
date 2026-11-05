@@ -624,6 +624,9 @@ jobs:
             exit 1
           fi
           hdiutil detach -quiet "$mnt"
+      # Every DMG from 0.22.0 to 0.23.2 crashed Finder when a student opened it, and nothing here opened one.
+      - name: Finder opens the DMG as a student's download, shows its window, and doesn't crash
+        run: sh tools/dmg/opens-in-finder.sh dist/mac/Syft-Notes.dmg
       - uses: actions/upload-artifact@v7
         if: needs.version.outputs.installers == 'true'
         with:
