@@ -37,6 +37,9 @@ public static class Desktop
         [DllImport(Lib, EntryPoint = "objc_msgSend")]
         public static extern void SendBool(IntPtr receiver, IntPtr selector, bool arg);
 
+        [DllImport(Lib, EntryPoint = "objc_msgSend")]
+        public static extern IntPtr SendCode(IntPtr receiver, IntPtr selector, uint code);
+
         public static IntPtr App => Send(objc_getClass("NSApplication"), sel_registerName("sharedApplication"));
     }
 
@@ -50,6 +53,25 @@ public static class Desktop
         }
         catch (Exception e) when (e is DllNotFoundException or EntryPointNotFoundException)
         {
+        }
+    }
+
+    /// <summary>The system asking the app to quit is the student's own Quit (⌘Q, the app menu's, the Dock's), not the
+    /// computer logging out, restarting or shutting down: only a Mac's Quit menu and Dock ask that way, and a log out's
+    /// quit event says why it came ('why?', which a student's has not). Windows asks only as the session ends.</summary>
+    public static bool StudentQuits()
+    {
+        if (!OperatingSystem.IsMacOS()) return false;
+        try
+        {
+            IntPtr events = ObjC.Send(ObjC.objc_getClass("NSAppleEventManager"), ObjC.sel_registerName("sharedAppleEventManager"));
+            IntPtr quit = events == IntPtr.Zero ? IntPtr.Zero : ObjC.Send(events, ObjC.sel_registerName("currentAppleEvent"));
+            if (quit == IntPtr.Zero) return true;
+            return ObjC.SendCode(quit, ObjC.sel_registerName("attributeDescriptorForKeyword:"), 0x7768793F /* 'why?' keyAEQuitReason */) == IntPtr.Zero;
+        }
+        catch (Exception e) when (e is DllNotFoundException or EntryPointNotFoundException)
+        {
+            return true;
         }
     }
 

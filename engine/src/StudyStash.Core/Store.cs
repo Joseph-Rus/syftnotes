@@ -486,8 +486,9 @@ public sealed partial class Store : IDisposable
     /// wrote them, its title, topics and class), and <paramref name="why"/> is kept with it for its page to say.
     /// Dropped like <see cref="Finish"/>'s result when the note changed meanwhile. The note file is left exactly as it
     /// is, so edits made in it stay too; only when the lecture itself is no longer the one the file was written from
-    /// (it was sent again with more recorded or typed, or moved to another class while it waited) is the file written
-    /// again, round the notes that were kept.
+    /// (it was sent again with more recorded or typed) is the file written again, round the notes that were kept. A
+    /// lecture moved to another class while it waited has its file moved then (<see cref="SetClass"/>), so it's already
+    /// in its place here.
     /// </summary>
     public string? KeepNotes(NoteRow claimed, Meeting m, string why)
     {
@@ -941,14 +942,23 @@ public sealed partial class Store : IDisposable
         {
             var row = Get(noteId);
             if (row is null) return null;
-            if (row.Status is Queued or Working)
+            // One with no file yet (waiting, being written, or one that couldn't be written): only its class changes. The
+            // pipeline writes the file when it's done (or tried again) and keeps this choice (see Finish).
+            if (row.Status is Queued or Working or Failed && string.IsNullOrEmpty(row.MdPath))
             {
-                // The pipeline writes the file when it's done and keeps this choice (see Finish).
                 Exec("UPDATE notes SET class_name=?, classified_by=?, confidence=1.0 WHERE id=?", className, by, noteId);
-                return string.IsNullOrEmpty(row.MdPath) ? null : row.MdPath;
+                return null;
             }
-            return Refile(row, new Classification(className, 1.0, by, row.LectureTitle ?? "", JsonList(row.Topics)), null,
+            // One with a file moves now, edits in it and all: left behind, a rewrite that then failed or wrote nothing would
+            // write the library's copy in the new place and drop the old file, edits with it.
+            string path = Refile(row, new Classification(className, 1.0, by, row.LectureTitle ?? "", JsonList(row.Topics)), null,
                 text => Notes.WithClass(text, row.ClassName ?? "", className));
+            // Refile files it as done. One that failed still says so; one waiting for its rewrite, or in the middle of it,
+            // goes back in the queue and is rewritten from where it is now (a rewrite in progress is dropped as changed:
+            // see Finish).
+            if (row.Status is Failed or Queued or Working)
+                Exec("UPDATE notes SET status=?, error=? WHERE id=?", row.Status == Failed ? Failed : Queued, row.Error ?? "", noteId);
+            return path;
         }
     }
 
@@ -1002,6 +1012,27 @@ public sealed partial class Store : IDisposable
             }, text => Notes.WithTitle(text, row.LectureTitle is { Length: > 0 } was ? was : row.Title ?? "", title));
             return Renamed.Done;
         }
+    }
+
+    /// <summary>Deletes a class's folder when no file is left in it, however deep (an empty Attachments or Canvas
+    /// folder doesn't keep it); a folder with any file in it stays, and so does the file.</summary>
+    public void DropEmptyClassFolder(string className)
+    {
+        static void Drop(string dir)
+        {
+            if (!Directory.Exists(dir)) return;
+            foreach (string sub in Directory.EnumerateDirectories(dir)) Drop(sub);
+            try
+            {
+                if (!Directory.EnumerateFileSystemEntries(dir).Any()) Directory.Delete(dir);
+            }
+            catch (Exception e) when (e is IOException or UnauthorizedAccessException)
+            {
+                // Something else has it open: it stays, empty.
+            }
+        }
+        string folder = ClassFolder(className);
+        if (!Py.SamePath(folder, PoolDir)) Drop(folder);
     }
 
     /// <summary>The folder a class's lectures (and its Canvas files) live in, without making it.</summary>

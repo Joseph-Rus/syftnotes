@@ -328,45 +328,57 @@ public class CanvasExtensionTests
     static List<string> HostsOf(string home) => Hosts(Extension.Folder(home));
 
     [Fact]
-    public async Task The_library_makes_the_extension_folder_on_start_and_keeps_it_on_the_canvas_address()
+    public async Task The_library_makes_no_extension_folder_until_asked_and_then_keeps_it_on_the_canvas_address()
     {
         using var dir = new TempDir();
         var (cfg, store, options, _) = FreshLibrary(dir);
         using var _1 = store;
         await using var site = await TestSite.StartAsync(b => LibraryWeb.Build(b, cfg, store, new Pipeline(cfg, store, log: _ => { }), options));
 
-        // Ready before anyone asked: this library's address and the extension's own key, no Canvas yet.
+        // Started with no Canvas: no folder for a student who uses a browser's store, or no Canvas at all.
         string folder = Extension.Folder(cfg.Home);
-        Assert.True(Extension.Ready(folder));
-        Assert.Equal(new ExtensionConnection("http://127.0.0.1:8790", CanvasSettings.ExtensionKey(cfg.Home), ""), Extension.Connection(folder));
-        Assert.Equal(["https://*.inscloudgate.net/*", "http://127.0.0.1:8790/*"], HostsOf(cfg.Home));
+        Assert.False(Directory.Exists(folder));
 
-        // The app sets the Canvas address: the folder follows.
+        // The app sets the Canvas address: still none.
         var ask = new HttpRequestMessage(HttpMethod.Post, "/api/v2/canvas")
         {
             Headers = { Authorization = new AuthenticationHeaderValue("Bearer", Password) },
             Content = new StringContent("""{"url":"canvas.test"}""", Encoding.UTF8, "application/json"),
         };
         var state = await JsonOf(await site.Client.SendAsync(ask));
-        Assert.Equal("https://canvas.test/*", HostsOf(cfg.Home)[0]);
-        Assert.True(state["extension"]!["folder_ready"]!.GetValue<bool>());
+        Assert.False(Directory.Exists(folder));
+        Assert.False(state["extension"]!["folder_ready"]!.GetValue<bool>());
 
-        // So does Settings' Save.
+        // The page's Make the folder (a student loading it): this library's address and the extension's own key.
         await site.PostForm("/login", ("password", Password), ("next", "/"));
+        Assert.Contains("Make the folder", await site.Text("/settings"));
+
+        // A folder that can't be made (a file is where it would go) is said in words, and the button is still there to try again.
+        File.WriteAllText(folder, "");
+        Assert.Equal("/settings?canvas=folder-failed#canvas", (await site.PostForm("/settings/canvas/extension")).Headers.Location!.OriginalString);
+        string failed = await site.Text("/settings?canvas=folder-failed");
+        Assert.Contains("Syft Notes couldn't make the folder. Check there's space on this computer, then try again.", failed);
+        Assert.Contains("Make the folder", failed);
+        File.Delete(folder);
+
+        Assert.Equal("/settings#canvas", (await site.PostForm("/settings/canvas/extension")).Headers.Location!.OriginalString);
+        Assert.True(Extension.Ready(folder));
+        Assert.Equal(new ExtensionConnection("http://127.0.0.1:8790", CanvasSettings.ExtensionKey(cfg.Home), "https://canvas.test"), Extension.Connection(folder));
+        Assert.Equal(["https://canvas.test/*", "https://*.inscloudgate.net/*", "http://127.0.0.1:8790/*"], HostsOf(cfg.Home));
+
+        // From then on the folder follows the Canvas address, Settings' Save say.
         var saved = await site.PostForm("/settings/canvas", ("canvas_url", "https://canvas2.test/courses/12"));
         Assert.Equal("/settings?canvas=saved#canvas", saved.Headers.Location!.OriginalString);
         Assert.Equal("https://canvas2.test/*", HostsOf(cfg.Home)[0]);
         Assert.Equal("https://canvas2.test", Extension.Connection(folder)!.Canvas);
 
-        // No "Make it" any more: the page shows the ready folder.
+        // The page shows the ready folder. The Chrome Web Store comes first, linked, with the code to paste; the folder
+        // is for Opera and the like.
         string page = await site.Text("/settings");
-        Assert.DoesNotContain("Make it", page);
+        Assert.DoesNotContain("Make the folder", page);
         Assert.Contains($"The extension's folder is ready: <code>{Ui.Esc(folder)}</code>", page);
-        // The Chrome Web Store comes first, linked, with the code to paste; the folder is for Opera and the like.
         Assert.Contains($"<a href=\"{Extension.ChromeStorePublishedAt}\">Chrome Web Store</a>", page);
         Assert.True(page.IndexOf("Chrome Web Store", StringComparison.Ordinal) < page.IndexOf("Load unpacked", StringComparison.Ordinal));
-        // An old page's "Make it" just goes back to Settings.
-        Assert.Equal("/settings#canvas", (await site.PostForm("/settings/canvas/extension")).Headers.Location!.OriginalString);
     }
 
     [Fact]
@@ -378,6 +390,7 @@ public class CanvasExtensionTests
         Assert.Empty(cfg.ClassNames());
         await using var site = await TestSite.StartAsync(b => LibraryWeb.Build(b, cfg, store, new Pipeline(cfg, store, log: _ => { }), options));
         await site.PostForm("/login", ("password", Password), ("next", "/"));
+        await site.PostForm("/settings/canvas/extension"); // a folder a student loaded: it follows the address
         var canvas = new FakeCanvas().Json("/api/v1/courses", """
             [{"id": 4201, "name": "CS 101 · Intro to Computer Science", "course_code": "CS 101", "term": {"name": "Fall 2025"}},
              {"id": 4206, "name": "202710.TS.CSCI321.A  Software Engineering", "course_code": "202710.TS.CSCI321.A", "term": {"name": "Fall 2026"}}]

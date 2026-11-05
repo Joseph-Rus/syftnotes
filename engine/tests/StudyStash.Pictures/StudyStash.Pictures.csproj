@@ -40,6 +40,7 @@
     <Compile Include="..\StudyStash.App.Tests\CanvasFakes.cs" Link="Shared\CanvasFakes.cs" />
     <Compile Include="..\StudyStash.App.Tests\CanvasFixtures.cs" Link="Shared\CanvasFixtures.cs" />
     <Compile Include="..\StudyStash.App.Tests\LibraryRig.cs" Link="Shared\LibraryRig.cs" />
+    <Compile Include="..\StudyStash.App.Tests\FakeLibrarySettings.cs" Link="Shared\FakeLibrarySettings.cs" />
   </ItemGroup>
 
   <ItemGroup>

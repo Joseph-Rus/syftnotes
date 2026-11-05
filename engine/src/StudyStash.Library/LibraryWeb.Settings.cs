@@ -268,6 +268,42 @@ public sealed partial class LibraryWeb
         return [.. cfg.Classes.Where(c => !had.Contains(c.Name) && !sent.Any(s => s.Name.Equals(c.Name, StringComparison.OrdinalIgnoreCase)))];
     }
 
+    /// <summary>The library's classes a new class list leaves out (renames are done by then, so a renamed class is in
+    /// it under its new name): the ones removed. Unsorted is never one.</summary>
+    List<string> Removed(List<ClassDef> classes) =>
+        [.. cfg.Classes.Select(c => c.Name).Where(n => !n.Equals(Configs.Unsorted, StringComparison.OrdinalIgnoreCase)
+            && !classes.Any(c => c.Name.Equals(n, StringComparison.OrdinalIgnoreCase)))];
+
+    /// <summary>Classes taken off the list, in the app's Settings or on this page: their lectures move to Unsorted, the
+    /// way "Move to" moves one (its file goes with it, edits and all; one with no file yet changes class only), its Canvas
+    /// course stops syncing (its Canvas files stay), and its folder goes once nothing is left in it. Nothing else is
+    /// deleted. A lecture whose file can't be moved (another app has it open) stays, and the rest carry on.</summary>
+    void ClassesRemoved(List<string> removed)
+    {
+        foreach (string cls in removed)
+        {
+            // Those not written yet first: one that finishes meanwhile is filed by then, so the second list has it.
+            var lectures = store.Processing().Where(n => string.Equals(n.ClassName, cls, StringComparison.OrdinalIgnoreCase))
+                .Concat(store.ListNotes(cls)).DistinctBy(n => n.Id).ToList();
+            int moved = 0;
+            foreach (var lecture in lectures)
+            {
+                try
+                {
+                    store.SetClass(lecture.Id, Configs.Unsorted);
+                    moved++;
+                }
+                catch (Exception e) when (e is IOException or UnauthorizedAccessException)
+                {
+                    Console.WriteLine($"[classes] lecture {lecture.Id} stayed in {cls}: its notes file couldn't be moved ({e.Message})");
+                }
+            }
+            StudyStash.Core.Canvas.CourseChoices.Unlink(cfg.Home, cls);
+            store.DropEmptyClassFolder(cls);
+            Console.WriteLine($"[classes] removed {cls}: {moved} of {lectures.Count} lectures moved to {Configs.Unsorted}");
+        }
+    }
+
     /// <summary>Changes what the body names and leaves the rest; null when done, or why not (nothing is changed then).</summary>
     IResult? ChangeSettings(JsonObject body)
     {
@@ -285,7 +321,12 @@ public sealed partial class LibraryWeb
             foreach (var item in list.OfType<JsonObject>())
             {
                 string cls = Text(item["name"]) ?? "";
-                if (cls.Length == 0) continue;
+                if (cls.Length == 0)
+                {
+                    // A name cleared and left: the class stays as it was. Removing one is the ×, which asks first.
+                    if (cfg.Classes.FirstOrDefault(c => c.Name == Text(item["was"])) is { } kept && seen.Add(kept.Name)) classes.Add(kept);
+                    continue;
+                }
                 if (cls.Length > StudyStash.Core.Canvas.CourseNames.MaxLength) return Http.Detail(400, $"“{cls[..20]}…” is too long for a class name (up to {StudyStash.Core.Canvas.CourseNames.MaxLength} characters).");
                 if (cls.Equals(Configs.Unsorted, StringComparison.OrdinalIgnoreCase)) return Http.Detail(400, $"“{Configs.Unsorted}” is taken: lectures wait there to be filed.");
                 if (!seen.Add(cls)) return Http.Detail(400, $"There are two classes called {cls}.");
@@ -345,6 +386,7 @@ public sealed partial class LibraryWeb
             var linked = folders ?? Folders.Load(cfg.Home);
             folders = [.. linked.Select(f => renames.FirstOrDefault(r => r.From == f.Class) is { } r ? f with { Class = r.To } : f)];
         }
+        List<string> removed = classes is null ? [] : Removed(classes);
         if (classes is not null) cfg.Classes = classes;
         if (body["notes"] is JsonObject notes)
         {
@@ -362,6 +404,7 @@ public sealed partial class LibraryWeb
             cfg.Uses = [.. uses.Select(n => n is JsonValue v && v.TryGetValue(out string? u) ? u.Trim().ToLowerInvariant() : "")
                 .Where(u => Config.UseKinds.Contains(u)).Distinct()];
         Configs.Save(cfg);
+        ClassesRemoved(removed);
         if (terminal is not null || sortEngine is not null)
         {
             var picked = AiSettings.Load(cfg.Home);

@@ -1132,7 +1132,8 @@ public sealed partial class SettingsModel : ObservableObject, IDisposable
     /// <summary>The row's quiet link: setup by hand, as it was before guided setup.</summary>
     [RelayCommand] void RunSetupByHand() => messages.Send(new SetupAgainRequested(ByHand: true));
 
-    [RelayCommand] void Quit() => messages.Send(new QuitRequested());
+    /// <summary>The student's Quit button: asks first while a lecture records, as ⌘Q does.</summary>
+    [RelayCommand] void Quit() => messages.Send(new QuitAskingRequested());
 
     public void Dispose()
     {

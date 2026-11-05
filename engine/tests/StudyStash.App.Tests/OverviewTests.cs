@@ -526,6 +526,34 @@ public class OverviewTests
         Assert.Equal("Transformers", note.TitleText);
     }
 
+    /// <summary>The title reads as a plain heading, but once clicked it shows it's being typed in: a caret in ink and an
+    /// ink ring round it, as a text field has (QA found a student cutting from it without knowing it could be edited).</summary>
+    [AvaloniaFact]
+    public void A_notes_title_shows_its_caret_and_a_ring_while_its_typed_in()
+    {
+        var note = new NoteModel { Id = "lec-recursion", Title = "Recursion and the call stack", OnRename = _ => Task.FromResult(true) }.Titled();
+        var page = new NotePage { DataContext = new LibraryModel { Note = note } };
+        var window = Host(page, SkinKind.Mac, 900, 600);
+        try
+        {
+            var title = Named<TextBox>(page, "Title");
+            var frame = title.GetVisualDescendants().OfType<Border>().First(b => b.Name == "PART_BorderElement");
+            static bool Shows(IBrush? b) => b is ISolidColorBrush { Color.A: > 0 } && b.Opacity > 0;
+            Assert.Equal(default, frame.BorderThickness);
+            Assert.False(Shows(frame.Background));
+
+            title.Focus();
+            Dispatcher.UIThread.RunJobs();
+            Assert.True(title.IsFocused);
+            Assert.True(Shows(title.CaretBrush), "the caret should be drawn in a colour that shows");
+            Assert.True(frame.BorderThickness.Left > 0 && Shows(frame.BorderBrush), "the title should be ringed while it's typed in");
+        }
+        finally
+        {
+            window.Close();
+        }
+    }
+
     [Theory]
     [InlineData("Theory of Computation and Compilers(CSCI4150.A)", "Theory of Computation and Compilers", "CSCI 4150", "Theory")]
     [InlineData("Machine and Deep Learning", "Machine and Deep Learning", "", "Machine")]
@@ -687,33 +715,6 @@ public class OverviewTests
             Assert.True(In(ask, view).Left >= In(page, view).Left && In(ask, view).Right <= In(page, view).Right, $"{skin}: Ask runs off the page");
             Assert.True(In(ask, view).Bottom <= In(page, view).Bottom, $"{skin}: Ask hangs under the page");
             Assert.Equal("Ask anything about your notes", ask.GetVisualDescendants().OfType<TextBox>().Single().PlaceholderText);
-        }
-        finally
-        {
-            w.Close();
-            ((App)Application.Current!).UseSkin(SkinKind.Mac);
-        }
-    }
-
-    [AvaloniaTheory]
-    [InlineData(SkinKind.Mac)]
-    [InlineData(SkinKind.Win)]
-    public void Homes_ask_for_a_tip_shows_whole_with_its_buttons_over_what_comes_next(SkinKind skin)
-    {
-        var m = Demo.Semester();
-        m.AskForSupport(last: false);
-        var view = Library(skin, m);
-        var w = Host(view, skin, 1280, 860);
-        try
-        {
-            var page = view.GetVisualDescendants().OfType<Overview>().Single();
-            var card = Named<Control>(page, "SupportAsk");
-            Assert.True(card.IsEffectivelyVisible);
-            // The card holds all of itself. It was cut off under its first line, its three buttons left under the
-            // heading below: its box was named as the Ask bar's is, and took the bar's fixed height.
-            foreach (string name in new[] { "Tip", "Later", "Never" })
-                Assert.True(In(Named<Button>(card, name), view).Bottom <= In(card, view).Bottom + 0.5, $"{skin}: {name} is inside the card");
-            Assert.True(In(Named<StackPanel>(page, "UpNext"), view).Top >= In(card, view).Bottom, $"{skin}: Up next starts under the card");
         }
         finally
         {

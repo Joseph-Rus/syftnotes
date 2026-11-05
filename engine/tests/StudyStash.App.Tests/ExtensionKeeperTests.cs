@@ -4,7 +4,8 @@ using StudyStash.Core.Canvas;
 
 namespace StudyStash.App.Tests;
 
-/// <summary>The laptop's Chrome extension folder, kept current by the app itself against a pretend library.</summary>
+/// <summary>The laptop's Chrome extension folder, kept current by the app itself against a pretend library. The app makes
+/// none by itself: the folder is made when the student loads it into a browser.</summary>
 public class ExtensionKeeperTests
 {
     const string NewLibrary = """
@@ -17,11 +18,15 @@ public class ExtensionKeeperTests
 
     static JsonObject Config(string folder) => JsonNode.Parse(File.ReadAllText(Path.Combine(folder, "config.json")))!.AsObject();
 
+    /// <summary>The folder as an earlier visit left it, out of date: a student loaded it into a browser.</summary>
+    static void LoadedBefore(ExtensionKeeper keeper) =>
+        Extension.Ensure(keeper.LocalFolder, "https://old.example.com", "old-key", "https://old.example.com");
+
     static string[] Hosts(string folder) =>
         [.. JsonNode.Parse(File.ReadAllText(Path.Combine(folder, "manifest.json")))!["host_permissions"]!.AsArray().Select(h => h!.GetValue<string>())];
 
     [Fact]
-    public async Task Paired_with_a_library_that_has_Canvas_it_writes_the_folder()
+    public async Task Paired_with_a_library_that_has_Canvas_it_makes_no_folder_and_keeps_the_one_that_is_there()
     {
         using var home = new TempHome();
         var fake = new FakeLibrary().Json(HttpMethod.Get, "/api/v2/canvas/extension", NewLibrary);
@@ -29,17 +34,24 @@ public class ExtensionKeeperTests
         int changed = 0;
         keeper.Changed += () => changed++;
 
-        Assert.True(await keeper.KeepAsync(TestContext.Current.CancellationToken));
-
+        // A student who uses a browser's store never loads the folder: none is made.
+        Assert.False(await keeper.KeepAsync(TestContext.Current.CancellationToken));
         Assert.Equal(home["chrome-extension"], keeper.LocalFolder);
-        Assert.True(Extension.Ready(keeper.LocalFolder));
-        Assert.True(keeper.FolderReady);
+        Assert.False(Directory.Exists(keeper.LocalFolder));
+        Assert.False(keeper.FolderReady);
         Assert.True(keeper.Connected);
         Assert.Equal("another_computer", keeper.SeenWhere);
         // A Chrome Web Store copy here connects with a code for the library as this laptop reaches it.
         Assert.Equal(new ExtensionConnection("https://mini.tail.ts.net", "test-key-abc123", "https://school.instructure.com"),
             Extension.ReadConnectionCode(keeper.ConnectionCode));
         Assert.Equal(1, changed);
+
+        // Loaded into a browser (the way Add to Chrome makes it): ready, and kept pointing at this library and Canvas.
+        Extension.EnsureFor(home.Path, keeper.LocalFolder, "https://mini.tail.ts.net", "test-key-abc123", "https://school.instructure.com");
+        Assert.False(await keeper.KeepAsync(TestContext.Current.CancellationToken));
+        Assert.True(Extension.Ready(keeper.LocalFolder));
+        Assert.True(keeper.FolderReady);
+        Assert.Equal(2, changed);
         var config = Config(keeper.LocalFolder);
         Assert.Equal("https://mini.tail.ts.net", config["app"]!.GetValue<string>());
         Assert.Equal("test-key-abc123", config["key"]!.GetValue<string>());
@@ -53,6 +65,7 @@ public class ExtensionKeeperTests
         using var home = new TempHome();
         var fake = new FakeLibrary().Json(HttpMethod.Get, "/api/v2/canvas/extension", NewLibrary);
         var keeper = new ExtensionKeeper(home.Path, () => Client(fake));
+        LoadedBefore(keeper);
         await keeper.KeepAsync(TestContext.Current.CancellationToken);
         string configPath = Path.Combine(keeper.LocalFolder, "config.json");
         var written = DateTime.UtcNow.AddHours(-1);
@@ -77,6 +90,7 @@ public class ExtensionKeeperTests
         void Library() => fake.Json(HttpMethod.Get, "/api/v2/canvas/extension", $$"""{"key": "test-key-abc123", "canvas": "{{canvas}}", "version": "1.4"}""");
         Library();
         var keeper = new ExtensionKeeper(home.Path, () => Client(fake));
+        LoadedBefore(keeper);
         await keeper.KeepAsync(TestContext.Current.CancellationToken);
 
         canvas = "https://canvas.other.edu";
@@ -94,6 +108,7 @@ public class ExtensionKeeperTests
         var fake = new FakeLibrary().Json(HttpMethod.Get, "/api/v2/canvas/extension", NewLibrary);
         string url = "http://192.168.1.20:8787";
         var keeper = new ExtensionKeeper(home.Path, () => Client(fake, url));
+        LoadedBefore(keeper);
         await keeper.KeepAsync(TestContext.Current.CancellationToken);
         Assert.Equal("http://192.168.1.20:8787/*", Hosts(keeper.LocalFolder)[^1]);
 
@@ -130,11 +145,12 @@ public class ExtensionKeeperTests
     }
 
     [Fact]
-    public async Task An_older_library_without_the_new_fields_still_gets_a_folder()
+    public async Task An_older_library_without_the_new_fields_still_has_its_folder_kept()
     {
         using var home = new TempHome();
         var fake = new FakeLibrary().Json(HttpMethod.Get, "/api/v2/canvas/extension", "extension"); // key, canvas, version only
         var keeper = new ExtensionKeeper(home.Path, () => Client(fake));
+        LoadedBefore(keeper);
 
         Assert.True(await keeper.KeepAsync(TestContext.Current.CancellationToken));
 
@@ -174,7 +190,7 @@ public class ExtensionKeeperTests
     }
 
     [Fact]
-    public async Task The_watch_keeps_the_folder_on_every_refresh()
+    public async Task The_watch_keeps_the_folder_it_has_on_every_refresh()
     {
         using var home = new TempHome();
         var fake = new FakeLibrary()
@@ -182,6 +198,7 @@ public class ExtensionKeeperTests
             .Json(HttpMethod.Get, "/api/v2/canvas/extension", NewLibrary);
         var context = CanvasFixtures.Context(fake, home.Path);
         var watch = new CanvasWatch(context) { Extension = new ExtensionKeeper(home.Path, () => context.Client) };
+        LoadedBefore(watch.Extension);
 
         await watch.RefreshAsync(TestContext.Current.CancellationToken);
 

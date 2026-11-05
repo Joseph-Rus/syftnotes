@@ -381,11 +381,6 @@ public sealed partial class OverviewModel : ObservableObject
     public bool CanSupport => IsHome && OnSupport is not null;
     [RelayCommand] void Support() => OnSupport?.Invoke();
 
-    /// <summary>The one gentle ask for a tip, on Home when it's due (the library window sets it).</summary>
-    [ObservableProperty] public partial SupportAskModel? Asking { get; set; }
-    public bool HasAsking => Asking is not null;
-    partial void OnAskingChanged(SupportAskModel? value) => OnPropertyChanged(nameof(HasAsking));
-
     /// <summary>Home's "Ready when class starts", after a first run (<see cref="WelcomeCardModel"/>); null otherwise.</summary>
     [ObservableProperty] public partial WelcomeCardModel? Welcome { get; set; }
     public bool HasWelcome => Welcome is not null;
