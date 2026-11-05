@@ -941,17 +941,22 @@ public sealed partial class Store : IDisposable
         {
             var row = Get(noteId);
             if (row is null) return null;
-            // One that couldn't be written and has no file yet: as one that's waiting, only its class changes.
-            if (row.Status is Queued or Working || row.Status == Failed && string.IsNullOrEmpty(row.MdPath))
+            // One with no file yet (waiting, being written, or one that couldn't be written): only its class changes. The
+            // pipeline writes the file when it's done (or tried again) and keeps this choice (see Finish).
+            if (row.Status is Queued or Working or Failed && string.IsNullOrEmpty(row.MdPath))
             {
-                // The pipeline writes the file when it's done (or tried again) and keeps this choice (see Finish).
                 Exec("UPDATE notes SET class_name=?, classified_by=?, confidence=1.0 WHERE id=?", className, by, noteId);
-                return string.IsNullOrEmpty(row.MdPath) ? null : row.MdPath;
+                return null;
             }
+            // One with a file moves now, edits in it and all: left behind, a rewrite that then failed or wrote nothing would
+            // write the library's copy in the new place and drop the old file, edits with it.
             string path = Refile(row, new Classification(className, 1.0, by, row.LectureTitle ?? "", JsonList(row.Topics)), null,
                 text => Notes.WithClass(text, row.ClassName ?? "", className));
-            // A rewrite that failed left a file: it moves (edits in it and all), and the lecture still says it failed.
-            if (row.Status == Failed) Exec("UPDATE notes SET status=?, error=? WHERE id=?", Failed, row.Error ?? "", noteId);
+            // Refile files it as done. One that failed still says so; one waiting for its rewrite, or in the middle of it,
+            // goes back in the queue and is rewritten from where it is now (a rewrite in progress is dropped as changed:
+            // see Finish).
+            if (row.Status is Failed or Queued or Working)
+                Exec("UPDATE notes SET status=?, error=? WHERE id=?", row.Status == Failed ? Failed : Queued, row.Error ?? "", noteId);
             return path;
         }
     }
