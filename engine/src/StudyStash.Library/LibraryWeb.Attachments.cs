@@ -286,7 +286,7 @@ public sealed partial class LibraryWeb
     {
         bool pages = KeepsPages(a) && readingPages.TryAdd(a.Id, 0);
         if (!words && !pages) return;
-        var read = options.ReadDocument ?? DocumentText.ExtractAsync;
+        var read = options.ReadDocument ?? ((file, ct) => DocumentText.ExtractAsync(file, DocumentTextOptions.For(cfg.Home), ct));
         string path = store.AttachmentPath(a);
         // A test's stand-in for reading words reads them alone.
         bool once = pages && options.ReadDocument is null && DocumentText.HasPages(path);
