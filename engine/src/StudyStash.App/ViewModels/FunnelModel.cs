@@ -324,6 +324,8 @@ public sealed partial class FunnelModel : ObservableObject, IDisposable
         AddOn = null;
         addOn.Dispose();
         await StartTypingAsync();
+        // An add-on from an earlier install is in some browser here: the code's line says to choose Paste a new code.
+        if (addOn.FromBefore) Canvas?.HeardOneFromBefore();
     }
 
     /// <summary>Continue on a step that's done (back on it after Back): the next one.</summary>
