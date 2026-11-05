@@ -15,7 +15,7 @@ static class MoveSheet
         try
         {
             return MoveToApplications.Offer(AppContext.BaseDirectory, home, Py.UserHome(), Ask, Machine.Run,
-                Updates.SpawnDetached, Environment.ProcessId, Program.Log);
+                a => Updates.SpawnDetached(a), Environment.ProcessId, Program.Log);
         }
         catch (Exception e) when (e is IOException or UnauthorizedAccessException or System.ComponentModel.Win32Exception or InvalidOperationException)
         {
@@ -41,7 +41,7 @@ static class MoveSheet
                     foreach (var (home, run) in background.All())
                         if (run.Count > 0 && run[0].StartsWith(plan.From.TrimEnd('/') + "/", StringComparison.Ordinal)) background.Stop(home);
                 },
-                Updates.SpawnDetached, Environment.ProcessId, args, Program.Log);
+                a => Updates.SpawnDetached(a), Environment.ProcessId, args, Program.Log);
         }
         catch (Exception e) when (e is IOException or UnauthorizedAccessException or System.ComponentModel.Win32Exception or InvalidOperationException)
         {
