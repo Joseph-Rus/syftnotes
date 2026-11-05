@@ -23,11 +23,18 @@ public static class NewPlace
     {
         var done = new List<string>();
         // The background library (the phone answered with the app closed), registered from the old program: registered
-        // again from this one, which starts it.
+        // again from this one, which starts it. One launchd won't take is said, and the rest is still put right.
         if (background?.Registered(home) is [var was, ..] && Moves.OldProgram(was, program))
         {
-            background.Register(home, program);
-            done.Add("the background library now runs " + program);
+            try
+            {
+                background.Register(home, program);
+                done.Add("the background library now runs " + program);
+            }
+            catch (InvalidOperationException e)
+            {
+                done.Add("the background library: " + e.Message);
+            }
         }
         foreach (var app in aiApps.States())
         {

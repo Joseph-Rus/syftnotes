@@ -165,7 +165,25 @@ public sealed class LibraryService : IDisposable
         try { status = await portStatus(cfg.WebPort); }
         catch (Exception e) when (e is HttpRequestException or SocketException) { status = "free"; }
         if (status == "busy") { SetState(LibraryServiceState.PortTaken, $"Port {cfg.WebPort} is taken by another program."); return; }
-        if (status == "ours") { SetState(LibraryServiceState.Elsewhere); return; }
+        if (status == "ours")
+        {
+            // Taken as it is when it answers as this version, to this password (or when this copy leaves the background
+            // library alone: one run from its disk image). Otherwise it's another version's, which would misread or refuse
+            // every call: the library an older copy that was just ended still runs, or a background one launchd kept
+            // loaded after its plist went. That one goes by its label, and this app's own starts once the port is free.
+            if (Background is not { } own || await health(cfg) is { } said && said.Version == Engine.Version)
+            {
+                SetState(LibraryServiceState.Elsewhere);
+                return;
+            }
+            log($"[library] the library on port {cfg.WebPort} isn't this version, or doesn't take this password: waiting for it to stop");
+            await Task.Run(() => own.System.Stop(home));
+            if (!await WaitPortFreeAsync())
+            {
+                SetState(LibraryServiceState.PortTaken, $"Port {cfg.WebPort} is taken by another program.");
+                return;
+            }
+        }
         await SpawnAsync();
     }
 
@@ -239,11 +257,9 @@ public sealed class LibraryService : IDisposable
         string.Equals(Path.GetFullPath(a), Path.GetFullPath(b), OperatingSystem.IsWindows() ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal);
 
     /// <summary>Up to 15 s for the port to be let go (a background library stopping): a child started sooner couldn't
-    /// listen on it.</summary>
-    async Task WaitPortFreeAsync()
-    {
-        await Poll.UntilAsync(async _ => await portStatus(cfg.WebPort) == "free", TimeSpan.FromMilliseconds(100), TimeSpan.FromSeconds(15));
-    }
+    /// listen on it. False when it's still taken.</summary>
+    Task<bool> WaitPortFreeAsync() =>
+        Poll.UntilAsync(async _ => await portStatus(cfg.WebPort) == "free", TimeSpan.FromMilliseconds(100), TimeSpan.FromSeconds(15));
 
     /// <summary>
     /// Settings → Phone's switch, Google connected or disconnected, or this computer no longer just this computer: the

@@ -475,8 +475,12 @@ public sealed partial class AppHost : IDisposable, IProblemSource
     /// <summary>The library answering is the background one.</summary>
     public bool LibraryInBackground => LocalLibrary?.InBackground == true;
 
-    BackgroundPlan MakeBackgroundPlan()
+    /// <summary>The background library this copy may register, or none for a Mac copy run from its disk image or a
+    /// translocation folder: launchd would keep a program there that's gone once the image is ejected or the Mac
+    /// restarts, so such a copy leaves the background library as the copy in Applications set it up.</summary>
+    BackgroundPlan? MakeBackgroundPlan()
     {
+        if (Moves.Passing(Desktop.Program)) return null;
         // The self-test's stand-in for Google Drive goes along, so its phone is answered with the app closed too.
         IReadOnlyList<string>? extra = SelfTest.Dir is not null && StudyStash.Core.TestSwitches.Get("STUDYSTASH_DRIVE_FOLDER") is { Length: > 0 } folder
             ? ["--drive-folder", folder] : null;

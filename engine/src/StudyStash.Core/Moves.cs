@@ -24,7 +24,8 @@ public static class Moves
 
     /// <summary>True when <paramref name="command"/> is this app's program as it was before it moved, so whatever names
     /// it should name <paramref name="current"/> instead: it's our program by name, it isn't the current one, and it is
-    /// gone or in one of the old places. <paramref name="exists"/> is File.Exists unless a test says otherwise.</summary>
+    /// gone, in one of the old places, or somewhere a copy only runs for a while (<see cref="Passing"/>).
+    /// <paramref name="exists"/> is File.Exists unless a test says otherwise.</summary>
     public static bool OldProgram(string? command, string current, Func<string, bool>? exists = null)
     {
         if (string.IsNullOrWhiteSpace(command) || !NamedLikeOurs(command)) return false;
@@ -32,7 +33,16 @@ public static class Moves
         if (string.Equals(command, current, same)) return false;
         string slashes = command.Replace('\\', '/');
         bool oldPlace = OldPlaces.Any(p => command.Contains(p, StringComparison.OrdinalIgnoreCase) || slashes.Contains(p, StringComparison.OrdinalIgnoreCase));
-        return oldPlace || !(exists ?? File.Exists)(command);
+        return oldPlace || Passing(command) || !(exists ?? File.Exists)(command);
+    }
+
+    /// <summary>A Mac copy run from somewhere it only stays for a while: its disk image (/Volumes) or the translocation
+    /// folder Gatekeeper runs a download from. What names a program there (a login item, an AI app's connection, the
+    /// background library) stops working once the image is ejected or the Mac restarts.</summary>
+    public static bool Passing(string program)
+    {
+        string path = program.Replace('\\', '/');
+        return path.StartsWith("/Volumes/", StringComparison.Ordinal) || path.Contains("/AppTranslocation/", StringComparison.Ordinal);
     }
 
     /// <summary>The files that make a folder an Inno Setup install of this app, deleted last so a folder only partly

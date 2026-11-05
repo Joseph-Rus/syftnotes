@@ -14,6 +14,9 @@ public class MovesTests
         Assert.True(Moves.OldProgram("/home/sam/.local/share/syft-notes/StudyStash", now, Exists));
         // Ours by name and gone: a copy that was moved or deleted.
         Assert.True(Moves.OldProgram("/somewhere/gone/StudyStash", now, _ => false));
+        // A copy run from its disk image or a translocation folder, there now but not for long.
+        Assert.True(Moves.OldProgram("/Volumes/Syft Notes/Syft Notes.app/Contents/MacOS/StudyStash", now, Exists));
+        Assert.True(Moves.OldProgram("/private/var/folders/x/T/AppTranslocation/ABC/d/Syft Notes.app/Contents/MacOS/StudyStash", now, Exists));
         // Left alone: this program, another copy that's still there (a build folder), and someone else's program.
         Assert.False(Moves.OldProgram(now, now, _ => false));
         Assert.False(Moves.OldProgram("/Users/sam/dev/bin/StudyStash", now, Exists));
