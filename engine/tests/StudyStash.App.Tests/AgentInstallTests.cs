@@ -245,8 +245,13 @@ public sealed class AgentInstallTests
         using var signIn = new AgentSignIn(AgentCli.Codex, exe);
         var state = signIn.Check();
         Assert.Equal(new AgentSignedIn(true), state);
+        // app.log stays open for writing while the tests run (Program.Log keeps it), and Windows refuses
+        // File.ReadAllText on a file open for writing: read it the way the log shares it.
         foreach (string log in Directory.EnumerateFiles(Path.Combine(Program.Home, "logs")))
-            Assert.DoesNotContain("FAKEKEY42", File.ReadAllText(log));
+        {
+            using var reader = new StreamReader(new FileStream(log, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete));
+            Assert.DoesNotContain("FAKEKEY42", reader.ReadToEnd());
+        }
         Assert.DoesNotContain(Directory.EnumerateFiles(home.Path, "*", SearchOption.AllDirectories),
             f => !f.EndsWith(".ps1", StringComparison.Ordinal) && !f.EndsWith("codex", StringComparison.Ordinal) && File.ReadAllText(f).Contains("FAKEKEY42", StringComparison.Ordinal));
     }
