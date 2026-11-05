@@ -228,6 +228,56 @@ public class FunnelTests
     }
 
     [AvaloniaFact]
+    public async Task An_add_on_from_before_with_an_old_key_gets_this_library_s_code_to_paste_once_it_knocks_after_Add()
+    {
+        using var home = new TempHome();
+        var now = DateTimeOffset.Parse("2026-11-02T09:00:00Z");
+        var log = new List<(string What, string Arg)>();
+        var handler = new FakeLibrary()
+            .Json(HttpMethod.Post, "/api/v2/canvas/pair", """{"until":"2026-11-02T09:05:00Z"}""")
+            .Json(HttpMethod.Get, "/api/v2/canvas/extension", "extension")
+            .Json(HttpMethod.Get, "/api/v2/canvas/state", """{"state": "no_extension", "url": "https://school.instructure.com", "extension": {"connected": false, "refused_at": "2026-11-02T08:59:40Z"}}""");
+        var context = CanvasFixtures.Context(handler, log: log, browsers: [Browsers.Firefox]);
+        var watch = new CanvasWatch(context) { Extension = new ExtensionKeeper(home.Path, () => context.Client) };
+        using var addOn = new AddOnModel(context, watch, () => now);
+        await addOn.AddCommand.ExecuteAsync(null);
+        await watch.RefreshAsync();
+        Assert.True(addOn.ShowStoreSteps); // a knock from before Add says nothing about the add-on being added now
+        Assert.False(addOn.ShowPaste);
+
+        // Firefox's add-on from an earlier install knocks again with its old key: this library's code, to paste in its button.
+        now += TimeSpan.FromSeconds(30);
+        handler.Json(HttpMethod.Get, "/api/v2/canvas/state", """{"state": "no_extension", "url": "https://school.instructure.com", "extension": {"connected": false, "refused_at": "2026-11-02T09:00:20Z"}}""");
+        await watch.RefreshAsync();
+        Assert.True(addOn.ShowPaste);
+        Assert.False(addOn.ShowStoreSteps);
+        Assert.Equal("Connect Firefox again", addOn.AddedLine);
+        Assert.Equal("Firefox already has Syft Notes from before. Click the Syft Notes button in Firefox's toolbar, choose Paste a new code, and paste this:", addOn.PasteLine);
+        Assert.Equal(new ExtensionConnection("https://library.test", "test-key-abc123", "https://school.instructure.com"), Extension.ReadConnectionCode(addOn.ConnectionCode));
+        addOn.CopyCodeCommand.Execute(null);
+        Assert.Contains(("Copy", addOn.ConnectionCode), log);
+
+        // Pasted: it checks in with this library's key, and the step is done as always.
+        handler.Json(HttpMethod.Get, "/api/v2/canvas/state", """{"state": "connected", "url": "https://school.instructure.com", "extension": {"connected": true, "browser": "Firefox"}}""");
+        await watch.RefreshAsync();
+        Assert.True(addOn.IsDone);
+        Assert.False(addOn.ShowPaste);
+
+        // A library with no Canvas address yet (a fresh install) has no code to give: the step that asks for the school's.
+        var fresh = new FakeLibrary()
+            .Json(HttpMethod.Post, "/api/v2/canvas/pair", """{"until":"2026-11-02T09:05:00Z"}""")
+            .Json(HttpMethod.Get, "/api/v2/canvas/state", """{"state": "not_set_up", "url": "", "extension": {"connected": false, "refused_at": "2026-11-02T09:00:20Z"}}""");
+        var freshContext = CanvasFixtures.Context(fresh, browsers: [Browsers.Firefox]);
+        var freshWatch = new CanvasWatch(freshContext);
+        using var freshAddOn = new AddOnModel(freshContext, freshWatch, () => DateTimeOffset.Parse("2026-11-02T09:00:00Z"));
+        bool typing = false;
+        freshAddOn.OnTypeInstead = () => typing = true;
+        await freshAddOn.AddCommand.ExecuteAsync(null);
+        await freshWatch.RefreshAsync();
+        Assert.True(typing);
+    }
+
+    [AvaloniaFact]
     public async Task A_version_the_library_heard_yesterday_changes_nothing_until_a_fresh_check_in_says_it_is_older()
     {
         var now = DateTimeOffset.Parse("2026-11-02T09:00:00Z");
