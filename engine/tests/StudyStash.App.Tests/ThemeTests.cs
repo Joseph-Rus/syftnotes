@@ -125,8 +125,8 @@ public partial class ThemeTests
         return (Math.Max(x, y) + 0.05) / (Math.Min(x, y) + 0.05);
     }
 
-    /// <summary>Words read: every grey on the page and on a card, and the words on every fill, at 4.5:1 or better,
-    /// light and dark.</summary>
+    /// <summary>Words read: every grey on the page and on a card, and the words on every fill and every class's
+    /// highlighter, at 4.5:1 or better, light and dark.</summary>
     [AvaloniaFact]
     public void Text_on_every_surface_and_fill_reads()
     {
@@ -136,6 +136,9 @@ public partial class ThemeTests
             ("Ink", "Canvas"), ("InkMuted", "Canvas"), ("TextFade1", "Surface"), ("TextFade2", "Surface"), ("TextFade3", "Surface"),
             ("OnAccent", "Accent"), ("OnSelected", "Selected"), ("SelectedMuted", "Selected"), ("OnRecording", "Recording"),
             ("OnHighlight", "Highlight"), ("Ink", "Hl"), ("Ink", "Chip"), ("InkMuted", "Chip"),
+            ("Ink", "Card"), ("InkMuted", "Card"), ("InkSubtle", "Card"),
+            .. Skin.ClassHues.Select(h => ("OnHighlight", "Hl" + h)),
+            .. Skin.ClassHues.Select(h => ("Ink", "HlQuiet" + h)),
         ];
         var failures = new List<string>();
         foreach (var kind in Looks)

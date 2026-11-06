@@ -77,7 +77,7 @@ public sealed class Highlight : TextBlock
     /// the rest hangs outside, so a marked line starts level with a plain one beside it. In ems.</summary>
     const double Reach = 0.28, Inset = 0.18;
 
-    readonly ClassShade marker, strike;
+    readonly ClassShade marker, under, strike;
 
     static Highlight() => AffectsRender<Highlight>(FillProperty, StruckProperty, OutlinedProperty, UnderProperty);
 
@@ -85,7 +85,9 @@ public sealed class Highlight : TextBlock
     {
         // The swipe hangs a little past the words' own box.
         ClipToBounds = false;
-        marker = new ClassShade(this, "Hl", "Hover");
+        marker = new ClassShade(this, "Hl", "Hover", Marked);
+        // Under a folder's title the words stay the page's ink, so in dark its line is a deep shade of the class.
+        under = new ClassShade(this, "HlQuiet", "Hover");
         strike = new ClassShade(this, "Swatch", "InkSubtle", Strike);
         Padding = new Thickness(Inset * FontSize, 0);
     }
@@ -122,11 +124,24 @@ public sealed class Highlight : TextBlock
         if (change.Property == FillProperty)
         {
             marker.Follow(Fill);
+            under.Follow(Fill);
             strike.Follow(Fill);
         }
-        else if (change.Property == FontSizeProperty || change.Property == UnderProperty) Padding = new Thickness(Under ? 0 : Inset * FontSize, 0);
-        else if (change.Property == StruckProperty) Strike();
+        else if (change.Property == FontSizeProperty || change.Property == UnderProperty)
+        {
+            Padding = new Thickness(Under ? 0 : Inset * FontSize, 0);
+            Marked();
+        }
+        else if (change.Property == StruckProperty)
+        {
+            Strike();
+            Marked();
+        }
     }
+
+    /// <summary>:marked while the words sit on a class's own highlighter (not struck, not a line under them): the
+    /// highlighter is the same bright one light and dark, so its words take the ink that reads on it (Styles.axaml).</summary>
+    void Marked() => PseudoClasses.Set(":marked", !Struck && !Under && Skin.HueOf(Fill) is not null && marker.Brush is not null);
 
     /// <summary>Handed in: struck through, two pixels of the class's colour.</summary>
     void Strike() => TextDecorations = !Struck ? null :
@@ -136,7 +151,7 @@ public sealed class Highlight : TextBlock
 
     protected override void RenderTextLayout(DrawingContext context, Point origin)
     {
-        if (!Struck && marker.Brush is { } brush)
+        if (!Struck && (Under ? under : marker).Brush is { } brush)
         {
             double em = FontSize;
             // A line's swipe is as tall as the type itself (its ascent and descent), not the line: lines that sit
