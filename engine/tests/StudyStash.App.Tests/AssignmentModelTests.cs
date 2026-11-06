@@ -201,4 +201,66 @@ public class AssignmentModelTests
         Assert.Equal("Lab 3: recursion traces", model.Title);
         Assert.Equal("?class=CS%20101&id=9001", Assert.Single(fake.Requests).Query);
     }
+
+    const string DueMissing = """
+        {"to_hand_in": 1, "groups": [{"key": "overdue", "label": "Overdue", "items": [{"class": "CS 101", "id": 9001, "name": "Lab 3: recursion traces", "kind": "assignment", "status": "missing", "mark": ""}]}]}
+        """;
+    const string DueDone = """
+        {"to_hand_in": 0, "groups": [{"key": "handed_in", "label": "Handed in", "items": [{"class": "CS 101", "id": 9001, "name": "Lab 3: recursion traces", "kind": "assignment", "status": "missing", "mark": "done"}]}]}
+        """;
+
+    /// <summary>"Mark as done" on a missing assignment: the page reads "Done (marked by you)" with Undo, the app's one copy
+    /// of the Due list (what Home, the Due tab, the calendar and the sidebar's count read) no longer has it as overdue or
+    /// counted, and Undo puts it back. The mark is the student's own: it's sent to the library, never to Canvas.</summary>
+    [Fact]
+    public async Task Marking_a_missing_assignment_done_takes_it_off_the_Due_list_and_Undo_puts_it_back()
+    {
+        var library = new FakeLibrary().Json(HttpMethod.Get, "/api/v2/canvas/due", DueMissing).Json(HttpMethod.Post, "/api/v2/canvas/mark", DueDone);
+        var context = CanvasFixtures.Context(library);
+        using var feed = new CanvasFeed(context);
+        var changed = new List<string>();
+        feed.Updated += touched => changed.AddRange(touched!);
+        Assert.True(await feed.LoadAsync(TestContext.Current.CancellationToken));
+        string Overdue() => $"{feed.Due!.ToHandIn} [{string.Join(", ", feed.Due!.Groups.Where(g => g.Key == "overdue").SelectMany(g => g.Items).Select(i => i.Name))}]";
+        Assert.Equal("1 [Lab 3: recursion traces]", Overdue());
+
+        var detail = CanvasFixtures.Load<CanvasApi.AssignmentDetail>("assignment-9001") with { Status = "missing", Label = "Missing", Missing = true };
+        var page = new AssignmentModel(context, (cls, kind, id, mark, stop) => feed.MarkAsync(cls, kind, id, mark, stop));
+        page.Show(detail);
+        Assert.Equal((true, false), (page.Marks.CanMark, page.Marks.ShowDone));
+
+        await page.Marks.MarkDoneCommand.ExecuteAsync(null);
+
+        Assert.Equal("""{"class":"CS 101","kind":"assignment","id":9001,"mark":"done"}""", Assert.Single(library.Requests, r => r.Path == "/api/v2/canvas/mark").Body);
+        Assert.Equal((false, true), (page.Marks.CanMark, page.Marks.ShowDone));
+        Assert.Equal("0 []", Overdue());
+        Assert.Equal(["CS 101"], changed); // the screens are told which class changed
+
+        library.Json(HttpMethod.Post, "/api/v2/canvas/mark", DueMissing);
+        await page.Marks.UndoItCommand.ExecuteAsync(null);
+
+        Assert.Equal("""{"class":"CS 101","kind":"assignment","id":9001,"mark":""}""", library.Requests.Last(r => r.Path == "/api/v2/canvas/mark").Body);
+        Assert.Equal((true, false), (page.Marks.CanMark, page.Marks.ShowDone));
+        Assert.Equal("1 [Lab 3: recursion traces]", Overdue());
+
+        // The page opened again later, with the mark kept in the library, reads done.
+        page.Show(detail with { Mark = "done" });
+        Assert.Equal((false, true), (page.Marks.CanMark, page.Marks.ShowDone));
+
+        // Closed and never handed in (the page the student sees for a missed one) offers it too; work already handed in offers nothing.
+        page.Show(detail with { Submission = new CanvasApi.SubmissionInfo { State = "unsubmitted" }, LockAt = CanvasFixtures.Now.AddDays(-2) });
+        Assert.True(page.Marks.CanMark);
+        page.Show(CanvasFixtures.Load<CanvasApi.AssignmentDetail>("assignment-9002"));
+        Assert.False(page.Marks.Showing);
+        // Graded with no hand-in on record (graded on paper, or an older index): nothing to mark.
+        page.Show(detail with { Status = "graded", Label = "Graded", Missing = false });
+        Assert.False(page.Marks.CanMark);
+
+        // A library that can't take the mark: the page says so in words and nothing changes.
+        using var gone = new CanvasFeed(CanvasFixtures.Context(new FakeLibrary()));
+        var offline = new AssignmentModel(context, (cls, kind, id, mark, stop) => gone.MarkAsync(cls, kind, id, mark, stop));
+        offline.Show(detail);
+        await offline.Marks.MarkDoneCommand.ExecuteAsync(null);
+        Assert.Equal((false, true), (offline.Marks.ShowDone, offline.Marks.Action.Say is { Length: > 0 }));
+    }
 }

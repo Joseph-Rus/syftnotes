@@ -355,7 +355,7 @@ public static partial class Shell
     /// page of its own; anything else the library no longer knows opens nothing rather than an empty page.</summary>
     static async Task<AssignmentModel?> AssignmentAsync(string cls, string id, CanvasApi.Item? row)
     {
-        var page = new AssignmentModel(Canvas()) { OnSearch = ToggleQuick, OnTidy = TestSwitches.On ? TidyFor(cls, id) : null };
+        var page = new AssignmentModel(Canvas(), CanvasMarker()) { OnSearch = ToggleQuick, OnTidy = TestSwitches.On ? TidyFor(cls, id) : null };
         try
         {
             if (row is { Kind: "todo" or "to-do" }) page.ShowTodo(row);
