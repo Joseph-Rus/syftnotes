@@ -175,7 +175,7 @@ public sealed partial class AssignmentModel(CanvasContext context) : ObservableO
 
     /// <summary>The chip's icon by the file's format: a document type the design draws its own way, code by
     /// extension, everything else a plain draft page.</summary>
-    static string FileGlyph(string? format) => format?.ToLowerInvariant() switch
+    internal static string FileGlyph(string? format) => format?.ToLowerInvariant() switch
     {
         "pdf" => "picture_as_pdf",
         "py" or "js" or "ts" or "java" or "c" or "cpp" or "cs" or "ipynb" or "rb" or "go" => "code",
@@ -262,4 +262,14 @@ public sealed partial class AssignmentModel(CanvasContext context) : ObservableO
 
     [RelayCommand]
     void Search() => OnSearch?.Invoke();
+
+    /// <summary>This hand-in waits on "Ready to tidy" (Submit &amp; Organize, test builds only): "Your submission" offers
+    /// Tidy up, which opens the tidy card. Null when nothing waits.</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(CanTidy))]
+    public partial Action? OnTidy { get; set; }
+    public bool CanTidy => OnTidy is not null;
+
+    [RelayCommand]
+    void TidyUp() => OnTidy?.Invoke();
 }

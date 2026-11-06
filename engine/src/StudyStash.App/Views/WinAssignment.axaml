@@ -63,6 +63,8 @@
             <StackPanel Orientation="Horizontal" Spacing="10">
               <c:PageText Classes="cv-sub-status" Text="{Binding SubmissionStatus}" />
               <c:PageText Classes="cv-sub-detail" Text="{Binding SubmissionDetail}" IsVisible="{Binding HasSubmissionDetail}" VerticalAlignment="Bottom" />
+              <Button Classes="btn sm" VerticalAlignment="Center" IsVisible="{Binding CanTidy}" Command="{Binding TidyUpCommand}"
+                      Content="{x:Static vm:FilingWords.TidyUp}" AutomationProperties.Name="{x:Static vm:FilingWords.TidyUp}" />
             </StackPanel>
             <c:PageText Classes="cv-sub-detail" Text="{Binding SubmissionBody}" IsVisible="{Binding HasSubmissionBody}" TextWrapping="Wrap" />
             <StackPanel Spacing="2" IsVisible="{Binding HasComment}">
