@@ -788,6 +788,10 @@
   <Style Selector="Button.lecture:pointerover TextBlock.lecture-title">
     <Setter Property="TextDecorations" Value="Underline" />
   </Style>
+  <!-- Words on a class's highlighter: the ink that reads on it, light and dark (the highlighters are bright in both). -->
+  <Style Selector="c|Highlight:marked">
+    <Setter Property="Foreground" Value="{DynamicResource OnHighlight}" />
+  </Style>
   <Style Selector="c|Highlight.lecture-class">
     <Setter Property="FontSize" Value="13.5" />
     <Setter Property="FontWeight" Value="SemiBold" />
@@ -1342,7 +1346,7 @@
   <!-- Notes from an AI Syft Notes doesn't run, on a note's page (the Claude app, any free chat): the offer over a
        lecture with no notes, a long lecture's copy in parts, and the box a chat's notes are pasted into. -->
   <Style Selector="Border.free-ai">
-    <Setter Property="Background" Value="{DynamicResource Surface}" />
+    <Setter Property="Background" Value="{DynamicResource Card}" />
     <Setter Property="CornerRadius" Value="{DynamicResource RadiusPanel}" />
     <Setter Property="BorderBrush" Value="{DynamicResource Line}" />
     <Setter Property="BorderThickness" Value="1" />
@@ -1352,7 +1356,7 @@
        Its hairline (and every card's and pill's) is a border inside its corners, never a 1 px shadow ring outside
        them: whatever holds a ring at its edge cuts that side off, and a ring thins round its corners. -->
   <Style Selector="Border.study-card">
-    <Setter Property="Background" Value="{DynamicResource Surface}" />
+    <Setter Property="Background" Value="{DynamicResource Card}" />
     <Setter Property="CornerRadius" Value="{DynamicResource RadiusPanel}" />
     <Setter Property="BorderBrush" Value="{DynamicResource Line}" />
     <Setter Property="BorderThickness" Value="1" />
@@ -1444,10 +1448,10 @@
     <Setter Property="CornerRadius" Value="4" />
   </Style>
   <Style Selector="Border.diff-line.added">
-    <Setter Property="Background" Value="{DynamicResource HlGreen}" />
+    <Setter Property="Background" Value="{DynamicResource HlQuietGreen}" />
   </Style>
   <Style Selector="Border.diff-line.removed">
-    <Setter Property="Background" Value="{DynamicResource HlPink}" />
+    <Setter Property="Background" Value="{DynamicResource HlQuietPink}" />
   </Style>
   <Style Selector="TextBlock.diff-text">
     <Setter Property="FontSize" Value="13.5" />

@@ -20,7 +20,7 @@
     </Style>
     <!-- A card being reviewed: the question big, the answer under a hairline once it shows. -->
     <Style Selector="Border.flashcard">
-      <Setter Property="Background" Value="{DynamicResource Surface}" />
+      <Setter Property="Background" Value="{DynamicResource Card}" />
       <Setter Property="CornerRadius" Value="{DynamicResource RadiusPanel}" />
       <Setter Property="BorderBrush" Value="{DynamicResource Line}" />
       <Setter Property="BorderThickness" Value="1" />
