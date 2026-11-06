@@ -51,7 +51,9 @@ public static partial class Shell
         canvasFeed = new CanvasFeed(context, watch);
         canvasFeed.Updated += touched => Dispatcher.UIThread.Post(() => Run(() => CanvasUpdatedAsync(touched), "CanvasUpdated"));
         canvasNotifier = new CanvasNotifier(context) { OnOpen = OpenCanvasNotification };
-        if (TestSwitches.On) FollowTidy(context, watch);
+#if TEST_HELPERS // a student's copy leaves it out (an if on the const would be unreachable code there)
+        FollowTidy(context, watch);
+#endif
     }
 
     /// <summary>Canvas is watched while the app has a library that answers, and not otherwise.</summary>
