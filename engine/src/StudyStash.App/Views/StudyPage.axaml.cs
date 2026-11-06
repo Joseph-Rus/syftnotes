@@ -1,5 +1,6 @@
 using Avalonia.Controls;
 using Avalonia.Input;
+using Avalonia.Interactivity;
 using StudyStash.App.ViewModels;
 
 namespace StudyStash.App.Views;
@@ -12,6 +13,9 @@ public partial class StudyPage : UserControl
         // Reviewing by keys: Space shows the answer, 1 to 4 say how it went.
         AddHandler(KeyDownEvent, OnKey, Avalonia.Interactivity.RoutingStrategies.Tunnel);
     }
+
+    /// <summary>A class picked in Another exam's menu closes the menu.</summary>
+    void OnPicked(object? sender, RoutedEventArgs e) => Menus.Close(sender as Control);
 
     void OnKey(object? sender, KeyEventArgs e)
     {

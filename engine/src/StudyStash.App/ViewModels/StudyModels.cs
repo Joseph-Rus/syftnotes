@@ -1,6 +1,7 @@
 using System.Collections.ObjectModel;
 using System.Runtime.CompilerServices;
 using System.Text.Json;
+using Avalonia.Media;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using StudyStash.Core;
@@ -303,9 +304,10 @@ public sealed partial class ReviewSessionModel(IStudyLibrary library, Func<DateT
 }
 
 /// <summary>One class's line on the Study page: its name and swatch, its cards due, and a way to review just them.</summary>
-public sealed class StudyClassRow(string name, int due, IRelayCommand review)
+public sealed class StudyClassRow(string name, int due, IRelayCommand review, IBrush dot)
 {
     public string Name { get; } = name;
+    public IBrush Dot { get; } = dot;
     public string Display => ClassNames.Display(Name);
     public int Due { get; } = due;
     public string DueSaid => Due == 1 ? "1 due" : $"{Due} due";
@@ -353,9 +355,12 @@ public sealed partial class StudyModel(IStudyLibrary library, Func<DateTimeOffse
 
     public bool HasDue => Due > 0;
     public bool NoCards => !Loading && Total == 0;
+    /// <summary>Review's card, with cards in it; or, with none yet, the dashed one that says how to make some.</summary>
+    public bool ShowReview => Available && !Loading && Total > 0;
+    public bool ShowNoCards => Available && NoCards;
     public string DueTitle => Due == 0 ? (Total == 0 ? "No cards yet" : "All caught up") : Due == 1 ? "1 card to review" : $"{Due} cards to review";
     public string DueMore => Total == 0
-        ? "Open a lecture and press Make review cards: your AI writes flashcards from its notes, and they come back here just before you'd forget them."
+        ? "Open a lecture and press Make review cards: they come back here just before you'd forget them."
         : Due == 0 ? $"{Total} cards in Review. The next ones come back when they're due."
         : "A few minutes now keeps them for the exam.";
 
@@ -366,13 +371,43 @@ public sealed partial class StudyModel(IStudyLibrary library, Func<DateTimeOffse
     partial void OnDueChanged(int value) => Said();
     partial void OnTotalChanged(int value) => Said();
     partial void OnLoadingChanged(bool value) => Said();
+    partial void OnAvailableChanged(bool value) => Said();
     partial void OnSessionChanged(ReviewSessionModel? value) => Shown();
     partial void OnPrepChanged(ExamPrepModel? value) => Shown();
     partial void OnNewClassChanged(string? value)
     {
         foreach (var c in ClassChoices) c.Picked = c.Name == value;
+        OnPropertyChanged(nameof(NewClassShown));
+        OnPropertyChanged(nameof(NewClassDot));
+        OnPropertyChanged(nameof(NewCovers));
         NewChanged();
     }
+
+    /// <summary>The class the new prep is for, as its picker shows it.</summary>
+    public string NewClassShown => NewClass is { } c ? ClassNames.Display(c) : "";
+    public IBrush NewClassDot => NewClass is { } c ? DotOf(c) : Brushes.Gray;
+
+    /// <summary>"Another exam" pressed: its row (the class, a name, Write the prep) shows. With no exams listed it
+    /// shows straight away.</summary>
+    [ObservableProperty] public partial bool AddingAnother { get; set; }
+    public bool ShowAnother => HasClassChoices && (AddingAnother || !HasExams);
+    public bool ShowAnotherButton => HasClassChoices && HasExams && !AddingAnother;
+    /// <summary>The exams' card: the exams, and Another exam (or its row).</summary>
+    public bool HasExamCard => HasExams || HasClassChoices;
+    public string ExamsSaid => HasExams ? "From Canvas and your calendar" : "None coming up in Canvas or your calendar";
+    /// <summary>Under the new prep's row: what it's written from.</summary>
+    public string NewCovers => NewClass is null ? "" : $"From {NewClassShown}'s lectures since its last exam.";
+    partial void OnAddingAnotherChanged(bool value) => Another();
+
+    void Another()
+    {
+        OnPropertyChanged(nameof(ShowAnother));
+        OnPropertyChanged(nameof(ShowAnotherButton));
+        OnPropertyChanged(nameof(HasExamCard));
+        OnPropertyChanged(nameof(ExamsSaid));
+    }
+
+    [RelayCommand] void AddAnother() => AddingAnother = true;
     partial void OnNewTitleChanged(string value) => NewChanged();
     partial void OnMakingNewChanged(bool value) => NewChanged();
     partial void OnNewProblemChanged(string? value) => OnPropertyChanged(nameof(HasNewProblem));
@@ -395,6 +430,8 @@ public sealed partial class StudyModel(IStudyLibrary library, Func<DateTimeOffse
     {
         OnPropertyChanged(nameof(HasDue));
         OnPropertyChanged(nameof(NoCards));
+        OnPropertyChanged(nameof(ShowReview));
+        OnPropertyChanged(nameof(ShowNoCards));
         OnPropertyChanged(nameof(DueTitle));
         OnPropertyChanged(nameof(DueMore));
     }
@@ -414,7 +451,7 @@ public sealed partial class StudyModel(IStudyLibrary library, Func<DateTimeOffse
                 foreach (var g in state.Due.Where(c => c.Class.Length > 0).GroupBy(c => c.Class).OrderByDescending(g => g.Count()))
                 {
                     string cls = g.Key;
-                    ByClass.Add(new StudyClassRow(cls, g.Count(), new AsyncRelayCommand(() => ReviewAsync(cls))));
+                    ByClass.Add(new StudyClassRow(cls, g.Count(), new AsyncRelayCommand(() => ReviewAsync(cls)), DotOf(cls)));
                 }
                 OnCount?.Invoke(Due);
             }
@@ -428,14 +465,30 @@ public sealed partial class StudyModel(IStudyLibrary library, Func<DateTimeOffse
         Loading = false;
     }
 
-    /// <summary>The classes a new exam prep can be for (the host gives the library's).</summary>
-    public void Classes(IEnumerable<string> names)
+    /// <summary>The classes a new exam prep can be for (the host gives the library's, each with its colour).</summary>
+    public void Classes(IEnumerable<string> names) => Classes(names.Select(n => (n, (IBrush)Brushes.Gray)));
+
+    public void Classes(IEnumerable<(string Name, IBrush Dot)> classes)
     {
         ClassChoices.Clear();
-        foreach (string n in names) ClassChoices.Add(new ExamClassChoice(n, new RelayCommand(() => NewClass = n)) { Picked = n == NewClass });
+        dots.Clear();
+        foreach (var (n, dot) in classes)
+        {
+            dots[n] = dot;
+            ClassChoices.Add(new ExamClassChoice(n, new RelayCommand(() => NewClass = n), dot) { Picked = n == NewClass });
+        }
         NewClass ??= ClassChoices.FirstOrDefault()?.Name;
         OnPropertyChanged(nameof(HasClassChoices));
+        OnPropertyChanged(nameof(NewClassShown));
+        OnPropertyChanged(nameof(NewClassDot));
+        OnPropertyChanged(nameof(NewCovers));
+        Another();
     }
+
+    readonly Dictionary<string, IBrush> dots = [];
+
+    /// <summary>A class's colour, grey for one the library doesn't list.</summary>
+    IBrush DotOf(string cls) => dots.GetValueOrDefault(cls, Brushes.Gray);
 
     /// <summary>The exams coming up and the prep made: each exam once, its prep beside it when it has one.</summary>
     public async Task LoadExamsAsync()
@@ -455,6 +508,7 @@ public sealed partial class StudyModel(IStudyLibrary library, Func<DateTimeOffse
         if (now is null)
         {
             OnPropertyChanged(nameof(HasExams));
+            Another();
             return;
         }
         var t = clock();
@@ -470,6 +524,7 @@ public sealed partial class StudyModel(IStudyLibrary library, Func<DateTimeOffse
         }
         foreach (var r in rows.OrderBy(r => r.When is null).ThenBy(r => r.When)) Exams.Add(r);
         OnPropertyChanged(nameof(HasExams));
+        Another();
     }
 
     ExamRow Row(string cls, string title, DateTimeOffset? when, DateTimeOffset now)
@@ -477,7 +532,7 @@ public sealed partial class StudyModel(IStudyLibrary library, Func<DateTimeOffse
         ExamRow? row = null;
         row = new ExamRow
         {
-            Class = cls, Title = title, When = when, WhenSaid = ExamWhen.Say(when, now),
+            Class = cls, Title = title, When = when, WhenSaid = ExamWhen.Say(when, now), Soon = ExamWhen.Soon(when, now), Dot = DotOf(cls),
             Go = new AsyncRelayCommand(() => row!.PrepId is { } id ? OpenPrepAsync(id) : MakePrepAsync(row)),
         };
         return row;
@@ -583,10 +638,11 @@ public sealed partial class StudyModel(IStudyLibrary library, Func<DateTimeOffse
     }
 }
 
-/// <summary>A class a new exam prep can be for, as a chip: picked or not.</summary>
-public sealed partial class ExamClassChoice(string name, IRelayCommand pick) : ObservableObject
+/// <summary>A class a new exam prep can be for, as a row of its menu: picked or not.</summary>
+public sealed partial class ExamClassChoice(string name, IRelayCommand pick, IBrush dot) : ObservableObject
 {
     public string Name { get; } = name;
+    public IBrush Dot { get; } = dot;
     public string Display => ClassNames.Display(Name);
     public IRelayCommand Pick { get; } = pick;
     [ObservableProperty] public partial bool Picked { get; set; }
