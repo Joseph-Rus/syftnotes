@@ -22,8 +22,9 @@
     <Style Selector="Border.flashcard">
       <Setter Property="Background" Value="{DynamicResource Surface}" />
       <Setter Property="CornerRadius" Value="{DynamicResource RadiusPanel}" />
-      <Setter Property="BoxShadow" Value="{DynamicResource LineRing}" />
-      <Setter Property="Padding" Value="32,28" />
+      <Setter Property="BorderBrush" Value="{DynamicResource Line}" />
+      <Setter Property="BorderThickness" Value="1" />
+      <Setter Property="Padding" Value="31,27" />
       <Setter Property="MinHeight" Value="220" />
     </Style>
     <!-- A practice question's choice: a row the page's width, not a pill. -->

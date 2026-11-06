@@ -155,8 +155,7 @@ public partial class ThemeTests
     static bool Neutral(Color c) => Math.Abs(c.R - c.G) <= 8 && Math.Abs(c.G - c.B) <= 16 && Math.Abs(c.R - c.B) <= 18;
 
     /// <summary>No coloured glow anywhere: every shadow token, in both looks, light and dark, is grey (black, white, a
-    /// hairline's grey), so no colour bleeds round a button, a row or a dot. The one ring with colour in it is the coral
-    /// round a recording.</summary>
+    /// hairline's grey), so no colour bleeds round a button, a row or a dot.</summary>
     [AvaloniaFact]
     public void Every_shadow_is_grey()
     {
@@ -167,7 +166,7 @@ public partial class ThemeTests
             foreach (var variant in Variants)
                 foreach (var (key, type) in Skin.Keys(kind))
                 {
-                    if (type != typeof(BoxShadows) || key == "RecordRing") continue;
+                    if (type != typeof(BoxShadows)) continue;
                     Assert.True(d.TryGetResource(key, variant, out var v) && v is BoxShadows, $"{kind} {variant}: no {key}");
                     foreach (var s in (BoxShadows)v!)
                         if (!Neutral(s.Color)) coloured.Add($"{kind} {variant} {key}: {s.Color}");
