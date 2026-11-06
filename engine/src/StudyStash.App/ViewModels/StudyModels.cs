@@ -354,7 +354,6 @@ public sealed partial class StudyModel(IStudyLibrary library, Func<DateTimeOffse
     public string MakeNewSaid => MakingNew ? "Writing your prep…" : "Write the prep";
 
     public bool HasDue => Due > 0;
-    public bool NoCards => !Loading && Total == 0;
     /// <summary>Review's card, with cards in it; or, with none yet, the dashed one that says how to make some. Both
     /// wait for the first load only: a reload (back from a review) keeps the card where it is.</summary>
     public bool ShowReview => Available && Loaded && Total > 0;
@@ -433,7 +432,6 @@ public sealed partial class StudyModel(IStudyLibrary library, Func<DateTimeOffse
     void Said()
     {
         OnPropertyChanged(nameof(HasDue));
-        OnPropertyChanged(nameof(NoCards));
         OnPropertyChanged(nameof(ShowReview));
         OnPropertyChanged(nameof(ShowNoCards));
         OnPropertyChanged(nameof(DueTitle));
