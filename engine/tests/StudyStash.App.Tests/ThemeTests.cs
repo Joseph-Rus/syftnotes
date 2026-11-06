@@ -76,13 +76,13 @@ public partial class ThemeTests
     {
         (string Key, Color Light, Color Dark)[] want =
         [
-            ("Surface", Syft.Paper, Syft.Ink), ("Ink", Syft.Ink, Syft.Paper), ("InkMuted", Syft.Muted, Color.Parse("#B4B1BC")),
+            ("Surface", Syft.Paper, Syft.Ink), ("Ink", Syft.Ink, Color.Parse("#F3F1F7")), ("InkMuted", Syft.Muted, Color.Parse("#B4B1BC")),
             ("Accent", Syft.Ink, Syft.Paper), ("OnAccent", Syft.Paper, Syft.Ink),
             ("Recording", Syft.Coral, Syft.Coral), ("OnRecording", Syft.Ink, Syft.Ink), ("Record", Syft.Coral, Syft.Coral),
             ("Selected", Syft.Lilac, Syft.Lilac), ("OnSelected", Syft.Ink, Syft.Ink),
             ("Progress", Syft.SkyDeep, Syft.SkyDeepDark), ("ProgressTrack", Syft.MeshLight, Syft.MeshDark),
             ("Highlight", Syft.Mustard, Syft.Mustard), ("SurfaceRaised", Syft.MeshLight, Syft.MeshDark), ("SurfaceSunken", Syft.MeshLight, Syft.MeshDark),
-            ("Chip", Syft.MeshLight, Syft.GhostDark), ("Border", Color.Parse("#E2DFD8"), Syft.GhostDark),
+            ("Chip", Syft.MeshLight, Syft.GhostDark), ("Border", Color.Parse("#E2DFD8"), Color.Parse("#36323F")),
         ];
         foreach (var kind in Looks)
         {
