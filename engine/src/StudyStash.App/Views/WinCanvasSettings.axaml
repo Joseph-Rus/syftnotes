@@ -193,6 +193,9 @@
           </ItemsControl>
         </Border>
       </StackPanel>
+
+      <!-- After you hand in (Submit & Organize): test builds only -->
+      <Panel IsVisible="{Binding HasFiling}" Margin="0,8,0,0"><v:SubmitOrganizeSettings DataContext="{Binding Filing}" /></Panel>
     </StackPanel>
   </ScrollViewer>
 </UserControl>

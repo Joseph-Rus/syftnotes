@@ -1,0 +1,120 @@
+<!-- The tidy card (Submit & Organize, test builds only), on a window's dialog layer (Controls/ConfirmLayer.cs; the toolkit
+     has no lighter overlay): a check, the assignment, its class in its colour; the file handed in as one icon and its
+     name (Yes / Choose another while unsure); the files worked from as a row of icons, the sure ones on and a tap turning
+     one off (faded), why each was picked in its tip; then Tidy up (ink) and a quiet Later. On Tidy up the files fly into
+     a folder in the class's colour (TidyCard.axaml.cs), and the card says Filed, with Undo, and fades. Drawn from the
+     Syft tokens, the same on both systems. -->
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:c="using:StudyStash.App.Controls"
+             xmlns:vm="using:StudyStash.App.ViewModels"
+             x:Class="StudyStash.App.Views.TidyCard"
+             x:DataType="vm:TidyCardModel"
+             Width="400" Focusable="False"
+             AutomationProperties.Name="{Binding Title}">
+  <UserControl.Styles>
+    <!-- A file: its icon over its name, a tap turns it off (faded) or on. Keyboard focus is a ring round the tile only. -->
+    <Style Selector="Button.tidy-file">
+      <Setter Property="Theme" Value="{StaticResource Surface}" />
+      <Setter Property="Width" Value="84" />
+      <Setter Property="Padding" Value="4,6" />
+      <Setter Property="FocusAdorner" Value="{x:Null}" />
+      <Setter Property="CornerRadius" Value="{DynamicResource RadiusControl}" />
+    </Style>
+    <Style Selector="Button.tidy-file.off">
+      <Setter Property="Opacity" Value="0.35" />
+    </Style>
+    <Style Selector="Button.tidy-file Border.focusring">
+      <Setter Property="CornerRadius" Value="{DynamicResource RadiusControl}" />
+      <Setter Property="Margin" Value="-2" />
+    </Style>
+    <Style Selector="Button.tidy-file:focus-visible Border.focusring">
+      <Setter Property="IsVisible" Value="True" />
+    </Style>
+    <Style Selector="TextBlock.tidy-name">
+      <Setter Property="FontSize" Value="{DynamicResource FontCaption}" />
+      <Setter Property="TextAlignment" Value="Center" />
+      <Setter Property="TextTrimming" Value="CharacterEllipsis" />
+      <Setter Property="MaxLines" Value="1" />
+    </Style>
+  </UserControl.Styles>
+
+  <Panel Name="Card" Margin="{DynamicResource Inset5}">
+    <StackPanel Name="Choosing" Spacing="{DynamicResource Space4}" IsVisible="{Binding ShowChoosing}">
+      <Grid ColumnDefinitions="Auto,*">
+        <c:Icon Glyph="check_circle" Size="22" VerticalAlignment="Top" Margin="0,1,0,0" />
+        <StackPanel Grid.Column="1" Spacing="{DynamicResource Space1}" Margin="10,0,0,0">
+          <TextBlock Name="Title" Text="{Binding Title}" FontSize="{DynamicResource FontSubtitle}" FontWeight="SemiBold" TextWrapping="Wrap" />
+          <c:Highlight Classes="lecture-class" Text="{Binding Class}" Fill="{Binding Dot}" HorizontalAlignment="Left" />
+        </StackPanel>
+      </Grid>
+
+      <!-- The file handed in, and the files worked from: one row of icons. -->
+      <WrapPanel Name="Files" ItemSpacing="4" LineSpacing="4">
+        <StackPanel Name="HandedIn" Spacing="{DynamicResource Space1}" IsVisible="{Binding HasHandedIn}">
+          <Border Width="84" Padding="4,6" ToolTip.Tip="{Binding HandedIn.Why}">
+            <StackPanel Spacing="{DynamicResource Space1}">
+              <c:Icon Glyph="{Binding HandedIn.Glyph}" Size="30" HorizontalAlignment="Center" />
+              <TextBlock Classes="tidy-name" Text="{Binding HandedIn.Name}" FontWeight="SemiBold" ToolTip.Tip="{Binding HandedIn.Name}" />
+            </StackPanel>
+          </Border>
+        </StackPanel>
+        <Button Name="ChooseFile" Classes="btn sm" Margin="0,12,8,0" VerticalAlignment="Top" IsVisible="{Binding NoHandedIn}"
+                Command="{Binding ChooseCommand}" Content="{x:Static vm:FilingWords.ChooseTheFile}" />
+        <ItemsControl ItemsSource="{Binding Materials}" ClipToBounds="False">
+          <ItemsControl.ItemsPanel><ItemsPanelTemplate><WrapPanel ItemSpacing="4" LineSpacing="4" /></ItemsPanelTemplate></ItemsControl.ItemsPanel>
+          <ItemsControl.ItemTemplate>
+            <DataTemplate x:DataType="vm:TidyFile">
+              <Button Classes="tidy-file quiet" Classes.off="{Binding !On}" Command="{Binding ToggleCommand}"
+                      ToolTip.Tip="{Binding Why}" AutomationProperties.Name="{Binding Name}">
+                <Panel>
+                  <Border Classes="focusring" />
+                  <StackPanel Spacing="{DynamicResource Space1}">
+                    <c:Icon Glyph="{Binding Glyph}" Size="30" HorizontalAlignment="Center" />
+                    <TextBlock Classes="tidy-name" Text="{Binding Name}" />
+                  </StackPanel>
+                </Panel>
+              </Button>
+            </DataTemplate>
+          </ItemsControl.ItemTemplate>
+        </ItemsControl>
+      </WrapPanel>
+
+      <!-- Not sure of the file handed in: a chip to say. -->
+      <StackPanel Orientation="Horizontal" Spacing="{DynamicResource Space2}" IsVisible="{Binding Unsure}" ToolTip.Tip="{x:Static vm:FilingWords.IsThisIt}">
+        <Button Name="ItIs" Classes="btn sm" Command="{Binding ItIsCommand}" Content="{x:Static vm:FilingWords.Yes}" AutomationProperties.Name="{x:Static vm:FilingWords.IsThisIt}" />
+        <Button Classes="btn sm" Command="{Binding ChooseCommand}" Content="{x:Static vm:FilingWords.ChooseAnother}" />
+      </StackPanel>
+      <TextBlock Text="{Binding PickSay}" FontSize="{DynamicResource FontCaption}" Foreground="{DynamicResource Warn}" TextWrapping="Wrap"
+                 IsVisible="{Binding PickSay, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+      <TextBlock Text="{Binding Tidying.Say}" FontSize="{DynamicResource FontCaption}" Foreground="{DynamicResource Warn}" TextWrapping="Wrap"
+                 IsVisible="{Binding Tidying.Say, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+
+      <Grid Name="Buttons" ColumnDefinitions="*,Auto,Auto">
+        <c:Icon Name="Folder" Glyph="folder" Size="34" Foreground="{Binding Dot}" Opacity="0" HorizontalAlignment="Left" VerticalAlignment="Center" />
+        <Button Name="Later" Grid.Column="1" Classes="text-link" VerticalAlignment="Center" Margin="0,0,16,0" Command="{Binding LaterCommand}"
+                Content="{x:Static vm:FilingWords.Later}" AutomationProperties.Name="{x:Static vm:FilingWords.Later}" />
+        <Button Name="TidyUp" Grid.Column="2" Classes="btn sm ink" Command="{Binding TidyUpCommand}" IsEnabled="{Binding !Tidying.Busy}"
+                Content="{Binding TidyLabel}" AutomationProperties.Name="{Binding TidyLabel}" />
+      </Grid>
+    </StackPanel>
+
+    <!-- Filed: where it went, and Undo while the card is still here (Filed work keeps it after). -->
+    <StackPanel Name="Done" Spacing="{DynamicResource Space3}" IsVisible="{Binding ShowFiled}">
+      <Grid ColumnDefinitions="Auto,*,Auto">
+        <c:Icon Glyph="folder" Size="30" Foreground="{Binding Dot}" VerticalAlignment="Center" />
+        <StackPanel Grid.Column="1" Margin="10,0,0,0" VerticalAlignment="Center">
+          <TextBlock Text="{x:Static vm:FilingWords.Filed}" FontSize="{DynamicResource FontSubtitle}" FontWeight="SemiBold" />
+          <TextBlock Text="{Binding Title}" FontSize="{DynamicResource FontCaption}" Foreground="{DynamicResource TextMuted}" TextTrimming="CharacterEllipsis" />
+        </StackPanel>
+        <Button Name="Undo" Grid.Column="2" Classes="btn sm" VerticalAlignment="Center" Command="{Binding UndoCommand}"
+                IsVisible="{Binding Undone, Converter={x:Static ObjectConverters.IsNull}}" IsEnabled="{Binding !Undoing.Busy}"
+                Content="{x:Static vm:FilingWords.Undo}" />
+      </Grid>
+      <TextBlock Text="{Binding Undone}" FontSize="{DynamicResource FontCaption}" Foreground="{DynamicResource TextMuted}" TextWrapping="Wrap"
+                 IsVisible="{Binding Undone, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+      <TextBlock Text="{Binding Undoing.Say}" FontSize="{DynamicResource FontCaption}" Foreground="{DynamicResource Warn}" TextWrapping="Wrap"
+                 IsVisible="{Binding Undoing.Say, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+    </StackPanel>
+  </Panel>
+</UserControl>
