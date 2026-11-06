@@ -202,6 +202,107 @@ public static class CanvasApi
         public DateTimeOffset? PausedUntil { get; init; }
         public ErrorInfo? Error { get; init; }
         public IReadOnlyList<string> Warnings { get; init; } = [];
+        /// <summary>Hand-ins a sync saw that wait for the student's say (Submit &amp; Organize's "Ask me"); test builds only,
+        /// and none from a library without it.</summary>
+        public IReadOnlyList<HandInWaiting> HandedIn { get; init; } = [];
+    }
+
+    // ---- Submit & Organize (canvas/filing; test builds only) ----
+
+    /// <summary>A hand-in waiting to be filed: its class, the library's key for it, and its assignment.</summary>
+    public sealed record HandInWaiting
+    {
+        public string Class { get; init; } = "";
+        public string Key { get; init; } = "";
+        public string Assignment { get; init; } = "";
+    }
+
+    /// <summary>A folder offered first, not added yet (Downloads, Desktop, Documents).</summary>
+    public sealed record FolderSuggestion
+    {
+        public string Name { get; init; } = "";
+        public string Path { get; init; } = "";
+    }
+
+    /// <summary>One run in "Filed work": when, the class and assignment, how many files, how many put back since.</summary>
+    public sealed record FiledRun
+    {
+        public string Run { get; init; } = "";
+        public DateTimeOffset? At { get; init; }
+        public string Class { get; init; } = "";
+        public string Assignment { get; init; } = "";
+        public int Files { get; init; }
+        public int Undone { get; init; }
+    }
+
+    /// <summary>GET canvas/filing: the student's choices, the folders, what waits, and the last runs, newest first.</summary>
+    public sealed record Filing
+    {
+        public bool On { get; init; }
+        public IReadOnlyList<string> Folders { get; init; } = [];
+        public IReadOnlyList<FolderSuggestion> Suggested { get; init; } = [];
+        public string When { get; init; } = "ask";
+        public string Mode { get; init; } = "organize";
+        public IReadOnlyList<HandInWaiting> Waiting { get; init; } = [];
+        public IReadOnlyList<FiledRun> Runs { get; init; } = [];
+    }
+
+    /// <summary>The file handed in as found here: <see cref="Found"/> is "exact", "unsure" or "none" (no path then).</summary>
+    public sealed record HandInFile
+    {
+        public string Name { get; init; } = "";
+        public string? Path { get; init; }
+        public string Found { get; init; } = "none";
+    }
+
+    /// <summary>A file the student may have worked from, why it's thought to be one, and how sure ("high", "medium", "low").</summary>
+    public sealed record HandInMaterial
+    {
+        public string Path { get; init; } = "";
+        public string Why { get; init; } = "";
+        public string Sure { get; init; } = "low";
+    }
+
+    /// <summary>GET canvas/filing/check: what was found for one hand-in, in the approved folders only.</summary>
+    public sealed record HandInCheck
+    {
+        public string Class { get; init; } = "";
+        public string Key { get; init; } = "";
+        public string Assignment { get; init; } = "";
+        public string Mode { get; init; } = "organize";
+        public IReadOnlyList<string> Folders { get; init; } = [];
+        public HandInFile File { get; init; } = new();
+        public IReadOnlyList<HandInMaterial> Materials { get; init; } = [];
+    }
+
+    public sealed record LeftFile
+    {
+        public string Path { get; init; } = "";
+        public string Why { get; init; } = "";
+    }
+
+    /// <summary>POST canvas/filing/file: the run (for Undo), how many files were filed, and those left where they were.</summary>
+    public sealed record Filed
+    {
+        public string Run { get; init; } = "";
+        public string Class { get; init; } = "";
+        public string Assignment { get; init; } = "";
+        [JsonPropertyName("filed")] public int Count { get; init; }
+        public IReadOnlyList<LeftFile> Left { get; init; } = [];
+    }
+
+    /// <summary>One file Undo dealt with: where it was, where it is now (null when it isn't back), and how: "back",
+    /// "beside", "in_trash", "missing" or "failed".</summary>
+    public sealed record PutBack
+    {
+        public string From { get; init; } = "";
+        public string? To { get; init; }
+        public string How { get; init; } = "";
+    }
+
+    public sealed record Undone
+    {
+        public IReadOnlyList<PutBack> Items { get; init; } = [];
     }
 
     /// <summary>The browser extension as the library sees it. <see cref="Seen"/> is when a browser last checked in

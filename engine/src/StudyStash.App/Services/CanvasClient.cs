@@ -217,6 +217,37 @@ public sealed class CanvasClient(string serverUrl, Func<string> key, HttpClient?
     public Task MarkNotificationsSeenAsync(long upTo, CancellationToken stop = default) =>
         SendAsync<JsonObject>(HttpMethod.Post, canvasRoot + "/notifications/seen", new JsonObject { ["up_to"] = upTo }, stop);
 
+    // ---- canvas/filing: Submit & Organize (test builds only) ----
+
+    public Task<CanvasApi.Filing?> FilingAsync(CancellationToken stop = default) =>
+        SendAsync<CanvasApi.Filing>(HttpMethod.Get, canvasRoot + "/filing", null, stop);
+
+    /// <summary>Changes a choice, or adds or takes off a folder (an added one is looked in at once; one that can't be
+    /// is refused with the reason, as <see cref="CanvasLibraryException"/>). What the library has after it.</summary>
+    public Task<CanvasApi.Filing?> SaveFilingAsync(bool? on = null, string? when = null, string? mode = null, string? add = null, string? remove = null,
+        CancellationToken stop = default)
+    {
+        var body = new JsonObject();
+        if (on is not null) body["on"] = on.Value;
+        if (when is not null) body["when"] = when;
+        if (mode is not null) body["mode"] = mode;
+        if (add is not null) body["add"] = add;
+        if (remove is not null) body["remove"] = remove;
+        return SendAsync<CanvasApi.Filing>(HttpMethod.Post, canvasRoot + "/filing", body, stop);
+    }
+
+    public Task<CanvasApi.HandInCheck?> CheckHandInAsync(string cls, string key, CancellationToken stop = default) =>
+        SendAsync<CanvasApi.HandInCheck>(HttpMethod.Get, $"{canvasRoot}/filing/check?class={Q(cls)}&key={Q(key)}", null, stop);
+
+    public Task<CanvasApi.Filed?> FileHandInAsync(string cls, string key, string? file, IReadOnlyList<string> materials, bool clean, CancellationToken stop = default) =>
+        SendAsync<CanvasApi.Filed>(HttpMethod.Post, canvasRoot + "/filing/file", new JsonObject
+        {
+            ["class"] = cls, ["key"] = key, ["file"] = file, ["materials"] = new JsonArray([.. materials.Select(m => (JsonNode)m)]), ["clean"] = clean,
+        }, stop);
+
+    public Task<CanvasApi.Undone?> UndoFilingAsync(string run, CancellationToken stop = default) =>
+        SendAsync<CanvasApi.Undone>(HttpMethod.Post, canvasRoot + "/filing/undo", new JsonObject { ["run"] = run }, stop);
+
     // ---- /api/v2/files (a lecture-style read of a Canvas file already saved locally) ----
 
     public async Task<string?> TextAsync(string cls, string path, CancellationToken stop = default)
