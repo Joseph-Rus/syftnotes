@@ -99,12 +99,13 @@ public class SnapshotTests
             },
         }, ThemeVariant.Light, new Size(520, 360)));
 
-    /// <summary>Study in dark: twelve cards due by class and Start, the exams coming up, and a prep for another exam
-    /// (its classes as pills, a name to type, Write the prep not ready yet).</summary>
+    /// <summary>Study in dark: twelve cards due, Start and each class's pill, the exams coming up on their dates, and
+    /// Another exam opened (its class's menu, a name to type, Write the prep not ready yet).</summary>
     [AvaloniaFact]
     public async Task Study_dark()
     {
         var model = await StudyScene.Page();
+        model.AddingAnother = true;
         await SnapshotSetup.Check(Stage.Surface(() => OnPane(new StudyPage { DataContext = model }), ThemeVariant.Dark, new Size(1036, 1056), new Thickness(28), 980, 1000));
     }
 
