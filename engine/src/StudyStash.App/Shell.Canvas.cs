@@ -37,6 +37,9 @@ public static partial class Shell
 
     static CanvasWatch CanvasPoll() => canvasLink.Watch;
 
+    /// <summary>Marks a Due item done in Syft Notes alone, through the one copy of the list (<see cref="CanvasFeed"/>).</summary>
+    static DueMarker? CanvasMarker() => canvasFeed is { } feed ? (cls, kind, id, mark, stop) => feed.MarkAsync(cls, kind, id, mark, stop) : null;
+
     /// <summary>A new library, so a new Canvas context and watch: the old watch (already stopped) is let go, and the
     /// status line, what's due and Canvas's notifications follow the new one.</summary>
     static void OnCanvasMade(CanvasWatch? old, CanvasContext context, CanvasWatch watch)

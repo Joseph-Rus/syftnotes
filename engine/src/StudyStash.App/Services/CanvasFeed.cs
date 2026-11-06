@@ -2,6 +2,10 @@ using System.Globalization;
 
 namespace StudyStash.App.Services;
 
+/// <summary>Marks a Due item in Syft Notes alone (Canvas is never asked): <paramref name="mark"/> is "done", or "" to take it
+/// back. What a button that marks calls; <see cref="CanvasFeed.MarkAsync"/> is the real one.</summary>
+public delegate Task<Outcome> DueMarker(string cls, string kind, string id, string mark, CancellationToken stop);
+
 /// <summary>
 /// What the app shows from Canvas, kept current: what's due (the sidebar's Due and its count, the Due page, the
 /// dropdown's next due, the quick panel's Canvas rows) and every class with its course (a linked class's own page).
@@ -91,6 +95,29 @@ public sealed class CanvasFeed : IDisposable
         {
             Volatile.Write(ref catchingUp, 0);
         }
+    }
+
+    /// <summary>Marks a Due item done (or, with "", takes the mark back), in Syft Notes only. The library answers with the Due
+    /// list as it now stands and this takes it in at once and says that item's class changed, so Home, Due, the calendar and
+    /// the sidebar's count all follow from the one copy.</summary>
+    public async Task<Outcome> MarkAsync(string cls, string kind, string id, string mark, CancellationToken stop = default)
+    {
+        if (context.Client is not { } client) return Outcome.Failed(Failure.Offline);
+        Outcome<CanvasApi.DueResponse> done;
+        try
+        {
+            done = await LibraryCall.Run(() => client.MarkAsync(cls, kind, id, mark, stop), stop);
+        }
+        catch (CanvasLibraryException e) when (LibraryCall.Handled(e, "[canvas] a Due mark"))
+        {
+            return Outcome.Failed(Failure.Offline);
+        }
+        if (done.Value is { } due)
+        {
+            Due = due;
+            Updated?.Invoke(new HashSet<string> { cls });
+        }
+        return done;
     }
 
     /// <summary>Reads what's due and every class now. False when it couldn't (no library, an older one, or no

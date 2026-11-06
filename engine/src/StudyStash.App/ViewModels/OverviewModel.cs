@@ -608,7 +608,7 @@ public sealed partial class OverviewModel : ObservableObject
     static OverviewDue DueRow(CanvasApi.Item i, Sources s, Func<string, IBrush> dot, bool classLabel, bool done = false)
     {
         bool late = !done && LateBefore(i, s);
-        string when = done ? "Handed in"
+        string when = done ? (i.Mark == "done" ? Kit.DueMarkModel.DoneRow : "Handed in")
             : i.DueAt is not { } d ? "No due date"
             : late ? $"Was due {Words(Local(d, s), Local(d, s).Year == Local(s.Now, s).Year ? "ddd d" : "d MMM yyyy")}"
             : Time(d, s.Zone);
