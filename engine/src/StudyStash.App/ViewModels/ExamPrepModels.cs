@@ -1,3 +1,4 @@
+using Avalonia.Media;
 using StudyStash.App.Services;
 using System.Collections.ObjectModel;
 using System.Globalization;
@@ -25,6 +26,21 @@ static class ExamWhen
             _ => $"{date} · in {days} days",
         };
     }
+
+    /// <summary>The same beside a date that's shown already: "In 9 days", "Tomorrow", "Today, 2:00 PM", or "" for
+    /// one that's past or has no date.</summary>
+    public static string Soon(DateTimeOffset? when, DateTimeOffset now)
+    {
+        if (when is not { } w) return "";
+        var local = w.ToLocalTime();
+        return (local.Date - now.ToLocalTime().Date).Days switch
+        {
+            < 0 => "",
+            0 => $"Today, {local.ToString("h:mm tt", CultureInfo.InvariantCulture)}",
+            1 => "Tomorrow",
+            int days => $"In {days} days",
+        };
+    }
 }
 
 /// <summary>An exam on the Study page: one coming up (from Canvas or the calendar) or one prepped for, with its prep
@@ -36,13 +52,22 @@ public sealed partial class ExamRow : ObservableObject
     public DateTimeOffset? When { get; init; }
     public string WhenSaid { get; init; } = "";
     public string ClassShown => ClassNames.Display(Class);
+    public IBrush Dot { get; init; } = Brushes.Gray;
+    /// <summary>The whole line, for a screen reader: "CS 201 · Thursday 15 October · in 3 days".</summary>
     public string Line => WhenSaid.Length > 0 ? $"{ClassShown} · {WhenSaid}" : ClassShown;
+    /// <summary>Beside its date: "In 3 days · Last practice test: 9 of 12".</summary>
+    public string Soon { get; init; } = "";
+    public string Detail => string.Join(" · ", new[] { Soon, Score }.Where(s => s.Length > 0));
+    public bool HasDetail => Detail.Length > 0;
+    /// <summary>Its date as a small calendar leaf: "THU" over "15".</summary>
+    public bool HasDate => When is not null;
+    public string Weekday => When?.ToLocalTime().ToString("ddd", CultureInfo.InvariantCulture).ToUpperInvariant() ?? "";
+    public string Day => When?.ToLocalTime().Day.ToString(CultureInfo.InvariantCulture) ?? "";
     [ObservableProperty] public partial string? PrepId { get; set; }
     [ObservableProperty] public partial string Score { get; set; } = "";
     [ObservableProperty] public partial bool Making { get; set; }
     [ObservableProperty] public partial string? Problem { get; set; }
     public bool HasPrep => PrepId is not null;
-    public bool HasScore => Score.Length > 0;
     public bool HasProblem => !string.IsNullOrEmpty(Problem);
     public string ActionSaid => Making ? "Writing your prep…" : HasPrep ? "Open prep" : "Prep for it";
     public IAsyncRelayCommand Go { get; init; } = null!;
@@ -53,7 +78,11 @@ public sealed partial class ExamRow : ObservableObject
         OnPropertyChanged(nameof(ActionSaid));
     }
     partial void OnMakingChanged(bool value) => OnPropertyChanged(nameof(ActionSaid));
-    partial void OnScoreChanged(string value) => OnPropertyChanged(nameof(HasScore));
+    partial void OnScoreChanged(string value)
+    {
+        OnPropertyChanged(nameof(Detail));
+        OnPropertyChanged(nameof(HasDetail));
+    }
     partial void OnProblemChanged(string? value) => OnPropertyChanged(nameof(HasProblem));
 }
 

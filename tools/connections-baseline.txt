@@ -8,5 +8,5 @@ bare-catches 7
 fire-and-forget-in-shell 0
 mac-views 36
 literal-colours 5
-literal-font-sizes 238
+literal-font-sizes 236
 clients-by-hand 1

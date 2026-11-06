@@ -13,8 +13,10 @@ static class StudyScene
     public static async Task<StudyModel> Page()
     {
         var model = new StudyModel(new Library(), () => Now);
+        // As the app does it: the library's classes and their colours first, then what's due and the exams.
+        string[] names = ["BIO 110", "CS 201", "HIST 150", "MATH 221", "PSYC 101", "Capstone Design"];
+        model.Classes(names.Select((n, i) => (n, Skin.ClassDot(i))));
         await model.LoadAsync();
-        model.Classes(["BIO 110", "CS 201", "HIST 150", "MATH 221", "PSYC 101", "Capstone Design"]);
         return model;
     }
 

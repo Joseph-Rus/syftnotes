@@ -32,7 +32,7 @@ public static partial class Shell
             },
             OnCount = due => library.StudyDue = due,
         };
-        study.Classes(library.Classes.Where(c => !c.IsDue && !c.IsHome && c.Name != Core.Configs.Unsorted).Select(c => c.Name));
+        study.Classes(library.Classes.Where(c => !c.IsDue && !c.IsHome && c.Name != Core.Configs.Unsorted).Select(c => (c.Name, c.Dot)));
         ClearPane();
         library.Overview = null;
         library.Study = study;
