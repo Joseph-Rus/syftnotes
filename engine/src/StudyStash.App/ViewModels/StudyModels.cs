@@ -355,13 +355,17 @@ public sealed partial class StudyModel(IStudyLibrary library, Func<DateTimeOffse
 
     public bool HasDue => Due > 0;
     public bool NoCards => !Loading && Total == 0;
-    /// <summary>Review's card, with cards in it; or, with none yet, the dashed one that says how to make some.</summary>
-    public bool ShowReview => Available && !Loading && Total > 0;
-    public bool ShowNoCards => Available && NoCards;
+    /// <summary>Review's card, with cards in it; or, with none yet, the dashed one that says how to make some. Both
+    /// wait for the first load only: a reload (back from a review) keeps the card where it is.</summary>
+    public bool ShowReview => Available && Loaded && Total > 0;
+    public bool ShowNoCards => Available && Loaded && Total == 0;
+    /// <summary>The first load has answered.</summary>
+    [ObservableProperty] public partial bool Loaded { get; set; }
+    partial void OnLoadedChanged(bool value) => Said();
     public string DueTitle => Due == 0 ? (Total == 0 ? "No cards yet" : "All caught up") : Due == 1 ? "1 card to review" : $"{Due} cards to review";
     public string DueMore => Total == 0
         ? "Open a lecture and press Make review cards: they come back here just before you'd forget them."
-        : Due == 0 ? $"{Total} cards in Review. The next ones come back when they're due."
+        : Due == 0 ? (Total == 1 ? "1 card in Review. It comes back when it's due." : $"{Total} cards in Review. The next ones come back when they're due.")
         : "A few minutes now keeps them for the exam.";
 
     public Action<string, double?>? OnOpenLecture { get; set; }
@@ -394,7 +398,7 @@ public sealed partial class StudyModel(IStudyLibrary library, Func<DateTimeOffse
     public bool ShowAnotherButton => HasClassChoices && HasExams && !AddingAnother;
     /// <summary>The exams' card: the exams, and Another exam (or its row).</summary>
     public bool HasExamCard => HasExams || HasClassChoices;
-    public string ExamsSaid => HasExams ? "From Canvas and your calendar" : "None coming up in Canvas or your calendar";
+    public string ExamsSaid => HasExams ? "Coming up" : "None coming up in Canvas or your calendar";
     /// <summary>Under the new prep's row: what it's written from.</summary>
     public string NewCovers => NewClass is null ? "" : $"From {NewClassShown}'s lectures since its last exam.";
     partial void OnAddingAnotherChanged(bool value) => Another();
@@ -463,6 +467,7 @@ public sealed partial class StudyModel(IStudyLibrary library, Func<DateTimeOffse
         }
         await LoadExamsAsync();
         Loading = false;
+        Loaded = true;
     }
 
     /// <summary>The classes a new exam prep can be for (the host gives the library's, each with its colour).</summary>
