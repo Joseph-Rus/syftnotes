@@ -89,6 +89,25 @@ public sealed partial class Store
         }
     }
 
+    /// <summary>The last <paramref name="most"/> runs, newest first: each with when it was, its class and assignment, how
+    /// many files it filed (a move still pending counts: Undo follows it), and how many of those were put back since.</summary>
+    public List<FiledRun> FiledRuns(int most = 20)
+    {
+        lock (gate)
+        {
+            MakeFiledTable();
+            using var cmd = Command("""
+                SELECT run, MIN(at), MIN(class_name), MIN(assignment), COUNT(*), COUNT(undone) FROM filed_moves
+                GROUP BY run ORDER BY MAX(seq) DESC LIMIT ?
+                """, most);
+            using var r = cmd.ExecuteReader();
+            string S(int i) => r.IsDBNull(i) ? "" : r.GetString(i);
+            var list = new List<FiledRun>();
+            while (r.Read()) list.Add(new FiledRun(S(0), S(1), S(2), S(3), r.GetInt32(4), r.GetInt32(5)));
+            return list;
+        }
+    }
+
     /// <summary>This file was put back (when: <paramref name="at"/>), so undoing its run again leaves it alone.</summary>
     public void MarkFiledUndone(long seq, string at)
     {

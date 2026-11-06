@@ -149,6 +149,13 @@ public static class LibraryCall
         {
             return Outcome<T>.Failed(Failure.Refused(e));
         }
+        catch (CanvasLibraryException e)
+        {
+            // Canvas's routes say no in plain words (a 4xx with its detail); anything else is the library not coping.
+            if (e.Status is >= 400 and < 500 && e.Message.Length > 0) return Outcome<T>.Failed(new Failure(FailureKind.Refused, e.Message) { Status = e.Status });
+            Program.Log($"[library] a Canvas call failed: {e.Status} {e.Message}");
+            return Outcome<T>.Failed(Failure.Offline);
+        }
         catch (Exception e) when (IsOffline(e))
         {
             return Outcome<T>.Failed(Failure.Offline);

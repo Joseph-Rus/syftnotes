@@ -1,7 +1,10 @@
+using System.Net.Http.Json;
+using System.Text.Json.Nodes;
 using StudyStash.Core;
 using StudyStash.Core.Ai;
 using StudyStash.Core.Canvas;
 using StudyStash.Core.Filing;
+using StudyStash.Library;
 
 namespace StudyStash.Core.Tests;
 
@@ -295,5 +298,76 @@ public class SubmitOrganizeTests
         Assert.All(filer.Undo("crash"), u => Assert.Equal(UndoOutcome.Back, u.How));
         Assert.Equal((movedSha, stayedSha), (Sha(moved), Sha(stayed)));
         Assert.False(File.Exists(Path.Combine(folder, "Submitted", "lab3.md")));
+    }
+
+    /// <summary>Part 2: what Settings may be given, and what "Filed work" lists. A whole disk, the home folder and the
+    /// library (and anything in it) are refused with a reason; the runs come newest first, each with its count.</summary>
+    [Fact]
+    public void A_whole_disk_the_home_folder_and_the_library_are_refused_and_runs_list_newest_first()
+    {
+        using var dir = new TempDir();
+        string home = dir["home"], library = Path.Combine(home, "Documents", "Syft Notes");
+        Assert.Equal(FilingFolders.WholeDisk, FilingFolders.Refuse(Path.GetPathRoot(Path.GetFullPath(home))!, home, library));
+        Assert.Equal(FilingFolders.WholeHome, FilingFolders.Refuse(home + Path.DirectorySeparatorChar, home, library));
+        Assert.Equal(FilingFolders.Library, FilingFolders.Refuse(library, home, library));
+        Assert.Equal(FilingFolders.Library, FilingFolders.Refuse(Path.Combine(library, "CS 101"), home, library));
+        Assert.Null(FilingFolders.Refuse(Path.Combine(home, "Documents"), home, library));
+        Assert.Equal(FilingFolders.Gone, FilingFolders.Look(Path.Combine(home, "Downloads")));
+
+        using var store = new Store(dir["state.db"], dir["Library"]);
+        foreach (var (run, file) in new[] { ("older", "a"), ("older", "b"), ("newer", "c") })
+            store.AddFiledMove(new FiledMove(0, run, "2026-10-01T10:00:00Z", "CS 101", run, file, "", FiledMove.Moved, ""));
+        Assert.Equal([("newer", 1), ("older", 2)], store.FiledRuns().Select(r => (r.Run, r.Files)));
+    }
+
+    /// <summary>Part 2's library routes, as the app calls them: tidying up switched on, a folder added (and one refused),
+    /// a hand-in checked, filed, listed in Filed work, and undone. A temp library and folder, no Canvas.</summary>
+    [Fact]
+    public async Task The_app_switches_it_on_adds_a_folder_files_a_hand_in_and_undoes_it()
+    {
+        using var dir = new TempDir();
+        var cfg = new Config(dir.Path, dir["pool"]) { PoolPassword = "pw", Classes = [new ClassDef("CS 101")] };
+        using var store = new Store(cfg.DbPath, cfg.PoolDir);
+        var sync = FakeCanvas.Library(dir, () => FakeCanvas.DesignNow);
+        string downloads = dir["Downloads"], report = Write(Path.Combine(downloads, "lab3.pdf"), "my lab report");
+        new CourseIndex
+        {
+            Class = "CS 101",
+            Assignments = [new AssignmentInfo { Id = 3, Name = "Lab 3", Submission = new SubmissionInfo
+            {
+                State = "submitted", Attempt = 1, SubmittedAt = "2026-10-01T10:00:00Z", Files = [new FileRef { Id = 7, Name = "lab3.pdf", Size = new FileInfo(report).Length }],
+            } }],
+        }.Save(cfg.Home);
+        await using var site = await TestSite.StartAsync(b => LibraryWeb.Build(b, cfg, store, new Pipeline(cfg, store, log: _ => { }), new LibraryWebOptions
+        {
+            ListModels = _ => Task.FromResult<List<(string, double)>?>(null), Tailscale = () => new TailscaleInfo(),
+            Latest = _ => Task.FromResult<Release?>(null), Canvas = sync,
+        }));
+        site.Client.DefaultRequestHeaders.Authorization = new("Bearer", "pw");
+        async Task<JsonObject> Post(string path, object body)
+        {
+            using var reply = await site.Client.PostAsJsonAsync(path, body);
+            return (JsonObject)JsonNode.Parse(await reply.Content.ReadAsStringAsync())!;
+        }
+
+        Assert.Equal(FilingFolders.Library, (string?)(await Post("/api/v2/canvas/filing", new { add = cfg.PoolDir }))["detail"]);
+        await Post("/api/v2/canvas/filing", new { on = true });
+        var filing = await Post("/api/v2/canvas/filing", new { add = downloads });
+        Assert.Equal([downloads], filing["folders"]!.AsArray().Select(f => (string)f!));
+
+        string key = "3:1:2026-10-01T10:00:00Z";
+        var check = (JsonObject)JsonNode.Parse(await site.Client.GetStringAsync($"/api/v2/canvas/filing/check?class=CS%20101&key={Uri.EscapeDataString(key)}"))!;
+        // No copy of Canvas's to compare bytes with here: the name and size agree, so the student is asked.
+        Assert.Equal(("unsure", report), ((string)check["file"]!["found"]!, (string)check["file"]!["path"]!));
+
+        var filed = await Post("/api/v2/canvas/filing/file", new { @class = "CS 101", key, file = report, materials = Array.Empty<string>(), clean = false });
+        Assert.Equal(1, (int)filed["filed"]!);
+        Assert.False(File.Exists(report));
+        var runs = ((JsonObject)JsonNode.Parse(await site.Client.GetStringAsync("/api/v2/canvas/filing"))!)["runs"]!.AsArray();
+        Assert.Equal(("Lab 3", 1), ((string)runs.Single()!["assignment"]!, (int)runs[0]!["files"]!));
+
+        var undone = await Post("/api/v2/canvas/filing/undo", new { run = (string)filed["run"]! });
+        Assert.Equal("back", (string)undone["items"]![0]!["how"]!);
+        Assert.True(File.Exists(report));
     }
 }

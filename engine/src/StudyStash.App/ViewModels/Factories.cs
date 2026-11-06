@@ -56,4 +56,9 @@ public sealed class CanvasModels(CanvasLink canvas, AppHost host, IMessenger mes
 
     /// <summary>The first run's step that adds the Canvas add-on from the browser's store.</summary>
     public AddOnModel AddOn() => new(canvas.Context, canvas.Watch);
+
+    /// <summary>The checklist after a hand-in (Submit &amp; Organize, test builds only): its notification goes out as the
+    /// app's, and <paramref name="pickFile"/> is the file picker over the window it shows in.</summary>
+    public HandInModel HandIn(CanvasApi.HandInWaiting waiting, Func<string, string, Task<string?>> pickFile) =>
+        new(canvas.Context, waiting, new HandInServices(pickFile, toast => messages.Send(toast)));
 }

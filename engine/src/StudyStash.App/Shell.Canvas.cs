@@ -95,7 +95,22 @@ public static partial class Shell
         else if (!browserChoiceByHand || state.Extension?.Browsers is not { Browsers.Count: > 1 }) browserChoiceWindow?.Close();
         library.Status = LibraryStatus();
         UpdateDueStatus();
+        if (TestSwitches.On) AskAboutHandIn(state.HandedIn);
     });
+
+    /// <summary>The hand-ins whose checklist has shown since the app started: Not now isn't asked again until the next start.</summary>
+    static readonly HashSet<string> handInsAsked = [];
+
+    /// <summary>Submit &amp; Organize (test builds only): a hand-in the last sync saw, with "Ask me", opens its checklist over
+    /// the window the student is in, once, after setup. Nothing shows while another question is over that window.</summary>
+    static void AskAboutHandIn(IReadOnlyList<CanvasApi.HandInWaiting> waiting)
+    {
+        if (!host.Settings.SetupDone || ConfirmLayer.Pick() is not { IsOpen: false } layer) return;
+        if (waiting.FirstOrDefault(w => !handInsAsked.Contains(w.Class + "\n" + w.Key)) is not { } next) return;
+        handInsAsked.Add(next.Class + "\n" + next.Key);
+        var model = canvasModels.HandIn(next, (folder, title) => HandInSheet.PickFileAsync(layer.Host, folder, title));
+        Run(() => HandInSheet.ShowAsync(layer, model), "AskAboutHandIn");
+    }
 
     static Window? browserChoiceWindow;
     /// <summary>The question already asked since the app started: Not now isn't asked again until the next start.</summary>
