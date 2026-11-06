@@ -12,7 +12,7 @@ namespace StudyStash.App.Tests.Snapshots;
 
 /// <summary>
 /// About ten screens of the Syft look, each drawn off screen from demo data and compared with its verified picture
-/// (see <see cref="SnapshotSetup"/>): Home (light and dark), a class page, a lecture's notes with a formula and a
+/// (see <see cref="SnapshotSetup"/>): Home (light and dark), Study (dark), a class page, a lecture's notes with a formula and a
 /// diagram, Due, Settings → Your AI, the first-run funnel, the recorder, the menu-bar dropdown, a notification, and Ask
 /// beside the notes. A change you meant: run with <c>STUDYSTASH_SNAPSHOTS=1</c>, look at the
 /// <c>*.received.png</c> beside the test, and rename it over the <c>*.verified.png</c>.
@@ -22,6 +22,14 @@ public class SnapshotTests
     public SnapshotTests() => SnapshotSetup.Require();
 
     static Control Library(LibraryModel m) => new MacLibrary { DataContext = m };
+
+    /// <summary>A page on the pane's own fill, as the library window shows it.</summary>
+    static Control OnPane(Control page)
+    {
+        var pane = new Border { Child = page };
+        pane.Bind(Border.BackgroundProperty, pane.GetResourceObservable("Surface"));
+        return pane;
+    }
 
     [AvaloniaFact]
     public Task Home_light() => SnapshotSetup.Check(Stage.Library(() => Library(Demo.Semester()), ThemeVariant.Light));
@@ -90,6 +98,15 @@ public class SnapshotTests
                 ToastView.For(Scenes.ToastGallery()[0]),
             },
         }, ThemeVariant.Light, new Size(520, 360)));
+
+    /// <summary>Study in dark: twelve cards due by class and Start, the exams coming up, and a prep for another exam
+    /// (its classes as pills, a name to type, Write the prep not ready yet).</summary>
+    [AvaloniaFact]
+    public async Task Study_dark()
+    {
+        var model = await StudyScene.Page();
+        await SnapshotSetup.Check(Stage.Surface(() => OnPane(new StudyPage { DataContext = model }), ThemeVariant.Dark, new Size(1036, 1056), new Thickness(28), 980, 1000));
+    }
 
     /// <summary>A lecture's page after an answer: Ask in its own panel beside the notes, the words of the notes it
     /// quoted highlighted, and the "From your notes" chips under the answer.</summary>

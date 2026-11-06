@@ -117,7 +117,9 @@
     <Setter Property="Padding" Value="14,0" />
     <Setter Property="Background" Value="{DynamicResource Surface}" />
     <Setter Property="Foreground" Value="{DynamicResource Ink}" />
-    <Setter Property="BorderThickness" Value="0" />
+    <!-- The hairline inside its corners, as Button.btn's. -->
+    <Setter Property="BorderBrush" Value="{DynamicResource Line}" />
+    <Setter Property="BorderThickness" Value="1" />
     <Setter Property="FontSize" Value="{DynamicResource FontBody}" />
     <Setter Property="FontWeight" Value="Bold" />
     <Setter Property="ClipToBounds" Value="False" />
@@ -126,21 +128,16 @@
     <Setter Property="FontWeight" Value="Bold" />
     <Setter Property="Foreground" Value="{Binding $parent[Button].Foreground}" />
   </Style>
-  <Style Selector=".in-setup Button.cv-pill /template/ Border#PART_Bg, .in-setup Button.cv-btn /template/ Border#PART_Bg">
-    <Setter Property="BoxShadow" Value="{DynamicResource LineRing}" />
-  </Style>
   <Style Selector=".in-setup Button.cv-pill /template/ Border#PART_Wash, .in-setup Button.cv-btn /template/ Border#PART_Wash">
     <Setter Property="IsVisible" Value="False" />
   </Style>
-  <Style Selector=".in-setup Button.cv-pill:pointerover /template/ Border#PART_Bg, .in-setup Button.cv-btn:pointerover /template/ Border#PART_Bg">
-    <Setter Property="BoxShadow" Value="{DynamicResource SubtleRing}" />
+  <Style Selector=".in-setup Button.cv-pill:pointerover, .in-setup Button.cv-btn:pointerover">
+    <Setter Property="BorderBrush" Value="{DynamicResource InkSubtle}" />
   </Style>
   <Style Selector=".in-setup Button.cv-pill.cv-primary, .in-setup Button.cv-btn.cv-primary">
     <Setter Property="Background" Value="{DynamicResource Ink}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource Ink}" />
     <Setter Property="Foreground" Value="{DynamicResource Surface}" />
-  </Style>
-  <Style Selector=".in-setup Button.cv-pill.cv-primary /template/ Border#PART_Bg, .in-setup Button.cv-btn.cv-primary /template/ Border#PART_Bg">
-    <Setter Property="BoxShadow" Value="none" />
   </Style>
   <Style Selector=".in-setup Button.cv-pill.cv-primary:pointerover, .in-setup Button.cv-btn.cv-primary:pointerover">
     <Setter Property="Opacity" Value="0.9" />
@@ -163,15 +160,14 @@
     <Setter Property="Height" Value="34" />
     <Setter Property="CornerRadius" Value="{DynamicResource RadiusControl}" />
     <Setter Property="Background" Value="{DynamicResource Surface}" />
-    <Setter Property="BoxShadow" Value="{DynamicResource LineRing}" />
-    <Setter Property="BorderBrush" Value="{DynamicResource Ink}" />
-    <Setter Property="BorderThickness" Value="0" />
-    <Setter Property="Padding" Value="10,0" />
+    <Setter Property="BorderBrush" Value="{DynamicResource Line}" />
+    <Setter Property="BorderThickness" Value="1" />
+    <Setter Property="Padding" Value="9,0" />
   </Style>
   <Style Selector=".in-setup Border.cv-field:focus-within">
+    <Setter Property="BorderBrush" Value="{DynamicResource Ink}" />
     <Setter Property="BorderThickness" Value="1.5" />
     <Setter Property="Padding" Value="8.5,0" />
-    <Setter Property="BoxShadow" Value="none" />
   </Style>
   <Style Selector=".in-setup Border.cv-field TextBox.bare">
     <Setter Property="FontSize" Value="{DynamicResource FontBody}" />
