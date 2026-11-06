@@ -252,6 +252,9 @@ public class AssignmentModelTests
         Assert.True(page.Marks.CanMark);
         page.Show(CanvasFixtures.Load<CanvasApi.AssignmentDetail>("assignment-9002"));
         Assert.False(page.Marks.Showing);
+        // Graded with no hand-in on record (graded on paper, or an older index): nothing to mark.
+        page.Show(detail with { Status = "graded", Label = "Graded", Missing = false });
+        Assert.False(page.Marks.CanMark);
 
         // A library that can't take the mark: the page says so in words and nothing changes.
         using var gone = new CanvasFeed(CanvasFixtures.Context(new FakeLibrary()));
