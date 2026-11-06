@@ -37,6 +37,9 @@ public static partial class Shell
 
     static CanvasWatch CanvasPoll() => canvasLink.Watch;
 
+    /// <summary>Marks a Due item done in Syft Notes alone, through the one copy of the list (<see cref="CanvasFeed"/>).</summary>
+    static DueMarker? CanvasMarker() => canvasFeed is { } feed ? (cls, kind, id, mark, stop) => feed.MarkAsync(cls, kind, id, mark, stop) : null;
+
     /// <summary>A new library, so a new Canvas context and watch: the old watch (already stopped) is let go, and the
     /// status line, what's due and Canvas's notifications follow the new one.</summary>
     static void OnCanvasMade(CanvasWatch? old, CanvasContext context, CanvasWatch watch)
@@ -48,6 +51,7 @@ public static partial class Shell
         canvasFeed = new CanvasFeed(context, watch);
         canvasFeed.Updated += touched => Dispatcher.UIThread.Post(() => Run(() => CanvasUpdatedAsync(touched), "CanvasUpdated"));
         canvasNotifier = new CanvasNotifier(context) { OnOpen = OpenCanvasNotification };
+        if (TestSwitches.On) FollowTidy(context, watch);
     }
 
     /// <summary>Canvas is watched while the app has a library that answers, and not otherwise.</summary>
@@ -96,6 +100,57 @@ public static partial class Shell
         library.Status = LibraryStatus();
         UpdateDueStatus();
     });
+
+    // --- Submit & Organize's Ready to tidy (test builds only) ---------------------------------------------------------
+
+    /// <summary>The hand-ins waiting to be tidied, for the library the app is connected to now.</summary>
+    static TidyList? tidyList;
+
+    /// <summary>A new Canvas context: Ready to tidy follows its watch. Home's list and the assignment page follow the
+    /// list; a hand-in new to it is said once in a notification whose Tidy up opens its card.</summary>
+    static void FollowTidy(CanvasContext context, CanvasWatch watch)
+    {
+        tidyList?.Dispose();
+        var list = tidyList = new TidyList(context, watch);
+        list.Changed += () => Dispatcher.UIThread.Post(ShowTidy);
+        list.Arrived += item => Dispatcher.UIThread.Post(() => Toast(FilingWords.HandedIn(item.Waiting.Assignment), FilingWords.ToTidy(item.Files),
+            FilingWords.TidyUp, () => Dispatcher.UIThread.Post(() => OpenTidyCard(item))));
+    }
+
+    /// <summary>Home's Ready to tidy, newest first.</summary>
+    static IEnumerable<TidyRow> TidyRows()
+    {
+        if (tidyList is not { } list) yield break;
+        var ctx = Canvas();
+        foreach (var item in list.Items.OrderByDescending(i => i.Waiting.At ?? DateTimeOffset.MinValue))
+            yield return new TidyRow(item.Id, ctx.DotOf(item.Waiting.Class), item.Waiting.Assignment,
+                FilingWords.RowLine(item.Files, item.Waiting.At is { } at ? CanvasWords.When(at, ctx.Clock.Zone, ctx.Clock.Now()) : ""),
+                () => OpenTidyCard(item),
+                () => Run(async () =>
+                {
+                    if ((await list.DismissAsync(item)).Failure is { } failed) Toast(FilingWords.NotThisOne, failed.Words, null, null);
+                }, "DismissTidy"));
+    }
+
+    /// <summary>Tidy up on the assignment's page while its hand-in waits; null when it doesn't.</summary>
+    static Action? TidyFor(string cls, string id) => tidyList?.For(cls, id) is { } item ? () => OpenTidyCard(item) : null;
+
+    /// <summary>The list changed: Home's part and the open assignment's button follow.</summary>
+    static void ShowTidy()
+    {
+        if (library.Overview is { IsHome: true } home) home.ShowTidy(TidyRows());
+        if (library.Assignment is { } page && pageState.Assignment is { } open) page.OnTidy = TidyFor(open.Class, open.Id);
+    }
+
+    /// <summary>The tidy card over the library window (brought forward, as the notification's Tidy up asks).</summary>
+    static void OpenTidyCard(TidyItem item)
+    {
+        ShowLibrary();
+        if (mainWindow is not { } w || ConfirmLayer.For(w) is not { } layer || tidyList is not { } list) return;
+        var model = canvasModels.TidyCard(item, Canvas().DotOf(item.Waiting.Class),
+            new TidyServices((folder, title) => TidyCard.PickFileAsync(layer.Host, folder, title), list.Tidied));
+        Run(() => TidyCard.ShowAsync(layer, model), "OpenTidyCard");
+    }
 
     static Window? browserChoiceWindow;
     /// <summary>The question already asked since the app started: Not now isn't asked again until the next start.</summary>

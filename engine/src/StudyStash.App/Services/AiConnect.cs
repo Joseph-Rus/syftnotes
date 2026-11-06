@@ -34,6 +34,11 @@ public sealed record ConnectOutcome(bool Ok, string Words)
     public string SignIn { get; init; } = "";
     /// <summary>The AI's state as the library last said it.</summary>
     public AiOverview? Overview { get; init; }
+    /// <summary>Its desktop app is open ("Claude"): nothing was written, and the screen offers to close it
+    /// (<see cref="CloseButtonWords"/>), which runs Connect again with it closed first. "" otherwise.</summary>
+    public string CloseFirst { get; init; } = "";
+    /// <summary>The app couldn't be closed: the screen's button is Connect, for once the student has quit it.</summary>
+    public bool CouldntClose { get; init; }
 }
 
 /// <summary>
@@ -80,12 +85,24 @@ public sealed class AiConnect(IAiLibrary library)
     public static string QuitWords(string app, bool windows) =>
         $"Quit {app} fully and open it again." + (windows ? " Quit it from the tray icon by the clock." : "");
 
+    /// <summary>An AI's desktop app is open, and Connect has to change its settings: it's closed first.</summary>
+    public static string CloseFirstWords(string app) => $"Close {app} first";
+    public static string CloseButtonWords(string app) => $"Close {app}";
+    public static string ClosingWords(string app) => $"Closing {app}…";
+    public static string OpeningWords(string app) => $"Opening {app}…";
+    /// <summary>It wouldn't close: how the student quits it themselves, and what to do then.</summary>
+    public static string CouldntCloseWords(string app, bool windows, string then = "press Connect") =>
+        $"Couldn't close {app}. Quit it {(windows ? "from the tray icon by the clock" : "from its menu")}, then {then}.";
+
     /// <summary>
     /// Connects <paramref name="id"/> ("claude", "codex", "gemini"), saying each step to <paramref name="progress"/>.
     /// Never throws for what a student can meet (offline, refused, an install that stopped): every way it ends is an
     /// outcome with words for them.
+    /// <para>A desktop app of the AI that's open, whose settings it has to change, would write its own copy back over
+    /// them: Connect stops before writing anything and says so (<see cref="ConnectOutcome.CloseFirst"/>). With
+    /// <paramref name="close"/> (the student pressed Close Claude), it closes the app, connects, and opens it again.</para>
     /// </summary>
-    public async Task<ConnectOutcome> ConnectAsync(string id, Action<ConnectProgress>? progress = null, CancellationToken ct = default)
+    public async Task<ConnectOutcome> ConnectAsync(string id, Action<ConnectProgress>? progress = null, CancellationToken ct = default, bool close = false)
     {
         string brand = Brand(id);
         string said = "";
@@ -116,8 +133,35 @@ public sealed class AiConnect(IAiLibrary library)
                 return new ConnectOutcome(false, $"Install {brand} on your library's computer, then connect it here.") { Overview = overview };
             ct.ThrowIfCancellationRequested();
 
-            // 2 · Every app of this AI on this computer, then a look that the server they'll start answers.
-            var (apps, appsSaid) = await ConnectAppsAsync(id, Say);
+            // 2 · Its desktop app, if it's open and its settings have to change, closed first: it keeps them in memory
+            // and writes them back whole, so what went in while it was open could be lost. Then every app of this AI on
+            // this computer, a look that the server they'll start answers, and the app it closed opened again.
+            string? closed = null;
+            if (Apps is { } setup && await Task.Run(() => setup.OpenToChange(id)) is { } open)
+            {
+                string app = ClaudeSetup.DesktopApp(open.Id)!.Value.Name;
+                if (!close) return new ConnectOutcome(false, CloseFirstWords(app)) { CloseFirst = app, Overview = overview };
+                Say(ConnectStep.Apps, ClosingWords(app));
+                if (!await setup.CloseAsync(open.Id))
+                    return new ConnectOutcome(false, CouldntCloseWords(app, Windows)) { CouldntClose = true, Overview = overview };
+                closed = open.Id;
+            }
+            IReadOnlyList<string> apps;
+            string? appsSaid;
+            string reopen = "";
+            try
+            {
+                (apps, appsSaid) = await ConnectAppsAsync(id, Say);
+            }
+            finally
+            {
+                if (closed is not null)
+                {
+                    string app = ClaudeSetup.DesktopApp(closed)!.Value.Name;
+                    Say(ConnectStep.Apps, OpeningWords(app));
+                    if (!await Apps!.OpenAsync(closed)) reopen = $"Open {app} again.";
+                }
+            }
             ct.ThrowIfCancellationRequested();
 
             // 3 · Signed in: checked when that isn't known yet (or after a sign-in somewhere Syft Notes can't see), and the
@@ -169,7 +213,7 @@ public sealed class AiConnect(IAiLibrary library)
             if (overview is { Notes: "" } && engine is { Installed: true } && Is(engine, AiEngineState.Ready, AiEngineState.Unchecked))
                 overview = await library.DefaultsAsync(notes: id, ask: overview.Ask.Length == 0 ? id : null) ?? overview;
 
-            string next = Apps is null ? "" : NextStep(id);
+            string next = reopen.Length > 0 ? reopen : Apps is null ? "" : NextStep(id);
             Say(ConnectStep.Done, "Done");
             return new ConnectOutcome(appsSaid is null, appsSaid ?? $"{brand} is connected.") { Apps = apps, Next = next, Overview = overview };
         }
@@ -237,7 +281,7 @@ public sealed class AiConnect(IAiLibrary library)
     string NextStep(string id)
     {
         foreach (var app in Apps!.StatesOf(id))
-            if (app is { Good: true, Running: true, Loaded: false } && ClaudeSetup.DesktopApp(app.Id) is { } desktop)
+            if (app.NeedsReopen && ClaudeSetup.DesktopApp(app.Id) is { } desktop)
                 return QuitWords(desktop.Name, Windows);
         return "";
     }

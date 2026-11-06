@@ -77,10 +77,14 @@
         <c:PageText Classes="cv-h3" Text="Your submission" Margin="0,14,0,0" IsVisible="{Binding ShowSubmission}" />
         <Border Classes="cv-submission" IsVisible="{Binding ShowSubmission}">
           <StackPanel Spacing="12">
-            <StackPanel Orientation="Horizontal" Spacing="10">
+            <StackPanel Orientation="Horizontal" Spacing="10" IsVisible="{Binding !Marks.ShowDone}">
               <c:PageText Classes="cv-sub-status" Text="{Binding SubmissionStatus}" />
               <c:PageText Classes="cv-sub-detail" Text="{Binding SubmissionDetail}" IsVisible="{Binding HasSubmissionDetail}" VerticalAlignment="Bottom" />
+              <Button Classes="btn sm" VerticalAlignment="Center" IsVisible="{Binding CanTidy}" Command="{Binding TidyUpCommand}"
+                      Content="{x:Static vm:FilingWords.TidyUp}" AutomationProperties.Name="{x:Static vm:FilingWords.TidyUp}" />
             </StackPanel>
+            <!-- "Mark as done", or once marked "Done (marked by you)" and Undo (in place of the row above), in Syft Notes only -->
+            <v:DueMarkBar DataContext="{Binding Marks}" IsVisible="{Binding Showing}" />
             <c:PageText Classes="cv-sub-detail" Text="{Binding SubmissionBody}" IsVisible="{Binding HasSubmissionBody}" TextWrapping="Wrap" />
             <StackPanel Spacing="2" IsVisible="{Binding HasComment}">
               <c:PageText Classes="cv-comment" Text="{Binding CommentText}" />

@@ -302,6 +302,9 @@ public sealed partial class CanvasSync
             st.Error = saveError.Length > 0 ? saveError : failed.Count > 0 ? $"Couldn't read {string.Join(", ", failed)} from Canvas ({Reason(done.Errors, failed[0])}), so what you had is kept."
                 : done.Errors.Count > 0 ? $"{done.Errors.Count} thing(s) couldn't be read: {done.Errors[0]}" : "";
             st.ErrorAt = st.Error.Length > 0 ? at : "";
+            // Submit & Organize (test builds only): what was handed in since the last sync waits to be filed.
+            if (TestSwitches.On && st.Filing is { On: true } filing)
+                filing.Saw(done.Indexes.SelectMany(kv => Filing.HandedIn.Since(done.Before.GetValueOrDefault(kv.Key), kv.Value)));
             if (changes.Count == 0) return;
             st.Changes = changes.Take(60).Select(c => c.Text).ToList();
             st.LastChanges = changes.Take(60).ToList();
@@ -405,6 +408,24 @@ public sealed partial class CanvasSync
                 break;
         }
         return result;
+    }
+
+    /// <summary>A Canvas file's bytes, read through the extension like any other read and kept in memory only (nothing
+    /// is saved): how Submit &amp; Organize checks that a file on this computer is the one handed in. Null when it isn't a
+    /// Canvas address, or Canvas or the browser didn't give it.</summary>
+    public async Task<byte[]?> BytesAsync(string url, CancellationToken ct = default)
+    {
+        if (CanvasUrl(url) is not string full || DeniesOtherPeople(full)) return null;
+        var r = await Agents.FetchAsync(full, "bytes", null, ct);
+        if (r.Error.Length > 0 || r.Status >= 400 || r.B64.Length == 0 || Crawl.Classify(r) == CanvasAnswer.SignedOut) return null;
+        try
+        {
+            return Convert.FromBase64String(r.B64);
+        }
+        catch (FormatException)
+        {
+            return null;
+        }
     }
 
     /// <summary>"CS 101/Canvas/files/slides.pdf" → the file in that class's folder, or null when the class isn't one

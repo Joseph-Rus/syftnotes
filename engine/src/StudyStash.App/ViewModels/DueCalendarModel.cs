@@ -155,7 +155,7 @@ public sealed partial class DueCalendarModel : ObservableObject
             : at.Date == Today ? $"{(at.Hour >= 17 ? "Tonight" : "Today")} {time}"
             : at is { Hour: 23, Minute: 59 } ? "" : time;
         string cls = ClassNames.Display(i.Class);
-        string state = done ? "Handed in" : missing ? "Missing" : "";
+        string state = done ? (i.Mark == "done" ? Kit.DueMarkModel.DoneRow : "Handed in") : missing ? "Missing" : "";
         string said = string.Join(", ", new[] { i.Name, cls, $"due {OverviewModel.Day(i.DueAt!.Value, sources.Now, sources.Zone)} at {time}", state }.Where(w => w.Length > 0));
         return new CalendarItem(i.Class, i.Id, i.Name, sub, missing, done, dot(i.Class), $"{i.Name}, {cls}", said, () => sources.OpenAssignment?.Invoke(i.Class, i.Id));
     }

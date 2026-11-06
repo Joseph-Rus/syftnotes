@@ -64,9 +64,15 @@ public sealed class ConnectFilms
                 Program = Path.Combine(AppContext.BaseDirectory, "StudyStash"), Home = host.Home, UserHome = user, Windows = windows, Mac = !windows,
                 LocalAppData = local, AppData = Path.Combine(user, "AppData", "Roaming"),
                 Find = pc.Which, AppInstalled = name => name == "Claude", Running = id => id == "claude-desktop" && ClaudeOpen,
-                // A Mac quits the Claude app and opens it again for the student: it loads Syft Notes as it starts.
-                ReopenApp = windows ? null : _ =>
+                // Syft Notes closes the Claude app before it writes, and opens it again: it loads Syft Notes as it starts.
+                QuitApp = _ =>
                 {
+                    ClaudeOpen = false;
+                    return Task.FromResult(true);
+                },
+                OpenApp = _ =>
+                {
+                    ClaudeOpen = true;
                     Loads();
                     return Task.FromResult(true);
                 },
@@ -77,7 +83,7 @@ public sealed class ConnectFilms
         public void Loads() => McpClients.Touch(McpClients.StartedFile(Home, "claude-desktop"));
     }
 
-    static async Task ConnectClaudeAsync(Desk desk, SettingsModel model, Control view, StandIns pc, AppHost host, bool windows, Apps apps)
+    static async Task ConnectClaudeAsync(Desk desk, SettingsModel model, Control view, StandIns pc, AppHost host)
     {
         var go = new TaskCompletionSource();
         model.Engines.Install = async (engine, phase) =>
@@ -101,22 +107,15 @@ public sealed class ConnectFilms
         desk.Caption("One Connect: Syft Notes installs Claude (the stand-in's installer) · nothing to type");
         desk.Hold(2.0);
         go.SetResult();
+        await desk.UntilAsync(() => AboutOf() == "Close Claude first", "close first", TimeSpan.FromSeconds(60), () => $"{StateOf()} · {AboutOf()}");
+        desk.Caption("The Claude app is open · it's closed first, so it can't write its old settings back over Syft Notes");
+        desk.Hold(2.4);
+        desk.Pointer();
+        desk.Press(Desk.ButtonIn(view, b => b.DataContext is ViewModels.AiEngineRow { Id: "claude" } now && b.Command == now.ActCommand));
+        desk.NoPointer();
         await desk.UntilAsync(() => StateOf() is "Signing in" or "Almost done" or "Connected", "signing in", TimeSpan.FromSeconds(60), () => $"{StateOf()} · {AboutOf()}");
         desk.Caption("The Claude app and Claude Code got Syft Notes in the files they read · now Claude's own sign-in, in your browser");
         desk.Hold(2.0);
-        await desk.UntilAsync(() => StateOf() is "Almost done" or "Connected", "connected", TimeSpan.FromSeconds(60), () => $"{StateOf()} · {AboutOf()}");
-        desk.Caption(windows ? "The one thing left, said once: quit Claude from the tray by the clock" : "The one thing left, said once: quit Claude and open it again (Reopen does it)");
-        desk.Hold(3.2);
-        if (!windows)
-        {
-            desk.Pointer();
-            desk.Press(Desk.ButtonIn(view, b => b.DataContext is ViewModels.AiEngineRow { Id: "claude", CanReopen: true } now && b.Command == now.ReopenCommand));
-        }
-        else
-        {
-            // The student quits Claude from the tray and opens it again: it loads Syft Notes.
-            apps.Loads();
-        }
         await desk.UntilAsync(() => StateOf() == "Connected", "loaded", TimeSpan.FromSeconds(30), () => $"{StateOf()} · {AboutOf()}");
         desk.NoPointer();
         desk.Caption("Connected · writes your notes · in the Claude app and Claude Code");
@@ -150,7 +149,7 @@ public sealed class ConnectFilms
         var view = new SettingsView { DataContext = model, DrawChrome = true };
         desk.Show(view);
         desk.Hold(1.4);
-        await ConnectClaudeAsync(desk, model, view, pc, host, windows, apps);
+        await ConnectClaudeAsync(desk, model, view, pc, host);
 
         // What Connect did, checked: both apps have Syft Notes in the file each reads, under its new name, and Claude
         // writes the notes; on the Windows look the old folder's entry is gone.

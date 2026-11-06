@@ -29,10 +29,12 @@ public class AiConnectTests
         Notes: "", Ask: "", Fallback: false, Problems: []);
 
     /// <summary>A Mac with the Claude app (open, say) and nothing else of Claude's yet, and the server check stood in for.</summary>
-    static ClaudeSetup Apps(TempHome home, List<string> probed, bool running = false, bool windows = false, Func<string, string?>? find = null) => new()
+    static ClaudeSetup Apps(TempHome home, List<string> probed, bool running = false, bool windows = false, Func<string, string?>? find = null,
+        Func<bool>? open = null, Func<string, Task<bool>>? quit = null, Func<string, Task<bool>>? reopen = null) => new()
     {
         Program = Program, Home = home["syft"], UserHome = home["user"], Windows = windows, Mac = !windows,
-        Find = find ?? (_ => null), AppInstalled = name => name == "Claude", Running = id => running && id == "claude-desktop", ReopenApp = null,
+        Find = find ?? (_ => null), AppInstalled = name => name == "Claude", Running = id => id == "claude-desktop" && (open?.Invoke() ?? running),
+        QuitApp = quit, OpenApp = reopen,
         DesktopConfig = home["user/Claude/claude_desktop_config.json"], ClaudeCodeConfig = home["user/.claude.json"],
         CodexConfig = home["user/.codex/config.toml"], GeminiConfig = home["user/.gemini/settings.json"],
         AntigravityConfig = home["user/.gemini/config/mcp_config.json"],
@@ -107,6 +109,70 @@ public class AiConnectTests
         Assert.True(done.Ok, done.Words);
         Assert.Equal(next, done.Next);
         Assert.DoesNotContain(lib.Calls, c => c.StartsWith("sign-in", StringComparison.Ordinal)); // already signed in
+    }
+
+    [Fact]
+    public async Task An_open_claude_app_is_closed_before_anything_is_written_then_connected_and_opened_again()
+    {
+        // Claude keeps its settings file in memory and writes it back whole: an entry added while it's open can be lost.
+        using var home = new TempHome();
+        var lib = new FakeAiLibrary { Overview = Fresh() with { Engines = [new EngineInfo("claude", "Claude Code", "ready") { Installed = true }] } };
+        bool open = true;
+        var did = new List<string>();
+        ClaudeSetup apps = null!;
+        apps = Apps(home, [], open: () => open,
+            quit: id =>
+            {
+                did.Add($"close {id}, written: {File.Exists(apps.DesktopConfig)}");
+                open = false;
+                return Task.FromResult(true);
+            },
+            reopen: id =>
+            {
+                did.Add($"open {id}, written: {apps.State(id).Good}");
+                open = true;
+                return Task.FromResult(true);
+            });
+        var connect = new AiConnect(lib) { Apps = apps };
+
+        // Pressed while it's open: nothing is written; the card asks to close it.
+        var first = await connect.ConnectAsync("claude", ct: TestContext.Current.CancellationToken);
+        Assert.Equal((false, "Close Claude first", "Claude"), (first.Ok, first.Words, first.CloseFirst));
+        Assert.False(File.Exists(apps.DesktopConfig));
+        Assert.Empty(did);
+
+        // Close Claude: closed, connected, opened again, and nothing left for the student to do.
+        var steps = new List<string>();
+        var done = await connect.ConnectAsync("claude", p => steps.Add(p.Words), TestContext.Current.CancellationToken, close: true);
+        Assert.True(done.Ok, done.Words);
+        Assert.Equal(["close claude-desktop, written: False", "open claude-desktop, written: True"], did);
+        Assert.Equal(["Closing Claude…", "Connecting Claude app…", "Checking Claude app…", "Opening Claude…", "Done"], steps);
+        Assert.Equal("", done.Next); // no "quit and open it again": Syft Notes just did
+        Assert.False(apps.State("claude-desktop").NeedsReopen);
+
+        // Not open: Connect is as it always was, with nothing closed.
+        open = false;
+        did.Clear();
+        Assert.True((await connect.ConnectAsync("claude", ct: TestContext.Current.CancellationToken)).Ok);
+        Assert.Empty(did);
+    }
+
+    [Theory]
+    [InlineData(false, "Couldn't close Claude. Quit it from its menu, then press Connect.")]
+    [InlineData(true, "Couldn't close Claude. Quit it from the tray icon by the clock, then press Connect.")]
+    public async Task An_app_that_wont_close_says_how_to_quit_it_and_nothing_is_written(bool windows, string words)
+    {
+        using var home = new TempHome();
+        var lib = new FakeAiLibrary { Overview = Fresh() with { Engines = [new EngineInfo("claude", "Claude Code", "ready") { Installed = true }] } };
+        bool opened = false;
+        var apps = Apps(home, [], running: true, windows: windows, quit: _ => Task.FromResult(false), reopen: _ => Task.FromResult(opened = true));
+        var connect = new AiConnect(lib) { Apps = apps, Windows = windows };
+
+        var done = await connect.ConnectAsync("claude", ct: TestContext.Current.CancellationToken, close: true);
+
+        Assert.Equal((false, words, true), (done.Ok, done.Words, done.CouldntClose));
+        Assert.False(File.Exists(apps.DesktopConfig));
+        Assert.False(opened);
     }
 
     [Fact]

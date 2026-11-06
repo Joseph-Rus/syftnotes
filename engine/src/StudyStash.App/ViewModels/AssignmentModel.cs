@@ -36,10 +36,13 @@ public sealed partial class FileChip : ObservableObject
 /// file into the library's cache under the student's home the first time it's opened, then just opens the saved copy
 /// — <see cref="LoadAsync"/> is the only place that talks to the library.
 /// </summary>
-public sealed partial class AssignmentModel(CanvasContext context) : ObservableObject
+public sealed partial class AssignmentModel(CanvasContext context, DueMarker? marker = null) : ObservableObject
 {
     string cls = "";
     string folder = "";
+
+    /// <summary>"Mark as done" (or "Done (marked by you)" and "Undo") in "Your submission", kept in Syft Notes alone.</summary>
+    public Kit.DueMarkModel Marks { get; } = new(marker);
 
     [ObservableProperty] public partial string Meta { get; set; } = "";
     [ObservableProperty] public partial IBrush Dot { get; set; } = Brushes.Transparent;
@@ -104,6 +107,9 @@ public sealed partial class AssignmentModel(CanvasContext context) : ObservableO
             : closed ? "Closed" : handedIn is not null && d.Label == "To do" ? "Submitted" : d.Label;
 
         Instructions = d.Instructions ?? "";
+        // The student can say they did it while nothing is handed in (Canvas's own tick already counts it done); a mark kept from
+        // before shows with Undo, but not over work that has since been handed in.
+        Marks.Show(d.Class, d.Kind, d.Id, d.Mark == "done", handedIn is null && !graded && !d.Excused && d.MarkedDone is null);
 
         Rubric.Clear();
         foreach (var r in d.Rubric)
@@ -175,7 +181,7 @@ public sealed partial class AssignmentModel(CanvasContext context) : ObservableO
 
     /// <summary>The chip's icon by the file's format: a document type the design draws its own way, code by
     /// extension, everything else a plain draft page.</summary>
-    static string FileGlyph(string? format) => format?.ToLowerInvariant() switch
+    internal static string FileGlyph(string? format) => format?.ToLowerInvariant() switch
     {
         "pdf" => "picture_as_pdf",
         "py" or "js" or "ts" or "java" or "c" or "cpp" or "cs" or "ipynb" or "rb" or "go" => "code",
@@ -262,4 +268,14 @@ public sealed partial class AssignmentModel(CanvasContext context) : ObservableO
 
     [RelayCommand]
     void Search() => OnSearch?.Invoke();
+
+    /// <summary>This hand-in waits on "Ready to tidy" (Submit &amp; Organize, test builds only): "Your submission" offers
+    /// Tidy up, which opens the tidy card. Null when nothing waits.</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(CanTidy))]
+    public partial Action? OnTidy { get; set; }
+    public bool CanTidy => OnTidy is not null;
+
+    [RelayCommand]
+    void TidyUp() => OnTidy?.Invoke();
 }
