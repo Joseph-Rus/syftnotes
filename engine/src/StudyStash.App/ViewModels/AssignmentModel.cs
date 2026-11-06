@@ -109,7 +109,7 @@ public sealed partial class AssignmentModel(CanvasContext context, DueMarker? ma
         Instructions = d.Instructions ?? "";
         // The student can say they did it while nothing is handed in (Canvas's own tick already counts it done); a mark kept from
         // before shows with Undo, but not over work that has since been handed in.
-        Marks.Show(d.Class, d.Kind, d.Id, d.Mark == "done", handedIn is null && !d.Excused && d.MarkedDone is null);
+        Marks.Show(d.Class, d.Kind, d.Id, d.Mark == "done", handedIn is null && !graded && !d.Excused && d.MarkedDone is null);
 
         Rubric.Clear();
         foreach (var r in d.Rubric)
