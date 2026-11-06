@@ -313,11 +313,38 @@ public class SubmitOrganizeTests
         Assert.Equal(FilingFolders.Library, FilingFolders.Refuse(Path.Combine(library, "CS 101"), home, library));
         Assert.Null(FilingFolders.Refuse(Path.Combine(home, "Documents"), home, library));
         Assert.Equal(FilingFolders.Gone, FilingFolders.Look(Path.Combine(home, "Downloads")));
-
         using var store = new Store(dir["state.db"], dir["Library"]);
         foreach (var (run, file) in new[] { ("older", "a"), ("older", "b"), ("newer", "c") })
             store.AddFiledMove(new FiledMove(0, run, "2026-10-01T10:00:00Z", "CS 101", run, file, "", FiledMove.Moved, ""));
         Assert.Equal([("newer", 1), ("older", 2)], store.FiledRuns().Select(r => (r.Run, r.Files)));
+
+        // A folder that holds the home folder (/Users, C:\Users) is refused, and so is a mounted disk on a Mac.
+        Assert.Equal(FilingFolders.HoldsHome, FilingFolders.Refuse(dir.Path, home, library));
+        if (!OperatingSystem.IsWindows())
+        {
+            Assert.Equal(FilingFolders.WholeDisk, FilingFolders.Refuse("/Volumes/Backup", home, library));
+            Assert.Equal(FilingFolders.WholeDisk, FilingFolders.Refuse("/Volumes", home, library));
+        }
+        // A link to the home folder or the library, or a folder reached through a link, is refused: it would lead outside.
+        Directory.CreateDirectory(Path.Combine(library, "CS 101"));
+        Directory.CreateDirectory(Path.Combine(home, "Documents", "School"));
+        string links = dir["links"], toHome = Path.Combine(links, "home"), toLibrary = Path.Combine(links, "library"), toDocuments = Path.Combine(links, "documents");
+        try
+        {
+            Directory.CreateDirectory(links);
+            Directory.CreateSymbolicLink(toHome, home);
+            Directory.CreateSymbolicLink(toLibrary, library);
+            Directory.CreateSymbolicLink(toDocuments, Path.Combine(home, "Documents"));
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException)
+        {
+            return; // Windows without the right to make links: there's nothing to refuse.
+        }
+        Assert.Equal(FilingFolders.Shortcut, FilingFolders.Refuse(toHome, home, library));
+        Assert.Equal(FilingFolders.Shortcut, FilingFolders.Refuse(toLibrary, home, library));
+        Assert.Equal(FilingFolders.Shortcut, FilingFolders.Refuse(Path.Combine(toDocuments, "School"), home, library));
+        Assert.Null(FilingFolders.Refuse(Path.Combine(home, "Documents", "School"), home, library));
+
     }
 
     /// <summary>Part 2's library routes, as the app calls them: tidying up switched on, a folder added (and one refused),
