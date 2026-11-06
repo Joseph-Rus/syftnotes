@@ -4,11 +4,15 @@
 # lines to $GITHUB_OUTPUT:
 #   version     StudyStashVersion in engine/Directory.Build.props
 #   new         true when v<version> has no tag yet (only a push to main with a new version ever publishes it)
+#   full        true when this run tests on every system (Mac, Windows and Linux apps, engine tests on all three): a
+#               release (a push to main with a new version), a run by hand, and the daily run when main's latest
+#               commit has no full run finished on it yet. false (Linux only) for a pull request and any other merge.
 #   installers  true when this run builds and proves the installers: a push to main with a new version (the release),
 #               and a run by hand on code with a new version, or with the "installers" box ticked (a rehearsal)
 #   tested      true when this very code already passed, so the engine tests and the self-tests aren't run again
 #   reuse_run   the id of an earlier run by hand whose tested installers a release publishes as they are, or empty
-# Needs: git, gh (GH_TOKEN), and in the environment EVENT_NAME, REF, SHA, BEFORE (a push's previous tip), REPO and,
+# Needs: git, gh (GH_TOKEN), and in the environment EVENT_NAME (push, pull_request, workflow_dispatch or schedule), REF,
+# SHA, BEFORE (a push's previous tip), REPO and,
 # for a run by hand, WANT_INSTALLERS and REUSE_RUN (its two inputs).
 set -u
 
@@ -69,6 +73,12 @@ trusted_run() {
   [ "$(gh api "repos/$REPO/actions/runs/$1" --jq "($trust) and .conclusion == \"success\"" 2> /dev/null)" = true ]
 }
 
+# Was this run a full one (every system)? A full run keeps a full-run artifact (ci.yml's version job).
+full_run() {
+  gh api "repos/$REPO/actions/runs/$1/artifacts" --paginate \
+    --jq '.artifacts[] | select(.name == "full-run" and .expired == false) | .name' 2> /dev/null | grep -qx full-run
+}
+
 # Does this run (by hand, on a branch) have every installer still to download (the Mac's, Windows', and Linux's two)?
 has_installers() {
   local names
@@ -89,7 +99,29 @@ tested_this_tree() {
   [ "$(cat prior/tested-tree.txt)" = "$tree" ]
 }
 
+# Every system, or Linux only. A merge of a version already released runs what a pull request runs; every system runs
+# for a release, a run by hand, and once a day on main's latest commit, unless a full run (the daily one, a release's,
+# or one by hand) already finished there, passed or failed: the same code isn't run in full twice.
+full=false
+case "$EVENT_NAME" in
+  push) full=$new ;;
+  workflow_dispatch) full=true ;;
+  schedule)
+    full=true
+    for run in $(gh api "repos/$REPO/actions/workflows/ci.yml/runs?head_sha=$SHA&status=completed&per_page=100" \
+        --jq ".workflow_runs[] | select(((.event == \"schedule\") or ($trust)) and .conclusion != \"cancelled\") | .id" 2> /dev/null); do
+      if full_run "$run"; then
+        full=false
+        tested=true
+        why="run $run already ran in full on this commit, and main hasn't moved since"
+        break
+      fi
+    done
+    ;;
+esac
+
 # 1. A push to main that changes only the version and files that can't matter, on top of a commit whose ci passed.
+#    A release (a full run) believes only a full run's pass there: a merge's Linux check alone isn't enough.
 if [ "$main_push" = true ] && [ -n "$BEFORE" ] && [ "$BEFORE" != "$ZEROS" ]; then
   if git fetch -q --depth=1 origin "$BEFORE"; then git fetch -q --deepen=1 origin "$SHA" || true; fi
   if changed=$(git diff --name-only "$BEFORE" "$SHA" 2> /dev/null); then
@@ -99,7 +131,10 @@ if [ "$main_push" = true ] && [ -n "$BEFORE" ] && [ "$BEFORE" != "$ZEROS" ]; the
     done <<< "$changed"
     # engine/Directory.Build.props holds more than the version: only a changed StudyStashVersion line is trivial.
     beyond=$(git diff -U0 "$BEFORE" "$SHA" -- "$props" | grep -E '^[+-]' | grep -vE '^(\+\+\+|---)' | grep -vc '<StudyStashVersion>')
-    passed=$(trusted_runs "$BEFORE" | grep -c .)
+    passed=0
+    for run in $(trusted_runs "$BEFORE"); do
+      if [ "$full" = false ] || full_run "$run"; then passed=$((passed + 1)); fi
+    done
     echo "changed since $BEFORE: $(echo "$changed" | tr '\n' ' '); other files: $others; other lines of $props: $beyond; ci passed there: $passed"
     if [ "$others" = 0 ] && [ "${beyond:-1}" = 0 ] && [ "${passed:-0}" -gt 0 ]; then
       tested=true
@@ -143,6 +178,9 @@ fi
 
 say "### What this run does"
 say "- version $V, $([ "$new" = true ] && echo "no tag yet" || echo "already tagged")"
+if [ "$full" = true ]; then say "- systems: every system (Mac, Windows, Linux)"
+elif [ "$EVENT_NAME" = schedule ]; then say "- systems: none, nothing new since a full run"
+else say "- systems: Linux only"; fi
 say "- code: $([ "$tested" = true ] && echo "already tested ($why)" || echo "tested here")"
 if [ "$installers" = true ]; then
   say "- installers: $([ -n "$reuse" ] && echo "reused from run $reuse, not rebuilt" || echo "built and proved here")$([ "$main_push" = true ] && echo ", then published" || echo "; nothing is published from a run by hand")"
@@ -152,6 +190,7 @@ fi
 
 out version "$V"
 out new "$new"
+out full "$full"
 out installers "$installers"
 out tested "$tested"
 out reuse_run "$reuse"
