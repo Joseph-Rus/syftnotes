@@ -8,9 +8,9 @@ public sealed record TidyItem(CanvasApi.HandInWaiting Waiting, CanvasApi.HandInC
 {
     public string Id => Waiting.Class + "\n" + Waiting.Key;
 
-    /// <summary>The files a press of Tidy up moves as it stands: the file handed in when one was found, and the files
-    /// worked from that Syft Notes is sure of.</summary>
-    public int Files => (Check.File.Found == "none" ? 0 : 1) + Check.Materials.Count(m => m.Sure == "high");
+    /// <summary>The files a press of Tidy up moves as it stands: the file handed in when Syft Notes is sure it's the one
+    /// (an unsure one counts once the student says Yes), and the files worked from that it's sure of.</summary>
+    public int Files => (Check.File.Found == "exact" ? 1 : 0) + Check.Materials.Count(m => m.Sure == "high");
 }
 
 /// <summary>
@@ -27,7 +27,8 @@ public sealed class TidyList : IDisposable
     readonly Lock gate = new();
     readonly List<TidyItem> items = [];
     readonly HashSet<string> checking = [];
-    HashSet<string>? told;
+    /// <summary>The hand-ins told of, oldest first (the file keeps the last 200).</summary>
+    List<string>? told;
 
     public TidyList(CanvasContext context, CanvasWatch? watch = null)
     {
@@ -114,17 +115,19 @@ public sealed class TidyList : IDisposable
             {
                 try
                 {
-                    told = File.Exists(ToldPath) ? JsonSerializer.Deserialize<HashSet<string>>(File.ReadAllText(ToldPath)) ?? [] : [];
+                    told = File.Exists(ToldPath) ? JsonSerializer.Deserialize<List<string>>(File.ReadAllText(ToldPath)) ?? [] : [];
                 }
                 catch (Exception e) when (e is IOException or JsonException or UnauthorizedAccessException)
                 {
                     told = [];
                 }
             }
-            if (!told.Add(id)) return false;
+            if (told.Contains(id)) return false;
+            told.Add(id);
+            if (told.Count > 200) told.RemoveRange(0, told.Count - 200);
             try
             {
-                if (context.Home.Length > 0) File.WriteAllText(ToldPath, JsonSerializer.Serialize(told.TakeLast(200)));
+                if (context.Home.Length > 0) File.WriteAllText(ToldPath, JsonSerializer.Serialize(told));
             }
             catch (Exception e) when (e is IOException or UnauthorizedAccessException)
             {

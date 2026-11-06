@@ -893,6 +893,10 @@
     <Setter Property="IsVisible" Value="True" />
     <Setter Property="Background" Value="Transparent" />
   </Style>
+  <!-- On an ink pill the Focus ink wouldn't show: the ring is paper there. -->
+  <Style Selector="Button.btn.ink:focus-visible /template/ Border#PART_Wash">
+    <Setter Property="BorderBrush" Value="{DynamicResource Surface}" />
+  </Style>
   <Style Selector="Button.btn:pointerover /template/ Border#PART_Bg, Button.btn:focus-visible /template/ Border#PART_Bg">
     <Setter Property="BoxShadow" Value="{DynamicResource SubtleRing}" />
   </Style>
