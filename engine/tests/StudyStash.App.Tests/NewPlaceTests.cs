@@ -82,10 +82,10 @@ public class NewPlaceTests
             Directory.CreateDirectory(Path.GetDirectoryName(path)!);
             File.WriteAllText(path, text);
         }
-        string claude = $$"""{"mcpServers":{"syft-notes":{"command":"{{before}}","args":["mcp","--client","claude-desktop"]},"github":{"command":"gh-mcp"}}}""";
+        string claude = $$$$"""{"mcpServers":{"syft-notes":{"command":"{{{{before}}}}","args":["mcp","--client","claude-desktop"]},"github":{"command":"gh-mcp"}}}""";
         Write(setup.DesktopConfig, claude);
         // A server of the student's own, under another name, that happens to start the old program: not ours.
-        string gemini = $$"""{"mcpServers":{"notes":{"command":"{{before}}","args":["mcp"]}}}""";
+        string gemini = $$$$"""{"mcpServers":{"notes":{"command":"{{{{before}}}}","args":["mcp"]}}}""";
         Write(setup.GeminiConfig, gemini);
         var waiting = new List<string>();
 
