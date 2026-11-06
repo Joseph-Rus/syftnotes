@@ -42,18 +42,54 @@ public static class FilingFolders
 {
     public const string WholeDisk = "That's a whole disk. Choose a folder on it, like Downloads.";
     public const string WholeHome = "That's your whole home folder. Choose a folder in it, like Downloads or Documents.";
+    public const string HoldsHome = "That folder holds your whole home folder. Choose a folder in it, like Downloads or Documents.";
+    public const string Shortcut = "That's a shortcut to another folder. Add the folder itself.";
     public const string Library = "That's your Syft Notes library. Your filed work goes there, so it isn't tidied.";
     public const string Gone = "That folder isn't there.";
     public const string NotAllowed = "Syft Notes wasn't allowed to look in that folder.";
 
-    /// <summary>Why <paramref name="folder"/> can't be one (a whole disk, the home folder itself, the library or a folder
-    /// in it), or null when it can.</summary>
+    /// <summary>Why <paramref name="folder"/> can't be one, or null when it can: a whole disk (a Mac's /Volumes/&lt;disk&gt;
+    /// too), the home folder or a folder that holds it, the library or a folder in it, or a link (a shortcut to another
+    /// folder, or a folder reached through one). The folder as it really is, every link followed, is checked too.</summary>
     public static string? Refuse(string folder, string home, string library)
     {
-        string full = Path.TrimEndingDirectorySeparator(Path.GetFullPath(folder));
-        if (Path.GetPathRoot(full) is { } root && Path.TrimEndingDirectorySeparator(root).Equals(full, SubmitMatch.Case)) return WholeDisk;
-        if (full.Equals(Path.TrimEndingDirectorySeparator(Path.GetFullPath(home)), SubmitMatch.Case)) return WholeHome;
-        return SubmitMatch.Within(full, Path.TrimEndingDirectorySeparator(Path.GetFullPath(library))) ? Library : null;
+        string full = Trim(Path.GetFullPath(folder));
+        if (Linked(full)) return Shortcut;
+        string[] homes = [.. new[] { home, LibraryFolders.Real(home) }.Select(h => Trim(Path.GetFullPath(h))).Distinct()];
+        string[] libraries = [.. new[] { library, LibraryFolders.Real(library) }.Select(l => Trim(Path.GetFullPath(l))).Distinct()];
+        foreach (string f in new[] { full, Trim(LibraryFolders.Real(full)) }.Distinct())
+        {
+            if (Disk(f)) return WholeDisk;
+            if (homes.Any(h => h.Equals(f, SubmitMatch.Case))) return WholeHome;
+            if (homes.Any(h => SubmitMatch.Within(h, f))) return HoldsHome;
+            if (libraries.Any(l => SubmitMatch.Within(f, l))) return Library;
+        }
+        return null;
+    }
+
+    static string Trim(string path) => Path.TrimEndingDirectorySeparator(path);
+
+    /// <summary>A disk's root: "/", "C:\\", or on a Mac a mounted disk (/Volumes/USB), or /Volumes itself.</summary>
+    static bool Disk(string full) =>
+        Path.GetPathRoot(full) is { } root && Trim(root).Equals(full, SubmitMatch.Case)
+        || !OperatingSystem.IsWindows() && (full == "/Volumes" || Path.GetDirectoryName(full) == "/Volumes");
+
+    /// <summary>The folder is a link, or sits under one, by the rule <see cref="SubmitMatch.Inside"/> uses below a folder.
+    /// The links the system keeps at the top of the disk (a Mac's /var and /tmp) are passed by as the folder's parents;
+    /// the folder as it really is is checked against home, the disks and the library all the same.</summary>
+    static bool Linked(string full)
+    {
+        string root = Trim(Path.GetPathRoot(full) ?? "");
+        try
+        {
+            for (string? d = full; d is not null && Trim(d).Length > root.Length; d = Path.GetDirectoryName(d))
+                if ((d == full || Trim(Path.GetDirectoryName(d) ?? "") != root) && SubmitMatch.IsLink(d)) return true;
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException)
+        {
+            // A part that can't be looked at: Look says so when the folder is added.
+        }
+        return false;
     }
 
     /// <summary>Looks into <paramref name="folder"/> once, as it's added: on a Mac the system asks the student there and
