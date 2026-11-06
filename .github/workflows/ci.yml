@@ -5,7 +5,12 @@
 #      project). No Mac, no Windows, no self-tests, no installers, no real sign-ins, no secrets. It never counts as proof
 #      for a merge or a release (plan.sh).
 #
-#   2. A push to main (a merge) runs everything, on every system, nothing it would throw away:
+#   2. A push to main (a merge) of a version that already has a tag runs only what a pull request runs: the connection
+#      rules and the Linux tests. (Every merge used to run every system; the macOS minutes of about forty merges in five
+#      days got GitHub to lock the account's Actions on 2026-11-05.)
+#      Every system runs once a day instead (09:00 UTC, on main), when main's latest commit has no full run finished on
+#      it yet; otherwise that day's run skips every job. A full run is everything, on every system, nothing it would
+#      throw away:
 #     - the engine's Core and App tests: in one job on macOS and one on Linux, and in a job each on Windows, whose App
 #       tests are the slowest; then, after the App tests, the real AI sign-ins (reported, but not counted against the
 #       run). The failed tests and the 20 slowest are on the run's page;
@@ -14,23 +19,24 @@
 #       this computer", both on the one app each job built.
 #     No installers are made for it, and nothing is published. It blocks nothing (the code is merged): a failure here
 #     is fixed straight away.
-#     A push to main with a StudyStashVersion in engine/Directory.Build.props that has no tag yet is a release. On top
-#     of all of the above it builds the installers, proves them where they will really run (the Mac app natively on an
-#     Intel Mac; Setup.exe installed, self-tested from the installed copy, updated in place with a silent Setup.exe and
-#     uninstalled cleanly; each Linux tarball installed with its install.sh, self-tested from there and uninstalled),
+#     A push to main with a StudyStashVersion in engine/Directory.Build.props that has no tag yet is a release, and runs
+#     in full. On top of all of the above it builds the installers, proves them where they will really run (the Mac app
+#     natively on an Intel Mac; Setup.exe installed, self-tested from the installed copy, updated in place with a
+#     silent Setup.exe and uninstalled cleanly; each Linux tarball installed with its install.sh, self-tested from there and uninstalled),
 #     and then publishes release v<version> with the installers and SHA256SUMS.txt. Installed copies pick it up within a
 #     few hours (auto_update), or right away with Update now. A version already released is never published again.
 #     Nothing is published unless every job it waits for passed or was skipped (a job that ran out of time ends
 #     "cancelled", and stops it too).
 #
-#   3. A run by hand (Actions → ci → Run workflow, or `gh workflow run ci --ref <branch>`) tests a branch as a merge
-#      does. On code whose version has no tag yet (a release branch), or with "installers" ticked, it rehearses the
-#      whole release too, down to the checksums, and publishes nothing, ever. Give it "reuse_run" (an earlier such
+#   3. A run by hand (Actions → ci → Run workflow, or `gh workflow run ci --ref <branch>`) runs in full, as the
+#      daily run does. On code whose version has no tag yet (a release branch), or with "installers" ticked, it
+#      rehearses the whole release too, down to the checksums, and publishes nothing, ever. Give it "reuse_run" (an earlier such
 #      run's id, on the same code) to rehearse the fast release below.
 #
 #   Code that already passed isn't tested twice. A push to main skips the engine tests and the self-tests when it
 #     - changes only the version and files that can't change what the code does (the docs, the website, the
-#       README, the iPhone app), on top of a commit whose run passed; or
+#       README, the iPhone app), on top of a commit whose run passed (for a release, a full run: a merge's Linux check
+#       alone isn't enough); or
 #     - merges a branch whose run by hand passed on exactly the same code (main hadn't moved meanwhile).
 #   Only ci's own runs in this repository, started by a push or by hand, are believed (plan.sh). A release that skips
 #   the tests still builds and proves its installers, unless that run by hand was a rehearsal and still holds its
@@ -72,6 +78,9 @@ on:
       - "!.github/ISSUE_TEMPLATE/**"
       - "!**/*.md"
       - "engine/tests/**/Golden/**"
+  # Level 2's daily full run on main. plan.sh skips it when a full run already finished on main's latest commit.
+  schedule:
+    - cron: "0 9 * * *"
   workflow_dispatch:
     inputs:
       installers:
@@ -96,9 +105,11 @@ permissions:
 
 # A push to main has a group of its own (its commit), so a release is never cancelled by the push after it. A pull
 # request's group is its own (refs/pull/<n>/merge), as is a branch's run by hand: a newer push replaces the older run.
+# The daily run shares its commit's group and cancels nothing: it waits for that push's run, and then sees whether it was
+# a full one.
 concurrency:
-  group: ci-${{ github.event_name == 'push' && github.sha || github.ref }}
-  cancel-in-progress: ${{ github.event_name != 'push' }}
+  group: ci-${{ (github.event_name == 'push' || github.event_name == 'schedule') && github.sha || github.ref }}
+  cancel-in-progress: ${{ github.event_name != 'push' && github.event_name != 'schedule' }}
 
 env:
   DOTNET_CLI_TELEMETRY_OPTOUT: "1"
@@ -118,6 +129,8 @@ jobs:
     outputs:
       version: ${{ steps.plan.outputs.version }}
       new: ${{ steps.plan.outputs.new }}
+      # true: every system (a release, a run by hand, the daily run); false: Linux only (a pull request, a merge).
+      full: ${{ inputs.real_sign_in_only && 'false' || steps.plan.outputs.full }}
       # A run of the real sign-ins alone skips everything else (as code already tested would), and builds no installers.
       installers: ${{ inputs.real_sign_in_only && 'false' || steps.plan.outputs.installers }}
       tested: ${{ inputs.real_sign_in_only && 'true' || steps.plan.outputs.tested }}
@@ -152,6 +165,17 @@ jobs:
           WANT_INSTALLERS: ${{ inputs.installers }}
           REUSE_RUN: ${{ inputs.reuse_run }}
         run: bash .github/scripts/plan.sh
+      # A full run says so, for plan.sh: a release believes only a full run's pass, and the daily run skips a commit that
+      # already had one.
+      - if: steps.plan.outputs.full == 'true' && !inputs.real_sign_in_only
+        run: git rev-parse 'HEAD^{tree}' > full-run.txt
+      - if: steps.plan.outputs.full == 'true' && !inputs.real_sign_in_only
+        uses: actions/upload-artifact@v7
+        continue-on-error: true
+        with:
+          name: full-run
+          path: full-run.txt
+          retention-days: 90
       # Which secrets exist (only that: no value comes here) decides whether the installers are signed.
       - id: signing
         env:
@@ -180,6 +204,7 @@ jobs:
   # install.ps1) and the Windows build and signing scripts (PowerShell 7, which this Linux runner has).
   connections:
     name: Connection rules (counts only go down), and the scripts parse
+    if: github.event_name != 'schedule'  # the push of that commit ran them already
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
@@ -237,10 +262,10 @@ jobs:
     if: needs.version.outputs.tested != 'true'
     strategy:
       fail-fast: false  # a flake in one doesn't hide the rest, and re-running a failed job re-runs only it
-      # A pull request runs the Linux leg alone; a push to main and a run by hand run all four.
+      # A pull request and a merge run the Linux leg alone; a full run (plan.sh) runs all four.
       matrix:
         include: >-
-          ${{ fromJSON(github.event_name == 'pull_request'
+          ${{ fromJSON(needs.version.outputs.full != 'true'
           && '[{"os":"ubuntu-latest","suite":"Core and App","slug":"all","core":true,"app":true}]'
           || '[{"os":"ubuntu-latest","suite":"Core and App","slug":"all","core":true,"app":true},
           {"os":"macos-latest","suite":"Core and App","slug":"all","core":true,"app":true},
@@ -325,7 +350,7 @@ jobs:
       # The App tests above built what this runs.
       - name: Each real AI's sign-in, in the hidden terminal, then Connect against what each reads (the makers' CLIs as they are today, so not one the run waits for)
         id: real-sign-in
-        if: ${{ !cancelled() && matrix.app && github.event_name != 'pull_request' }}
+        if: ${{ !cancelled() && matrix.app && needs.version.outputs.full == 'true' }}
         continue-on-error: true
         timeout-minutes: 12
         shell: pwsh
@@ -341,7 +366,7 @@ jobs:
           if (Test-Path $kept) { Rename-Item $kept 'Git' }
           if ($env:GIT_KEPT_PATH) { "PATH=$env:GIT_KEPT_PATH" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append }
       - name: What each real sign-in did
-        if: ${{ !cancelled() && matrix.app && github.event_name != 'pull_request' }}
+        if: ${{ !cancelled() && matrix.app && needs.version.outputs.full == 'true' }}
         shell: bash
         env:
           OUTCOME: ${{ steps.real-sign-in.outcome }}
@@ -465,7 +490,7 @@ jobs:
   mac-app:
     name: Mac app (self-test, DMG)
     needs: [version]
-    if: github.event_name != 'pull_request' && (needs.version.outputs.tested != 'true' || (needs.version.outputs.installers == 'true' && needs.version.outputs.reuse_run == ''))
+    if: needs.version.outputs.full == 'true' && (needs.version.outputs.tested != 'true' || (needs.version.outputs.installers == 'true' && needs.version.outputs.reuse_run == ''))
     # Notarization usually answers within minutes, but Apple's first answers for a new account can take much longer.
     timeout-minutes: ${{ needs.version.outputs.mac_signing == 'real' && 120 || (needs.version.outputs.mac_signing == 'rehearsal' && 45 || 30) }}
     runs-on: macos-latest
@@ -763,7 +788,7 @@ jobs:
   windows-app:
     name: Windows app (self-test, Setup.exe)
     needs: [version]
-    if: github.event_name != 'pull_request' && (needs.version.outputs.tested != 'true' || (needs.version.outputs.installers == 'true' && needs.version.outputs.reuse_run == ''))
+    if: needs.version.outputs.full == 'true' && (needs.version.outputs.tested != 'true' || (needs.version.outputs.installers == 'true' && needs.version.outputs.reuse_run == ''))
     timeout-minutes: ${{ needs.version.outputs.win_signing != 'off' && 40 || 25 }}
     runs-on: windows-latest
     steps:
@@ -1163,7 +1188,7 @@ jobs:
     name: Linux app (${{ matrix.rid }}, self-test, tarball)
     needs: [version]
     # As the Mac and Windows apps: a release that reuses a rehearsal's installers doesn't build them again.
-    if: github.event_name != 'pull_request' && (needs.version.outputs.tested != 'true' || (needs.version.outputs.installers == 'true' && needs.version.outputs.reuse_run == ''))
+    if: needs.version.outputs.full == 'true' && (needs.version.outputs.tested != 'true' || (needs.version.outputs.installers == 'true' && needs.version.outputs.reuse_run == ''))
     strategy:
       fail-fast: false
       matrix:
