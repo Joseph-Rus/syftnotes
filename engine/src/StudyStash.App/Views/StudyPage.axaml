@@ -117,6 +117,8 @@
            Another exam (its class from a menu, its name, Write the prep). -->
       <StackPanel Name="Hub" Classes="st-page" IsVisible="{Binding ShowHub}" Spacing="0">
         <TextBlock Classes="page-title" Text="Study" />
+        <!-- Until the library first answers -->
+        <c:SyftLoader Kind="HoppingBits" Size="24" Margin="0,40,0,0" HorizontalAlignment="Left" IsActive="{Binding !Loaded}" IsVisible="{Binding !Loaded}" />
 
         <Border Name="ReviewCard" Classes="study-card" Margin="0,24,0,0" Padding="19,17" IsVisible="{Binding ShowReview}">
           <StackPanel Spacing="14">
@@ -182,20 +184,24 @@
                     <Border Classes="exam-row" AutomationProperties.Name="{Binding Line}">
                       <StackPanel Spacing="6">
                         <Grid ColumnDefinitions="Auto,*,Auto">
-                          <!-- Its date as a small calendar leaf -->
-                          <Border Classes="date-leaf" IsVisible="{Binding HasDate}" Margin="0,0,12,0" VerticalAlignment="Center">
-                            <StackPanel>
-                              <TextBlock Classes="leaf-weekday" Text="{Binding Weekday}" />
-                              <TextBlock Classes="leaf-day" Text="{Binding Day}" />
-                            </StackPanel>
-                          </Border>
+                          <!-- Its date as a small calendar leaf; with no date its room is kept, so every name lines up -->
+                          <Panel Width="58" VerticalAlignment="Center">
+                            <Border Classes="date-leaf" IsVisible="{Binding HasDate}" HorizontalAlignment="Left">
+                              <StackPanel>
+                                <TextBlock Classes="leaf-weekday" Text="{Binding Weekday}" />
+                                <TextBlock Classes="leaf-day" Text="{Binding Day}" />
+                              </StackPanel>
+                            </Border>
+                          </Panel>
                           <StackPanel Grid.Column="1" Spacing="3" VerticalAlignment="Center">
                             <TextBlock Classes="free-ai-lead" Text="{Binding Title}" />
-                            <StackPanel Orientation="Horizontal" Spacing="8">
-                              <c:Highlight Classes="lecture-class" Text="{Binding ClassShown}" Fill="{Binding Dot}" VerticalAlignment="Center" />
-                              <TextBlock Classes="st-aside" Text="{Binding Detail}" IsVisible="{Binding HasDetail}" VerticalAlignment="Center"
+                            <!-- Its class, then when and its last score: each cut short with "…" (and its tip) when the row is narrow -->
+                            <Grid ColumnDefinitions="Auto,8,*">
+                              <c:Highlight Classes="lecture-class" Text="{Binding ClassShown}" Fill="{Binding Dot}" VerticalAlignment="Center" MaxWidth="220"
+                                           TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding ClassShown}" c:Tips.WhenCut="True" />
+                              <TextBlock Grid.Column="2" Classes="st-aside" Text="{Binding Detail}" IsVisible="{Binding HasDetail}" VerticalAlignment="Center"
                                          TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding Detail}" c:Tips.WhenCut="True" />
-                            </StackPanel>
+                            </Grid>
                           </StackPanel>
                           <Button Grid.Column="2" Classes="btn sm" Classes.ink="{Binding !HasPrep}" Command="{Binding Go}" VerticalAlignment="Center" Margin="16,0,0,0"
                                   AutomationProperties.Name="{Binding ActionSaid}">
@@ -267,7 +273,7 @@
                           </StackPanel>
                         </Button>
                       </Grid>
-                      <TextBlock Classes="st-aside" Text="{Binding NewCovers}" />
+                      <TextBlock Classes="st-aside" Text="{Binding NewCovers}" TextWrapping="Wrap" />
                       <c:PageText Classes="free-ai-problem" Text="{Binding NewProblem}" IsVisible="{Binding HasNewProblem}" />
                     </StackPanel>
                   </Border>
