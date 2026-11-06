@@ -292,12 +292,12 @@ public sealed class AiStatusStore : IDisposable
 
     /// <summary>Connect on Claude's, ChatGPT's or Gemini's card (<see cref="AiConnect"/>): what it ends on is taken, so the
     /// problem cards follow the card, and a sign-in it left waiting is watched.</summary>
-    public async Task<ConnectOutcome> ConnectAsync(AiConnect connector, string id, Action<ConnectProgress>? progress = null, CancellationToken ct = default)
+    public async Task<ConnectOutcome> ConnectAsync(AiConnect connector, string id, Action<ConnectProgress>? progress = null, CancellationToken ct = default, bool close = false)
     {
         checkNext.Remove(id);
         // Asked meanwhile, so a sign-in Connect starts that waits for a pasted code (Gemini's) gets its box.
         using var watching = Hurry();
-        var outcome = await connector.ConnectAsync(id, progress, ct);
+        var outcome = await connector.ConnectAsync(id, progress, ct, close);
         if (outcome.Overview is { } overview) Take(overview);
         return outcome;
     }

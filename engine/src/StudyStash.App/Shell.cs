@@ -157,7 +157,11 @@ public static partial class Shell
         host.Start();
         Run(() => SuggestLighterModelAsync(), "SuggestLighterModel");
         // The program may have moved (Velopack's install, the Mac bundle's new name): what names the old one is put right.
-        UiTasks.RunQuietly(() => Task.Run(() => NewPlace.RunHere(host.Home, host.Settings.StartAtLogin)), "put right what names the app's old place");
+        // An AI app that's open isn't written to: Home asks to close it first (Close Claude), once.
+        UiTasks.RunQuietly(async () =>
+        {
+            if (await Task.Run(() => NewPlace.RunHere(host.Home, host.Settings.StartAtLogin)) is [var open, ..]) AskToCloseForRepair(open);
+        }, "put right what names the app's old place");
         AppUpdates.Start(host, stop.Token, SayUpdate, () => TypingNotes || SettingUp, LibraryWindowOpen);
         if (AppUpdates.Current is { } updater)
             updater.FoundChanged += () => Dispatcher.UIThread.Post(() =>
@@ -1533,17 +1537,41 @@ public static partial class Shell
         },
         AlreadyHere = () => host.Settings.SetupAi is "claude" or "codex" or "gemini" ? host.Settings.SetupAi : "",
         Connect = ConnectSignedInAsync,
+        AppToClose = AppToClose,
     };
 
     /// <summary>An AI the student signed in to here outside the library (setup's own sign-in, or one Get started found):
     /// Settings' own Connect for it, through the one AI store, so Settings → Your AI and every other screen say it's
     /// connected with no second Connect.</summary>
-    static async Task ConnectSignedInAsync(string id)
+    static Task ConnectSignedInAsync(string id) => ConnectHereAsync(id);
+
+    /// <summary>That Connect; with <paramref name="close"/>, the AI's desktop app closed first and opened again after
+    /// (the student pressed Close Claude), saying each step.</summary>
+    static async Task<ConnectOutcome> ConnectHereAsync(string id, bool close = false, Action<string>? say = null)
     {
         var connect = new AiConnect(host.AiStatus.Library) { Apps = ClaudeSetup.ThisComputer(host.Home), WaitForSignIn = false, SignedInHere = true };
-        var done = await host.AiStatus.ConnectAsync(connect, id);
+        var done = await host.AiStatus.ConnectAsync(connect, id, say is null ? null : step => say(step.Words), close: close);
         host.Log($"[setup] {AiConnect.Brand(id)}: " + (!done.Ok ? done.Words : done.SignIn == Core.Ai.SignInPhase.Waiting ? "a sign-in is waiting" : "connected"));
+        return done;
     }
+
+    /// <summary>Home's "Close Claude first": an older copy's connection in an AI app that was open at start, put right
+    /// once the student presses Close Claude (the app closed, written, opened again).</summary>
+    static void AskToCloseForRepair(string appId)
+    {
+        if (ClaudeSetup.DesktopApp(appId) is not { } app) return;
+        var apps = ClaudeSetup.ThisComputer(host.Home);
+        library.CloseAsk = new CloseAppAsk(app.Name, say => apps.RepairAsync(appId, say), () =>
+        {
+            library.CloseAsk = null;
+            Program.Log($"[moved] {app.Name}'s connection now starts {Desktop.Program}");
+        });
+    }
+
+    /// <summary>The AI's desktop app that is open and whose settings Connect has to change ("Claude"), so setup closes
+    /// it first; "" for none.</summary>
+    static string AppToClose(string id) =>
+        ClaudeSetup.ThisComputer(host.Home).OpenToChange(id) is { } app ? ClaudeSetup.DesktopApp(app.Id)!.Value.Name : "";
 
     /// <summary>Guided setup's model for this window, reaching the app's own installer, hidden sign-in and pages.
     /// The self-test finds no AI's CLI at all, so it never installs one or reaches an account.</summary>
@@ -1558,8 +1586,11 @@ public static partial class Shell
             Find = SelfTest.Dir is not null ? _ => AgentFound.None : cli => AgentInstall.Find(cli),
             AiApps = aiApps.DesktopStates,
             ConnectAiApp = aiApps.Connect,
-            // An AI signed in here (setup's AI step, a lecture's Get study notes): Settings' own Connect for it.
+            // An AI signed in here (setup's AI step, a lecture's Get study notes): Settings' own Connect for it, with
+            // its desktop app closed first when it's open.
             Connect = ConnectSignedInAsync,
+            AppToClose = AppToClose,
+            CloseAndConnect = (id, say) => ConnectHereAsync(id, close: true, say),
             Downloading = () => host.Downloading?.Fraction,
             Log = host.Log,
         };

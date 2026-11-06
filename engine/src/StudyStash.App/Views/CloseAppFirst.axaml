@@ -1,0 +1,24 @@
+<!-- "Close Claude first" (both looks; CloseAppAsk): an AI's desktop app (Claude, ChatGPT) is open, and what Syft Notes
+     has to write to its settings waits for it to close, because the app keeps them in memory and writes them back
+     whole. One button, Close Claude: Syft Notes closes it, writes, opens it again and carries on by itself. If it won't
+     close, how to quit it, and the button turns to Connect. On guided setup's sign-in screen and in the Get-ready window
+     (the first run's AI step), and on Home when a connection from an older copy waits for the app to close. -->
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:kit="using:StudyStash.App.ViewModels.Kit"
+             xmlns:c="using:StudyStash.App.Controls"
+             x:Class="StudyStash.App.Views.CloseAppFirst"
+             x:DataType="kit:CloseAppAsk">
+  <UserControl.Styles>
+    <StyleInclude Source="avares://StudyStash/Views/SetupStyles.axaml" />
+  </UserControl.Styles>
+  <Border Name="CloseBox" Classes="problem">
+    <Grid ColumnDefinitions="Auto,10,*,10,Auto">
+      <c:Icon Glyph="info" Size="18" VerticalAlignment="Center" />
+      <TextBlock Name="CloseSay" Grid.Column="2" Classes="say" Text="{Binding Say}" TextWrapping="Wrap" VerticalAlignment="Center" />
+      <Button Name="CloseButton" Grid.Column="4" Classes="btn sm ink" VerticalAlignment="Center" Command="{Binding CloseCommand}"
+              Content="{Binding Button}" IsVisible="{Binding !Busy}" />
+      <c:SyftLoader Grid.Column="4" Kind="HoppingBits" Size="20" VerticalAlignment="Center" IsVisible="{Binding Busy}" />
+    </Grid>
+  </Border>
+</UserControl>
