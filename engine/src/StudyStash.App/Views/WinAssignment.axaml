@@ -64,6 +64,8 @@
             <StackPanel Orientation="Horizontal" Spacing="10" IsVisible="{Binding !Marks.ShowDone}">
               <c:PageText Classes="cv-sub-status" Text="{Binding SubmissionStatus}" />
               <c:PageText Classes="cv-sub-detail" Text="{Binding SubmissionDetail}" IsVisible="{Binding HasSubmissionDetail}" VerticalAlignment="Bottom" />
+              <Button Classes="btn sm" VerticalAlignment="Center" IsVisible="{Binding CanTidy}" Command="{Binding TidyUpCommand}"
+                      Content="{x:Static vm:FilingWords.TidyUp}" AutomationProperties.Name="{x:Static vm:FilingWords.TidyUp}" />
             </StackPanel>
             <!-- "Mark as done", or once marked "Done (marked by you)" and Undo (in place of the row above), in Syft Notes only -->
             <v:DueMarkBar DataContext="{Binding Marks}" IsVisible="{Binding Showing}" />

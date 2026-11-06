@@ -1,0 +1,150 @@
+<!-- Settings → Canvas's "After you hand in" (Submit & Organize, test builds only) and "Filed work", the one place a run
+     is undone. One view for both looks, in Settings' own rows (SettingsView's group, row, switch, seg, btn sm): it sits
+     at the foot of MacCanvasSettings and WinCanvasSettings, inside SettingsView, whose styles it takes. -->
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:StudyStash.App.ViewModels"
+             xmlns:s="using:StudyStash.App.Services"
+             xmlns:c="using:StudyStash.App.Controls"
+             xmlns:filing="using:StudyStash.Core.Filing"
+             x:Class="StudyStash.App.Views.SubmitOrganizeSettings"
+             x:DataType="vm:SubmitOrganizeModel">
+  <StackPanel Spacing="8">
+    <TextBlock Classes="section" Text="{x:Static vm:FilingWords.Heading}" />
+    <Border Classes="group">
+      <StackPanel>
+        <Border Classes="row">
+          <Grid ColumnDefinitions="*,Auto">
+            <TextBlock Classes="row-title" Text="{x:Static vm:FilingWords.SwitchTitle}" />
+            <ToggleButton Name="TidySwitch" Grid.Column="1" Classes="switch act" IsChecked="{Binding On}"
+                          AutomationProperties.Name="{x:Static vm:FilingWords.SwitchTitle}" />
+          </Grid>
+        </Border>
+
+        <StackPanel IsVisible="{Binding On}">
+          <!-- The folders it may look in: none until the student adds one. -->
+          <Border Classes="rowsep" />
+          <Border Classes="row">
+            <StackPanel Spacing="8">
+              <Grid ColumnDefinitions="*,Auto">
+                <TextBlock Classes="row-title" Text="{x:Static vm:FilingWords.FoldersTitle}" />
+                <Button Name="AddFolder" Grid.Column="1" Classes="btn sm act" Command="{Binding AddFolderCommand}" IsEnabled="{Binding !Saving.Busy}">
+                  <TextBlock Text="{x:Static vm:FilingWords.AddFolder}" />
+                </Button>
+              </Grid>
+              <TextBlock Classes="row-sub" Text="{x:Static vm:FilingWords.NoFolders}" IsVisible="{Binding !HasFolders}" />
+              <ItemsControl ItemsSource="{Binding Folders}" IsVisible="{Binding HasFolders}" ClipToBounds="False">
+                <ItemsControl.ItemsPanel><ItemsPanelTemplate><StackPanel Spacing="6" /></ItemsPanelTemplate></ItemsControl.ItemsPanel>
+                <ItemsControl.ItemTemplate>
+                  <DataTemplate x:DataType="vm:FilingFolderRow">
+                    <Grid ColumnDefinitions="Auto,*,Auto" MinHeight="34">
+                      <c:Icon Glyph="folder" Size="16" Foreground="{DynamicResource InkMuted}" VerticalAlignment="Center" />
+                      <c:PageText Grid.Column="1" Text="{Binding Name}" FontSize="{DynamicResource FontBody}" Margin="8,0" VerticalAlignment="Center"
+                                  ToolTip.Tip="{Binding Path}" />
+                      <Button Grid.Column="2" Classes="btn sm" VerticalAlignment="Center"
+                              Command="{Binding $parent[ItemsControl].((vm:SubmitOrganizeModel)DataContext).RemoveFolderCommand}" CommandParameter="{Binding}"
+                              Content="{x:Static vm:FilingWords.Remove}" AutomationProperties.Name="{x:Static vm:FilingWords.Remove}" />
+                    </Grid>
+                  </DataTemplate>
+                </ItemsControl.ItemTemplate>
+              </ItemsControl>
+              <!-- Downloads, Desktop and Documents, offered: a click adds it, and a Mac asks about it there and then. -->
+              <ItemsControl ItemsSource="{Binding Suggested}" ClipToBounds="False">
+                <ItemsControl.ItemsPanel><ItemsPanelTemplate><WrapPanel ItemSpacing="8" LineSpacing="8" /></ItemsPanelTemplate></ItemsControl.ItemsPanel>
+                <ItemsControl.ItemTemplate>
+                  <DataTemplate x:DataType="s:CanvasApi+FolderSuggestion">
+                    <Button Classes="btn sm" ToolTip.Tip="{Binding Path}" IsEnabled="{Binding !$parent[ItemsControl].((vm:SubmitOrganizeModel)DataContext).Saving.Busy}"
+                            Command="{Binding $parent[ItemsControl].((vm:SubmitOrganizeModel)DataContext).AddSuggestedCommand}" CommandParameter="{Binding}">
+                      <StackPanel Orientation="Horizontal" Spacing="6">
+                        <c:Icon Glyph="add" Size="15" />
+                        <TextBlock Text="{Binding Name}" />
+                      </StackPanel>
+                    </Button>
+                  </DataTemplate>
+                </ItemsControl.ItemTemplate>
+              </ItemsControl>
+            </StackPanel>
+          </Border>
+
+          <!-- When: ask first (the checklist), or by itself after 12 hours (kept, not acted on yet). -->
+          <Border Classes="rowsep" />
+          <Border Classes="row">
+            <Grid ColumnDefinitions="*,Auto">
+              <TextBlock Classes="row-title" Text="{x:Static vm:FilingWords.WhenTitle}" />
+              <Border Grid.Column="1" Classes="seg act">
+                <StackPanel Orientation="Horizontal" Spacing="2">
+                  <Button Classes="seg-item" Classes.on="{Binding AskFirst}" Command="{Binding PickWhenCommand}" CommandParameter="{x:Static filing:FilingSettings.Ask}">
+                    <TextBlock Text="{x:Static vm:FilingWords.AskMe}" />
+                  </Button>
+                  <Button Classes="seg-item" Classes.on="{Binding !AskFirst}" Command="{Binding PickWhenCommand}" CommandParameter="{x:Static filing:FilingSettings.Later}">
+                    <TextBlock Text="{x:Static vm:FilingWords.Automatically}" />
+                  </Button>
+                </StackPanel>
+              </Border>
+            </Grid>
+          </Border>
+
+          <!-- The files worked from: kept together with the work, or to the Trash. -->
+          <Border Classes="rowsep" />
+          <Border Classes="row">
+            <Grid ColumnDefinitions="*,Auto">
+              <StackPanel Spacing="2" VerticalAlignment="Center" Margin="0,0,16,0">
+                <TextBlock Classes="row-title" Text="{x:Static vm:FilingWords.MaterialsTitle}" />
+                <TextBlock Classes="row-sub" Text="{x:Static vm:FilingWords.KeepTogetherSub}" TextWrapping="Wrap" IsVisible="{Binding Organize}" />
+                <TextBlock Classes="row-sub" Text="{x:Static vm:FilingWords.ToTrashSub}" TextWrapping="Wrap" IsVisible="{Binding !Organize}" />
+              </StackPanel>
+              <Border Grid.Column="1" Classes="seg act">
+                <StackPanel Orientation="Horizontal" Spacing="2">
+                  <Button Classes="seg-item" Classes.on="{Binding Organize}" Command="{Binding PickModeCommand}" CommandParameter="{x:Static filing:FilingSettings.Organize}">
+                    <TextBlock Text="{x:Static vm:FilingWords.KeepTogether}" />
+                  </Button>
+                  <Button Classes="seg-item" Classes.on="{Binding !Organize}" Command="{Binding PickModeCommand}" CommandParameter="{x:Static filing:FilingSettings.Clean}">
+                    <TextBlock Text="{Binding ToTrash}" />
+                  </Button>
+                </StackPanel>
+              </Border>
+            </Grid>
+          </Border>
+        </StackPanel>
+      </StackPanel>
+    </Border>
+    <TextBlock Name="SaySaving" Classes="say" Text="{Binding Saving.Say}" IsVisible="{Binding Saving.Say, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+
+    <!-- Filed work: the last runs, newest first, each with Undo. -->
+    <TextBlock Classes="section" Text="{x:Static vm:FilingWords.FiledWork}" />
+    <Border Classes="group">
+      <StackPanel>
+        <Border Classes="row" IsVisible="{Binding !HasRuns}">
+          <TextBlock Classes="row-sub" Text="{x:Static vm:FilingWords.NothingFiled}" VerticalAlignment="Center" />
+        </Border>
+        <ItemsControl ItemsSource="{Binding Runs}">
+          <ItemsControl.ItemTemplate>
+            <DataTemplate x:DataType="vm:FiledRunRow">
+              <StackPanel>
+                <Border Classes="rowsep itemsep" />
+                <Border Classes="row">
+                  <Grid ColumnDefinitions="*,Auto">
+                    <StackPanel Spacing="2" VerticalAlignment="Center" Margin="0,0,16,0">
+                      <c:PageText Classes="row-title" Text="{Binding Title}" />
+                      <TextBlock Classes="row-sub" Text="{Binding Line}" />
+                      <TextBlock Classes="row-sub" Text="{Binding Said}" TextWrapping="Wrap" IsVisible="{Binding Said, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+                      <TextBlock Classes="row-sub" Text="{Binding Undo.Say}" TextWrapping="Wrap" IsVisible="{Binding Undo.Say, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+                    </StackPanel>
+                    <Button Grid.Column="1" Classes="btn sm act" Command="{Binding Undo.Command}" IsVisible="{Binding CanUndo}"
+                            AutomationProperties.Name="{x:Static vm:FilingWords.Undo}">
+                      <StackPanel Orientation="Horizontal" Spacing="6">
+                        <c:Icon Glyph="undo" Size="15" />
+                        <TextBlock Text="{x:Static vm:FilingWords.Undo}" />
+                      </StackPanel>
+                    </Button>
+                    <TextBlock Grid.Column="1" Classes="row-sub act" Text="{x:Static vm:FilingWords.PutBack}" IsVisible="{Binding !CanUndo}" />
+                  </Grid>
+                </Border>
+              </StackPanel>
+            </DataTemplate>
+          </ItemsControl.ItemTemplate>
+        </ItemsControl>
+      </StackPanel>
+    </Border>
+  </StackPanel>
+</UserControl>

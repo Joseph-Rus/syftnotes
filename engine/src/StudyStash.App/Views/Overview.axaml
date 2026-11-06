@@ -168,6 +168,33 @@
         </ItemsControl>
       </StackPanel>
 
+      <!-- Home: ready to tidy (Submit & Organize, test builds only). Each hand-in waiting: its class's dot, the assignment,
+           how many files and when, Tidy up (the tidy card) and × (Not this one). Hidden while there are none. -->
+      <StackPanel Name="ReadyToTidy" IsVisible="{Binding HasTidy}" Margin="0,36,0,0">
+        <TextBlock Classes="h2" Text="{x:Static vm:FilingWords.ReadyToTidy}" Margin="0,0,0,12" />
+        <ItemsControl ItemsSource="{Binding Tidy}" ClipToBounds="False">
+          <ItemsControl.ItemsPanel><ItemsPanelTemplate><StackPanel Spacing="8" /></ItemsPanelTemplate></ItemsControl.ItemsPanel>
+          <ItemsControl.ItemTemplate>
+            <DataTemplate x:DataType="vm:TidyRow">
+              <Grid ColumnDefinitions="Auto,*,Auto,Auto" MinHeight="40">
+                <c:Swatch Small="True" Fill="{Binding Dot}" VerticalAlignment="Center" />
+                <StackPanel Grid.Column="1" Margin="12,0,12,0" VerticalAlignment="Center">
+                  <TextBlock Classes="lecture-title" Text="{Binding Assignment}" TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding Assignment}" c:Tips.WhenCut="True" />
+                  <TextBlock Classes="event-day" Text="{Binding Line}" />
+                </StackPanel>
+                <Button Grid.Column="2" Classes="btn sm" VerticalAlignment="Center" Content="{x:Static vm:FilingWords.TidyUp}" AutomationProperties.Name="{Binding TidySaid}"
+                        Command="{Binding $parent[UserControl].((vm:OverviewModel)DataContext).TidyUpCommand}" CommandParameter="{Binding}" />
+                <Button Grid.Column="3" Classes="btn sm" Width="34" Padding="0" Margin="8,0,0,0" VerticalAlignment="Center"
+                        ToolTip.Tip="{x:Static vm:FilingWords.NotThisOne}" AutomationProperties.Name="{Binding DismissSaid}"
+                        Command="{Binding $parent[UserControl].((vm:OverviewModel)DataContext).NotThisOneCommand}" CommandParameter="{Binding}">
+                  <c:Icon Glyph="close" Size="15" HorizontalAlignment="Center" />
+                </Button>
+              </Grid>
+            </DataTemplate>
+          </ItemsControl.ItemTemplate>
+        </ItemsControl>
+      </StackPanel>
+
       <!-- Home: every note, newest first; the filter shows them all or only the unsorted ones, and a folder picked in
            it goes to that folder's page -->
       <StackPanel Name="Notes" IsVisible="{Binding IsHome}" Margin="0,36,0,0">

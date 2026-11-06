@@ -56,4 +56,8 @@ public sealed class CanvasModels(CanvasLink canvas, AppHost host, IMessenger mes
 
     /// <summary>The first run's step that adds the Canvas add-on from the browser's store.</summary>
     public AddOnModel AddOn() => new(canvas.Context, canvas.Watch);
+
+    /// <summary>The tidy card for a hand-in on "Ready to tidy" (Submit &amp; Organize, test builds only), its class's
+    /// colour <paramref name="dot"/>, over the app's one Canvas context.</summary>
+    public TidyCardModel TidyCard(TidyItem item, Avalonia.Media.IBrush dot, TidyServices services) => new(canvas.Context, item, dot, services);
 }

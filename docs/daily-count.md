@@ -31,7 +31,7 @@ them. A copy can't be counted twice on one day: the second create is a 409.
 
 ## Never counted
 
-The app trying itself (`STUDYSTASH_SELFTEST`: CI's self-tests run the real app on every merge and release, and
+The app trying itself (`STUDYSTASH_SELFTEST`: CI's self-tests run the real app daily and on every release, and
 counted themselves until 0.18.5), anything under CI (`CI`, `GITHUB_ACTIONS`), Debug builds (lanes, a developer's
 copies) and the tests. Only students' copies count.
 

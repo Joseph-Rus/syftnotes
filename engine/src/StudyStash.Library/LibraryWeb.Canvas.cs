@@ -74,6 +74,7 @@ public sealed partial class LibraryWeb
         var state = CanvasView.State(Canvas, Canvas.Clock(), refusedAt);
         if (state["extension"] is JsonObject ext)
             ext["asking"] = Asking() is { Allowed: false } ask ? (ask.Origin.StartsWith("moz-extension://", StringComparison.Ordinal) ? "firefox" : "chrome") : null;
+        if (TestSwitches.On) state["handed_in"] = WaitingJson();
         return state;
     }
 
@@ -422,6 +423,7 @@ public sealed partial class LibraryWeb
         {
             return Task.FromResult(Http.SeeOther(EnsureHere(make: true) ? "/settings#canvas" : "/settings?canvas=folder-failed#canvas"));
         })));
+        if (TestSwitches.On) MapFiling(app);
     }
 
     /// <summary>Bring up to date the extension's folder on this computer, when it has one, pointing at this library and
