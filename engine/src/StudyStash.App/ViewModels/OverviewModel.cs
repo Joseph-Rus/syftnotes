@@ -411,6 +411,12 @@ public sealed partial class OverviewModel : ObservableObject
     public bool HasWelcome => Welcome is not null;
     partial void OnWelcomeChanged(WelcomeCardModel? value) => OnPropertyChanged(nameof(HasWelcome));
 
+    /// <summary>Home's "Close Claude first" (<see cref="CloseAppAsk"/>), while a connection waits for an AI app to close.</summary>
+    [NotifyPropertyChangedFor(nameof(HasCloseAsk))]
+    [ObservableProperty]
+    public partial CloseAppAsk? CloseAsk { get; set; }
+    public bool HasCloseAsk => CloseAsk is not null;
+
     /// <summary>Ask about every note (Home) or this folder's (its page), floating at the foot of the page as under a note.</summary>
     [ObservableProperty] public partial AiAskModel? Ask { get; set; }
     public bool HasAsk => Ask is not null;

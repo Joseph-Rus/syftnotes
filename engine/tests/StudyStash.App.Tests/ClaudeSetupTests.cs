@@ -15,7 +15,7 @@ public class ClaudeSetupTests
 
     static ClaudeSetup Setup(TempHome home, string program = Program) => new()
     {
-        Program = program, Home = home["study-stash"], UserHome = home["user"], Find = _ => null, AppInstalled = _ => false, ReopenApp = null,
+        Program = program, Home = home["study-stash"], UserHome = home["user"], Find = _ => null, AppInstalled = _ => false, QuitApp = null, OpenApp = null,
         Running = _ => false, Probe = null,
         DesktopConfig = home["user/Claude/claude_desktop_config.json"], ClaudeCodeConfig = home["user/.claude.json"],
         CodexConfig = home["user/.codex/config.toml"], GeminiConfig = home["user/.gemini/settings.json"],
@@ -190,7 +190,7 @@ public class ClaudeSetupTests
         var none = Setup(home);
         Assert.Equal("ChatGPT", none.State("codex").Name);
         Assert.False(none.State("codex").Installed);
-        var withApp = new ClaudeSetup { Home = home["study-stash"], UserHome = home["user"], Find = _ => null, AppInstalled = name => name == "ChatGPT", ReopenApp = null, CodexConfig = home["user/.codex/config.toml"] };
+        var withApp = new ClaudeSetup { Home = home["study-stash"], UserHome = home["user"], Find = _ => null, AppInstalled = name => name == "ChatGPT", QuitApp = null, OpenApp = null, CodexConfig = home["user/.codex/config.toml"] };
         Assert.True(withApp.State("codex").Installed);
     }
 
@@ -229,7 +229,7 @@ public class ClaudeSetupTests
     {
         Program = program, Home = home[Path.Combine("Zoë Test", ".study-stash")], UserHome = home["Zoë Test"], Windows = true, Mac = false,
         LocalAppData = home[Path.Combine("Zoë Test", "AppData", "Local")], AppData = home[Path.Combine("Zoë Test", "AppData", "Roaming")],
-        Find = _ => null, Running = _ => false, ReopenApp = null, Probe = null,
+        Find = _ => null, Running = _ => false, QuitApp = null, OpenApp = null, Probe = null,
     };
 
     const string Package = "Claude_pzs8sxrjxfjjc";
@@ -328,7 +328,7 @@ public class ClaudeSetupTests
     }
 
     [Fact]
-    public async Task Reopen_quits_and_opens_the_rows_desktop_app_and_says_what_to_do_when_it_cant()
+    public async Task Reopen_closes_and_opens_the_rows_desktop_app_and_says_what_to_do_when_it_cant()
     {
         using var home = new TempHome();
         var asked = new List<string>();
@@ -337,20 +337,22 @@ public class ClaudeSetupTests
         {
             Home = home["study-stash"], UserHome = home["user"], Find = _ => null, AppInstalled = name => name is "ChatGPT" or "Claude",
             CodexConfig = home["user/.codex/config.toml"], DesktopConfig = home["user/Claude/claude_desktop_config.json"],
-            ReopenApp = bundle => { asked.Add(bundle); return Task.FromResult(works); },
+            QuitApp = id => { asked.Add("close " + id); return Task.FromResult(works); },
+            OpenApp = id => { asked.Add("open " + id); return Task.FromResult(true); },
         };
         Assert.True(setup.State("codex").CanReopen);
         Assert.False(setup.State("gemini").CanReopen); // it lives in a terminal: nothing to reopen
 
         Assert.True((await setup.ReopenAsync("codex")).Ok);
         Assert.True((await setup.ReopenAsync("claude-desktop")).Ok);
-        Assert.Equal(["com.openai.codex", "com.anthropic.claudefordesktop"], asked);
+        Assert.Equal(["close codex", "open codex", "close claude-desktop", "open claude-desktop"], asked);
 
-        works = false; // it's asking about unsaved work, say: nothing is forced
+        works = false; // it's asking about unsaved work, say: nothing is forced, and it isn't opened
         var stuck = await setup.ReopenAsync("codex");
         Assert.False(stuck.Ok);
-        Assert.Contains("Quit it yourself", stuck.Say);
-        // Where Syft Notes can't reopen apps (Windows), no row offers to.
+        Assert.StartsWith("Couldn't close ChatGPT. Quit it", stuck.Say);
+        Assert.Equal("close codex", asked[^1]);
+        // Where Syft Notes can't close apps (a test that stands in for whether they're open), no row offers to.
         Assert.False(Setup(home).State("codex").CanReopen);
     }
 

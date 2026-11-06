@@ -30,7 +30,7 @@ public class NewPlaceTests
         File.WriteAllText(other, "");
         var setup = new ClaudeSetup
         {
-            Program = now, Home = home["study-stash"], UserHome = home["user"], Find = _ => null, AppInstalled = _ => false, ReopenApp = null,
+            Program = now, Home = home["study-stash"], UserHome = home["user"], Find = _ => null, AppInstalled = _ => false, QuitApp = null, OpenApp = null,
             Running = _ => false, Probe = null,
             DesktopConfig = home["user/Claude/claude_desktop_config.json"], ClaudeCodeConfig = home["user/.claude.json"],
             CodexConfig = home["user/.codex/config.toml"], GeminiConfig = home["user/.gemini/settings.json"],
@@ -57,6 +57,53 @@ public class NewPlaceTests
         Assert.Equal(3, done.Count);
         // A second start finds nothing left to do.
         Assert.Empty(NewPlace.Run(setup, home["study-stash"], now, () => now, () => throw new InvalidOperationException("nothing to do")));
+    }
+
+    [Fact]
+    public async Task An_open_claude_app_is_never_written_to_and_close_claude_puts_only_ours_right()
+    {
+        // Claude keeps its settings in memory and writes them back whole: what's written while it's open comes undone.
+        using var home = new TempHome();
+        const string now = "/Applications/Syft Notes.app/Contents/MacOS/StudyStash";
+        const string before = "/Applications/Study Stash.app/Contents/MacOS/StudyStash";
+        bool open = true;
+        var setup = new ClaudeSetup
+        {
+            Program = now, Home = home["study-stash"], UserHome = home["user"], Find = _ => null, AppInstalled = name => name == "Claude", Probe = null,
+            Running = id => id == "claude-desktop" && open,
+            QuitApp = _ => Task.FromResult(!(open = false)),
+            OpenApp = _ => Task.FromResult(open = true),
+            DesktopConfig = home["user/Claude/claude_desktop_config.json"], ClaudeCodeConfig = home["user/.claude.json"],
+            CodexConfig = home["user/.codex/config.toml"], GeminiConfig = home["user/.gemini/settings.json"],
+            AntigravityConfig = home["user/.gemini/config/mcp_config.json"],
+        };
+        static void Write(string path, string text)
+        {
+            Directory.CreateDirectory(Path.GetDirectoryName(path)!);
+            File.WriteAllText(path, text);
+        }
+        string claude = $$$$"""{"mcpServers":{"syft-notes":{"command":"{{{{before}}}}","args":["mcp","--client","claude-desktop"]},"github":{"command":"gh-mcp"}}}""";
+        Write(setup.DesktopConfig, claude);
+        // A server of the student's own, under another name, that happens to start the old program: not ours.
+        string gemini = $$$$"""{"mcpServers":{"notes":{"command":"{{{{before}}}}","args":["mcp"]}}}""";
+        Write(setup.GeminiConfig, gemini);
+        var waiting = new List<string>();
+
+        NewPlace.Run(setup, home["study-stash"], now, () => now, () => { }, waiting: waiting);
+
+        Assert.Equal(["claude-desktop"], waiting); // Home asks: Close Claude first
+        Assert.Equal(claude, File.ReadAllText(setup.DesktopConfig)); // nothing written while it's open
+        Assert.Equal(gemini, File.ReadAllText(setup.GeminiConfig));
+
+        // Close Claude: closed, its entry put right (and only that), opened again.
+        var said = new List<string>();
+        var done = await setup.RepairAsync("claude-desktop", said.Add);
+        Assert.True(done.Ok, done.Words);
+        Assert.Equal(["Closing Claude…", "Opening Claude…"], said);
+        Assert.True(open);
+        Assert.Equal(now, setup.CommandOf("claude-desktop"));
+        Assert.Equal("gh-mcp", JsonNode.Parse(File.ReadAllText(setup.DesktopConfig))!["mcpServers"]!["github"]!["command"]!.GetValue<string>());
+        Assert.Equal(gemini, File.ReadAllText(setup.GeminiConfig));
     }
 
     [Fact]

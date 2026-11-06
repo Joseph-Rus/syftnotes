@@ -515,6 +515,7 @@ public sealed partial class LibraryModel : ObservableObject
             newValue.Narrow = Narrow;
             // "Ready when class starts" shows on Home, after a first run.
             newValue.Welcome = newValue.IsHome ? Welcome : null;
+            newValue.CloseAsk = newValue.IsHome ? CloseAsk : null;
             // A page read while the library was still deleting a note lists it: it's shown without it.
             foreach (string id in gone) newValue.Remove(id);
         }
@@ -601,6 +602,14 @@ public sealed partial class LibraryModel : ObservableObject
     partial void OnWelcomeChanged(WelcomeCardModel? value)
     {
         if (Overview is { IsHome: true } home) home.Welcome = value;
+    }
+
+    /// <summary>Home's "Close Claude first": a connection from an older copy waits for an AI app to close; null otherwise.</summary>
+    [ObservableProperty] public partial CloseAppAsk? CloseAsk { get; set; }
+
+    partial void OnCloseAskChanged(CloseAppAsk? value)
+    {
+        if (Overview is { IsHome: true } home) home.CloseAsk = value;
     }
 
     /// <summary>Starts the ask, once a session at most: null if it asked already since the app started.

@@ -32,7 +32,7 @@ public sealed partial class RealCliSignInTests
         var setup = new ClaudeSetup
         {
             Program = AppProgram, Home = syft, UserHome = home, LocalAppData = local, AppData = roaming,
-            AppInstalled = n => n == "Claude", Running = _ => false, ReopenApp = null,
+            AppInstalled = n => n == "Claude", Running = _ => false, QuitApp = null, OpenApp = null,
         };
         var parts = new List<string>();
         bool failed = false;
