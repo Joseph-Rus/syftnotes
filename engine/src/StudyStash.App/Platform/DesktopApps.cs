@@ -7,8 +7,9 @@ using StudyStash.App.Services.Kit;
 
 namespace StudyStash.App.Platform;
 
-/// <summary>One running process of an AI's desktop app, as Windows lists it: its id and the program file it runs.</summary>
-public sealed record AppProcess(int Id, string Program);
+/// <summary>One running process of an AI's desktop app, as Windows lists it: its id, the program file it runs, and the
+/// sign-in session it runs in (each account signed in to Windows has its own).</summary>
+public sealed record AppProcess(int Id, string Program, int Session);
 
 /// <summary>
 /// Closing an AI's desktop app (Claude, ChatGPT) and opening it again, on a Mac and on Windows, for Connect. Both apps
@@ -18,7 +19,7 @@ public sealed record AppProcess(int Id, string Program);
 /// <item>A Mac: asks the app to quit the way its own Quit menu does (it may ask about unsaved work), and never forces it.</item>
 /// <item>Windows: asks each of its windows to close. These apps then sit on in the tray by the clock, so after
 /// <see cref="PoliteWait"/> it ends the app's own processes, found by their program's name and where the app is
-/// installed. Never anything else, and never Syft Notes itself.</item>
+/// installed, in this account's own session. Never anything else, never another account's, and never Syft Notes itself.</item>
 /// </list>
 /// The app ids are <see cref="ClaudeSetup"/>'s ("claude-desktop", "codex").
 /// </summary>
@@ -46,6 +47,8 @@ public sealed class DesktopApps
     public Func<string, bool> Start { get; init; } = StartProgram;
     /// <summary>Syft Notes' own process, never closed.</summary>
     public int Own { get; init; } = Environment.ProcessId;
+    /// <summary>This account's session: another account's apps are never touched, even by a Syft Notes run as administrator.</summary>
+    public int Session { get; init; } = OwnSession();
 
     /// <summary>The program each app was closed from on Windows, to start it again.</summary>
     readonly ConcurrentDictionary<string, string> closedFrom = new();
@@ -59,16 +62,23 @@ public sealed class DesktopApps
         _ => null,
     };
 
-    /// <summary>The app's own processes on Windows: named like it, run from where it's installed, and not this one.</summary>
+    /// <summary>The app's own processes on Windows: named like it, run from where it's installed, in this session, and
+    /// not this one.</summary>
     public IReadOnlyList<AppProcess> RunningOnWindows(string id) =>
         OnWindows(id) is { } app
-            ? [.. Find(app.Names).Where(p => p.Id != Own && app.Places.Any(place => p.Program.Contains(place, StringComparison.OrdinalIgnoreCase)))]
+            ? [.. Find(app.Names).Where(p => p.Id != Own && p.Session == Session && app.Places.Any(place => p.Program.Contains(place, StringComparison.OrdinalIgnoreCase)))]
             : [];
+
+    static int OwnSession()
+    {
+        using var self = Process.GetCurrentProcess();
+        return self.SessionId;
+    }
 
     /// <summary>Whether the app is open now.</summary>
     public bool IsRunning(string id)
     {
-        if (OperatingSystem.IsMacOS()) return ClaudeSetup.DesktopApp(id) is { } app && Running(app.Bundle).Count > 0;
+        if (OperatingSystem.IsMacOS()) return ClaudeSetup.DesktopApp(id) is { } app && Running(app.Bundle) > 0;
         return OperatingSystem.IsWindows() && RunningOnWindows(id).Count > 0;
     }
 
@@ -79,8 +89,8 @@ public sealed class DesktopApps
         if (OperatingSystem.IsMacOS())
         {
             if (ClaudeSetup.DesktopApp(id) is not { } app) return false;
-            foreach (IntPtr running in Running(app.Bundle)) SendByte(running, sel_registerName("terminate"));
-            return await Poll.UntilAsync(() => Running(app.Bundle).Count == 0, Every, QuitWait, ct, Clock);
+            Running(app.Bundle, running => SendByte(running, sel_registerName("terminate")));
+            return await Poll.UntilAsync(() => Running(app.Bundle) == 0, Every, QuitWait, ct, Clock);
         }
         return await QuitOnWindowsAsync(id, ct);
     }
@@ -130,7 +140,7 @@ public sealed class DesktopApps
                 {
                     try
                     {
-                        if (p.MainModule?.FileName is { } file) found.Add(new AppProcess(p.Id, file));
+                        if (p.MainModule?.FileName is { } file) found.Add(new AppProcess(p.Id, file, p.SessionId));
                     }
                     catch (Exception e) when (e is System.ComponentModel.Win32Exception or InvalidOperationException or NotSupportedException)
                     {
@@ -173,7 +183,7 @@ public sealed class DesktopApps
         try
         {
             var start = StoreApp(program) is { } store
-                ? new ProcessStartInfo("explorer.exe") { ArgumentList = { store }, UseShellExecute = false }
+                ? new ProcessStartInfo(Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Windows), "explorer.exe")) { ArgumentList = { store }, UseShellExecute = false }
                 : new ProcessStartInfo(program) { UseShellExecute = true, WorkingDirectory = Path.GetDirectoryName(program) ?? "" };
             using var started = Process.Start(start);
             return started is not null;
@@ -223,23 +233,34 @@ public sealed class DesktopApps
     [DllImport(Lib, EntryPoint = "objc_msgSend")] static extern IntPtr SendIndex(IntPtr receiver, IntPtr selector, nuint index);
     [DllImport(Lib, EntryPoint = "objc_msgSend")] static extern nuint SendCount(IntPtr receiver, IntPtr selector);
     [DllImport(Lib, EntryPoint = "objc_msgSend")] static extern byte SendByte(IntPtr receiver, IntPtr selector);
+    [DllImport(Lib)] static extern IntPtr objc_autoreleasePoolPush();
+    [DllImport(Lib)] static extern void objc_autoreleasePoolPop(IntPtr pool);
 
-    /// <summary>Every running copy of the app with this bundle id, asked fresh.</summary>
-    static List<IntPtr> Running(string bundleId)
+    /// <summary>How many copies of the app with this bundle id are running, asked fresh; each is handed to
+    /// <paramref name="each"/> first. In its own autorelease pool, so asking every quarter second piles nothing up (and
+    /// nothing it hands out is used after the pool is gone).</summary>
+    static int Running(string bundleId, Action<IntPtr>? each = null)
     {
-        var found = new List<IntPtr>();
-        if (!OperatingSystem.IsMacOS()) return found;
+        if (!OperatingSystem.IsMacOS()) return 0;
+        IntPtr pool = IntPtr.Zero;
         try
         {
+            pool = objc_autoreleasePoolPush();
             IntPtr id = SendText(objc_getClass("NSString"), sel_registerName("stringWithUTF8String:"), bundleId);
             IntPtr apps = SendPtr(objc_getClass("NSRunningApplication"), sel_registerName("runningApplicationsWithBundleIdentifier:"), id);
-            if (apps == IntPtr.Zero) return found;
+            if (apps == IntPtr.Zero) return 0;
             nuint count = SendCount(apps, sel_registerName("count"));
-            for (nuint i = 0; i < count; i++) found.Add(SendIndex(apps, sel_registerName("objectAtIndex:"), i));
+            if (each is not null)
+                for (nuint i = 0; i < count; i++) each(SendIndex(apps, sel_registerName("objectAtIndex:"), i));
+            return (int)count;
         }
         catch (Exception e) when (e is DllNotFoundException or EntryPointNotFoundException)
         {
+            return 0;
         }
-        return found;
+        finally
+        {
+            if (pool != IntPtr.Zero) objc_autoreleasePoolPop(pool);
+        }
     }
 }
