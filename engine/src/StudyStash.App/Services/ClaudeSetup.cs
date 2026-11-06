@@ -201,6 +201,27 @@ public sealed class ClaudeSetup
         return true;
     }
 
+    /// <summary>Puts Syft Notes' entry in an app's settings right (one an older copy left, <see cref="NewPlace"/>), with
+    /// the app closed first if it's open and opened again after, saying each step. Only that entry changes.</summary>
+    public async Task<ConnectOutcome> RepairAsync(string id, Action<string> say)
+    {
+        string name = DesktopApp(id)?.Name ?? NameOf(id);
+        bool closed = false;
+        if (DesktopApp(id) is not null && IsRunning(id))
+        {
+            say(AiConnect.ClosingWords(name));
+            if (!await CloseAsync(id)) return new ConnectOutcome(false, AiConnect.CouldntCloseWords(name, Windows)) { CouldntClose = true };
+            closed = true;
+        }
+        var change = await Task.Run(() => Connect(id));
+        if (closed)
+        {
+            say(AiConnect.OpeningWords(name));
+            await OpenAsync(id);
+        }
+        return new ConnectOutcome(change.Ok, change.Ok ? $"{name} is connected." : change.Say);
+    }
+
     /// <summary>Closes the row's desktop app and opens it again, so it loads the settings Connect wrote.</summary>
     public async Task<AiAppChange> ReopenAsync(string id)
     {
