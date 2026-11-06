@@ -414,8 +414,8 @@ public static class LibraryBringIn
     /// <summary>Before a <see cref="FolderId"/> in sync_state: that file was taken as a listed attachment's own.</summary>
     const string Taken = "bring-in-taken:";
 
-    /// <summary>A file's SHA-256, or null when it isn't there or can't be read.</summary>
-    static string? Sha(string path)
+    /// <summary>A file's SHA-256 (read only), or null when it isn't there or can't be read.</summary>
+    internal static string? Sha(string path)
     {
         try
         {

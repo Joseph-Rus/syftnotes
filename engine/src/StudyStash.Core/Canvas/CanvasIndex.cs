@@ -211,6 +211,9 @@ public sealed class AssignmentInfo
     public string? DueAt { get; set; }
     public string? UnlockAt { get; set; }
     public string? LockAt { get; set; }
+    /// <summary>When the professor made it (Canvas's UTC ISO): where work on it can start when it has no unlock date.
+    /// Read in test builds only for now (Submit &amp; Organize).</summary>
+    public string? CreatedAt { get; set; }
     public double? Points { get; set; }
     /// <summary>points | percent | letter_grade | gpa_scale | pass_fail | not_graded</summary>
     public string GradingType { get; set; } = "points";
@@ -251,6 +254,7 @@ public sealed class AssignmentInfo
             Name = Py.Strip(S(a["name"])),
             Kind = quiz is not null || types.Contains("online_quiz") ? "quiz" : topic is not null || types.Contains("discussion_topic") ? "discussion" : "assignment",
             DueAt = T(a["due_at"]), UnlockAt = T(a["unlock_at"]), LockAt = T(a["lock_at"]),
+            CreatedAt = TestSwitches.On ? T(a["created_at"]) : null,
             Points = D(a["points_possible"]),
             GradingType = T(a["grading_type"]) ?? "points",
             SubmissionTypes = types,

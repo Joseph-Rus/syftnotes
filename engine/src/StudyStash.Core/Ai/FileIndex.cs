@@ -70,7 +70,10 @@ public sealed partial class FileIndex
         c.ExecuteNonQuery();
     }
 
-    static IEnumerable<string> Walk(string root)
+    /// <summary>Every file under <paramref name="root"/>: never a hidden one, a link (so nothing outside it is reached),
+    /// or a folder of tools' and the system's (<see cref="SkipDirs"/>), nor whatever <paramref name="skip"/> says to pass
+    /// by.</summary>
+    internal static IEnumerable<string> Walk(string root, Func<FileSystemInfo, bool>? skip = null)
     {
         var stack = new Stack<string>([root]);
         while (stack.Count > 0)
@@ -87,7 +90,7 @@ public sealed partial class FileIndex
             }
             foreach (var e in entries)
             {
-                if (e.Name.StartsWith('.') || e.LinkTarget is not null) continue;
+                if (e.Name.StartsWith('.') || e.LinkTarget is not null || skip?.Invoke(e) == true) continue;
                 if (e is DirectoryInfo)
                 {
                     if (!SkipDirs.Contains(e.Name) && !e.Name.EndsWith(".app", StringComparison.Ordinal) && !e.Name.EndsWith(".photoslibrary", StringComparison.Ordinal))
