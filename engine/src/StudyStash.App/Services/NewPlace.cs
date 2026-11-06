@@ -17,9 +17,11 @@ namespace StudyStash.App.Services;
 /// </summary>
 public static class NewPlace
 {
-    /// <summary>What was put right, for the log; empty when nothing needed it.</summary>
+    /// <summary>What was put right, for the log; empty when nothing needed it. An AI's desktop app that is open isn't
+    /// written to (it keeps its settings in memory and would write the old entry back): its id goes in
+    /// <paramref name="waiting"/>, for Home to ask to close it first.</summary>
     public static IReadOnlyList<string> Run(ClaudeSetup aiApps, string home, string program, Func<string?> loginProgram, Action relogin,
-        BackgroundLibrary? background = null)
+        BackgroundLibrary? background = null, ICollection<string>? waiting = null)
     {
         var done = new List<string>();
         // The background library (the phone answered with the app closed), registered from the old program: registered
@@ -38,7 +40,17 @@ public static class NewPlace
         }
         foreach (var app in aiApps.States())
         {
-            if (!app.Added || !app.OtherCopy || !Moves.OldProgram(aiApps.CommandOf(app.Id), program)) continue;
+            // Only Syft Notes' own entry: one for an older copy (moved, or "Study Stash.app" before the rename), or this
+            // copy's under its old name, the way Connect no longer writes it, or left where the app no longer reads.
+            // Another copy someone keeps on purpose, and every other server, are left alone.
+            bool ours = app.Added && (app.OtherCopy ? Moves.OldProgram(aiApps.CommandOf(app.Id), program) : !app.Good);
+            if (!ours) continue;
+            if (app.Running && ClaudeSetup.DesktopApp(app.Id) is not null)
+            {
+                waiting?.Add(app.Id);
+                done.Add($"{app.Name} is open: its connection is put right once it's closed");
+                continue;
+            }
             var change = aiApps.Connect(app.Id);
             done.Add(change.Ok ? $"{app.Name} now starts {program}" : $"{app.Name}: {change.Say}");
         }
@@ -98,22 +110,23 @@ public static class NewPlace
     }
 
     /// <summary>The real thing, once the app has started: only for a copy that's installed (Velopack's, or a Mac
-    /// bundle), never while the self-test or a test runs.</summary>
-    public static void RunHere(string home, bool? startAtLogin)
+    /// bundle), never while the self-test or a test runs. The AI desktop apps whose connection waits for them to close.</summary>
+    public static IReadOnlyList<string> RunHere(string home, bool? startAtLogin)
     {
-        if (Desktop.SystemChangesOff || SelfTest.Dir is not null) return;
+        var waiting = new List<string>();
+        if (Desktop.SystemChangesOff || SelfTest.Dir is not null) return waiting;
         bool installed = VelopackUpdates.Installed || OperatingSystem.IsMacOS() && Apps.MacBundleOf() is not null;
-        if (!installed) return;
+        if (!installed) return waiting;
         // A Mac copy run from its disk image or a translocation folder isn't where the app lives: what it wrote there would
         // break again at eject or restart, so it leaves everything as the copy in Applications set it up.
-        if (MacRename.Passing(Desktop.Program)) return;
+        if (MacRename.Passing(Desktop.Program)) return waiting;
         // First, so the old copy is gone by the time the AI apps' connections name this one.
         if (OperatingSystem.IsWindows()) OldInnoCopy(home);
         if (OperatingSystem.IsWindows()) LoginItemBack(startAtLogin, home);
         try
         {
             foreach (string line in Run(ClaudeSetup.ThisComputer(home), home, Desktop.Program, () => Desktop.LoginProgram(home),
-                         () => Desktop.StartAtLogin(true, home), BackgroundLibrary.ThisComputer()))
+                         () => Desktop.StartAtLogin(true, home), BackgroundLibrary.ThisComputer(), waiting))
                 Program.Log("[moved] " + line);
             // A Dock icon pinned to "Study Stash.app" before the rename: pointed at this bundle, once (MacDock.cs).
             if (OperatingSystem.IsMacOS() && Apps.MacBundleOf() is { } bundle && Path.GetFileName(bundle) == MacRename.Name)
@@ -125,6 +138,7 @@ public static class NewPlace
         {
             Program.Log("[moved] couldn't put everything right for the new place: " + e.Message);
         }
+        return waiting;
     }
 
     /// <summary>Where Windows keeps Task Manager's Startup tab switch for each Run entry.</summary>

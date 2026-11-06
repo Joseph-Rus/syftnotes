@@ -22,6 +22,9 @@ public sealed class CanvasSettings
     /// <summary>The Canvas courses (ids) the student chose to bring in; only these sync, and only these are explored.
     /// Null in a library from before the choice: then every linked course is chosen.</summary>
     public List<string>? Chosen { get; set; }
+    /// <summary>Submit &amp; Organize's choices and the hand-ins waiting to be filed; null until the student first changes
+    /// one. Test builds only for now.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] public Filing.FilingSettings? Filing { get; set; }
     /// <summary>How often the extension reads Canvas again.</summary>
     public int PollMinutes { get; set; } = 60;
     /// <summary>When the last sync started (ISO), and when the extension last asked for work.</summary>

@@ -54,6 +54,8 @@ public sealed class FunnelServices
     /// <summary>Settings → Your AI's own Connect for an AI signed in here (<see cref="GuidedServices.Connect"/>), run in the
     /// background once it's picked; null: nothing is connected (a test).</summary>
     public Func<string, Task>? Connect { get; init; }
+    /// <summary>The AI's desktop app that is open and whose settings Connect has to change ("Claude"); "" for none.</summary>
+    public Func<string, string> AppToClose { get; init; } = _ => "";
     /// <summary>The AI Get started found signed in here on a plan ("claude"), already writing the notes; "" for none.</summary>
     public Func<string> AlreadyHere { get; init; } = () => "";
 }
@@ -448,10 +450,16 @@ public sealed partial class FunnelModel : ObservableObject, IDisposable
 
     /// <summary>"Continue with Claude": the AI Get started found here is the one, already writing the notes.</summary>
     [RelayCommand]
-    void UseAlreadyHere()
+    async Task UseAlreadyHere()
     {
         if (!HasAlreadyHere) return;
         string id = AlreadyHere;
+        // Its desktop app is open: guided setup's screens check it, then close the app first (Close Claude).
+        if (services.MakeReady is not null && services.AppToClose(id).Length > 0)
+        {
+            await ConnectAiAsync(id);
+            return;
+        }
         Finish(id);
         // Connected all the way, as an AI signed in on setup's own screens is (in the background).
         if (services.Connect is { } connect) UiTasks.Run(() => connect(id), $"setup: connect {id}");

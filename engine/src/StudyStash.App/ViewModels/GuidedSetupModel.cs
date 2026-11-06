@@ -52,6 +52,11 @@ public sealed class GuidedServices
     /// app's AI store), run in the background: its apps here get Syft Notes, and the library checks it, so every screen
     /// says it's connected with no second Connect. Null: nothing is connected (a test).</summary>
     public Func<string, Task>? Connect { get; init; }
+    /// <summary>The AI's desktop app that is open and whose settings Connect has to change ("Claude"), so it's closed
+    /// first (<see cref="ClaudeSetup.OpenToChange"/>); "" for none.</summary>
+    public Func<string, string> AppToClose { get; init; } = _ => "";
+    /// <summary>That Connect with the app closed first and opened again after, saying each step ("Closing Claude…").</summary>
+    public Func<string, Action<string>, Task<ConnectOutcome>>? CloseAndConnect { get; init; }
 
     public AgentInstall MakeInstaller(AgentCliInfo cli) =>
         Installer?.Invoke(cli) ?? new AgentInstall(cli, Windows, Path.Combine(Home, "logs", "setup-install.log"));
@@ -571,6 +576,7 @@ public sealed partial class GuidedSetupModel : ObservableObject, IDisposable
     {
         if (id is not ("claude" or "codex" or "gemini")) return;
         StopWork();
+        CloseAsk = null;
         forNotes = id;
         Picked = id;
         Notify(nameof(ForNotes), nameof(ByHandLabel), nameof(StepLabel), nameof(PlanNote), nameof(ReadyTitle), nameof(InstallLede));
@@ -586,18 +592,31 @@ public sealed partial class GuidedSetupModel : ObservableObject, IDisposable
     }
 
     /// <summary>Back to the by-hand step that asked, the AI ready (or the student gave up on it: <paramref name="ready"/>
-    /// false, and nothing is picked).</summary>
-    void BackToNotes(bool ready = true)
+    /// false, and nothing is picked). Its desktop app open, it waits on this screen for Close Claude first.</summary>
+    void BackToNotes(bool ready = true, bool connected = false)
     {
         string id = forNotes;
+        if (ready && !connected && services.AppToClose(id) is { Length: > 0 } app && services.CloseAndConnect is { } run)
+        {
+            CloseAsk = new CloseAppAsk(app, say => run(id, say), () => BackToNotes(connected: true));
+            return;
+        }
+        CloseAsk = null;
         forNotes = "";
         Notify(nameof(ForNotes), nameof(ByHandLabel));
         Screen = GuidedScreen.Manual;
         if (!ready) return;
         // Connected all the way, by Settings' own Connect, in the background: the store turns every screen Connected.
-        if (services.Connect is { } connect) UiTasks.Run(() => connect(id), $"setup: connect {id}");
+        if (!connected && services.Connect is { } connect) UiTasks.Run(() => connect(id), $"setup: connect {id}");
         ReadyForNotes?.Invoke(id);
     }
+
+    /// <summary>"Close Claude first": the AI's desktop app is open, and this screen waits for the student to press Close,
+    /// which closes it, connects, opens it again and carries on; null otherwise.</summary>
+    [NotifyPropertyChangedFor(nameof(HasCloseAsk))]
+    [ObservableProperty]
+    public partial CloseAppAsk? CloseAsk { get; set; }
+    public bool HasCloseAsk => CloseAsk is not null;
 
     void ByHandAt(string item)
     {

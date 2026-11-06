@@ -13,7 +13,7 @@ namespace StudyStash.App.Services;
 /// Syft Notes is in its settings (and for this copy of Syft Notes), when Settings added it, and when the app last
 /// started it. <paramref name="Outdated"/>: this copy is in there, but not the way Connect writes it (pasted in by
 /// hand, say), so it never says which app started it and Settings can't tell when it's connected.
-/// <paramref name="CanReopen"/>: it's a desktop app Syft Notes can quit and open again for the student (a Mac).</summary>
+/// <paramref name="CanReopen"/>: it's a desktop app Syft Notes can close and open again for the student.</summary>
 public sealed record AiAppState(string Id, string Name, bool Installed, bool Added, bool OtherCopy, DateTime? AddedAt, DateTime? Started, string ConfigPath,
     bool Outdated = false, bool CanReopen = false)
 {
@@ -32,6 +32,11 @@ public sealed record AiAppState(string Id, string Name, bool Installed, bool Add
     public bool Good => Added && !OtherCopy && !Outdated && !OldName && !Stale;
     /// <summary>The app has started Syft Notes since it was added (it has loaded it).</summary>
     public bool Loaded => Started is { } s && (AddedAt is null || s >= AddedAt);
+    /// <summary>When Syft Notes last opened the app again itself (after closing it for Connect).</summary>
+    public DateTime? Opened { get; init; }
+    /// <summary>The app is open with Syft Notes in its settings but hasn't loaded it, and wasn't opened by Syft Notes
+    /// since it went in: it has to be closed and opened again.</summary>
+    public bool NeedsReopen => Good && Running && !Loaded && !(Opened is { } o && (AddedAt is null || o >= AddedAt));
 }
 
 /// <summary>Where Claude Desktop reads its settings on this computer (<see cref="Config"/>), and the other places
@@ -76,9 +81,19 @@ public sealed class ClaudeSetup
     public Func<string, bool>? Running { get; init; }
     /// <summary>False in a test or a self-test: nothing is written to an AI app's settings.</summary>
     public bool CanWrite { get; init; } = true;
-    /// <summary>Quits a desktop app (by its bundle id) and opens it again; whether it did. A Mac only: elsewhere the
-    /// student is told to do it.</summary>
-    public Func<string, Task<bool>>? ReopenApp { get; init; } = OperatingSystem.IsMacOS() ? id => Platform.MacApps.ReopenAsync(id) : null;
+    /// <summary>Closes a desktop app (by this setup's id), true once it's closed (<see cref="Platform.DesktopApps"/>).
+    /// Null: Syft Notes can't, and the student is told to. Only real where whether it's open is looked at for real too,
+    /// so a test that stands in for <see cref="Running"/> never closes an app that's really open.</summary>
+    public Func<string, Task<bool>>? QuitApp { get => quitSet ? quitApp : Real(id => Platform.DesktopApps.This.QuitAsync(id)); init => (quitApp, quitSet) = (value, true); }
+    /// <summary>Opens a desktop app Syft Notes closed; whether it did.</summary>
+    public Func<string, Task<bool>>? OpenApp { get => openSet ? openApp : Real(id => Platform.DesktopApps.This.OpenAsync(id)); init => (openApp, openSet) = (value, true); }
+    Func<string, Task<bool>>? quitApp, openApp;
+    bool quitSet, openSet;
+    Func<string, Task<bool>>? Real(Func<string, Task<bool>> real) =>
+        Running is null && !Platform.Desktop.SystemChangesOff && (OperatingSystem.IsMacOS() || OperatingSystem.IsWindows()) ? real : null;
+
+    /// <summary>When Syft Notes last opened each app again itself, by the settings file it reads.</summary>
+    static readonly System.Collections.Concurrent.ConcurrentDictionary<string, DateTime> opened = new(StringComparer.OrdinalIgnoreCase);
     /// <summary>Starts a server the way an app's settings say (command, arguments) and asks for its tools; null: not checked.</summary>
     public Func<string, IReadOnlyList<string>, Task<McpProbeResult>>? Probe { get; init; } = (command, args) => McpProbe.ToolsAsync(command, args);
 
@@ -120,7 +135,7 @@ public sealed class ClaudeSetup
         string user = Path.Combine(home, "ai-apps-home");
         return new()
         {
-            Home = home, UserHome = user, CanWrite = false, Find = _ => null, AppInstalled = _ => false, Running = _ => false, ReopenApp = null, Probe = null,
+            Home = home, UserHome = user, CanWrite = false, Find = _ => null, AppInstalled = _ => false, Running = _ => false, QuitApp = null, OpenApp = null, Probe = null,
             LocalAppData = Path.Combine(user, "AppData", "Local"), AppData = Path.Combine(user, "AppData", "Roaming"),
             DesktopConfig = Path.Combine(user, "Claude", "claude_desktop_config.json"), ClaudeCodeConfig = Path.Combine(user, ".claude.json"),
             CodexConfig = Path.Combine(user, ".codex", "config.toml"), GeminiConfig = Path.Combine(user, ".gemini", "settings.json"),
@@ -167,13 +182,52 @@ public sealed class ClaudeSetup
     public IReadOnlyList<AiAppState> DesktopStates() =>
         [.. Apps.Where(a => DesktopApp(a.Id) is { } desktop && Installed(desktop.Name)).Select(a => State(a.Id))];
 
-    /// <summary>Quits the row's desktop app and opens it again, so it loads the settings Connect just wrote.</summary>
+    /// <summary>Syft Notes can close the desktop apps here and open them again.</summary>
+    public bool CanClose => QuitApp is not null && OpenApp is not null;
+
+    /// <summary>The AI's desktop app that is open and whose settings Connect has to change, so it has to be closed first
+    /// (it would write its own copy back over them); null when there's none, or Syft Notes can't close it.</summary>
+    public AiAppState? OpenToChange(string provider) =>
+        CanClose ? StatesOf(provider).FirstOrDefault(a => a is { Installed: true, Good: false, Running: true } && DesktopApp(a.Id) is not null) : null;
+
+    /// <summary>Closes a desktop app; true once it's closed.</summary>
+    public Task<bool> CloseAsync(string id) => QuitApp is { } quit ? quit(id) : Task.FromResult(false);
+
+    /// <summary>Opens a desktop app again; whether it did. Remembered, so it isn't asked to be opened again once more.</summary>
+    public async Task<bool> OpenAsync(string id)
+    {
+        if (OpenApp is not { } open || !await open(id)) return false;
+        opened[ConfigOf(id)] = DateTime.Now;
+        return true;
+    }
+
+    /// <summary>Puts Syft Notes' entry in an app's settings right (one an older copy left, <see cref="NewPlace"/>), with
+    /// the app closed first if it's open and opened again after, saying each step. Only that entry changes.</summary>
+    public async Task<ConnectOutcome> RepairAsync(string id, Action<string> say)
+    {
+        string name = DesktopApp(id)?.Name ?? NameOf(id);
+        bool closed = false;
+        if (DesktopApp(id) is not null && IsRunning(id))
+        {
+            say(AiConnect.ClosingWords(name));
+            if (!await CloseAsync(id)) return new ConnectOutcome(false, AiConnect.CouldntCloseWords(name, Windows)) { CouldntClose = true };
+            closed = true;
+        }
+        var change = await Task.Run(() => Connect(id));
+        if (closed)
+        {
+            say(AiConnect.OpeningWords(name));
+            await OpenAsync(id);
+        }
+        return new ConnectOutcome(change.Ok, change.Ok ? $"{name} is connected." : change.Say);
+    }
+
+    /// <summary>Closes the row's desktop app and opens it again, so it loads the settings Connect wrote.</summary>
     public async Task<AiAppChange> ReopenAsync(string id)
     {
-        if (DesktopApp(id) is not { } desktop || ReopenApp is null || !Installed(desktop.Name)) return new(false, $"Quit {NameOf(id)} completely, then open it again.");
-        return await ReopenApp(desktop.Bundle)
-            ? new(true, "")
-            : new(false, $"{desktop.Name} didn't quit and open again. Quit it yourself ({desktop.Name} menu → Quit {desktop.Name}), then open it again.");
+        if (DesktopApp(id) is not { } desktop || !CanClose || !Installed(desktop.Name)) return new(false, $"Quit {NameOf(id)} completely, then open it again.");
+        if (!await CloseAsync(id)) return new(false, AiConnect.CouldntCloseWords(desktop.Name, Windows, "open it again"));
+        return await OpenAsync(id) ? new(true, "") : new(false, $"Open {desktop.Name} again.");
     }
 
     const string DesktopFile = "claude_desktop_config.json";
@@ -293,30 +347,8 @@ public sealed class ClaudeSetup
     public static bool IsCodexBundle(string infoPlist) =>
         File.Exists(infoPlist) && File.ReadAllBytes(infoPlist).AsSpan().IndexOf("com.openai.codex"u8) >= 0;
 
-    /// <summary>Whether a desktop app is open now: on a Mac by its bundle, on Windows by its program and where it's
-    /// installed (Claude Code's own claude.exe isn't the Claude app).</summary>
-    bool IsRunning(string id)
-    {
-        if (Running is { } running) return running(id);
-        if (DesktopApp(id) is not { } app) return false;
-        if (Mac) return Platform.MacApps.IsRunning(app.Bundle);
-        if (!Windows) return false;
-        string[] names = id == "codex" ? ["ChatGPT", "Codex"] : ["claude"];
-        string[] places = id == "codex" ? [@"\WindowsApps\OpenAI.Codex_"] : [@"\AnthropicClaude\", @"\WindowsApps\Claude_"];
-        foreach (string name in names)
-            foreach (var p in System.Diagnostics.Process.GetProcessesByName(name))
-                using (p)
-                {
-                    try
-                    {
-                        if (p.MainModule?.FileName is { } file && places.Any(place => file.Contains(place, StringComparison.OrdinalIgnoreCase))) return true;
-                    }
-                    catch (Exception e) when (e is System.ComponentModel.Win32Exception or InvalidOperationException or NotSupportedException)
-                    {
-                    }
-                }
-        return false;
-    }
+    /// <summary>Whether a desktop app is open now (<see cref="Platform.DesktopApps.IsRunning"/>).</summary>
+    bool IsRunning(string id) => Running is { } running ? running(id) : DesktopApp(id) is not null && Platform.DesktopApps.This.IsRunning(id);
 
     /// <summary>The MCP server's command: the app, told to be the server (and where its settings are, if not the usual).</summary>
     public List<string> McpArgs => Home == Configs.DefaultHome ? ["mcp"] : ["--home", Home, "mcp"];
@@ -436,9 +468,10 @@ public sealed class ClaudeSetup
         return new AiAppState(id, NameOf(id), IsInstalled(id) || added, added, added && !ours,
             ToLocal(McpClients.When(McpClients.AddedFile(Home, id))), ToLocal(McpClients.When(McpClients.StartedFile(Home, id))), path,
             Outdated: outdated || stale && ours,
-            CanReopen: ReopenApp is not null && DesktopApp(id) is { } desktop && Installed(desktop.Name))
+            CanReopen: CanClose && DesktopApp(id) is { } desktop && Installed(desktop.Name))
         {
             OldName = oldName, Stale = stale, Running = DesktopApp(id) is not null && IsRunning(id), Words = WordsFor(id),
+            Opened = opened.TryGetValue(path, out var at) ? at : null,
         };
     }
 
