@@ -259,6 +259,10 @@
     <Setter Property="FontFamily" Value="{DynamicResource TextFont}" />
     <Setter Property="FontFeatures" Value="+tnum" />
   </Style>
+  <!-- A plain text field: the control's corners, as the buttons beside it (its colours and hairline are FluentParts'). -->
+  <Style Selector="TextBox">
+    <Setter Property="CornerRadius" Value="{DynamicResource RadiusControl}" />
+  </Style>
   <!-- A text field that's only its text: the design draws the field around it (the ask bars, the quick panel). -->
   <Style Selector="TextBox.bare">
     <Setter Property="Background" Value="Transparent" />
@@ -504,18 +508,19 @@
     <Setter Property="FontSize" Value="15" />
     <Setter Property="FontWeight" Value="Bold" />
     <Setter Property="ClipToBounds" Value="False" />
-  </Style>
-  <Style Selector="Button.record /template/ Border#PART_Bg">
-    <Setter Property="BoxShadow" Value="{DynamicResource LineRing}" />
+    <!-- The hairline inside its corners, as Button.btn's. -->
+    <Setter Property="BorderBrush" Value="{DynamicResource Line}" />
+    <Setter Property="BorderThickness" Value="1" />
   </Style>
   <Style Selector="Button.record /template/ Border#PART_Wash">
     <Setter Property="IsVisible" Value="False" />
   </Style>
-  <Style Selector="Button.record:pointerover /template/ Border#PART_Bg, Button.record:focus-visible /template/ Border#PART_Bg">
-    <Setter Property="BoxShadow" Value="{DynamicResource SubtleRing}" />
+  <Style Selector="Button.record:pointerover, Button.record:focus-visible">
+    <Setter Property="BorderBrush" Value="{DynamicResource InkSubtle}" />
   </Style>
-  <Style Selector="Button.record.recording /template/ Border#PART_Bg, Button.record.paused /template/ Border#PART_Bg">
-    <Setter Property="BoxShadow" Value="{DynamicResource RecordRing}" />
+  <Style Selector="Button.record.recording, Button.record.paused">
+    <Setter Property="BorderBrush" Value="{DynamicResource Record}" />
+    <Setter Property="BorderThickness" Value="1.5" />
   </Style>
   <!-- Ready to record, the stop square is only the red dot: a screen reader doesn't hear "Stop recording" inside
        "Start recording". -->
@@ -879,11 +884,12 @@
     <Setter Property="FontSize" Value="15" />
     <Setter Property="FontWeight" Value="Bold" />
     <Setter Property="ClipToBounds" Value="False" />
+    <!-- Its hairline is a border inside its corners, not a 1 px shadow ring outside them: in a row of pills (the Study
+         page's classes) whatever held each one cut its ring off along the top or the left, leaving bare corners. -->
+    <Setter Property="BorderBrush" Value="{DynamicResource Line}" />
+    <Setter Property="BorderThickness" Value="1" />
     <!-- No square focus box from the theme: the keyboard's focus is the ring below, round as the pill. -->
     <Setter Property="FocusAdorner" Value="{x:Null}" />
-  </Style>
-  <Style Selector="Button.btn /template/ Border#PART_Bg">
-    <Setter Property="BoxShadow" Value="{DynamicResource LineRing}" />
   </Style>
   <Style Selector="Button.btn /template/ Border#PART_Wash">
     <Setter Property="IsVisible" Value="False" />
@@ -897,8 +903,8 @@
   <Style Selector="Button.btn.ink:focus-visible /template/ Border#PART_Wash">
     <Setter Property="BorderBrush" Value="{DynamicResource Surface}" />
   </Style>
-  <Style Selector="Button.btn:pointerover /template/ Border#PART_Bg, Button.btn:focus-visible /template/ Border#PART_Bg">
-    <Setter Property="BoxShadow" Value="{DynamicResource SubtleRing}" />
+  <Style Selector="Button.btn:pointerover, Button.btn:focus-visible">
+    <Setter Property="BorderBrush" Value="{DynamicResource InkSubtle}" />
   </Style>
   <Style Selector="Button.btn.sm">
     <Setter Property="Height" Value="34" />
@@ -908,13 +914,19 @@
   </Style>
   <Style Selector="Button.btn.ink">
     <Setter Property="Background" Value="{DynamicResource Ink}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource Ink}" />
     <Setter Property="Foreground" Value="{DynamicResource Surface}" />
-  </Style>
-  <Style Selector="Button.btn.ink /template/ Border#PART_Bg">
-    <Setter Property="BoxShadow" Value="none" />
   </Style>
   <Style Selector="Button.btn.ink:pointerover">
     <Setter Property="Opacity" Value="0.9" />
+  </Style>
+  <!-- An ink pill that can't be pressed yet (Write the prep with no name): a quiet chip with grey words, not the ink
+       faded to a muddy grey. -->
+  <Style Selector="Button.btn.ink:disabled">
+    <Setter Property="Opacity" Value="1" />
+    <Setter Property="Background" Value="{DynamicResource Chip}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource Chip}" />
+    <Setter Property="Foreground" Value="{DynamicResource InkSubtle}" />
   </Style>
 
   <!-- A menu's button (the notes' filter, the calendar's classes): words and a chevron in a hairline. -->
@@ -927,9 +939,8 @@
     <Setter Property="FontSize" Value="{DynamicResource FontBody}" />
     <Setter Property="FontWeight" Value="Bold" />
     <Setter Property="ClipToBounds" Value="False" />
-  </Style>
-  <Style Selector="Button.picker /template/ Border#PART_Bg">
-    <Setter Property="BoxShadow" Value="{DynamicResource LineRing}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource Line}" />
+    <Setter Property="BorderThickness" Value="1" />
   </Style>
   <Style Selector="Button.picker:pointerover">
     <Setter Property="Foreground" Value="{DynamicResource Ink}" />
@@ -1183,9 +1194,10 @@
   </Style>
   <!-- Two ways to see one thing, side by side (Month | Week): the chosen one on a grey wash. -->
   <Style Selector="Border.seg-group">
-    <Setter Property="Padding" Value="2" />
+    <Setter Property="Padding" Value="1" />
     <Setter Property="CornerRadius" Value="{DynamicResource RadiusControl}" />
-    <Setter Property="BoxShadow" Value="{DynamicResource LineRing}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource Line}" />
+    <Setter Property="BorderThickness" Value="1" />
   </Style>
   <Style Selector="Button.seg-item">
     <Setter Property="Theme" Value="{StaticResource Surface}" />
@@ -1323,23 +1335,28 @@
   <Style Selector="Border.recbar">
     <Setter Property="Background" Value="{DynamicResource Surface}" />
     <Setter Property="CornerRadius" Value="{DynamicResource RadiusPanel}" />
-    <Setter Property="BoxShadow" Value="{DynamicResource LineRing}" />
-    <Setter Property="Padding" Value="12,8,8,8" />
+    <Setter Property="BorderBrush" Value="{DynamicResource Line}" />
+    <Setter Property="BorderThickness" Value="1" />
+    <Setter Property="Padding" Value="11,7,7,7" />
   </Style>
   <!-- Notes from an AI Syft Notes doesn't run, on a note's page (the Claude app, any free chat): the offer over a
        lecture with no notes, a long lecture's copy in parts, and the box a chat's notes are pasted into. -->
   <Style Selector="Border.free-ai">
     <Setter Property="Background" Value="{DynamicResource Surface}" />
     <Setter Property="CornerRadius" Value="{DynamicResource RadiusPanel}" />
-    <Setter Property="BoxShadow" Value="{DynamicResource LineRing}" />
-    <Setter Property="Padding" Value="18,16" />
+    <Setter Property="BorderBrush" Value="{DynamicResource Line}" />
+    <Setter Property="BorderThickness" Value="1" />
+    <Setter Property="Padding" Value="17,15" />
   </Style>
-  <!-- A study card on a page (the exam flags over a lecture's notes, Review, exam prep, Listen): the same quiet card. -->
+  <!-- A study card on a page (the exam flags over a lecture's notes, Review, exam prep, Listen): the same quiet card.
+       Its hairline (and every card's and pill's) is a border inside its corners, never a 1 px shadow ring outside
+       them: whatever holds a ring at its edge cuts that side off, and a ring thins round its corners. -->
   <Style Selector="Border.study-card">
     <Setter Property="Background" Value="{DynamicResource Surface}" />
     <Setter Property="CornerRadius" Value="{DynamicResource RadiusPanel}" />
-    <Setter Property="BoxShadow" Value="{DynamicResource LineRing}" />
-    <Setter Property="Padding" Value="18,14" />
+    <Setter Property="BorderBrush" Value="{DynamicResource Line}" />
+    <Setter Property="BorderThickness" Value="1" />
+    <Setter Property="Padding" Value="17,13" />
   </Style>
   <Style Selector="TextBlock.free-ai-lead">
     <Setter Property="FontSize" Value="15" />
@@ -1363,8 +1380,9 @@
   <Style Selector="Border.paste-box">
     <Setter Property="Background" Value="{DynamicResource SurfaceSunken}" />
     <Setter Property="CornerRadius" Value="10" />
-    <Setter Property="Padding" Value="14,12" />
-    <Setter Property="BoxShadow" Value="{DynamicResource LineRing}" />
+    <Setter Property="Padding" Value="13,11" />
+    <Setter Property="BorderBrush" Value="{DynamicResource Line}" />
+    <Setter Property="BorderThickness" Value="1" />
   </Style>
   <Style Selector="TextBox.paste-box">
     <Setter Property="FontSize" Value="{DynamicResource FontBody}" />
@@ -1379,8 +1397,9 @@
   <Style Selector="Border.change-bar">
     <Setter Property="Background" Value="{DynamicResource SurfaceSunken}" />
     <Setter Property="CornerRadius" Value="{DynamicResource RadiusPanel}" />
-    <Setter Property="BoxShadow" Value="{DynamicResource LineRing}" />
-    <Setter Property="Padding" Value="14,6,6,6" />
+    <Setter Property="BorderBrush" Value="{DynamicResource Line}" />
+    <Setter Property="BorderThickness" Value="1" />
+    <Setter Property="Padding" Value="13,5,5,5" />
   </Style>
   <Style Selector="TextBlock.change-line">
     <Setter Property="FontSize" Value="13.5" />
@@ -1399,15 +1418,17 @@
   </Style>
   <Style Selector="Border.version-row">
     <Setter Property="CornerRadius" Value="8" />
-    <Setter Property="Padding" Value="12,8" />
+    <Setter Property="Padding" Value="11,7" />
     <Setter Property="Background" Value="Transparent" />
+    <Setter Property="BorderBrush" Value="Transparent" />
+    <Setter Property="BorderThickness" Value="1" />
   </Style>
   <Style Selector="Button.version-row:pointerover Border.version-row">
     <Setter Property="Background" Value="{DynamicResource Hover}" />
   </Style>
   <Style Selector="Border.version-row.selected">
     <Setter Property="Background" Value="{DynamicResource SurfaceSunken}" />
-    <Setter Property="BoxShadow" Value="{DynamicResource LineRing}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource Line}" />
   </Style>
   <Style Selector="TextBlock.version-words">
     <Setter Property="FontSize" Value="{DynamicResource FontBody}" />
