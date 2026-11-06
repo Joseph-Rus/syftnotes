@@ -302,6 +302,9 @@ public sealed partial class CanvasSync
             st.Error = saveError.Length > 0 ? saveError : failed.Count > 0 ? $"Couldn't read {string.Join(", ", failed)} from Canvas ({Reason(done.Errors, failed[0])}), so what you had is kept."
                 : done.Errors.Count > 0 ? $"{done.Errors.Count} thing(s) couldn't be read: {done.Errors[0]}" : "";
             st.ErrorAt = st.Error.Length > 0 ? at : "";
+            // Submit & Organize (test builds only): what was handed in since the last sync waits to be filed.
+            if (TestSwitches.On && st.Filing is { On: true } filing)
+                filing.Saw(done.Indexes.SelectMany(kv => Filing.HandedIn.Since(done.Before.GetValueOrDefault(kv.Key), kv.Value)));
             if (changes.Count == 0) return;
             st.Changes = changes.Take(60).Select(c => c.Text).ToList();
             st.LastChanges = changes.Take(60).ToList();

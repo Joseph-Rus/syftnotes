@@ -96,6 +96,7 @@ public sealed partial class CanvasSettingsModel : ObservableObject, IDisposable
         this.context = context;
         this.watch = watch;
         Status = new CanvasStatusModel(context);
+        Filing = Core.TestSwitches.On ? new SubmitOrganizeModel(context) : null;
         if (watch is not null) watch.Changed += OnWatchChanged;
         Picker = new CoursePickerModel(context)
         {
@@ -107,6 +108,10 @@ public sealed partial class CanvasSettingsModel : ObservableObject, IDisposable
             },
         };
     }
+
+    /// <summary>"After you hand in": Submit &amp; Organize's choices and Filed work. Test builds only for now (null otherwise).</summary>
+    public SubmitOrganizeModel? Filing { get; }
+    public bool HasFiling => Filing is not null;
 
     /// <summary>Which Canvas courses to bring in: every course Find my courses found, with a tick.</summary>
     public CoursePickerModel Picker { get; }
@@ -207,6 +212,7 @@ public sealed partial class CanvasSettingsModel : ObservableObject, IDisposable
             }
             Say = null;
             Apply(state, overview, await classesTask ?? []);
+            if (Filing is not null) await Filing.LoadAsync();
         }
         catch (Exception e) when (e is CanvasLibraryException or HttpRequestException or TaskCanceledException)
         {

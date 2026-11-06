@@ -355,7 +355,7 @@ public static partial class Shell
     /// page of its own; anything else the library no longer knows opens nothing rather than an empty page.</summary>
     static async Task<AssignmentModel?> AssignmentAsync(string cls, string id, CanvasApi.Item? row)
     {
-        var page = new AssignmentModel(Canvas()) { OnSearch = ToggleQuick };
+        var page = new AssignmentModel(Canvas()) { OnSearch = ToggleQuick, OnTidy = TestSwitches.On ? TidyFor(cls, id) : null };
         try
         {
             if (row is { Kind: "todo" or "to-do" }) page.ShowTodo(row);
@@ -392,6 +392,7 @@ public static partial class Shell
         }
         // Home's "Buy us a coffee": the Ko-fi page, and the library window's own ask for a tip goes for good.
         if (page.IsHome) page.OnSupport = () => SupportAsk.Answer(host, SupportAnswer.Tip, url => Dialogs.OpenUrl(url), DateTimeOffset.Now);
+        if (page.IsHome && TestSwitches.On) page.ShowTidy(TidyRows());
         if (library.Overview is { Ask: { } kept } before && before.IsHome == page.IsHome && before.ClassName == page.ClassName && !before.IsDuePage)
         {
             before.Ask = null;

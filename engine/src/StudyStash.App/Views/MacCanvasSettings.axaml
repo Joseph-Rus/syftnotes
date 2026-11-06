@@ -180,5 +180,8 @@
         </ItemsControl>
       </Border>
     </StackPanel>
+
+    <!-- After you hand in (Submit & Organize): test builds only -->
+    <Panel IsVisible="{Binding HasFiling}"><v:SubmitOrganizeSettings DataContext="{Binding Filing}" /></Panel>
   </StackPanel>
 </UserControl>

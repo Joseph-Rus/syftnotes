@@ -19,6 +19,10 @@ public sealed record FiledMove(long Seq, string Run, string At, string ClassName
 /// approved folder, gone, or a move that failed), with why.</summary>
 public sealed record FilingResult(string Run, List<FiledMove> Moves, List<(string Path, string Why)> Left);
 
+/// <summary>One run in the undo log, as "Filed work" lists it: when, the class and assignment, how many files it filed,
+/// and how many of them were put back since.</summary>
+public sealed record FiledRun(string Run, string At, string ClassName, string Assignment, int Files, int Undone);
+
 /// <summary>How a file came back on Undo.</summary>
 public enum UndoOutcome
 {

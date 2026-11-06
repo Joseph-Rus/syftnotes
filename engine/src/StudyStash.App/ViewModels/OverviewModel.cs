@@ -61,6 +61,14 @@ public sealed partial class NoteItem : ObservableObject
     partial void OnNounChanged(string value) => OnPropertyChanged(nameof(Said));
 }
 
+/// <summary>A hand-in on Home's "Ready to tidy" (Submit &amp; Organize, test builds only): its class's dot, the assignment,
+/// "3 files · Today, 9:40 AM", Tidy up (the tidy card) and × ("Not this one").</summary>
+public sealed record TidyRow(string Id, IBrush Dot, string Assignment, string Line, Action Tidy, Action Dismiss)
+{
+    public string TidySaid => $"{FilingWords.TidyUp}: {Assignment}";
+    public string DismissSaid => $"{FilingWords.NotThisOne}: {Assignment}";
+}
+
 /// <summary>A folder's notes under a heading: "This week", "Last week", "September".</summary>
 public sealed record NoteGroup(string Label, bool First, IReadOnlyList<NoteItem> Notes);
 
@@ -208,6 +216,23 @@ public sealed partial class OverviewModel : ObservableObject
     public bool NoUpNext => ShowUpNext && UpNext.Count == 0;
     public string UpNextEmpty => "Nothing on your calendar for the rest of today or tomorrow.";
     [RelayCommand] static void RecordEvent(UpNext e) => e.Record();
+
+    // --- Home: Ready to tidy (Submit & Organize, test builds only) ---------------------------------------------------
+
+    /// <summary>The hand-ins waiting to be tidied, newest first; the part is hidden while there are none.</summary>
+    public ObservableCollection<TidyRow> Tidy { get; } = [];
+    [ObservableProperty] public partial bool HasTidy { get; private set; }
+    [RelayCommand] static void TidyUp(TidyRow r) => r.Tidy();
+    [RelayCommand] static void NotThisOne(TidyRow r) => r.Dismiss();
+
+    /// <summary>Shows <paramref name="rows"/> as Ready to tidy (only Home has the part).</summary>
+    public void ShowTidy(IEnumerable<TidyRow> rows)
+    {
+        if (!IsHome) return;
+        Tidy.Clear();
+        foreach (var r in rows) Tidy.Add(r);
+        HasTidy = Tidy.Count > 0;
+    }
 
     // --- the notes --------------------------------------------------------------------------------------------------
 

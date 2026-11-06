@@ -97,7 +97,7 @@ public static partial class SubmitMatch
             if (!Within(full, root) || full.Length == root.Length) continue;
             bool linked = false;
             for (string? d = full; d is not null && d.Length > root.Length; d = Path.GetDirectoryName(d))
-                if ((Directory.Exists(d) ? (FileSystemInfo)new DirectoryInfo(d) : new FileInfo(d)).LinkTarget is not null)
+                if (IsLink(d))
                 {
                     linked = true;
                     break;
@@ -106,6 +106,11 @@ public static partial class SubmitMatch
         }
         return false;
     }
+
+    /// <summary>The path is a link (a symlink, or a junction on Windows) to somewhere else. A cloud folder's placeholder
+    /// (OneDrive's) isn't one.</summary>
+    internal static bool IsLink(string path) =>
+        (Directory.Exists(path) ? (FileSystemInfo)new DirectoryInfo(path) : new FileInfo(path)).LinkTarget is not null;
 
     [GeneratedRegex(@" \(\d+\)$")]
     private static partial Regex DownloadCopy();
