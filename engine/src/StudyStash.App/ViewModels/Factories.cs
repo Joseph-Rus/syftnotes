@@ -57,8 +57,7 @@ public sealed class CanvasModels(CanvasLink canvas, AppHost host, IMessenger mes
     /// <summary>The first run's step that adds the Canvas add-on from the browser's store.</summary>
     public AddOnModel AddOn() => new(canvas.Context, canvas.Watch);
 
-    /// <summary>The checklist after a hand-in (Submit &amp; Organize, test builds only): its notification goes out as the
-    /// app's, and <paramref name="pickFile"/> is the file picker over the window it shows in.</summary>
-    public HandInModel HandIn(CanvasApi.HandInWaiting waiting, Func<string, string, Task<string?>> pickFile) =>
-        new(canvas.Context, waiting, new HandInServices(pickFile, toast => messages.Send(toast)));
+    /// <summary>The tidy card for a hand-in on "Ready to tidy" (Submit &amp; Organize, test builds only), its class's
+    /// colour <paramref name="dot"/>, over the app's one Canvas context.</summary>
+    public TidyCardModel TidyCard(TidyItem item, Avalonia.Media.IBrush dot, TidyServices services) => new(canvas.Context, item, dot, services);
 }

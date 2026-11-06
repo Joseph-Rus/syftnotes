@@ -209,12 +209,15 @@ public static class CanvasApi
 
     // ---- Submit & Organize (canvas/filing; test builds only) ----
 
-    /// <summary>A hand-in waiting to be filed: its class, the library's key for it, and its assignment.</summary>
+    /// <summary>A hand-in waiting to be tidied: its class, the library's key for it, its assignment (name and id), and
+    /// when it went in.</summary>
     public sealed record HandInWaiting
     {
         public string Class { get; init; } = "";
         public string Key { get; init; } = "";
         public string Assignment { get; init; } = "";
+        public string Id { get; init; } = "";
+        public DateTimeOffset? At { get; init; }
     }
 
     /// <summary>A folder offered first, not added yet (Downloads, Desktop, Documents).</summary>

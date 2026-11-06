@@ -23,7 +23,12 @@ public sealed partial class LibraryWeb
     {
         var f = FilingNow();
         if (!f.On || f.When != FilingSettings.Ask) return [];
-        return [.. f.Waiting.Select(w => (JsonNode)new JsonObject { ["class"] = w.Class, ["key"] = w.Key, ["assignment"] = w.Assignment })];
+        // The key is HandedIn.Key: the assignment's id, the attempt and when it went in.
+        return [.. f.Waiting.Select(w => (JsonNode)new JsonObject
+        {
+            ["class"] = w.Class, ["key"] = w.Key, ["assignment"] = w.Assignment,
+            ["id"] = w.Key.Split(':', 3)[0], ["at"] = w.Key.Split(':', 3) is [_, _, var at] ? at : null,
+        })];
     }
 
     JsonObject FilingJson()
@@ -78,6 +83,8 @@ public sealed partial class LibraryWeb
                 if (S(body?["mode"]) is FilingSettings.Organize or FilingSettings.Clean) f.Mode = S(body?["mode"]);
                 if (add.Length > 0 && !f.Folders.Contains(add, StringComparer.OrdinalIgnoreCase)) f.Folders.Add(add);
                 if (S(body?["remove"]) is { Length: > 0 } remove) f.Folders.RemoveAll(p => p.Equals(remove, StringComparison.OrdinalIgnoreCase));
+                // "Not this one": the hand-in leaves the list to tidy, and nothing of it moves.
+                if (body?["dismiss"] is JsonObject d) f.Waiting.RemoveAll(w => w.Class == S(d["class"]) && w.Key == S(d["key"]));
                 if (!f.On) f.Waiting.Clear();
             });
             return Http.Json(FilingJson());

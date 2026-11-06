@@ -236,6 +236,10 @@ public sealed class CanvasClient(string serverUrl, Func<string> key, HttpClient?
         return SendAsync<CanvasApi.Filing>(HttpMethod.Post, canvasRoot + "/filing", body, stop);
     }
 
+    /// <summary>"Not this one": the hand-in leaves the list to tidy; nothing of it moves.</summary>
+    public Task<CanvasApi.Filing?> DismissHandInAsync(string cls, string key, CancellationToken stop = default) =>
+        SendAsync<CanvasApi.Filing>(HttpMethod.Post, canvasRoot + "/filing", new JsonObject { ["dismiss"] = new JsonObject { ["class"] = cls, ["key"] = key } }, stop);
+
     public Task<CanvasApi.HandInCheck?> CheckHandInAsync(string cls, string key, CancellationToken stop = default) =>
         SendAsync<CanvasApi.HandInCheck>(HttpMethod.Get, $"{canvasRoot}/filing/check?class={Q(cls)}&key={Q(key)}", null, stop);
 

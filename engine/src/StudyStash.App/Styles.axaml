@@ -879,12 +879,19 @@
     <Setter Property="FontSize" Value="15" />
     <Setter Property="FontWeight" Value="Bold" />
     <Setter Property="ClipToBounds" Value="False" />
+    <!-- No square focus box from the theme: the keyboard's focus is the ring below, round as the pill. -->
+    <Setter Property="FocusAdorner" Value="{x:Null}" />
   </Style>
   <Style Selector="Button.btn /template/ Border#PART_Bg">
     <Setter Property="BoxShadow" Value="{DynamicResource LineRing}" />
   </Style>
   <Style Selector="Button.btn /template/ Border#PART_Wash">
     <Setter Property="IsVisible" Value="False" />
+  </Style>
+  <!-- Keyboard focus only (not a click, not a window opening): the Focus ring inside the pill's own corners. -->
+  <Style Selector="Button.btn:focus-visible /template/ Border#PART_Wash">
+    <Setter Property="IsVisible" Value="True" />
+    <Setter Property="Background" Value="Transparent" />
   </Style>
   <Style Selector="Button.btn:pointerover /template/ Border#PART_Bg, Button.btn:focus-visible /template/ Border#PART_Bg">
     <Setter Property="BoxShadow" Value="{DynamicResource SubtleRing}" />
