@@ -36,16 +36,17 @@ public sealed record NewFileLecture(string Path, string Class, string Title, Dat
 /// video is used.</summary>
 public sealed record RecordingFile(string Path, long Bytes, DateTime Date)
 {
-    static readonly string[] VideoEndings = [".mp4", ".mov", ".m4v"];
+    /// <summary>A video (its sound is what's used): every readable ending that isn't a sound file's.</summary>
+    static bool Video(string ending) => ending == ".mp4" || (LectureFromFile.Endings.Contains(ending) && !LectureFromFile.SoundEndings.Contains(ending));
 
     public string Name => System.IO.Path.GetFileName(Path);
     string Ending => System.IO.Path.GetExtension(Path).ToLowerInvariant();
-    public bool IsVideo => VideoEndings.Contains(Ending);
+    public bool IsVideo => Video(Ending);
     /// <summary>A kind of file Syft Notes can listen to: a voice memo's or a phone's, or a video.</summary>
-    public bool CanRead => IsVideo || VoiceMemos.IsAudio(Path);
+    public bool CanRead => LectureFromFile.CanRead(Path);
 
     /// <summary>The endings the file picker offers: every recording and video.</summary>
-    public static IEnumerable<string> Endings => VoiceMemos.Endings.Concat(VideoEndings).Distinct();
+    public static IEnumerable<string> Endings => LectureFromFile.Endings;
 
     /// <summary>Whether a dropped or picked path is one: the page takes it as a lecture instead of an attachment.</summary>
     public static bool Is(string path) => new RecordingFile(path, 0, default).CanRead;
