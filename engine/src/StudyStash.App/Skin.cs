@@ -46,13 +46,13 @@ public static class Skin
         };
 
     /// <summary>The surfaces and inks for light or for dark: the window behind everything (<see cref="Canvas"/>, which
-    /// the sidebar sits straight on), the page (<see cref="Surface"/>), a card on the page (<see cref="Card"/>: the
+    /// the sidebar sits straight on), the page (<see cref="Surface"/>), a card on the page (<see cref="PageCard"/>: the
     /// page's own paper in light, a step lighter than the page in dark, so it lifts off it), the week's grid (sunken),
     /// today's column lifted out of it, hairlines, the wash under the pointer, the three inks, the coral that means
     /// recording and the red that means late, and each class colour as a highlighter (behind ink, the same bright one
     /// light and dark), as a quiet one under the page's own ink (a folder title's line, History's changed lines: deep
     /// in dark, under paper words), and as a swatch (nothing on it, so brighter in dark).</summary>
-    public sealed record Palette(Color Canvas, Color Surface, Color Card, Color SurfaceSunken, Color SurfaceToday, Color Line, Color Hover, Color Press,
+    public sealed record Palette(Color Canvas, Color Surface, Color PageCard, Color SurfaceSunken, Color SurfaceToday, Color Line, Color Hover, Color Press,
         Color Ink, Color InkMuted, Color InkSubtle, Color Record, Color OnRecord, Color Late, Color Focus,
         IReadOnlyDictionary<string, Color> Highlighters, IReadOnlyDictionary<string, Color> QuietHighlighters, IReadOnlyDictionary<string, Color> Swatches,
         double TodayShade, double FloatShade);
@@ -68,7 +68,7 @@ public static class Skin
     /// <summary>Light: paper pages on the light mesh, ink text. The two quieter inks are the brand's muted grey and one
     /// step lighter, both over 4.5:1 on paper and on the mesh.</summary>
     public static readonly Palette Light = new(
-        Canvas: Controls.Syft.MeshLight, Surface: Controls.Syft.Paper, Card: Controls.Syft.Paper, SurfaceSunken: Controls.Syft.MeshLight, SurfaceToday: Controls.Syft.White,
+        Canvas: Controls.Syft.MeshLight, Surface: Controls.Syft.Paper, PageCard: Controls.Syft.Paper, SurfaceSunken: Controls.Syft.MeshLight, SurfaceToday: Controls.Syft.White,
         Line: Color.Parse("#E2DFD8"), Hover: Color.FromArgb(0x14, 0x16, 0x13, 0x1D), Press: Color.FromArgb(0x24, 0x16, 0x13, 0x1D),
         Ink: Controls.Syft.Ink, InkMuted: Controls.Syft.Muted, InkSubtle: Color.Parse("#67656E"),
         Record: Controls.Syft.Coral, OnRecord: Controls.Syft.Ink, Late: Color.Parse("#B3261E"), Focus: Controls.Syft.Ink,
@@ -78,7 +78,7 @@ public static class Skin
     /// step lighter than the ghost so they show, paper text a touch softer so big headings don't glare, and the class
     /// highlighters the same bright ones as light, with ink words on them (Highlight's :marked).</summary>
     public static readonly Palette Dark = new(
-        Canvas: Color.Parse("#0E0C13"), Surface: Controls.Syft.Ink, Card: Color.Parse("#201C2A"), SurfaceSunken: Controls.Syft.MeshDark, SurfaceToday: Controls.Syft.GhostDark,
+        Canvas: Color.Parse("#0E0C13"), Surface: Controls.Syft.Ink, PageCard: Color.Parse("#201C2A"), SurfaceSunken: Controls.Syft.MeshDark, SurfaceToday: Controls.Syft.GhostDark,
         Line: Color.Parse("#36323F"), Hover: Color.FromArgb(0x1A, 0xFB, 0xFA, 0xF7), Press: Color.FromArgb(0x2B, 0xFB, 0xFA, 0xF7),
         Ink: Color.Parse("#F3F1F7"), InkMuted: Color.Parse("#B4B1BC"), InkSubtle: Color.Parse("#9A97A3"),
         Record: Controls.Syft.Coral, OnRecord: Controls.Syft.Ink, Late: Color.Parse("#FF8A80"), Focus: Controls.Syft.Paper,
@@ -250,7 +250,7 @@ public static class Skin
         void B(string key, Color c) => r[key] = new SolidColorBrush(c);
         B("Canvas", p.Canvas);
         B("Surface", p.Surface);
-        B("Card", p.Card);
+        B("PageCard", p.PageCard);
         B("SurfaceSunken", p.SurfaceSunken);
         B("SurfaceToday", p.SurfaceToday);
         B("Line", p.Line);
@@ -439,7 +439,7 @@ public static class Skin
     /// <summary>The design's own tokens, in both looks.</summary>
     static readonly string[] SemesterBrushes =
     [
-        "Canvas", "Surface", "Card", "SurfaceSunken", "SurfaceToday", "Line", "Hover", "Press", "Ink", "InkMuted", "InkSubtle", "Record",
+        "Canvas", "Surface", "PageCard", "SurfaceSunken", "SurfaceToday", "Line", "Hover", "Press", "Ink", "InkMuted", "InkSubtle", "Record",
         "OnRecord", "Late", "Focus",
     ];
     /// <summary>The meanings (<see cref="Meanings"/>) and the plainer names, in both looks.</summary>

@@ -62,7 +62,7 @@ public sealed class Swatch : Control
 /// Words marked with a class's highlighter: a swipe behind ink text, its corners uneven so it reads as drawn by hand,
 /// and when the words wrap each line gets a swipe of its own. An assignment's name in the week, the class under a
 /// lecture's title. <see cref="Fill"/> is the class's brush (<see cref="Skin.ClassDots"/>), drawn in the look's
-/// highlighter shade, light or dark (deep in dark, so the text stays light). <see cref="Struck"/> is something handed
+/// highlighter shade (the same bright one light and dark, its words in the ink that reads on it: :marked). <see cref="Struck"/> is something handed
 /// in: no swipe, the words struck through in the class's colour. <see cref="Outlined"/> rings the swipe in ink (the
 /// pointer over a deadline).
 /// </summary>
@@ -157,7 +157,9 @@ public sealed class Highlight : TextBlock
             // A line's swipe is as tall as the type itself (its ascent and descent), not the line: lines that sit
             // close together touch, as a marker's passes do.
             double body = Body() * em;
-            IPen? ring = Outlined ? new Pen(Foreground, 1.5) : null;
+            // The pointer's ring is the page's ink (Focus), not the words': in dark the words on a bright highlighter
+            // are ink, which wouldn't show round it on the ink page.
+            IPen? ring = Outlined ? new Pen(this.TryFindResource("Focus", ActualThemeVariant, out var focus) && focus is IBrush b ? b : Foreground, 1.5) : null;
             double y = origin.Y;
             foreach (var line in TextLayout.TextLines)
             {

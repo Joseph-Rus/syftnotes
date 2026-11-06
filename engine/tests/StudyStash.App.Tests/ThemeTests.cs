@@ -136,7 +136,7 @@ public partial class ThemeTests
             ("Ink", "Canvas"), ("InkMuted", "Canvas"), ("TextFade1", "Surface"), ("TextFade2", "Surface"), ("TextFade3", "Surface"),
             ("OnAccent", "Accent"), ("OnSelected", "Selected"), ("SelectedMuted", "Selected"), ("OnRecording", "Recording"),
             ("OnHighlight", "Highlight"), ("Ink", "Hl"), ("Ink", "Chip"), ("InkMuted", "Chip"),
-            ("Ink", "Card"), ("InkMuted", "Card"), ("InkSubtle", "Card"),
+            ("Ink", "PageCard"), ("InkMuted", "PageCard"), ("InkSubtle", "PageCard"),
             .. Skin.ClassHues.Select(h => ("OnHighlight", "Hl" + h)),
             .. Skin.ClassHues.Select(h => ("Ink", "HlQuiet" + h)),
         ];
