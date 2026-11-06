@@ -165,6 +165,38 @@ public class EdgeTests
         Assert.True(uneven.Count == 0, string.Join("\n", uneven));
     }
 
+    /// <summary>The Study page's class pills (Prep for another exam), at 2x in dark: each one's hairline is there along
+    /// all four sides. Drawn as a ring outside the pill, it was cut off along the top or the left by what held each
+    /// pill, and only the round corners were left of it there.</summary>
+    [AvaloniaFact]
+    public async Task The_study_pages_pills_keep_their_hairline_on_every_side_at_2x()
+    {
+        var model = await Snapshots.StudyScene.Page();
+        var window = Show(SkinKind.Mac, ThemeVariant.Dark, () => new StudyPage { DataContext = model }, 980, 1000, scale: 2);
+        var pills = window.GetVisualDescendants().OfType<Button>().Where(b => b.DataContext is ViewModels.ExamClassChoice && !b.Classes.Contains("ink") && b.IsEffectivelyVisible).ToList();
+        var bare = pills.SelectMany(p => BareSides(window, p, Skin.Dark.Line).Select(side => $"{((ViewModels.ExamClassChoice)p.DataContext!).Display}: no hairline along its {side}")).ToList();
+        window.Close();
+        Assert.True(pills.Count >= 4, $"{pills.Count} class pills");
+        Assert.True(bare.Count == 0, string.Join("\n", bare));
+    }
+
+    /// <summary>The sides of <paramref name="c"/> with no pixel of the hairline's colour from three pixels outside its box
+    /// to three inside, through the middle of the side.</summary>
+    static IEnumerable<string> BareSides(Window window, Control c, Color line)
+    {
+        var frame = window.CaptureRenderedFrame() ?? throw new InvalidOperationException("nothing rendered");
+        double scale = window.RenderScaling;
+        var at = c.TranslatePoint(default, window) ?? throw new InvalidOperationException("not in the window");
+        int left = (int)Math.Round(at.X * scale), top = (int)Math.Round(at.Y * scale);
+        int right = (int)Math.Round((at.X + c.Bounds.Width) * scale), bottom = (int)Math.Round((at.Y + c.Bounds.Height) * scale);
+        int midX = (left + right) / 2, midY = (top + bottom) / 2;
+        bool Has(Func<int, (int X, int Y)> point) => Enumerable.Range(-3, 6).Select(point).Any(p => Distance(GlassTests.Pixel(frame, p.X, p.Y), line) <= 3);
+        if (!Has(d => (midX, top + d))) yield return "top";
+        if (!Has(d => (midX, bottom + d))) yield return "bottom";
+        if (!Has(d => (left + d, midY))) yield return "left";
+        if (!Has(d => (right + d, midY))) yield return "right";
+    }
+
     static Button Holding(Visual root, string words) =>
         root.GetVisualDescendants().OfType<TextBlock>().Single(x => x.Text == words && x.IsEffectivelyVisible).FindAncestorOfType<Button>()!;
 
