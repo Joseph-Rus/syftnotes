@@ -15,10 +15,7 @@
       <StackPanel>
         <Border Classes="row">
           <Grid ColumnDefinitions="*,Auto">
-            <StackPanel Spacing="2" VerticalAlignment="Center" Margin="0,0,16,0">
-              <TextBlock Classes="row-title" Text="{x:Static vm:FilingWords.SwitchTitle}" />
-              <TextBlock Classes="row-sub" Text="{x:Static vm:FilingWords.SwitchSub}" TextWrapping="Wrap" />
-            </StackPanel>
+            <TextBlock Classes="row-title" Text="{x:Static vm:FilingWords.SwitchTitle}" />
             <ToggleButton Name="TidySwitch" Grid.Column="1" Classes="switch act" IsChecked="{Binding On}"
                           AutomationProperties.Name="{x:Static vm:FilingWords.SwitchTitle}" />
           </Grid>
@@ -30,24 +27,21 @@
           <Border Classes="row">
             <StackPanel Spacing="8">
               <Grid ColumnDefinitions="*,Auto">
-                <StackPanel Spacing="2" VerticalAlignment="Center" Margin="0,0,16,0">
-                  <TextBlock Classes="row-title" Text="{x:Static vm:FilingWords.FoldersTitle}" />
-                  <TextBlock Classes="row-sub" Text="{x:Static vm:FilingWords.FoldersSub}" TextWrapping="Wrap" />
-                </StackPanel>
+                <TextBlock Classes="row-title" Text="{x:Static vm:FilingWords.FoldersTitle}" />
                 <Button Name="AddFolder" Grid.Column="1" Classes="btn sm act" Command="{Binding AddFolderCommand}" IsEnabled="{Binding !Saving.Busy}">
                   <TextBlock Text="{x:Static vm:FilingWords.AddFolder}" />
                 </Button>
               </Grid>
               <TextBlock Classes="row-sub" Text="{x:Static vm:FilingWords.NoFolders}" IsVisible="{Binding !HasFolders}" />
-              <ItemsControl ItemsSource="{Binding Folders}" IsVisible="{Binding HasFolders}">
-                <ItemsControl.ItemsPanel><ItemsPanelTemplate><StackPanel Spacing="4" /></ItemsPanelTemplate></ItemsControl.ItemsPanel>
+              <ItemsControl ItemsSource="{Binding Folders}" IsVisible="{Binding HasFolders}" ClipToBounds="False">
+                <ItemsControl.ItemsPanel><ItemsPanelTemplate><StackPanel Spacing="6" /></ItemsPanelTemplate></ItemsControl.ItemsPanel>
                 <ItemsControl.ItemTemplate>
                   <DataTemplate x:DataType="vm:FilingFolderRow">
-                    <Grid ColumnDefinitions="Auto,*,Auto" MinHeight="28">
+                    <Grid ColumnDefinitions="Auto,*,Auto" MinHeight="34">
                       <c:Icon Glyph="folder" Size="16" Foreground="{DynamicResource InkMuted}" VerticalAlignment="Center" />
                       <c:PageText Grid.Column="1" Text="{Binding Name}" FontSize="{DynamicResource FontBody}" Margin="8,0" VerticalAlignment="Center"
                                   ToolTip.Tip="{Binding Path}" />
-                      <Button Grid.Column="2" Classes="text-link small" VerticalAlignment="Center"
+                      <Button Grid.Column="2" Classes="btn sm" VerticalAlignment="Center"
                               Command="{Binding $parent[ItemsControl].((vm:SubmitOrganizeModel)DataContext).RemoveFolderCommand}" CommandParameter="{Binding}"
                               Content="{x:Static vm:FilingWords.Remove}" AutomationProperties.Name="{x:Static vm:FilingWords.Remove}" />
                     </Grid>
@@ -55,7 +49,7 @@
                 </ItemsControl.ItemTemplate>
               </ItemsControl>
               <!-- Downloads, Desktop and Documents, offered: a click adds it, and a Mac asks about it there and then. -->
-              <ItemsControl ItemsSource="{Binding Suggested}">
+              <ItemsControl ItemsSource="{Binding Suggested}" ClipToBounds="False">
                 <ItemsControl.ItemsPanel><ItemsPanelTemplate><WrapPanel ItemSpacing="8" LineSpacing="8" /></ItemsPanelTemplate></ItemsControl.ItemsPanel>
                 <ItemsControl.ItemTemplate>
                   <DataTemplate x:DataType="s:CanvasApi+FolderSuggestion">

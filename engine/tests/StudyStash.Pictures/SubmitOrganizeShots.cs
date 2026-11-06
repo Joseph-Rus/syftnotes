@@ -3,6 +3,7 @@ using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Headless;
 using Avalonia.Headless.XUnit;
+using Avalonia.Media;
 using Avalonia.Media.Imaging;
 using Avalonia.Styling;
 using Avalonia.Threading;
@@ -18,9 +19,9 @@ namespace StudyStash.App.Pictures;
 
 /// <summary>
 /// Submit &amp; Organize, part 2 (test builds only), as a student would see it, light and dark, both looks: Settings →
-/// Canvas's "After you hand in" off, then on with folders and Filed work (and after an Undo), the checklist over the
-/// library after a hand-in (the file found for sure, not sure, and in Clean), and the notification after filing
-/// (shots/submit-organize-*.png). A stand-in library with made-up folders; drawn off-screen, never on the student's screen,
+/// Canvas's "After you hand in" off, then on with folders and Filed work (and after an Undo), Home's Ready to tidy, the
+/// tidy card over it (the file found for sure, not sure, in Clean, and Filed after Tidy up), and the notification after a
+/// hand-in (shots/submit-organize-*.png). A stand-in library with made-up folders; drawn off-screen, never on the student's screen,
 /// and no folder on this computer is read.
 /// </summary>
 public class SubmitOrganizeShots
@@ -116,15 +117,22 @@ public class SubmitOrganizeShots
     {
         ["class"] = "CS 101", ["key"] = "3:1:2025-09-25T16:38:00Z", ["assignment"] = "Lab 3: Recursion traces", ["mode"] = mode,
         ["folders"] = new JsonArray(P(skin, "Downloads"), P(skin, "Documents/School")),
-        ["file"] = new JsonObject { ["name"] = "lab3-traces.pdf", ["path"] = P(skin, "Documents/School/CS 101/lab3-traces.pdf"), ["found"] = found },
+        ["file"] = new JsonObject { ["name"] = "lab3-traces.pdf", ["path"] = found == "none" ? null : P(skin, "Documents/School/CS 101/lab3-traces.pdf"), ["found"] = found },
         ["materials"] = new JsonArray(
             new JsonObject { ["path"] = P(skin, "Downloads/lab3-handout.pdf"), ["why"] = "Your professor attached a file of this name to the assignment", ["sure"] = "high" },
-            new JsonObject { ["path"] = P(skin, "Documents/School/CS 101/recursion traces draft.docx"), ["why"] = "Its name shares words with the assignment, and you changed it while working on it", ["sure"] = "high" },
-            new JsonObject { ["path"] = P(skin, "Downloads/call stack diagram.png"), ["why"] = "It's in the assignment's module on Canvas", ["sure"] = "medium" },
+            new JsonObject { ["path"] = P(skin, "Documents/School/CS 101/recursion draft.docx"), ["why"] = "Its name shares words with the assignment, and you changed it while working on it", ["sure"] = "high" },
+            new JsonObject { ["path"] = P(skin, "Downloads/call stack.png"), ["why"] = "It's in the assignment's module on Canvas", ["sure"] = "medium" },
             new JsonObject { ["path"] = P(skin, "Downloads/grocery list.txt"), ["why"] = "You changed it while working on the assignment", ["sure"] = "low" }),
     }.ToJsonString();
 
-    static async Task ChecklistAsync(SkinKind skin, ThemeVariant variant, string mode, string found, string name)
+    static readonly CanvasApi.HandInWaiting Lab3 = new()
+    {
+        Class = "CS 101", Key = "3:1:2025-09-25T16:38:00Z", Assignment = "Lab 3: Recursion traces", Id = "3", At = DateTimeOffset.Parse("2025-09-25T16:38:00Z"),
+    };
+
+    /// <summary>Home with Ready to tidy (two hand-ins waiting), and, unless <paramref name="card"/> is null, the tidy card
+    /// over it: "exact", "unsure", "clean", or "filed" (after Tidy up, once the files have flown into the folder).</summary>
+    static async Task HomeAsync(SkinKind skin, ThemeVariant variant, string? card)
     {
         ((App)Application.Current!).UseSkin(skin);
         var library = Demo.Semester();
@@ -133,23 +141,45 @@ public class SubmitOrganizeShots
         window.Content = ConfirmLayer.Wrap(window, page);
         Look.Apply(window);
         window.Show();
-        var fake = new FakeLibrary().Json(HttpMethod.Get, "/api/v2/canvas/filing/check", CheckJson(skin, mode, found));
-        var model = new HandInModel(CanvasFixtures.Context(fake),
-            new CanvasApi.HandInWaiting { Class = "CS 101", Key = "3:1:2025-09-25T16:38:00Z", Assignment = "Lab 3: Recursion traces" },
-            new HandInServices((_, _) => Task.FromResult<string?>(null), _ => { }));
-        var showing = HandInSheet.ShowAsync(ConfirmLayer.For(window)!, model);
-        await Wait.UntilAsync(() => model.Loaded && window.GetVisualDescendants().OfType<HandInSheet>().FirstOrDefault() is { IsEffectivelyVisible: true } s
-            && s.FindControl<Button>("NotNow")!.IsFocused, "the checklist to show");
-        var sheet = window.GetVisualDescendants().OfType<HandInSheet>().Single();
+        var home = library.Overview!;
+        home.ShowTidy(
+        [
+            new TidyRow("a", Brushes.SteelBlue, "Lab 3: Recursion traces", FilingWords.RowLine(3, "Today, 9:38 AM"), () => { }, () => { }),
+            new TidyRow("b", Brushes.SeaGreen, "Essay 2: Cell signalling", FilingWords.RowLine(1, "Mon 22 Sep, 1:05 PM"), () => { }, () => { }),
+        ]);
+        string mode = card == "clean" ? "clean" : "organize", found = card == "unsure" ? "unsure" : "exact";
+        if (card is null)
+        {
+            // Ready to tidy is on Home below Up next: bring it into view.
+            Dispatcher.UIThread.RunJobs();
+            window.GetVisualDescendants().OfType<Control>().First(c => c.Name == "ReadyToTidy").BringIntoView();
+            Save(window, $"submit-organize-home-ready-to-tidy-{Tail(skin, variant)}");
+            window.Close();
+            return;
+        }
+        var fake = new FakeLibrary().Json(HttpMethod.Post, "/api/v2/canvas/filing/file", """{"run": "r1", "class": "CS 101", "assignment": "Lab 3: Recursion traces", "filed": 3, "left": []}""");
+        var item = new TidyItem(Lab3, System.Text.Json.JsonSerializer.Deserialize<CanvasApi.HandInCheck>(CheckJson(skin, mode, found), CanvasApi.Json)!);
+        var model = new TidyCardModel(CanvasFixtures.Context(fake), item, Brushes.SteelBlue, new TidyServices((_, _) => Task.FromResult<string?>(null), _ => { }));
+        var showing = TidyCard.ShowAsync(ConfirmLayer.For(window)!, model);
+        await Wait.UntilAsync(() => window.GetVisualDescendants().OfType<TidyCard>().FirstOrDefault() is { IsEffectivelyVisible: true }, "the card to show");
+        var shown = window.GetVisualDescendants().OfType<TidyCard>().Single();
         var cover = ConfirmLayer.For(window)!.Host.GetVisualDescendants().OfType<Avalonia.Controls.Shapes.Rectangle>().Single(r => r.Name == "PART_ContentCover");
         await Wait.UntilAsync(() =>
         {
             AvaloniaHeadlessPlatform.ForceRenderTimerTick();
-            return cover.Opacity >= 1 && sheet.GetVisualAncestors().All(a => a.Opacity >= 1);
-        }, "the checklist to finish opening");
-        Save(window, $"submit-organize-checklist-{name}-{Tail(skin, variant)}");
-        Assert.Single(fake.Requests); // only the look: nothing filed
-        model.NotNowCommand.Execute(null);
+            return cover.Opacity >= 1 && shown.GetVisualAncestors().All(a => a.Opacity >= 1);
+        }, "the card to finish opening");
+        if (card == "filed")
+        {
+            await model.TidyUpCommand.ExecuteAsync(null);
+            await Wait.UntilAsync(() =>
+            {
+                AvaloniaHeadlessPlatform.ForceRenderTimerTick();
+                return model.ShowFiled;
+            }, "the files to fly into the folder");
+        }
+        Save(window, $"submit-organize-card-{card}-{Tail(skin, variant)}");
+        model.Close();
         await showing;
         window.Close();
     }
@@ -157,17 +187,13 @@ public class SubmitOrganizeShots
     [AvaloniaTheory]
     [InlineData(SkinKind.Mac)]
     [InlineData(SkinKind.Win)]
-    public async Task The_checklist_after_a_hand_in(SkinKind skin)
+    public async Task Ready_to_tidy_and_the_tidy_card(SkinKind skin)
     {
         try
         {
             foreach (var t in Themes)
-            {
-                await ChecklistAsync(skin, t, "organize", "exact", "exact");
-                await ChecklistAsync(skin, t, "organize", "unsure", "unsure");
-                await ChecklistAsync(skin, t, "clean", "exact", "clean");
-                await ChecklistAsync(skin, t, "organize", "none", "not-found");
-            }
+                foreach (string? card in new[] { null, "exact", "unsure", "clean", "filed" })
+                    await HomeAsync(skin, t, card);
         }
         finally
         {
@@ -176,18 +202,13 @@ public class SubmitOrganizeShots
     }
 
     [AvaloniaFact]
-    public void The_notification_after_filing()
+    public void The_notification_after_a_hand_in()
     {
         foreach (var skin in new[] { SkinKind.Mac, SkinKind.Win })
             foreach (var t in Themes)
-            {
-                Shot.Take($"submit-organize-toast-{(skin == SkinKind.Mac ? "mac" : "win")}", skin, t,
-                    () => new ToastView { Title = FilingWords.FiledTitle("CS 101", "Lab 3: Recursion traces"), Text = FilingWords.FiledText(3, 0), ActionLabel = FilingWords.Undo, Width = 380 },
+                Shot.Take($"submit-organize-notification-{(skin == SkinKind.Mac ? "mac" : "win")}", skin, t,
+                    () => new ToastView { Title = FilingWords.HandedIn("Lab 3: Recursion traces"), Text = FilingWords.ToTidy(3), ActionLabel = FilingWords.TidyUp, Width = 380 },
                     size: new Size(540, 260));
-                Shot.Take($"submit-organize-toast-undone-{(skin == SkinKind.Mac ? "mac" : "win")}", skin, t,
-                    () => new ToastView { Title = FilingWords.PutBackTitle, Text = FilingWords.Undone(["back", "back", "beside"]), Width = 380 },
-                    size: new Size(540, 260));
-            }
         ((App)Application.Current!).UseSkin(SkinKind.Mac);
     }
 }

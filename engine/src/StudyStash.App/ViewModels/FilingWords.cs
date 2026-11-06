@@ -1,7 +1,7 @@
 namespace StudyStash.App.ViewModels;
 
-/// <summary>Submit &amp; Organize's words: Settings → Canvas's "Tidy up after you hand in" and "Filed work", the checklist
-/// that opens after a hand-in, and its notification. The Trash is the Recycle Bin on Windows.</summary>
+/// <summary>Submit &amp; Organize's words: Settings → Canvas's "After you hand in" and "Filed work", Home's "Ready to
+/// tidy", the notification, and the tidy card. The Trash is the Recycle Bin on Windows.</summary>
 public static class FilingWords
 {
     static bool Win => OperatingSystem.IsWindows();
@@ -10,9 +10,7 @@ public static class FilingWords
     // Settings
     public const string Heading = "After you hand in";
     public const string SwitchTitle = "Tidy up after you hand in";
-    public const string SwitchSub = "Files what you handed in on Canvas in its class's folder, with the files you worked from.";
     public const string FoldersTitle = "Folders to look in";
-    public const string FoldersSub = "Syft Notes looks only in these, and only moves what you say.";
     public const string NoFolders = "None yet. Add the folders you save your work in.";
     public const string AddFolder = "Add a folder…";
     public const string Remove = "Remove";
@@ -28,40 +26,33 @@ public static class FilingWords
     public const string NothingFiled = "Nothing filed yet.";
     public const string Undo = "Undo";
     public const string PutBack = "Put back";
-    public const string LibraryOffline = "Your library didn't answer. Try again in a moment.";
-
-    /// <summary>"Add Downloads": a folder offered first.</summary>
-    public static string AddSuggested(string name) => $"Add {name}";
 
     /// <summary>"CS 101 · Today, 10:42 AM · 3 files".</summary>
     public static string RunLine(string cls, string when, int files) => $"{cls} · {when} · {CanvasWords.FileCountText(files)}";
 
-    // The checklist
-    public static string Title(string assignment) => $"You handed in {assignment}";
-    public static string Where(string cls, string assignment) => $"{cls} / {assignment}";
-    public static string Intro(string cls, string assignment) => $"Syft Notes found these in your folders. They go in {Where(cls, assignment)}. Nothing moves until you say.";
-    public const string Looking = "Looking in your folders…";
-    public const string HandedInLabel = "What you handed in";
+    // Home's list, the notification and the assignment's page
+    public const string ReadyToTidy = "Ready to tidy";
+    public const string TidyUp = "Tidy up";
+    public const string NotThisOne = "Not this one";
+
+    /// <summary>"3 files · Today, 9:40 AM".</summary>
+    public static string RowLine(int files, string when) => when.Length == 0 ? CanvasWords.FileCountText(files) : $"{CanvasWords.FileCountText(files)} · {when}";
+
+    /// <summary>The notification: "Lab 3 handed in", "3 files to tidy".</summary>
+    public static string HandedIn(string assignment) => $"{assignment} handed in";
+    public static string ToTidy(int files) => files == 0 ? "Choose the file to tidy" : $"{CanvasWords.FileCountText(files)} to tidy";
+
+    // The tidy card
+    public const string TidyUpAndClear = "Tidy up and clear the rest";
+    public const string Later = "Later";
+    public const string Filed = "Filed";
     public const string IsThisIt = "Is this the file you handed in?";
     public const string Yes = "Yes";
     public const string ChooseAnother = "Choose another";
     public const string ChooseTheFile = "Choose the file";
-    public static string NotFound(string name) => $"Syft Notes didn't find {name} in your folders.";
-    public const string MaterialsLabel = "Files you worked from";
-    public static string MaterialsLabelClean => $"Files you worked from: the ticked ones go to the {Trash}";
-    public const string NoMaterials = "Nothing else looked like it was for this assignment.";
-    public const string FileIt = "File it";
-    public const string FileItAndClear = "File it and clear the rest";
-    public const string NotNow = "Not now";
     public static string PickTitle(string assignment) => $"Choose the file you handed in for {assignment}";
     public static string OutsideFolders(IReadOnlyList<string> names) =>
         $"Choose a file in one of your folders to look in: {CanvasWords.JoinAnd(names)}.";
-
-    // The notification
-    public static string FiledTitle(string cls, string assignment) => $"Filed in {Where(cls, assignment)}";
-    public static string FiledText(int filed, int left) =>
-        left == 0 ? $"{CanvasWords.FileCountText(filed)} filed." : $"{CanvasWords.FileCountText(filed)} filed. {CanvasWords.FileCountText(left)} stayed where {(left == 1 ? "it was" : "they were")}.";
-    public const string PutBackTitle = "Put back";
 
     /// <summary>What Undo did, one sentence per outcome: "2 files put back where they were. 1 is in the Trash: restore it
     /// from the Trash." <paramref name="how"/> is each file's outcome as the library says it.</summary>
