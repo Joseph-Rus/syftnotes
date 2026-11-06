@@ -33,7 +33,8 @@
     <Setter Property="Height" Value="20" />
     <Setter Property="CornerRadius" Value="10" />
     <Setter Property="Background" Value="{DynamicResource SurfaceSunken}" />
-    <Setter Property="BoxShadow" Value="{DynamicResource LineRing}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource Line}" />
+    <Setter Property="BorderThickness" Value="1" />
     <Setter Property="VerticalAlignment" Value="Top" />
   </Style>
   <Style Selector="Border.stepnum TextBlock">
