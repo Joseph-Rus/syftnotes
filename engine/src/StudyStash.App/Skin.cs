@@ -79,7 +79,7 @@ public static class Skin
     /// highlighters the same bright ones as light, with ink words on them (Highlight's :marked).</summary>
     public static readonly Palette Dark = new(
         Canvas: Color.Parse("#0E0C13"), Surface: Controls.Syft.Ink, Card: Color.Parse("#201C2A"), SurfaceSunken: Controls.Syft.MeshDark, SurfaceToday: Controls.Syft.GhostDark,
-        Line: Color.Parse("#363143"), Hover: Color.FromArgb(0x1A, 0xFB, 0xFA, 0xF7), Press: Color.FromArgb(0x2B, 0xFB, 0xFA, 0xF7),
+        Line: Color.Parse("#36323F"), Hover: Color.FromArgb(0x1A, 0xFB, 0xFA, 0xF7), Press: Color.FromArgb(0x2B, 0xFB, 0xFA, 0xF7),
         Ink: Color.Parse("#F3F1F7"), InkMuted: Color.Parse("#B4B1BC"), InkSubtle: Color.Parse("#9A97A3"),
         Record: Controls.Syft.Coral, OnRecord: Controls.Syft.Ink, Late: Color.Parse("#FF8A80"), Focus: Controls.Syft.Paper,
         Highlighters: LightHues,
