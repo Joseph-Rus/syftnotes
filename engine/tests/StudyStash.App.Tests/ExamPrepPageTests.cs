@@ -134,7 +134,13 @@ public class ExamPrepPageTests
         try
         {
             Assert.Contains(page.GetVisualDescendants().OfType<TextBlock>(), t => t.Text == "Midterm 2" && t.IsEffectivelyVisible);
-            Assert.True(page.GetVisualDescendants().OfType<Border>().Single(b => b.Name == "NewPrep").IsEffectivelyVisible);
+            // With an exam listed, Another exam is a link until it's pressed; then its row shows.
+            var newPrep = page.GetVisualDescendants().OfType<Border>().Single(b => b.Name == "NewPrep");
+            Assert.False(newPrep.IsEffectivelyVisible);
+            Assert.True(page.GetVisualDescendants().OfType<Button>().Single(b => b.Name == "AnotherExam").IsEffectivelyVisible);
+            model.AddAnotherCommand.Execute(null);
+            Dispatcher.UIThread.RunJobs();
+            Assert.True(newPrep.IsEffectivelyVisible);
             await model.Exams[0].Go.ExecuteAsync(null);
             Dispatcher.UIThread.RunJobs();
             Assert.True(page.GetVisualDescendants().OfType<NoteView>().Single(v => v.Name == "Guide").IsEffectivelyVisible);

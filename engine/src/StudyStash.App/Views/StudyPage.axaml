@@ -1,5 +1,5 @@
 <!-- Study (both looks), from the sidebar: the page that fills the pane. Review: how many cards are due, by class, and
-     Start. While a review is on it takes the page's place: one card at a time, the question, then (Space) the answer,
+     Start; the exams coming up; Another exam. While a review is on it takes the page's place: one card at a time, the question, then (Space) the answer,
      then how it went (1 to 4), each grade saying when the card comes back. -->
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
@@ -14,9 +14,68 @@
       <Setter Property="MaxWidth" Value="760" />
     </Style>
     <Style Selector="TextBlock.st-section">
-      <Setter Property="FontSize" Value="13" />
+      <Setter Property="FontSize" Value="{DynamicResource FontSubtitle}" />
       <Setter Property="FontWeight" Value="Bold" />
+      <Setter Property="Foreground" Value="{DynamicResource Ink}" />
+    </Style>
+    <!-- Small words beside or under something: where the exams come from, when one is. -->
+    <Style Selector="TextBlock.st-aside">
+      <Setter Property="FontSize" Value="{DynamicResource FontCaption}" />
       <Setter Property="Foreground" Value="{DynamicResource InkSubtle}" />
+    </Style>
+    <!-- Review's headline: how many cards are due. -->
+    <Style Selector="TextBlock.st-lead">
+      <Setter Property="FontSize" Value="{DynamicResource FontTitle}" />
+      <Setter Property="FontWeight" Value="ExtraBold" />
+      <Setter Property="Foreground" Value="{DynamicResource Ink}" />
+      <Setter Property="TextWrapping" Value="Wrap" />
+    </Style>
+    <!-- A class's cards due, as a small pill. -->
+    <Style Selector="Button.btn.sm.st-chip">
+      <Setter Property="Height" Value="30" />
+      <Setter Property="Padding" Value="10,0" />
+      <Setter Property="FontSize" Value="{DynamicResource FontBody}" />
+    </Style>
+    <!-- The icon on No cards yet, on the chip's grey. -->
+    <Style Selector="Border.st-icon">
+      <Setter Property="Width" Value="32" />
+      <Setter Property="Height" Value="32" />
+      <Setter Property="CornerRadius" Value="{DynamicResource RadiusControl}" />
+      <Setter Property="Background" Value="{DynamicResource Chip}" />
+    </Style>
+    <Style Selector="Border.st-icon > c|Icon">
+      <Setter Property="HorizontalAlignment" Value="Center" />
+      <Setter Property="VerticalAlignment" Value="Center" />
+    </Style>
+    <!-- The exams' rows, a hairline between them (none over the first). -->
+    <Style Selector="Border.exam-row">
+      <Setter Property="Padding" Value="0,11" />
+      <Setter Property="BorderBrush" Value="{DynamicResource Line}" />
+      <Setter Property="BorderThickness" Value="0,1,0,0" />
+    </Style>
+    <Style Selector="ItemsControl#Exams ContentPresenter:nth-child(1) Border.exam-row, Border.exam-row.first">
+      <Setter Property="BorderThickness" Value="0" />
+    </Style>
+    <!-- An exam's date: a small calendar leaf, its weekday over its day. -->
+    <Style Selector="Border.date-leaf">
+      <Setter Property="Width" Value="46" />
+      <Setter Property="Padding" Value="0,4,0,5" />
+      <Setter Property="CornerRadius" Value="{DynamicResource RadiusControl}" />
+      <Setter Property="BorderBrush" Value="{DynamicResource Line}" />
+      <Setter Property="BorderThickness" Value="1" />
+    </Style>
+    <Style Selector="TextBlock.leaf-weekday">
+      <Setter Property="FontSize" Value="10" />
+      <Setter Property="FontWeight" Value="Bold" />
+      <Setter Property="LetterSpacing" Value="0.5" />
+      <Setter Property="Foreground" Value="{DynamicResource InkSubtle}" />
+      <Setter Property="HorizontalAlignment" Value="Center" />
+    </Style>
+    <Style Selector="TextBlock.leaf-day">
+      <Setter Property="FontSize" Value="{DynamicResource FontSubtitle}" />
+      <Setter Property="FontWeight" Value="ExtraBold" />
+      <Setter Property="Foreground" Value="{DynamicResource Ink}" />
+      <Setter Property="HorizontalAlignment" Value="Center" />
     </Style>
     <!-- A card being reviewed: the question big, the answer under a hairline once it shows. -->
     <Style Selector="Border.flashcard">
@@ -54,20 +113,21 @@
 
   <ScrollViewer Name="Page" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
     <Panel>
-      <!-- The page: what's due, and Start -->
+      <!-- The page: Review (what's due, Start, each class's share), then the exams coming up, each with one button, and
+           Another exam (its class from a menu, its name, Write the prep). -->
       <StackPanel Name="Hub" Classes="st-page" IsVisible="{Binding ShowHub}" Spacing="0">
         <TextBlock Classes="page-title" Text="Study" />
-        <c:PageText Classes="page-lede" Text="Flashcards from your lectures, brought back just before you'd forget them." Margin="0,8,0,0" />
+        <!-- Until the library first answers -->
+        <c:SyftLoader Kind="HoppingBits" Size="24" Margin="0,40,0,0" HorizontalAlignment="Left" IsActive="{Binding !Loaded}" IsVisible="{Binding !Loaded}" />
 
-        <Border Name="ReviewCard" Classes="study-card" Margin="0,32,0,0" IsVisible="{Binding Available}">
+        <Border Name="ReviewCard" Classes="study-card" Margin="0,24,0,0" Padding="19,17" IsVisible="{Binding ShowReview}">
           <StackPanel Spacing="14">
-            <Grid ColumnDefinitions="Auto,10,*,Auto">
-              <c:Icon Glyph="history" Size="20" Foreground="{DynamicResource Ink}" VerticalAlignment="Center" />
-              <StackPanel Grid.Column="2" Spacing="2" VerticalAlignment="Center">
-                <TextBlock Name="DueTitle" Classes="free-ai-lead" Text="{Binding DueTitle}" />
+            <Grid ColumnDefinitions="*,Auto">
+              <StackPanel Spacing="3" VerticalAlignment="Center">
+                <TextBlock Name="DueTitle" Classes="st-lead" Text="{Binding DueTitle}" />
                 <c:PageText Name="DueMore" Classes="free-ai-more" Text="{Binding DueMore}" />
               </StackPanel>
-              <Button Name="StartReview" Grid.Column="3" Classes="btn ink" Command="{Binding StartReviewCommand}" IsVisible="{Binding HasDue}"
+              <Button Name="StartReview" Grid.Column="1" Classes="btn ink" Command="{Binding StartReviewCommand}" IsVisible="{Binding HasDue}"
                       VerticalAlignment="Center" Margin="16,0,0,0" AutomationProperties.Name="Start review">
                 <StackPanel Orientation="Horizontal" Spacing="8">
                   <c:Icon Glyph="play_arrow" Size="16" VerticalAlignment="Center" />
@@ -75,14 +135,16 @@
                 </StackPanel>
               </Button>
             </Grid>
+            <!-- Each class's cards due: its swatch, its name, how many; a click reviews just them -->
             <ItemsControl Name="ByClass" ItemsSource="{Binding ByClass}" IsVisible="{Binding HasDue}">
               <ItemsControl.ItemsPanel>
                 <ItemsPanelTemplate><WrapPanel /></ItemsPanelTemplate>
               </ItemsControl.ItemsPanel>
               <ItemsControl.ItemTemplate>
                 <DataTemplate x:DataType="vm:StudyClassRow">
-                  <Button Classes="btn sm" Margin="0,0,8,8" Command="{Binding Review}" AutomationProperties.Name="{Binding Display, StringFormat='Review {0}'}">
-                    <StackPanel Orientation="Horizontal" Spacing="8">
+                  <Button Classes="btn sm st-chip" Margin="0,0,6,6" Command="{Binding Review}" AutomationProperties.Name="{Binding Display, StringFormat='Review {0}'}">
+                    <StackPanel Orientation="Horizontal" Spacing="7">
+                      <c:Swatch Fill="{Binding Dot}" Small="True" VerticalAlignment="Center" />
                       <TextBlock Text="{Binding Display}" VerticalAlignment="Center" />
                       <TextBlock Text="{Binding DueSaid}" Foreground="{DynamicResource InkSubtle}" VerticalAlignment="Center" />
                     </StackPanel>
@@ -92,73 +154,131 @@
             </ItemsControl>
           </StackPanel>
         </Border>
-        <c:PageText Classes="free-ai-more" IsVisible="{Binding !Available}" Margin="0,32,0,0"
+        <!-- No cards yet: a dashed card that says how to make some -->
+        <Panel Name="NoCards" Margin="0,24,0,0" IsVisible="{Binding ShowNoCards}">
+          <Rectangle Stroke="{DynamicResource Line}" StrokeThickness="1" StrokeDashArray="4,3" RadiusX="12" RadiusY="12" />
+          <Grid ColumnDefinitions="Auto,12,*" Margin="18,16">
+            <Border Classes="st-icon" VerticalAlignment="Center">
+              <c:Icon Glyph="history" Size="17" Foreground="{DynamicResource InkMuted}" />
+            </Border>
+            <StackPanel Grid.Column="2" Spacing="2" VerticalAlignment="Center">
+              <TextBlock Classes="free-ai-lead" Text="{Binding DueTitle}" />
+              <c:PageText Classes="free-ai-more" Text="{Binding DueMore}" />
+            </StackPanel>
+          </Grid>
+        </Panel>
+        <c:PageText Classes="free-ai-more" IsVisible="{Binding !Available}" Margin="0,24,0,0"
                     Text="Your library can't keep review cards yet: update Syft Notes on the computer that keeps your library." />
 
-        <!-- Exam prep: the exams coming up, and the prep made for them -->
-        <StackPanel Name="ExamPrep" IsVisible="{Binding ExamPrepAvailable}" Margin="0,40,0,0" Spacing="12">
-          <TextBlock Classes="st-section" Text="EXAM PREP" />
-          <c:PageText Classes="free-ai-more" Text="A study guide and a practice test for an exam, from its class's lectures since the exam before, with what the lecturer said would be on it first." />
-          <ItemsControl Name="Exams" ItemsSource="{Binding Exams}">
-            <ItemsControl.ItemsPanel>
-              <ItemsPanelTemplate><StackPanel Spacing="10" /></ItemsPanelTemplate>
-            </ItemsControl.ItemsPanel>
-            <ItemsControl.ItemTemplate>
-              <DataTemplate x:DataType="vm:ExamRow">
-                <Border Classes="study-card">
-                  <StackPanel Spacing="6">
-                    <Grid ColumnDefinitions="*,Auto">
-                      <StackPanel Spacing="2" VerticalAlignment="Center">
-                        <TextBlock Classes="free-ai-lead" Text="{Binding Title}" />
-                        <TextBlock Text="{Binding Line}" FontSize="13" Foreground="{DynamicResource InkMuted}" />
-                        <TextBlock Text="{Binding Score}" FontSize="{DynamicResource FontCaption}" Foreground="{DynamicResource InkSubtle}" IsVisible="{Binding HasScore}" />
-                      </StackPanel>
-                      <Button Grid.Column="1" Classes="btn sm" Classes.ink="{Binding !HasPrep}" Command="{Binding Go}" VerticalAlignment="Center" Margin="16,0,0,0"
-                              AutomationProperties.Name="{Binding ActionSaid}">
-                        <StackPanel Orientation="Horizontal" Spacing="8">
-                          <c:SyftLoader Kind="HoppingBits" Size="14" IsActive="{Binding Making}" IsVisible="{Binding Making}" VerticalAlignment="Center" />
-                          <TextBlock Text="{Binding ActionSaid}" VerticalAlignment="Center" />
-                        </StackPanel>
-                      </Button>
-                    </Grid>
-                    <c:PageText Classes="free-ai-problem" Text="{Binding Problem}" IsVisible="{Binding HasProblem}" />
-                  </StackPanel>
-                </Border>
-              </DataTemplate>
-            </ItemsControl.ItemTemplate>
-          </ItemsControl>
-          <TextBlock Text="No exams coming up in Canvas or your calendar." FontSize="13" Foreground="{DynamicResource InkSubtle}" IsVisible="{Binding !HasExams}" />
-
-          <!-- Another exam: its class and name -->
-          <Border Name="NewPrep" Classes="study-card" IsVisible="{Binding HasClassChoices}" Margin="0,6,0,0">
-            <StackPanel Spacing="10">
-              <TextBlock Classes="free-ai-lead" Text="Prep for another exam" />
-              <ItemsControl ItemsSource="{Binding ClassChoices}">
-                <ItemsControl.ItemsPanel>
-                  <ItemsPanelTemplate><WrapPanel /></ItemsPanelTemplate>
-                </ItemsControl.ItemsPanel>
+        <!-- Exams: the ones coming up and the prep made for them -->
+        <StackPanel Name="ExamPrep" IsVisible="{Binding ExamPrepAvailable}" Margin="0,36,0,0" Spacing="10">
+          <Grid ColumnDefinitions="*,Auto">
+            <TextBlock Classes="st-section" Text="Exams" VerticalAlignment="Bottom" />
+            <TextBlock Grid.Column="1" Classes="st-aside" Text="{Binding ExamsSaid}" VerticalAlignment="Bottom" />
+          </Grid>
+          <Border Name="ExamList" Classes="study-card" Padding="17,3" IsVisible="{Binding HasExamCard}">
+            <StackPanel>
+              <ItemsControl Name="Exams" ItemsSource="{Binding Exams}">
                 <ItemsControl.ItemTemplate>
-                  <DataTemplate x:DataType="vm:ExamClassChoice">
-                    <Button Classes="btn sm" Classes.ink="{Binding Picked}" Margin="0,0,8,8" Content="{Binding Display}" Command="{Binding Pick}"
-                            AutomationProperties.Name="{Binding Display}" />
+                  <DataTemplate x:DataType="vm:ExamRow">
+                    <Border Classes="exam-row" AutomationProperties.Name="{Binding Line}">
+                      <StackPanel Spacing="6">
+                        <Grid ColumnDefinitions="Auto,*,Auto">
+                          <!-- Its date as a small calendar leaf; with no date its room is kept, so every name lines up -->
+                          <Panel Width="58" VerticalAlignment="Center">
+                            <Border Classes="date-leaf" IsVisible="{Binding HasDate}" HorizontalAlignment="Left">
+                              <StackPanel>
+                                <TextBlock Classes="leaf-weekday" Text="{Binding Weekday}" />
+                                <TextBlock Classes="leaf-day" Text="{Binding Day}" />
+                              </StackPanel>
+                            </Border>
+                          </Panel>
+                          <StackPanel Grid.Column="1" Spacing="3" VerticalAlignment="Center">
+                            <TextBlock Classes="free-ai-lead" Text="{Binding Title}" />
+                            <!-- Its class, then when and its last score: each cut short with "…" (and its tip) when the row is narrow -->
+                            <Grid ColumnDefinitions="Auto,8,*">
+                              <c:Highlight Classes="lecture-class" Text="{Binding ClassShown}" Fill="{Binding Dot}" VerticalAlignment="Center" MaxWidth="220"
+                                           TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding ClassShown}" c:Tips.WhenCut="True" />
+                              <TextBlock Grid.Column="2" Classes="st-aside" Text="{Binding Detail}" IsVisible="{Binding HasDetail}" VerticalAlignment="Center"
+                                         TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding Detail}" c:Tips.WhenCut="True" />
+                            </Grid>
+                          </StackPanel>
+                          <Button Grid.Column="2" Classes="btn sm" Classes.ink="{Binding !HasPrep}" Command="{Binding Go}" VerticalAlignment="Center" Margin="16,0,0,0"
+                                  AutomationProperties.Name="{Binding ActionSaid}">
+                            <StackPanel Orientation="Horizontal" Spacing="8">
+                              <c:SyftLoader Kind="HoppingBits" Size="14" IsActive="{Binding Making}" IsVisible="{Binding Making}" VerticalAlignment="Center" />
+                              <TextBlock Text="{Binding ActionSaid}" VerticalAlignment="Center" />
+                            </StackPanel>
+                          </Button>
+                        </Grid>
+                        <c:PageText Classes="free-ai-problem" Text="{Binding Problem}" IsVisible="{Binding HasProblem}" />
+                      </StackPanel>
+                    </Border>
                   </DataTemplate>
                 </ItemsControl.ItemTemplate>
               </ItemsControl>
-              <Grid ColumnDefinitions="*,10,Auto">
-                <TextBox Name="NewTitle" Text="{Binding NewTitle}" PlaceholderText="The exam's name, like Midterm 2" FontSize="{DynamicResource FontBody}" VerticalAlignment="Center"
-                         AutomationProperties.Name="The exam's name">
-                  <TextBox.KeyBindings>
-                    <KeyBinding Gesture="Enter" Command="{Binding MakeNewPrepCommand}" />
-                  </TextBox.KeyBindings>
-                </TextBox>
-                <Button Grid.Column="2" Classes="btn sm ink" Command="{Binding MakeNewPrepCommand}" AutomationProperties.Name="{Binding MakeNewSaid}">
-                  <StackPanel Orientation="Horizontal" Spacing="8">
-                    <c:SyftLoader Kind="HoppingBits" Size="14" IsActive="{Binding MakingNew}" IsVisible="{Binding MakingNew}" VerticalAlignment="Center" />
-                    <TextBlock Text="{Binding MakeNewSaid}" VerticalAlignment="Center" />
-                  </StackPanel>
-                </Button>
-              </Grid>
-              <c:PageText Classes="free-ai-problem" Text="{Binding NewProblem}" IsVisible="{Binding HasNewProblem}" />
+
+              <!-- Another exam: a link, and once pressed (or with no exams listed) its row -->
+              <Border Classes="exam-row" Classes.first="{Binding !HasExams}" IsVisible="{Binding HasClassChoices}">
+                <Panel>
+                  <Button Name="AnotherExam" Classes="link-btn" HorizontalAlignment="Left" IsVisible="{Binding ShowAnotherButton}" Command="{Binding AddAnotherCommand}">
+                    <StackPanel Orientation="Horizontal" Spacing="6">
+                      <c:Icon Glyph="add" Size="15" VerticalAlignment="Center" />
+                      <TextBlock Text="Another exam" VerticalAlignment="Center" />
+                    </StackPanel>
+                  </Button>
+                  <Border Name="NewPrep" IsVisible="{Binding ShowAnother}">
+                    <StackPanel Spacing="8">
+                      <Grid ColumnDefinitions="Auto,8,*,8,Auto">
+                        <!-- Its class: the app's own menu, each class with its swatch -->
+                        <Button Name="ExamClass" Classes="picker" Height="34" VerticalAlignment="Center" AutomationProperties.Name="{Binding NewClassShown, StringFormat='Class: {0}'}">
+                          <StackPanel Orientation="Horizontal" Spacing="7">
+                            <c:Swatch Fill="{Binding NewClassDot}" Small="True" VerticalAlignment="Center" />
+                            <TextBlock Text="{Binding NewClassShown}" MaxWidth="180" TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding NewClassShown}" c:Tips.WhenCut="True" VerticalAlignment="Center" />
+                            <c:Icon Glyph="expand_more" Size="14" VerticalAlignment="Center" />
+                          </StackPanel>
+                          <Button.Flyout>
+                            <Flyout Placement="BottomEdgeAlignedLeft" VerticalOffset="6" FlyoutPresenterClasses="bare">
+                              <Border Classes="menu" Width="264" MaxHeight="340">
+                                <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+                                  <ItemsControl ItemsSource="{Binding ClassChoices}">
+                                    <ItemsControl.ItemTemplate>
+                                      <DataTemplate x:DataType="vm:ExamClassChoice">
+                                        <Button Classes="menu-item" Classes.active="{Binding Picked}" Command="{Binding Pick}" Click="OnPicked"
+                                                HorizontalAlignment="Stretch" HorizontalContentAlignment="Stretch" AutomationProperties.Name="{Binding Display}">
+                                          <Grid ColumnDefinitions="Auto,*,Auto">
+                                            <c:Swatch Fill="{Binding Dot}" Margin="0,0,10,0" VerticalAlignment="Center" />
+                                            <TextBlock Grid.Column="1" Text="{Binding Display}" ToolTip.Tip="{Binding Display}" c:Tips.WhenCut="True" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
+                                            <c:Icon Grid.Column="2" Glyph="check" Size="16" Foreground="{DynamicResource InkSubtle}" IsVisible="{Binding Picked}" VerticalAlignment="Center" />
+                                          </Grid>
+                                        </Button>
+                                      </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                  </ItemsControl>
+                                </ScrollViewer>
+                              </Border>
+                            </Flyout>
+                          </Button.Flyout>
+                        </Button>
+                        <TextBox Name="NewTitle" Grid.Column="2" Text="{Binding NewTitle}" PlaceholderText="The exam's name, like Midterm 2" FontSize="{DynamicResource FontBody}" VerticalAlignment="Center"
+                                 AutomationProperties.Name="The exam's name">
+                          <TextBox.KeyBindings>
+                            <KeyBinding Gesture="Enter" Command="{Binding MakeNewPrepCommand}" />
+                          </TextBox.KeyBindings>
+                        </TextBox>
+                        <Button Grid.Column="4" Classes="btn sm ink" Command="{Binding MakeNewPrepCommand}" AutomationProperties.Name="{Binding MakeNewSaid}">
+                          <StackPanel Orientation="Horizontal" Spacing="8">
+                            <c:SyftLoader Kind="HoppingBits" Size="14" IsActive="{Binding MakingNew}" IsVisible="{Binding MakingNew}" VerticalAlignment="Center" />
+                            <TextBlock Text="{Binding MakeNewSaid}" VerticalAlignment="Center" />
+                          </StackPanel>
+                        </Button>
+                      </Grid>
+                      <TextBlock Classes="st-aside" Text="{Binding NewCovers}" TextWrapping="Wrap" />
+                      <c:PageText Classes="free-ai-problem" Text="{Binding NewProblem}" IsVisible="{Binding HasNewProblem}" />
+                    </StackPanel>
+                  </Border>
+                </Panel>
+              </Border>
             </StackPanel>
           </Border>
         </StackPanel>

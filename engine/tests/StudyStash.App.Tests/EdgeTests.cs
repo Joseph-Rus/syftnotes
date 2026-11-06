@@ -165,7 +165,7 @@ public class EdgeTests
         Assert.True(uneven.Count == 0, string.Join("\n", uneven));
     }
 
-    /// <summary>The Study page's class pills (Prep for another exam), at 2x in dark: each one's hairline is there along
+    /// <summary>The Study page's class pills (each class's cards due), at 2x in dark: each one's hairline is there along
     /// all four sides. Drawn as a ring outside the pill, it was cut off along the top or the left by what held each
     /// pill, and only the round corners were left of it there.</summary>
     [AvaloniaFact]
@@ -173,10 +173,10 @@ public class EdgeTests
     {
         var model = await Snapshots.StudyScene.Page();
         var window = Show(SkinKind.Mac, ThemeVariant.Dark, () => new StudyPage { DataContext = model }, 980, 1000, scale: 2);
-        var pills = window.GetVisualDescendants().OfType<Button>().Where(b => b.DataContext is ViewModels.ExamClassChoice && !b.Classes.Contains("ink") && b.IsEffectivelyVisible).ToList();
-        var bare = pills.SelectMany(p => BareSides(window, p, Skin.Dark.Line).Select(side => $"{((ViewModels.ExamClassChoice)p.DataContext!).Display}: no hairline along its {side}")).ToList();
+        var pills = window.GetVisualDescendants().OfType<Button>().Where(b => b.DataContext is ViewModels.StudyClassRow && b.IsEffectivelyVisible).ToList();
+        var bare = pills.SelectMany(p => BareSides(window, p, Skin.Dark.Line).Select(side => $"{((ViewModels.StudyClassRow)p.DataContext!).Display}: no hairline along its {side}")).ToList();
         window.Close();
-        Assert.True(pills.Count >= 4, $"{pills.Count} class pills");
+        Assert.True(pills.Count == 3, $"{pills.Count} class pills");
         Assert.True(bare.Count == 0, string.Join("\n", bare));
     }
 
