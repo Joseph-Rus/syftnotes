@@ -1346,7 +1346,7 @@
   <!-- Notes from an AI Syft Notes doesn't run, on a note's page (the Claude app, any free chat): the offer over a
        lecture with no notes, a long lecture's copy in parts, and the box a chat's notes are pasted into. -->
   <Style Selector="Border.free-ai">
-    <Setter Property="Background" Value="{DynamicResource Card}" />
+    <Setter Property="Background" Value="{DynamicResource PageCard}" />
     <Setter Property="CornerRadius" Value="{DynamicResource RadiusPanel}" />
     <Setter Property="BorderBrush" Value="{DynamicResource Line}" />
     <Setter Property="BorderThickness" Value="1" />
@@ -1356,7 +1356,7 @@
        Its hairline (and every card's and pill's) is a border inside its corners, never a 1 px shadow ring outside
        them: whatever holds a ring at its edge cuts that side off, and a ring thins round its corners. -->
   <Style Selector="Border.study-card">
-    <Setter Property="Background" Value="{DynamicResource Card}" />
+    <Setter Property="Background" Value="{DynamicResource PageCard}" />
     <Setter Property="CornerRadius" Value="{DynamicResource RadiusPanel}" />
     <Setter Property="BorderBrush" Value="{DynamicResource Line}" />
     <Setter Property="BorderThickness" Value="1" />
