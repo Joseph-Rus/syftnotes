@@ -62,7 +62,7 @@ public sealed class Swatch : Control
 /// Words marked with a class's highlighter: a swipe behind ink text, its corners uneven so it reads as drawn by hand,
 /// and when the words wrap each line gets a swipe of its own. An assignment's name in the week, the class under a
 /// lecture's title. <see cref="Fill"/> is the class's brush (<see cref="Skin.ClassDots"/>), drawn in the look's
-/// highlighter shade, light or dark (deep in dark, so the text stays light). <see cref="Struck"/> is something handed
+/// highlighter shade (the same bright one light and dark, its words in the ink that reads on it: :marked). <see cref="Struck"/> is something handed
 /// in: no swipe, the words struck through in the class's colour. <see cref="Outlined"/> rings the swipe in ink (the
 /// pointer over a deadline).
 /// </summary>
@@ -77,7 +77,7 @@ public sealed class Highlight : TextBlock
     /// the rest hangs outside, so a marked line starts level with a plain one beside it. In ems.</summary>
     const double Reach = 0.28, Inset = 0.18;
 
-    readonly ClassShade marker, strike;
+    readonly ClassShade marker, under, strike;
 
     static Highlight() => AffectsRender<Highlight>(FillProperty, StruckProperty, OutlinedProperty, UnderProperty);
 
@@ -85,7 +85,9 @@ public sealed class Highlight : TextBlock
     {
         // The swipe hangs a little past the words' own box.
         ClipToBounds = false;
-        marker = new ClassShade(this, "Hl", "Hover");
+        marker = new ClassShade(this, "Hl", "Hover", Marked);
+        // Under a folder's title the words stay the page's ink, so in dark its line is a deep shade of the class.
+        under = new ClassShade(this, "HlQuiet", "Hover");
         strike = new ClassShade(this, "Swatch", "InkSubtle", Strike);
         Padding = new Thickness(Inset * FontSize, 0);
     }
@@ -122,11 +124,24 @@ public sealed class Highlight : TextBlock
         if (change.Property == FillProperty)
         {
             marker.Follow(Fill);
+            under.Follow(Fill);
             strike.Follow(Fill);
         }
-        else if (change.Property == FontSizeProperty || change.Property == UnderProperty) Padding = new Thickness(Under ? 0 : Inset * FontSize, 0);
-        else if (change.Property == StruckProperty) Strike();
+        else if (change.Property == FontSizeProperty || change.Property == UnderProperty)
+        {
+            Padding = new Thickness(Under ? 0 : Inset * FontSize, 0);
+            Marked();
+        }
+        else if (change.Property == StruckProperty)
+        {
+            Strike();
+            Marked();
+        }
     }
+
+    /// <summary>:marked while the words sit on a class's own highlighter (not struck, not a line under them): the
+    /// highlighter is the same bright one light and dark, so its words take the ink that reads on it (Styles.axaml).</summary>
+    void Marked() => PseudoClasses.Set(":marked", !Struck && !Under && Skin.HueOf(Fill) is not null && marker.Brush is not null);
 
     /// <summary>Handed in: struck through, two pixels of the class's colour.</summary>
     void Strike() => TextDecorations = !Struck ? null :
@@ -136,13 +151,15 @@ public sealed class Highlight : TextBlock
 
     protected override void RenderTextLayout(DrawingContext context, Point origin)
     {
-        if (!Struck && marker.Brush is { } brush)
+        if (!Struck && (Under ? under : marker).Brush is { } brush)
         {
             double em = FontSize;
             // A line's swipe is as tall as the type itself (its ascent and descent), not the line: lines that sit
             // close together touch, as a marker's passes do.
             double body = Body() * em;
-            IPen? ring = Outlined ? new Pen(Foreground, 1.5) : null;
+            // The pointer's ring is the page's ink (Focus), not the words': in dark the words on a bright highlighter
+            // are ink, which wouldn't show round it on the ink page.
+            IPen? ring = Outlined ? new Pen(this.TryFindResource("Focus", ActualThemeVariant, out var focus) && focus is IBrush b ? b : Foreground, 1.5) : null;
             double y = origin.Y;
             foreach (var line in TextLayout.TextLines)
             {

@@ -76,13 +76,13 @@ public partial class ThemeTests
     {
         (string Key, Color Light, Color Dark)[] want =
         [
-            ("Surface", Syft.Paper, Syft.Ink), ("Ink", Syft.Ink, Syft.Paper), ("InkMuted", Syft.Muted, Color.Parse("#B4B1BC")),
+            ("Surface", Syft.Paper, Syft.Ink), ("Ink", Syft.Ink, Color.Parse("#F3F1F7")), ("InkMuted", Syft.Muted, Color.Parse("#B4B1BC")),
             ("Accent", Syft.Ink, Syft.Paper), ("OnAccent", Syft.Paper, Syft.Ink),
             ("Recording", Syft.Coral, Syft.Coral), ("OnRecording", Syft.Ink, Syft.Ink), ("Record", Syft.Coral, Syft.Coral),
             ("Selected", Syft.Lilac, Syft.Lilac), ("OnSelected", Syft.Ink, Syft.Ink),
             ("Progress", Syft.SkyDeep, Syft.SkyDeepDark), ("ProgressTrack", Syft.MeshLight, Syft.MeshDark),
             ("Highlight", Syft.Mustard, Syft.Mustard), ("SurfaceRaised", Syft.MeshLight, Syft.MeshDark), ("SurfaceSunken", Syft.MeshLight, Syft.MeshDark),
-            ("Chip", Syft.MeshLight, Syft.GhostDark), ("Border", Color.Parse("#E2DFD8"), Syft.GhostDark),
+            ("Chip", Syft.MeshLight, Syft.GhostDark), ("Border", Color.Parse("#E2DFD8"), Color.Parse("#36323F")),
         ];
         foreach (var kind in Looks)
         {
@@ -125,8 +125,8 @@ public partial class ThemeTests
         return (Math.Max(x, y) + 0.05) / (Math.Min(x, y) + 0.05);
     }
 
-    /// <summary>Words read: every grey on the page and on a card, and the words on every fill, at 4.5:1 or better,
-    /// light and dark.</summary>
+    /// <summary>Words read: every grey on the page and on a card, and the words on every fill and every class's
+    /// highlighter, at 4.5:1 or better, light and dark.</summary>
     [AvaloniaFact]
     public void Text_on_every_surface_and_fill_reads()
     {
@@ -136,6 +136,9 @@ public partial class ThemeTests
             ("Ink", "Canvas"), ("InkMuted", "Canvas"), ("TextFade1", "Surface"), ("TextFade2", "Surface"), ("TextFade3", "Surface"),
             ("OnAccent", "Accent"), ("OnSelected", "Selected"), ("SelectedMuted", "Selected"), ("OnRecording", "Recording"),
             ("OnHighlight", "Highlight"), ("Ink", "Hl"), ("Ink", "Chip"), ("InkMuted", "Chip"),
+            ("Ink", "PageCard"), ("InkMuted", "PageCard"), ("InkSubtle", "PageCard"),
+            .. Skin.ClassHues.Select(h => ("OnHighlight", "Hl" + h)),
+            .. Skin.ClassHues.Select(h => ("Ink", "HlQuiet" + h)),
         ];
         var failures = new List<string>();
         foreach (var kind in Looks)
