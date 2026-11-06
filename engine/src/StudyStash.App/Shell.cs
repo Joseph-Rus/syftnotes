@@ -157,7 +157,11 @@ public static partial class Shell
         host.Start();
         Run(() => SuggestLighterModelAsync(), "SuggestLighterModel");
         // The program may have moved (Velopack's install, the Mac bundle's new name): what names the old one is put right.
-        UiTasks.RunQuietly(() => Task.Run(() => NewPlace.RunHere(host.Home, host.Settings.StartAtLogin)), "put right what names the app's old place");
+        // An AI app that's open isn't written to: Home asks to close it first (Close Claude), once.
+        UiTasks.RunQuietly(async () =>
+        {
+            if (await Task.Run(() => NewPlace.RunHere(host.Home, host.Settings.StartAtLogin)) is [var open, ..]) AskToCloseForRepair(open);
+        }, "put right what names the app's old place");
         AppUpdates.Start(host, stop.Token, SayUpdate, () => TypingNotes || SettingUp, LibraryWindowOpen);
         if (AppUpdates.Current is { } updater)
             updater.FoundChanged += () => Dispatcher.UIThread.Post(() =>
@@ -1549,6 +1553,19 @@ public static partial class Shell
         var done = await host.AiStatus.ConnectAsync(connect, id, say is null ? null : step => say(step.Words), close: close);
         host.Log($"[setup] {AiConnect.Brand(id)}: " + (!done.Ok ? done.Words : done.SignIn == Core.Ai.SignInPhase.Waiting ? "a sign-in is waiting" : "connected"));
         return done;
+    }
+
+    /// <summary>Home's "Close Claude first": an older copy's connection in an AI app that was open at start, put right
+    /// once the student presses Close Claude (the app closed, written, opened again).</summary>
+    static void AskToCloseForRepair(string appId)
+    {
+        if (ClaudeSetup.DesktopApp(appId) is not { } app) return;
+        var apps = ClaudeSetup.ThisComputer(host.Home);
+        library.CloseAsk = new CloseAppAsk(app.Name, say => apps.RepairAsync(appId, say), () =>
+        {
+            library.CloseAsk = null;
+            Program.Log($"[moved] {app.Name}'s connection now starts {Desktop.Program}");
+        });
     }
 
     /// <summary>The AI's desktop app that is open and whose settings Connect has to change ("Claude"), so setup closes

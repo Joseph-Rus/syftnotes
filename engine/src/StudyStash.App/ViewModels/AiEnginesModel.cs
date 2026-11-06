@@ -76,6 +76,8 @@ public sealed partial class AiEngineRow : ObservableObject
     /// again."); "" when there's nothing.</summary>
     public string Next { get; init; } = "";
     public bool HasNext => Next.Length > 0;
+    /// <summary>The button is Close Claude: Connect closes the AI's desktop app first, then opens it again.</summary>
+    public bool ClosesFirst { get; init; }
     /// <summary>Syft Notes can close the app and open it again for the student: the card offers to.</summary>
     public bool CanReopen { get; init; }
     public string ReopenWords { get; init; } = "";
@@ -623,6 +625,10 @@ public sealed partial class AiEnginesModel : ObservableObject, IDisposable
         bool connected = e.Installed && status.State is AiEngineState.Ready or AiEngineState.Limited;
         string next = connected && broken is null ? NextFor(mine) : "";
         var reopen = next.Length > 0 ? mine.FirstOrDefault(a => a is { NeedsReopen: true, CanReopen: true }) : null;
+        // Its desktop app is open and its connection needs putting right (Connect asked, or an older copy's entry): Close
+        // Claude first, which closes it, puts it right and opens it again.
+        string closeFor = said?.CloseFirst is { Length: > 0 } asked ? asked
+            : said is null && broken is { Running: true, CanReopen: true } && ClaudeSetup.DesktopApp(broken.Id) is { } open ? open.Name : "";
 
         string state, about, action = "", link = "";
         bool good = false, warn = false, primary = false, options = false;
@@ -640,12 +646,13 @@ public sealed partial class AiEnginesModel : ObservableObject, IDisposable
             primary = true;
             about = signIn.Length > 0 ? AiWords.SignInAbout(name, signIn)
                 : said is { Ok: false } ? said.Words
+                : closeFor.Length > 0 ? AiConnect.CloseFirstWords(closeFor)
                 : status.State == AiEngineState.NotSignedIn ? $"Signed out of {name}. Fix signs you in again."
                 : status.State == AiEngineState.Failed ? $"{name} didn't work last time. Fix checks it and signs you in if it needs to."
                 : broken is not null ? $"{broken.Words} isn't reading your lectures yet. Fix connects it."
                 : AiWords.ConnectAbout(e.Id);
             // Its desktop app is open: Close Claude, which carries on by itself; Connect once the student has quit it.
-            action = said?.CloseFirst is { Length: > 0 } app ? AiConnect.CloseButtonWords(app)
+            action = closeFor.Length > 0 ? AiConnect.CloseButtonWords(closeFor)
                 : said?.CouldntClose == true ? "Connect"
                 : SignInPhase.TryAgain(signIn) || SignInPhase.TryAgain(said?.SignIn) ? "Try again"
                 : signIn == SignInPhase.Region ? "" : "Fix";
@@ -692,6 +699,7 @@ public sealed partial class AiEnginesModel : ObservableObject, IDisposable
             ActionWords = action,
             IsPrimary = primary,
             NeedsOptions = options,
+            ClosesFirst = closeFor.Length > 0,
             Next = next,
             CanReopen = reopen is not null,
             ReopenWords = reopen is not null ? $"Reopen {ClaudeSetup.DesktopApp(reopen.Id)?.Name}" : "",
@@ -780,7 +788,7 @@ public sealed partial class AiEnginesModel : ObservableObject, IDisposable
         // Claude, ChatGPT and Gemini: one Connect, whatever is needed (closing its desktop app first, once asked to).
         if (row.Id != "ollama")
         {
-            await ConnectAsync(row.Id, close: outcomes.GetValueOrDefault(row.Id)?.CloseFirst.Length > 0);
+            await ConnectAsync(row.Id, close: row.ClosesFirst);
             return;
         }
         Busy = true;

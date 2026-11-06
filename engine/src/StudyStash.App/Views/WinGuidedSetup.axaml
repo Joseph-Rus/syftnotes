@@ -274,7 +274,9 @@
                       <!-- How much of the account's allowance is left, when the AI says (Gemini's). -->
                       <TextBlock Name="Allowance" Classes="hint" Margin="26,6,0,0" Text="{Binding AllowanceWords}" IsVisible="{Binding HasAllowance}" />
                       <!-- Its desktop app is open: Close Claude first, then it's connected and opened again. -->
-                      <v:CloseAppFirst Name="CloseApp" />
+                      <Panel Margin="0,18,0,0" IsVisible="{Binding HasCloseAsk}">
+                        <v:CloseAppFirst Name="CloseApp" DataContext="{Binding CloseAsk}" />
+                      </Panel>
                       <!-- A sign-in that stopped: Try again; one Syft Notes couldn't start, Get help too (never a terminal). -->
                       <Border Name="SignInProblem" Classes="problem" Margin="0,18,0,0" IsVisible="{Binding HasSignInProblem}">
                         <Grid ColumnDefinitions="Auto,10,*,10,Auto,8,Auto">

@@ -485,10 +485,10 @@ public sealed class GuidedSetupTests
         (ready, rig.AppOpen) = (null, "Claude");
         rig.AppsOf.Clear();
         await g.GetReadyForNotesAsync("claude");
-        Assert.Equal((GuidedScreen.SignIn, "Close Claude first", "Close Claude", (string?)null), (g.Screen, g.CloseSay, g.CloseButton, ready));
+        Assert.Equal((GuidedScreen.SignIn, "Close Claude first", "Close Claude", (string?)null), (g.Screen, g.CloseAsk?.Say, g.CloseAsk?.Button, ready));
         Assert.Empty(rig.AppsOf);
-        await g.CloseAndConnectCommand.ExecuteAsync(null);
-        Assert.Equal((GuidedScreen.Manual, "claude", false), (g.Screen, ready, g.HasCloseApp));
+        await g.CloseAsk!.CloseCommand.ExecuteAsync(null);
+        Assert.Equal((GuidedScreen.Manual, "claude", false), (g.Screen, ready, g.HasCloseAsk));
         Assert.Equal(["claude"], rig.ClosedFirst);
         Assert.Empty(rig.AppsOf); // connected by Close Claude, not once more in the background
     }

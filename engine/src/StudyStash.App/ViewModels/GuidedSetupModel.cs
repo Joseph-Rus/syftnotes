@@ -576,7 +576,7 @@ public sealed partial class GuidedSetupModel : ObservableObject, IDisposable
     {
         if (id is not ("claude" or "codex" or "gemini")) return;
         StopWork();
-        CloseApp = "";
+        CloseAsk = null;
         forNotes = id;
         Picked = id;
         Notify(nameof(ForNotes), nameof(ByHandLabel), nameof(StepLabel), nameof(PlanNote), nameof(ReadyTitle), nameof(InstallLede));
@@ -596,14 +596,12 @@ public sealed partial class GuidedSetupModel : ObservableObject, IDisposable
     void BackToNotes(bool ready = true, bool connected = false)
     {
         string id = forNotes;
-        if (ready && !connected && services.AppToClose(id) is { Length: > 0 } app)
+        if (ready && !connected && services.AppToClose(id) is { Length: > 0 } app && services.CloseAndConnect is { } run)
         {
-            CloseFailed = false;
-            CloseSay = AiConnect.CloseFirstWords(app);
-            CloseApp = app;
+            CloseAsk = new CloseAppAsk(app, say => run(id, say), () => BackToNotes(connected: true));
             return;
         }
-        CloseApp = "";
+        CloseAsk = null;
         forNotes = "";
         Notify(nameof(ForNotes), nameof(ByHandLabel));
         Screen = GuidedScreen.Manual;
@@ -613,60 +611,12 @@ public sealed partial class GuidedSetupModel : ObservableObject, IDisposable
         ReadyForNotes?.Invoke(id);
     }
 
-    /// <summary>The AI's desktop app that has to be closed before it's connected ("Claude"), while this screen waits
-    /// for the student to press Close; "" otherwise.</summary>
-    [NotifyPropertyChangedFor(nameof(HasCloseApp), nameof(CloseButton))]
+    /// <summary>"Close Claude first": the AI's desktop app is open, and this screen waits for the student to press Close,
+    /// which closes it, connects, opens it again and carries on; null otherwise.</summary>
+    [NotifyPropertyChangedFor(nameof(HasCloseAsk))]
     [ObservableProperty]
-    public partial string CloseApp { get; set; } = "";
-    public bool HasCloseApp => CloseApp.Length > 0;
-    /// <summary>"Close Claude first", then where it's got to, or how to quit it when it wouldn't close.</summary>
-    [ObservableProperty] public partial string CloseSay { get; set; } = "";
-    /// <summary>It wouldn't close: the button is Connect, for once the student has quit it.</summary>
-    [NotifyPropertyChangedFor(nameof(CloseButton))]
-    [ObservableProperty]
-    public partial bool CloseFailed { get; set; }
-    [ObservableProperty] public partial bool ClosingApp { get; set; }
-    public string CloseButton => CloseFailed ? "Connect" : AiConnect.CloseButtonWords(CloseApp);
-
-    /// <summary>Close Claude (or Connect, once it's quit by hand): closes the app, connects it, opens it again, and
-    /// carries on as if it had never been open.</summary>
-    [RelayCommand]
-    async Task CloseAndConnect()
-    {
-        if (ClosingApp || !HasCloseApp) return;
-        string id = forNotes;
-        string app = services.AppToClose(id);
-        if (app.Length == 0 || services.CloseAndConnect is not { } run)
-        {
-            // Quit by hand meanwhile: on as usual.
-            BackToNotes();
-            return;
-        }
-        ClosingApp = true;
-        CloseSay = AiConnect.ClosingWords(app);
-        var ui = SynchronizationContext.Current;
-        ConnectOutcome done;
-        try
-        {
-            // Said on this thread (Connect's steps are), it shows at once and in order; from another, it's posted here.
-            done = await run(id, words =>
-            {
-                if (ui is null || SynchronizationContext.Current == ui) CloseSay = words;
-                else services.Post(() => CloseSay = words);
-            });
-        }
-        finally
-        {
-            ClosingApp = false;
-        }
-        if (done.CouldntClose)
-        {
-            CloseSay = done.Words;
-            CloseFailed = true;
-            return;
-        }
-        BackToNotes(connected: true);
-    }
+    public partial CloseAppAsk? CloseAsk { get; set; }
+    public bool HasCloseAsk => CloseAsk is not null;
 
     void ByHandAt(string item)
     {
