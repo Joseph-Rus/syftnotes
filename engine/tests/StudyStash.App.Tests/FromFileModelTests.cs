@@ -41,6 +41,31 @@ public class FromFileModelTests
         Assert.True(closed);
     }
 
+    /// <summary>Cancel while a long video is still being got ready: the add is told to stop (so no lecture is added and
+    /// nothing is left of it), the form closes, and it ends quietly: nothing said, nothing thrown.</summary>
+    [Fact]
+    public async Task Cancel_while_it_gets_ready_stops_the_add_and_closes_quietly()
+    {
+        bool closed = false;
+        var started = new TaskCompletionSource();
+        var form = Form("Zoom Recording - Week 6.mp4", "", async (_, ct) =>
+        {
+            started.SetResult();
+            await Task.Delay(Timeout.Infinite, ct); // until it's cancelled
+            return Outcome.Done;
+        }, () => closed = true);
+
+        var run = form.Add.Command.ExecuteAsync(null);
+        await started.Task;
+        Assert.True(form.Add.Busy);
+        form.CancelCommand.Execute(null);
+        await run;
+
+        Assert.True(closed);
+        Assert.False(form.Add.Busy);
+        Assert.Null(form.Problem);
+    }
+
     [Fact]
     public async Task A_refusal_stays_in_the_form_in_the_librarys_words_and_a_file_it_cant_read_cant_be_added()
     {

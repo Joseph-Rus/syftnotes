@@ -11,6 +11,9 @@ public static partial class Shell
 {
     const string FromFileKey = "from-file";
 
+    /// <summary>The form that's open, if one is: one at a time.</summary>
+    static (FromFileModel Form, Avalonia.Controls.Window Window)? fromFile;
+
     /// <summary>The form for <paramref name="path"/>, started on <paramref name="cls"/>'s page ("" on Home, where the
     /// library sorts it). A file that's gone by now says so instead.</summary>
     static void AddFromFile(string path, string cls)
@@ -20,12 +23,30 @@ public static partial class Shell
             Toast("That file isn't there any more", "It may have been moved or renamed. Pick it again where it is now.", null, null);
             return;
         }
+        if (fromFile is { } open)
+        {
+            // Still getting the last one ready: that one finishes first. Otherwise the new file takes its place.
+            if (open.Form.Add.Busy)
+            {
+                AppWindows.Raise(open.Window);
+                Toast("One recording at a time", "The last one is still getting ready. Add this one when it's done.", null, null);
+                return;
+            }
+            open.Window.Close();
+        }
         string named = FromFileModel.TitleFrom(file.Name);
         Avalonia.Controls.Window? shown = null;
         var form = new FromFileModel(file, cls, [.. host.Classes().Select(c => (c.Name, c.Color))],
             // A title left as the file's name lets the library name the lecture from what was said in it.
             async (lecture, ct) => await host.AddLectureFromFileAsync(lecture.Path, lecture.Class, lecture.Title == named ? null : lecture.Title, lecture.Day, ct),
             close: () => shown?.Close());
-        shown = AppWindows.Open(new WindowSpec(FromFileKey, FromFileWords.WindowTitle, new FromFilePage { DataContext = form }));
+        shown = AppWindows.Open(new WindowSpec(FromFileKey, FromFileWords.WindowTitle, new FromFilePage { DataContext = form }), w =>
+            w.Closed += (_, _) =>
+            {
+                // Closed while a file was still being got ready: it isn't added, and nothing is left of it.
+                form.Add.Cancel();
+                if (fromFile is { } f && ReferenceEquals(f.Form, form)) fromFile = null;
+            });
+        fromFile = (form, shown);
     }
 }
