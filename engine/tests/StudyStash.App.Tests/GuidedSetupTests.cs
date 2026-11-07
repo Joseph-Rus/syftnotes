@@ -342,7 +342,9 @@ public sealed class GuidedSetupTests
 
         if (chat)
         {
-            await Until(() => g.Screen == GuidedScreen.Chat && !g.Busy, "the chat");
+            // Starting the chat's AI (a fake CLI here) took over 30 s once on a loaded Windows runner (main's run
+            // 42326063897; the same code passed before and after): a longer limit, still waiting on the chat itself.
+            await Wait.UntilAsync(() => g.Screen == GuidedScreen.Chat && !g.Busy, "the chat", TimeSpan.FromSeconds(90));
             // The brief tells the AI it's the one the student picked, and so writes the notes.
             Assert.Contains($"call set_notes_writer with \"{answer}\"", File.ReadAllText(Path.Combine(SetupChat.Folder(rig.Home.Path), "brief.md")));
             // The computer card's Set up on a computer whose library is already made: the AI picked writes the notes.
