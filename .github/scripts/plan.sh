@@ -49,7 +49,7 @@ fi
 # a commit that passed has nothing new to test. The workflow itself is never one of them: a change to ci is tested.
 trivial() {
   case "$1" in
-    "$props" | README.md | SECURITY.md | LICENSE | engine/README.md | docs/* | site/* | ios/* | firebase.json | .firebaserc | .github/FUNDING.yml | .github/workflows/site.yml) return 0 ;;
+    "$props" | README.md | SECURITY.md | LICENSE | engine/README.md | docs/* | site/* | firebase.json | .firebaserc | .github/FUNDING.yml | .github/workflows/site.yml) return 0 ;;
   esac
   return 1
 }
