@@ -48,7 +48,16 @@ public sealed partial class AsyncAction : ObservableObject
         if (what is null) return;
         Failure = null;
         Say = null;
-        var done = await what(ct);
+        Outcome done;
+        try
+        {
+            done = await what(ct);
+        }
+        catch (OperationCanceledException) when (ct.IsCancellationRequested)
+        {
+            // Cancelled (the student closed what it was for): it ends quietly, from the button as from RunAsync.
+            return;
+        }
         Failure = done.Failure;
         Say = done.Failure?.Words;
         outcome = done;

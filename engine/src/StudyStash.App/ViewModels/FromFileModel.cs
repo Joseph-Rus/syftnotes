@@ -143,8 +143,13 @@ public sealed partial class FromFileModel : ObservableObject
     /// <summary>Why it can't be added (a kind of file that can't be read) or why it didn't work; null otherwise.</summary>
     public string? Problem => File.CanRead ? Add.Say : FromFileWords.CantRead;
 
+    /// <summary>Cancel (or Esc): a file still being got ready isn't added (nothing is left of it), and the form closes.</summary>
     [RelayCommand]
-    void Cancel() => close();
+    void Cancel()
+    {
+        Add.Cancel();
+        close();
+    }
 
     async Task<Outcome> AddAsync(CancellationToken ct)
     {
