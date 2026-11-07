@@ -280,7 +280,7 @@ stray files of its own kind older than a day.
 
 ### What the laptop does for the phone (and nothing else)
 
-Exactly the iPhone app's own calls (`ios/StudyStash/API/APIClient.swift`, and the two the Due tab makes itself), replayed against the local library
+Exactly the iPhone app's own calls (its API client, and the two the Due tab makes itself), replayed against the local library
 (`PhoneCalls.cs`):
 
 - GET: `/me`, `/library`, `/ai` (which AI answers each job, no keys: the phone shows Ask's AI while it thinks), `/lectures`, `/lectures/{id}`, `/lectures/{id}/rendered`, `/search`, `/chats`,
@@ -438,7 +438,7 @@ short:
 - Notes writing gives the photos to the AI as images (Claude Code: files copied into its working folder and named in the prompt; Codex: `--image`);
   Gemini and Ollama get each photo's OCR text. A note may embed `![Whiteboard at 12:34](attachment:<id>)`; every renderer shows only that lecture's own pictures.
 
-## The iPhone side, as built (`ios/StudyStash/Drive/`)
+## The iPhone side, as built (the iPhone app's Drive code)
 
 - `GoogleSignIn.swift`: Continue with Google through `ASWebAuthenticationSession` (SwiftUI's `webAuthenticationSession`),
   PKCE S256, `login_hint` when the QR code named an account (else `prompt=select_account`), no secret, no Google SDK.

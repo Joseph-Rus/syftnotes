@@ -237,7 +237,7 @@ feedback, files, pages and announcements. See [Canvas](#canvas-assignments-due-d
 
 Your library serves a phone app you can use today on an iPhone, iPad or Android phone over
 Tailscale: read your notes, see what's due, search and add photos. A native iPhone and iPad app that
-also records is in [`ios/`](ios/), and is coming soon to the App Store. See
+also records is coming soon to the App Store. See
 [On your phone](#on-your-phone).
 
 ## One computer or two
@@ -663,12 +663,9 @@ to a lecture. Install Tailscale on your phone and sign in to the same account, t
 page that opens to your home screen, and it opens like any other app; an iPhone or iPad can do the
 same from Safari ([docs/phone.md](docs/phone.md) has the details).
 
-A native Syft Notes app for iPhone and iPad is in [`ios/`](ios/): it records lectures (written down
-on the phone as they're said), reads your notes, asks, takes handwritten notes and adds files. It's
-coming soon to the App Store.
-
-You can build the iPhone app from this repo yourself. The App Store version is the easy way: it
-pays for the app's development and updates itself.
+A native Syft Notes app for iPhone and iPad records lectures (written down on the phone as they're
+said), reads your notes, asks, takes handwritten notes and adds files. It's coming soon to the App
+Store. Its code isn't in this repository.
 
 ## Granola
 
@@ -782,9 +779,8 @@ they are; only the app goes. To remove them too, delete the folders under
 ## Build from source
 
 Syft Notes is C# on .NET 10: the Mac, Windows and Linux app is [Avalonia](https://avaloniaui.net), speech
-runs on Whisper.net and sherpa-onnx, the library and its MCP server are in the same program, the
-phone web app in `web/` is Preact and TypeScript, and the iPhone and iPad app in `ios/` is SwiftUI
-([ios/README.md](ios/README.md)).
+runs on Whisper.net and sherpa-onnx, the library and its MCP server are in the same program,
+and the phone web app in `web/` is Preact and TypeScript.
 
 You need the [.NET 10 SDK](https://dotnet.microsoft.com), and [Node](https://nodejs.org) (22 or later) for the
 phone app in `web/`.

@@ -18,7 +18,7 @@ public enum PhoneAnswerKind
 }
 
 /// <summary>
-/// Exactly the iPhone app's own calls (ios/StudyStash/API/APIClient.swift), and nothing else: never settings,
+/// Exactly the iPhone app's own calls (its API client), and nothing else: never settings,
 /// passwords, AI engines or keys, Canvas tokens, devices, Claude connections, history, files, or anything outside
 /// /api/v2. A request whose method and path aren't one of these, or whose path has anything odd in it (a "..", a
 /// slash or backslash inside a segment, a fragment), is refused before the library hears of it.
