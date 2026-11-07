@@ -389,6 +389,8 @@ public static partial class Shell
                 else Run(() => StartRecordingAsync(cls ?? "", null, openPage: true), "StartRecording");
             };
             page.OnStop = () => StopRecording();
+            // A recording or a lecture video the student already has: Add a recording, Record's menu, or dropped here.
+            page.OnAddRecording = path => AddFromFile(path, cls ?? "");
         }
         // Home's "Buy us a coffee": the Ko-fi page, and the library window's own ask for a tip goes for good.
         if (page.IsHome) page.OnSupport = () => SupportAsk.Answer(host, SupportAnswer.Tip, url => Dialogs.OpenUrl(url), DateTimeOffset.Now);

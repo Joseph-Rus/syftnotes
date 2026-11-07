@@ -401,10 +401,7 @@ public sealed partial class OverviewModel : ObservableObject
     }
     [RelayCommand] void Record() => OnRecord?.Invoke();
 
-    // --- A lecture from a recording that already exists (in development: only with the test helpers) ------------------
-
-    /// <summary>How the way in is offered, until Joey picks: a button of its own beside Attach and Record, or a menu on Record.</summary>
-    public enum AddRecordingEntry { Button, Menu }
+    // --- A lecture from a recording that already exists: Add a recording, Record's menu, or a file dropped on the page --
 
     /// <summary>Opens the form for a recording the student has (picked, or dropped on the page); null leaves the way in out.</summary>
     public Action<string>? OnAddRecording
@@ -414,20 +411,15 @@ public sealed partial class OverviewModel : ObservableObject
         {
             field = value;
             OnPropertyChanged(nameof(CanAddRecording));
-            OnPropertyChanged(nameof(ShowAddButton));
             OnPropertyChanged(nameof(ShowRecordMenu));
         }
     }
     /// <summary>The system's file picker for a recording (the view sets it): its path, null when cancelled.</summary>
     public Func<Task<string?>>? PickRecording { get; set; }
-    [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(ShowAddButton), nameof(ShowRecordMenu))]
-    public partial AddRecordingEntry Entry { get; set; }
-    public bool CanAddRecording => StudyStash.Core.TestSwitches.On && OnAddRecording is not null;
-    /// <summary>"Add a recording", a button beside Attach and Record.</summary>
-    public bool ShowAddButton => CanAddRecording && Entry == AddRecordingEntry.Button;
-    /// <summary>Record's small menu: Record now, or add a recording you already have.</summary>
-    public bool ShowRecordMenu => CanAddRecording && Entry == AddRecordingEntry.Menu && Idle;
+    /// <summary>A recording can be added here: on this computer's own pages (where Whisper writes it down).</summary>
+    public bool CanAddRecording => OnAddRecording is not null;
+    /// <summary>Record's small menu (Record now, or add a recording you already have), while nothing records.</summary>
+    public bool ShowRecordMenu => CanAddRecording && Idle;
 
     [RelayCommand]
     async Task AddRecording()
