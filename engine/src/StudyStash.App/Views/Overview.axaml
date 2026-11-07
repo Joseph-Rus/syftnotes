@@ -39,18 +39,6 @@
       <Setter Property="Margin" Value="0,16,0,0" />
       <Setter Property="HorizontalAlignment" Value="Left" />
     </Style>
-    <!-- Record's small menu: a chevron after a hairline inside the pill. A press on it opens the menu, not a recording. -->
-    <Style Selector="Button.record-more">
-      <Setter Property="Theme" Value="{StaticResource Surface}" />
-      <Setter Property="Width" Value="36" />
-      <Setter Property="Height" Value="40" />
-      <Setter Property="Padding" Value="0" />
-      <Setter Property="c:Cell.Round" Value="True" />
-      <Setter Property="Foreground" Value="{DynamicResource InkMuted}" />
-    </Style>
-    <Style Selector="Button.record-more:pointerover">
-      <Setter Property="Foreground" Value="{DynamicResource Ink}" />
-    </Style>
     <!-- A folder's rail: 272 beside its notes, or the page's width under them (narrow) -->
     <Style Selector="StackPanel.ov-rail">
       <Setter Property="Width" Value="272" />
@@ -115,30 +103,6 @@
                           VerticalAlignment="Center" IsVisible="{Binding Running}" />
               <TextBlock Text="{Binding Elapsed}" FontWeight="Medium" Foreground="{DynamicResource InkMuted}" VerticalAlignment="Center" IsVisible="{Binding Recording}" />
               <TextBlock Classes="kbd" Text="{Binding RecordKeys}" FontSize="{DynamicResource FontCaption}" VerticalAlignment="Center" Margin="2,0,0,0" IsVisible="{Binding Idle}" />
-              <!-- A small menu on Record: Record now, or add a recording you already have -->
-              <StackPanel Orientation="Horizontal" Spacing="2" IsVisible="{Binding ShowRecordMenu}" Margin="-2,0,-10,0">
-                <Border Width="1" Height="24" Background="{DynamicResource Line}" VerticalAlignment="Center" />
-                <Button Name="RecordMenu" Classes="record-more" ToolTip.Tip="More ways to add a lecture" AutomationProperties.Name="More ways to add a lecture">
-                  <c:Icon Glyph="expand_more" Size="16" VerticalAlignment="Center" />
-                  <Button.Flyout>
-                    <Flyout Placement="BottomEdgeAlignedRight" VerticalOffset="10" FlyoutPresenterClasses="bare">
-                      <Border Classes="menu" Width="296">
-                        <StackPanel>
-                          <Button Name="MenuRecord" Classes="menu-item" Click="OnPicked" HorizontalAlignment="Stretch" HorizontalContentAlignment="Stretch" Command="{Binding RecordCommand}">
-                            <Grid ColumnDefinitions="*,Auto">
-                              <TextBlock Text="{x:Static vm:FromFileWords.MenuRecord}" VerticalAlignment="Center" />
-                              <TextBlock Grid.Column="1" Classes="kbd" Text="{Binding RecordKeys}" FontSize="{DynamicResource FontCaption}" VerticalAlignment="Center" />
-                            </Grid>
-                          </Button>
-                          <Button Name="MenuAdd" Classes="menu-item" Click="OnPicked" HorizontalAlignment="Stretch" HorizontalContentAlignment="Stretch" Command="{Binding AddRecordingCommand}">
-                            <TextBlock Text="{x:Static vm:FromFileWords.MenuAdd}" VerticalAlignment="Center" />
-                          </Button>
-                        </StackPanel>
-                      </Border>
-                    </Flyout>
-                  </Button.Flyout>
-                </Button>
-              </StackPanel>
             </StackPanel>
           </Button>
         </StackPanel>
