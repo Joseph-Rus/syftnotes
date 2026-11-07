@@ -39,7 +39,7 @@
       <Setter Property="Margin" Value="0,16,0,0" />
       <Setter Property="HorizontalAlignment" Value="Left" />
     </Style>
-    <!-- Record's small menu (B): a chevron after a hairline inside the pill. A press on it opens the menu, not a recording. -->
+    <!-- Record's small menu: a chevron after a hairline inside the pill. A press on it opens the menu, not a recording. -->
     <Style Selector="Button.record-more">
       <Setter Property="Theme" Value="{StaticResource Surface}" />
       <Setter Property="Width" Value="36" />
@@ -89,9 +89,9 @@
               <TextBlock Text="Attach" VerticalAlignment="Center" />
             </StackPanel>
           </Button>
-          <!-- A lecture that already happened (A, a button of its own): pick a recording or a lecture video; it's written down
-               here, then your AI writes the notes -->
-          <Button Name="AddRecording" Classes="btn" Command="{Binding AddRecordingCommand}" IsVisible="{Binding ShowAddButton}"
+          <!-- A lecture that already happened: pick a recording or a lecture video; it's written down here, then your AI
+               writes the notes -->
+          <Button Name="AddRecording" Classes="btn" Command="{Binding AddRecordingCommand}" IsVisible="{Binding CanAddRecording}"
                   ToolTip.Tip="{x:Static vm:FromFileWords.AddTip}" AutomationProperties.Name="{x:Static vm:FromFileWords.AddButton}">
             <StackPanel Orientation="Horizontal" Spacing="8">
               <c:Icon Glyph="upload" Size="16" VerticalAlignment="Center" />
@@ -115,7 +115,7 @@
                           VerticalAlignment="Center" IsVisible="{Binding Running}" />
               <TextBlock Text="{Binding Elapsed}" FontWeight="Medium" Foreground="{DynamicResource InkMuted}" VerticalAlignment="Center" IsVisible="{Binding Recording}" />
               <TextBlock Classes="kbd" Text="{Binding RecordKeys}" FontSize="{DynamicResource FontCaption}" VerticalAlignment="Center" Margin="2,0,0,0" IsVisible="{Binding Idle}" />
-              <!-- (B) A small menu on Record: Record now, or add a recording you already have -->
+              <!-- A small menu on Record: Record now, or add a recording you already have -->
               <StackPanel Orientation="Horizontal" Spacing="2" IsVisible="{Binding ShowRecordMenu}" Margin="-2,0,-10,0">
                 <Border Width="1" Height="24" Background="{DynamicResource Line}" VerticalAlignment="Center" />
                 <Button Name="RecordMenu" Classes="record-more" ToolTip.Tip="More ways to add a lecture" AutomationProperties.Name="More ways to add a lecture">
