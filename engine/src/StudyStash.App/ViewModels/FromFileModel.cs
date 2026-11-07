@@ -14,8 +14,6 @@ public static class FromFileWords
     public const string WindowTitle = "Add a lecture from a recording";
     public const string AddButton = "Add a recording";
     public const string AddTip = "Add a lecture from a recording you already have: a voice memo, or a video of the lecture";
-    public const string MenuRecord = "Record now";
-    public const string MenuAdd = "Add a recording you already have";
     public const string TitleLabel = "Title";
     public const string ClassLabel = "Class";
     public const string DateLabel = "Date";

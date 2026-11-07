@@ -5,7 +5,7 @@ using StudyStash.App.Windows;
 namespace StudyStash.App;
 
 /// <summary>A lecture that already happened: a recording or a lecture video on this computer (picked with Add a
-/// recording or Record's menu, or dropped on Home or a folder's page) goes through its small form, and is then written
+/// recording, or dropped on Home or a folder's page) goes through its small form, and is then written
 /// down here and sent on like any recording.</summary>
 public static partial class Shell
 {
