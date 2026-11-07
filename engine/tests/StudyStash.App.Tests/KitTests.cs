@@ -111,7 +111,7 @@ public class KitTests
         var run = action.Command.ExecuteAsync(null);
         Assert.True(action.Busy);
         action.Cancel();
-        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => run);
+        await run; // from the button too: nothing thrown (it would reach the app's error handler)
         Assert.False(action.Busy);
         Assert.Null(action.Say);
 
