@@ -394,14 +394,13 @@ public sealed partial class OverviewModel : ObservableObject
         OnPropertyChanged(nameof(Idle));
         OnPropertyChanged(nameof(Paused));
         OnPropertyChanged(nameof(Running));
-        OnPropertyChanged(nameof(ShowRecordMenu));
         OnPropertyChanged(nameof(RecordWords));
         OnPropertyChanged(nameof(Elapsed));
         OnPropertyChanged(nameof(RecordTip));
     }
     [RelayCommand] void Record() => OnRecord?.Invoke();
 
-    // --- A lecture from a recording that already exists: Add a recording, Record's menu, or a file dropped on the page --
+    // --- A lecture from a recording that already exists: Add a recording, or a file dropped on the page ---------------
 
     /// <summary>Opens the form for a recording the student has (picked, or dropped on the page); null leaves the way in out.</summary>
     public Action<string>? OnAddRecording
@@ -411,15 +410,12 @@ public sealed partial class OverviewModel : ObservableObject
         {
             field = value;
             OnPropertyChanged(nameof(CanAddRecording));
-            OnPropertyChanged(nameof(ShowRecordMenu));
         }
     }
     /// <summary>The system's file picker for a recording (the view sets it): its path, null when cancelled.</summary>
     public Func<Task<string?>>? PickRecording { get; set; }
     /// <summary>A recording can be added here: on this computer's own pages (where Whisper writes it down).</summary>
     public bool CanAddRecording => OnAddRecording is not null;
-    /// <summary>Record's small menu (Record now, or add a recording you already have), while nothing records.</summary>
-    public bool ShowRecordMenu => CanAddRecording && Idle;
 
     [RelayCommand]
     async Task AddRecording()
