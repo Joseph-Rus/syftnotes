@@ -74,7 +74,6 @@ on:
       - "**"
       - "!docs/**"
       - "!site/**"
-      - "!ios/**"
       - "!.github/ISSUE_TEMPLATE/**"
       - "!**/*.md"
       - "engine/tests/**/Golden/**"

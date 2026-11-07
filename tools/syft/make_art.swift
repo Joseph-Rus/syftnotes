@@ -18,7 +18,6 @@
 //   assets/syft/*.svg                          the marks, both tiles, the wordmark and both lockups, as vectors
 //   assets/icon.png 256, assets/study-stash.ico 16–256, assets/apple-touch-icon.png 180, docs/images/icon.png 128
 //   engine/src/StudyStash.App/Assets/icon.png 256, mark-32.png, mark-36.png (the ink s, for the tray and the menu bar)
-//   ios/StudyStash/Resources/Assets.xcassets/AppIcon.appiconset/AppIcon-1024(-dark).png, Logo.imageset/Logo(-dark).png
 //   web/public/favicon-32.png, icon-192.png, icon-512.png, icon-maskable-192/512.png, apple-touch-icon.png
 //   site/assets/favicon.png 64, apple-touch-icon.png 180, img/icon.webp 256 (needs cwebp), social.png 1200 × 630
 //   extension/icon-16.png, icon-32.png, icon-48.png, icon-128.png
@@ -608,24 +607,6 @@ func everything() {
     // The menu bar's and the tray's ink s.
     write(png(mark(32)), "engine/src/StudyStash.App/Assets/mark-32.png")
     write(png(mark(36)), "engine/src/StudyStash.App/Assets/mark-36.png")
-
-    // The iPhone: the white tile on the home screen, the dark one in dark mode; the logo in the app the same way.
-    let xc = "ios/StudyStash/Resources/Assets.xcassets"
-    write(png(square(light, 1024)), "\(xc)/AppIcon.appiconset/AppIcon-1024.png")
-    write(png(square(dark, 1024)), "\(xc)/AppIcon.appiconset/AppIcon-1024-dark.png")
-    write(png(square(light, 512)), "\(xc)/Logo.imageset/Logo.png")
-    write(png(square(dark, 512)), "\(xc)/Logo.imageset/Logo-dark.png")
-    write("""
-    {
-      "images" : [
-        { "filename" : "Logo.png", "idiom" : "universal" },
-        { "appearances" : [ { "appearance" : "luminosity", "value" : "dark" } ], "filename" : "Logo-dark.png", "idiom" : "universal" }
-      ],
-      "info" : { "author" : "xcode", "version" : 1 },
-      "properties" : { "template-rendering-intent" : "original" }
-    }
-
-    """.data(using: .utf8)!, "\(xc)/Logo.imageset/Contents.json")
 
     // The phone web app.
     write(png(darkTile(32)), "web/public/favicon-32.png")
