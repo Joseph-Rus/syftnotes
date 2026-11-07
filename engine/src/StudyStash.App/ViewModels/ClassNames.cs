@@ -12,6 +12,9 @@ namespace StudyStash.App.ViewModels;
 /// </summary>
 public static partial class ClassNames
 {
+    /// <summary>What a class menu says for no class at all: the library files the lecture by what was said in it.</summary>
+    public const string SortLabel = "Let the library sort it";
+
     /// <summary>The name without the registrar's code on the end: "Theory of Computation and Compilers".</summary>
     public static string Display(string name) => string.IsNullOrWhiteSpace(name) ? name : CourseNames.Title(name);
 
