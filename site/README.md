@@ -11,6 +11,8 @@ site/
   privacy/index.html  privacy policy, including Google's Limited Use disclosure
   terms/index.html    terms of use (MIT, as is)
   support/index.html  support: GitHub issues, private security reports
+  granola-alternative/index.html  Syft Notes vs Granola: facts about Granola checked on its own pages, dated
+  robots.txt, sitemap.xml  for search engines: update the sitemap (and its lastmod) when a page is added
   404.html            the page for a missing address
   assets/             site.css, site.js, the app's font and the wordmark's (Archivo), the icon, favicon, social picture,
                       the pixel s (img/tile-light.svg, img/mark-dark.svg), pictures of the app, light and dark (WebP),
