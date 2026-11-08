@@ -153,8 +153,8 @@ files, which hold the library's words.)
 
 - `laptop.id` is made once per install (`<home>/laptop-id`) and kept through Disconnect; `name` is the computer's
   own (a Mac's Sharing name, "Joey's MacBook Air"; a PC's name).
-- `seen` is rewritten at least every 60 s while the laptop runs (every 45 s); the phone says "Your laptop was last
-  here 3 hours ago" from it.
+- `seen` is rewritten at least every 60 s while the laptop runs (every 45 s); the phone says "Last here 3 hours
+  ago." from it.
 - `answered`: the last 500 request ids it has finished, so a request is never done twice, across restarts too.
 - `removed`: phones Settings → Remove took off. The laptop doesn't answer their boxes (see "Changes asked for").
 - laptop.json is written at most once a second, a moment after anything in it changes.
@@ -269,7 +269,7 @@ The phone's box, `phone-<phoneId>.json`:
 - A binary body (`GET /attachments/<id>/raw`) goes into a `blob-` file (named by its bytes' sha256, reused for the
   same bytes within 12 hours); the answer says `{"status": 200, "type": "application/pdf", "blob": "<drive id>",
   "done": true}`. The phone keeps it. Files over 5 MB go up in Drive's resumable upload, both ways.
-- A request the laptop won't do (not in the list below): `{"status": 403, "body": {"detail": "Your laptop doesn't
+- A request the laptop won't do (not in the list below): `{"status": 403, "body": {"detail": "Your computer doesn't
   take that from the phone."}, "done": true}`.
 - A request the laptop can't do yet (its library is starting or stopped) isn't answered: it's tried again five seconds
   later, and so the phone's give-up rules apply.
@@ -318,7 +318,7 @@ is "Joey's iPhone" and accents are dropped.
   `demo.studystash.app`: `APIClient` and every screen stay as they are. GETs in the copy are answered from the phone
   at once; anything else becomes a request.
 - Giving up: a GET or an Ask/chat with no answer after 25 s is taken out of the box and fails as unreachable, with
-  "Your laptop isn't answering. Is it on and awake?" (Ask while the laptop sleeps isn't kept for later: Joey hasn't
+  "Your computer isn't answering. Is it on and awake?" (Ask while the laptop sleeps isn't kept for later: Joey hasn't
   decided, so keep it simple). A write (a recording, a rename, a file, a voice memo) **stays in the box** until the
   laptop does it; the screen gets "unreachable" after 25 s as today, so a recording stays "waiting"; sending the
   same request again (same method, path and body) reuses the one already waiting instead of adding a second. (The
@@ -397,7 +397,7 @@ short:
    `GET /chats/<id>`. `GET /chats` is copied without a query.
 2. **laptop.json gains `"removed": ["<phoneId>", …]`** (Settings → Remove on the laptop). The laptop stops answering
    that phone and deletes its box (and the uploads its waiting requests named). A phone that finds its own id there
-   should stop sending, say "Your laptop removed this phone. Sign in again to use it.", and use a new phone id (a new
+   should stop sending, say "Your computer removed this phone. Sign in again to use it.", and use a new phone id (a new
    box) at its next sign-in: with the same id it's never answered again.
 3. **A copy file can be a moment ahead of laptop.json.** The laptop rewrites a `copy-` file in place (same id), then
    laptop.json about a second later. If the body the phone downloaded doesn't hash to laptop.json's sha, keep it
@@ -472,7 +472,7 @@ short:
   request); their answers' `attachments` are put together. `POST /ai/warm` also makes the spare answer file; the next
   Ask or chat uses it (within an hour), so asking is one write.
 - Giving up, as above, plus: with no internet the screen hears "This phone isn't online…" at once (a write is kept);
-  with no laptop in the folder a read hears "Your laptop isn't connected to Google yet…" at once; a streamed answer
+  with no laptop in the folder a read hears "Your computer isn't connected to Google yet…" at once; a streamed answer
   that stops changing for 2 minutes is given up. A write the laptop does after its screen stopped waiting is kept as
   done (the last 50, by method, path and body): sending the same again answers from it instead of asking twice (a
   recording's Send again, RecordingStore's resend). A write already waiting that the laptop hasn't done is joined and
@@ -483,20 +483,20 @@ short:
 - Before the student tries anything, the phone says when the laptop is away. `DriveStatus.checked` turns true once
   laptop.json has been read since the app came to the front (the copy kept on the phone is from the last time, so its
   `seen` always looks old); only then does `LaptopPresence` call the laptop away, when `seen` is over 3 minutes old (it's
-  written every 45 s) or the file isn't in the folder. A banner ("Your laptop is asleep or off. Last here 2 hours ago…")
+  written every 45 s) or the file isn't in the folder. A banner ("Your computer is asleep or off. Last here 2 hours ago…")
   shows on Home, Due, Search and Ask, Ask's first screen and bar say it too, and when `seen` is fresh again the banner
-  turns to "Your laptop is back." for 4 s. A question is never queued for later (it's given up after 25 s), so the bar
+  turns to "Your computer is back." for 4 s. A question is never queued for later (it's given up after 25 s), so the bar
   still sends but its placeholder says to ask when the laptop is back. `-demo -laptop-away` / `-laptop-back` show it. Once a day the phone deletes
   `upload-` files older than a day that no request of its own points at.
 - Setup: Welcome is Continue with Google (ink), "Use the same Google account as on your laptop.", Scan the code on
   your laptop, and Other ways (Connect over Tailscale; Try it with sample classes). The scanner (and the Camera app,
   through the `studystash://` scheme) takes `studystash://google?account=<email>` as well as a library's address.
-  Signed in with no laptop in the folder: "Now connect your laptop", which looks every 3 s and goes on by itself to
-  What it's for / You're in. Settings shows the phone, Google Drive and the laptop, the account, "Your laptop was last
-  here 3 hours ago." when `seen` is over 3 minutes old, what's on its way, and Sign out of Google.
+  Signed in with no laptop in the folder: "Now connect your computer", which looks every 3 s and goes on by itself to
+  What it's for / You're in. Settings shows the phone, Google Drive and the laptop, the account, "Last here 3 hours
+  ago." when `seen` is over 3 minutes old, what's on its way, and Sign out of Google.
 - The laptop lane's changes (below), on the phone: (1) the filters are exactly those rules (`class`/`lecture` trimmed);
   (2) a phone that finds its id in `removed` stops, signs out of Google (which forgets its id, so the next sign-in is a
-  new box) and Welcome says "Your laptop removed this phone. Sign in again to use it."; (3) a copy that hashes ahead
+  new box) and Welcome says "Your computer removed this phone. Sign in again to use it."; (3) a copy that hashes ahead
   of laptop.json is kept, and fetched again only until laptop.json agrees; (4) the QR link as given, `space` taken by
   debug builds only; (5) a body that's a JSON string with a non-JSON `type` is handed on as its text, an Ask/chat
   answered with `body` (no `lines`) is a plain answer; (6) `phone.name` is `UIDevice.current.name`, which iOS gives as
