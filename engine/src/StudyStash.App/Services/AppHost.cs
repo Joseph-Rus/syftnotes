@@ -422,7 +422,14 @@ public sealed partial class AppHost : IDisposable, IProblemSource
     public Task<MicAccess> AskMicAsync() => mics.AskAsync();
 
     /// <summary>The microphone to record from (and, if asked, what the computer plays too).</summary>
-    public IAudioSource OpenMic() => pretendMic is { } pretend ? pretend() : Microphones.Open(Settings.ComputerAudio || RecordsCall);
+    public IAudioSource OpenMic() => opened = pretendMic is { } pretend ? pretend() : Microphones.Open(Settings.ComputerAudio || RecordsCall);
+
+    /// <summary>The newest microphone opened (the recorder opens it again after trouble).</summary>
+    IAudioSource? opened;
+
+    /// <summary>A Mac recording what it plays has heard nothing but silence from it since the microphone opened: most
+    /// likely it wasn't allowed to (System Settings → Privacy &amp; Security).</summary>
+    public bool HearsOnlyMic => OperatingSystem.IsMacOSVersionAtLeast(14, 2) && opened is MacSound { HearsComputer: false };
 
     /// <summary>The recording now is a call's (Record on a call's ask): it records what the computer plays too, the
     /// others on the call, whatever Settings → Recording says.</summary>

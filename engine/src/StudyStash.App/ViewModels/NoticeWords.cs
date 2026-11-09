@@ -30,6 +30,22 @@ public static class NoticeWords
         ActionLabel = "Record", SecondLabel = "Not now", Act = record, UntilClosed = true, StillTrue = stillOn,
     };
 
+    /// <summary>The call being recorded has ended: Stop now, or Keep going (it stops by itself otherwise). It stays until
+    /// it's answered or the recording stops (<paramref name="stillOn"/>).</summary>
+    public static Notice CallEnded(Action stop, Action keepGoing, Func<bool> stillOn) => new()
+    {
+        Title = "The call ended", Text = "Stop taking notes? Syft Notes stops by itself in 2 minutes.",
+        ActionLabel = "Stop", Act = stop, SecondLabel = "Keep going", SecondAct = keepGoing, UntilClosed = true, StillTrue = stillOn,
+    };
+
+    /// <summary>A Mac recording a call heard nothing from the call itself for its first half minute: most likely macOS
+    /// wasn't allowed to let Syft Notes record what it plays. The microphone goes on recording.</summary>
+    public static Notice HearsOnlyYou(Action openSettings, Func<bool> stillOn) => new()
+    {
+        Title = "Syft Notes can only hear you", Text = "To hear everyone on the call, allow it in System Settings.",
+        ActionLabel = "Open Settings", Act = openSettings, UntilClosed = true, StillTrue = stillOn,
+    };
+
     /// <summary>A lecture the library has filed: its class, its title, and whether its notes were written (when they
     /// weren't, the transcript is there all the same). Notes its AI couldn't write because it needs signing in again
     /// say so, and the button is Sign in, to Settings → Your AI.</summary>

@@ -14,6 +14,11 @@ public sealed class MacSound(bool withComputerAudio) : IAudioSource
     readonly MacMicrophone mic = new();
     readonly PlayedSound played = new();
     MacComputerAudio? computer;
+    volatile bool heardComputer;
+
+    /// <summary>What the Mac plays has given something other than silence since it started. A Mac that wasn't allowed
+    /// to hand its sound over gives only silence (or none at all), so this stays false.</summary>
+    public bool HearsComputer => computer is not null && heardComputer;
 
     public string Name => computer is not null ? "Microphone and computer audio" : "Microphone";
     public int SampleRate => Sound.Rate;
@@ -30,7 +35,11 @@ public sealed class MacSound(bool withComputerAudio) : IAudioSource
         mic.Start();
         if (!withComputerAudio || computer is not null) return;
         var c = new MacComputerAudio();
-        c.Samples += played.Add;
+        c.Samples += s =>
+        {
+            if (!heardComputer && Array.Exists(s, x => x != 0)) heardComputer = true;
+            played.Add(s);
+        };
         try
         {
             c.Start();

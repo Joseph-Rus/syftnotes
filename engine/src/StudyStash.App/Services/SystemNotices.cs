@@ -70,7 +70,7 @@ public sealed class SystemNotices
     public bool Knows(string id) => live.Any(l => l.Id == id);
 
     /// <summary>A Canvas notice has Open and Later (which only marks it seen); any other, its buttons if it has any (its
-    /// second only puts it away, as Later does).</summary>
+    /// second does its own small thing, if any, and puts it away, as Later does).</summary>
     static IReadOnlyList<NotificationButton> Buttons(Notice notice)
     {
         if (notice.Model is CanvasToastModel canvas) return [new(Act, notice.ActionLabel ?? "Open"), new(Later, canvas.DismissLabel, OpensApp: false)];
@@ -122,6 +122,8 @@ public sealed class SystemNotices
         }
         else if (acted && notice.ActionLabel is { Length: > 0 })
             notice.Act?.Invoke();
+        else if (what == Later)
+            notice.SecondAct?.Invoke();
         if (acted || what == Later) system.Remove(id);
     }
 
