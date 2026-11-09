@@ -902,7 +902,9 @@ public static partial class Shell
         var ask = asks.Create();
         // What's been said so far: the transcript as far as it has got, and the live words after it.
         ask.Live = host.LiveTranscript;
-        ask.LiveTitle = $"{(cls.Length > 0 ? cls : "This lecture")}, now";
+        // A call's recording is a meeting, whatever folder it's in.
+        string noun = host.RecordsCall ? Nouns.Meeting : Nouns.For(cls, cls.Length > 0 ? host.GroupOf(cls) : "");
+        ask.LiveTitle = $"{(cls.Length > 0 ? cls : host.RecordsCall ? "This meeting" : "This lecture")}, now";
         // The scope's "This lecture" is this recording and nothing else in the library; its folder and All notes look
         // further, as they do under a note.
         ask.LectureId = liveId;
@@ -917,7 +919,7 @@ public static partial class Shell
         };
         // A recording in no folder has no folder to ask about.
         if (cls.Length == 0) ask.OnlyScopes("lecture", "all");
-        ask.NameScopes(Nouns.For(cls, cls.Length > 0 ? host.GroupOf(cls) : ""), cls.Length > 0 ? ClassNames.Display(cls) : null);
+        ask.NameScopes(noun, cls.Length > 0 ? ClassNames.Display(cls) : null);
         Run(() => ask.Load(), "ask.Load");
         return ask;
     }

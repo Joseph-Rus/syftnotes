@@ -30,6 +30,9 @@ public static class NoticeWords
         ActionLabel = "Record", SecondLabel = "Not now", Act = record, UntilClosed = true, StillTrue = stillOn,
     };
 
+    /// <summary>A call's recording's name: "Zoom call", or "Call in Chrome" for a browser.</summary>
+    public static string CallTitle(Platform.MicUser call) => call.Browser ? $"Call in {call.App}" : $"{call.App} call";
+
     /// <summary>The call being recorded has ended: Stop now, or Keep going (it stops by itself otherwise). It stays until
     /// it's answered or the recording stops (<paramref name="stillOn"/>).</summary>
     public static Notice CallEnded(Action stop, Action keepGoing, Func<bool> stillOn) => new()

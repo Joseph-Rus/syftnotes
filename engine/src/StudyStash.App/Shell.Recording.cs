@@ -40,16 +40,16 @@ public static partial class Shell
     /// <summary>
     /// Starts a recording: into <paramref name="className"/> ("" lets the event that's on, or the library, say where),
     /// or of <paramref name="forEvent"/> (its title, its folder). <paramref name="openPage"/> opens its page in the
-    /// library window. <paramref name="call"/>: a call's, recording both sides. False when it couldn't start, which a
-    /// notice or a toast has said why.
+    /// library window. <paramref name="call"/>: a call's name ("Zoom call"), recording both sides. False when it couldn't
+    /// start, which a notice or a toast has said why.
     /// </summary>
-    static Task<bool> StartRecordingAsync(string className, CalendarEvent? forEvent, bool openPage, bool call = false) =>
+    static Task<bool> StartRecordingAsync(string className, CalendarEvent? forEvent, bool openPage, string? call = null) =>
         BeginAsync(() => host.RecordAsync(className, forEvent, call), openPage);
 
     /// <summary>A call started (<see cref="CallWatch"/>): asked plainly whether to record it, until it ends. Record records
     /// both sides for this one recording, into the event that's on or Unsorted, with the small recorder showing.</summary>
     static void AskAboutCall(MicUser call) => Notify(NoticeWords.CallAsk(call,
-        record: () => Run(RecordCallAsync, "RecordCall"),
+        record: () => Run(() => RecordCallAsync(call), "RecordCall"),
         stillOn: () => calls.Call == call && host.Recorder.Current is null));
 
     /// <summary>How long after its call ends a call's recording stops by itself, unless the student says Keep going.</summary>
@@ -57,9 +57,9 @@ public static partial class Shell
 
     /// <summary>Record, on a call's ask. On a Mac, a call that's still silent half a minute in most likely wasn't let
     /// through by macOS: the student is told how to allow it, and the microphone goes on recording.</summary>
-    static async Task RecordCallAsync()
+    static async Task RecordCallAsync(MicUser call)
     {
-        if (!await StartRecordingAsync("", null, openPage: false, call: true) || host.Recorder.Current is not { } l) return;
+        if (!await StartRecordingAsync("", null, openPage: false, call: NoticeWords.CallTitle(call)) || host.Recorder.Current is not { } l) return;
         if (!OperatingSystem.IsMacOS()) return;
         bool Same() => host.Recorder.Current?.Id == l.Id;
         await Services.Kit.Poll.AfterAsync(TimeSpan.FromSeconds(30));

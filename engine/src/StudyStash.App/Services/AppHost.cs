@@ -1096,9 +1096,9 @@ public sealed partial class AppHost : IDisposable, IProblemSource
     /// Record's whole start: ask for the microphone if the system hasn't asked yet (and wait for the answer), then
     /// start. A microphone that isn't allowed, isn't there or won't start comes back as <see cref="MicTrouble"/>
     /// instead of a lecture; the model or the disk not being ready still throws, as <see cref="StartRecording"/> does.
-    /// <paramref name="call"/>: a call's recording, of both sides (<see cref="RecordsCall"/>).
+    /// <paramref name="call"/>: a call's recording, of both sides (<see cref="RecordsCall"/>), and its name ("Zoom call").
     /// </summary>
-    public Task<RecordStart> RecordAsync(string className, CalendarEvent? forEvent = null, bool call = false) =>
+    public Task<RecordStart> RecordAsync(string className, CalendarEvent? forEvent = null, string? call = null) =>
         MicThenAsync(() => StartRecording(className, forEvent, call));
 
     /// <summary>Keep recording a lecture that stopped (minutes or days ago): what's recorded now is added to the end of
@@ -1165,16 +1165,19 @@ public sealed partial class AppHost : IDisposable, IProblemSource
 
     /// <param name="forEvent">The calendar event the student picked to record (Coming up, Up next): the lecture takes
     /// its title and its folder from it, whatever else is on. Null records what's on now, as Record does.</param>
-    /// <param name="call">A call's recording, of both sides (<see cref="RecordsCall"/>).</param>
-    public Lecture StartRecording(string className, CalendarEvent? forEvent = null, bool call = false)
+    /// <param name="call">A call's recording, of both sides (<see cref="RecordsCall"/>), named for the call ("Zoom call")
+    /// unless a calendar event that's on names it.</param>
+    public Lecture StartRecording(string className, CalendarEvent? forEvent = null, string? call = null)
     {
-        if (Recorder.Current is null) RecordsCall = call;
+        if (Recorder.Current is null) RecordsCall = call is not null;
         // Before the model has arrived (a first lecture, minutes after setup) Record still records: the lecture is
         // written down once the model is here, and the download is started if it isn't going.
         bool waits = !ModelReady;
         if (waits && Downloading is null) _ = DownloadModelAsync();
         var calendar = CalendarStart(className, forEvent);
         var l = WithEvent(Recorder.Start(calendar.ClassName, Client().DisplayName, afterClass: !Settings.LiveTranscript, waitsForModel: waits), calendar);
+        // Named as if typed, so the library keeps it rather than naming it from what was said; renaming still works.
+        if (call is not null && l.Event is null && l.Title.Length == 0) l = Lectures.Update(l.Id, x => (x.Title, x.TitleTyped) = (call, true)) ?? l;
         RecorderStarted();
         return l;
     }
