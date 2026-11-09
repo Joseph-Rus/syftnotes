@@ -110,6 +110,9 @@ public sealed class AppSettings
     public bool GranolaNotify { get; set; } = true;
     /// <summary>The notes' diagrams have shown, once, how to explore one ("Click a box to follow its arrows").</summary>
     public bool DiagramHintSeen { get; set; }
+    /// <summary>The look round Home's buttons (<see cref="ViewModels.HomeTour"/>) has been shown here: after a first run, or
+    /// on the first start of an update that never had it. Never again by itself; Settings → General shows it on request.</summary>
+    public bool TourSeen { get; set; }
     /// <summary>The browser the student added the Canvas extension to on this computer ("Chrome", "Firefox"…): the
     /// one Syft Notes opens Canvas in, and offers first next time. "" until they've added it.</summary>
     public string CanvasBrowser { get; set; } = "";

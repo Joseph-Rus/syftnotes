@@ -210,6 +210,8 @@ public static partial class Shell
         public static ViewModels.FunnelModel? Funnel => funnel;
         /// <summary>Home's "Ready when class starts", while it shows.</summary>
         public static ViewModels.WelcomeCardModel? WelcomeCard => library.Welcome;
+        /// <summary>The look round Home's buttons, while it runs.</summary>
+        public static TourModel? Tour => library.Tour;
         public static void TogglePanel() => Shell.TogglePanel();
         public static void ToggleQuick() => Shell.ToggleQuick();
         public static void Record() => ToggleRecording();
@@ -1277,6 +1279,35 @@ public static partial class Shell
                 });
             }
         }, "LoadLibrary");
+    }
+
+    /// <summary>Settings → General's Show me around: the next time the library is read, it goes Home and shows the tour.</summary>
+    static bool tourAgain;
+
+    static void ShowTourAgain()
+    {
+        settingsWindow?.Close();
+        tourAgain = true;
+        ShowLibrary();
+    }
+
+    /// <summary>The look round Home's buttons (<see cref="HomeTour"/>), once the library window has read the library:
+    /// once, the first time it shows Home after a first run or an update that never had it, and again when asked. A
+    /// library that can't be read yet has no Home to point at, so it waits for the load that can.</summary>
+    static async Task TourIfDueAsync()
+    {
+        bool again = tourAgain;
+        tourAgain = false;
+        if ((!again && host.Settings.TourSeen) || library.Tour is not null || mainWindow?.IsVisible != true) return;
+        if (again && library.Overview is not { IsHome: true }) await ShowHomeAsync();
+        if (library.Overview is not { IsHome: true }) return;
+        if (!host.Settings.TourSeen) host.Save(s => s.TourSeen = true);
+        var tour = new TourModel(HomeTour.Steps);
+        tour.Ended += () =>
+        {
+            if (library.Tour == tour) library.Tour = null;
+        };
+        library.Tour = tour;
     }
 
     /// <summary>
