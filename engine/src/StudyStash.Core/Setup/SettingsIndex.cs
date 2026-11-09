@@ -54,6 +54,8 @@ public static class SettingsIndex
     }
 
     const string OnOff = "on or off";
+    /// <summary>Settings → Recording's switch for the ask when a call starts (only where calls can be noticed).</summary>
+    public const string AskAtCalls = "Ask to take notes when a call starts";
 
     static SettingEntry Page(string id, string detail, string words = "", string only = "") =>
         new() { Section = id, Title = SectionName(id), Detail = detail, Words = words, Only = only, IsPage = true };
@@ -95,6 +97,7 @@ public static class SettingsIndex
         new() { Section = "Recording", Title = "Also record what this computer plays (a lecture on Zoom or Teams)",
             Detail = "Records the computer's own sound as well as the microphone.",
             Words = "zoom teams meet online system audio computer sound video call", Key = "computer_audio", Short = "Recording the computer's sound", Takes = OnOff, Only = "records" },
+        new() { Section = "Recording", Title = AskAtCalls, Detail = "Asks whether to record a call (Teams, Webex, a call in a browser) when it starts.", Words = "call calls meeting webex ask pop up notice", Only = "records" },
         new() { Section = "Recording", Title = "Tell speakers apart in the transcript", Detail = "Marks where a voice other than the lecturer's speaks.",
             Words = "speakers diarization voices who talking questions students", Key = "speakers", Short = "Telling speakers apart", Takes = OnOff, Only = "records" },
         new() { Section = "Recording", Title = "Keep recordings", Detail = "Days the audio stays after a lecture is filed (0 keeps it).",

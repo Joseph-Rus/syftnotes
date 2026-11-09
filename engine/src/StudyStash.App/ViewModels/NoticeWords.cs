@@ -30,6 +30,9 @@ public static class NoticeWords
         ActionLabel = "Record", SecondLabel = "Not now", Act = record, UntilClosed = true, StillTrue = stillOn,
     };
 
+    /// <summary>A call's recording's name: "Zoom call", or "Call in Chrome" for a browser.</summary>
+    public static string CallTitle(Platform.MicUser call) => call.Browser ? $"Call in {call.App}" : $"{call.App} call";
+
     /// <summary>A lecture the library has filed: its class, its title, and whether its notes were written (when they
     /// weren't, the transcript is there all the same). Notes its AI couldn't write because it needs signing in again
     /// say so, and the button is Sign in, to Settings → Your AI.</summary>
