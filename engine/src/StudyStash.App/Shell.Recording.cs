@@ -49,8 +49,44 @@ public static partial class Shell
     /// <summary>A call started (<see cref="CallWatch"/>): asked plainly whether to record it, until it ends. Record records
     /// both sides for this one recording, into the event that's on or Unsorted, with the small recorder showing.</summary>
     static void AskAboutCall(MicUser call) => Notify(NoticeWords.CallAsk(call,
-        record: () => Run(() => StartRecordingAsync("", null, openPage: false, call: NoticeWords.CallTitle(call)), "RecordCall"),
+        record: () => Run(() => RecordCallAsync(call), "RecordCall"),
         stillOn: () => calls.Call == call && host.Recorder.Current is null));
+
+    /// <summary>How long after its call ends a call's recording stops by itself, unless the student says Keep going.</summary>
+    static readonly TimeSpan CallStopsAfter = TimeSpan.FromMinutes(2);
+
+    /// <summary>Record, on a call's ask. On a Mac, a call that's still silent half a minute in most likely wasn't let
+    /// through by macOS: the student is told how to allow it, and the microphone goes on recording.</summary>
+    static async Task RecordCallAsync(MicUser call)
+    {
+        if (!await StartRecordingAsync("", null, openPage: false, call: NoticeWords.CallTitle(call)) || host.Recorder.Current is not { } l) return;
+        if (!OperatingSystem.IsMacOS()) return;
+        bool Same() => host.Recorder.Current?.Id == l.Id;
+        await Services.Kit.Poll.AfterAsync(TimeSpan.FromSeconds(30));
+        if (Same() && host.HearsOnlyMic)
+            Notify(NoticeWords.HearsOnlyYou(() => Dialogs.OpenUrl(StudyStash.Audio.MicTrouble.MacSystemAudioUrl), stillOn: Same));
+    }
+
+    /// <summary>The call being recorded ended (<see cref="CallWatch"/>): Stop now, or Keep going; otherwise it stops by
+    /// itself after <see cref="CallStopsAfter"/>, its notes written as usual. Only a recording started from a call's ask.</summary>
+    static void OfferToStopCall()
+    {
+        if (!host.RecordsCall || host.Recorder.Current is not { } l) return;
+        var keep = new CancellationTokenSource();
+        bool Same() => host.Recorder.Current?.Id == l.Id;
+        Notify(NoticeWords.CallEnded(
+            stop: () =>
+            {
+                if (Same()) StopRecording();
+            },
+            keepGoing: keep.Cancel,
+            stillOn: () => Same() && !keep.IsCancellationRequested));
+        Run(async () =>
+        {
+            await Services.Kit.Poll.AfterAsync(CallStopsAfter, keep.Token);
+            if (Same()) StopRecording();
+        }, "StopCallByItself");
+    }
 
     /// <summary>Keep recording a note that stopped, minutes or days ago: what's said now goes on the end of its
     /// transcript, its page opens as the recording's, and once it stops its notes are written again from all of it.

@@ -118,6 +118,30 @@ public class SystemNoticesTests
     }
 
     [Fact]
+    public void When_the_call_ends_keep_going_is_its_own_answer_and_stop_stops()
+    {
+        var rig = new Rig();
+        int stopped = 0, kept = 0;
+        var ended = NoticeWords.CallEnded(() => stopped++, () => kept++, () => true);
+
+        rig.Notices.Show(ended);
+        var (id, title, _, buttons) = Assert.Single(rig.System.Shown);
+        Assert.Equal("The call ended", title);
+        Assert.Equal(new NotificationButton[] { new("act", "Stop"), new("later", "Keep going", OpensApp: false) }, buttons);
+        rig.System.Respond(id, "later");
+        Assert.Equal((0, 1), (stopped, kept));
+
+        // Cleared away unanswered: neither (it stops by itself later).
+        rig.Notices.Show(ended);
+        rig.System.Respond(id, NotificationResponse.Dismissed);
+        Assert.Equal((0, 1), (stopped, kept));
+
+        rig.Notices.Show(ended);
+        rig.System.Respond(id, "act");
+        Assert.Equal((1, 1), (stopped, kept));
+    }
+
+    [Fact]
     public void One_that_says_something_is_still_so_is_taken_down_when_it_isnt()
     {
         var rig = new Rig();

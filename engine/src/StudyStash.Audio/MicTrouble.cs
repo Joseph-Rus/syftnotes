@@ -26,6 +26,8 @@ public sealed record MicTrouble(MicTroubleKind Kind, string Title, string Detail
 {
     public const string MacPrivacyUrl = "x-apple.systempreferences:com.apple.preference.security?Privacy_Microphone";
     public const string MacSoundUrl = "x-apple.systempreferences:com.apple.Sound-Settings.extension";
+    /// <summary>Screen &amp; System Audio Recording, where a Mac lets an app record what it plays.</summary>
+    public const string MacSystemAudioUrl = "x-apple.systempreferences:com.apple.preference.security?Privacy_ScreenCapture";
     public const string WindowsPrivacyUrl = "ms-settings:privacy-microphone";
     public const string WindowsSoundUrl = "ms-settings:sound";
 

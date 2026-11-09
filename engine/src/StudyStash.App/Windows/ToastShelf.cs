@@ -82,7 +82,8 @@ public sealed class ToastShelf
         if (added)
         {
             var view = notice.Model is CanvasToastModel canvasToast ? ToastView.For(canvasToast)
-                : new ToastView { Title = notice.Title, Text = notice.Text, ActionLabel = notice.ActionLabel, SecondLabel = notice.SecondLabel };
+                : new ToastView { Title = notice.Title, Text = notice.Text, ActionLabel = notice.ActionLabel, SecondLabel = notice.SecondLabel,
+                    SecondCommand = notice.SecondAct is { } second ? new CommunityToolkit.Mvvm.Input.RelayCommand(second) : null };
             var w = new Floating { Content = view, Title = notice.Title, ShowActivated = false, Notification = true };
             view.Acted += () =>
             {

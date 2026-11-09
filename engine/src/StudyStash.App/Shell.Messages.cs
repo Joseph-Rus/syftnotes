@@ -29,5 +29,6 @@ public static partial class Shell
         messages.Register<WindowsChanged>(listener, static (_, _) => UpdateDock());
         messages.Register<SomethingWentWrong>(listener, static (_, _) => SayOops());
         messages.Register<CallStarted>(listener, static (_, m) => AskAboutCall(m.Call));
+        messages.Register<CallEnded>(listener, static (_, _) => OfferToStopCall());
     }
 }
