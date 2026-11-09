@@ -43,6 +43,9 @@ public sealed class AppSettings
     public string Language { get; set; } = "";
     /// <summary>Record what the computer plays too (a lecture on Zoom): Windows, and macOS 14.2 or later.</summary>
     public bool ComputerAudio { get; set; }
+    /// <summary>Settings → Recording's "Ask to take notes when a call starts" (<see cref="CallWatch"/>). On until it's
+    /// switched off.</summary>
+    public bool AskAtCalls { get; set; } = true;
     /// <summary>Parakeet's library wouldn't load on this computer (a Windows PC without Microsoft's Visual C++ runtime, say):
     /// Whisper is the model for it from then on.</summary>
     public bool ParakeetFailed { get; set; }
@@ -419,7 +422,11 @@ public sealed partial class AppHost : IDisposable, IProblemSource
     public Task<MicAccess> AskMicAsync() => mics.AskAsync();
 
     /// <summary>The microphone to record from (and, if asked, what the computer plays too).</summary>
-    public IAudioSource OpenMic() => pretendMic is { } pretend ? pretend() : Microphones.Open(Settings.ComputerAudio);
+    public IAudioSource OpenMic() => pretendMic is { } pretend ? pretend() : Microphones.Open(Settings.ComputerAudio || RecordsCall);
+
+    /// <summary>The recording now is a call's (Record on a call's ask): it records what the computer plays too, the
+    /// others on the call, whatever Settings → Recording says.</summary>
+    public bool RecordsCall { get; private set; }
 
     /// <summary>Where the student turns the microphone on for Syft Notes.</summary>
     public string MicSettingsUrl => Microphones.SettingsUrl;
@@ -1082,8 +1089,10 @@ public sealed partial class AppHost : IDisposable, IProblemSource
     /// Record's whole start: ask for the microphone if the system hasn't asked yet (and wait for the answer), then
     /// start. A microphone that isn't allowed, isn't there or won't start comes back as <see cref="MicTrouble"/>
     /// instead of a lecture; the model or the disk not being ready still throws, as <see cref="StartRecording"/> does.
+    /// <paramref name="call"/>: a call's recording, of both sides (<see cref="RecordsCall"/>), and its name ("Zoom call").
     /// </summary>
-    public Task<RecordStart> RecordAsync(string className, CalendarEvent? forEvent = null) => MicThenAsync(() => StartRecording(className, forEvent));
+    public Task<RecordStart> RecordAsync(string className, CalendarEvent? forEvent = null, string? call = null) =>
+        MicThenAsync(() => StartRecording(className, forEvent, call));
 
     /// <summary>Keep recording a lecture that stopped (minutes or days ago): what's recorded now is added to the end of
     /// its transcript, and its notes are written again. The microphone is asked for as Record asks.
@@ -1107,6 +1116,7 @@ public sealed partial class AppHost : IDisposable, IProblemSource
                 x.FiledTitle = title;
                 if (x.TitleTyped) x.Title = title;
             });
+        if (Recorder.Current is null) RecordsCall = false;
         var l = Recorder.Continue(id);
         RecorderStarted();
         return l;
@@ -1148,14 +1158,19 @@ public sealed partial class AppHost : IDisposable, IProblemSource
 
     /// <param name="forEvent">The calendar event the student picked to record (Coming up, Up next): the lecture takes
     /// its title and its folder from it, whatever else is on. Null records what's on now, as Record does.</param>
-    public Lecture StartRecording(string className, CalendarEvent? forEvent = null)
+    /// <param name="call">A call's recording, of both sides (<see cref="RecordsCall"/>), named for the call ("Zoom call")
+    /// unless a calendar event that's on names it.</param>
+    public Lecture StartRecording(string className, CalendarEvent? forEvent = null, string? call = null)
     {
+        if (Recorder.Current is null) RecordsCall = call is not null;
         // Before the model has arrived (a first lecture, minutes after setup) Record still records: the lecture is
         // written down once the model is here, and the download is started if it isn't going.
         bool waits = !ModelReady;
         if (waits && Downloading is null) _ = DownloadModelAsync();
         var calendar = CalendarStart(className, forEvent);
         var l = WithEvent(Recorder.Start(calendar.ClassName, Client().DisplayName, afterClass: !Settings.LiveTranscript, waitsForModel: waits), calendar);
+        // Named as if typed, so the library keeps it rather than naming it from what was said; renaming still works.
+        if (call is not null && l.Event is null && l.Title.Length == 0) l = Lectures.Update(l.Id, x => (x.Title, x.TitleTyped) = (call, true)) ?? l;
         RecorderStarted();
         return l;
     }

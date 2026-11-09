@@ -69,10 +69,16 @@ public sealed class SystemNotices
     /// <summary>Whether a click on notification <paramref name="id"/> is one this run of the app can act on.</summary>
     public bool Knows(string id) => live.Any(l => l.Id == id);
 
-    /// <summary>A Canvas notice has Open and Later (which only marks it seen); any other, its one button if it has one.</summary>
-    static IReadOnlyList<NotificationButton> Buttons(Notice notice) => notice.Model is CanvasToastModel canvas
-        ? [new(Act, notice.ActionLabel ?? "Open"), new(Later, canvas.DismissLabel, OpensApp: false)]
-        : notice.ActionLabel is { Length: > 0 } label ? [new(Act, label)] : [];
+    /// <summary>A Canvas notice has Open and Later (which only marks it seen); any other, its buttons if it has any (its
+    /// second only puts it away, as Later does).</summary>
+    static IReadOnlyList<NotificationButton> Buttons(Notice notice)
+    {
+        if (notice.Model is CanvasToastModel canvas) return [new(Act, notice.ActionLabel ?? "Open"), new(Later, canvas.DismissLabel, OpensApp: false)];
+        var buttons = new List<NotificationButton>();
+        if (notice.ActionLabel is { Length: > 0 } label) buttons.Add(new(Act, label));
+        if (notice.SecondLabel is { Length: > 0 } second) buttons.Add(new(Later, second, OpensApp: false));
+        return buttons;
+    }
 
     public void Show(Notice notice)
     {

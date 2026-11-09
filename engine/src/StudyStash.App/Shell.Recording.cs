@@ -40,10 +40,17 @@ public static partial class Shell
     /// <summary>
     /// Starts a recording: into <paramref name="className"/> ("" lets the event that's on, or the library, say where),
     /// or of <paramref name="forEvent"/> (its title, its folder). <paramref name="openPage"/> opens its page in the
-    /// library window. False when it couldn't start, which a notice or a toast has said why.
+    /// library window. <paramref name="call"/>: a call's name ("Zoom call"), recording both sides. False when it couldn't
+    /// start, which a notice or a toast has said why.
     /// </summary>
-    static Task<bool> StartRecordingAsync(string className, CalendarEvent? forEvent, bool openPage) =>
-        BeginAsync(() => host.RecordAsync(className, forEvent), openPage);
+    static Task<bool> StartRecordingAsync(string className, CalendarEvent? forEvent, bool openPage, string? call = null) =>
+        BeginAsync(() => host.RecordAsync(className, forEvent, call), openPage);
+
+    /// <summary>A call started (<see cref="CallWatch"/>): asked plainly whether to record it, until it ends. Record records
+    /// both sides for this one recording, into the event that's on or Unsorted, with the small recorder showing.</summary>
+    static void AskAboutCall(MicUser call) => Notify(NoticeWords.CallAsk(call,
+        record: () => Run(() => StartRecordingAsync("", null, openPage: false, call: NoticeWords.CallTitle(call)), "RecordCall"),
+        stillOn: () => calls.Call == call && host.Recorder.Current is null));
 
     /// <summary>Keep recording a note that stopped, minutes or days ago: what's said now goes on the end of its
     /// transcript, its page opens as the recording's, and once it stops its notes are written again from all of it.

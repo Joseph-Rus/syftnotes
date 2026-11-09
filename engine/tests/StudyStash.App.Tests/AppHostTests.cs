@@ -265,6 +265,23 @@ public class AppHostTests
         host.StopRecording();
     }
 
+    /// <summary>Record on a call's ask: both sides, and named for the call the way a typed title is, so the library
+    /// keeps the name instead of naming it from what was said.</summary>
+    [Fact]
+    public async Task A_calls_recording_records_both_sides_and_keeps_the_calls_name()
+    {
+        using var home = new TempHome();
+        using var host = Recording(home, new FakeMics(MicAccess.Allowed));
+        var l = (await host.RecordAsync("", call: "Zoom call")).Lecture!;
+        Assert.True(host.RecordsCall);
+        Assert.Equal(("Zoom call", true), (l.Title, l.TitleTyped));
+        Assert.Equal(Core.Meeting.ByHand, l.Payload()["raw"]?[Core.Meeting.TitleBy]?.GetValue<string>());
+        host.StopRecording();
+        Assert.False((await host.RecordAsync("")).Lecture!.TitleTyped);
+        Assert.False(host.RecordsCall);
+        host.StopRecording();
+    }
+
     /// <summary>⌘Q while a lecture records asks first; pressed again while the question shows, it neither asks again
     /// nor quits but brings the question to the front; "Keep recording" leaves the lecture recording.</summary>
     [Fact]
