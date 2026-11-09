@@ -69,6 +69,18 @@ public sealed class SharedLectureTests
             Assert.Equal(SyftFile.Unexpected, refused.Message);
         }
         Assert.Equal(SyftFile.NotOne, Assert.Throws<SyftFileException>(() => SyftFile.Read(new MemoryStream("not a zip"u8.ToArray()))).Message);
+        Assert.Equal(SyftFile.NotOne, Assert.Throws<SyftFileException>(() =>
+            SyftFile.Read(new MemoryStream(Zip(("manifest.json", """{"format": 1, "format": 1, "title": "x"}"""), ("notes.md", NotesFile))))).Message);
+        // A tiny file with one big picture linked over and over can't grow into a huge one: refused, and quickly.
+        string big = "<svg xmlns=\"http://www.w3.org/2000/svg\">" + new string(' ', 150_000) + "</svg>";
+        string links = string.Concat(Enumerable.Repeat("![Diagram: x](notes.assets/diagram-1.svg)\n", 1500));
+        var started = System.Diagnostics.Stopwatch.StartNew();
+        Assert.Equal(SyftFile.TooBig, Assert.Throws<SyftFileException>(() => SyftFile.Read(new MemoryStream(Zip(("manifest.json", Manifest),
+            ("notes.md", "# Lecture 4\n\n" + links), ("notes.assets/diagram-1.svg", big))))).Message);
+        Assert.True(started.Elapsed < TimeSpan.FromSeconds(2), $"took {started.Elapsed}");
+        // A line break in the title can't start a heading in the note file.
+        Assert.Equal("Lecture 4 # Owned", SyftFile.Read(new MemoryStream(Zip(("manifest.json", Manifest.Replace("Lecture 4", "Lecture 4\\n# Owned")),
+            ("notes.md", NotesFile)))).Title);
         Assert.Equal(SyftFile.Newer, Assert.Throws<SyftFileException>(() =>
             SyftFile.Read(new MemoryStream(Zip(("manifest.json", Manifest.Replace("\"format\": 1", "\"format\": 2")), ("notes.md", NotesFile))))).Message);
     }

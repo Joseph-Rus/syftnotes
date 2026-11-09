@@ -18,7 +18,8 @@ namespace StudyStash.Core;
 public sealed record SharedLecture(string Title, string ClassName, string Date, string Notes, string Transcript)
 {
     public const int MaxTitle = 200, MaxClass = 60;
-    public const int MaxNotesChars = 8 * 1024 * 1024, MaxTranscriptChars = 8 * 1024 * 1024;
+    /// <summary>Notes rarely pass 100 KB, drawings put back included; a three-hour transcript is about 250 KB.</summary>
+    public const int MaxNotesChars = 1024 * 1024, MaxTranscriptChars = 4 * 1024 * 1024;
 
     /// <summary>Who wrote the notes, as the byline says it: someone else, not this library's AI.</summary>
     public const string Writer = "Shared by a friend";
@@ -43,13 +44,19 @@ public sealed record SharedLecture(string Title, string ClassName, string Date, 
     /// <see cref="SyftFileException"/> with words for the student otherwise.</summary>
     internal static SharedLecture Checked(string? title, string? className, string? date, string? notes, string? transcript)
     {
-        string t = (title ?? "").Trim(), n = (notes ?? "").Trim('\n', '\r'), s = (transcript ?? "").Trim('\n', '\r');
+        string t = OneLine(title), n = (notes ?? "").Trim('\n', '\r'), s = (transcript ?? "").Trim('\n', '\r');
         if (t.Length == 0) throw new SyftFileException(SyftFile.NotOne);
         if (n.Length > MaxNotesChars || s.Length > MaxTranscriptChars) throw new SyftFileException(SyftFile.TooBig);
         if (n.Trim().Length == 0 && s.Trim().Length == 0) throw new SyftFileException(SyftFile.Empty);
-        string day = DateTimeOffset.TryParse(date, CultureInfo.InvariantCulture, DateTimeStyles.None, out _) ? date! : "";
-        return new SharedLecture(Py.Head(t, MaxTitle), Py.Head((className ?? "").Trim(), MaxClass), day, n, s);
+        string day = (date ?? "").Trim();
+        if (!DateTimeOffset.TryParse(day, CultureInfo.InvariantCulture, DateTimeStyles.None, out _)) day = "";
+        return new SharedLecture(Py.Head(t, MaxTitle), Py.Head(OneLine(className), MaxClass), day, n, s);
     }
+
+    /// <summary>A title or class as plain words on one line: a line break (which would start a heading in the note file),
+    /// a control character or an invisible one (a right-to-left override) becomes a space.</summary>
+    static string OneLine(string? text) => new string([.. (text ?? "").Select(c =>
+        char.IsControl(c) || CharUnicodeInfo.GetUnicodeCategory(c) == UnicodeCategory.Format ? ' ' : c)]).Trim();
 
     /// <summary>The lecture as the library keeps one. The class the friend had it in is its folder, so the library's
     /// own sorting finds a class of that name (or another name of one); its title stays as it came.</summary>
@@ -91,9 +98,9 @@ public static partial class SyftFile
     public const int Format = 1;
     public const string Manifest = "manifest.json", NotesEntry = "notes.md", TranscriptEntry = "transcript.txt";
 
-    const long MaxFileBytes = 40L * 1024 * 1024;
-    const int MaxEntries = 200, MaxManifestBytes = 64 * 1024, MaxPictureBytes = 4 * 1024 * 1024;
-    const long MaxTotalBytes = 48L * 1024 * 1024;
+    const long MaxFileBytes = 16L * 1024 * 1024;
+    const int MaxEntries = 200, MaxManifestBytes = 64 * 1024, MaxPictureBytes = SafeSvg.MaxBytes;
+    const long MaxTotalBytes = 24L * 1024 * 1024;
 
     public const string NotOne = "Syft Notes can't open that file: it isn't a lecture shared from Syft Notes, or it was damaged on the way. Ask for it to be sent again.";
     public const string Unexpected = "Syft Notes didn't open that file: it has things in it that a shared lecture never has. Ask for it to be shared again from Syft Notes.";
@@ -102,7 +109,7 @@ public static partial class SyftFile
     public const string Empty = "That file has no notes or transcript in it.";
     public const string Gone = "Syft Notes can't find that file any more. It may have been moved or renamed.";
 
-    [GeneratedRegex(@"^notes\.assets/diagram-[1-9][0-9]{0,3}\.svg$", RegexOptions.CultureInvariant)]
+    [GeneratedRegex(@"\Anotes\.assets/diagram-[1-9][0-9]{0,3}\.svg\z", RegexOptions.CultureInvariant)]
     private static partial Regex PictureEntry();
 
     public static bool Is(string path) => path.EndsWith(Ending, StringComparison.OrdinalIgnoreCase);
@@ -152,21 +159,24 @@ public static partial class SyftFile
         }
         if (!texts.TryGetValue(Manifest, out string? manifestText) || !texts.TryGetValue(NotesEntry, out string? notes))
             throw new SyftFileException(NotOne);
-        JsonObject manifest;
+        int format;
+        string? title, className, date;
         try
         {
-            manifest = JsonNode.Parse(manifestText) as JsonObject ?? throw new SyftFileException(NotOne);
+            var manifest = JsonNode.Parse(manifestText) as JsonObject ?? throw new SyftFileException(NotOne);
+            format = manifest["format"] is JsonValue v && v.TryGetValue(out int f) ? f : 0;
+            (title, className, date) = (Py.AsString(manifest["title"]), Py.AsString(manifest["class"]), Py.AsString(manifest["date"]));
         }
-        catch (System.Text.Json.JsonException)
+        // A key said twice ({"format": 1, "format": 1}) is an ArgumentException once it's read.
+        catch (Exception e) when (e is System.Text.Json.JsonException or ArgumentException)
         {
             throw new SyftFileException(NotOne);
         }
-        int format = manifest["format"] is JsonValue v && v.TryGetValue(out int f) ? f : 0;
         if (format > Format) throw new SyftFileException(Newer);
         if (format != Format) throw new SyftFileException(NotOne);
         var pictures = texts.Where(kv => PictureEntry().IsMatch(kv.Key)).ToDictionary(kv => kv.Key, kv => kv.Value);
-        return SharedLecture.Checked(Py.AsString(manifest["title"]), Py.AsString(manifest["class"]), Py.AsString(manifest["date"]),
-            NoteExport.Undrawn(notes, pictures), texts.GetValueOrDefault(TranscriptEntry));
+        return SharedLecture.Checked(title, className, date,
+            NoteExport.Undrawn(notes, pictures, SharedLecture.MaxNotesChars) ?? throw new SyftFileException(TooBig), texts.GetValueOrDefault(TranscriptEntry));
     }
 
     /// <summary>"Cell Biology - Lecture 4.syft": the name the Save dialog suggests for a lecture.</summary>
