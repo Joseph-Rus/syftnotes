@@ -84,4 +84,41 @@ public sealed class SharedLectureTests
         Assert.Equal(SyftFile.Newer, Assert.Throws<SyftFileException>(() =>
             SyftFile.Read(new MemoryStream(Zip(("manifest.json", Manifest.Replace("\"format\": 1", "\"format\": 2")), ("notes.md", NotesFile))))).Message);
     }
+
+    /// <summary>What Send to a Syft Notes user writes is what opening it reads: the title, class, day, notes (a drawing
+    /// as a drawing again) and transcript, and nothing of who sent it.</summary>
+    [Fact]
+    public void A_written_file_reads_back()
+    {
+        const string notes = "## Summary\n\nThe membrane keeps the cell's inside apart.\n\n- lipids\n- proteins\n\n```svg\n" + Svg + "\n```\n\n## Proteins\n\nChannels and pumps.";
+        var lecture = new System.Text.Json.Nodes.JsonObject
+        {
+            ["id"] = "rec-20261103-093000-abc123", ["owner"] = "Sender's MacBook", ["title"] = "Lecture 4", ["class"] = "Cell Biology",
+            ["date"] = "2026-11-03T09:30:00-05:00", ["seconds"] = 3120, ["notes"] = notes,
+            ["transcript"] = "[00:05] Today, the cell membrane.\n[00:40] It is a lipid bilayer.", ["typed"] = "my own private aside",
+        };
+        var file = new MemoryStream();
+        SyftFile.Write(file, lecture, "0.24.0");
+
+        file.Position = 0;
+        using (var zip = new ZipArchive(file, ZipArchiveMode.Read, leaveOpen: true))
+        {
+            Assert.Equal(["manifest.json", "notes.md", "notes.assets/diagram-1.svg", "transcript.txt"], zip.Entries.Select(e => e.FullName));
+            string all = string.Concat(zip.Entries.Select(e => new StreamReader(e.Open()).ReadToEnd()));
+            foreach (string personal in (string[])["rec-20261103", "MacBook", "private aside", "09:30"]) Assert.DoesNotContain(personal, all);
+        }
+        file.Position = 0;
+        var back = SyftFile.Read(file);
+        Assert.Equal(("Lecture 4", "Cell Biology", "2026-11-03"), (back.Title, back.ClassName, back.Date));
+        Assert.Equal(lecture["transcript"]!.GetValue<string>(), back.Transcript);
+        Assert.Equal(notes.Replace(Svg, SafeSvgOf(Svg)), back.Notes);
+        Assert.Equal("Cell Biology - Lecture 4.syft", SyftFile.SaveName("Cell Biology", "Lecture 4"));
+
+        // Only what the student typed, and no transcript: nothing is sent, and it says so.
+        lecture["notes"] = "";
+        lecture["transcript"] = "";
+        Assert.Equal(SyftFile.NothingToSend, Assert.Throws<SyftFileException>(() => SyftFile.Write(new MemoryStream(), lecture, "0.24.0")).Message);
+    }
+
+    static string SafeSvgOf(string svg) => Rich.SafeSvg.Clean(svg).Svg!;
 }

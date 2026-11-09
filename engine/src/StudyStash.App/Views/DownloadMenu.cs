@@ -3,15 +3,17 @@ using StudyStash.App.Controls;
 
 namespace StudyStash.App.Views;
 
-/// <summary>The share/Export button's menu: download this lecture as Markdown or as a PDF, download the whole open
-/// class (when one is open), and a check for whether a download includes the transcript.</summary>
+/// <summary>The share/Export button's menu: download this lecture as Markdown or as a PDF, send it to another Syft Notes
+/// user (a .syft file), download the whole open class (when one is open), and a check for whether a download includes
+/// the transcript.</summary>
 public static class DownloadMenu
 {
     /// <summary><paramref name="className"/> null leaves out "Download all of…" (Due, or no class open).
     /// <paramref name="includeTranscripts"/> checks "Include transcripts". <paramref name="download"/>,
-    /// <paramref name="downloadPdf"/>, <paramref name="downloadClass"/> and <paramref name="toggleTranscripts"/> run
-    /// when their row is picked.</summary>
-    public static ContextMenu Build(string? className, bool includeTranscripts, Action download, Action downloadPdf, Action downloadClass, Action toggleTranscripts)
+    /// <paramref name="downloadPdf"/>, <paramref name="send"/> (a .syft file for another Syft Notes user, always with
+    /// its transcript), <paramref name="downloadClass"/> and <paramref name="toggleTranscripts"/> run when their row is
+    /// picked.</summary>
+    public static ContextMenu Build(string? className, bool includeTranscripts, Action download, Action downloadPdf, Action send, Action downloadClass, Action toggleTranscripts)
     {
         var menu = new ContextMenu { WindowManagerAddShadowHint = OperatingSystem.IsMacOS() };
         var one = new MenuItem { Header = "Download as Markdown…" };
@@ -20,6 +22,9 @@ public static class DownloadMenu
         var pdf = new MenuItem { Header = "Download as PDF…" };
         pdf.Click += (_, _) => downloadPdf();
         menu.Items.Add(pdf);
+        var syft = new MenuItem { Header = "Send to a Syft Notes user…" };
+        syft.Click += (_, _) => send();
+        menu.Items.Add(syft);
         if (className is not null)
         {
             var all = new MenuItem { Header = $"Download all of {className}…" };
