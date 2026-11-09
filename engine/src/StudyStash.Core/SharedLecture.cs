@@ -169,7 +169,34 @@ public static partial class SyftFile
             NoteExport.Undrawn(notes, pictures), texts.GetValueOrDefault(TranscriptEntry));
     }
 
-    static readonly UTF8Encoding Strict = new(encoderShouldEmitUTF8Identifier: false, throwOnInvalidBytes: true);
+    /// <summary>"Cell Biology - Lecture 4.syft": the name the Save dialog suggests for a lecture.</summary>
+    public static string SaveName(string? className, string title) =>
+        NoteExport.SaveName(string.Join(" - ", new[] { className, title }.Where(s => !string.IsNullOrWhiteSpace(s) && s != Configs.Unsorted)), Ending);
+
+    /// <summary>Writes <paramref name="lecture"/> (the library's JSON for it) as a .syft file to <paramref name="to"/>:
+    /// its notes as a download makes them, their pictures, its transcript, and the manifest. <paramref name="app"/> is
+    /// this Syft Notes' version. Nothing else of it goes in: no recording, attachments, ids or names.</summary>
+    public static void Write(Stream to, JsonObject lecture, string app)
+    {
+        // A Mermaid chart needs no picture: Syft Notes draws it from its source.
+        var export = NoteExport.Lecture(lecture, transcript: false, _ => null, NotesEntry);
+        using var zip = new ZipArchive(to, ZipArchiveMode.Create, leaveOpen: true);
+        void Add(string name, string text)
+        {
+            using var w = new StreamWriter(zip.CreateEntry(name, CompressionLevel.Optimal).Open(), new UTF8Encoding(false));
+            w.Write(text);
+        }
+        Add(Manifest, PyJson.Dumps(new JsonObject
+        {
+            ["format"] = Format, ["title"] = Py.AsString(lecture["title"]) ?? "", ["class"] = Py.AsString(lecture["class"]) ?? "",
+            ["date"] = Py.AsString(lecture["date"]) ?? "", ["app"] = app,
+        }, indent: 2));
+        Add(NotesEntry, export.Markdown);
+        foreach (var asset in export.Assets) Add(asset.RelativePath, asset.Text);
+        if (Py.AsString(lecture["transcript"]) is { Length: > 0 } transcript) Add(TranscriptEntry, transcript);
+    }
+
+    static readonly UTF8Encoding Strict =new(encoderShouldEmitUTF8Identifier: false, throwOnInvalidBytes: true);
 
     /// <summary>An entry's bytes, read no further than <paramref name="limit"/> (the size a zip says it has can lie).</summary>
     static byte[] Bounded(ZipArchiveEntry entry, long limit)

@@ -115,6 +115,41 @@ public static class NotesDownload
         if (stream.CanSeek) stream.SetLength(stream.Position);
     }
 
+    /// <summary>One lecture as a file for another Syft Notes user (<see cref="SyftFile"/>), chosen with the Save dialog:
+    /// its notes and transcript, which their Syft Notes opens as a lecture of their own.</summary>
+    public static async Task LectureSyftAsync(Window window, RemoteLibrary lib, string lectureId, string suggestedName)
+    {
+        var file = await window.StorageProvider.SaveFilePickerAsync(new FilePickerSaveOptions
+        {
+            Title = "Send to a Syft Notes user", SuggestedFileName = suggestedName, DefaultExtension = "syft",
+            FileTypeChoices = [new FilePickerFileType("Syft Notes lecture") { Patterns = ["*.syft"], AppleUniformTypeIdentifiers = [SyftFile.TypeId] }],
+        });
+        if (file is null) return;
+        JsonObject? lecture;
+        try
+        {
+            lecture = await lib.LectureAsync(lectureId);
+        }
+        catch (Exception e) when (e is HttpRequestException or TaskCanceledException or LibraryRefusedException)
+        {
+            Say("Couldn't save it", e.Message);
+            return;
+        }
+        if (lecture is null) return;
+        // Made in memory first, away from the window: a file that couldn't be made leaves the one picked as it was.
+        using var made = new MemoryStream();
+        await Task.Run(() => SyftFile.Write(made, lecture, Engine.Version));
+        await using (var stream = await file.OpenWriteAsync())
+        {
+            made.Position = 0;
+            await made.CopyToAsync(stream);
+            if (stream.CanSeek) stream.SetLength(stream.Position);
+        }
+        string? folder = file.TryGetLocalPath() is { Length: > 0 } path ? Path.GetDirectoryName(path) : null;
+        Say("Ready to send", "Send the file to your friend. Their Syft Notes opens it with the notes and transcript.",
+            folder is null ? null : "Show", folder is null ? null : () => Machine.Open(folder));
+    }
+
     /// <summary>Every lecture of a class, into a folder of its own chosen with the folder dialog.</summary>
     public static Task ClassAsync(Window window, RemoteLibrary lib, string className, bool transcript, Func<string, string?> mermaidSvg) =>
         ClassAsync(async () =>
