@@ -200,7 +200,11 @@ public static partial class Shell
                 if (OperatingSystem.IsWindows()) WinFileTypes.Register(Desktop.Program);
             }), "say that .syft files open in Syft Notes");
         // Started by opening a lecture a friend shared (Windows starts the program with its path).
-        if (host.Settings.SetupDone && Program.OpenedFile is { } shared) AddShared(shared, "");
+        if (Program.OpenedFile is { } shared)
+        {
+            if (host.Settings.SetupDone) AddShared(shared, "");
+            else sharedAfterSetup = shared;
+        }
         if (SelfTest.Dir is not null) SelfTest.Run();
     }
 
@@ -1267,6 +1271,12 @@ public static partial class Shell
         {
             ShowSetup();
             return;
+        }
+        // A lecture a friend shared, opened before setup was done (setup ends here).
+        if (sharedAfterSetup is { } shared)
+        {
+            sharedAfterSetup = null;
+            AddShared(shared, "");
         }
         var w = MainWindow();
         library.DrawChrome = false;

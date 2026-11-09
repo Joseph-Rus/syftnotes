@@ -199,9 +199,13 @@ public static partial class NoteExport
     /// <summary>The notes in a file <see cref="Lecture"/> wrote (without its transcript), as the library keeps them again:
     /// the front matter, the title and the line under it left off; a drawing's picture (in <paramref name="assets"/>, by
     /// its path in the file's links) its SVG again, without the list of its parts (the drawing names them itself); a
-    /// plot's picture left out (its source is just above it). Anything else is as the file has it.</summary>
-    public static string Undrawn(string markdown, IReadOnlyDictionary<string, string> assets)
+    /// plot's picture left out (its source is just above it). Anything else is as the file has it. Null when a picture is
+    /// linked twice, or as soon as the notes would pass <paramref name="maxChars"/>: a small file can't grow into a huge
+    /// one.</summary>
+    public static string? Undrawn(string markdown, IReadOnlyDictionary<string, string> assets, int maxChars)
     {
+        var unused = new Dictionary<string, string>(assets);
+        long length = 0;
         string[] lines = markdown.ReplaceLineEndings("\n").Split('\n');
         int i = 0;
         void Blanks() { while (i < lines.Length && lines[i].Trim().Length == 0) i++; }
@@ -217,9 +221,14 @@ public static partial class NoteExport
         for (; i < lines.Length; i++)
         {
             string t = lines[i].TrimStart(), indent = lines[i][..(lines[i].Length - t.Length)];
-            if (Picture().Match(t) is not { Success: true } picture || !assets.TryGetValue(Uri.UnescapeDataString(picture.Groups[2].Value), out string? svg))
+            var picture = Picture().Match(t);
+            string? name = picture.Success ? Uri.UnescapeDataString(picture.Groups[2].Value) : null;
+            // A picture linked a second time (Lecture never does that) would paste it in again: not had.
+            if (name is not null && assets.ContainsKey(name) && !unused.ContainsKey(name)) return null;
+            if (name is null || !unused.Remove(name, out string? svg))
             {
                 output.Add(lines[i]);
+                if ((length += lines[i].Length + 1) > maxChars) return null;
                 continue;
             }
             if (picture.Groups[1].Value == "Plot")
@@ -227,6 +236,7 @@ public static partial class NoteExport
                 if (output.Count > 0 && output[^1].Length == 0) output.RemoveAt(output.Count - 1);
                 continue;
             }
+            if ((length += svg.Length + 16) > maxChars) return null;
             output.Add(indent + "```svg");
             output.AddRange(svg.ReplaceLineEndings("\n").TrimEnd('\n').Split('\n').Select(l => indent + l));
             output.Add(indent + "```");

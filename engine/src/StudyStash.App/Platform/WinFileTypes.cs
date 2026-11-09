@@ -21,7 +21,13 @@ static partial class WinFileTypes
         string command = $"\"{program}\" \"%1\"";
         using (var open = Registry.CurrentUser.OpenSubKey($@"{Classes}{Kind}\shell\open\command"))
             if (open?.GetValue("") as string == command) return;
-        using (var ending = Registry.CurrentUser.CreateSubKey(Classes + SyftFile.Ending)) ending.SetValue("", Kind);
+        using (var ending = Registry.CurrentUser.CreateSubKey(Classes + SyftFile.Ending))
+        {
+            // Another app that took .syft keeps it: Syft Notes is only offered under Open with.
+            if (ending.GetValue("") is not string taken || taken.Length == 0 || taken == Kind) ending.SetValue("", Kind);
+            using var openWith = ending.CreateSubKey("OpenWithProgids");
+            openWith.SetValue(Kind, Array.Empty<byte>(), RegistryValueKind.None);
+        }
         using (var kind = Registry.CurrentUser.CreateSubKey(Classes + Kind)) kind.SetValue("", "Syft Notes lecture");
         using (var icon = Registry.CurrentUser.CreateSubKey($@"{Classes}{Kind}\DefaultIcon")) icon.SetValue("", $"\"{program}\",0");
         using (var open = Registry.CurrentUser.CreateSubKey($@"{Classes}{Kind}\shell\open\command")) open.SetValue("", command);
@@ -35,9 +41,11 @@ static partial class WinFileTypes
         using (var open = Registry.CurrentUser.OpenSubKey($@"{Classes}{Kind}\shell\open\command"))
             if (!ours(open?.GetValue("") as string)) return;
         Registry.CurrentUser.DeleteSubKeyTree(Classes + Kind, throwOnMissingSubKey: false);
-        using (var ending = Registry.CurrentUser.OpenSubKey(Classes + SyftFile.Ending))
-            if (ending?.GetValue("") as string != Kind) return;
-        Registry.CurrentUser.DeleteSubKeyTree(Classes + SyftFile.Ending, throwOnMissingSubKey: false);
+        using var ending = Registry.CurrentUser.OpenSubKey(Classes + SyftFile.Ending, writable: true);
+        if (ending is null) return;
+        using (var openWith = ending.OpenSubKey("OpenWithProgids", writable: true)) openWith?.DeleteValue(Kind, throwOnMissingValue: false);
+        // Only ours is taken out: another app's .syft stays its own.
+        if (ending.GetValue("") as string == Kind) ending.DeleteValue("", throwOnMissingValue: false);
     }
 
     [LibraryImport("shell32.dll")]
