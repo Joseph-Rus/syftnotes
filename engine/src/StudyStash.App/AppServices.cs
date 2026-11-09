@@ -45,6 +45,8 @@ public static class AppServices
         services.AddSingleton(sp => sp.GetRequiredService<AppHost>().Api);
         services.AddSingleton<AiStatusStore>(sp => sp.GetRequiredService<AppHost>().AiStatus);
         services.AddSingleton<CanvasLink>();
+        // Notices a call starting (Zoom, Teams…) and says so on the messenger.
+        services.AddSingleton<CallWatch>();
 
         // View models made at runtime, with their connections.
         services.AddSingleton<AskFactory>();
