@@ -14,7 +14,8 @@ namespace StudyStash.App.Platform;
 /// shadow follows what the window shows, so it's shaped again once the panel is drawn. Each popup window is also put on
 /// every desktop (Space), as Avalonia does for its own dialogs and the app for its floating windows: left to AppKit, a
 /// popup can land on another desktop than the window it opened from, and the dropdown or menu seems not to open.
-/// Dropdowns and menus close as their window loses focus, so none trails onto another desktop. Anything missing
+/// Only popups that close as their window loses focus (dropdowns, menus) and tooltips do, so none trails onto another
+/// desktop; one that stays open keeps AppKit's choice and is only brought to the front. Anything missing
 /// (another OS, a popup drawn inside its window, no window handle) leaves the popup as it was.
 /// </summary>
 public static class MacPopupShadow
@@ -39,8 +40,14 @@ public static class MacPopupShadow
         try
         {
             if (!ObjC.IsKind(shown.Handle, ObjC.Class("NSWindow"))) return;
-            const nuint canJoinAllSpaces = 1 << 0, fullScreenAuxiliary = 1 << 8;
-            ObjC.SendNuint(shown.Handle, ObjC.Sel("setCollectionBehavior:"), canJoinAllSpaces | fullScreenAuxiliary);
+            // Only a popup that closes by itself when its window loses focus (or a tooltip) may join every desktop: one
+            // that stays open (the Ask bar's recipe list) would otherwise float over the next desktop too.
+            if (popup.IsLightDismissEnabled || popup.Child is ToolTip)
+            {
+                const nuint canJoinAllSpaces = 1 << 0, fullScreenAuxiliary = 1 << 8;
+                var behavior = ObjC.GetNuint(shown.Handle, ObjC.Sel("collectionBehavior"));
+                ObjC.SendNuint(shown.Handle, ObjC.Sel("setCollectionBehavior:"), behavior | canJoinAllSpaces | fullScreenAuxiliary);
+            }
             // Already shown by now (on whichever desktop AppKit chose): in front again, on the one showing.
             ObjC.SendPtr(shown.Handle, ObjC.Sel("orderFront:"), IntPtr.Zero);
             ObjC.SendBool(shown.Handle, ObjC.Sel("setHasShadow:"), true);
@@ -89,6 +96,9 @@ public static class MacPopupShadow
 
         [DllImport(Lib, EntryPoint = "objc_msgSend")]
         public static extern void SendBool(IntPtr receiver, IntPtr selector, [MarshalAs(UnmanagedType.I1)] bool arg);
+
+        [DllImport(Lib, EntryPoint = "objc_msgSend")]
+        public static extern nuint GetNuint(IntPtr receiver, IntPtr selector);
 
         [DllImport(Lib, EntryPoint = "objc_msgSend")]
         public static extern void SendNuint(IntPtr receiver, IntPtr selector, nuint arg);
