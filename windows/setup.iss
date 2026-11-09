@@ -80,6 +80,9 @@ Name: "{userprograms}\Syft Notes"; Filename: "{app}\StudyStash.exe"; Comment: "O
 ; own (its name and icon for them, and the link a click on one opens). Nothing is written here; they go with the app.
 Root: HKCU; Subkey: "Software\Classes\AppUserModelId\StudyStash.App"; Flags: dontcreatekey uninsdeletekey
 Root: HKCU; Subkey: "Software\Classes\studystash"; Flags: dontcreatekey uninsdeletekey
+; A lecture a friend shared (.syft) opens in the app: it says so itself at each start (WinFileTypes.cs).
+Root: HKCU; Subkey: "Software\Classes\SyftNotes.Lecture"; Flags: dontcreatekey uninsdeletekey
+Root: HKCU; Subkey: "Software\Classes\.syft"; Flags: dontcreatekey uninsdeletekey
 
 [Run]
 ; opens by itself when a person ran Setup (no postinstall flag: no checkbox, no finished page); a silent run (the

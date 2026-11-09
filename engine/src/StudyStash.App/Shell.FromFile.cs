@@ -18,6 +18,11 @@ public static partial class Shell
     /// library sorts it). A file that's gone by now says so instead.</summary>
     static void AddFromFile(string path, string cls)
     {
+        if (Core.SyftFile.Is(path))
+        {
+            AddShared(path, cls);
+            return;
+        }
         if (RecordingFile.Read(path) is not { } file)
         {
             Toast("That file isn't there any more", "It may have been moved or renamed. Pick it again where it is now.", null, null);
@@ -49,4 +54,48 @@ public static partial class Shell
             });
         fromFile = (form, shown);
     }
+
+    /// <summary>A lecture a friend shared (a .syft file: dropped, picked with Add a recording, or opened from Finder or
+    /// Explorer), after the one question of which class. A file that isn't one says why, in plain words.</summary>
+    static void AddShared(string path, string cls)
+    {
+        if (!host.Settings.SetupDone)
+        {
+            ShowSetup();
+            return;
+        }
+        Core.SharedLecture lecture;
+        try
+        {
+            lecture = Core.SyftFile.Read(path);
+        }
+        catch (Core.SyftFileException e)
+        {
+            Toast(SharedWords.CantOpen, e.Message, null, null);
+            return;
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException)
+        {
+            Program.Log($"[shared] couldn't read {Path.GetFileName(path)}: {e.GetType().Name}: {e.Message}");
+            Toast(SharedWords.CantOpen, SharedWords.CantRead, null, null);
+            return;
+        }
+        Avalonia.Controls.Window? shown = null;
+        var form = new SharedLectureModel(lecture, cls, [.. host.Classes().Select(c => (c.Name, c.Color))], async (className, ct) =>
+        {
+            var added = await host.AddSharedLectureAsync(lecture, className, ct);
+            if (added.Value is { } it)
+            {
+                Toast(SharedWords.Added(lecture.Title), SharedWords.AddedTo(it.ClassName), SharedWords.Open, () => OpenLecture(it.Id));
+                RequestLibraryReload();
+            }
+            return added;
+        }, close: () => shown?.Close());
+        // One at a time: a second file takes the place of the first.
+        AppWindows.Find(SharedKey)?.Close();
+        shown = AppWindows.Open(new WindowSpec(SharedKey, SharedWords.WindowTitle, new SharedLecturePage { DataContext = form }), w =>
+            w.Closed += (_, _) => form.Add.Cancel());
+    }
+
+    const string SharedKey = "shared-lecture";
 }

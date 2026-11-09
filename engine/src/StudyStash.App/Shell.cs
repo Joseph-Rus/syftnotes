@@ -9,6 +9,7 @@ using Avalonia.Input.Platform;
 using Avalonia.Layout;
 using Avalonia.Media;
 using Avalonia.Media.Imaging;
+using Avalonia.Platform.Storage;
 using Avalonia.Threading;
 using Avalonia.VisualTree;
 using CommunityToolkit.Mvvm.Messaging;
@@ -117,11 +118,15 @@ public static partial class Shell
                 c.Cancel = true;
                 Dispatcher.UIThread.Post(() => Quit());
             });
-        // A Mac: opening the app again (Finder, Spotlight, the Dock) while it runs.
+        // A Mac: opening the app again (Finder, Spotlight, the Dock) while it runs, or a lecture a friend shared opened in
+        // Finder.
         if (application.TryGetFeature<IActivatableLifetime>() is { } activatable)
             activatable.Activated += (_, e) =>
             {
                 if (e.Kind == ActivationKind.Reopen) OnHandOff("show");
+                else if (e is FileActivatedEventArgs opened)
+                    foreach (var file in opened.Files)
+                        if (file.TryGetLocalPath() is { } path && SyftFile.Is(path)) AddShared(path, "");
             };
         else if (OperatingSystem.IsMacOS())
             Program.Log("[app] this Mac doesn't say when the app is opened again; a second copy still hands off");
@@ -188,6 +193,14 @@ public static partial class Shell
             ShowLibrary();
         }
         if (host.Settings.SetupDone) AskWhichNotesFolderSoon();
+        // Windows: a .syft file opens in the installed app (a Mac's Info.plist says so for it).
+        if (OperatingSystem.IsWindows() && InstalledHere)
+            UiTasks.RunQuietly(() => Task.Run(() =>
+            {
+                if (OperatingSystem.IsWindows()) WinFileTypes.Register(Desktop.Program);
+            }), "say that .syft files open in Syft Notes");
+        // Started by opening a lecture a friend shared (Windows starts the program with its path).
+        if (host.Settings.SetupDone && Program.OpenedFile is { } shared) AddShared(shared, "");
         if (SelfTest.Dir is not null) SelfTest.Run();
     }
 
@@ -285,6 +298,7 @@ public static partial class Shell
         else if (message == "settings" || message.StartsWith("settings:", StringComparison.Ordinal))
             ShowSettings(message.Length > "settings:".Length ? message["settings:".Length..] : null);
         else if (message.StartsWith("snap:", StringComparison.Ordinal)) MacSnap.Save(message["snap:".Length..]);
+        else if (Desktop.OpenedFile(message) is { } shared) AddShared(shared, "");
         else ShowLibrary();
     }
 

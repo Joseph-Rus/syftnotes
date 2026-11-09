@@ -26,6 +26,18 @@ public static class ClassPicker
         return menu;
     }
 
+    /// <summary>The menu opened under a form's class field (<paramref name="field"/>), as wide as it, not wherever the
+    /// pointer was: Add a recording's and a shared lecture's.</summary>
+    public static void OpenUnder(Control field, IReadOnlyList<(string Name, int Color)> classes, string chosen, Action<string> pick)
+    {
+        var menu = Build(classes, chosen, pick);
+        menu.Placement = PlacementMode.BottomEdgeAlignedLeft;
+        menu.PlacementTarget = field;
+        menu.VerticalOffset = 6;
+        menu.MinWidth = field.Bounds.Width;
+        menu.Open(field);
+    }
+
     static MenuItem Row(string label, int? color, bool picked, Action act)
     {
         var dot = new Ellipse { Width = 8, Height = 8, VerticalAlignment = VerticalAlignment.Center };
