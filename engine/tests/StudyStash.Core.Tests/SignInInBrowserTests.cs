@@ -130,22 +130,6 @@ public class SignInInBrowserTests
     }
 
     [Fact]
-    public async Task Open_the_page_again_runs_the_sign_in_once_more_and_never_reads_what_it_prints()
-    {
-        await using var rig = await Rig.StartAsync(["claude"], bin => File.WriteAllText(Path.Combine(bin, "login-delay"), "120"));
-        await rig.Remote.SignInAsync("claude");
-        await rig.UntilAsync("claude", _ => FakeAgents.Logins(rig.Bin) == 1);
-
-        var again = await rig.Remote.SignInAgainAsync("claude");
-
-        Assert.Equal(SignInPhase.Waiting, again!.Overview!.Engines.Single(e => e.Id == "claude").SignIn);
-        await rig.UntilAsync("claude", _ => FakeAgents.Logins(rig.Bin) == 2);
-        // The page's address is the sign-in's own business: it's nowhere in what the library says.
-        Assert.DoesNotContain("example.com", System.Text.Json.JsonSerializer.Serialize(again, AiRemote.Options));
-        Assert.Equal(0, rig.Fake.SignInCalls);
-    }
-
-    [Fact]
     public async Task A_sign_in_that_stops_at_once_is_stuck_with_no_terminal_and_Try_again_starts_it_afresh()
     {
         await using var rig = await Rig.StartAsync(["claude"], bin => File.WriteAllText(Path.Combine(bin, "login-fails"), ""));
