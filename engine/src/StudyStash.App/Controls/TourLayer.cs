@@ -1,6 +1,7 @@
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Input;
+using Avalonia.Interactivity;
 using Avalonia.Media;
 using Avalonia.Threading;
 using Avalonia.VisualTree;
@@ -13,7 +14,8 @@ namespace StudyStash.App.Controls;
 /// A <see cref="TourModel"/> over a view: put it last in the view's top panel and bind <see cref="Tour"/>. While a tour
 /// runs, the view dims (the <c>Scrim</c> token), the step's control shows through a hole ringed in ink, and the
 /// <see cref="TourCard"/> sits beside it, keeping up as the window is resized or the page reloads. Clicks on the dimmed
-/// page do nothing; Escape skips, Right goes on, Left goes back, Return presses the card's focused button (Next).
+/// page do nothing; one on the control in the hole does what it always does, and ends the tour (<see cref="TourModel.Used"/>).
+/// Escape skips, Right goes on, Left goes back, Return presses the card's focused button (Next).
 /// Targets are found by their Name among the view's visible controls, so the view needs no other wiring.
 /// </summary>
 public sealed class TourLayer : Panel
@@ -25,15 +27,37 @@ public sealed class TourLayer : Panel
     readonly TourCard card = new();
     readonly Veil veil = new();
     Rect hole;
+    /// <summary>The control in the hole, watched for a click.</summary>
+    Control? watched;
 
     public TourLayer()
     {
         IsVisible = false;
-        Background = Brushes.Transparent; // the dimmed page takes no clicks
         Children.Add(veil);
         Children.Add(card);
-        AddHandler(KeyDownEvent, OnKey, Avalonia.Interactivity.RoutingStrategies.Tunnel);
+        AddHandler(KeyDownEvent, OnKey, RoutingStrategies.Tunnel);
         LayoutUpdated += (_, _) => Follow();
+    }
+
+    /// <summary>Clicks on the dimmed page stop before they reach it: caught on the way down, in the view this layer covers.</summary>
+    protected override void OnAttachedToVisualTree(VisualTreeAttachmentEventArgs e)
+    {
+        base.OnAttachedToVisualTree(e);
+        (Parent as Interactive)?.AddHandler(PointerPressedEvent, OnPage, RoutingStrategies.Tunnel);
+        (Parent as Interactive)?.AddHandler(PointerReleasedEvent, OnPage, RoutingStrategies.Tunnel);
+    }
+
+    protected override void OnDetachedFromVisualTree(VisualTreeAttachmentEventArgs e)
+    {
+        base.OnDetachedFromVisualTree(e);
+        (Parent as Interactive)?.RemoveHandler(PointerPressedEvent, OnPage);
+        (Parent as Interactive)?.RemoveHandler(PointerReleasedEvent, OnPage);
+    }
+
+    void OnPage(object? sender, PointerEventArgs e)
+    {
+        var at = e.GetPosition(this);
+        if (IsVisible && !hole.Contains(at) && !card.Bounds.Contains(at)) e.Handled = true;
     }
 
     public TourModel? Tour
@@ -54,7 +78,7 @@ public sealed class TourLayer : Panel
         // Once the page under it is laid out, so what's on screen can be asked.
         Dispatcher.UIThread.Post(() =>
         {
-            if (Tour == tour && tour.Current is null) tour.Begin(name => Target(name) is not null);
+            if (Tour == tour) tour.Start(name => Target(name) is not null);
         }, DispatcherPriority.Loaded);
     }
 
@@ -62,7 +86,11 @@ public sealed class TourLayer : Panel
     {
         if (e.PropertyName != nameof(TourModel.Current)) return;
         IsVisible = Tour?.Current is not null;
-        if (Tour?.Current is null) return;
+        if (Tour?.Current is null)
+        {
+            Watch(null);
+            return;
+        }
         Target(Tour.Current.Target)?.BringIntoView();
         Follow();
         Dispatcher.UIThread.Post(() => card.FindControl<Button>("Next")?.Focus(NavigationMethod.Tab), DispatcherPriority.Loaded);
@@ -81,13 +109,31 @@ public sealed class TourLayer : Panel
     void Follow()
     {
         if (!IsVisible || Tour?.Current is not { } step) return;
-        var at = Target(step.Target) is { } c && c.TranslatePoint(default, this) is { } p
+        var target = Target(step.Target);
+        Watch(target);
+        var at = target is { } c && c.TranslatePoint(default, this) is { } p
             ? new Rect(p, c.Bounds.Size).Inflate(Pad).Intersect(new Rect(Bounds.Size))
             : default;
         if (at == hole) return;
         hole = veil.Hole = at;
         InvalidateArrange();
         veil.InvalidateVisual();
+    }
+
+    /// <summary>Watches <paramref name="target"/> for a click: it does its own thing first, then the tour ends.</summary>
+    void Watch(Control? target)
+    {
+        if (target == watched) return;
+        watched?.RemoveHandler(PointerReleasedEvent, OnUsed);
+        watched = target;
+        watched?.AddHandler(PointerReleasedEvent, OnUsed, RoutingStrategies.Bubble, handledEventsToo: true);
+    }
+
+    void OnUsed(object? sender, PointerReleasedEventArgs e)
+    {
+        if (e.InitialPressMouseButton != MouseButton.Left || sender is not Control c || !new Rect(c.Bounds.Size).Contains(e.GetPosition(c))) return;
+        var tour = Tour;
+        Dispatcher.UIThread.Post(() => tour?.Used());
     }
 
     protected override Size ArrangeOverride(Size size)
@@ -123,7 +169,8 @@ public sealed class TourLayer : Panel
         command.Execute(null);
     }
 
-    /// <summary>The dimmed page with the hole in it, and the ink ring round the hole.</summary>
+    /// <summary>The dimmed page with the hole in it, and the ink ring round the hole. The pointer over the dim is over
+    /// it (no hover on the page beneath); in the hole, it's over the control there.</summary>
     sealed class Veil : Control
     {
         public Rect Hole;

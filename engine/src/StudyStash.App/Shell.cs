@@ -1292,8 +1292,8 @@ public static partial class Shell
     }
 
     /// <summary>The look round Home's buttons (<see cref="HomeTour"/>), once the library window has read the library:
-    /// once, the first time it shows Home after a first run or an update that never had it, and again when asked. A
-    /// library that can't be read yet has no Home to point at, so it waits for the load that can.</summary>
+    /// the first time it shows Home after a first run or an update that never had it, until it's seen through, and again
+    /// when asked. A library that can't be read yet has no Home to point at, so it waits for the load that can.</summary>
     static async Task TourIfDueAsync()
     {
         bool again = tourAgain;
@@ -1301,11 +1301,14 @@ public static partial class Shell
         if ((!again && host.Settings.TourSeen) || library.Tour is not null || mainWindow?.IsVisible != true) return;
         if (again && library.Overview is not { IsHome: true }) await ShowHomeAsync();
         if (library.Overview is not { IsHome: true }) return;
-        if (!host.Settings.TourSeen) host.Save(s => s.TourSeen = true);
         var tour = new TourModel(HomeTour.Steps);
-        tour.Ended += () =>
+        tour.Ended += seen =>
         {
             if (library.Tour == tour) library.Tour = null;
+            // Seen through (Done, Skip tour, or a button used): never again by itself. One whose buttons never drew tries
+            // again on a later load. Either way, "Ready when class starts" it held back can show now.
+            if (seen && !host.Settings.TourSeen) host.Save(s => s.TourSeen = true);
+            RequestRefresh();
         };
         library.Tour = tour;
     }
@@ -2011,7 +2014,8 @@ public static partial class Shell
     {
         // A first run that ended with "Later" leaves "Notes need an AI" on Home until an AI writes the notes.
         bool needsAi = host.Settings.SetupAi == "later" && (host.Overview is null || NotesOff);
-        if (!(host.Settings.WelcomeCard || needsAi) || !host.Settings.SetupDone || host.Settings.Role == AppRole.Library)
+        // The tour of Home comes first; the card shows once it's finished or skipped.
+        if (!(host.Settings.WelcomeCard || needsAi) || !host.Settings.SetupDone || host.Settings.Role == AppRole.Library || !host.Settings.TourSeen || library.Tour is not null)
         {
             if (library.Welcome is not null) library.Welcome = null;
             return;

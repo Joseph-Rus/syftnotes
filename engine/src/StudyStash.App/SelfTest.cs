@@ -472,10 +472,13 @@ public static partial class SelfTest
         if (host.Settings.SetupAi != "later" || !host.Settings.AddClassesOnHome) throw new InvalidOperationException("Home wasn't told to offer an AI and adding classes");
         if (!m.LibraryOk || host.LocalLibrary is not { } lib) throw new InvalidOperationException("Get started didn't make its library");
         if (host.LoginItems.StartsAtLogin(host.Home)) throw new InvalidOperationException("unticked, Get started still added a login item");
-        // Home opens with the look round its buttons, once: pictured, then Skip tour puts it away for good.
+        // Home opens with the look round its buttons, once, before "Ready when class starts": pictured, then Skip tour puts
+        // it away for good (only then is it seen) and the card follows.
         bool toured = await Until(() => Shell.Windows.Tour?.Current is not null, 30);
         Say(toured ? $"tour: {Shell.Windows.Tour!.Counter}, \"{Shell.Windows.Tour.Current!.Title}\"" : "tour: Home never showed it");
         if (!toured) throw new InvalidOperationException("Home didn't show the tour after a first run");
+        if (host.Settings.TourSeen) throw new InvalidOperationException("the tour counted as seen before it was finished or skipped");
+        if (Shell.Windows.WelcomeCard is not null) throw new InvalidOperationException("Home's card showed under the tour instead of after it");
         await Settle();
         Shot(Shell.Windows.Main, "home-tour");
         Shell.Windows.Tour!.SkipCommand.Execute(null);
