@@ -15,7 +15,7 @@ public sealed record ExportFile(string FileName, string Markdown, IReadOnlyList<
 /// their formulas as plain LaTeX and their diagrams drawn as a picture beside the file, and (asked for) its
 /// transcript. Pure: nothing here touches a disk or a library, so the app and the library computer share it.
 /// </summary>
-public static class NoteExport
+public static partial class NoteExport
 {
     /// <summary>The name a lecture's file is saved under unless the student picks another: its day and title,
     /// "2026-09-23 The cardiac cycle.md".</summary>
@@ -191,6 +191,63 @@ public static class NoteExport
         }
         for (; at < lines.Length; at++) output.Add(lines[at]);
         return string.Join("\n", output);
+    }
+
+    [System.Text.RegularExpressions.GeneratedRegex(@"^!\[(Diagram|Plot): .*\]\(([^()]+)\)$")]
+    private static partial System.Text.RegularExpressions.Regex Picture();
+
+    /// <summary>The notes in a file <see cref="Lecture"/> wrote (without its transcript), as the library keeps them again:
+    /// the front matter, the title and the line under it left off; a drawing's picture (in <paramref name="assets"/>, by
+    /// its path in the file's links) its SVG again, without the list of its parts (the drawing names them itself); a
+    /// plot's picture left out (its source is just above it). Anything else is as the file has it. Null when a picture is
+    /// linked twice, or as soon as the notes would pass <paramref name="maxChars"/>: a small file can't grow into a huge
+    /// one.</summary>
+    public static string? Undrawn(string markdown, IReadOnlyDictionary<string, string> assets, int maxChars)
+    {
+        var unused = new Dictionary<string, string>(assets);
+        long length = 0;
+        string[] lines = markdown.ReplaceLineEndings("\n").Split('\n');
+        int i = 0;
+        void Blanks() { while (i < lines.Length && lines[i].Trim().Length == 0) i++; }
+        if (lines[0] == "---")
+            for (i = 1; i < lines.Length;)
+                if (lines[i++] == "---") break;
+        Blanks();
+        if (i < lines.Length && lines[i].StartsWith("# ", StringComparison.Ordinal)) i++;
+        Blanks();
+        if (i < lines.Length && lines[i].Length > 1 && lines[i][0] == '*' && lines[i][^1] == '*') i++;
+        Blanks();
+        var output = new List<string>();
+        for (; i < lines.Length; i++)
+        {
+            string t = lines[i].TrimStart(), indent = lines[i][..(lines[i].Length - t.Length)];
+            var picture = Picture().Match(t);
+            string? name = picture.Success ? Uri.UnescapeDataString(picture.Groups[2].Value) : null;
+            // A picture linked a second time (Lecture never does that) would paste it in again: not had.
+            if (name is not null && assets.ContainsKey(name) && !unused.ContainsKey(name)) return null;
+            if (name is null || !unused.Remove(name, out string? svg))
+            {
+                output.Add(lines[i]);
+                if ((length += lines[i].Length + 1) > maxChars) return null;
+                continue;
+            }
+            if (picture.Groups[1].Value == "Plot")
+            {
+                if (output.Count > 0 && output[^1].Length == 0) output.RemoveAt(output.Count - 1);
+                continue;
+            }
+            if ((length += svg.Length + 16) > maxChars) return null;
+            output.Add(indent + "```svg");
+            output.AddRange(svg.ReplaceLineEndings("\n").TrimEnd('\n').Split('\n').Select(l => indent + l));
+            output.Add(indent + "```");
+            // Its parts' list: a blank line, then one "- **name**" line each.
+            int parts = SafeSvg.Clean(svg).Parts.Count;
+            if (parts > 0 && i + 1 + parts < lines.Length && lines[i + 1].Length == 0
+                && lines.Skip(i + 2).Take(parts).All(l => l.StartsWith(indent + "- **", StringComparison.Ordinal)))
+                i += 1 + parts;
+        }
+        string notes = string.Join("\n", output).Trim('\n');
+        return notes == "_No notes yet._" ? "" : notes;
     }
 
     static Plot? TryPlot(string source)

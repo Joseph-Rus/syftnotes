@@ -167,6 +167,9 @@ public sealed record WindowPlace(int X, int Y, double Width, double Height, bool
 /// <summary>What pressing Record came to: the lecture now recording, or why the microphone didn't start.</summary>
 public sealed record RecordStart(Lecture? Lecture, MicTrouble? Trouble);
 
+/// <summary>A lecture a friend shared, now in the library: its id and the class it went in.</summary>
+public sealed record SharedAdded(string Id, string ClassName);
+
 /// <summary>How the library answered lately.</summary>
 public enum LibraryState
 {
@@ -459,6 +462,15 @@ public sealed partial class AppHost : IDisposable, IProblemSource
             return Outcome<Lecture>.Failed(new Failure(FailureKind.Refused, "Syft Notes couldn't open that file. Check that it's still there and that this computer has room for it."));
         }
     }
+
+    /// <summary>A lecture a friend shared (a .syft file, already read), into <paramref name="className"/> ("" lets the
+    /// library sort it). The outcome is the lecture's id and the class it went in, or the library's words: "already in
+    /// your library".</summary>
+    public Task<Outcome<SharedAdded>> AddSharedLectureAsync(SharedLecture lecture, string className, CancellationToken cancel = default) =>
+        Api.Library is { } library
+            ? LibraryCall.Run(async () => await library.AddSharedAsync(lecture.Json(className), cancel) is { } said
+                ? new SharedAdded(Py.AsString(said["id"]) ?? "", Py.AsString(said["class_name"]) ?? "") : null, cancel)
+            : Task.FromResult(Outcome<SharedAdded>.Failed(Failure.Offline));
 
     /// <summary>The student's Granola, once they've signed in to it in Settings: looked at for lectures Syft Notes
     /// doesn't have (<see cref="Start"/> runs it), which Transfer brings over.</summary>

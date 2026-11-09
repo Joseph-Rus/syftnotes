@@ -111,6 +111,7 @@ public static class Engines
     {
         // Notes the student brought back from a chat, or that an AI app saved without saying which it is.
         _ when notesModel.StartsWith(YourAi, StringComparison.Ordinal) => YourAi,
+        SharedLecture.Writer => SharedLecture.Writer,
         _ when notesModel.StartsWith("Claude", StringComparison.Ordinal) => "Claude",
         _ when notesModel.StartsWith("ChatGPT", StringComparison.Ordinal) || notesModel.StartsWith("Codex", StringComparison.Ordinal) => "ChatGPT",
         _ when notesModel.StartsWith("Gemini", StringComparison.Ordinal) => "Gemini",

@@ -38,7 +38,7 @@ static class VelopackHooks
     /// Windows' Apps list uninstalls Syft Notes (Velopack's Update.exe --uninstall, which then removes the folder and its
     /// own shortcuts): what the app itself put in this account's registry goes too, as Inno Setup's uninstaller took it,
     /// where it names this install: starting at login, the background library, the notifications' name and the link a
-    /// click on one opens, and pins to the taskbar. Settings, lectures and Documents stay. Velopack gives this 60 seconds.
+    /// click on one opens, what opens a shared lecture (.syft), and pins to the taskbar. Settings, lectures and Documents stay. Velopack gives this 60 seconds.
     /// </summary>
     [SupportedOSPlatform("windows")]
     static void WindowsUninstalling()
@@ -57,6 +57,7 @@ static class VelopackHooks
                     Registry.CurrentUser.DeleteSubKeyTree(@"Software\Classes\studystash", throwOnMissingSubKey: false);
                     Registry.CurrentUser.DeleteSubKeyTree(@"Software\Classes\AppUserModelId\StudyStash.App", throwOnMissingSubKey: false);
                 }
+            WinFileTypes.Unregister(Ours);
             string pins = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "Microsoft", "Internet Explorer", "Quick Launch", "User Pinned", "TaskBar");
             if (Directory.Exists(pins))
                 foreach (string lnk in Directory.EnumerateFiles(pins, "*.lnk"))

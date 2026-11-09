@@ -16,6 +16,9 @@ static class Program
     /// <summary>Started at login: stay in the menu bar or tray, open no window.</summary>
     public static bool Background { get; private set; }
 
+    /// <summary>A lecture a friend shared that this copy was started with (Windows opens a .syft file so), or null.</summary>
+    public static string? OpenedFile { get; private set; }
+
     static RollingLog? log;
 
     /// <summary>A line in logs/app.log (from any thread).</summary>
@@ -74,8 +77,11 @@ static class Program
         // One copy at a time: a second one asks the first to show itself (or record), then goes. One started at login
         // has nothing to show, so it just goes.
         int show = Array.IndexOf(args, "--show"), open = Array.IndexOf(args, "--open");
+        // A .syft file opened in Explorer: Windows starts the program with its path.
+        OpenedFile = args.FirstOrDefault(a => SyftFile.Is(a) && File.Exists(a)) is { } shared ? Path.GetFullPath(shared) : null;
         // "--open LINK": Windows opened a studystash: link, for a click on one of the app's notifications.
         string? word = open >= 0 && open + 1 < args.Length && NoticeLinks.WordFor(args[open + 1]) is { } click ? click
+            : OpenedFile is not null ? Desktop.OpenWord(OpenedFile)
             : args.Contains("--record") ? "record"
             : show >= 0 && show + 1 < args.Length ? args[show + 1]
             : Background ? null : "show";

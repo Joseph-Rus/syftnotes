@@ -30,13 +30,17 @@ public static partial class Shell
         return systemNotices = new SystemNotices(center, a => Dispatcher.UIThread.Post(a), notice => Shelf().Show(notice), log: Program.Log);
     }
 
+    /// <summary>Windows: the installed app, in its usual settings folder. Only it says to Windows what opens its links
+    /// and files: a build run from its folder, or a second profile, mustn't take them over.</summary>
+    static bool InstalledHere => File.Exists(Path.Combine(AppContext.BaseDirectory, "study-stash.ini")) && Desktop.SameFolder(host.Home, Configs.DefaultHome);
+
     /// <summary>Windows' notifications, for the installed app in its usual settings folder: a click on one comes back
     /// through a link that opens the installed program, which a build run from its folder, or a second profile,
     /// mustn't take over. The app's icon is written out for Windows to show beside its name, as it does for any app.</summary>
     [System.Runtime.Versioning.SupportedOSPlatform("windows")]
     static WinNotifications? WindowsNotifications()
     {
-        if (!File.Exists(Path.Combine(AppContext.BaseDirectory, "study-stash.ini")) || !Desktop.SameFolder(host.Home, Configs.DefaultHome)) return null;
+        if (!InstalledHere) return null;
         string? icon = null;
         try
         {

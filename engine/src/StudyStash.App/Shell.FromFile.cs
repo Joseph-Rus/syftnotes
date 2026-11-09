@@ -18,6 +18,11 @@ public static partial class Shell
     /// library sorts it). A file that's gone by now says so instead.</summary>
     static void AddFromFile(string path, string cls)
     {
+        if (Core.SyftFile.Is(path))
+        {
+            AddShared(path, cls);
+            return;
+        }
         if (RecordingFile.Read(path) is not { } file)
         {
             Toast("That file isn't there any more", "It may have been moved or renamed. Pick it again where it is now.", null, null);
@@ -49,4 +54,79 @@ public static partial class Shell
             });
         fromFile = (form, shown);
     }
+
+    /// <summary>A lecture a friend shared (a .syft file: dropped, picked with Add a recording, or opened from Finder or
+    /// Explorer), after the one question of which class. A file that isn't one says why, in plain words.</summary>
+    static void AddShared(string path, string cls)
+    {
+        // Before setup is done there's no library to add it to: it opens once setup ends (ShowLibrary).
+        if (!host.Settings.SetupDone)
+        {
+            sharedAfterSetup = path;
+            ShowSetup();
+            return;
+        }
+        Run(async () =>
+        {
+            Core.SharedLecture lecture;
+            try
+            {
+                // Away from the window: a big file takes a moment to read and check.
+                lecture = await Task.Run(() => Core.SyftFile.Read(path));
+            }
+            catch (Core.SyftFileException e)
+            {
+                Toast(SharedWords.CantOpen, e.Message, null, null);
+                return;
+            }
+            catch (Exception e) when (e is IOException or UnauthorizedAccessException)
+            {
+                Program.Log($"[shared] couldn't read {Path.GetFileName(path)}: {e.GetType().Name}: {e.Message}");
+                Toast(SharedWords.CantOpen, SharedWords.CantRead, null, null);
+                return;
+            }
+            ShowShared(lecture, cls);
+        }, "AddShared");
+    }
+
+    /// <summary>A lecture a friend shared that was opened before setup was done: opened when it is.</summary>
+    static string? sharedAfterSetup;
+
+    /// <summary>The shared lecture's question that's open, if one is: one at a time.</summary>
+    static (SharedLectureModel Form, Avalonia.Controls.Window Window)? sharedOpen;
+
+    static void ShowShared(Core.SharedLecture lecture, string cls)
+    {
+        if (sharedOpen is { } open)
+        {
+            // Still adding the last one: that one finishes first. Otherwise the new file takes its place.
+            if (open.Form.Add.Busy)
+            {
+                AppWindows.Raise(open.Window);
+                Toast("One lecture at a time", "The last one is still being added. Open this one when it's done.", null, null);
+                return;
+            }
+            open.Window.Close();
+        }
+        Avalonia.Controls.Window? shown = null;
+        var form = new SharedLectureModel(lecture, cls, [.. host.Classes().Select(c => (c.Name, c.Color))], async (className, ct) =>
+        {
+            var added = await host.AddSharedLectureAsync(lecture, className, ct);
+            if (added.Value is { } it)
+            {
+                Toast(SharedWords.Added(lecture.Title), SharedWords.AddedTo(it.ClassName), SharedWords.Open, () => OpenLecture(it.Id));
+                RequestLibraryReload();
+            }
+            return added;
+        }, close: () => shown?.Close());
+        shown = AppWindows.Open(new WindowSpec(SharedKey, SharedWords.WindowTitle, new SharedLecturePage { DataContext = form }), w =>
+            w.Closed += (_, _) =>
+            {
+                form.Add.Cancel();
+                if (sharedOpen is { } s && ReferenceEquals(s.Form, form)) sharedOpen = null;
+            });
+        sharedOpen = (form, shown);
+    }
+
+    const string SharedKey = "shared-lecture";
 }
