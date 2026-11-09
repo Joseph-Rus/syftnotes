@@ -210,6 +210,8 @@ public static partial class Shell
         public static ViewModels.FunnelModel? Funnel => funnel;
         /// <summary>Home's "Ready when class starts", while it shows.</summary>
         public static ViewModels.WelcomeCardModel? WelcomeCard => library.Welcome;
+        /// <summary>The look round Home's buttons, while it runs.</summary>
+        public static TourModel? Tour => library.Tour;
         public static void TogglePanel() => Shell.TogglePanel();
         public static void ToggleQuick() => Shell.ToggleQuick();
         public static void Record() => ToggleRecording();
@@ -1279,6 +1281,38 @@ public static partial class Shell
         }, "LoadLibrary");
     }
 
+    /// <summary>Settings → General's Show me around: the next time the library is read, it goes Home and shows the tour.</summary>
+    static bool tourAgain;
+
+    static void ShowTourAgain()
+    {
+        settingsWindow?.Close();
+        tourAgain = true;
+        ShowLibrary();
+    }
+
+    /// <summary>The look round Home's buttons (<see cref="HomeTour"/>), once the library window has read the library:
+    /// the first time it shows Home after a first run or an update that never had it, until it's seen through, and again
+    /// when asked. A library that can't be read yet has no Home to point at, so it waits for the load that can.</summary>
+    static async Task TourIfDueAsync()
+    {
+        bool again = tourAgain;
+        tourAgain = false;
+        if ((!again && host.Settings.TourSeen) || library.Tour is not null || mainWindow?.IsVisible != true) return;
+        if (again && library.Overview is not { IsHome: true }) await ShowHomeAsync();
+        if (library.Overview is not { IsHome: true }) return;
+        var tour = new TourModel(HomeTour.Steps);
+        tour.Ended += seen =>
+        {
+            if (library.Tour == tour) library.Tour = null;
+            // Seen through (Done, Skip tour, or a button used): never again by itself. One whose buttons never drew tries
+            // again on a later load. Either way, "Ready when class starts" it held back can show now.
+            if (seen && !host.Settings.TourSeen) host.Save(s => s.TourSeen = true);
+            RequestRefresh();
+        };
+        library.Tour = tour;
+    }
+
     /// <summary>
     /// The splash over the library window opened at launch: Sort In in a dark window, Sieve Drop in a light one
     /// (Controls/Syft/SyftSplash.cs), played once while the library is read the first time, then faded out and gone; at
@@ -1980,7 +2014,8 @@ public static partial class Shell
     {
         // A first run that ended with "Later" leaves "Notes need an AI" on Home until an AI writes the notes.
         bool needsAi = host.Settings.SetupAi == "later" && (host.Overview is null || NotesOff);
-        if (!(host.Settings.WelcomeCard || needsAi) || !host.Settings.SetupDone || host.Settings.Role == AppRole.Library)
+        // The tour of Home comes first; the card shows once it's finished or skipped.
+        if (!(host.Settings.WelcomeCard || needsAi) || !host.Settings.SetupDone || host.Settings.Role == AppRole.Library || !host.Settings.TourSeen || library.Tour is not null)
         {
             if (library.Welcome is not null) library.Welcome = null;
             return;

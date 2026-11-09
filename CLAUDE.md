@@ -33,6 +33,7 @@ first time you need it (docs/ARCHITECTURE.md section 3 says how), not inside you
 | Text that can be cut off | `c:Tips.WhenCut="True"` plus `ToolTip.Tip` (CutTextTests checks the main pages) |
 | A piece drawn differently on Mac and Windows | one view plus skin styles, or `c:BySkin`; a Mac/Win pair only when the layout really differs |
 | To ask "Are you sure?" before something that can't be undone | `IConfirm.AskAsync(new ConfirmAsk(title, what happens, "Delete"))` (ViewModels/Kit/Confirm.cs), taken in the constructor; `Confirm.Default` is the app's. Never a `Confirming…` flag and inline buttons, never your own dialog |
+| To show a student round a window's buttons | `TourModel` (ViewModels/Kit/Tour.cs) with `TourStep`s naming the controls, and a `c:TourLayer` last in the window's view (Home's: `HomeTour`) |
 | Icons, the logo, loaders | `c:Icon`, `AppMark`/`SyftMark`, `SyftLoader` |
 
 ## Connection rules (CI's "Connection rules" job counts them: `tools/check-connections.sh`)

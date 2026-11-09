@@ -175,6 +175,7 @@ public static partial class Shell
         Run(() => HearNotesWriterAsync(), "HearNotesWriter");
         await ReshowAsync();
         AskForSupportIfDue(host.Classes().Sum(c => c.Lectures) + unsorted);
+        await TourIfDueAsync();
     }
 
     /// <summary>The page the window is on, read again: a note filed, a class linked, the library back. No step in

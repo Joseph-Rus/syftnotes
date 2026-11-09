@@ -599,6 +599,9 @@ public sealed partial class LibraryModel : ObservableObject
     /// <summary>Home's "Ready when class starts", after a first run; null once it's put away (or never, for an update).</summary>
     [ObservableProperty] public partial WelcomeCardModel? Welcome { get; set; }
 
+    /// <summary>The look round Home's buttons (<see cref="HomeTour"/>) while it runs.</summary>
+    [ObservableProperty] public partial TourModel? Tour { get; set; }
+
     partial void OnWelcomeChanged(WelcomeCardModel? value)
     {
         if (Overview is { IsHome: true } home) home.Welcome = value;

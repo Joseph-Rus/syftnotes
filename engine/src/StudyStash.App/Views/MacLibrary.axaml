@@ -73,6 +73,9 @@
     <Panel Name="FolderAsk" IsVisible="{Binding AskingFolder}" Background="Transparent">
       <v:MacNewFolder HorizontalAlignment="Center" VerticalAlignment="Center" />
     </Panel>
+
+    <!-- The tour of Home's buttons, over everything -->
+    <c:TourLayer Name="TourLayer" Tour="{Binding Tour}" />
     </Panel>
   </Border>
 </UserControl>
