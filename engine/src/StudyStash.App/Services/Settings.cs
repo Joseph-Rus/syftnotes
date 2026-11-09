@@ -196,6 +196,9 @@ public sealed partial class SettingsModel : ObservableObject, IDisposable
     /// <summary>Under the choice, while a lecture records the other way: it stays as it started.</summary>
     [ObservableProperty] public partial string LiveTranscriptLine { get; set; } = "";
     [ObservableProperty] public partial bool ComputerAudio { get; set; }
+    /// <summary>"Ask to take notes when a call starts" (<see cref="CallWatch"/>).</summary>
+    [ObservableProperty] public partial bool AskAtCalls { get; set; } = true;
+    public bool CanNoticeCalls => Platform.CallApps.Supported;
     [ObservableProperty] public partial bool Speakers { get; set; }
     /// <summary>Under "Tell speakers apart": what it does, or where its model is.</summary>
     [ObservableProperty] public partial string SpeakersLine { get; set; } = "";
@@ -484,6 +487,7 @@ public sealed partial class SettingsModel : ObservableObject, IDisposable
         Language = host.Settings.Language;
         LiveTranscript = host.Settings.LiveTranscript;
         ComputerAudio = host.Settings.ComputerAudio;
+        AskAtCalls = host.Settings.AskAtCalls;
         Speakers = host.Settings.Speakers;
         SpeakersLine = SpeakersWords(host);
         KeepAudio = host.Settings.KeepAudioDays.ToString(System.Globalization.CultureInfo.InvariantCulture);
@@ -736,6 +740,11 @@ public sealed partial class SettingsModel : ObservableObject, IDisposable
     partial void OnComputerAudioChanged(bool value)
     {
         if (!loading) host.Save(s => s.ComputerAudio = value);
+    }
+
+    partial void OnAskAtCallsChanged(bool value)
+    {
+        if (!loading) host.Save(s => s.AskAtCalls = value);
     }
 
     partial void OnSpeakersChanged(bool value)

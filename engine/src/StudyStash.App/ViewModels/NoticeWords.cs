@@ -20,6 +20,16 @@ public static class NoticeWords
         Title = "Couldn't start recording", Text = why, UntilClosed = true, StillTrue = notRecording,
     };
 
+    /// <summary>A call has started (<see cref="CallWatch"/>): a plain question, not a promotion. It stays while the call is
+    /// on (<paramref name="stillOn"/>) and goes by itself when it ends; Not now only puts it away, since each call is asked
+    /// about once.</summary>
+    public static Notice CallAsk(Platform.MicUser call, Action record, Func<bool> stillOn) => new()
+    {
+        Title = "Record this meeting?",
+        Text = (call.Browser ? $"You're in a call in {call.App}." : $"You're in a {call.App} call.") + " Syft Notes can take the notes for you.",
+        ActionLabel = "Record", SecondLabel = "Not now", Act = record, UntilClosed = true, StillTrue = stillOn,
+    };
+
     /// <summary>A lecture the library has filed: its class, its title, and whether its notes were written (when they
     /// weren't, the transcript is there all the same). Notes its AI couldn't write because it needs signing in again
     /// say so, and the button is Sign in, to Settings → Your AI.</summary>

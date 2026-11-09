@@ -89,6 +89,35 @@ public class SystemNoticesTests
     }
 
     [Fact]
+    public void A_calls_ask_has_record_and_not_now_which_only_puts_it_away_and_it_goes_when_the_call_ends()
+    {
+        var rig = new Rig();
+        int recorded = 0;
+        bool on = true;
+        Notice Ask() => NoticeWords.CallAsk(new MicUser("Zoom", false), () => recorded++, () => on);
+
+        rig.Notices.Show(Ask());
+        var (id, title, body, buttons) = Assert.Single(rig.System.Shown);
+        Assert.Equal(("Record this meeting?", "You're in a Zoom call. Syft Notes can take the notes for you."), (title, body));
+        Assert.Equal(new NotificationButton[] { new("act", "Record"), new("later", "Not now", OpensApp: false) }, buttons);
+        rig.System.Respond(id, "later");
+        Assert.Equal(0, recorded);
+        Assert.Contains(id, rig.System.Removed);
+
+        rig.Notices.Show(Ask());
+        rig.System.Respond(id, "act");
+        Assert.Equal(1, recorded);
+
+        // Never answered: it goes once the call is over.
+        rig.System.Removed.Clear();
+        rig.Notices.Show(Ask());
+        on = false;
+        rig.Notices.Tick();
+        Assert.Contains(id, rig.System.Removed);
+        Assert.Equal("You're in a call in Chrome. Syft Notes can take the notes for you.", NoticeWords.CallAsk(new MicUser("Chrome", true), () => { }, () => true).Text);
+    }
+
+    [Fact]
     public void One_that_says_something_is_still_so_is_taken_down_when_it_isnt()
     {
         var rig = new Rig();

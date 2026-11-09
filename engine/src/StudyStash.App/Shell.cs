@@ -42,6 +42,8 @@ public static partial class Shell
     static AskFactory asks = null!;
     /// <summary>Makes Connect Canvas, the first run's sync and its add-on step over the one Canvas link.</summary>
     static CanvasModels canvasModels = null!;
+    /// <summary>Notices a call starting, for its ask.</summary>
+    static CallWatch calls = null!;
     static TrayIcon? tray;
     static bool trayRecording;
     static readonly CancellationTokenSource stop = new();
@@ -155,7 +157,8 @@ public static partial class Shell
         if (host.PretendMic) Program.Log("[app] recording from a pretend microphone (STUDYSTASH_MIC_FILE)");
         Wire();
         host.Start();
-        services.GetRequiredService<CallWatch>().Start();
+        calls = services.GetRequiredService<CallWatch>();
+        calls.Start();
         Run(() => SuggestLighterModelAsync(), "SuggestLighterModel");
         // The program may have moved (Velopack's install, the Mac bundle's new name): what names the old one is put right.
         // An AI app that's open isn't written to: Home asks to close it first (Close Claude), once.

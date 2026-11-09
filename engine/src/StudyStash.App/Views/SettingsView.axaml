@@ -904,6 +904,9 @@
                 <CheckBox IsVisible="{Binding CanRecordComputerAudio}" IsChecked="{Binding ComputerAudio}" Margin="0,16,0,0">
                   <TextBlock Text="Also record what this computer plays (a lecture on Zoom or Teams)" FontSize="{DynamicResource FontBody}" />
                 </CheckBox>
+                <CheckBox IsVisible="{Binding CanNoticeCalls}" IsChecked="{Binding AskAtCalls}" Margin="0,16,0,0">
+                  <TextBlock Text="Ask to take notes when a call starts" FontSize="{DynamicResource FontBody}" />
+                </CheckBox>
                 <CheckBox IsChecked="{Binding Speakers}" Margin="0,16,0,0">
                   <TextBlock Text="Tell speakers apart in the transcript" FontSize="{DynamicResource FontBody}" />
                 </CheckBox>

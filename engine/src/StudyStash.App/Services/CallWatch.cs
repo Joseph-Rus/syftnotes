@@ -78,8 +78,14 @@ public sealed class CallWatch(AppHost host, IMessenger messages, TimeProvider cl
     public void Start()
     {
         if (poll is not null || !CallApps.Supported || Desktop.SystemChangesOff) return;
-        poll = Poll.Every(Every, async _ => Look(await Task.Run(CallApps.Holding)), clock: clock);
+        poll = Poll.Every(Every, async _ =>
+        {
+            if (Asks) Look(await Task.Run(CallApps.Holding));
+        }, clock: clock);
     }
+
+    /// <summary>Settings → Recording's switch is on, on a computer that records and is set up: nothing is read otherwise.</summary>
+    bool Asks => host.Settings is { AskAtCalls: true, SetupDone: true, Role: not AppRole.Library };
 
     void Look(IReadOnlyList<MicUser> holding)
     {

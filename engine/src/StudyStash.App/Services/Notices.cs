@@ -33,6 +33,9 @@ public sealed class Notice
 
     public Action? Act { get; init; }
 
+    /// <summary>A second button that only puts it away ("Not now"); null for none.</summary>
+    public string? SecondLabel { get; init; }
+
     /// <summary>How long it stays by itself; null for the usual time (<see cref="NoticeTimes.Brief"/>, or
     /// <see cref="NoticeTimes.WithAction"/> with a button).</summary>
     public TimeSpan? Stay { get; init; }
