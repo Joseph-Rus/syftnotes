@@ -185,28 +185,42 @@ public static partial class SyftFile
 
     /// <summary>Writes <paramref name="lecture"/> (the library's JSON for it) as a .syft file to <paramref name="to"/>:
     /// its notes as a download makes them, their pictures, its transcript, and the manifest. <paramref name="app"/> is
-    /// this Syft Notes' version. Nothing else of it goes in: no recording, attachments, ids or names.</summary>
+    /// this Syft Notes' version. Nothing else of it goes in: no recording, attachments, ids, names, or what the student
+    /// typed themselves. Throws a <see cref="SyftFileException"/> (<see cref="NothingToSend"/>) for a lecture with no notes and no
+    /// transcript.</summary>
     public static void Write(Stream to, JsonObject lecture, string app)
     {
+        // The AI's notes only: what the student typed in the lecture is theirs, and a download with no notes falls back on it.
+        var notesOnly = lecture.DeepClone().AsObject();
+        notesOnly["typed"] = "";
+        string transcript = Py.AsString(lecture["transcript"]) ?? "";
+        if (NoteExport.Shown(notesOnly).Trim().Length == 0 && transcript.Trim().Length == 0) throw new SyftFileException(NothingToSend);
         // A Mermaid chart needs no picture: Syft Notes draws it from its source.
-        var export = NoteExport.Lecture(lecture, transcript: false, _ => null, NotesEntry);
+        var export = NoteExport.Lecture(notesOnly, transcript: false, _ => null, NotesEntry);
+        string day = DateTimeOffset.TryParse(Py.AsString(lecture["date"]), CultureInfo.InvariantCulture, DateTimeStyles.None, out var d)
+            ? d.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture) : "";
         using var zip = new ZipArchive(to, ZipArchiveMode.Create, leaveOpen: true);
         void Add(string name, string text)
         {
-            using var w = new StreamWriter(zip.CreateEntry(name, CompressionLevel.Optimal).Open(), new UTF8Encoding(false));
+            var entry = zip.CreateEntry(name, CompressionLevel.Optimal);
+            // The same lecture makes the same file, and it says nothing of when it was made.
+            entry.LastWriteTime = new DateTimeOffset(2000, 1, 1, 0, 0, 0, TimeSpan.Zero);
+            using var w = new StreamWriter(entry.Open(), new UTF8Encoding(false));
             w.Write(text);
         }
         Add(Manifest, PyJson.Dumps(new JsonObject
         {
             ["format"] = Format, ["title"] = Py.AsString(lecture["title"]) ?? "", ["class"] = Py.AsString(lecture["class"]) ?? "",
-            ["date"] = Py.AsString(lecture["date"]) ?? "", ["app"] = app,
+            ["date"] = day, ["app"] = app,
         }, indent: 2));
         Add(NotesEntry, export.Markdown);
         foreach (var asset in export.Assets) Add(asset.RelativePath, asset.Text);
-        if (Py.AsString(lecture["transcript"]) is { Length: > 0 } transcript) Add(TranscriptEntry, transcript);
+        if (transcript.Length > 0) Add(TranscriptEntry, transcript);
     }
 
-    static readonly UTF8Encoding Strict =new(encoderShouldEmitUTF8Identifier: false, throwOnInvalidBytes: true);
+    public const string NothingToSend = "This lecture has no notes or transcript yet, so there's nothing to send.";
+
+    static readonly UTF8Encoding Strict = new(encoderShouldEmitUTF8Identifier: false, throwOnInvalidBytes: true);
 
     /// <summary>An entry's bytes, read no further than <paramref name="limit"/> (the size a zip says it has can lie).</summary>
     static byte[] Bounded(ZipArchiveEntry entry, long limit)

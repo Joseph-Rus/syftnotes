@@ -95,7 +95,7 @@ public sealed class SharedLectureTests
         {
             ["id"] = "rec-20261103-093000-abc123", ["owner"] = "Sender's MacBook", ["title"] = "Lecture 4", ["class"] = "Cell Biology",
             ["date"] = "2026-11-03T09:30:00-05:00", ["seconds"] = 3120, ["notes"] = notes,
-            ["transcript"] = "[00:05] Today, the cell membrane.\n[00:40] It is a lipid bilayer.",
+            ["transcript"] = "[00:05] Today, the cell membrane.\n[00:40] It is a lipid bilayer.", ["typed"] = "my own private aside",
         };
         var file = new MemoryStream();
         SyftFile.Write(file, lecture, "0.24.0");
@@ -105,15 +105,19 @@ public sealed class SharedLectureTests
         {
             Assert.Equal(["manifest.json", "notes.md", "notes.assets/diagram-1.svg", "transcript.txt"], zip.Entries.Select(e => e.FullName));
             string all = string.Concat(zip.Entries.Select(e => new StreamReader(e.Open()).ReadToEnd()));
-            Assert.DoesNotContain("rec-20261103", all);
-            Assert.DoesNotContain("MacBook", all);
+            foreach (string personal in (string[])["rec-20261103", "MacBook", "private aside", "09:30"]) Assert.DoesNotContain(personal, all);
         }
         file.Position = 0;
         var back = SyftFile.Read(file);
-        Assert.Equal(("Lecture 4", "Cell Biology", "2026-11-03T09:30:00-05:00"), (back.Title, back.ClassName, back.Date));
+        Assert.Equal(("Lecture 4", "Cell Biology", "2026-11-03"), (back.Title, back.ClassName, back.Date));
         Assert.Equal(lecture["transcript"]!.GetValue<string>(), back.Transcript);
         Assert.Equal(notes.Replace(Svg, SafeSvgOf(Svg)), back.Notes);
         Assert.Equal("Cell Biology - Lecture 4.syft", SyftFile.SaveName("Cell Biology", "Lecture 4"));
+
+        // Only what the student typed, and no transcript: nothing is sent, and it says so.
+        lecture["notes"] = "";
+        lecture["transcript"] = "";
+        Assert.Equal(SyftFile.NothingToSend, Assert.Throws<SyftFileException>(() => SyftFile.Write(new MemoryStream(), lecture, "0.24.0")).Message);
     }
 
     static string SafeSvgOf(string svg) => Rich.SafeSvg.Clean(svg).Svg!;

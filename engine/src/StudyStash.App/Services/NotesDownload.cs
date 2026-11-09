@@ -125,20 +125,24 @@ public static class NotesDownload
             FileTypeChoices = [new FilePickerFileType("Syft Notes lecture") { Patterns = ["*.syft"], AppleUniformTypeIdentifiers = [SyftFile.TypeId] }],
         });
         if (file is null) return;
-        JsonObject? lecture;
-        try
+        var got = await LibraryCall.Run(() => lib.LectureAsync(lectureId));
+        if (got.Value is not { } lecture)
         {
-            lecture = await lib.LectureAsync(lectureId);
-        }
-        catch (Exception e) when (e is HttpRequestException or TaskCanceledException or LibraryRefusedException)
-        {
-            Say("Couldn't save it", e.Message);
+            // No such lecture is the library's 404, which reads as an older library: here it means it was deleted.
+            Say("Couldn't save it", got.Failure?.Kind == FailureKind.OlderLibrary ? "That lecture isn't there any more." : got.Failure?.Words ?? "");
             return;
         }
-        if (lecture is null) return;
         // Made in memory first, away from the window: a file that couldn't be made leaves the one picked as it was.
         using var made = new MemoryStream();
-        await Task.Run(() => SyftFile.Write(made, lecture, Engine.Version));
+        try
+        {
+            await Task.Run(() => SyftFile.Write(made, lecture, Engine.Version));
+        }
+        catch (SyftFileException e)
+        {
+            Say("Nothing to send yet", e.Message);
+            return;
+        }
         await using (var stream = await file.OpenWriteAsync())
         {
             made.Position = 0;
