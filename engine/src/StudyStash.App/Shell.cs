@@ -155,6 +155,7 @@ public static partial class Shell
         if (host.PretendMic) Program.Log("[app] recording from a pretend microphone (STUDYSTASH_MIC_FILE)");
         Wire();
         host.Start();
+        services.GetRequiredService<CallWatch>().Start();
         Run(() => SuggestLighterModelAsync(), "SuggestLighterModel");
         // The program may have moved (Velopack's install, the Mac bundle's new name): what names the old one is put right.
         // An AI app that's open isn't written to: Home asks to close it first (Close Claude), once.

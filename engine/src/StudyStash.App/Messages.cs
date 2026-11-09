@@ -50,3 +50,10 @@ public sealed record WindowsChanged;
 
 /// <summary>Something unexpected went wrong (already in the log): the student is told once.</summary>
 public sealed record SomethingWentWrong;
+
+/// <summary>A call on this computer has gone on long enough to ask about taking notes (<see cref="CallWatch"/>): once
+/// per call, never while recording.</summary>
+public sealed record CallStarted(Platform.MicUser Call);
+
+/// <summary>The call asked about is over: its app let go of the microphone a little while ago.</summary>
+public sealed record CallEnded(Platform.MicUser Call);
