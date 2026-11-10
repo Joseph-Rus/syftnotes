@@ -288,10 +288,14 @@ Exactly the iPhone app's own calls (its API client, and the two the Due tab make
   `/voice-memos`
 - POST: `/lectures` (a recording written down on the phone; idempotent by its `phone-…` id), `/lectures/shared` (a lecture a
   friend shared as a .syft file, read on the phone; body `title`, `from_class` (the class it was in), `date`, `notes`,
-  `transcript` and `class` (the class to put it in; `""` lets the library sort it); the library makes the lecture's id
-  from what it holds, so the same lecture sent again is the same lecture. Answered 200 `{id, class_name}`; 409
-  `{detail, id, class_name}` when it is in the library already ("… is already in your library", and the id to open, also
-  for a retry of a call that did add it); 400 `{detail}` with words for the student when it isn't a lecture), `/lectures/{id}/class`,
+  `transcript` and `class` (the class to put it in; a name that isn't one of the library's classes, and `""`, let the
+  library sort it). `notes` is what `NoteExport.Undrawn` makes of the file's `notes.md`, not the file itself: no front
+  matter, no `# title` line, no italic byline under it; each `notes.assets/diagram-N.svg` put back as an
+  ```` ```svg ```` block (without the list of its parts); a plot's picture dropped (its ```` ```plot ```` source stays);
+  `_No notes yet._` sent as `""`. The library makes the lecture's id from what it holds, so the same lecture sent
+  again is the same lecture. Answered 200 `{id, class_name}`; 409 `{detail, id, class_name}` when it is in the library
+  already ("… is already in your library", and the id to open, also for a retry of a call that did add it); 400
+  `{detail}` with words for the student when it isn't a lecture, is too big, or has neither notes nor transcript), `/lectures/{id}/class`,
   `/lectures/{id}/title`, `/lectures/{id}/restore`, `/lectures/{id}/rewrite`, `/ai/ask` (streamed), `/ai/warm`,
   `/chat` (streamed), `/chats/{id}` (rename), `/chats/{id}/restore` (Delete's undo), `/classes/alias`, `/uses`, `/attachments` (multipart from `upload`), `/voice-memos` (multipart
   from `upload`), `/voice-memos/{id}/retry`, `/canvas` (the Due tab's sync now: whatever the phone sends, the
