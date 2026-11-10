@@ -17,6 +17,36 @@ public sealed class SharedLectureTests
         return bytes.ToArray();
     }
 
+    /// <summary>A zip whose entries all point at the same packed bytes: 1,000 empty deflate blocks, then one holding
+    /// <paramref name="text"/>. Each entry unpacks to the text, and together they say they hold more than the file.</summary>
+    static byte[] SharingBytes(string text, params string[] names)
+    {
+        const int Empty = 1000;
+        byte[] plain = Encoding.UTF8.GetBytes(text), empty = [0x00, 0x00, 0x00, 0xFF, 0xFF]; // a block, not the last, of no bytes
+        uint crc = new ZipArchive(new MemoryStream(Zip(("x", text)))).Entries[0].Crc32, packed = Empty * 5 + 5 + (uint)plain.Length;
+        var file = new MemoryStream();
+        var w = new BinaryWriter(file);
+        void Header(bool central, string name)
+        {
+            w.Write(central ? 0x02014B50u : 0x04034B50u);
+            if (central) w.Write((ushort)20);
+            w.Write((ushort)20); w.Write((ushort)0); w.Write((ushort)8); w.Write(0u); // version, flags, deflate, time and day
+            w.Write(crc); w.Write(packed); w.Write((uint)plain.Length);
+            w.Write((ushort)name.Length); w.Write((ushort)0);
+            if (central) { w.Write((ushort)0); w.Write((ushort)0); w.Write((ushort)0); w.Write(0u); w.Write(0u); } // its header at 0
+            w.Write(Encoding.ASCII.GetBytes(name));
+        }
+        Header(central: false, names[0]);
+        for (int b = 0; b < Empty; b++) w.Write(empty);
+        w.Write((byte)1); w.Write((ushort)plain.Length); w.Write((ushort)~plain.Length); w.Write(plain); // the last, stored
+        long directory = file.Position;
+        foreach (string name in names) Header(central: true, name);
+        long end = file.Position;
+        w.Write(0x06054B50u); w.Write(0u); w.Write((ushort)names.Length); w.Write((ushort)names.Length);
+        w.Write((uint)(end - directory)); w.Write((uint)directory); w.Write((ushort)0);
+        return file.ToArray();
+    }
+
     const string Manifest = """{"format": 1, "title": "Lecture 4", "class": "Cell Biology", "date": "2026-11-03T09:30:00-05:00", "app": "0.24.0"}""";
     const string Svg = """<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 10 10"><title>Cell</title><circle cx="5" cy="5" r="4"/></svg>""";
     const string NotesFile = """
@@ -36,6 +66,27 @@ public sealed class SharedLectureTests
 
         ![Diagram: Cell](notes.assets/diagram-1.svg)
         """;
+
+    /// <summary>A small file made to tie up the computer, or to crash it, is refused in plain words before it costs
+    /// anything.</summary>
+    [Fact]
+    public void A_file_made_to_tie_up_the_computer_is_refused()
+    {
+        // Entries sharing their packed bytes (200 sharing 16 MB would each unpack all of it) are a damaged file, even when
+        // each one unpacks to a lecture.
+        Assert.Equal(SyftFile.NotOne, Assert.Throws<SyftFileException>(() => SyftFile.Read(new MemoryStream(
+            SharingBytes("""{"format": 1, "title": "x"}""", "manifest.json", "notes.md", "transcript.txt")))).Message);
+
+        // 1,000 spaces before one link to a picture of 2,000 short lines: 2 million characters, refused before they're made.
+        Assert.Null(Rich.NoteExport.Undrawn(new string(' ', 1000) + "![Diagram: x](a.svg)",
+            new Dictionary<string, string> { ["a.svg"] = string.Concat(Enumerable.Repeat("a\n", 2000)) }, SharedLecture.MaxNotesChars));
+
+        // Half a surrogate pair in a key or the title is a damaged file; in what nothing reads, it opens as before.
+        foreach (string bad in (string[])[Manifest.Replace("\"title\"", "\"\\uD800\": 1, \"title\""), Manifest.Replace("Lecture 4", "\\uD800")])
+            Assert.Equal(SyftFile.NotOne, Assert.Throws<SyftFileException>(() => SyftFile.Read(new MemoryStream(Zip(("manifest.json", bad),
+                ("notes.md", NotesFile))))).Message);
+        Assert.Equal("Lecture 4", SyftFile.Read(new MemoryStream(Zip(("manifest.json", Manifest.Replace("0.24.0", "\\uD800")), ("notes.md", NotesFile)))).Title);
+    }
 
     [Fact]
     public void A_good_file_comes_in_once_and_one_reaching_outside_is_refused()

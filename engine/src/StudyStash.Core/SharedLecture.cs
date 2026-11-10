@@ -131,18 +131,25 @@ public static partial class SyftFile
     {
         var info = new FileInfo(path);
         if (!info.Exists) throw new SyftFileException(Gone);
-        if (info.Length > MaxFileBytes) throw new SyftFileException(TooBig);
         using var stream = info.OpenRead();
         return Read(stream);
     }
 
+    /// <summary>The lecture in a .syft file's bytes, as <see cref="Read(string)"/> reads it: <paramref name="stream"/> can
+    /// seek (a file's, or one in memory).</summary>
     public static SharedLecture Read(Stream stream)
     {
+        if (stream.Length > MaxFileBytes) throw new SyftFileException(TooBig);
         var texts = new Dictionary<string, string>(StringComparer.Ordinal);
         try
         {
             using var zip = new ZipArchive(stream, ZipArchiveMode.Read, leaveOpen: true);
             if (zip.Entries.Count > MaxEntries) throw new SyftFileException(Unexpected);
+            // Each entry's packed bytes are its own, so together they fit in the file. A directory that says more is
+            // damaged, or made so that 200 entries share the same 16 MB and each unpacks all of it.
+            long room = stream.Length;
+            foreach (var entry in zip.Entries)
+                if ((room -= entry.CompressedLength) < 0) throw new SyftFileException(NotOne);
             long total = 0;
             foreach (var entry in zip.Entries)
             {
@@ -167,8 +174,9 @@ public static partial class SyftFile
             format = manifest["format"] is JsonValue v && v.TryGetValue(out int f) ? f : 0;
             (title, className, date) = (Py.AsString(manifest["title"]), Py.AsString(manifest["class"]), Py.AsString(manifest["date"]));
         }
-        // A key said twice ({"format": 1, "format": 1}) is an ArgumentException once it's read.
-        catch (Exception e) when (e is System.Text.Json.JsonException or ArgumentException)
+        // A key said twice ({"format": 1, "format": 1}) is an ArgumentException once it's read, and half a surrogate pair
+        // ("\uD800") in a key or in one of these words an InvalidOperationException.
+        catch (Exception e) when (e is System.Text.Json.JsonException or ArgumentException or InvalidOperationException)
         {
             throw new SyftFileException(NotOne);
         }
