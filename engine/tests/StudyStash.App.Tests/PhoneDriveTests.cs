@@ -74,6 +74,10 @@ public class PhoneDriveTests
         // A chat renamed, or brought back after Delete's undo, from the phone.
         Assert.NotNull(PhoneCalls.Check("POST", "/chats/c-1"));
         Assert.NotNull(PhoneCalls.Check("POST", "/chats/c-1/restore"));
+        // A shared lecture isn't a lecture's own page (no copy of a lecture called "shared"); a title change is.
+        Assert.NotNull(PhoneCalls.Check("POST", "/lectures/shared"));
+        Assert.Null(PhoneCalls.Check("POST", "/lectures/shared")!.Lecture);
+        Assert.Equal("rec-1", PhoneCalls.Check("POST", "/lectures/rec-1/title")!.Lecture);
 
         foreach (string r in refused)
         {
@@ -235,10 +239,10 @@ public class PhoneDriveTests
 
         var again = await phone.DoneAsync(phone.Ask("POST", "/lectures/shared", shared));
         Assert.Equal(409, (int)again["status"]!);
-        Assert.Equal("\u201cSample lecture\u201d is already in your library.", (string)again["body"]!["detail"]!);
-        // It isn't a lecture's own page: the copy is not asked for a lecture called "shared".
-        Assert.Null(PhoneCalls.Check("POST", "/lectures/shared")!.Lecture);
-        Assert.Equal("rec-1", PhoneCalls.Check("POST", "/lectures/rec-1/title")!.Lecture);
+        Assert.Equal(SharedLecture.AlreadyHere("Sample lecture"), (string)again["body"]!["detail"]!);
+        // The words come with the id and class it went in, so a retry of a call that did add it can open the lecture.
+        Assert.Equal((string)added["body"]!["id"]!, (string)again["body"]!["id"]!);
+        Assert.Equal("CS 101", (string)again["body"]!["class_name"]!);
         stop.Cancel();
         await running;
     }
