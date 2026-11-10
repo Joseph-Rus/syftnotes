@@ -136,6 +136,8 @@ public static partial class SyftFile
         return Read(stream);
     }
 
+    /// <summary>The lecture in a .syft file's bytes, as <see cref="Read(string)"/> reads it: <paramref name="stream"/> can
+    /// seek (a file's, or one in memory).</summary>
     public static SharedLecture Read(Stream stream)
     {
         var texts = new Dictionary<string, string>(StringComparer.Ordinal);
@@ -143,6 +145,11 @@ public static partial class SyftFile
         {
             using var zip = new ZipArchive(stream, ZipArchiveMode.Read, leaveOpen: true);
             if (zip.Entries.Count > MaxEntries) throw new SyftFileException(Unexpected);
+            // Each entry's packed bytes are its own, so together they fit in the file. Entries made to share the same
+            // 16 MB would each be unpacked in full, one after another, from a file that small.
+            long room = stream.Length;
+            foreach (var entry in zip.Entries)
+                if ((room -= entry.CompressedLength) < 0) throw new SyftFileException(TooBig);
             long total = 0;
             foreach (var entry in zip.Entries)
             {
@@ -167,8 +174,9 @@ public static partial class SyftFile
             format = manifest["format"] is JsonValue v && v.TryGetValue(out int f) ? f : 0;
             (title, className, date) = (Py.AsString(manifest["title"]), Py.AsString(manifest["class"]), Py.AsString(manifest["date"]));
         }
-        // A key said twice ({"format": 1, "format": 1}) is an ArgumentException once it's read.
-        catch (Exception e) when (e is System.Text.Json.JsonException or ArgumentException)
+        // A key said twice ({"format": 1, "format": 1}) is an ArgumentException once it's read, and half a surrogate pair
+        // ("\uD800") in a key or in one of these words an InvalidOperationException.
+        catch (Exception e) when (e is System.Text.Json.JsonException or ArgumentException or InvalidOperationException)
         {
             throw new SyftFileException(NotOne);
         }
