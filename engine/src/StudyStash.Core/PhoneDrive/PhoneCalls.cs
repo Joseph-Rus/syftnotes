@@ -48,6 +48,8 @@ public static class PhoneCalls
         ("GET", "/attachments/{}/raw", PhoneAnswerKind.Blob, false),
         ("GET", "/voice-memos", PhoneAnswerKind.Json, false),
         ("POST", "/lectures", PhoneAnswerKind.Json, false),
+        // A lecture a friend shared as a .syft file, which the phone read and checked; the library checks it again.
+        ("POST", "/lectures/shared", PhoneAnswerKind.Json, false),
         ("POST", "/lectures/{}/class", PhoneAnswerKind.Json, false),
         ("POST", "/lectures/{}/title", PhoneAnswerKind.Json, false),
         ("POST", "/lectures/{}/restore", PhoneAnswerKind.Json, false),
@@ -107,7 +109,7 @@ public static class PhoneCalls
             bool changes = method != "GET" && route != "/ai/warm";
             return new PhoneCall(method, clean, route, kind, changes, multipart)
             {
-                Lecture = want[0] == "lectures" && want.Length >= 2 ? decoded[1] : null,
+                Lecture = want[0] == "lectures" && want.Length >= 2 && want[1] == "{}" ? decoded[1] : null,
             };
         }
         return null;

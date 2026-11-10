@@ -286,7 +286,8 @@ Exactly the iPhone app's own calls (its API client, and the two the Due tab make
 - GET: `/me`, `/library`, `/ai` (which AI answers each job, no keys: the phone shows Ask's AI while it thinks), `/lectures`, `/lectures/{id}`, `/lectures/{id}/rendered`, `/search`, `/chats`,
   `/chats/{id}`, `/canvas/due`, `/canvas/state`, `/canvas/assignment`, `/calendar/upcoming`, `/attachments`, `/attachments/{id}/raw`,
   `/voice-memos`
-- POST: `/lectures` (a recording written down on the phone; idempotent by its `phone-…` id), `/lectures/{id}/class`,
+- POST: `/lectures` (a recording written down on the phone; idempotent by its `phone-…` id), `/lectures/shared` (a lecture a
+  friend shared as a .syft file: the same id twice is answered 409, "already in your library"), `/lectures/{id}/class`,
   `/lectures/{id}/title`, `/lectures/{id}/restore`, `/lectures/{id}/rewrite`, `/ai/ask` (streamed), `/ai/warm`,
   `/chat` (streamed), `/chats/{id}` (rename), `/chats/{id}/restore` (Delete's undo), `/classes/alias`, `/uses`, `/attachments` (multipart from `upload`), `/voice-memos` (multipart
   from `upload`), `/voice-memos/{id}/retry`, `/canvas` (the Due tab's sync now: whatever the phone sends, the

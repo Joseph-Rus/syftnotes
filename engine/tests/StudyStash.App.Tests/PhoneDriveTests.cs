@@ -214,6 +214,36 @@ public class PhoneDriveTests
     }
 
     [Fact]
+    public async Task A_lecture_a_friend_shared_sent_from_the_phone_comes_in_once_and_a_second_time_says_its_there()
+    {
+        await using var rig = await LibraryRig.StartAsync();
+        var drive = new FakeDrive();
+        using var stop = new CancellationTokenSource();
+        var running = Link(drive, rig).RunAsync(stop.Token);
+        var phone = new FakePhone(drive);
+        var shared = new JsonObject
+        {
+            ["title"] = "Sample lecture", ["from_class"] = "Sample class", ["date"] = "2026-11-03T09:30:00-05:00",
+            ["notes"] = "## Summary\nSample notes.", ["transcript"] = "[00:05] Sample words.", ["class"] = "CS 101",
+        };
+
+        var added = await phone.DoneAsync(phone.Ask("POST", "/lectures/shared", shared.DeepClone()));
+        Assert.Equal(200, (int)added["status"]!);
+        Assert.Equal("CS 101", (string)added["body"]!["class_name"]!);
+        var row = await rig.RawAsync("/api/v2/lectures/" + (string)added["body"]!["id"]!);
+        Assert.Equal("Sample lecture", (string)row["title"]!);
+
+        var again = await phone.DoneAsync(phone.Ask("POST", "/lectures/shared", shared));
+        Assert.Equal(409, (int)again["status"]!);
+        Assert.Equal("\u201cSample lecture\u201d is already in your library.", (string)again["body"]!["detail"]!);
+        // It isn't a lecture's own page: the copy is not asked for a lecture called "shared".
+        Assert.Null(PhoneCalls.Check("POST", "/lectures/shared")!.Lecture);
+        Assert.Equal("rec-1", PhoneCalls.Check("POST", "/lectures/rec-1/title")!.Lecture);
+        stop.Cancel();
+        await running;
+    }
+
+    [Fact]
     public async Task A_changed_lecture_reaches_the_copy_and_an_unchanged_one_isnt_uploaded_again()
     {
         await using var rig = await LibraryRig.StartAsync();
