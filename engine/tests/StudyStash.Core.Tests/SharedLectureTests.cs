@@ -17,14 +17,13 @@ public sealed class SharedLectureTests
         return bytes.ToArray();
     }
 
-    /// <summary>A zip whose entries all point at the same packed bytes: 3.35 million empty deflate blocks, then one
-    /// holding a zero byte. Each entry says it's 16.75 MB packed and 1 byte unpacked.</summary>
-    static byte[] SharingBytes(string[] names)
+    /// <summary>A zip whose entries all point at the same packed bytes: 1,000 empty deflate blocks, then one holding
+    /// <paramref name="text"/>. Each entry unpacks to the text, and together they say they hold more than the file.</summary>
+    static byte[] SharingBytes(string text, params string[] names)
     {
-        const int Blocks = 3_350_000;
-        var packed = new byte[Blocks * 5 + 6];
-        for (int b = 0; b < Blocks; b++) packed[b * 5 + 3] = packed[b * 5 + 4] = 0xFF; // 00 00 00 FF FF: not the last, no bytes
-        ((byte[])[0x01, 0x01, 0x00, 0xFE, 0xFF, 0x00]).CopyTo(packed, Blocks * 5);     // the last: one zero byte
+        const int Empty = 1000;
+        byte[] plain = Encoding.UTF8.GetBytes(text), empty = [0x00, 0x00, 0x00, 0xFF, 0xFF]; // a block, not the last, of no bytes
+        uint crc = new ZipArchive(new MemoryStream(Zip(("x", text)))).Entries[0].Crc32, packed = Empty * 5 + 5 + (uint)plain.Length;
         var file = new MemoryStream();
         var w = new BinaryWriter(file);
         void Header(bool central, string name)
@@ -32,13 +31,14 @@ public sealed class SharedLectureTests
             w.Write(central ? 0x02014B50u : 0x04034B50u);
             if (central) w.Write((ushort)20);
             w.Write((ushort)20); w.Write((ushort)0); w.Write((ushort)8); w.Write(0u); // version, flags, deflate, time and day
-            w.Write(0xD202EF8Du); w.Write((uint)packed.Length); w.Write(1u);         // the CRC of one zero byte, the sizes
+            w.Write(crc); w.Write(packed); w.Write((uint)plain.Length);
             w.Write((ushort)name.Length); w.Write((ushort)0);
             if (central) { w.Write((ushort)0); w.Write((ushort)0); w.Write((ushort)0); w.Write(0u); w.Write(0u); } // its header at 0
             w.Write(Encoding.ASCII.GetBytes(name));
         }
         Header(central: false, names[0]);
-        w.Write(packed);
+        for (int b = 0; b < Empty; b++) w.Write(empty);
+        w.Write((byte)1); w.Write((ushort)plain.Length); w.Write((ushort)~plain.Length); w.Write(plain); // the last, stored
         long directory = file.Position;
         foreach (string name in names) Header(central: true, name);
         long end = file.Position;
@@ -72,16 +72,14 @@ public sealed class SharedLectureTests
     [Fact]
     public void A_file_made_to_tie_up_the_computer_is_refused()
     {
-        // 200 entries sharing the same 16 MB, each unpacking all of it for one byte: 3.35 GB of unpacking.
-        var sharing = SharingBytes(["manifest.json", "notes.md", "transcript.txt", .. Enumerable.Range(1, 197).Select(n => $"notes.assets/diagram-{n}.svg")]);
-        Assert.True(sharing.Length < 16 * 1024 * 1024);
-        Assert.Equal(SyftFile.TooBig, Assert.Throws<SyftFileException>(() => SyftFile.Read(new MemoryStream(sharing))).Message);
+        // Entries sharing their packed bytes (200 sharing 16 MB would each unpack all of it) are a damaged file, even when
+        // each one unpacks to a lecture.
+        Assert.Equal(SyftFile.NotOne, Assert.Throws<SyftFileException>(() => SyftFile.Read(new MemoryStream(
+            SharingBytes("""{"format": 1, "title": "x"}""", "manifest.json", "notes.md", "transcript.txt")))).Message);
 
-        // 100,000 spaces before one link to a picture of 96,000 short lines: 9.6 billion characters from a file of about 1 KB.
-        string notes = "# Lecture 4\n\n" + new string(' ', 100_000) + "![Diagram: x](notes.assets/diagram-1.svg)";
-        string lines = string.Concat(Enumerable.Repeat("a\n", 96_000));
-        Assert.Equal(SyftFile.TooBig, Assert.Throws<SyftFileException>(() => SyftFile.Read(new MemoryStream(Zip(("manifest.json", Manifest),
-            ("notes.md", notes), ("notes.assets/diagram-1.svg", lines))))).Message);
+        // 1,000 spaces before one link to a picture of 2,000 short lines: 2 million characters, refused before they're made.
+        Assert.Null(Rich.NoteExport.Undrawn(new string(' ', 1000) + "![Diagram: x](a.svg)",
+            new Dictionary<string, string> { ["a.svg"] = string.Concat(Enumerable.Repeat("a\n", 2000)) }, SharedLecture.MaxNotesChars));
 
         // Half a surrogate pair in a key or the title is a damaged file; in what nothing reads, it opens as before.
         foreach (string bad in (string[])[Manifest.Replace("\"title\"", "\"\\uD800\": 1, \"title\""), Manifest.Replace("Lecture 4", "\\uD800")])

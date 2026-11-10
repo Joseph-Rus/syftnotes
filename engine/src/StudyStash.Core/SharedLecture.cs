@@ -131,7 +131,6 @@ public static partial class SyftFile
     {
         var info = new FileInfo(path);
         if (!info.Exists) throw new SyftFileException(Gone);
-        if (info.Length > MaxFileBytes) throw new SyftFileException(TooBig);
         using var stream = info.OpenRead();
         return Read(stream);
     }
@@ -140,16 +139,17 @@ public static partial class SyftFile
     /// seek (a file's, or one in memory).</summary>
     public static SharedLecture Read(Stream stream)
     {
+        if (stream.Length > MaxFileBytes) throw new SyftFileException(TooBig);
         var texts = new Dictionary<string, string>(StringComparer.Ordinal);
         try
         {
             using var zip = new ZipArchive(stream, ZipArchiveMode.Read, leaveOpen: true);
             if (zip.Entries.Count > MaxEntries) throw new SyftFileException(Unexpected);
-            // Each entry's packed bytes are its own, so together they fit in the file. Entries made to share the same
-            // 16 MB would each be unpacked in full, one after another, from a file that small.
+            // Each entry's packed bytes are its own, so together they fit in the file. A directory that says more is
+            // damaged, or made so that 200 entries share the same 16 MB and each unpacks all of it.
             long room = stream.Length;
             foreach (var entry in zip.Entries)
-                if ((room -= entry.CompressedLength) < 0) throw new SyftFileException(TooBig);
+                if ((room -= entry.CompressedLength) < 0) throw new SyftFileException(NotOne);
             long total = 0;
             foreach (var entry in zip.Entries)
             {
