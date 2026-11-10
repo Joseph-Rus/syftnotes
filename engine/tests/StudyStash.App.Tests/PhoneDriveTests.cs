@@ -74,6 +74,10 @@ public class PhoneDriveTests
         // A chat renamed, or brought back after Delete's undo, from the phone.
         Assert.NotNull(PhoneCalls.Check("POST", "/chats/c-1"));
         Assert.NotNull(PhoneCalls.Check("POST", "/chats/c-1/restore"));
+        // A shared lecture isn't a lecture's own page (no copy of a lecture called "shared"); a title change is.
+        Assert.NotNull(PhoneCalls.Check("POST", "/lectures/shared"));
+        Assert.Null(PhoneCalls.Check("POST", "/lectures/shared")!.Lecture);
+        Assert.Equal("rec-1", PhoneCalls.Check("POST", "/lectures/rec-1/title")!.Lecture);
 
         foreach (string r in refused)
         {
@@ -209,6 +213,36 @@ public class PhoneDriveTests
         var attached = await phone.DoneAsync(page);
         Assert.Equal(200, (int)attached["status"]!);
         Assert.Equal("phone-20261024-101500-b2c3d4", (string)attached["body"]!["attachments"]![0]!["lecture"]!);
+        stop.Cancel();
+        await running;
+    }
+
+    [Fact]
+    public async Task A_lecture_a_friend_shared_sent_from_the_phone_comes_in_once_and_a_second_time_says_its_there()
+    {
+        await using var rig = await LibraryRig.StartAsync();
+        var drive = new FakeDrive();
+        using var stop = new CancellationTokenSource();
+        var running = Link(drive, rig).RunAsync(stop.Token);
+        var phone = new FakePhone(drive);
+        var shared = new JsonObject
+        {
+            ["title"] = "Sample lecture", ["from_class"] = "Sample class", ["date"] = "2026-11-03T09:30:00-05:00",
+            ["notes"] = "## Summary\nSample notes.", ["transcript"] = "[00:05] Sample words.", ["class"] = "CS 101",
+        };
+
+        var added = await phone.DoneAsync(phone.Ask("POST", "/lectures/shared", shared.DeepClone()));
+        Assert.Equal(200, (int)added["status"]!);
+        Assert.Equal("CS 101", (string)added["body"]!["class_name"]!);
+        var row = await rig.RawAsync("/api/v2/lectures/" + (string)added["body"]!["id"]!);
+        Assert.Equal("Sample lecture", (string)row["title"]!);
+
+        var again = await phone.DoneAsync(phone.Ask("POST", "/lectures/shared", shared));
+        Assert.Equal(409, (int)again["status"]!);
+        Assert.Equal(SharedLecture.AlreadyHere("Sample lecture"), (string)again["body"]!["detail"]!);
+        // The words come with the id and class it went in, so a retry of a call that did add it can open the lecture.
+        Assert.Equal((string)added["body"]!["id"]!, (string)again["body"]!["id"]!);
+        Assert.Equal("CS 101", (string)again["body"]!["class_name"]!);
         stop.Cancel();
         await running;
     }
