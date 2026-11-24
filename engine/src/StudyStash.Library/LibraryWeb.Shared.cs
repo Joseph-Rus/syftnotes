@@ -25,13 +25,20 @@ public sealed partial class LibraryWeb
             {
                 return Http.Detail(400, e.Message);
             }
-            if (store.Get(lecture.Id) is not null) return Http.Detail(409, SharedLecture.AlreadyHere(lecture.Title));
+            if (store.Get(lecture.Id) is { } here) return Here(lecture, here.ClassName);
             string asked = Py.AsString(body["class"]) ?? "";
             var known = cfg.Classes.FirstOrDefault(c => c.Name.Equals(asked, StringComparison.OrdinalIgnoreCase));
             var c = known is not null ? new Classification(known.Name, 1.0, "human")
                 : await pipeline.SortAsync(lecture.Meeting().WithNotes(lecture.Notes));
-            if (lecture.Add(store, c) is not { } id) return Http.Detail(409, SharedLecture.AlreadyHere(lecture.Title));
+            if (lecture.Add(store, c) is not { } id) return Here(lecture, store.Get(lecture.Id)?.ClassName);
             Console.WriteLine($"[shared] lecture {id} → {c.ClassName}");
             return Http.Json(new JsonObject { ["id"] = id, ["class_name"] = c.ClassName });
         })));
+
+    /// <summary>409: it's here already. The lecture's id and class come too, so a retry of a call that ran long (the
+    /// first one added it) can still open what it added.</summary>
+    static IResult Here(SharedLecture lecture, string? className) => Http.Json(new JsonObject
+    {
+        ["detail"] = SharedLecture.AlreadyHere(lecture.Title), ["id"] = lecture.Id, ["class_name"] = className ?? "",
+    }, 409);
 }
