@@ -302,7 +302,7 @@ public class MenuPickTests
         try
         {
             int downloaded = 0, downloadedPdf = 0, downloadedClass = 0, toggled = 0;
-            var menu = DownloadMenu.Build("BIO 110", includeTranscripts: false, () => downloaded++, () => downloadedPdf++, () => downloadedClass++, () => toggled++);
+            var menu = DownloadMenu.Build("BIO 110", includeTranscripts: false, () => downloaded++, () => downloadedPdf++, () => { }, () => downloadedClass++, () => toggled++);
             menu.Open(anchor);
             Dispatcher.UIThread.RunJobs();
             Assert.True(menu.IsOpen);
@@ -323,7 +323,7 @@ public class MenuPickTests
             menu.Close();
 
             // No class open (Due, or nothing picked yet): no "Download all of…" row at all.
-            var noClass = DownloadMenu.Build(null, includeTranscripts: true, () => { }, () => { }, () => { }, () => { });
+            var noClass = DownloadMenu.Build(null, includeTranscripts: true, () => { }, () => { }, () => { }, () => { }, () => { });
             Assert.DoesNotContain(noClass.Items.OfType<MenuItem>(), i => (i.Header as string)?.StartsWith("Download all of") == true);
             noClass.Open(anchor);
             Dispatcher.UIThread.RunJobs();

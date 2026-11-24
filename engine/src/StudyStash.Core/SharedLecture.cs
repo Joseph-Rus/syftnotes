@@ -55,7 +55,7 @@ public sealed record SharedLecture(string Title, string ClassName, string Date, 
 
     /// <summary>A title or class as plain words on one line: a line break (which would start a heading in the note file),
     /// a control character or an invisible one (a right-to-left override) becomes a space.</summary>
-    static string OneLine(string? text) => new string([.. (text ?? "").Select(c =>
+    internal static string OneLine(string? text) => new string([.. (text ?? "").Select(c =>
         char.IsControl(c) || CharUnicodeInfo.GetUnicodeCategory(c) == UnicodeCategory.Format ? ' ' : c)]).Trim();
 
     /// <summary>The lecture as the library keeps one. The class the friend had it in is its folder, so the library's
@@ -186,6 +186,54 @@ public static partial class SyftFile
         return SharedLecture.Checked(title, className, date,
             NoteExport.Undrawn(notes, pictures, SharedLecture.MaxNotesChars) ?? throw new SyftFileException(TooBig), texts.GetValueOrDefault(TranscriptEntry));
     }
+
+    /// <summary>"Cell Biology - Lecture 4.syft": the name the Save dialog suggests for a lecture.</summary>
+    public static string SaveName(string? className, string title) =>
+        NoteExport.SaveName(string.Join(" - ", new[] { className, title }.Where(s => !string.IsNullOrWhiteSpace(s) && s != Configs.Unsorted)), Ending);
+
+    /// <summary>Writes <paramref name="lecture"/> (the library's JSON for it) as a .syft file to <paramref name="to"/>:
+    /// its notes as a download makes them, their pictures, its transcript, and the manifest. <paramref name="app"/> is
+    /// this Syft Notes' version. Nothing else of it goes in: no recording, attachments, ids, names, or what the student
+    /// typed themselves. Throws a <see cref="SyftFileException"/> (<see cref="NothingToSend"/>) for a lecture with no notes and no
+    /// transcript.</summary>
+    public static void Write(Stream to, JsonObject lecture, string app)
+    {
+        // The AI's notes only: what the student typed in the lecture is theirs, and a download with no notes falls back on it.
+        var notesOnly = lecture.DeepClone().AsObject();
+        notesOnly["typed"] = "";
+        // A title every reader takes (none refuses the file), and no class for one in Unsorted, so the friend's library
+        // sorts it rather than filing it in their own Unsorted. The phone writes both the same way.
+        string title = Py.AsString(lecture["title"]) ?? "", cls = Py.AsString(lecture["class"]) ?? "";
+        if (SharedLecture.OneLine(title).Length == 0) title = "Untitled lecture";
+        if (cls.Equals(Configs.Unsorted, StringComparison.OrdinalIgnoreCase)) cls = "";
+        notesOnly["title"] = title;
+        notesOnly["class"] = cls;
+        string transcript = Py.AsString(lecture["transcript"]) ?? "";
+        if (NoteExport.Shown(notesOnly).Trim().Length == 0 && transcript.Trim().Length == 0) throw new SyftFileException(NothingToSend);
+        // A Mermaid chart needs no picture: Syft Notes draws it from its source.
+        var export = NoteExport.Lecture(notesOnly, transcript: false, _ => null, NotesEntry);
+        string day = DateTimeOffset.TryParse(Py.AsString(lecture["date"]), CultureInfo.InvariantCulture, DateTimeStyles.None, out var d)
+            ? d.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture) : "";
+        using var zip = new ZipArchive(to, ZipArchiveMode.Create, leaveOpen: true);
+        void Add(string name, string text)
+        {
+            var entry = zip.CreateEntry(name, CompressionLevel.Optimal);
+            // The same lecture makes the same file, and it says nothing of when it was made.
+            entry.LastWriteTime = new DateTimeOffset(2000, 1, 1, 0, 0, 0, TimeSpan.Zero);
+            using var w = new StreamWriter(entry.Open(), new UTF8Encoding(false));
+            w.Write(text);
+        }
+        Add(Manifest, PyJson.Dumps(new JsonObject
+        {
+            ["format"] = Format, ["title"] = title, ["class"] = cls,
+            ["date"] = day, ["app"] = app,
+        }, indent: 2));
+        Add(NotesEntry, export.Markdown);
+        foreach (var asset in export.Assets) Add(asset.RelativePath, asset.Text);
+        if (transcript.Length > 0) Add(TranscriptEntry, transcript);
+    }
+
+    public const string NothingToSend = "This lecture has no notes or transcript yet, so there's nothing to send.";
 
     static readonly UTF8Encoding Strict = new(encoderShouldEmitUTF8Identifier: false, throwOnInvalidBytes: true);
 
