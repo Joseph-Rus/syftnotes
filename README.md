@@ -53,6 +53,7 @@ choose, including a free one that runs on your machine.
 - **Works without a paid AI**: a free AI on your computer, a free Gemini key, the free Claude app, or copy and paste with any chat.
 - **Lets you select and copy almost anything**: notes, transcripts, chats, assignments, even error messages.
 - **Finds anything in a second** from a quick panel, and shows what's due on a calendar.
+- **Shares a lecture with a friend** as one `.syft` file with its notes and transcript, which their Syft Notes opens as a lecture of theirs.
 - **Comes with you on your phone**, and lets Claude, ChatGPT and other AI apps read your library over MCP.
 
 ## Take notes while it records
@@ -163,6 +164,15 @@ keeps its shape: each bullet keeps its "• ", a table's cells paste into a spre
 comes out as LaTeX. Transcripts (each line keeps its time), chats, the recorder's live words,
 assignments, Canvas pages and announcements select the same way, and so do error messages,
 addresses and codes, so you can paste them when you need help.
+
+## Share a lecture with a friend
+
+On a lecture's page, **Share** → **Send to a Syft Notes user…** saves it as one `.syft` file: its
+title, class, day, notes (with the lines you typed into them) and transcript. Send it however you
+like: AirDrop, email, a chat. Your friend double-clicks it, or drops it on Home or a class's page, and
+Syft Notes asks one thing: which class it goes in. Then it's a lecture of theirs, marked "Shared by a
+friend", that they can search, ask about and study. The recording, attachments and names never go in
+the file, and opening it twice never makes a copy.
 
 ## Filed by class, with what's coming up
 
