@@ -55,7 +55,7 @@ public sealed record SharedLecture(string Title, string ClassName, string Date, 
 
     /// <summary>A title or class as plain words on one line: a line break (which would start a heading in the note file),
     /// a control character or an invisible one (a right-to-left override) becomes a space.</summary>
-    static string OneLine(string? text) => new string([.. (text ?? "").Select(c =>
+    internal static string OneLine(string? text) => new string([.. (text ?? "").Select(c =>
         char.IsControl(c) || CharUnicodeInfo.GetUnicodeCategory(c) == UnicodeCategory.Format ? ' ' : c)]).Trim();
 
     /// <summary>The lecture as the library keeps one. The class the friend had it in is its folder, so the library's
@@ -193,6 +193,13 @@ public static partial class SyftFile
         // The AI's notes only: what the student typed in the lecture is theirs, and a download with no notes falls back on it.
         var notesOnly = lecture.DeepClone().AsObject();
         notesOnly["typed"] = "";
+        // A title every reader takes (none refuses the file), and no class for one in Unsorted, so the friend's library
+        // sorts it rather than filing it in their own Unsorted. The phone writes both the same way.
+        string title = Py.AsString(lecture["title"]) ?? "", cls = Py.AsString(lecture["class"]) ?? "";
+        if (SharedLecture.OneLine(title).Length == 0) title = "Untitled lecture";
+        if (cls.Equals(Configs.Unsorted, StringComparison.OrdinalIgnoreCase)) cls = "";
+        notesOnly["title"] = title;
+        notesOnly["class"] = cls;
         string transcript = Py.AsString(lecture["transcript"]) ?? "";
         if (NoteExport.Shown(notesOnly).Trim().Length == 0 && transcript.Trim().Length == 0) throw new SyftFileException(NothingToSend);
         // A Mermaid chart needs no picture: Syft Notes draws it from its source.
@@ -210,7 +217,7 @@ public static partial class SyftFile
         }
         Add(Manifest, PyJson.Dumps(new JsonObject
         {
-            ["format"] = Format, ["title"] = Py.AsString(lecture["title"]) ?? "", ["class"] = Py.AsString(lecture["class"]) ?? "",
+            ["format"] = Format, ["title"] = title, ["class"] = cls,
             ["date"] = day, ["app"] = app,
         }, indent: 2));
         Add(NotesEntry, export.Markdown);

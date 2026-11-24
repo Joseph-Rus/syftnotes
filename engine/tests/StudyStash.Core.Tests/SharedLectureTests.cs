@@ -114,6 +114,15 @@ public sealed class SharedLectureTests
         Assert.Equal(notes.Replace(Svg, SafeSvgOf(Svg)), back.Notes);
         Assert.Equal("Cell Biology - Lecture 4.syft", SyftFile.SaveName("Cell Biology", "Lecture 4"));
 
+        // No title and no class: still a file that opens, which the friend's library sorts.
+        lecture["title"] = " ";
+        lecture["class"] = Configs.Unsorted;
+        var untitled = new MemoryStream();
+        SyftFile.Write(untitled, lecture, "0.24.0");
+        untitled.Position = 0;
+        var opened = SyftFile.Read(untitled);
+        Assert.Equal(("Untitled lecture", ""), (opened.Title, opened.ClassName));
+
         // Only what the student typed, and no transcript: nothing is sent, and it says so.
         lecture["notes"] = "";
         lecture["transcript"] = "";
