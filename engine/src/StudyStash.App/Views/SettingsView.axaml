@@ -656,18 +656,31 @@
                 </StackPanel>
                 <TextBlock Classes="section" Text="Setup" />
                 <Border Classes="group">
-                  <Border Classes="row">
-                    <Grid ColumnDefinitions="*,Auto">
-                      <StackPanel Spacing="2">
-                        <TextBlock Classes="row-title" Text="Run setup again" />
-                        <TextBlock Classes="row-sub" Text="The first-run steps, with what's set up already kept" />
-                      </StackPanel>
-                      <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="12" VerticalAlignment="Center">
-                        <Button Name="SetUpByHand" Classes="text-link small" Command="{Binding RunSetupByHandCommand}" VerticalAlignment="Center" Content="Set up by hand" />
-                        <Button Classes="btn sm" Command="{Binding RunSetupAgainCommand}" VerticalAlignment="Center"><TextBlock Text="Run setup" /></Button>
-                      </StackPanel>
-                    </Grid>
-                  </Border>
+                  <StackPanel>
+                    <Border Classes="row">
+                      <Grid ColumnDefinitions="*,Auto">
+                        <StackPanel Spacing="2">
+                          <TextBlock Classes="row-title" Text="Run setup again" />
+                          <TextBlock Classes="row-sub" Text="The first-run steps, with what's set up already kept" />
+                        </StackPanel>
+                        <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="12" VerticalAlignment="Center">
+                          <Button Name="SetUpByHand" Classes="text-link small" Command="{Binding RunSetupByHandCommand}" VerticalAlignment="Center" Content="Set up by hand" />
+                          <Button Classes="btn sm" Command="{Binding RunSetupAgainCommand}" VerticalAlignment="Center"><TextBlock Text="Run setup" /></Button>
+                        </StackPanel>
+                      </Grid>
+                    </Border>
+                    <Border Classes="rowsep" />
+                    <!-- The look round Home's buttons that a first run ends on, again -->
+                    <Border Classes="row">
+                      <Grid ColumnDefinitions="*,Auto">
+                        <StackPanel Spacing="2">
+                          <TextBlock Classes="row-title" Text="Show me around again" />
+                          <TextBlock Classes="row-sub" Text="A short look at the main buttons on Home" />
+                        </StackPanel>
+                        <Button Name="ShowTour" Grid.Column="1" Classes="btn sm" Command="{Binding ShowTourCommand}" VerticalAlignment="Center" Content="Show me" />
+                      </Grid>
+                    </Border>
+                  </StackPanel>
                 </Border>
                 <TextBlock Classes="section" Text="About" />
                 <Border Classes="group">

@@ -29,6 +29,9 @@ public sealed record LibraryRequested;
 /// <summary>Settings → General's Run setup again (<see cref="ByHand"/>: setup by hand).</summary>
 public sealed record SetupAgainRequested(bool ByHand = false);
 
+/// <summary>Settings → General's Show me around: the look round Home's buttons again.</summary>
+public sealed record TourRequested;
+
 /// <summary>Connect Canvas, in its own window.</summary>
 public sealed record CanvasConnectRequested;
 

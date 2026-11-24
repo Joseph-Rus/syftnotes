@@ -1,0 +1,23 @@
+<!-- A tour's card (TourLayer places it beside the button it's about): which step, what the button is, what it does,
+     how to use it, then Skip tour, Back and Next. Drawn from the Syft tokens, the same on both systems. Tab stays in it. -->
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:kit="using:StudyStash.App.ViewModels.Kit"
+             x:Class="StudyStash.App.Views.TourCard"
+             x:DataType="kit:TourModel"
+             Width="320" KeyboardNavigation.TabNavigation="Cycle"
+             AutomationProperties.Name="{Binding Current.Title, FallbackValue=''}">
+  <Border Background="{DynamicResource PopupBg}" CornerRadius="{DynamicResource RadiusPanel}" BoxShadow="{DynamicResource ShadowFloat}">
+    <StackPanel Margin="{DynamicResource Inset5}" Spacing="{DynamicResource Space2}">
+      <TextBlock Name="Counter" Text="{Binding Counter}" FontSize="{DynamicResource FontCaption}" Foreground="{DynamicResource TextMuted}" />
+      <TextBlock Name="Title" Text="{Binding Current.Title, FallbackValue=''}" FontSize="{DynamicResource FontSubtitle}" FontWeight="SemiBold" TextWrapping="Wrap" />
+      <TextBlock Text="{Binding Current.What, FallbackValue=''}" FontSize="{DynamicResource FontBody}" TextWrapping="Wrap" />
+      <TextBlock Text="{Binding Current.How, FallbackValue=''}" FontSize="{DynamicResource FontBody}" Foreground="{DynamicResource TextMuted}" TextWrapping="Wrap" />
+      <Grid ColumnDefinitions="Auto,*,Auto,Auto" Margin="0,8,0,0">
+        <Button Name="Skip" Classes="text-link small" VerticalAlignment="Center" Command="{Binding SkipCommand}" Content="Skip tour" AutomationProperties.Name="Skip tour" />
+        <Button Name="Back" Grid.Column="2" Classes="btn sm" Margin="0,0,8,0" Command="{Binding BackCommand}" IsVisible="{Binding CanGoBack}" Content="Back" AutomationProperties.Name="Back" />
+        <Button Name="Next" Grid.Column="3" Classes="btn sm ink" Command="{Binding NextCommand}" Content="{Binding NextLabel}" AutomationProperties.Name="{Binding NextLabel}" />
+      </Grid>
+    </StackPanel>
+  </Border>
+</UserControl>

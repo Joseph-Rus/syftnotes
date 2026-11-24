@@ -21,6 +21,7 @@ public static partial class Shell
         });
         messages.Register<LibraryRequested>(listener, static (_, _) => ShowLibrary());
         messages.Register<SetupAgainRequested>(listener, static (_, m) => RunSetupAgain(m.ByHand));
+        messages.Register<TourRequested>(listener, static (_, _) => ShowTourAgain());
         messages.Register<CanvasConnectRequested>(listener, static (_, _) => ShowCanvasConnect());
         messages.Register<BrowserChoiceRequested>(listener, static (_, m) => ChooseBrowser(m.Ask));
         messages.Register<ShortcutsPaused>(listener, static (_, m) => PauseShortcuts(m.Paused));

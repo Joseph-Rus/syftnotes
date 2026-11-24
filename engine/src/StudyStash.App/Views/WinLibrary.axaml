@@ -73,6 +73,9 @@
     <Panel Name="FolderAsk" IsVisible="{Binding AskingFolder}" Background="Transparent">
       <v:WinNewFolder HorizontalAlignment="Center" VerticalAlignment="Center" />
     </Panel>
+
+    <!-- The tour of Home's buttons, over everything under the title bar, whose buttons stay usable -->
+    <c:TourLayer Name="TourLayer" Tour="{Binding Tour}" Margin="0,32,0,0" />
     </Panel>
   </Border>
 </UserControl>
