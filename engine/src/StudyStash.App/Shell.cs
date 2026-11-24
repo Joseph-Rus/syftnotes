@@ -203,7 +203,7 @@ public static partial class Shell
         if (Program.OpenedFile is { } shared)
         {
             if (host.Settings.SetupDone) AddShared(shared, "");
-            else sharedAfterSetup = shared;
+            else sharedAfterSetup.Add(shared);
         }
         if (SelfTest.Dir is not null) SelfTest.Run();
     }
@@ -292,7 +292,9 @@ public static partial class Shell
             }
             message = "show";
         }
-        if (!host.Settings.SetupDone) ShowSetup();
+        // A lecture a friend shared: before setup is done, it's kept until it is.
+        if (Desktop.OpenedFile(message) is { } shared) AddShared(shared, "");
+        else if (!host.Settings.SetupDone) ShowSetup();
         else if (message == "record") ToggleRecording();
         // "--show panel" / "--show quick": open the dropdown or the quick panel without the menu bar or the shortcut
         // (to look at them, or when another copy of the app owns the shortcuts).
@@ -302,7 +304,6 @@ public static partial class Shell
         else if (message == "settings" || message.StartsWith("settings:", StringComparison.Ordinal))
             ShowSettings(message.Length > "settings:".Length ? message["settings:".Length..] : null);
         else if (message.StartsWith("snap:", StringComparison.Ordinal)) MacSnap.Save(message["snap:".Length..]);
-        else if (Desktop.OpenedFile(message) is { } shared) AddShared(shared, "");
         else ShowLibrary();
     }
 
@@ -1272,12 +1273,10 @@ public static partial class Shell
             ShowSetup();
             return;
         }
-        // A lecture a friend shared, opened before setup was done (setup ends here).
-        if (sharedAfterSetup is { } shared)
-        {
-            sharedAfterSetup = null;
-            AddShared(shared, "");
-        }
+        // Lectures a friend shared, opened before setup was done (setup ends here).
+        string[] opened = [.. sharedAfterSetup];
+        sharedAfterSetup.Clear();
+        foreach (string shared in opened) AddShared(shared, "");
         var w = MainWindow();
         library.DrawChrome = false;
         w.Show();
