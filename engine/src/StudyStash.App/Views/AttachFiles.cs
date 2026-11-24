@@ -37,20 +37,21 @@ public static class AttachFiles
         return [.. files.Select(f => f.TryGetLocalPath()).OfType<string>()];
     }
 
-    /// <summary>The system's file picker for one recording or lecture video (a voice memo, a Zoom recording).</summary>
+    /// <summary>The system's file picker for one recording or lecture video (a voice memo, a Zoom recording), or a lecture
+    /// a friend shared (a .syft file).</summary>
     public static async Task<string?> PickRecordingAsync(Control near)
     {
         if (TopLevel.GetTopLevel(near)?.StorageProvider is not { CanOpen: true } storage) return null;
         var files = await storage.OpenFilePickerAsync(new FilePickerOpenOptions
         {
-            Title = "Pick a recording or a video of the lecture",
+            Title = "Pick a recording, a video of the lecture, or a lecture a friend shared",
             AllowMultiple = false,
             FileTypeFilter =
             [
-                new FilePickerFileType("Recordings and lecture videos")
+                new FilePickerFileType("Recordings, lecture videos and shared lectures")
                 {
-                    Patterns = [.. RecordingFile.Endings.Select(e => "*" + e)],
-                    AppleUniformTypeIdentifiers = ["public.audio", "public.movie"],
+                    Patterns = [.. RecordingFile.Endings.Append(Core.SyftFile.Ending).Select(e => "*" + e)],
+                    AppleUniformTypeIdentifiers = ["public.audio", "public.movie", Core.SyftFile.TypeId],
                     MimeTypes = ["audio/*", "video/*"],
                 },
                 FilePickerFileTypes.All,
@@ -94,9 +95,9 @@ public static class AttachFiles
         });
     }
 
-    /// <summary>The one file being dragged, when it's a recording or a video (a bundle of files isn't one).</summary>
+    /// <summary>The one file being dragged, when it's a recording, a video or a shared lecture (a bundle of files isn't one).</summary>
     static (string Name, string Path)? OneRecording(DragEventArgs e) =>
-        e.DataTransfer.TryGetFiles() is { Length: 1 } items && items[0].TryGetLocalPath() is { } path && RecordingFile.Is(path) ? (items[0].Name, path) : null;
+        e.DataTransfer.TryGetFiles() is { Length: 1 } items && items[0].TryGetLocalPath() is { } path && (RecordingFile.Is(path) || Core.SyftFile.Is(path)) ? (items[0].Name, path) : null;
 
     /// <summary>A view's Attach button opens the picker next to it.</summary>
     public static void Wire(Control view)

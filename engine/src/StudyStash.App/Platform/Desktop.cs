@@ -461,7 +461,16 @@ public static class Desktop
     public static bool IsWord(string word) =>
         Words.Contains(word) || NoticeLinks.IsWord(word)
         || (word.StartsWith("settings:", StringComparison.Ordinal) && SettingsPages.Contains(word["settings:".Length..]))
-        || (word.StartsWith("snap:", StringComparison.Ordinal) && MacSnap.Folder is not null && MacSnap.IsName(word["snap:".Length..]));
+        || (word.StartsWith("snap:", StringComparison.Ordinal) && MacSnap.Folder is not null && MacSnap.IsName(word["snap:".Length..]))
+        || OpenedFile(word) is not null;
+
+    /// <summary>"open:&lt;path&gt;": a later copy was started with a lecture a friend shared (Explorer opened a .syft file
+    /// with it), which the running app opens.</summary>
+    public static string OpenWord(string path) => "open:" + path;
+
+    /// <summary>The shared lecture's file an <see cref="OpenWord"/> names (a whole path to a .syft file), or null.</summary>
+    public static string? OpenedFile(string word) =>
+        word.StartsWith("open:", StringComparison.Ordinal) && word[5..] is var path && Path.IsPathFullyQualified(path) && SyftFile.Is(path) ? path : null;
 
     /// <summary>Listen for later copies handing off (they say "show", or "record"); what they say is passed to
     /// <paramref name="onMessage"/> through <paramref name="post"/> (the UI thread, unless a test says otherwise).

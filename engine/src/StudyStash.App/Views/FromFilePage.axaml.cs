@@ -1,5 +1,4 @@
 using Avalonia.Controls;
-using Avalonia.Controls.Primitives;
 using Avalonia.Interactivity;
 using Avalonia.Threading;
 using StudyStash.App.ViewModels;
@@ -33,13 +32,6 @@ public partial class FromFilePage : UserControl
     /// <summary>The class menu the dropdown's picker uses: "Let the library sort it", then each class.</summary>
     void OnPickClass(object? sender, RoutedEventArgs e)
     {
-        if (DataContext is not FromFileModel m) return;
-        // Under the field, as wide as it, not wherever the pointer was.
-        var menu = ClassPicker.Build(m.Classes, m.Class, name => m.Class = name);
-        menu.Placement = PlacementMode.BottomEdgeAlignedLeft;
-        menu.PlacementTarget = ClassButton;
-        menu.VerticalOffset = 6;
-        menu.MinWidth = ClassButton.Bounds.Width;
-        menu.Open(ClassButton);
+        if (DataContext is FromFileModel m) ClassPicker.OpenUnder(ClassButton, m.Classes, m.Class, name => m.Class = name);
     }
 }

@@ -452,6 +452,7 @@ public sealed partial class LibraryWeb
         MapAttachments(app);
         MapVoiceMemos(app);
         MapPhoneLectures(app);
+        MapShared(app);
         MapCanvas(app);
         MapChat(app);
         MapFiles(app);

@@ -23,5 +23,28 @@
     <key>NSMicrophoneUsageDescription</key><string>Syft Notes records your lectures so it can write them down. The recording stays on this computer.</string>
     <key>NSAudioCaptureUsageDescription</key><string>Syft Notes can also record what this computer plays, like a lecture on Zoom.</string>
     <key>NSLocalNetworkUsageDescription</key><string>Syft Notes opens your library on your Mac mini.</string>
+    <!-- A lecture a friend shared (Cell Biology - Lecture 4.syft) opens in Syft Notes from Finder: the kind of file is
+         declared here, and the app is its owner. SyftFile.TypeId is the same id. -->
+    <key>UTExportedTypeDeclarations</key>
+    <array>
+        <dict>
+            <key>UTTypeIdentifier</key><string>com.syftnotes.lecture</string>
+            <key>UTTypeDescription</key><string>Syft Notes lecture</string>
+            <key>UTTypeConformsTo</key><array><string>public.data</string><string>public.content</string></array>
+            <key>UTTypeTagSpecification</key>
+            <dict>
+                <key>public.filename-extension</key><array><string>syft</string></array>
+            </dict>
+        </dict>
+    </array>
+    <key>CFBundleDocumentTypes</key>
+    <array>
+        <dict>
+            <key>CFBundleTypeName</key><string>Syft Notes lecture</string>
+            <key>CFBundleTypeRole</key><string>Viewer</string>
+            <key>LSHandlerRank</key><string>Owner</string>
+            <key>LSItemContentTypes</key><array><string>com.syftnotes.lecture</string></array>
+        </dict>
+    </array>
 </dict>
 </plist>

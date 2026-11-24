@@ -811,6 +811,7 @@ public static partial class Shell
             download: () => Run(() => NotesDownload.LectureAsync(mainWindow, lib, note.Id, NoteExport.SaveName(note.Title), host.Settings.DownloadTranscripts, MermaidSvg()), "NotesDownload.Lecture"),
             downloadPdf: () => Run(() => NotesDownload.LecturePdfAsync(mainWindow, lib, note.Id, NoteExport.SaveName(note.Title, ".pdf"), host.Settings.DownloadTranscripts,
                 note.Dot is ISolidColorBrush dot ? dot.Color : Colors.Gray), "NotesDownload.LecturePdf"),
+            send: () => Run(() => NotesDownload.LectureSyftAsync(mainWindow, lib, note.Id, SyftFile.SaveName(cls, note.Title)), "NotesDownload.LectureSyft"),
             downloadClass: () => Run(() => NotesDownload.ClassAsync(mainWindow, lib, cls!, host.Settings.DownloadTranscripts, MermaidSvg()), "NotesDownload.Class"),
             toggleTranscripts: () => host.Save(s => s.DownloadTranscripts = !s.DownloadTranscripts)).Open(anchor);
     }

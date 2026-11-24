@@ -151,27 +151,8 @@ public sealed class Pipeline(Config cfg, Store store, SortChatFn? chat = null,
             // A person filed it: writing the notes again never undoes that.
             c = new Classification(row.ClassName, 1.0, "human", row.LectureTitle ?? "", JsonTopics(row.Topics));
         }
-        else
-        {
-            // Sort on our notes when we have them: they are cleaner than the raw transcript. A lecture recorded with no
-            // class has no folder: the AI reads it against each class's name, other names, what it covers and its
-            // course's name on Canvas.
-            var basis = summary.Length > 0 ? m.WithNotes(summary) : m;
-            var classes = Classify.WithCanvas(Cfg.Classes, Cfg.Home);
-            c = await Classify.ClassifyAsync(basis, Cfg, chat, classes);
-            // The AI that sorted it is named as it is (claude, gemini…), not always Ollama.
-            if (c.By == "ollama" && sortedWith?.Invoke() is { Length: > 0 } sorter) c.By = sorter;
-            if (c.By is "folder" or "rules" && Cfg.OllamaEnabled && classes.Count > 0)
-            {
-                // The folder or title picked the class; still let the model name the lecture and tag its topics.
-                var described = await Classify.WithOllamaAsync(basis, classes, Cfg, chat);
-                if (described is not null)
-                {
-                    if (described.LectureTitle.Length > 0) c.LectureTitle = described.LectureTitle;
-                    c.Topics = described.Topics;
-                }
-            }
-        }
+        // Sort on our notes when we have them: they are cleaner than the raw transcript.
+        else c = await SortAsync(summary.Length > 0 ? m.WithNotes(summary) : m);
         // A title the student typed (on the recording, or renaming it since) is the lecture's: no AI names it over them.
         // Nor is one that was kept recording named again: it has the name its first notes were filed under.
         if (m.TitleStays) c.LectureTitle = !string.IsNullOrEmpty(row.LectureTitle) ? row.LectureTitle : m.Title;
@@ -193,6 +174,28 @@ public sealed class Pipeline(Config cfg, Store store, SortChatFn? chat = null,
             }
         }
         return path;
+    }
+
+    /// <summary>The class a lecture goes in by the library's own sorting, read from <paramref name="basis"/> (the lecture
+    /// with its notes, when it has them). A lecture recorded with no class has no folder: the AI reads it against each
+    /// class's name, other names, what it covers and its course's name on Canvas.</summary>
+    public async Task<Classification> SortAsync(Meeting basis)
+    {
+        var classes = Classify.WithCanvas(Cfg.Classes, Cfg.Home);
+        var c = await Classify.ClassifyAsync(basis, Cfg, chat, classes);
+        // The AI that sorted it is named as it is (claude, gemini…), not always Ollama.
+        if (c.By == "ollama" && sortedWith?.Invoke() is { Length: > 0 } sorter) c.By = sorter;
+        if (c.By is "folder" or "rules" && Cfg.OllamaEnabled && classes.Count > 0)
+        {
+            // The folder or title picked the class; still let the model name the lecture and tag its topics.
+            var described = await Classify.WithOllamaAsync(basis, classes, Cfg, chat);
+            if (described is not null)
+            {
+                if (described.LectureTitle.Length > 0) c.LectureTitle = described.LectureTitle;
+                c.Topics = described.Topics;
+            }
+        }
+        return c;
     }
 
     /// <summary>An engine's own words as a sentence: a full stop is added when they end without one.</summary>
