@@ -26,7 +26,7 @@ public enum PhoneAnswerKind
 public static class PhoneCalls
 {
     /// <summary>What a refused request is answered (403).</summary>
-    public const string Refused = "Your laptop doesn't take that from the phone.";
+    public const string Refused = "Your computer doesn't take that from the phone.";
 
     static readonly (string Method, string Route, PhoneAnswerKind Kind, bool Multipart)[] List =
     [
