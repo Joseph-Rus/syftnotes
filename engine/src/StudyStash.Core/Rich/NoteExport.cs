@@ -236,10 +236,11 @@ public static partial class NoteExport
                 if (output.Count > 0 && output[^1].Length == 0) output.RemoveAt(output.Count - 1);
                 continue;
             }
-            if ((length += svg.Length + 16) > maxChars) return null;
-            output.Add(indent + "```svg");
-            output.AddRange(svg.ReplaceLineEndings("\n").TrimEnd('\n').Split('\n').Select(l => indent + l));
-            output.Add(indent + "```");
+            // Counted as any line is, before any of it is made: every line with the link's indent before it and a line
+            // break after. 100,000 spaces before one link to a picture of short lines would be billions of characters.
+            string[] block = ["```svg", .. svg.ReplaceLineEndings("\n").TrimEnd('\n').Split('\n'), "```"];
+            if ((length += block.Sum(l => (long)indent.Length + l.Length + 1)) > maxChars) return null;
+            output.AddRange(block.Select(l => indent + l));
             // Its parts' list: a blank line, then one "- **name**" line each.
             int parts = SafeSvg.Clean(svg).Parts.Count;
             if (parts > 0 && i + 1 + parts < lines.Length && lines[i + 1].Length == 0
