@@ -1,3 +1,5 @@
+using Avalonia.Threading;
+using StudyStash.App.Services.Kit;
 using StudyStash.App.ViewModels;
 using StudyStash.App.Views;
 using StudyStash.App.Windows;
@@ -62,7 +64,7 @@ public static partial class Shell
         // Before setup is done there's no library to add it to: it opens once setup ends (ShowLibrary).
         if (!host.Settings.SetupDone)
         {
-            sharedAfterSetup = path;
+            sharedAfterSetup.Add(path);
             ShowSetup();
             return;
         }
@@ -85,28 +87,34 @@ public static partial class Shell
                 Toast(SharedWords.CantOpen, SharedWords.CantRead, null, null);
                 return;
             }
+            // The app was started by this file: its class menu waits a little for the classes, which come once the
+            // library answers.
+            if (host.Overview is null)
+                await Poll.UntilAsync(async _ =>
+                {
+                    await host.CheckLibraryAsync();
+                    return host.Overview is not null;
+                }, TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(20));
             ShowShared(lecture, cls);
         }, "AddShared");
     }
 
-    /// <summary>A lecture a friend shared that was opened before setup was done: opened when it is.</summary>
-    static string? sharedAfterSetup;
+    /// <summary>Lectures a friend shared that were opened before setup was done: each is asked about once it is.</summary>
+    static readonly List<string> sharedAfterSetup = [];
 
     /// <summary>The shared lecture's question that's open, if one is: one at a time.</summary>
     static (SharedLectureModel Form, Avalonia.Controls.Window Window)? sharedOpen;
+
+    /// <summary>Shared lectures opened while another's question was open (several files at once): asked in turn.</summary>
+    static readonly Queue<(Core.SharedLecture Lecture, string Cls)> sharedNext = new();
 
     static void ShowShared(Core.SharedLecture lecture, string cls)
     {
         if (sharedOpen is { } open)
         {
-            // Still adding the last one: that one finishes first. Otherwise the new file takes its place.
-            if (open.Form.Add.Busy)
-            {
-                AppWindows.Raise(open.Window);
-                Toast("One lecture at a time", "The last one is still being added. Open this one when it's done.", null, null);
-                return;
-            }
-            open.Window.Close();
+            sharedNext.Enqueue((lecture, cls));
+            AppWindows.Raise(open.Window);
+            return;
         }
         Avalonia.Controls.Window? shown = null;
         var form = new SharedLectureModel(lecture, cls, [.. host.Classes().Select(c => (c.Name, c.Color))], async (className, ct) =>
@@ -124,6 +132,8 @@ public static partial class Shell
             {
                 form.Add.Cancel();
                 if (sharedOpen is { } s && ReferenceEquals(s.Form, form)) sharedOpen = null;
+                // The next file's question, once this window has gone.
+                if (sharedNext.TryDequeue(out var next)) Dispatcher.UIThread.Post(() => ShowShared(next.Lecture, next.Cls));
             });
         sharedOpen = (form, shown);
     }

@@ -63,7 +63,8 @@ public static class AttachFiles
     /// <summary>Files dragged over <paramref name="target"/> are taken by the list <paramref name="model"/> gives
     /// (the lecture's, or the class's); nothing happens while there's no list, or for something that isn't a file. A page
     /// that also adds lectures from recordings gives <paramref name="recording"/>: one recording or video dropped on it
-    /// opens that form (and is said to, while it's dragged over); anything else is attached as before.</summary>
+    /// opens that form (and is said to, while it's dragged over), each lecture a friend shared (.syft) gets its question,
+    /// and anything else is attached as before.</summary>
     public static void AcceptDrops(Control target, Func<AttachmentsModel?> model, Func<RecordingDrop?>? recording = null)
     {
         DragDrop.SetAllowDrop(target, true);
@@ -77,7 +78,8 @@ public static class AttachFiles
                 return;
             }
             drop?.Hover(null);
-            e.DragEffects = model() is not null && e.DataTransfer.TryGetFiles() is { Length: > 0 } ? DragDropEffects.Copy : DragDropEffects.None;
+            e.DragEffects = e.DataTransfer.TryGetFiles() is { Length: > 0 } files && (model() is not null || drop is not null && Shared(files).Any())
+                ? DragDropEffects.Copy : DragDropEffects.None;
         });
         target.AddHandler(DragDrop.DragLeaveEvent, (_, _) => recording?.Invoke()?.Hover(null));
         target.AddHandler(DragDrop.DropEvent, async (_, e) =>
@@ -89,11 +91,22 @@ public static class AttachFiles
                 drop.Add(one.Path);
                 return;
             }
-            if (model() is not { } list || e.DataTransfer.TryGetFiles() is not { Length: > 0 } items) return;
+            if (e.DataTransfer.TryGetFiles() is not { Length: > 0 } items) return;
             var paths = items.Select(i => i.TryGetLocalPath()).OfType<string>().Where(File.Exists).ToList();
-            if (paths.Count > 0) await list.AddAsync(paths);
+            // Lectures a friend shared are never attached: each is asked about, in turn.
+            if (drop is not null)
+                foreach (string shared in Shared(items))
+                {
+                    drop.Add(shared);
+                    paths.Remove(shared);
+                }
+            if (model() is { } list && paths.Count > 0) await list.AddAsync(paths);
         });
     }
+
+    /// <summary>The .syft files among <paramref name="items"/>: lectures a friend shared.</summary>
+    static IEnumerable<string> Shared(IEnumerable<IStorageItem> items) =>
+        items.Select(i => i.TryGetLocalPath()).OfType<string>().Where(Core.SyftFile.Is).ToList();
 
     /// <summary>The one file being dragged, when it's a recording, a video or a shared lecture (a bundle of files isn't one).</summary>
     static (string Name, string Path)? OneRecording(DragEventArgs e) =>
