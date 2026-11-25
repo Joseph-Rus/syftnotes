@@ -65,8 +65,10 @@ why=""
 trust="(.event == \"push\" or .event == \"workflow_dispatch\") and .head_repository.full_name == \"$REPO\" and .path == \".github/workflows/ci.yml\""
 # The ids of the runs to believe that passed on a commit.
 trusted_runs() {
-  gh api "repos/$REPO/actions/workflows/ci.yml/runs?head_sha=$1&status=success&per_page=100" \
-    --jq ".workflow_runs[] | select($trust) | .id" 2> /dev/null
+  # Not the API's status=success filter: on 2026-11-24 it left out a run by hand that had passed (0.24.0's rehearsal,
+  # 45508964556) while listing it unfiltered, so the release built everything again instead of publishing its installers.
+  gh api "repos/$REPO/actions/workflows/ci.yml/runs?head_sha=$1&per_page=100" \
+    --jq ".workflow_runs[] | select(($trust) and .conclusion == \"success\") | .id" 2> /dev/null
 }
 # Is this a run to believe, and did it pass?
 trusted_run() {
